@@ -274,8 +274,8 @@ The precondition holds: S is not already on the map, each arrow has S at one end
 | State | When | H reads | Why |
 |---|---|---|---|
 | **supposed** | 2026-10-01 | true in every simulated world; the tile shows the words, not a number | The user pulled a lever and nothing live pushes back |
-| **withdrawn** | 2026-10-02 to 10-04 | `.35`, its own prior, labelled *withdrawn — no live push yet* | The **cause** of the opposing arrow became true on the 2nd, so we stop taking the user's word. S → H carries a three-day delay, so nothing has pushed yet |
-| **pushed** | from 2026-10-05 | about `.07` | The delay has run and S → H's −1.9 push lands on the prior |
+| **withdrawn** | 2026-10-02 to 10-04 | `.36` — its own prior, `.35`, read back — labelled *withdrawn — no live push yet* | The **cause** of the opposing arrow became true on the 2nd, so we stop taking the user's word. S → H carries a three-day delay, so nothing has pushed yet |
+| **pushed** | from 2026-10-05 | about `.08` | The delay has run and S → H's −1.9 push lands on the prior |
 
 A supposition ends on the day its undermining **cause** becomes true, not on the day that arrow's push arrives. Tying it to the arrival would tie *do I still take your word for this* to a delay parameter — change the lag from three days to thirty and the supposition would silently outlive the news.
 
@@ -283,7 +283,7 @@ A supposition ends on the day its undermining **cause** becomes true, not on the
 
 **INV-3 is untouched by this.** `do(H)` still moves nothing upstream of H; its own reach is H and what H causes. H's movement on the 2nd is not attributed to `do(H)` at all. It belongs to the two edits that produced it — `Insert(S, …)` and `Do(S, …)` — whose affected set includes H, because the insert made H a descendant of S. Every claim that moved can still name the edit that moved it, which is the property the whole branch mechanism exists to keep.
 
-**And the override is visible (UX-14).** A claim that was supposed true and has since been pushed back down is never drawn as plainly true. H's tile reads **Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"**, naming the edit responsible, and the branch panel lists the three edits in the order they were made. On the 2nd to the 4th the badge sits beside `.35` and the words *withdrawn — no live push yet*; from the 5th it sits beside `.07`. The rule above is surprising if you meet it in a number and obvious if you can read the sequence, so the sequence is on the screen.
+**And the override is visible (UX-14).** A claim that was supposed true and has since been pushed back down is never drawn as plainly true. H's tile reads **Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"**, naming the edit responsible, and the branch panel lists the three edits in the order they were made. On the 2nd to the 4th the badge sits beside `.36` and the words *withdrawn — no live push yet*; from the 5th it sits beside `.08`. (Those are the engine's own numbers at the fixture's seed. H's prior is `.35`; a reported likelihood sits a hair above its prior below `.5`, for the reason [`propagation.md`](propagation.md) gives.) The rule above is surprising if you meet it in a number and obvious if you can read the sequence, so the sequence is on the screen.
 
 **The other half of the showcase — H → B.** H → B is a **trigger**: on 2026-10-01 it fired, B fell, and that domino stays fallen. Retracting H on 2026-10-02 does not un-fall B; the spike simply fades on its own half-life from then on, while S → B pushes B back the other way. One branch, both kinds of causality — the sustaining kind and the sequential kind — which is exactly the distinction in `docs/initial-brainstorming.md`.
 
@@ -369,6 +369,8 @@ Stated for the test: for all maps `g` from `graphs()` and all interventions `i` 
 | `retune` | The claim at the arrow's head, and that claim's descendants | The edit reaches one field of one arrow, so the earliest thing that can move is the claim that arrow points at |
 | `refine` | The target's internals — the finer claims that stand in for it | Their combined likelihood equals the original's within tolerance (INV-10), so the map outside the target sees the same number it saw before |
 | `believe` | One slot on one claim: `beliefs.user` on the target | The user's number is written beside the model's and the market's and is not pushed through the map in this version (INV-11) |
+
+**The table covers one edit on a map, and one case reaches further than one row can say.** When an `observe` is already in force and a later edit changes *what that observation is evidence about* — a `do` on a claim somebody reported, say, which cuts that claim loose from its causes — then evidence is no longer local: the second edit moves the first observation's reach as well as its own, and the claims that may move are the **union** of the two. It is not an exception to the principle; it is the principle applied twice, because the map the second edit leaves behind is a different map for the observation too. `GraphEditMachine` accounts for it when it re-checks locality after every step, in a helper named `_evidence_moved`, so a generated sequence that trips over this reports the two edits rather than a mysterious byte difference.
 
 `observe` is the wide one, and it is wide for a stated mechanical reason rather than as an exception carved out to keep two invariants from fighting: learning something is done by keeping only the simulated worlds consistent with what was learned, and discarding worlds changes what the survivors say about the target's causes just as much as about what it causes (decision record 0005, amended 2026-09-17).
 
