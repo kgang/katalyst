@@ -309,6 +309,43 @@ export interface components {
             interventions: (components["schemas"]["Do"] | components["schemas"]["Observe"] | components["schemas"]["Insert"] | components["schemas"]["Retune"] | components["schemas"]["Refine"] | components["schemas"]["Believe"])[];
         };
         /**
+         * ContractPayoff
+         * @description A named contract at a named venue, and which side of it you would take.
+         *
+         *     The kind of ending where somebody already sells exactly this claim: a
+         *     prediction-market contract that settles on the same question the claim asks.
+         *     Nothing here says what the contract costs, because that is a live price rather
+         *     than a fact about the map.
+         */
+        ContractPayoff: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "contract";
+            /**
+             * Venue
+             * @description Where the contract trades, by the venue's own name: 'Polymarket', 'Kalshi'.
+             */
+            venue: string;
+            /**
+             * Contract Id
+             * @description How that venue identifies this exact contract, so a reader can look it up and a later step can fetch its price.
+             */
+            contract_id: string;
+            /**
+             * Title
+             * @description The contract's question in the venue's own words, so a person reading the map can see it is really the same question the claim asks.
+             */
+            title: string;
+            /**
+             * Side
+             * @description 'yes' if you make money when the claim comes true, 'no' if you make money when it fails.
+             * @enum {string}
+             */
+            side: "yes" | "no";
+        };
+        /**
          * Do
          * @description Suppose a claim is true — and cut it loose from whatever would have caused it.
          *
@@ -316,6 +353,11 @@ export interface components {
          *     so nothing upstream of the claim may move: supposing the strait opens must not
          *     quietly raise the odds that a diplomatic deal happened. To record something
          *     that actually happened, use `Observe` instead.
+         *
+         *     The cut reaches only the arrows into the target that exist at the moment this
+         *     edit is applied; an arrow added after it is live, and can push the target back
+         *     the other way. This is a supposition that starts on a day — "true from `at`" —
+         *     not a permanent seal on the claim.
          */
         Do: {
             /**
@@ -503,11 +545,14 @@ export interface components {
          *     push takes to arrive (`lag`), what the push looks like over time (`shape`),
          *     and whether the push survives its cause going away (`mode`).
          *
-         *     A link must never carry a number without a reason. A link with no rationale,
-         *     or one claiming evidence it does not cite, is rejected with a message — never
-         *     quietly patched up. Those two checks belong to the map's validity rules, not
-         *     to this class, because a well-formed model proposal breaks them often and the
-         *     user has to be told which arrow it was.
+         *     A link records where its number came from and nothing about how sure the model
+         *     is of its own mechanism: the sentence in `rationale` is the model's argument,
+         *     and `provenance` is our receipt for it. A link must never carry a number
+         *     without a reason. A link with no rationale, or one claiming evidence it does
+         *     not cite, is rejected with a message — never quietly patched up. Those two
+         *     checks belong to the map's validity rules, not to this class, because a
+         *     well-formed model proposal breaks them often and the user has to be told which
+         *     arrow it was.
          */
         Link: {
             /**
@@ -564,12 +609,6 @@ export interface components {
              */
             sources: components["schemas"]["Source"][];
             /**
-             * Confidence
-             * @description How sure the model is that the mechanism it just described is real. The model's certainty about its own claim. Never a probability, and never rendered as one.
-             * @enum {string}
-             */
-            confidence: "speculative" | "argued" | "documented";
-            /**
              * Provenance
              * @description Where this link and its number came from, as a fact about our pipeline. Set from what actually happened; the model never fills this in.
              * @enum {string}
@@ -609,15 +648,22 @@ export interface components {
             value: boolean;
         };
         /**
-         * Payoff
-         * @description What a `market` terminal is actually worth: instrument, side, size of move.
+         * PricePayoff
+         * @description An instrument you would buy or sell, which way, and how far you expect it to move.
          *
-         *     This is what makes a terminal tradeable rather than merely interesting.
+         *     The kind of ending where no contract asks this question, but something traded
+         *     moves when the answer changes: a futures contract, a ticker, one fund against
+         *     another.
          */
-        Payoff: {
+        PricePayoff: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "price";
             /**
              * Instrument
-             * @description The thing you would buy or sell, named the way its venue names it: a Polymarket contract title, a ticker, a futures contract.
+             * @description The thing you would buy or sell, named the way its venue names it: a ticker, a futures contract, one fund against another.
              */
             instrument: string;
             /**
@@ -627,10 +673,10 @@ export interface components {
              */
             direction: "long" | "short";
             /**
-             * Magnitude
-             * @description How far the instrument is expected to move if the claim resolves true, as a fraction: 0.03 means three per cent. The side is carried by `direction`, so this number is never negative.
+             * Move
+             * @description How far the instrument's price is expected to move if the claim comes out true, as a fraction of that price: 0.03 means three per cent. The side is carried by `direction`, so this number is never negative.
              */
-            magnitude: number;
+            move: number;
         };
         /**
          * Proposition
@@ -674,8 +720,11 @@ export interface components {
              * @default []
              */
             evidence: components["schemas"]["Evidence"][];
-            /** @description What you would trade. Required when `kind` is `market` — required by the map's validity rules, not by this class. */
-            payoff?: components["schemas"]["Payoff"] | null;
+            /**
+             * Payoff
+             * @description What you would trade. Required when `kind` is `market` — required by the map's validity rules, not by this class.
+             */
+            payoff?: (components["schemas"]["ContractPayoff"] | components["schemas"]["PricePayoff"]) | null;
             /**
              * Not Tradeable Reason
              * @description Why this chain ends without an instrument, in one plain sentence. Required when `kind` is `not_tradeable` — again by the validity rules.

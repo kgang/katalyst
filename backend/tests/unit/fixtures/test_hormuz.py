@@ -13,7 +13,16 @@ import json
 
 import pytest
 
-from katalyst.domain import Belief, Branch, Graph, Insert, Link, validate
+from katalyst.domain import (
+    Belief,
+    Branch,
+    ContractPayoff,
+    Graph,
+    Insert,
+    Link,
+    PricePayoff,
+    validate,
+)
 from katalyst.fixtures import EXAMPLES, find
 from katalyst.fixtures.hormuz import (
     FIXTURE_DATE,
@@ -115,14 +124,44 @@ def test_the_map_has_one_starting_claim_and_both_kinds_of_ending() -> None:
 
 
 def test_every_tradeable_ending_names_something_to_trade() -> None:
-    """A market ending carries an instrument, a side, and a size of move."""
+    """A market ending names a contract to take a side of, or an instrument to move on."""
     tradeable = [one for one in HORMUZ.propositions if one.kind == "market"]
 
     assert tradeable
     for proposition in tradeable:
-        assert proposition.payoff is not None
-        assert proposition.payoff.instrument.strip()
-        assert proposition.payoff.magnitude > 0
+        payoff = proposition.payoff
+        assert payoff is not None
+        if isinstance(payoff, ContractPayoff):
+            assert payoff.venue.strip()
+            assert payoff.contract_id.strip()
+            assert payoff.title.strip()
+        else:
+            assert payoff.instrument.strip()
+            assert payoff.move > 0
+
+
+def test_the_two_endings_use_the_two_payoff_shapes() -> None:
+    """M1 names a contract somebody sells; M2 names an instrument that moves. Both shapes.
+
+    They are genuinely different endings, which is why there are two shapes
+    rather than one with fields that mean different things in each case. Neither
+    one names a price: what a contract costs is a live quote, and the map is not
+    where a live quote lives.
+    """
+    contract = next(one for one in HORMUZ.propositions if one.id == "M1").payoff
+    price = next(one for one in HORMUZ.propositions if one.id == "M2").payoff
+
+    assert isinstance(contract, ContractPayoff)
+    assert contract.kind == "contract"
+    assert contract.venue == "Polymarket"
+    assert contract.side == "yes"
+
+    assert isinstance(price, PricePayoff)
+    assert price.kind == "price"
+    assert price.direction == "short"
+    # A fraction of the instrument's own price: three per cent, read straight
+    # off the claim, not a return on a position whose entry nobody wrote down.
+    assert price.move == pytest.approx(0.03)
 
 
 def test_the_ending_that_cannot_be_traded_says_why() -> None:
@@ -252,6 +291,10 @@ def test_the_example_exercises_every_shape_the_model_layer_defines() -> None:
     assert any(link.half_life is not None for link in every_link())
     assert any(link.strength < 0 for link in every_link())
     assert any(link.sources for link in every_link())
+    assert {one.payoff.kind for one in propositions if one.payoff is not None} == {
+        "contract",
+        "price",
+    }
 
 
 def test_every_arrow_is_named_after_its_two_ends() -> None:

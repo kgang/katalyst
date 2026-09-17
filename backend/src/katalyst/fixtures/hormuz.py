@@ -5,8 +5,9 @@ data file so that every number can carry a comment saying where it came from.
 Stack 03a works the likelihoods through this map in its golden test, and stack
 03b draws it, so it is built to exercise every shape the model layer defines:
 all four kinds of claim, both modes of arrow, all three signal shapes, a
-feedback arrow, all three belief slots, a base rate, evidence, a payoff, and a
-reason for the one ending that cannot be traded.
+feedback arrow, all three belief slots, a base rate, evidence, both shapes of
+payoff — a named contract and a move in a price — and a stated reason for the
+one ending that cannot be traded.
 
 **Every number here is illustrative.** Not one strength, likelihood, lag or
 half-life was measured. They come from the sketch in
@@ -75,12 +76,13 @@ from katalyst.domain import (
     Belief,
     Beliefs,
     Branch,
+    ContractPayoff,
     Do,
     Evidence,
     Graph,
     Insert,
     Link,
-    Payoff,
+    PricePayoff,
     Proposition,
     Resolution,
     Source,
@@ -277,17 +279,19 @@ BRENT_CONTRACT = Proposition(
         # later stack, and this stands in for one until then.
         market=Belief(p=0.48, lo=0.45, hi=0.52, owner="market"),
     ),
-    payoff=Payoff(
-        instrument='Polymarket contract "Brent below $70 on 2026-10-31"',
-        direction="long",
-        # 1.08 reads as a 108% move in the contract's own price: bought at the
-        # .48 mid above, it pays 1.00 if the claim resolves YES. Open question 1
-        # in `spec/graph/proposition.md` asks whether this field is a move in the
-        # instrument's price or a return on the position; here the two readings
-        # give the same number, because the contract is bought outright at the
-        # mid with no borrowing. On a leveraged instrument they would not agree,
-        # which is why the question is still open.
-        magnitude=1.08,
+    # A contract payoff, because somebody already sells this exact question. It
+    # names the venue, the contract and the side, and it names no price at all:
+    # what the contract costs is a live quote, fetched at run time, and a number
+    # typed here would be stale the moment it was written.
+    payoff=ContractPayoff(
+        venue="Polymarket",
+        # Illustrative. Polymarket identifies a contract by a long hexadecimal
+        # condition identifier; this readable stand-in is what a reader can
+        # follow, and the grounding stack replaces it with a real one.
+        contract_id="brent-below-70-2026-10-31",
+        title="Brent below $70 on 2026-10-31",
+        # You make money when the claim comes true, so the side is the yes side.
+        side="yes",
     ),
 )
 
@@ -313,21 +317,24 @@ ENERGY_SHARES_LAG = Proposition(
     # Illustrative, and again the number research report 02 §3 gives for the
     # base world.
     beliefs=Beliefs(model=Belief(p=0.54, lo=0.38, hi=0.68, owner="model")),
-    payoff=Payoff(
-        instrument=(
-            "A dollar-neutral pair: XLE (Energy Select Sector SPDR) against SPY (SPDR S&P 500 ETF)"
-        ),
+    # A price payoff, because no venue asks this question, but two funds anybody
+    # can trade move when the answer changes. The other half of the pair the map
+    # shows: a contract at one ending, an instrument at the other.
+    payoff=PricePayoff(
+        # The pair, held on both sides at once: XLE (Energy Select Sector SPDR)
+        # against SPY (SPDR S&P 500 ETF), dollar for dollar.
+        instrument="XLE vs SPY",
         # `direction` says which side of the named instrument makes money when
         # the claim comes true. Holding the pair long — long XLE, short SPY —
         # loses if energy shares lag, so the position that pays here is the
         # short side: short XLE, long SPY.
         direction="short",
         # Three per cent, read straight from the claim: the size of the
-        # underperformance the claim asks for. This is the reading the field's
-        # own description takes — a fractional move in the instrument — and it
-        # needs no assumption about an entry price, which is why it is the
-        # cleaner of the two magnitudes on this map.
-        magnitude=0.03,
+        # underperformance the claim asks for. `move` is a fraction of the
+        # instrument's own price, which needs no assumption about an entry price
+        # — and having a separate contract shape next door is what lets it mean
+        # only that.
+        move=0.03,
     ),
 )
 
@@ -363,9 +370,9 @@ TALKS_RESUME = Proposition(
 #
 # Every arrow says why it exists, how hard it pushes, how long the push takes to
 # arrive, what the push does over time, and whether the push survives its cause
-# going away. `confidence` is how sure the model is that the mechanism it just
-# described is real; `provenance` is our own receipt for where the arrow came
-# from. They are different questions, and the fixture keeps them apart.
+# going away. The sentence in `rationale` is the argument for the arrow;
+# `provenance` is the only receipt, and it is ours to write rather than the
+# model's to claim. An arrow does not get to say how sure it is of itself.
 
 
 # H → B — the trigger, and the other half of the showcase the branch sets up.
@@ -399,7 +406,6 @@ HORMUZ_TO_BRENT = Link(
             retrieved=None,
         ),
     ),
-    confidence="argued",
     provenance="argued",
 )
 
@@ -419,7 +425,6 @@ HORMUZ_TO_PREMIUM = Link(
         "Underwriters reprice Gulf hulls only while the lane actually stays open. The "
         "low rate is held up by the openness, not caused once by it."
     ),
-    confidence="argued",
     provenance="argued",
 )
 
@@ -427,10 +432,9 @@ HORMUZ_TO_PREMIUM = Link(
 # H → N1 — the weakest arrow on the map, and marked as such. The sentence below
 # is a story rather than a mechanism: it cannot say which way the causality
 # runs, because quiet diplomacy is at least as likely to have reopened the lane
-# as the other way round. So the model's own certainty is `speculative` and our
-# receipt is `asserted` — the weakest pair there is, which is how the canvas
-# will draw it. An arrow like this is kept rather than deleted because the
-# ending it reaches is worth saying out loud.
+# as the other way round. So the receipt is `asserted`, the weakest of the seven,
+# and that is how the canvas will draw it. An arrow like this is kept rather than
+# deleted because the ending it reaches is worth saying out loud.
 HORMUZ_TO_TALKS = Link(
     id="H->N1",
     source="H",
@@ -444,19 +448,16 @@ HORMUZ_TO_TALKS = Link(
         "a public round becomes easier to announce. Which way this runs is arguable: "
         "quiet talks may be what reopened the lane in the first place."
     ),
-    confidence="speculative",
     provenance="asserted",
 )
 
 
-# C → B — the insurance step reaching the oil price, about a week later. This is
-# the one arrow where the model believes the mechanism is written down in the
-# literature, so `confidence` is `documented`. Our receipt still says `argued`,
-# because no retrieval step ran and nothing was fetched. That pair reads like a
-# contradiction and is not one: confidence is a claim the model makes about a
-# mechanism, provenance is a receipt we write about our own pipeline. Marking it
-# `documented` with nothing behind it would be rejected outright by the map's
-# rules, which is the point.
+# C → B — the insurance step reaching the oil price, about a week later. The
+# mechanism is the sort of thing that is written down somewhere, and the arrow
+# still says `argued`, because provenance is the only receipt and it records what
+# our pipeline actually did: nothing was fetched for this file. An arrow does not
+# get to grade its own mechanism, and marking this one `documented` with nothing
+# behind it would be rejected outright by the map's rules.
 PREMIUM_TO_BRENT = Link(
     id="C->B",
     source="C",
@@ -469,7 +470,6 @@ PREMIUM_TO_BRENT = Link(
         "Lower war-risk premiums cut the delivered cost of a Gulf cargo, and the saving "
         "shows up in the physical differential within about a week."
     ),
-    confidence="documented",
     provenance="argued",
 )
 
@@ -494,7 +494,6 @@ BRENT_TO_CONTRACT = Link(
         "The contract is written on almost the same thing the claim measures, so a run "
         "of settlements below $68 reprices it within a day."
     ),
-    confidence="argued",
     provenance="argued",
 )
 
@@ -513,7 +512,6 @@ BRENT_TO_ENERGY_SHARES = Link(
         "Energy earnings track the crude price with a lag, and the shares grind toward "
         "the new level over days rather than repricing in one session."
     ),
-    confidence="argued",
     provenance="argued",
 )
 
@@ -536,7 +534,6 @@ BRENT_TO_OPEC = Link(
         "A sustained run of sub-$68 settlements pressures OPEC+ revenue targets and "
         "brings forward a restraint announcement."
     ),
-    confidence="argued",
     provenance="argued",
     reflexive=True,
 )
@@ -558,7 +555,6 @@ OPEC_TO_BRENT = Link(
     rationale=(
         "Announced restraint tightens expected supply and props the price back above the threshold."
     ),
-    confidence="argued",
     provenance="argued",
 )
 
@@ -656,7 +652,6 @@ STRIKE_TO_BRENT = Link(
         "A strike restores the war-risk premium in the oil price faster than transit "
         "data removes it."
     ),
-    confidence="argued",
     provenance="argued",
 )
 
@@ -673,7 +668,6 @@ STRIKE_TO_PREMIUM = Link(
     lag=1.0,
     shape="step",
     rationale="Underwriters reprice on the threat, not on transit counts.",
-    confidence="argued",
     provenance="argued",
 )
 
@@ -685,9 +679,15 @@ STRIKE_TO_PREMIUM = Link(
 # reopening is held up by the *absence* of hostilities the way an apple is held
 # up by a desk, not caused once by the opening event. So from the day the strike
 # lands, the strait's openness **retracts** — even though the user supposed it
-# true the day before with `do(H)`. Supposing a claim cuts the arrows that exist
-# at that moment; this arrow was inserted afterwards, so it is live, and that is
-# why the branch lists `do(H)` first.
+# true the day before.
+#
+# That is allowed because supposing a claim is a **timed assertion, not a seal**.
+# "Suppose the strait is open, from 2026-10-01" cuts the arrows into H that exist
+# at the moment the edit is applied, and it cuts nothing else, ever. This arrow
+# did not exist then — it arrives with the edit after it — so it is live and it
+# can push H back the other way. That is the whole reason the branch lists the
+# supposition first and the insert second; reverse them and the arrow would be
+# cut and nothing interesting would happen.
 #
 # Now look at H → B in the base map above. That one is a `trigger`: it fired on
 # 2026-10-01, the risk premium came out of the price, and that domino stays
@@ -710,7 +710,6 @@ STRIKE_TO_HORMUZ = Link(
         "A reopening is sustained by the absence of hostilities, not by the opening "
         "event, so a strike withdraws what was holding the lane open."
     ),
-    confidence="argued",
     provenance="argued",
 )
 
@@ -724,10 +723,11 @@ HORMUZ_THEN_STRIKE = Branch(
     # No parent: this branch forks straight off the untouched base map.
     parent=None,
     interventions=(
-        # 1. Suppose the strait opens, on the day this example is set. `do` cuts
-        #    H loose from its causes; H is the hypothesis and has none, so the
-        #    cut removes nothing — which is precisely what lets step 2 hang a new
-        #    arrow onto H at all, and why this edit comes first.
+        # 1. Suppose the strait opens, from the day this example is set. The cut
+        #    reaches only the arrows into H that exist right now; H is the
+        #    hypothesis and has none, so it removes nothing. The supposition
+        #    holds from this day rather than for ever, which is what lets step 2
+        #    hang a live arrow onto H at all, and why this edit comes first.
         Do(target="H", value=True, at=FIXTURE_DATE),
         # 2. …but a strike happens. The claim and its three arrows arrive as one
         #    edit, so the map is never left holding a claim that causes nothing.
