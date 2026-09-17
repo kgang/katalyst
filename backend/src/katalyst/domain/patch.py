@@ -12,11 +12,13 @@ values travel beside the map as `Assignment` records, and the pair — map plus
 assignments — is also what a further fold takes, which is what keeps "apply two
 branches in a row" and "apply the two joined" the same operation.
 
-Three functions live here.
+Four functions live here.
 
 * `apply` folds one branch's edits onto a map, in order.
 * `flatten` puts a chain of branches — a child, its parent, its parent's parent —
   into one ordered list of edits, the parent's first.
+* `introduced_by` says which edit added each arrow, so a claim pushed back down
+  can name the edit responsible.
 * `affected_set` says which claims an edit is allowed to move, read from the
   shape of the map alone.
 
@@ -25,8 +27,9 @@ What this file must never do
 - Never change the map it was given. Every model here is frozen and every edit
   builds a new map, so the original is still there for the next branch to use.
 - Never raise because an edit does not fit the map. A claim that is not there, an
-  identifier already in use, an arrow that does not exist: each comes back as a
-  `Violation` with a plain sentence, exactly as a rejected proposal does.
+  identifier already in use, an arrow that does not exist, an edit this version
+  cannot carry out: each comes back as a `Violation` with a plain sentence,
+  exactly as a rejected proposal does.
 - Never half-apply a branch. If one edit cannot be applied, the whole fold comes
   back as violations and no map at all.
 - Never repair. Nothing here drops the arrow that would close a loop, renames an
@@ -35,7 +38,7 @@ What this file must never do
   answer every time.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Literal
 
@@ -205,7 +208,7 @@ def flatten(
         if here in walked:
             return [
                 Violation(
-                    code="cycle",
+                    code="edit_not_applicable",
                     subject=here,
                     message=(
                         f"The branch {_quoted(branches[here].label)} continues from itself, "
@@ -227,6 +230,35 @@ def flatten(
     return edits
 
 
+def introduced_by(edits: Branch | Sequence[Intervention]) -> Mapping[LinkId, int]:
+    """Say which edit added each arrow, by that edit's position in the run of edits.
+
+    Only an `insert` adds an arrow, so this reads the positions straight off the
+    list. It exists because a claim that was supposed true and has since been
+    pushed back down has to name the edit responsible — the badge reads *Retracted
+    · Oct 2 · by "…"* — and the map the fold leaves behind does not record which
+    edit put which arrow on it.
+
+    It is a fact about a branch, not about a map, so it is computed here and
+    handed to whatever needs it rather than being stored on an arrow. An arrow
+    that was on the base map all along is simply absent from the answer: nothing
+    added it during this branch.
+
+    Args:
+        edits: A branch, or the ordered run of edits `flatten` returns.
+
+    Returns:
+        The position, counting from zero, of the edit that added each arrow.
+    """
+    run = edits.interventions if isinstance(edits, Branch) else tuple(edits)
+    return {
+        arrow.id: position
+        for position, edit in enumerate(run)
+        if isinstance(edit, Insert)
+        for arrow in edit.links
+    }
+
+
 def affected_set(graph: Graph, intervention: Intervention) -> frozenset[PropositionId]:
     """Say which claims an edit is allowed to move, from the shape of the map alone.
 
@@ -245,6 +277,12 @@ def affected_set(graph: Graph, intervention: Intervention) -> frozenset[Proposit
     | `retune` | the claim the arrow points at, and that claim's descendants |
     | `refine` | the finer claims that stand in for the target |
     | `believe` | the target alone — the user's own number is not pushed through the map |
+
+    **Feedback arrows are set aside**, exactly as the map's loop check sets them
+    aside. In this version a feedback arrow is carried as data and never worked
+    through, so nothing an edit does can travel along one, and a claim reachable
+    only through one provably cannot move. The two rules change together: the day
+    the arithmetic unrolls a feedback arrow over time, it belongs back in here.
 
     This is a permission, not a prediction: it says what an edit is allowed to
     move, never what it did move. Asking the engine what it touched and calling
@@ -403,9 +441,12 @@ def _add_claim(graph: Graph, edit: Insert) -> Applied | list[Violation]:
 
     Four things are checked, and every one of them that fails is reported, so a
     badly attached claim is not fixed one arrow per attempt. The claim's
-    identifier must be free; each arrow's identifier must be free, including of
-    the other arrows arriving with it; each arrow must join the new claim at one
-    end to a claim already on the map at the other; and the map that results must
+    identifier must be free and each arrow's identifier must be free, including of
+    the other arrows arriving with it — anything else is a `duplicate_id`. Each
+    arrow must reach a claim that is on the map — otherwise `unknown_target` — and
+    must name the new claim at one of its two ends, because an arrow between two
+    claims that are already there is not part of adding this one and would move
+    claims nowhere near it. And the map that results must
     still have no loops once the feedback arrows are set aside. A map that was
     already running round in circles refuses the edit too, because a map like that
     has no order to work its claims through and so no world to build.
@@ -466,7 +507,7 @@ def _add_claim(graph: Graph, edit: Insert) -> Applied | list[Violation]:
         if edit.proposition.id not in (arrow.source, arrow.target):
             faults.append(
                 Violation(
-                    code="unknown_target",
+                    code="edit_not_applicable",
                     subject=edit.proposition.id,
                     message=(
                         f"The arrow {ends} does not name the claim this edit adds, so there "
@@ -548,11 +589,11 @@ def _split_claim(graph: Graph, edit: Refine) -> list[Violation]:
         ]
     return [
         Violation(
-            code="unknown_target",
+            code="edit_not_applicable",
             subject=edit.target,
             message=(
                 f"Splitting the claim {_quoted(found.claim)} into finer claims is not built "
-                "yet, so the finer claims it names cannot be put on this map."
+                "yet, so this edit cannot be folded onto this map."
             ),
         )
     ]
@@ -624,7 +665,7 @@ def _no_such_branch(missing: BranchId, walked: list[Branch]) -> Violation:
     """
     if not walked:
         return Violation(
-            code="unknown_target",
+            code="edit_not_applicable",
             subject=missing,
             message=(
                 "There is no branch stored under the name this world was asked for, so "
@@ -632,7 +673,7 @@ def _no_such_branch(missing: BranchId, walked: list[Branch]) -> Violation:
             ),
         )
     return Violation(
-        code="unknown_target",
+        code="edit_not_applicable",
         subject=missing,
         message=(
             f"The branch {_quoted(walked[-1].label)} continues from a branch that is not "
@@ -644,23 +685,29 @@ def _no_such_branch(missing: BranchId, walked: list[Branch]) -> Violation:
 def _walkable(graph: Graph) -> "networkx.DiGraph[PropositionId]":
     """Build the map as a plain directed graph, for asking what leads to what.
 
-    Every arrow is kept, feedback arrows included. An affected set is a permission
-    — these claims may move — so it must never be narrower than the arrows drawn
-    on the map, whatever a later stack does with them. An arrow with an end that
-    is not on the map is left out, because a claim that does not exist cannot move
-    and inventing one here would widen the answer for no reason.
+    Two kinds of arrow are left out, and they are exactly the two the loop check
+    leaves out. A **feedback** arrow — a market changing the world it is measuring
+    — is carried as data in this version and never worked through: nothing an edit
+    does travels along one until a later stack unrolls them over time, so a claim
+    reachable only through one provably cannot move, and saying otherwise would
+    leave the product with nothing it can call untouched. An arrow with an end
+    that is not on the map is left out too, because a claim that does not exist
+    cannot move and inventing one here would widen the answer for no reason.
+
+    This rule and the arithmetic change together: the day a feedback arrow is
+    worked through, it belongs back in here.
 
     Args:
         graph: The map to read.
 
     Returns:
-        A directed graph of the claims and the arrows between them.
+        A directed graph of the claims and the ordinary arrows between them.
     """
     walkable: networkx.DiGraph[PropositionId] = networkx.DiGraph()
     walkable.add_nodes_from(one.id for one in graph.propositions)
     present = {one.id for one in graph.propositions}
     for link in graph.links:
-        if link.source in present and link.target in present:
+        if not link.reflexive and link.source in present and link.target in present:
             walkable.add_edge(link.source, link.target)
     return walkable
 

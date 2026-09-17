@@ -34,9 +34,11 @@ the six typed edits and `branch.py` the ordered list of them; `ids.py` holds the
 identifier names. `validity.py` decides whether a proposed map is well-formed,
 and returns every fault at once rather than the first. `patch.py` folds a
 branch's edits onto a map, puts a chain of branches in order, and says which
-claims an edit is allowed to move. Working the likelihoods through — the
-arithmetic that turns a map and its edits into numbers — arrives in a later
-stack.
+claims an edit is allowed to move. `propagation.py` works the likelihoods
+through: it turns a map and the values its edits fixed into a world — a number
+and a range for every claim on the day it is judged, a number for every day in
+between, and a named state for each of those days. Comparing two worlds arrives
+in a later pull request.
 """
 
 from katalyst.domain.belief import Belief, Beliefs
@@ -53,7 +55,21 @@ from katalyst.domain.intervention import (
     Retune,
 )
 from katalyst.domain.link import Days, Link, Provenance, Source
-from katalyst.domain.patch import Assignment, affected_set, apply, flatten
+from katalyst.domain.patch import (
+    Assignment,
+    affected_set,
+    apply,
+    flatten,
+    introduced_by,
+)
+from katalyst.domain.propagation import (
+    Retraction,
+    SeriesState,
+    Versions,
+    World,
+    propagate,
+    versions_of,
+)
 from katalyst.domain.proposition import (
     BaseRate,
     ContractPayoff,
@@ -90,12 +106,19 @@ __all__ = [
     "Provenance",
     "Refine",
     "Resolution",
+    "Retraction",
     "Retune",
+    "SeriesState",
     "Source",
+    "Versions",
     "Violation",
     "ViolationCode",
+    "World",
     "affected_set",
     "apply",
     "flatten",
+    "introduced_by",
+    "propagate",
     "validate",
+    "versions_of",
 ]
