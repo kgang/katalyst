@@ -41,6 +41,11 @@ class Do(BaseModel):
     so nothing upstream of the claim may move: supposing the strait opens must not
     quietly raise the odds that a diplomatic deal happened. To record something
     that actually happened, use `Observe` instead.
+
+    The cut reaches only the arrows into the target that exist at the moment this
+    edit is applied; an arrow added after it is live, and can push the target back
+    the other way. This is a supposition that starts on a day — "true from `at`" —
+    not a permanent seal on the claim.
     """
 
     model_config = ConfigDict(frozen=True)

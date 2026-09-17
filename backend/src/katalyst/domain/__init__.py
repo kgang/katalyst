@@ -51,8 +51,10 @@ from katalyst.domain.intervention import (
 from katalyst.domain.link import Days, Link, Provenance, Source
 from katalyst.domain.proposition import (
     BaseRate,
+    ContractPayoff,
     Evidence,
     Payoff,
+    PricePayoff,
     Proposition,
     Resolution,
 )
@@ -64,6 +66,7 @@ __all__ = [
     "Believe",
     "Branch",
     "BranchId",
+    "ContractPayoff",
     "Days",
     "Do",
     "Evidence",
@@ -74,6 +77,7 @@ __all__ = [
     "LinkId",
     "Observe",
     "Payoff",
+    "PricePayoff",
     "Proposition",
     "PropositionId",
     "Provenance",

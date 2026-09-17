@@ -17,6 +17,13 @@ list is only half frozen. Every field carries a plain-words description rather
 than a comment, for one reason: descriptions travel into the types generated for
 the browser, so the same sentence explains the field in Python and in TypeScript.
 
+What a payoff says, and what it does not. This layer names **what you would
+trade** — a contract at a venue, or an instrument and which way you would take
+it. It never names what that costs. Prices, spreads and the moment a quote was
+read belong to the layer that fetches them, and they reach the map as the
+market's own likelihood on the claim, which carries its own owner and can say
+where it came from.
+
 Some rules about a proposition are checked here, when the object is built, and
 some are checked later over the whole map. The line between them: a rule only our
 own code could break raises an exception at construction; a rule a well-formed
@@ -26,7 +33,7 @@ but cannot be valid.
 """
 
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -145,20 +152,56 @@ class Evidence(BaseModel):
     )
 
 
-class Payoff(BaseModel):
-    """What a `market` terminal is actually worth: instrument, side, size of move.
+class ContractPayoff(BaseModel):
+    """A named contract at a named venue, and which side of it you would take.
 
-    This is what makes a terminal tradeable rather than merely interesting.
+    The kind of ending where somebody already sells exactly this claim: a
+    prediction-market contract that settles on the same question the claim asks.
+    Nothing here says what the contract costs, because that is a live price rather
+    than a fact about the map.
     """
 
     model_config = ConfigDict(frozen=True)
 
-    # Open question 2 in spec/graph/proposition.md: a payoff names an instrument
-    # but not the venue that quotes it.
+    kind: Literal["contract"] = "contract"
+    venue: str = Field(
+        description="Where the contract trades, by the venue's own name: 'Polymarket', 'Kalshi'."
+    )
+    contract_id: str = Field(
+        description=(
+            "How that venue identifies this exact contract, so a reader can look it up and "
+            "a later step can fetch its price."
+        )
+    )
+    title: str = Field(
+        description=(
+            "The contract's question in the venue's own words, so a person reading the map "
+            "can see it is really the same question the claim asks."
+        )
+    )
+    side: Literal["yes", "no"] = Field(
+        description=(
+            "'yes' if you make money when the claim comes true, 'no' if you make money when "
+            "it fails."
+        )
+    )
+
+
+class PricePayoff(BaseModel):
+    """An instrument you would buy or sell, which way, and how far you expect it to move.
+
+    The kind of ending where no contract asks this question, but something traded
+    moves when the answer changes: a futures contract, a ticker, one fund against
+    another.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: Literal["price"] = "price"
     instrument: str = Field(
         description=(
-            "The thing you would buy or sell, named the way its venue names it: "
-            "a Polymarket contract title, a ticker, a futures contract."
+            "The thing you would buy or sell, named the way its venue names it: a ticker, "
+            "a futures contract, one fund against another."
         )
     )
     direction: Literal["long", "short"] = Field(
@@ -167,17 +210,24 @@ class Payoff(BaseModel):
             "'short' if it makes money when the claim fails."
         )
     )
-    # Open question 1 in spec/graph/proposition.md: is this a move in the
-    # instrument's price, a return on the position, or a size of position? The
-    # description below takes the first reading; the question is still open.
-    magnitude: float = Field(
+    move: float = Field(
         ge=0.0,
         description=(
-            "How far the instrument is expected to move if the claim resolves "
-            "true, as a fraction: 0.03 means three per cent. The side is carried "
-            "by `direction`, so this number is never negative."
+            "How far the instrument's price is expected to move if the claim comes out true, "
+            "as a fraction of that price: 0.03 means three per cent. The side is carried by "
+            "`direction`, so this number is never negative."
         ),
     )
+
+
+Payoff = Annotated[ContractPayoff | PricePayoff, Field(discriminator="kind")]
+"""What a `market` terminal is worth: a named contract, or a move in a price.
+
+Read the `kind` field to know which of the two it is. Two shapes rather than one
+because the two endings are genuinely different: one names a question somebody
+already sells, the other names something traded that moves when the answer
+changes. Squeezing both into one shape left every field meaning two things.
+"""
 
 
 class Proposition(BaseModel):

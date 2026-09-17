@@ -29,6 +29,7 @@ from katalyst.domain import (
     Beliefs,
     Believe,
     Branch,
+    ContractPayoff,
     Do,
     Evidence,
     Graph,
@@ -37,6 +38,7 @@ from katalyst.domain import (
     Link,
     Observe,
     Payoff,
+    PricePayoff,
     Proposition,
     Refine,
     Resolution,
@@ -89,7 +91,6 @@ def a_link(identifier: str = "H->B", source: str = "H", target: str = "B") -> Li
         shape="impulse",
         half_life=30.0,
         rationale="The war-risk premium priced into crude unwinds once transit data confirms it.",
-        confidence="argued",
         provenance="argued",
     )
 
@@ -111,9 +112,19 @@ def a_graph() -> Graph:
     )
 
 
-def a_payoff() -> Payoff:
-    """What one tradeable ending is worth."""
-    return Payoff(instrument="Brent below $70 on 2026-10-31", direction="long", magnitude=0.03)
+def a_contract_payoff() -> ContractPayoff:
+    """One tradeable ending where a venue already sells this exact question."""
+    return ContractPayoff(
+        venue="Polymarket",
+        contract_id="brent-below-70-2026-10-31",
+        title="Will Brent settle below $70 on 2026-10-31?",
+        side="yes",
+    )
+
+
+def a_price_payoff() -> PricePayoff:
+    """One tradeable ending where nothing sells the question, but something traded moves."""
+    return PricePayoff(instrument="XLE against SPY", direction="short", move=0.03)
 
 
 # --- One test per rule the classes check while they are being built --------
@@ -229,12 +240,16 @@ def test_hypothesis_id_names_a_claim_on_the_map() -> None:
             ),
         ),
         (
-            "a payoff's size of move is never negative; the side is carried by its direction",
-            lambda: Payoff(instrument="Brent below $70", direction="long", magnitude=-0.03),
+            "a price move is never negative; the side is carried by its direction",
+            lambda: PricePayoff(instrument="XLE against SPY", direction="long", move=-0.03),
         ),
         (
-            "a payoff is taken from one of two sides",
-            lambda: Payoff(instrument="Brent below $70", direction="sideways", magnitude=0.03),
+            "a price payoff is taken from one of two sides",
+            lambda: PricePayoff(instrument="XLE against SPY", direction="sideways", move=0.03),
+        ),
+        (
+            "a contract payoff is taken from one of two sides",
+            lambda: ContractPayoff(venue="Polymarket", contract_id="c", title="t", side="maybe"),
         ),
         (
             "a claim is one of the four kinds and no other",
@@ -286,7 +301,8 @@ def every_model() -> list[tuple[str, BaseModel]]:
                 weight=0.3,
             ),
         ),
-        ("Payoff", a_payoff()),
+        ("ContractPayoff", a_contract_payoff()),
+        ("PricePayoff", a_price_payoff()),
         ("Proposition", a_proposition()),
         ("Source", Source(url="https://example.test/war-risk", title="War risk rates")),
         ("Link", a_link()),
@@ -364,6 +380,34 @@ def test_intervention_discriminator(kind: str, edit: BaseModel) -> None:
     assert parsed.kind == kind
     assert type(parsed) is type(edit)
     assert parsed == edit
+
+
+@pytest.mark.parametrize(
+    ("kind", "ending"),
+    [("contract", a_contract_payoff()), ("price", a_price_payoff())],
+)
+def test_payoff_discriminator(kind: str, ending: BaseModel) -> None:
+    """Reading `kind` alone is enough to know whether an ending is a contract or a price move.
+
+    The two endings are genuinely different — one names a question somebody already
+    sells, the other names something traded that moves when the answer changes — so
+    nothing guesses from which fields happen to be present.
+    """
+    reader: TypeAdapter[Payoff] = TypeAdapter(Payoff)
+
+    parsed = reader.validate_json(ending.model_dump_json())
+
+    assert parsed.kind == kind
+    assert type(parsed) is type(ending)
+    assert parsed == ending
+
+
+def test_payoff_rejects_an_unknown_kind() -> None:
+    """An ending whose `kind` is neither of the two is refused, and the message says so."""
+    reader: TypeAdapter[Payoff] = TypeAdapter(Payoff)
+
+    with pytest.raises(ValidationError, match="kind"):
+        reader.validate_python({"kind": "vibes", "instrument": "XLE", "direction": "long"})
 
 
 def test_intervention_rejects_an_unknown_kind() -> None:

@@ -89,11 +89,14 @@ class Link(BaseModel):
     push takes to arrive (`lag`), what the push looks like over time (`shape`),
     and whether the push survives its cause going away (`mode`).
 
-    A link must never carry a number without a reason. A link with no rationale,
-    or one claiming evidence it does not cite, is rejected with a message — never
-    quietly patched up. Those two checks belong to the map's validity rules, not
-    to this class, because a well-formed model proposal breaks them often and the
-    user has to be told which arrow it was.
+    A link records where its number came from and nothing about how sure the model
+    is of its own mechanism: the sentence in `rationale` is the model's argument,
+    and `provenance` is our receipt for it. A link must never carry a number
+    without a reason. A link with no rationale, or one claiming evidence it does
+    not cite, is rejected with a message — never quietly patched up. Those two
+    checks belong to the map's validity rules, not to this class, because a
+    well-formed model proposal breaks them often and the user has to be told which
+    arrow it was.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -169,15 +172,6 @@ class Link(BaseModel):
             "What backs the link. At least one is required when `provenance` claims evidence — "
             "'documented', 'historical' or 'market_implied'."
         ),
-    )
-    # Open question 1 in spec/graph/link.md: `confidence` and `provenance` share
-    # the words 'argued' and 'documented', which reads like a contradiction until
-    # you know that one is the model's claim and the other is our receipt.
-    confidence: Literal["speculative", "argued", "documented"] = Field(
-        description=(
-            "How sure the model is that the mechanism it just described is real. The model's "
-            "certainty about its own claim. Never a probability, and never rendered as one."
-        )
     )
     provenance: Provenance = Field(
         description=(
