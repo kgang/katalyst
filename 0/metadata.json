@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2Q2VKS4S3N8YYFQFJPG7WSA",
+  "session_id": "3bcc9024-06ad-4692-9a6a-e303e34756e0",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-17T07:03:54.931762Z",
+  "branch": "spec/03a-propagation-and-diff",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "spec/multiverse/diff.md",
+    "spec/multiverse/propagation.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "d76142028062",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 111275,
+    "cache_read_tokens": 709354,
+    "output_tokens": 3880,
+    "api_call_count": 8
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-17T07:03:54.889015Z",
+    "agent_lines": 30,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 30,
+    "total_lines_changed": 30,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
