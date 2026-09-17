@@ -219,3 +219,13 @@ __marimo__/
 
 # Local agent workspace: handoffs, notes, orchestration. Never committed.
 plans/
+
+# Node and the browser app
+#   `dist/` and `.cache` are already covered above by the Python entries; these
+#   are the ones that are not.
+node_modules/
+frontend/dist/
+frontend/.vite/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
