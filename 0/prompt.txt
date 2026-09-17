@@ -1,0 +1,1 @@
+It's fine for me to create the stacks themselves in the git ui as long as the PRs are organized as stack compatible where intended/desired
