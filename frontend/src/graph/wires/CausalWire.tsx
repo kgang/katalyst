@@ -140,8 +140,8 @@ export interface WireLabelsProps {
   readonly plateAt: Point;
   /** The shape of the room the plate has. */
   readonly plateLayout: "stacked" | "inline";
-  /** True when the plate sits clear of the wire rather than on it. */
-  readonly ridesAbove: boolean;
+  /** Where the plate's own box is pinned to the point it was given. */
+  readonly plateAnchor: string;
   /** True when the panel beside the map is open on this arrow. */
   readonly selected: boolean;
 }
@@ -161,7 +161,7 @@ export function WireLabels({
   sourceY,
   plateAt,
   plateLayout,
-  ridesAbove,
+  plateAnchor,
   selected,
 }: WireLabelsProps) {
   return (
@@ -193,9 +193,7 @@ export function WireLabels({
         data-dimmed={data.dimmed ? "yes" : "no"}
         data-selected={selected ? "true" : "false"}
         style={{
-          transform:
-            `translate(-50%, ${ridesAbove ? "-100%" : "-50%"}) ` +
-            `translate(${plateAt[0]}px, ${plateAt[1]}px)`,
+          transform: `translate(-50%, ${plateAnchor}) translate(${plateAt[0]}px, ${plateAt[1]}px)`,
         }}
       >
         <WireChip
@@ -296,14 +294,26 @@ export function CausalWire({
   // wire would cover the whole of it — so the plate steps up and sits just clear
   // of the wire instead, and what the stroke says can be read again.
   const drop = targetY > sourceY ? targetY - sourceY : sourceY - targetY;
-  const ridesAbove = plan.kind === "direct" && drop < PLATE_HEIGHT;
-  const plateAt: Point = ridesAbove
-    ? [chipAt[0], (targetY < sourceY ? targetY : sourceY) - PLATE_STANDOFF]
-    : plan.kind === "direct"
-      ? [chipAt[0] + PLATE_NUDGE, chipAt[1]]
-      : plan.kind === "corridor"
-        ? [(plan.fromX + plan.toX) / 2, plan.corridorY]
-        : chipAt;
+  const ridesAside = plan.kind === "direct" && drop < PLATE_HEIGHT;
+  // **Which side it steps to is decided by the socket the wire leaves.** A tile
+  // has two: an arrow that fires once leaves the upper one and an arrow that has
+  // to keep holding leaves the lower one. So the first kind's plates take the
+  // space above the wire and the second kind's take the space below, and two
+  // plates from one tile can never land on each other — or on the marks at the
+  // other socket's tails, which is what went wrong before this rule existed.
+  const asideBelow = ridesAside && data.mode === "sustain";
+  const plateAt: Point = asideBelow
+    ? [chipAt[0], (targetY > sourceY ? targetY : sourceY) + PLATE_STANDOFF]
+    : ridesAside
+      ? [chipAt[0], (targetY < sourceY ? targetY : sourceY) - PLATE_STANDOFF]
+      : plan.kind === "direct"
+        ? [chipAt[0] + PLATE_NUDGE, chipAt[1]]
+        : plan.kind === "corridor"
+          ? [(plan.fromX + plan.toX) / 2, plan.corridorY]
+          : chipAt;
+
+  /** Where the plate's own box is pinned to the point worked out above. */
+  const plateAnchor = asideBelow ? "0" : ridesAside ? "-100%" : "-50%";
 
   // And what shape it is. A gutter is tall and narrow and a corridor is wide and
   // short, so the plate stacks in one and lies along the wire in the other.
@@ -337,7 +347,7 @@ export function CausalWire({
           sourceY={sourceY}
           plateAt={plateAt}
           plateLayout={plateLayout}
-          ridesAbove={ridesAbove}
+          plateAnchor={plateAnchor}
           selected={selected === true}
         />
       </EdgeLabelRenderer>

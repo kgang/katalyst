@@ -66,6 +66,10 @@
 .canvas .wire-mark {
   position: absolute;
   pointer-events: none;
+  /* No line box of its own. The mark is a picture rather than a word, and a line
+   * box would make it two and a half times its own height — which two marks
+   * stacked at one socket would then overlap in. */
+  line-height: 0;
   transition: opacity var(--duration-fast) ease-out;
   /* Above the plate, so that where the two do meet the receipt is the thing you
    * can still read. */

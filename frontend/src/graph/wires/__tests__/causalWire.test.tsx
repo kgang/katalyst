@@ -114,7 +114,7 @@ describe("a wire's five encodings", () => {
           sourceY={0}
           plateAt={[100, 20]}
           plateLayout="stacked"
-          ridesAbove={false}
+          plateAnchor="-50%"
           selected={false}
         />,
       );
@@ -150,7 +150,7 @@ describe("the mark and the word", () => {
         sourceY={0}
         plateAt={[100, 20]}
         plateLayout="stacked"
-        ridesAbove={false}
+        plateAnchor="-50%"
         selected={false}
       />,
     );
