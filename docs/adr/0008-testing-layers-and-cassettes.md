@@ -7,35 +7,35 @@ consulted: docs/research/04-engineering-structure.md, docs/research/02-causal-mo
 informed: future agents adding tests or prompts
 supersedes: none
 superseded-by: none
-spec-impact: spec/05-llm-boundary.md (Testing), spec/01-causal-graph.md and spec/02-interventions.md (Invariants → test names)
+spec-impact: spec/generation/ (Testing), spec/graph/ and spec/multiverse/ (Invariants → test names)
 ---
 
 # ADR-0008: Four test layers; the LLM boundary is tested with committed cassettes and CI needs no API key
 
 ## Context and Problem Statement
 
-The product's correctness claims are mathematical (locality, patch algebra, bounds) while its inputs are stochastic (an LLM). Tests must prove the invariants in `PRODUCT_REQUIREMENTS.md` §9 over *generated* inputs, exercise the LLM boundary without spending money or leaking keys, and still let us measure prompt quality when we choose to. Where does each kind of test live, and what do we deliberately not test?
+The product's correctness claims are mathematical — an intervention touches only its descendants, edits compose, probabilities stay in bounds — while its inputs come from a language model and are never the same twice. Tests must prove the invariants in `PRODUCT_REQUIREMENTS.md` §9 over *generated* inputs, exercise the model boundary without spending money or leaking keys, and still let us measure prompt quality when we choose to. Where does each kind of test live, and what do we deliberately not test?
 
 ## Decision Drivers
 
-* INV-3, INV-4, INV-5, INV-6, INV-7, INV-10 must be property-tested, not example-tested (NFR-3).
-* INV-13: `ci.yml` runs green with no `ANTHROPIC_API_KEY`.
-* NFR-8: cassettes must never contain a key.
-* D5(ii): a test failure must say *which invariant* broke.
-* Solo developer: test suite must run in seconds locally.
+* INV-3, INV-4, INV-5, INV-6, INV-7, INV-10 (assert versus observe, locality, patch replay, no loops, belief bounds, refinement adds back up) must be property-tested, not example-tested (NFR-3): thousands of generated inputs, with any failure shrunk to the smallest example that still breaks.
+* INV-13: `ci.yml`, the continuous-integration workflow that runs on every push, passes with no `ANTHROPIC_API_KEY`.
+* NFR-8: a recorded response must never contain a key.
+* D5(ii): a failing test must say *which invariant* broke.
+* Solo developer: the suite must run in seconds locally.
 
 ## Considered Options
 
-* A. **Four layers: pure-domain property tests · cassette-backed boundary tests · out-of-band eval harness · thin frontend tests**
-* B. Hand-written mocks of the SDK client
-* C. Live API calls in CI behind a secret
-* D. No tests at the LLM boundary; test only the domain
+* A. **Four layers: pure-domain property tests · boundary tests backed by cassettes (recorded API responses replayed in tests) · an out-of-band eval harness · thin frontend tests**
+* B. Hand-written stand-ins for the vendor's client library.
+* C. Live API calls in continuous integration, behind a stored secret.
+* D. No tests at the model boundary; test only the domain.
 
 ## Decision Outcome
 
-Chosen option: "A", because it puts the weight where the claims are (the domain), makes the boundary deterministic and key-free, and keeps prompt quality measurable without making CI non-deterministic or expensive.
+Chosen option: "A", because it puts the weight where the claims are (the domain), makes the boundary deterministic and key-free, and keeps prompt quality measurable without making the shared build slow, costly, or flaky.
 
-**Layer 1 — pure domain (`tests/unit/`).** `hypothesis` strategies generate arbitrary valid graphs, branches, and intervention sequences. Named tests map to invariants:
+**Layer 1 — pure domain (`tests/unit/`).** The `hypothesis` library generates arbitrary valid graphs, branches, and intervention sequences. Named tests map to invariants:
 
 | Invariant | Test |
 |---|---|
@@ -46,53 +46,53 @@ Chosen option: "A", because it puts the weight where the claims are (the domain)
 | INV-7 | `test_belief_bounds_after_any_sequence` |
 | INV-10 | `test_refine_marginalizes_to_parent` |
 
-A `RuleBasedStateMachine` (`GraphEditMachine`) applies random interventions and checks INV-4/6/7 after every step. Target ≥85 % coverage of `domain/`.
+`GraphEditMachine`, a `RuleBasedStateMachine` — a generated *sequence* of random interventions rather than one random input — re-checks INV-4, INV-6 and INV-7 after every step. Target: ≥85 % of `domain/` covered.
 
-**Layer 2 — LLM boundary (`tests/boundary/`).** `pytest-recording` (vcrpy) with `@pytest.mark.vcr`; `record_mode=none` in CI; `filter_headers=["x-api-key", "authorization"]`; cassettes committed under `tests/cassettes/`. `scripts/record-cassettes.sh` re-records with `--record-mode=rewrite` against a real key. Includes a deliberately recorded proposal that would create a cycle, asserting the validator rejects it (`test_expand_rejects_cycle`) — schema-valid is not graph-valid (ADR-0003, ADR-0006).
+**Layer 2 — model boundary (`tests/boundary/`).** `pytest-recording` (a wrapper over vcrpy) saves each real HTTP exchange to a cassette file and replays it from then on. Tests carry `@pytest.mark.vcr`; the build runs `record_mode=none`, so an unrecorded call fails rather than dialling out; `filter_headers=["x-api-key", "authorization"]` strips credentials before anything is written; cassettes are committed under `tests/cassettes/`. `scripts/record-cassettes.sh` re-records with `--record-mode=rewrite` against a real key. One cassette deliberately holds a proposal that would close a loop, and the test asserts the validator rejects it (`test_expand_rejects_cycle`) — fitting the schema is not the same as being a valid graph (ADR-0003, ADR-0006).
 
-**Layer 3 — evals (`evals/`).** `evals/cases/*.yaml` hold the four `ASSIGNMENT.md` examples. `make eval` runs live against `claude-opus-5` and asserts structure only, never text: DAG; ≥1 `market` or `not_tradeable` terminal (INV-9); every link has `rationale` and `provenance`; `documented ⇒ sources ≠ ∅` (INV-2); every proposition has resolution criteria (INV-1); Verify cases return a path or explicit `no_path` (FR-7); second call in a run has non-zero `cache_read_input_tokens`. Results are written to `evals/runs/<date>.tsv`. Not in CI.
+**Layer 3 — evals (`evals/`).** `evals/cases/*.yaml` hold the four `ASSIGNMENT.md` examples. `make eval` runs live against `claude-opus-5` and asserts structure, never wording: no loops; at least one `market` or `not_tradeable` terminal (INV-9); `rationale` and `provenance` on every link; a source on every link marked `documented` (INV-2); resolution criteria on every proposition (INV-1); Verify cases return a graded path or an explicit `no_path` verdict (FR-7); non-zero `cache_read_input_tokens` on a run's second call, proving the prompt cache is hit. Results go to `evals/runs/<date>.tsv`. Not in the build.
 
-**Layer 4 — frontend.** vitest + Testing Library for the layout pinning logic, the diff-state reducer, and the intervention panel reducer. One Playwright smoke (ADR-0007 Confirmation).
+**Layer 4 — frontend.** vitest with Testing Library for the layout-pinning logic, the diff-state reducer, and the intervention-panel reducer. One end-to-end browser test (ADR-0007 Confirmation).
 
-**Deliberately skipped in v1:** LLM-as-judge grading of narrative quality; SVG snapshot tests; contract tests; load tests; mutation testing; more than one e2e; coverage thresholds outside `domain/`.
+**Deliberately skipped in v1:** a model grading narrative quality; image snapshot comparisons; contract tests between services; load tests; mutation testing (breaking code on purpose to see whether tests notice); more than one end-to-end test; coverage thresholds outside `domain/`.
 
 ### Consequences
 
-* Good, because a reviewer can run the whole suite with no key in under a minute and read invariant names as the test list.
-* Good, because prompt changes have a regression harness (`make eval`) with a cost we choose to pay.
-* Bad, because cassettes drift when prompts change; re-recording is a documented, scripted step and a PR that changes a prompt must re-record.
-* Bad, because evals are non-deterministic; we assert structure, not exact output, and accept flakiness there by keeping them out of CI.
+* Good, because a reviewer can run the whole suite with no key in under a minute and read the invariant names as the test list.
+* Good, because prompt changes have a regression harness (`make eval`) whose cost we choose when to pay.
+* Bad, because cassettes drift when prompts change; re-recording is a scripted, documented step, and any pull request that changes a prompt must re-record.
+* Bad, because evals are non-deterministic; we assert structure, not exact output, and keep them out of the build so flakiness never blocks a merge.
 * Neutral, because `api/` and `engine/` orchestration are lightly tested by design; the README says so.
 
 ### Confirmation
 
-* CI job `backend`: `uv sync --frozen` → `ruff check` → `ruff format --check` → `mypy --strict src/katalyst/domain` → `pytest --record-mode=none`. The job has no `ANTHROPIC_API_KEY` in its environment (INV-13); a test that needs one fails loudly with vcrpy's `CannotOverwriteExistingCassetteException`.
-* `gitleaks` in pre-commit scans cassettes.
-* PR template item: "prompt changed? cassettes re-recorded, `make eval` scorecard attached".
+* Continuous-integration job `backend`: `uv sync --frozen` (install the exact pinned dependencies) → `ruff check` and `ruff format --check` (lint and formatting) → `mypy --strict src/katalyst/domain` (type check) → `pytest --record-mode=none`. The job has no `ANTHROPIC_API_KEY` in its environment (INV-13); a test that needs one fails loudly, because vcrpy raises `CannotOverwriteExistingCassetteException` rather than making a live call.
+* `gitleaks`, a secret scanner, runs before every commit and scans the cassettes.
+* Pull-request template item: "prompt changed? cassettes re-recorded, `make eval` scorecard attached".
 
 ## Pros and Cons of the Options
 
 ### A. Four layers (chosen)
 
-* Good, because deterministic CI, real HTTP shapes in cassettes, invariants as properties.
-* Bad, because two tools (vcrpy, hypothesis) to learn; both are mature.
+* Good, because the build is deterministic, cassettes carry real HTTP shapes, and invariants are checked over generated inputs.
+* Bad, because two libraries to learn (vcrpy, hypothesis); both are mature.
 
-### B. Hand-written SDK mocks
+### B. Hand-written stand-ins
 
 * Good, because no cassette files.
-* Bad, because mocks encode our assumptions about the SDK, not its behaviour; they rot silently and never catch a real shape change.
+* Bad, because a stand-in encodes our assumptions about the client library rather than its behaviour; it rots silently and never catches a real change of shape.
 
-### C. Live API in CI
+### C. Live API in continuous integration
 
 * Good, because always current.
-* Bad, because non-deterministic, costs money per push, needs a secret in CI, and violates INV-13.
+* Bad, because non-deterministic, costs money on every push, needs a secret in the build, and breaks INV-13.
 
 ### D. No boundary tests
 
-* Bad, because the rejection path (cycles, missing criteria) is exactly where the product's honesty lives.
+* Bad, because the rejection path — loops, missing criteria — is exactly where the product's honesty lives.
 
 ## More Information
 
-* Interview D5(ii) (traceability), D9 (ADR-gated cadence — invariants are named before code).
-* `docs/research/04-engineering-structure.md` §4 (testing layers) and §6 (invariants phrased as `∀x, P(x)` with a named strategy).
+* Interview D5(ii) (traceability), D9 (decision-gated cadence — invariants are named before code).
+* `docs/research/04-engineering-structure.md` §4 (testing layers) and §6 (invariants phrased as claims true for every input, each with a named generation strategy).
 * pytest-recording: https://github.com/kiwicom/pytest-recording · hypothesis: https://hypothesis.readthedocs.io/

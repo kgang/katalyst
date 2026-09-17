@@ -16,3 +16,4 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0008](0008-testing-layers-and-cassettes.md) | Four testing layers; VCR cassettes so CI runs without an API key; evals out-of-band | proposed | 2026-09-16 |
 | [0009](0009-git-workflow-stacked-prs.md) | Conventional commits, `<type>/<NN>-<slug>` branches, GitHub native stacked PRs (git-spice fallback) | accepted | 2026-09-16 |
 | [0010](0010-grounding-sources.md) | Grounding: Polymarket + FRED behind a `GroundingSource` Protocol; Metaculus/yfinance rejected | proposed | 2026-09-16 |
+| [0011](0011-spec-as-book-and-living-architecture.md) | Spec organized as a book by idea (unnumbered chapters); living `ARCHITECTURE.md` at the root | accepted | 2026-09-16 |
