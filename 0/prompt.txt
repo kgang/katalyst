@@ -2673,3 +2673,124 @@ ac073a8 chore(frontend): keep the linter out of the browser test's output folder
 One thing worth your eye: on the union the strait and the strike share a 48 px gap, so their two lanes land about 11 px apart — they read as two parallel wires crossing to the oil price, which is true, but it is tight. If you would rather they were further apart, the answer is to push the second wire to the *next* free band instead of sharing, which is a few lines in `planRoutes`.</result>
 <usage><subagent_tokens>755554</subagent_tokens><tool_uses>45</tool_uses><duration_ms>927571</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a3c1dc15cb3f3e01e</task-id>
+<tool-use-id>toolu_01D3xVzt3kDeRi63PhVQDv8K</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/a3c1dc15cb3f3e01e.output</output-file>
+<status>completed</status>
+<summary>Agent "Repo docs close-out for stack 03" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Everything is committed on `docs/03-close`; nothing pushed, no PR, `main` untouched, no `.env` read or written.
+
+## Per file
+
+**`ARCHITECTURE.md`**
+- **§5 was the stale part.** Opening count said "Seven of the fourteen fully checked, three partly, four waiting — the canvas (03b), the model boundary (04), the thesis (05), refinement (06)." Recounted honestly against the table's own "Still planned" column: **nine fully checked, three partly, two waiting** (thesis 05, refinement 06). Full: INV-1,2,3,5,6,7,9,11,12. Partly: INV-4, INV-8, INV-13 — all three waiting on stack 04, which the opening now says.
+- **INV-7** browser half filled in (four real belief-chip tests, including the `&gt;.99` / `&lt;.01` certainty guard Kent set on 2026-09-17); **INV-8** went from "none / a component test on the path bar, stack 03b" to eight real path-bar tests plus the syntax-tree walk, and is now honestly *partly* checked because no world on screen carries a product yet; **INV-11** browser side filled in (drawn + source-reading); **INV-12** went from "none" to the greyscale test, provenance-is-a-mark, the direction readout, the wire encodings and the six-test colour-law stylesheet walk. Added a note about naming (some browser tests are sentences, some are `test_…`), and a paragraph on the by-eye half: line 3 of the twelve-line visual review checklist.
+- **INV-4** gained the one deliberately skipped test — there are now two implementations of "what an edit can reach" and nothing compares them.
+- **§7**: browser-app row rewritten to name what is actually covered; `make test` sentence now says `npm run e2e` (there is no `make e2e`) and a new paragraph names the single skip and says nothing else is skipped.
+- **§10**: the canvas bullet moved out of "not yet built" — §10 now opens with **both halves of stack 03 built**, a paragraph on each, and "the one thing stack 03 did not do is join them". New bullet lists what the canvas deliberately does not do: not joined, no streaming, no thesis dock / world-state strip / time axis, and two of three budgeted animations built (propagation wave, branch arrival) with the number-roll having nothing to roll. Notes that stack 04 runs as 04a/04b.
+- **Other falsehoods found and fixed inside §4/§10**: the `Branch` row still said replay "arrives with `apply` in stack 03a" (it is built and checked by `test_world_replays_from_base_branch_seed`); the probes bullet said `range_shares` is read by "no route" (it travels on every world the three routes serve — confirmed in the live response); replay mode sat under "Open technical questions" although record 0012 settled it, so it moved to the settled list.
+- **Checked and left alone as already true**: §1 (drawing, both "What runs" paragraphs, the three `[planned]` browser items), §2, §3, §6, §8 (twelve `domain/` files, the three still-empty directories verified), §9 (fourteen records, statuses match `docs/adr/README.md`). "Last verified: 2026-09-17" was already set. Every `[planned]`/`[built]` marker checked.
+- **§6 needs no word about Playwright**: the end-to-end test runs outside Docker (`playwright.config.ts` starts both halves with `uv` and `npm`), and `.dockerignore` excludes `*.md`, so a docs-only change cannot enter any build context — the `docker` job is provably unaffected.
+
+**`PRODUCT_REQUIREMENTS.md`** — §12 only. 03a and 03b rows: **merged**, with the real branch names (verified against `gh pr list`, all eight exact) and #18/#19/#24/#25 and #21/#22/#26/#27. 03b's "Proves" cell said "streaming from fixture", which never happened — now "the stored example drawn whole". Stack 04 split into **04a** (browser: join the canvas to the engine, then the map from a stream) and **04b** (server: model pipeline, event stream, replay, evals), both **next**, with the reason quoted from record 0009 ("never deeper than four"). 05's "depends on" updated. Status paragraph now explains the letter suffixes and adds two bullets: **#17** (`adr/03-engine-rules`, ADR-0014 — the gate 03a was written against, in neither row) and **#20/#23 do not exist** (neither resolves; pull requests and issues share one counter). §13 untouched — neither open question was answered by stack 03. §1–§11 untouched.
+
+**`README.md`** — was claiming "the browser app is a status screen, and the canvas is stack 03b", "137 tests on the server and 3 in the browser app", and "four jobs". Now: a **What you see** section (launchpad with the four examples and three not live; seven tiles, five wire encodings none of them in colour, midpoint plates, the lens, the Inspector, the origin line; the branch via `⌘K` with the two-world overlay, rail and panel and the *Supposed → Retracted* line word for word; every computed number an absence with a reason). A **What the server can already compute** section with two `curl` examples **run against a local server on port 8016 before being written down** — `POST /api/worlds` with `{"base_id":"hormuz","seed":20261001}` returning M1's belief, and the diff piped through `jq` from `/api/fixtures/hormuz` returning the real summary sentence. Make targets plus `npx playwright install chromium &amp;&amp; npm run e2e`. Tests section: 259 / 177, the one purposeful skip, five CI jobs. New **Not built yet** list. Repo map's `backend/` and `frontend/` rows corrected.
+
+**`spec/multiverse/README.md`** — `propagation.md` and `diff.md` cells said "stack 03a — written"; now "written, engine built", matching the stack-02 rows' convention.
+
+**`spec/workbench/README.md`** — six chapter cells said "stack 03b — written"; now "written, canvas built" (colour-motion-type: "built bar the number-roll"), `streaming-growth.md` marked "not written", and one paragraph under the table: **"Built" here means drawn, not fed** — the canvas reads the fixture and has not asked the world routes.
+
+**`AGENTS.md`** — Map table's `backend/` row now says `domain/` holds the arithmetic too and names `engine/`; `frontend/` row now describes the canvas and says plainly it is not joined to the engine.
+
+**`spec/README.md`, `spec/generation/README.md`, `docs/adr/README.md`, `.github/pull_request_template.md`** — read in full, nothing false, untouched.
+
+## False outside my list (not fixed, as instructed)
+
+1. **`docs/adr/0009-git-workflow-stacked-prs.md:44`** — "One workflow, four jobs: `backend`, `frontend`, `types-fresh`, `docker`." There are five; `e2e` was added by #27.
+2. **`spec/workbench/tiles-ports-wires.md:375, :385` and `spec/workbench/keyboard-and-access.md:242`** name browser tests that do not exist under those names. `test_chip_never_omits_the_range` and `test_every_absence_renders_words_and_a_reason` appear **nowhere** in `frontend/` — not even as comments. `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_prints_a_certainty` and `test_model_chip_says_computed_only_when_a_world_computed_it` exist **only as comments** beside prose-named tests. (The tests themselves all exist and pass; the names are the drift. This is why `ARCHITECTURE.md` cites the runnable names and flags the one comment-only alias.)
+3. **`frontend/src/world/apiSource.ts:1-3, :21`** (code, not touched) — "The routes it names do not exist… the server has nothing to describe yet." All three routes exist since #25 and are in the committed `schema.ts`.
+
+## Grep proof for every test name cited
+
+All 94 `test_…` tokens in `ARCHITECTURE.md` resolve to a file under `backend/tests`, `frontend/src` or `frontend/e2e`; **0 missing**. Checked further that each is a real definition (`def test_…` / `it("test_…")`) — only two are not, and both are legitimate: `test_import_boundary` (a filename) and `test_chip_never_shows_more_than_two_significant_figures` (a comment-only alias, disclosed as such in the doc text).
+
+The 27 frontend names newly cited, each `1` occurrence as `it("…")`:
+
+```
+1 pathBar.test.tsx      test_renders_the_product_and_never_computes_one
+1 pathBar.test.tsx      test_the_best_backed_route_wins_and_a_tie_goes_to_the_shorter
+1 pathBar.test.tsx      test_a_better_backed_route_beats_a_shorter_one
+1 pathBar.test.tsx      test_a_route_never_walks_the_arrow_that_feeds_back
+1 pathBar.test.tsx      test_tells_no_route_apart_from_no_number
+1 pathBar.test.tsx      test_the_wart_is_said_out_loud_rather_than_hidden
+1 pathBar.test.tsx      test_the_bar_never_disappears
+1 pathBar.test.tsx      test_the_hypothesis_has_no_route_into_it_and_says_why
+1 noArithmetic.test.ts  test_canvas_never_combines_two_model_numbers
+1+1 noArithmetic/colourLaw  test_the_files_being_walked_are_really_there  (cited in both rows)
+1 inspector.test.tsx    test_renders_three_owners_and_never_averages_them
+1 inspector.test.tsx    test_the_panels_mark_matches_the_wires_mark
+1 notByColourAlone.test.tsx  test_nothing_is_carried_by_hue_alone
+1 strokeIsShapeOnly.test.tsx test_two_wires_differing_only_in_provenance_have_identical_strokes
+1 strokeIsShapeOnly.test.tsx test_the_stroke_changes_when_and_only_when_the_kind_of_push_changes
+1 causalWire.test.tsx   test_the_stroke_is_never_a_hue
+1 causalWire.test.tsx   test_wire_and_inspector_draw_the_same_origin_mark
+1 directionReadout.test.tsx  test_direction_always_has_its_glyph_sign_and_word
+1 directionReadout.test.tsx  test_no_file_outside_direction_readout_names_a_direction_token
+1 encodings.test.ts     test_each_shape_has_its_own_stroke_pattern
+1 encodings.test.ts     test_seven_receipts_fall_into_three_steps
+1 colourLaw.test.ts     test_every_token_the_law_names_exists_in_both_themes
+1 colourLaw.test.ts     test_every_new_colour_carries_its_measured_ratio
+1 colourLaw.test.ts     test_likelihood_ramp_is_read_only_by_the_two_chips
+1 colourLaw.test.ts     test_no_rule_sets_a_text_colour_to_the_ramp
+1 colourLaw.test.ts     test_the_ramp_never_paints_a_whole_tile
+1 colourLaw.test.ts     test_the_branch_teal_is_not_the_accent_teal_or_the_focus_teal
+```
+
+The nine quoted sentence-named tests, each `1` occurrence:
+
+```
+beliefChip.test.tsx:47   it("never shows more than two significant figures"
+beliefChip.test.tsx:69   it("keeps the nought that carries information, rather than dropping it"
+beliefChip.test.tsx:79   it("never omits the range"
+beliefChip.test.tsx:195  it("never prints a certainty at either end"
+branchPanel.test.tsx:233 it("records your own number, and says it is never averaged with the model's"
+diffState.test.ts:95     it("says out loud that the strike cannot reach OPEC's announcement"
+diffState.test.ts:101    it("never carries a change along a feedback arrow"
+diffState.test.ts:115    it("only lets the strike reach the strait because its arrow arrived afterwards"
+diffState.test.ts:246    it.skip("agrees with the server's own affected set — skipped until …"
+```
+
+## Verification
+
+- `cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest -q` → **259 passed**, `domain/` **100%** lines and branches.
+- `cd frontend &amp;&amp; npm ci &amp;&amp; npm run check` → **exit 0** (biome + tsc + vitest: **176 passed, 1 skipped (177)**).
+- `pre-commit run --from-ref main --to-ref HEAD` → end-of-file-fixer, trailing-whitespace, gitleaks, large-files all **Passed**.
+- Nineteen violation codes confirmed in `domain/validity.py`: 14 map faults + 4 refused edits + `worlds_not_comparable`. Twelve files under `domain/`. Five CI jobs in `ci.yml`.
+- Local `docker build` of both packaged images: started, still running after ~15 minutes on this machine, so I killed it rather than leave it. The question it was meant to answer is settled more strongly anyway — `.dockerignore` line 50 excludes `*.md`, so no file I changed can enter a build context, and #27 merged with all five jobs green.
+
+## Git
+
+```
+44d46f1 docs: close stack 03 — the canvas draws, the engine answers, and they are not joined yet
+5dcb2a1 feat(canvas): two worlds in one picture, the six buttons, the whole keyboard, and one browser test (#27)
+2355eca feat(canvas): wires that show the push, the colour law, a persistent Inspector and the path bar (#26)
+```
+
+```
+ AGENTS.md                 |  4 +--
+ ARCHITECTURE.md           | 45 +++++++++++++++++--------
+ PRODUCT_REQUIREMENTS.md   | 17 ++++++----
+ README.md                 | 85 +++++++++++++++++++++++++++++++++++++++++++----
+ spec/multiverse/README.md |  4 +--
+ spec/workbench/README.md  | 16 +++++----
+ 6 files changed, 132 insertions(+), 39 deletions(-)
+```
+
+One note: the commit's co-author line reads `Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;` rather than the shorter `Claude Opus` you specified — a system instruction in this session sets that exact line and states it replaces earlier attribution guidance. Say the word and I'll amend it.</result>
+<usage><subagent_tokens>240128</subagent_tokens><tool_uses>175</tool_uses><duration_ms>1236136</duration_ms></usage>
+</task-notification>
