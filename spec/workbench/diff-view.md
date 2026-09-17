@@ -218,8 +218,8 @@ announcement.* That sentence is the product, and `INV-workbench.41` and `.42` be
 
 ### B3 — The fifth state arrives with the engine, and nothing is deleted
 
-`shifted` — `.61 → .18` with a directional chevron — needs two numbers to compare, so it cannot
-exist here. When `ApiWorldSource` is switched on in stack 04 the empty slots fill and `shifted`
+`shifted` — a before and an after with a directional chevron — needs two numbers to compare, so it
+cannot exist here. When `ApiWorldSource` is switched on in stack 04 the empty slots fill and `shifted`
 appears. **Nothing written in this stack is deleted then, because nothing false was written.** The
 authority changes hands: the server's `affected_set` becomes the truth and the browser's structural
 states become a **hint that must agree with it**, pinned by a component test on the Hormuz branch. A
@@ -240,7 +240,14 @@ The rail sits beside the canvas and lists what changed at the **endings** — th
 instrument, or name why there is none. **With the engine** it is the terminal changes, ranked, one
 line each, in the order the engine gave them:
 
-> the Polymarket Brent contract · `.61 → .18` ▼ · largest on Oct 9
+> the terminal's own words · `before → after` ▼ · largest on *day*
+
+The engine writes every part of that row. On the Hormuz strike branch (seed 20261001) the three rows
+it gives are: the Polymarket Brent contract · `.50 → .42` ▼ · largest on Oct 4; the energy-shares
+claim · `.43 → .36` ▼ · largest on Oct 6; the talks that cannot be traded · `.28 → .37` ▲ · largest
+on Oct 11 — the biggest move on the map, and last, because the only arrow into it is a bare assertion
+([`../multiverse/diff.md`](../multiverse/diff.md) has the arithmetic). This stack draws none of those
+numbers; it asks for none.
 
 That order is the size of the move times the **weakest arrow on the best-backed route** from any of
 the branch's edits to that ending — the route whose weakest arrow is strongest. Two factors and no
@@ -294,14 +301,16 @@ series is data, never inference** — and this stack has some of it and not the 
 |---|---|---|---|
 | **Supposed · Oct 1** | Oct 1; H shows the word, not a number | The assignment itself: an earlier supposition on H, with its date | **No** — the branch carries it |
 | **Retracted · Oct 2 · by "…"** | Oct 2 | A `sustain` arrow into H inserted afterwards, and the later edit that makes its source true; the quoted words are S's own `claim` field | **No** — structure and dates, the same reachability the four states use |
-| **withdrawn** | Oct 2 – Oct 4, `.35`, labelled *"withdrawn — no live push yet"* | The `states` series: the cause of the opposing arrow became true on the 2nd, so we stop taking the user's word; S → H's three-day delay has not run | **Yes** |
-| **pushed** | Oct 5 onward, about `.070` | The `states` series: the delay has run and S → H's −1.9 push lands on the prior | **Yes** |
+| **withdrawn** | Oct 2 – Oct 4, `.36`, labelled *"withdrawn — no live push yet"* | The `states` series: the cause of the opposing arrow became true on the 2nd, so we stop taking the user's word; S → H's three-day delay has not run, so H reads its own prior again | **Yes** |
+| **pushed** | Oct 5 onward, about `.080` | The `states` series: the delay has run and S → H's −1.9 push lands on that prior | **Yes** |
 
 So in this stack H's tile carries the badge pair and its order, its number slot reads *"no engine
 yet"*, and the series is absent with its reason. As with the affected set, the browser's derived
-badge becomes a hint the world must agree with once the engine lands. (`.070`, not `.07`: two
+badge becomes a hint the world must agree with once the engine lands. (`.080`, not `.08`: two
 significant figures on every number, the rule [`keyboard-and-access.md`](keyboard-and-access.md)
-owns.)
+owns. And `.36` rather than H's stated prior of `.35` — reading a prior back through the engine
+lands a hair above the middle for a likelihood under a half, which decision record 0014 predicts and
+the golden series confirms.)
 
 **The three-day gap between the badge's date and the day the number moves is honest, not something
 to smooth away.** A supposition ends the day its undermining *cause* becomes true, not the day that

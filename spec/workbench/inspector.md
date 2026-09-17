@@ -94,7 +94,7 @@ RESOLVES
   Front-month Brent crude futures settle below $68.00 on five
   sessions, consecutive or not, within the window.
   judged by   ICE Brent front-month settlement prices
-  by          2026-11-15
+  by          2026-10-15
 
 BASE RATE
   —  no reference class recorded for this claim
@@ -103,7 +103,7 @@ PRIOR
   .28 (.15–.42)          model
 
 BELIEFS
-  model    .46 (.30–.63)
+  model    .28 (.15–.42)
   stated range · not computed
   This range is stated, not computed — it says how sure the elicitation
   was. Nothing has worked this number through the map yet.
@@ -117,7 +117,7 @@ WHY THIS NUMBER
   —  no engine yet
 ```
 
-Four things to read off that:
+Five things to read off that:
 
 * **The resolution triple is never optional.** Criteria, the source that adjudicates, and the date —
   all three, on every claim (INV-1, *checkable*: a claim nobody can score is not a claim).
@@ -125,12 +125,13 @@ Four things to read off that:
   many versions of the map the engine ran — is present only when something was computed. **Absent**,
   as here and everywhere in this stack, the row reads the **stated** pair above and **the reserved
   band slot is not drawn at all**: there is no computed band for it to explain. **Present**, the row
-  reads record 0014's *model interval, uncalibrated · how sure we are of `.46` — not how much the
+  reads record 0014's *model interval, uncalibrated · how sure we are of `.40` — not how much the
   world can move*, and the slot appears beneath it. The two sentences are written once and shared
-  with the belief chip ([`tiles-ports-wires.md`](tiles-ports-wires.md)) so they cannot drift. The
-  stated form is literally true of B: stack 03a's fixture change makes every `beliefs.model` equal
-  its own `prior`, so `.46 (.30–.63)` becomes the prior's numbers and the sentence describes exactly
-  what the row holds.
+  with the belief chip ([`tiles-ports-wires.md`](tiles-ports-wires.md)) so they cannot drift.
+* **The model row here is the prior's own numbers, and that is not a coincidence.** Every
+  `beliefs.model` in the fixture equals its `prior`, because nothing has been computed into it — so
+  the stated sentence describes exactly what the row holds. Run the engine over this map and B comes
+  out `.40 (.25–.55)`, which is the number the computed sentence above would be about.
 * **Four things are genuinely absent on B, and each absence says which kind it is.** The **tile**
   shows `no market` and nothing else; **this panel is where the reason is read** — chosen by the
   claim's `kind` and written once in [`../vocabulary.md`](../vocabulary.md). B is an `event`, so it
@@ -139,10 +140,13 @@ Four things to read off that:
   tile too. The **user** slot is the one absence drawn as a bare dash: an invitation to type your own
   number, where a sentence would read as an error rather than an offer.
 * **Three beliefs, three owners, never merged** (INV-11). On B only the model has spoken; on **M1**
-  all three do — `model .61 (.45–.74)`, `market .48 (.45–.52)`, `user —` — and the thirteen points
-  between the first two is the edge somebody would be trading. That gap is the product's output, and
-  no function anywhere may average it away. The panel writes a belief on one line; the **tile**
-  stacks it — owner, number, range beneath ([`tiles-ports-wires.md`](tiles-ports-wires.md)).
+  two do. Read from the fixture, as this stack reads it, that is `model .40 (.28–.55)` — the prior,
+  nothing computed — beside `market .48 (.45–.52)`, eight points apart, with `user —`. Run the
+  engine and the model side becomes `.46 (.32–.60)`, two points apart. **Say which source a number
+  came from before calling the gap an edge**: the gap is only worth trading once the engine has
+  written the model's half of it. No function anywhere may average the two. The panel writes a
+  belief on one line; the **tile** stacks it — owner, number, range beneath
+  ([`tiles-ports-wires.md`](tiles-ports-wires.md)).
 
 ### B2 — The decomposition: a number that can say why
 
@@ -168,7 +172,7 @@ there is a slot directly under it, and **in this stack nothing ever draws it**, 
 computed yet. What it will hold, in stack 06, is one sentence naming the claim whose own prior
 explains most of the band:
 
-> **92% of this band is B's own prior; pin that down and the band goes from 29 points to 8.**
+> **65% of this band is B's own prior; pin that down and the band goes from 30 points to 12.**
 
 That sentence is computed from `World.range_shares` — each stated range's share of this claim's
 band, which the engine gets out of the same two thousand versions of the map it already runs, at no
@@ -264,8 +268,8 @@ path likelihood       —  no engine yet
   2026-09-17) because it is a property of the *route*, not of the claim. The bar never disappears; a
   missing bar looks like a bar nobody needed.
 * **The honest wart, stated beside the number rather than hidden:** the factors are each read on
-  their **own resolve-by day** — H by Nov 1, B by Nov 15, M1 by Oct 31 — so the product multiplies
-  numbers read on different days. It is still the most honest single number available for a chain,
+  their **own resolve-by day** — H by Nov 1, B by Oct 15, M1 by Oct 31 — so the product multiplies
+  numbers read on three different days, and not even in order. It is still the most honest single number available for a chain,
   and **it is not a joint probability**. The panel says that in those words (decision record
   0014 §E).
 

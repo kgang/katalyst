@@ -162,15 +162,15 @@ A range where the guard fires on one end only: `.9962 (.988–.9995)` prints **`
 
 ### Which form appears where
 
-The chip on a tile is **three stacked lines**: the owner, the number, the range beneath it (`tiles-ports-wires.md` draws it). The **one-line form `.61 (.45–.74)`** is what prose, the outline view and the accessible name use — so a reader who hears the chip hears it as one phrase rather than as three disconnected fragments. Same number, same rounding, same guard; two shapes.
+The chip on a tile is **three stacked lines**: the owner, the number, the range beneath it (`tiles-ports-wires.md` draws it). The **one-line form `.40 (.28–.55)`** is what prose, the outline view and the accessible name use — so a reader who hears the chip hears it as one phrase rather than as three disconnected fragments. Same number, same rounding, same guard; two shapes.
 
 The three Hormuz chips, in the one-line form:
 
 - H, the hypothesis: model `.35 (.22–.50)` · user `.55 (.40–.70)` · market **no market**.
-- M1, the Polymarket contract: model `.61 (.45–.74)` · market `.48 (.45–.52)`. Thirteen points apart, side by side, never averaged — that gap is the trade (INV-11: model, user and market beliefs are stored and rendered separately, and no code path averages them).
+- M1, the Polymarket contract: model `.40 (.28–.55)` · market `.48 (.45–.52)`. Eight points apart, side by side, never averaged — that gap is the trade (INV-11: model, user and market beliefs are stored and rendered separately, and no code path averages them).
 - S, the strike, on the branch: model `.060 (.020–.14)`.
 
-The chip never drops its range to fit. If the space is too narrow for `.61 (.45–.74)`, the space gets wider — the range does not go. A number without its range is the fake-precise percentage the whole product is arguing against.
+The chip never drops its range to fit. If the space is too narrow for `.40 (.28–.55)`, the space gets wider — the range does not go. A number without its range is the fake-precise percentage the whole product is arguing against.
 
 The range means one specific thing and the chip's label says which: **how sure we are of the number, not how much the world can move.** That label, and the sentence behind it on hover, are written out word for word in `tiles-ports-wires.md`.
 
@@ -187,12 +187,12 @@ Each item reads as a sentence. `trigger` arrows read **caused by**; `sustain` ar
 The Hormuz map, spoken:
 
 > **H** — *"The Strait of Hormuz reopens to unrestricted commercial transit. Model .35, range .22 to .50. Your own number .55, range .40 to .70. No market — no venue quotes this claim. The hypothesis — nothing on this map causes it. Three claims follow."*
-> - **B** — *"Brent crude settles below $68 for five sessions. Model .46, range .30 to .63. Caused by the strait reopening, two days later. Held up by the war-risk premium falling. Pushed the other way by OPEC+ restraint. Three claims follow."*
->   - **M1** — *"A Polymarket contract, Brent below $70 on the 31st of October, resolves yes. Model .61, range .45 to .74. Market .48, range .45 to .52. A tradeable ending. Caused by Brent settling below $68, one day later."*
->   - **M2** — *"The energy fund XLE underperforms the S&P 500 fund SPY by more than 3 per cent over 20 trading days. Model .54, range .38 to .68. No market — no venue quotes this claim; what you would trade is on the payoff. A tradeable ending. Caused by Brent settling below $68, three days later."*
->   - **R** — *"OPEC+ announces output restraint. Model .24, range .12 to .40. Fed back into by Brent settling below $68, fourteen days later. It pushes back on Brent, already listed above."*
-> - **C** — *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4 per cent. Model .44, range .30 to .60. Held up by the strait reopening, the same day. It reaches Brent crude, already listed above."*
-> - **N1** — *"Omani-mediated United States–Iran talks resume publicly. Model .29, range .15 to .45. Not tradeable — no venue quotes a contract on a diplomatic round. Caused by the strait reopening, ten days later."*
+> - **B** — *"Brent crude settles below $68 for five sessions. Model .28, range .15 to .42. Caused by the strait reopening, two days later. Held up by the war-risk premium falling. Pushed the other way by OPEC+ restraint. Three claims follow."*
+>   - **M1** — *"A Polymarket contract, Brent below $70 on the 31st of October, resolves yes. Model .40, range .28 to .55. Market .48, range .45 to .52. A tradeable ending. Caused by Brent settling below $68, one day later."*
+>   - **M2** — *"The energy fund XLE underperforms the S&P 500 fund SPY by more than 3 per cent over 20 trading days. Model .35, range .22 to .50. No market — no venue quotes this claim; what you would trade is on the payoff. A tradeable ending. Caused by Brent settling below $68, three days later."*
+>   - **R** — *"OPEC+ announces output restraint. Model .18, range .08 to .32. Fed back into by Brent settling below $68, fourteen days later. It pushes back on Brent, already listed above."*
+> - **C** — *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4 per cent. Model .30, range .18 to .45. Held up by the strait reopening, the same day. It reaches Brent crude, already listed above."*
+> - **N1** — *"Omani-mediated United States–Iran talks resume publicly. Model .22, range .12 to .36. Not tradeable — no venue quotes a contract on a diplomatic round. Caused by the strait reopening, ten days later."*
 
 A claim sitting behind a **"+n more"** tile (`layout-and-zoom.md`) still gets its item. The outline is built from the world, never from what happens to be painted — which is also why activating a "+n more" tile opens **this view, filtered to that column** (Kent, 2026-09-17). The collapsed claims already have items here; the tile just points at them.
 
@@ -250,7 +250,7 @@ Each is *for all X, statement P holds*, and each names what checks it. "Visual r
 2. **Do not move focus by screen geometry**, because the tile nearest your arrow key is often not connected to the one you are on, and a map's meaning is its wires. Follow the wires, and say which wire you took.
 3. **Do not drop the ordering under reduced motion**, because the ordering *is* the causality — it is the one thing the animation was carrying. Drop the easing; keep the sequence.
 4. **Do not round in the view model**, because the Inspector needs the precision the chip threw away, and a number rounded twice drifts a whole step. Carry the full number; round once, in the chip, at paint.
-5. **Do not drop the range when the space is tight**, because a bare `.61` is the fake-precise number this product exists to argue against. Widen the space.
+5. **Do not drop the range when the space is tight**, because a bare `.40` is the fake-precise number this product exists to argue against. Widen the space.
 6. **Do not print `1.0` or `.0` on a chip**, because a likelihood of one is a claim that something cannot fail and this product does not make that claim. Print `>.99` and `<.01`, on the range's ends as well as on the number.
 7. **Do not say "six claims changed" before anything computed a change**, because a count nobody computed is a state nobody can trace. Say what is true — added, reachable, retracted — and say "no numbers yet" out loud.
 8. **Do not build the outline from the tiles on screen**, because a claim behind a "+n more" tile would silently vanish for the reader who needs the outline most. Build it from the world.

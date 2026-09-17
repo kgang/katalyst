@@ -160,7 +160,7 @@ That is a rendering rule, and the rendering lives in the workbench spec. What be
 
 ### B1 — Three numbers, side by side, on one claim
 
-The Hormuz map reaches terminal M1, *a Polymarket contract "Brent below $70 on 2026-10-31" resolves YES*. Its tile shows three chips (numbers illustrative, from research report 02 §3, marked in the fixture as `argued`, never `documented`):
+The Hormuz map reaches terminal M1, *a Polymarket contract "Brent below $70 on 2026-10-31" resolves YES*. Its tile shows three chips. The numbers below are an **illustration of the form**, taken from research report 02 §3 before there was an engine; the shipped engine computes `.46 (.32–.60)` for this claim (seed 20261001), and until a world has been computed the stored example shows the claim's own prior, `.40 (.28–.55)`, under a label saying the range is stated and not computed:
 
 | Owner | Shown | Where it came from |
 |-------|-------|--------------------|
