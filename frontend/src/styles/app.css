@@ -20,9 +20,13 @@
 }
 
 html,
-body {
+body,
+#root {
   margin: 0;
   padding: 0;
+  /* The map fills the window, so the chain of boxes above it has to have a
+   * height to fill. Without this the canvas collapses to nothing. */
+  height: 100%;
 }
 
 body {
@@ -59,6 +63,87 @@ body {
 .column {
   width: 100%;
   max-width: 660px;
+}
+
+/* ---- The map screen ----------------------------------------------------- *
+ * A bar across the top, the map filling everything under it, and one line at
+ * the foot saying where every number on it came from. No padding around the
+ * map: the map is the screen. */
+
+.page--map {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.map-bar {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-raised);
+}
+
+/* A word with an arrow in front of it, not a button with a fill. The only thing
+ * on this bar that does anything, so it does not need to shout. */
+.map-bar__back {
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.map-bar__back:hover {
+  color: var(--text);
+}
+
+.map-bar__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+/* Where every number on the map came from, in one sentence, under the map. A
+ * map whose numbers cannot say where they came from is the state this product
+ * refuses to show, so the sentence is part of the map rather than a footnote
+ * somebody might have left off. */
+.map-origin {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-raised);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* What the screen says while the map is on its way, or when it could not be
+ * read. A sentence naming the address, never a spinner. */
+.map-waiting {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-6) var(--space-3);
+}
+
+.map-waiting__line {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--text-md);
+  color: var(--text-muted);
+  text-wrap: pretty;
 }
 
 /* ---- Masthead: the product name and the one line under it ------------- */

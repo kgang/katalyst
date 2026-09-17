@@ -1,33 +1,34 @@
 /**
- * The whole screen, for now.
+ * The whole screen: the launchpad, and the map you open from it.
  *
- * It names the product, says in one line what the product does, and reports
- * what the server just told us about itself. That report is the interesting
- * part: three readings, each one traceable to the route it came from, each one
- * in one of exactly three named states — waiting for an answer, answered, or
- * failed. There is no fourth state, and nothing on the screen is drawn from
- * anything but those three.
+ * Two states and nothing in between. The launchpad names the two ways into the
+ * tool and offers the four examples from the brief; opening the one that is
+ * built swaps the page for the map. Everything on the map came over the wire
+ * from the server, and the line under it says which address it came from — this
+ * product does not put a number on screen that a reader cannot trace to an
+ * input, a rule or a source, and that includes numbers a stored example happens
+ * to carry.
  *
- * Which product rules this serves (PRODUCT_REQUIREMENTS.md section 7):
- *
- *   UX-6  Meaning is never carried by colour alone: every reading has a glyph
- *         and a word beside it, and the word is what says what happened.
- *   UX-7  While a request is in flight the value cell holds a plain bar of the
- *         same height, so nothing moves when the answer lands. There is no
- *         spinner: a spinner says "wait" without saying what for.
- *   UX-10 A failure is printed in the row it belongs to, in a sentence. It is
- *         never a pop-up dialog the reader has to dismiss.
- *   UX-11 Values sit in the monospace face with fixed-width digits.
- *   UX-12 The readings are a description list, so the relationship between a
- *         label and its value survives being read aloud.
+ * There is no spinner anywhere, and there never will be. A spinner says "wait"
+ * without saying what for. While something is on its way the screen says what
+ * it is waiting for and where it asked.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { About, Health, Readiness } from "./api/client";
 import { readAbout, readHealth, readReadiness } from "./api/client";
+import { Launchpad } from "./components/Launchpad";
+import { MapCanvas } from "./graph/Canvas";
+import {
+  type FixtureSummary,
+  FixtureWorldSource,
+  readExampleList,
+  type WorldSource,
+  type WorldView,
+} from "./world";
 
 /**
- * Everything the screen can know about one reading. There are three states and
+ * Everything the screen can know about one thing it asked for. Three states and
  * no others, which is what makes every pixel below traceable to a cause.
  */
 type Answer<Reading> =
@@ -35,14 +36,11 @@ type Answer<Reading> =
   | { state: "answered"; value: Reading }
   | { state: "failed"; reason: string };
 
-/**
- * How loud a row's words are. This changes emphasis only — the words carry the
- * meaning, so a reader who cannot see the difference loses nothing.
- */
+/** How loud a row's words are. Emphasis only — the words carry the meaning. */
 type Tone = "good" | "quiet" | "loud";
 
-/** One row of the strip, already turned into the words that will be printed. */
-type Reading = {
+/** One row of the strip at the foot of the launchpad. */
+interface Reading {
   /** What is being reported, such as "server". */
   label: string;
   /** The value from the server, or null while the request is still in flight. */
@@ -52,7 +50,7 @@ type Reading = {
   /** What the value means, in plain words. On a failure, this is the failure. */
   state: string;
   tone: Tone;
-};
+}
 
 /** Turn whatever a failed request threw into one sentence. */
 function inWords(reason: unknown): string {
@@ -171,11 +169,24 @@ function versionReading(answer: Answer<About>): Reading {
 }
 
 /**
+ * Why the three examples that need the model are not live, in one sentence.
+ *
+ * Read from the server's own answer rather than written into the page, so that
+ * the reason on screen is the real one.
+ */
+function notLiveReason(answer: Answer<Readiness>): string {
+  if (answer.state === "answered" && !answer.value.model_key_present) {
+    return "Turning your own words into a map needs the model, and this server has no key for one.";
+  }
+  return "Turning your own words into a map is not built yet.";
+}
+
+/**
  * One row: a label, the value the server gave, and what that value means.
  *
  * While the value is missing the cell holds a bar of the same height, so the
- * row does not change size when the answer arrives. Once there is a value the
- * cell fades it in over a single duration token and then stops moving.
+ * row does not change size when the answer arrives. There is no spinner: a bar
+ * where the value will land says the same thing without pretending to spin.
  */
 function StatusRow({ reading }: { reading: Reading }) {
   const waiting = reading.value === null;
@@ -195,13 +206,87 @@ function StatusRow({ reading }: { reading: Reading }) {
   );
 }
 
+/** Which of the two screens is showing. */
+type Screen =
+  | { at: "launchpad" }
+  | { at: "opening"; id: string }
+  | { at: "map"; world: WorldView }
+  | { at: "failed"; id: string; reason: string };
+
+/**
+ * Where maps come from.
+ *
+ * Today this reads the stored example the server ships with. When the engine's
+ * world route lands, this one line becomes `new ApiWorldSource()` and every
+ * number slot that reads as an absence today fills in. Nothing else on this
+ * screen changes, which is the whole reason there is a seam here at all.
+ */
+const DEFAULT_SOURCE: WorldSource = new FixtureWorldSource();
+
+/** What the screen needs. Both have defaults; both exist so they can be swapped. */
+export interface AppProps {
+  /** Where maps and worlds come from. */
+  readonly source?: WorldSource;
+  /** How the list of stored examples is read. */
+  readonly listExamples?: () => Promise<FixtureSummary[]>;
+}
+
 /** The screen. */
-export function App() {
+export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }: AppProps = {}) {
   const health = useAnswer(readHealth);
   const readiness = useAnswer(readReadiness);
   const about = useAnswer(readAbout);
+  const examples = useAnswer(listExamples);
 
-  const readings = [serverReading(health), modelKeyReading(readiness), versionReading(about)];
+  const [screen, setScreen] = useState<Screen>({ at: "launchpad" });
+
+  const open = useCallback(
+    (id: string) => {
+      setScreen({ at: "opening", id });
+      source.readWorld({ baseId: id }).then(
+        (world) => setScreen({ at: "map", world }),
+        (reason: unknown) => setScreen({ at: "failed", id, reason: inWords(reason) }),
+      );
+    },
+    [source],
+  );
+
+  const toLaunchpad = useCallback(() => setScreen({ at: "launchpad" }), []);
+
+  const readings = useMemo(
+    () => [serverReading(health), modelKeyReading(readiness), versionReading(about)],
+    [health, readiness, about],
+  );
+
+  if (screen.at !== "launchpad") {
+    return (
+      <main className="page page--map">
+        <header className="map-bar">
+          <button className="map-bar__back" type="button" onClick={toLaunchpad}>
+            <span aria-hidden="true">←</span> Back to the launchpad
+          </button>
+          <h1 className="map-bar__title">
+            {screen.at === "map" ? screen.world.title : "Strait of Hormuz"}
+          </h1>
+        </header>
+
+        {screen.at === "map" ? (
+          <>
+            <MapCanvas world={screen.world} />
+            <p className="map-origin">{screen.world.origin}</p>
+          </>
+        ) : (
+          <div className="map-waiting">
+            <p className="map-waiting__line">
+              {screen.at === "opening"
+                ? `Reading the stored map from /api/fixtures/${screen.id}.`
+                : screen.reason}
+            </p>
+          </div>
+        )}
+      </main>
+    );
+  }
 
   return (
     <main className="page">
@@ -214,6 +299,13 @@ export function App() {
           </p>
         </header>
 
+        <Launchpad
+          examples={examples.state === "answered" ? examples.value : null}
+          failure={examples.state === "failed" ? examples.reason : null}
+          notLiveReason={notLiveReason(readiness)}
+          onOpen={open}
+        />
+
         <section aria-labelledby="status-heading">
           <h2 className="section-heading" id="status-heading">
             What this build can do right now
@@ -225,8 +317,8 @@ export function App() {
           </dl>
           <p className="provenance">
             Every reading above came from the server, at <code>/api/healthz</code>,{" "}
-            <code>/api/readyz</code> and <code>/api/about</code>. Nothing on this screen is written
-            into the page.
+            <code>/api/readyz</code> and <code>/api/about</code>. The examples came from{" "}
+            <code>/api/fixtures</code>. Nothing on this screen is written into the page.
           </p>
         </section>
       </div>
