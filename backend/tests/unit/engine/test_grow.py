@@ -14,6 +14,7 @@ from tests.unit.engine.answers import (
     Storyteller,
     a_claim,
     a_declined_answer,
+    a_link,
     a_starting_claim,
     a_stop,
     an_answer,
@@ -351,3 +352,129 @@ def test_an_accepted_claim_arrives_as_its_own_outcome() -> None:
         and one.result.proposition is not None
     ]
     assert landed == [STARTED_AT, AN_ENDING]
+
+
+def test_the_reason_names_what_closed_the_last_line_that_was_still_open() -> None:
+    """One line ends at a trade; the other is abandoned after three refusals."""
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [a_declined_answer()] * 4,
+        }
+    )
+    finished = ending(walk(told, at_once=1, refusals_in_a_row=3))
+
+    assert finished.reason == "refusal_cap"
+    assert "abandoned after 3 proposals" in finished.why
+
+
+def test_every_outcome_carries_the_frontier_as_it_stands_after_it() -> None:
+    """No answer ever says "this claim is closed"; a claim leaving the list is how you learn."""
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market"))],
+        }
+    )
+    steps = walk(told, at_once=1)
+    outcomes = [one for one in steps[:-1] if isinstance(one, Outcome)]
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    started = finished.graph.hypothesis_id
+    # The claim the map starts from arrives first, and is open the moment it does.
+    assert outcomes[0].frontier == (started,)
+    # The last answer leaves nothing open, which is what empties the canvas of
+    # skeletons all at once.
+    assert outcomes[-1].frontier == ()
+    # An ending never joins the list.
+    landed = {
+        one.result.proposition.id
+        for one in outcomes
+        if isinstance(one.result, Accepted) and one.result.proposition is not None
+    }
+    endings = {
+        one.id for one in finished.graph.propositions if one.kind in ("market", "not_tradeable")
+    }
+    assert endings <= landed
+    assert all(not (set(one.frontier) & endings) for one in outcomes)
+
+
+def test_the_claim_the_map_starts_from_arrives_as_an_accepted_answer_with_no_arrows() -> None:
+    """A claim with nothing causing it is exactly what a hypothesis is."""
+    told = Storyteller(
+        {STARTED_AT: [an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market"))]}
+    )
+    steps = walk(told, at_once=1)
+
+    first = steps[0]
+    assert isinstance(first, Outcome)
+    assert isinstance(first.result, Accepted)
+    assert first.result.proposition is not None
+    assert first.result.proposition.kind == "hypothesis"
+    assert first.result.links == ()
+    assert first.about is None
+
+
+def test_a_refusal_that_is_not_the_third_leaves_the_frontier_where_it_was() -> None:
+    """The count is what changes, not the map and not what is open."""
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                a_declined_answer(),
+                an_answer(a_stop()),
+            ]
+        }
+    )
+    steps = walk(told, at_once=1, refusals_in_a_row=3)
+    outcomes = [one for one in steps[:-1] if isinstance(one, Outcome)]
+
+    refused_at = next(i for i, one in enumerate(outcomes) if isinstance(one.result, Refused))
+    assert outcomes[refused_at].frontier == outcomes[refused_at - 1].frontier
+
+
+def test_an_arrow_between_two_claims_counts_toward_the_room_beside_its_cause() -> None:
+    """The width cap counts what leaves a claim, whether or not a claim came with it.
+
+    A cap that counted only the claims one claim caused could be walked past for
+    ever by proposing arrows instead. This is the step the generation chapter
+    works in full: a claim's third arrow closes it, and the arrow that closed it
+    brought no claim with it.
+    """
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_link(FROM_THE_QUESTION, AN_ENDING)),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [an_answer(a_stop())],
+        }
+    )
+    steps = walk(told, at_once=1, width=3)
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    started = finished.graph.hypothesis_id
+    assert sum(1 for one in finished.graph.links if one.source == started) == 3
+    # The arrow that closed it brought no claim with it.
+    arrow_only = [
+        one
+        for one in steps[:-1]
+        if isinstance(one, Outcome)
+        and isinstance(one.result, Accepted)
+        and one.result.proposition is None
+        and one.result.links
+    ]
+    assert len(arrow_only) == 1
+    assert started not in arrow_only[0].frontier
+    assert told.asked_about.count(STARTED_AT) == 3

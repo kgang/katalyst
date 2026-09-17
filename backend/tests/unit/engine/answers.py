@@ -388,12 +388,31 @@ def _pointing_at(
     happening — so this does it, and only for answers that asked for it.
     """
     said = answer.parsed_output
-    if not isinstance(said, ClaimProposal) or said.cause != FROM_THE_QUESTION:
-        return answer
-    named = _name_for(question, about)
-    return answer.model_copy(
-        update={"content": [_a_block(said.model_copy(update={"cause": named}))]}
-    )
+    if isinstance(said, ClaimProposal) and said.cause == FROM_THE_QUESTION:
+        named = _name_for(question, about)
+        return answer.model_copy(
+            update={"content": [_a_block(said.model_copy(update={"cause": named}))]}
+        )
+    if isinstance(said, LinkProposal):
+        # A story writes an arrow by naming the two claims' own words; the short
+        # names are minted while the run is happening, so they are put in here.
+        return answer.model_copy(
+            update={
+                "content": [
+                    _a_block(
+                        said.model_copy(
+                            update={
+                                "source": _name_for(question, about)
+                                if said.source == FROM_THE_QUESTION
+                                else _name_for(question, said.source),
+                                "target": _name_for(question, said.target),
+                            }
+                        )
+                    )
+                ]
+            }
+        )
+    return answer
 
 
 def _name_for(question: str, about: str) -> str:
