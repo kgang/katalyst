@@ -1,0 +1,74 @@
+# syntax=docker/dockerfile:1
+
+# The browser half of Katalyst.
+#
+# One file, two images.
+#
+#   dev   The build tool's own web server. It compiles pages as the browser asks
+#         for them and replaces changed parts of a running page without a
+#         refresh.
+#   prod  A folder of built files, served by nginx, a small and very fast web
+#         server. The same nginx also hands anything beginning with `/api` to
+#         the Python server, so the whole app answers on one address.
+#
+# Choose one with `--target dev` or `--target prod`. `compose.yaml` chooses
+# `dev`; `compose.prod.yaml` chooses `prod`.
+#
+# Node 24 is used in both, and in the checks that run on every pull request.
+# It is a long-term-support release, which means it keeps getting fixes for
+# years; the version on a developer's laptop may be newer and shorter-lived, and
+# this is the version that decides.
+#
+# The build context is the repository root, which is why the paths below begin
+# with `frontend/` and `docker/`.
+
+FROM node:24-bookworm-slim AS base
+WORKDIR /app
+
+# --- the installed packages, shared by every image below --------------------
+
+FROM base AS deps
+
+# Only the two package files, so that this install is reused from the previous
+# build whenever the source changed but the packages did not.
+COPY frontend/package.json frontend/package-lock.json ./
+# `npm ci` installs exactly the versions the lock file names and nothing else.
+# It refuses to run if the lock file and `package.json` disagree, which is the
+# behaviour we want in a build.
+RUN npm ci
+
+# --- the image you work in --------------------------------------------------
+
+FROM deps AS dev
+
+COPY frontend/ ./
+
+EXPOSE 5173
+
+# `--host` makes the dev server answer on every address inside the container.
+# Without it the server would only answer itself and the page would never load.
+CMD ["npm", "run", "dev", "--", "--host"]
+
+# --- the image a deployment would run ---------------------------------------
+
+# This stage turns the source into a folder of plain files. Nothing from it
+# ships except that folder.
+FROM deps AS build
+
+COPY frontend/ ./
+# `npm run build` checks the types first and then writes the built files to
+# `/app/dist`. A type error stops the build here rather than surfacing in a
+# browser later.
+RUN npm run build
+
+FROM nginx:alpine AS prod
+
+# How to serve the files and where to send `/api`. Worth reading: it is the
+# reason the packaged app has one address and no cross-address configuration.
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+# No start command: the nginx image already has one, and it is the right one.

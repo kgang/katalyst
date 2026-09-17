@@ -1,0 +1,63 @@
+# The packaged versions of the same two services, for checking that what would
+# be deployed actually works.
+#
+#   docker compose -f compose.yaml -f compose.prod.yaml up --build
+#
+# Then open http://localhost:8080.
+#
+# This file is not a second description of the app. It is a short list of
+# changes laid over `compose.yaml`, which still supplies everything not repeated
+# here — the build files, the keys, the health check on the Python server, and
+# the rule that the browser app waits for it.
+#
+# Three things differ from `docker compose up`:
+#
+#   * The browser app is a folder of built files served by nginx, a small web
+#     server, rather than the build tool's dev server.
+#   * That same nginx hands `/api` to the Python server, so there is one address
+#     and one port for the whole app.
+#   * The Python server is not published on this machine at all. Only nginx can
+#     reach it, over the private network between the two containers.
+#
+# Nothing reloads here. A change means building again.
+#
+# Two words below are instructions to Docker Compose rather than settings:
+# `!reset` deletes a setting that `compose.yaml` made, and `!override` replaces
+# one instead of adding to it. Without them Compose would combine the two files'
+# lists and publish both sets of ports.
+
+services:
+  backend:
+    build:
+      target: prod
+    # `compose.yaml` publishes the server on port 8000 of this machine so it can
+    # be poked at directly while working. A deployment does not do that: the
+    # only way in is through nginx, and this deletes the published port.
+    ports: !reset null
+
+  frontend:
+    build:
+      target: prod
+    # nginx listens on port 80 inside its container; this makes it reachable at
+    # http://localhost:8080. Port 8080 rather than 80 because ports below 1024
+    # need administrator permission on most machines.
+    ports: !override
+      - "8080:80"
+    # `compose.yaml` tells the dev server where to forward `/api`. There is no
+    # dev server here — `docker/nginx.conf` does the forwarding — so the setting
+    # is removed rather than left behind for a reader to wonder about.
+    environment: !reset null
+    healthcheck:
+      # Ask nginx for the app's own page. `wget` is what this image carries;
+      # `-O -` throws the page away rather than writing a file, and `-q` keeps
+      # the health check out of the logs.
+      #
+      # The address is written as numbers rather than as `localhost` on purpose.
+      # Inside this image `localhost` is tried as an IPv6 address first, and
+      # nginx here listens on IPv4 only, so the check would be refused a
+      # connection while the app was working perfectly well.
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
