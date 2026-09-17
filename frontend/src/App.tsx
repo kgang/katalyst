@@ -17,8 +17,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { About, FixtureSummary, Health, Readiness } from "./api/client";
 import { readAbout, readExampleList, readHealth, readReadiness } from "./api/client";
+import { Inspector } from "./components/Inspector";
 import { Launchpad } from "./components/Launchpad";
-import { MapCanvas } from "./graph/Canvas";
+import { MapCanvas, type Selection } from "./graph/Canvas";
 import { FixtureWorldSource, type WorldSource, type WorldView } from "./world";
 
 /**
@@ -234,9 +235,15 @@ export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }:
 
   const [screen, setScreen] = useState<Screen>({ at: "launchpad" });
 
+  // What the panel beside the map is open on. It lives here rather than inside
+  // the map because the panel is beside the map, not on it: selecting a claim
+  // changes what the panel says and nothing opens over the canvas.
+  const [selection, setSelection] = useState<Selection>(null);
+
   const open = useCallback(
     (id: string) => {
       setScreen({ at: "opening", id });
+      setSelection(null);
       source.readWorld({ baseId: id }).then(
         (world) => setScreen({ at: "map", world }),
         (reason: unknown) => setScreen({ at: "failed", id, reason: inWords(reason) }),
@@ -266,7 +273,15 @@ export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }:
 
         {screen.at === "map" ? (
           <>
-            <MapCanvas world={screen.world} />
+            {/* The map and the panel, side by side. The panel is part of the
+                screen rather than something that appears over it: there are no
+                pop-ups anywhere in this product, and a dialog you have to
+                dismiss would steal the map that makes the detail mean
+                anything. */}
+            <div className="map-body">
+              <MapCanvas world={screen.world} selection={selection} onSelect={setSelection} />
+              <Inspector world={screen.world} subject={selection} />
+            </div>
             <p className="map-origin">{screen.world.origin}</p>
           </>
         ) : (

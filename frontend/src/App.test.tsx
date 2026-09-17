@@ -10,6 +10,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { aClaim, aWire, aWorld } from "./test/aMap";
 import type { WorldSource, WorldView } from "./world";
 
 vi.mock("./api/client", () => ({
@@ -47,41 +48,35 @@ const EXAMPLES = [
 ];
 
 /** A world with two claims and one arrow, enough to prove the screen swapped. */
-const WORLD: WorldView = {
+const WORLD: WorldView = aWorld({
   baseId: "hormuz",
   title: "Strait of Hormuz",
-  hypothesisId: "H",
   claims: [
-    {
+    aClaim({
       id: "H",
       claim: "The Strait of Hormuz reopens to unrestricted commercial transit.",
       kind: "hypothesis",
-      resolvesBy: "2026-11-01",
-      resolutionSource: "Lloyd's List transit counts.",
       beliefs: {
         model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-        user: { absence: { words: "—", reason: "You have not said." } },
+        user: { absence: { words: "\u2014", reason: "You have not said." } },
         market: { absence: { words: "no market", reason: "No venue quotes this claim." } },
       },
-      evidence: [],
-    },
-    {
+    }),
+    aClaim({
       id: "B",
       claim: "Brent crude settles below $68 for five sessions.",
-      kind: "event",
       resolvesBy: "2026-11-15",
       resolutionSource: "ICE Brent front-month settlement prices.",
       beliefs: {
         model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
-        user: { absence: { words: "—", reason: "You have not said." } },
+        user: { absence: { words: "\u2014", reason: "You have not said." } },
         market: { absence: { words: "no market", reason: "No venue quotes this claim." } },
       },
-      evidence: [],
-    },
+    }),
   ],
-  links: [{ id: "H->B", source: "H", target: "B", mode: "trigger", reflexive: false }],
+  links: [aWire({ source: "H", target: "B" })],
   origin: "Every claim on this map was read from /api/fixtures/hormuz.",
-};
+});
 
 /** A source that hands back the world above. */
 function sourceThatAnswers(): WorldSource {

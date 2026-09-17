@@ -114,6 +114,17 @@ body {
   color: var(--text);
 }
 
+/* The map and the panel beside it, filling everything between the bar at the
+ * top and the line at the foot. The map takes what is left when the panel has
+ * had its width: the panel's job is to answer one question at a time, and a
+ * panel that grew with the window would make a short answer look like a page. */
+.map-body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
 /* Where every number on the map came from, in one sentence, under the map. A
  * map whose numbers cannot say where they came from is the state this product
  * refuses to show, so the sentence is part of the map rather than a footnote
