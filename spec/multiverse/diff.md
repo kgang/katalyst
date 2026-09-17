@@ -4,7 +4,7 @@
 
 The user supposes the strait reopens, then adds a strike the next day, and asks the only question that matters: *what changed?* Before this chapter the answer is two full maps side by side and a reader squinting at fourteen numbers. After it, the answer is a short, ordered list — the Brent contract went from `.50` to `.42`, this claim is out of the picture, this one did not move — with the biggest, best-backed change at the top and a single sentence anybody can read aloud. A **diff** is that list. It is not an approximation and it is not a guess: because both worlds are built from the same untouched base map and the same random seed, every difference in it can be traced to an edit the user made.
 
-This chapter owns the four per-claim states, how a change is decided, how the changes are ranked and dated, the one-line summary, the one-at-a-time sensitivity sweep, and the three routes that serve them. It rests on decision record **0014 (accepted 2026-09-17)** — *a supposition ends when something pushes back; a range says how sure we are of the number, not how the dice fall* — which settles how a change is ranked and which day a number is read on. A **world**, a **version of the map**, the two seed streams and the **range** on a computed likelihood are defined in [`propagation.md`](propagation.md); this chapter uses those words and does not redefine them.
+This chapter owns the four per-claim states, how a change is decided, how much each version of the map counts when a direction is read, how the changes are ranked and dated, the one-line summary, the one-at-a-time sensitivity sweep, and the three routes that serve them. It rests on decision record **0014 (accepted 2026-09-17, amended in place the same day)** — *a supposition ends when something pushes back; a range says how sure we are of the number, not how the dice fall* — which settles how a change is ranked, which day a number is read on, and that the direction is read with the same weights the number was read with. A **world**, a **version of the map**, the two seed streams and the **range** on a computed likelihood are defined in [`propagation.md`](propagation.md); this chapter uses those words and does not redefine them.
 
 ---
 
@@ -38,11 +38,15 @@ class ClaimDiff(BaseModel):          # proposed here — the plan names the four
     before: float | None             # world A's likelihood on this claim's own resolve-by day; None when added
     after: float | None              # world B's likelihood on the same day
     delta: float | None              # signed, after minus before; None when added
-    agreement: float | None          # share of versions that moved the same way;
-                                     # `None` only when the claim is `added`
+    agreement: float | None          # share of the versions that count which moved the same
+                                     # way; `None` only when the claim is `added`
+    moved_only_by_reweighting: bool  # the move is nothing but the observation changing how
+                                     # much each version counts. See B3
 ```
 
-`agreement` is carried on **every** claim present in both worlds, not only the shifted ones, so a reader — or a test — can check the rule that decided a claim's state without recomputing anything. It is `None` only for an `added` claim, which has no world A to be compared against.
+`agreement` is carried on **every** claim present in both worlds, not only the shifted ones, so a reader — or a test — can check the rule that decided a claim's state without recomputing anything. It is `None` only for an `added` claim, which has no world A to be compared against. It is read with **the same weights the two numbers beside it were read with** — B3 states that rule once.
+
+`moved_only_by_reweighting` is `true` **exactly when the claim is in both worlds, it moved by `0.005` or more, and every version that counts gives it the identical number in both worlds** — not one paired difference among them is anything but zero. Then nothing about the map's arithmetic moved the number; all that moved is how much each version counts. It is `false` everywhere else, including on an `added` claim. Only an observation can make it `true`: under every other edit both worlds count every version the same, so identical version-by-version answers give an identical number and the move is exactly nothing, which is below the floor. The Inspector turns it into one sentence, and there is no fifth state — B3.
 
 `before` and `after` are read on **the claim's own resolve-by day** — the day the claim is judged, which every claim has (INV-1, the product rule that a claim without resolution criteria, a named judge and a date is not a claim). That is the number the claim's tile shows, so it is the number its state has to be about. When a claim is still `supposed` on its own resolve-by day, `before` and `after` carry the stored `1.0` (or `0.0` for a claim supposed false) so that `delta` stays ordinary arithmetic — but any surface showing that row reads `states` first and prints the word, *Supposed · date*, never `1.0`, because no surface except a path product may print that number ([`propagation.md`](propagation.md)).
 
@@ -56,7 +60,8 @@ class DeltaRow(BaseModel):
     peak_delta: float      # signed; the largest divergence over the window
     at_day: date           # the day that divergence is largest
     range_width: float     # a column in the delta rail; never multiplied into rank
-    agreement: float       # share of versions that moved the same way; a column, never a factor
+    agreement: float       # share of the versions that count which moved the same way;
+                           # a column, never a factor
     rank: float            # |peak_delta| × weakest provenance weight on the path. Two factors
 ```
 
@@ -150,9 +155,41 @@ A claim present in world A and missing from world B cannot happen: there is no d
 Subtract world A's version *k* from world B's version *k*, for all 2 000 versions. Because the versions stream does not depend on the branch, the elicitation noise cancels and what is left is the edit — this is *common random numbers*, the standard trick for comparing two runs of the same simulation. Two numbers come out of those 2 000 paired differences:
 
 * **the move** — the average paired difference, which is what `delta` and `peak_delta` report;
-* **agreement** — the share of versions whose paired difference has the same sign as that average. It is the vocabulary's word for a number the machine computes rather than one anything self-reports. Here it means the share of versions of the map that moved the same way; stack 04's run-to-run agreement across generations is the other sense, and the vocabulary asks us to say which.
+* **agreement** — the share of versions whose paired difference has the same sign as that average, **each version counted by as much as it counted for the two numbers** (the rule is stated once just below). It is the vocabulary's word for a number the machine computes rather than one anything self-reports. Here it means the share of versions of the map that moved the same way; stack 04's run-to-run agreement across generations is the other sense, and the vocabulary asks us to say which.
 
 A claim is `shifted` when the move is at least `0.005` in size **and** agreement is at least `90%`.
+
+#### The one rule: the direction is read with the same weights the number was read with
+
+*(Kent, 2026-09-17 — G2. This closes open question 7, below.)*
+
+A world does not always count every version equally. When something was **observed**, the worlds it did not happen in are thrown away, and each version then counts by **the share of its worlds that survived** — but only for the claims that observation is evidence about ([`propagation.md`](propagation.md) B6). Every other claim, and every claim under every other edit, is read with each version counting the same.
+
+The direction is counted the same way as the number, in one sentence: **a version counts for the move by as much as it counted for the two numbers — the smaller of the two weights it carried — so a version with no surviving world counts for nothing and does not vote.** A version can only speak about a difference as far as it counted in *both* numbers.
+
+Three situations fall out of that one sentence, and not one of them is a special case:
+
+| Which world observed something | How much version *k* counts for the direction |
+|---|---|
+| Only world B | the weight world B read that claim with |
+| Both worlds | the smaller of the two weights |
+| Neither — or the claim is one the observation is not evidence about | 1, the same as every other version |
+
+And one corner: if nothing at all survived what was observed, anywhere, every version counts the same again — which is exactly what the band does in the same corner, so the number and its direction stay read the same way, and nothing is divided by nothing. The world already carries a loud warning saying the reader is looking at the map rather than at an answer.
+
+**Why it had to change, measured.** Hormuz, seed `20261001`, the shipped 2 000 versions × 8 worlds, `observe(B, true)` — *Brent settled below $68*: **209 of the 2 000 versions have no surviving world at all**. Such a version reports nothing to the number and nothing to the band, because its weight is zero — and yet, counted as one vote each, all 209 voted **against** the direction. M1 and M2 both came out at `89.05%`, a hair under the 90% bar, so both read `unchanged`, the rail was empty, and **This happened** looked like a button that does nothing. Counted with the weights, both read `98.66%` (`99.44%` among the versions that survived, counted one vote each), both are `shifted`, and both are on the rail. Nothing else moved: under the five edits that are not an observation every weight is 1, so every number this chapter quotes for the strike branch and for `do(H)` is what it was, bit for bit. Worlds per version stays 8 and the 90% bar is untouched.
+
+#### A claim moved only by reweighting
+
+*(Kent, 2026-09-17 — G3.)*
+
+A claim with **no causes** — the hypothesis, usually — is its own prior in every world of a version, so throwing worlds away cannot change what a version *says* about it. Inside every version that counts, the two worlds give it the identical number and the paired difference is exactly zero. Its same-direction share is therefore `0`, by construction and not by disagreement, and it can never be `shifted`. But its reported number does move, because the versions are now counted differently: on Hormuz, `observe(C, true)` — *the war-risk premium printed below 0.4%* — moves H from `.356` to `.365`, nearly twice the `0.005` floor.
+
+**The four states stay as they are.** A fifth state would put two unrelated facts under one word, exactly as `killed` nearly did (B2). Instead the claim's row carries `moved_only_by_reweighting`, true under the rule in the Data model above, and the Inspector prints one sentence, word for word:
+
+> **this claim moved only because the observation made some versions count more.**
+
+That is the same shape as the path bar's sentence in B2: a fact about how the number was *read* lives in the Inspector, beside the number, and not in the claim's state. Such a claim never appears on the rail — the rail holds `shifted` endings, and a same-direction share of zero cannot clear the bar — so the field lives on `ClaimDiff` and not on `DeltaRow`.
 
 **On screen the rail heads this column *same direction*, and the range-width column beside it *how firm*** (Kent, 2026-09-17). The field names stay `agreement` and `range_width`; the headings say in the reader's words what each column answers, and keeping *agreement* off the screen here leaves the word free for stack 04's run-to-run number.
 
@@ -186,6 +223,15 @@ The rail the engine actually produces, base world against the strike branch:
 | 3 | N1, talks resume | day 10, 2026-10-11 | `.28` → `.37` | `+.088` | 99.9% | 0.3 | `.026` |
 
 **N1 has the biggest move on the map and ranks last**, and that is the second factor earning its place. `+.088` is larger than either market's move and the direction is all but unanimous, but the only way into N1 is `H → N1`, an arrow whose own rationale admits it cannot say which way the causality runs — quiet talks may be what reopened the lane rather than the other way about. The rail does not hide the move; it puts the two claims somebody can actually trade above it.
+
+**And the rail under an observation**, base world against `observe(B, true)` — *Brent settled below $68* — which is what **This happened** produces on the same map. Both endings rise, because cheap Brent is evidence for both, and both peak within days of the news:
+
+| | Ending | `at_day` | before → after | `peak_delta` | same direction | weakest weight | `rank` |
+|---|---|---|---|---|---|---|---|
+| 1 | M1, the Polymarket contract | day 1, 2026-10-02 | `.41` → `.62` | `+.21` | 100% | 0.6 | `.13` |
+| 2 | M2, energy shares against the market | day 3, 2026-10-04 | `.38` → `.54` | `+.16` | 100% | 0.6 | `.095` |
+
+N1 is reachable — the observation climbs from B to H and runs forward down `H → N1` — but it is absent, and for the ordinary reason: its move is `+.0004`, well under the `0.005` floor, and its same-direction share is `41%`, well under the bar. Read both rows above with every version counted as one vote instead and each reads `89.05%`, each falls under the bar, and this table is empty — which was open question 7, and B3's one rule is the answer.
 
 **The Inspector's path-product bar walks this same route** and names its steps. One path-choosing rule, used twice, so the bar and the rail can never point at two different chains through the same map. When two routes are equally well-backed the **shorter** one is taken, and if they are still level, the one whose first differing arrow comes earlier in the map's own list of arrows *(proposed here)* — the rank does not care, because tied routes give the same weight, but the bar names its steps, so the choice has to be the same every time. On the Hormuz map every arrow into M1 is `argued`, so `H → B → M1` wins over `H → C → B → M1` by being shorter.
 
@@ -268,7 +314,7 @@ All under the `/api/` prefix, in `backend/src/katalyst/api/worlds.py`.
 
 Each statement is true for every input a named generator can produce, and each names the automated test that checks it. Generators live in `backend/tests/strategies.py`: `graphs()` yields random valid maps, `branches(graph)` yields branches of edits whose subjects exist in that map, and `seeds()` draws integer seeds. Tests live in `backend/tests/unit/domain/test_diff.py` unless noted; the route tests live in `backend/tests/api/test_worlds.py`. All of them land in **stack 03a**.
 
-This chapter uses the local numbers `INV-multiverse.18` through `.30`. `.1`–`.5` belong to [`interventions.md`](interventions.md), `.6`–`.8` to [`branches-and-worlds.md`](branches-and-worlds.md), and `.9`–`.17` to [`propagation.md`](propagation.md).
+This chapter uses the local numbers `INV-multiverse.18` through `.33`. `.1`–`.5` belong to [`interventions.md`](interventions.md), `.6`–`.8` to [`branches-and-worlds.md`](branches-and-worlds.md), and `.9`–`.17` to [`propagation.md`](propagation.md).
 
 **INV-multiverse.18 — a difference comes from two worlds, one base and one seed.** For all maps `g` from `graphs()`, all pairs of branches `a`, `b` from `branches(g)` and all seeds `s` from `seeds()`: `diff` over the two worlds built from `(g, a, s)` and `(g, b, s)` returns a `Diff`; over two worlds differing in `base_id`, `seed`, `versions` or `worlds` it returns a list of violations and never a number. Test: `test_diff_refuses_mismatched_worlds`.
 
@@ -296,6 +342,12 @@ This chapter uses the local numbers `INV-multiverse.18` through `.30`. `.1`–`.
 
 **INV-multiverse.30 — the diff route builds both worlds from one versions stream.** For all maps `g`, branch pairs and seeds: the `Diff` returned by `POST /api/worlds/diff` is byte-identical to the one `diff` gives for the two worlds `POST /api/worlds` returns for the same base, branches and seed. Test: `test_diff_route_matches_two_world_calls`, in `backend/tests/api/test_worlds.py`.
 
+**INV-multiverse.31 — a version with no surviving world does not vote.** On the worked example under `observe(B, true)`: for every claim, the versions that count for the direction are exactly the versions that counted for both numbers, so every version an observation left with no surviving world counts zero. Make every one of those versions point the opposite way and not one `agreement` in the answer changes. The same-direction share is read with the weights each world read that claim's own number with — the test rebuilds each number from the version-by-version answers to find out which weights those were, rather than being told. Tests: `test_a_dead_version_does_not_vote`, `test_direction_is_read_with_the_numbers_own_weights`, and `test_an_observation_puts_a_row_on_the_rail`, which is the visible consequence: both tradeable endings come out `shifted`, both are on the rail, and the summary is the first sentence.
+
+**INV-multiverse.32 — the weights change nothing under any edit that is not an observation.** For the strike branch and for `do(H, true)` on the worked example: no version is weighted, and the whole `Diff` computed as the code computes it serializes to exactly the bytes of the same `Diff` computed with every version forced to count the same. Nothing is compared against a number anybody typed — the difference is compared with itself. Test: `test_an_edit_that_is_not_an_observation_is_unchanged_by_the_weights`.
+
+**INV-multiverse.33 — a claim moved only by reweighting says so, and keeps its state.** On the worked example under `observe(C, true)`: the hypothesis, which nothing on the map causes, carries `moved_only_by_reweighting` true, a `delta` at or past the `0.005` floor, an `agreement` of exactly zero, and the state it would have had anyway — `unchanged`, not a fifth word. It is the only claim on that map in that position, and under an edit that is not an observation no claim is. Test: `test_a_claim_moved_only_by_reweighting_says_so`.
+
 ---
 
 ## ANTI-PATTERNS
@@ -312,13 +364,17 @@ This chapter uses the local numbers `INV-multiverse.18` through `.30`. `.1`–`.
 
 **6. Do not read a delta row on the claim's distant resolve-by day.** *Because* two worlds are furthest apart soon after the edit and then drift back together — on this fixture all three endings peak within ten days of the strike, and M1's row reads `−.079` on day 3 against a headline move of `−.05` on its own resolve-by day three weeks later — so a row read there shows two thirds of the move and calls it the answer. **Do** read the row at the day of largest divergence, carry that day as `at_day`, and name it on screen.
 
-**7. Do not build the two worlds of a difference from different seeds, or different loop sizes.** *Because* the whole comparison rests on version *k* of both worlds having been built from the same numbers; break that and every difference is the user's edit plus a wash of sampling noise, which is unreadable and untraceable. **Do** take one seed for the pair, refuse two worlds that disagree about it, and keep the versions stream free of any dependence on the branch.
+**7. Do not count the versions one way for the number and another way for the direction.** *Because* a version an observation left with no surviving world reports nothing to the number and nothing to the band — its weight is zero — so letting it cast a full vote on the direction lets a version that contributed to neither answer argue about which way they moved. Measured: 209 of Hormuz's 2 000 versions die under `observe(B, true)`, and counted as one vote each they dragged both tradeable endings from `98.66%` to `89.05%`, under the 90% bar, and emptied the rail. **Do** count a version for the move by as much as it counted for the two numbers, which under every edit but an observation is 1 for every version and changes not a bit.
+
+**8. Do not add a fifth state for a claim moved only by reweighting.** *Because* the four states answer one question — what happened to this claim — and a word that instead answers *how was this number read* puts two unrelated facts under one heading, which is the mistake `killed` nearly made (B2, anti-pattern 3). **Do** leave the state alone, carry `moved_only_by_reweighting` on the claim's row, and let the Inspector say *"this claim moved only because the observation made some versions count more"* beside the number.
+
+**9. Do not build the two worlds of a difference from different seeds, or different loop sizes.** *Because* the whole comparison rests on version *k* of both worlds having been built from the same numbers; break that and every difference is the user's edit plus a wash of sampling noise, which is unreadable and untraceable. **Do** take one seed for the pair, refuse two worlds that disagree about it, and keep the versions stream free of any dependence on the branch.
 
 ---
 
 ## Open questions
 
-Raised 2026-09-17. The first four were settled the same day and their answers are recorded in place below. The next two stay open and name who owns them, and the seventh was raised by the engine itself.
+Raised 2026-09-17. The first four were settled the same day and their answers are recorded in place below. The seventh was raised by the engine itself and was settled the same day; its answer is recorded in place too. The fifth and sixth stay open and name who owns them.
 
 1. **Which subject the path starts from, when a branch holds several edits.** The ranking was defined from "the edit's subject", and the showcase branch has three edits. The draft proposed the nearest subject.
    **Decided 2026-09-17:** the question disappears, because "shortest" and "which subject" both leave the rule. The rank reads the **best-backed route** — over every path from *any* differing edit's subject to the terminal, the one whose weakest arrow is strongest. See B4.
@@ -336,4 +392,10 @@ Raised 2026-09-17. The first four were settled the same day and their answers ar
 
 6. **Diffing more than two worlds.** The interface shows up to four branches at once, and `diff` takes exactly two worlds. Three pairwise diffs against a common base world is the obvious reading and nothing here forbids it, but nothing names it either, and the delta rail's ranking across three lists is undesigned. `spec/workbench/` owns how four branches are compared on screen.
 
-7. **An observation rarely puts a row on the rail at eight worlds per version.** *Raised 2026-09-17, when the engine first ran it; owner: stack 04, where **This happened** first meets real numbers.* Under a `do` the dice cancel out of the paired difference, because both worlds roll the same dice. Under an `observe` they do not: *which* of a version's eight worlds survive the observation is itself a coin flip, so the version-by-version difference carries that noise and the share of versions moving the same way runs lower. Measured on Hormuz: learning that B happened moves M1 by `+.063` and M2 by `+.107`, and both come out at **89%** — a hair under the 90% bar — so both read `unchanged`, the rail is empty, and the summary is the second sentence. That is the settled rule doing what it says, and it is also a button that appears to do nothing. Two candidate repairs, neither taken: run more worlds under each version while an observation is in force (the noise falls as the survivors grow), or read the direction off each version's survival-weighted estimate rather than off its raw worlds. A related fact belongs beside it: a claim with **no causes** moves under an observation only through the version weights — observing B moves H by `−0.0002` — because within one version such a claim's answer is its prior in every world.
+7. **An observation rarely puts a row on the rail at eight worlds per version.** *Raised 2026-09-17, when the engine first ran it.* Under a `do` the dice cancel out of the paired difference, because both worlds roll the same dice. Under an `observe` they do not: *which* of a version's eight worlds survive the observation is itself a coin flip, and a version can lose all eight. Measured on Hormuz at seed `20261001` and the shipped 2 000 × 8: learning that B happened moves M1 by `+.063` and M2 by `+.107`, and with every version counted as one vote both came out at **`89.05%`** — a hair under the 90% bar — so both read `unchanged`, the rail was empty, the summary was the second sentence, and **This happened** looked like a button that does nothing.
+
+   **Decided 2026-09-17 (Kent, G2): count only the versions that survived, each by how much it survived.** The cause is not the coin flip; it is that **209 of the 2 000 versions have no surviving world at all**, weigh nothing in the number and the band, and were each casting a full vote against the direction anyway. One rule, stated once in B3 and obeyed everywhere: *the direction is read with the same weights the number was read with.* Both endings then read **`98.66%`** (`99.44%` among the versions that survived, one vote each), both are `shifted`, and both are on the rail. **Worlds per version stays 8** — the candidate repair of running more worlds under an observation was not taken, because it buys steadiness with time and does not fix the arithmetic — **and the 90% bar is untouched.** Under the five edits that are not an observation every weight is 1, so no other number in this chapter moved by a bit, which `test_an_edit_that_is_not_an_observation_is_unchanged_by_the_weights` pins by computing one such difference both ways and asking for the same bytes.
+
+   **Decided 2026-09-17 (Kent, G3), the related fact that came with it.** A claim with **no causes** moves under an observation only through the version weights, because within one version such a claim's answer is its prior in every world: observing B moves H by `−0.0002`, and observing C moves H from `.356` to `.365`. Its same-direction share is zero by construction, so it can never be `shifted`. There is no fifth state; the claim's row carries `moved_only_by_reweighting` and the Inspector says *"this claim moved only because the observation made some versions count more."* See B3 and the Data model.
+
+   *Recorded as a dated amendment to decision record **0014**, which owns the two loops and the `observe` weighting; nothing in that decision changed.*
