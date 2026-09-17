@@ -109,7 +109,7 @@ Defined once as pydantic models in `domain/`; the same models serve as the model
 - **Production-ish.** Two multi-stage images: a slim Python image containing only the built virtual environment, and a static-file image serving the built frontend with `/api` proxied to the backend on the same origin (no cross-origin configuration to explain).
 - **State.** One SQLite file (a single-file database, no server) on a volume. No database service, no accounts, no multi-tenancy in v1.
 - **Configuration.** `.env.example` lists every variable; the real `.env` is git-ignored; values are read once in `settings.py` and the process fails fast with a clear message if a required key is missing.
-- **Health.** `/healthz` (process is up) and `/readyz` (a model key is configured).
+- **Health.** `/api/healthz` (process is up; depends on nothing) and `/api/readyz` (reports whether a model key is configured, never the key). Every browser-facing route lives under `/api/`, so the static-file server forwards one prefix.
 
 ---
 
