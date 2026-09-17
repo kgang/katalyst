@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2Q0MQ675E35T2WKPJ3T7AXF",
+  "session_id": "66803034-4bb5-492b-abd1-36f8748f9300",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-17T06:25:10.503593Z",
+  "branch": "fix/02-half-life-violation",
+  "checkpoints_count": 2,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "d55b51e683ac",
+  "checkpoint_transcript_start": 1209,
+  "transcript_lines_at_start": 1209,
+  "compact_transcript_start": 172,
+  "token_usage": {
+    "input_tokens": 42,
+    "cache_creation_tokens": 475986,
+    "cache_read_tokens": 1829468,
+    "output_tokens": 15586,
+    "api_call_count": 5
+  },
+  "session_metrics": {
+    "turn_count": 7
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
