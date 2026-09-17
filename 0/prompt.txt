@@ -1,0 +1,6 @@
+gh updated
+
+this verbiage in the PRD is a little obtuse.
+D1    Hero use case    One graph, two doors. Both use cases supported; Explore canvas is the first screen; Verify = Explore with a target
+
+Could you make it more clear in simple terms what the hero use case is? I added an additional instruction to AGENTS.md that your written passages should be self-contained, without jargon, and punchy/concise/succinct
