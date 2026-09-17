@@ -6,6 +6,8 @@ Each step is a claim that can be checked by a date, judged by a named source. Ea
 
 This is a take-home prototype for [Catalyst](https://catalyst.app). The brief is in `ASSIGNMENT.md`.
 
+That is the whole product. It is being built in numbered stacks, and `ARCHITECTURE.md` says section by section what exists and what is still a plan. As of 2026-09-17: the rules of the map, a stored worked example, and the two halves that serve it are built; the canvas, the model that writes a map, and the thesis are not.
+
 ## Run it
 
 You need Docker, and nothing else. No key is needed to start the app or to run the tests.
@@ -15,6 +17,8 @@ docker compose up           # build both halves, then start them
 ```
 
 Then open <http://localhost:5173>. That is the browser app. The Python server is on <http://localhost:8000>, and the browser app reaches it through `/api` on its own address, so there is nothing to point at anything.
+
+One worked example is stored in the repository and served read-only: <http://localhost:8000/api/fixtures/hormuz> returns the Strait of Hormuz map together with the branch in which Iran is struck the next day, every claim and arrow with its own source beside it (`/api/fixtures` lists what there is). Nothing draws it yet — today the browser app is a status screen, and the canvas is stack 03b.
 
 While editing, run `docker compose watch` (or `make dev`) instead. It starts the same two halves and then copies files into the running containers as you save them, so both reload themselves. Changing which packages are installed rebuilds the image instead, because copying a file cannot install a package.
 
@@ -48,9 +52,14 @@ make          # the whole list of tasks
 make test
 ```
 
-No network, no key, and the same checks a pull request runs. Today that means the server's route tests, the browser app's component tests, and the one test that matters most: it reads every file under `backend/src/katalyst/domain/` — the layer that holds the rules — and fails if any of them imports the routes, the engine, the outside-data layer, or a language-model client. That layer must stay decidable by our own code alone.
+No network, no key, and the same checks a pull request runs. Today that is 137 tests on the server and 3 in the browser app:
 
-Two more layers are built into the shape of the suite and are empty until later stacks: property tests, where the `hypothesis` library generates thousands of random maps and shrinks any failure to the smallest example that still breaks; and calls to the model replayed from responses recorded under `backend/tests/cassettes/`. A call that has not been recorded fails the test instead of dialling out, which is what keeps the suite free of keys forever.
+- **The rules, checked against maps nobody wrote by hand.** Hundreds of random maps per test, built by the generators in `backend/tests/strategies.py` — some correct by construction, some damaged on exactly one rule — and when one fails, the `hypothesis` library shrinks it to the smallest map that still breaks. Every line and every branch of `backend/src/katalyst/domain/` is run.
+- **The stored example.** The Strait of Hormuz map and its "Iran is struck the next day" branch, held to every rule they claim to obey, and refusing to load at all if they break one.
+- **The routes**, and the browser app's component tests for the status screen.
+- **The one that matters most**: it reads every file under `backend/src/katalyst/domain/` — the layer that holds the rules — and fails if any of them imports the routes, the engine, the outside-data layer, or a language-model client. That layer must stay decidable by our own code alone.
+
+One layer is built into the shape of the suite and is still empty: calls to the model replayed from responses recorded under `backend/tests/cassettes/`. There is nothing to record yet, because nothing calls a model until stack 04. A call that has not been recorded fails the test instead of dialling out, which is what keeps the suite free of keys forever.
 
 Continuous integration runs four jobs on every pull request — `backend`, `frontend`, `types-fresh` (the committed browser types still match the server's data shapes), and `docker` (both packaged images still build). None of them is given a key.
 
@@ -64,7 +73,7 @@ Continuous integration runs four jobs on every pull request — `backend`, `fron
 | `docs/adr/` | Numbered decision records — a journal of why each choice was made |
 | `spec/` | The spec, organized as a book: one directory per idea, one file per chapter |
 | `docs/research/` | Research reports that fed the requirements. Inputs, not decisions |
-| `backend/` | Python server: `domain/` (the rules, pure), `engine/` (talks to the model), `grounding/` (outside data), `api/` (routes) |
+| `backend/` | Python server: `domain/` (the rules, pure), `fixtures/` (the stored worked example), `engine/` (will talk to the model), `grounding/` (will fetch outside data), `api/` (routes) |
 | `frontend/` | React browser app; `src/api/schema.ts` is generated from the server, never hand-written |
 | `docker/`, `compose.yaml` | Container images and how they run together |
 

@@ -8,7 +8,9 @@
 
 ---
 
-## 1. The system in one picture `[planned]`
+## 1. The system in one picture `[built]`
+
+Both halves of the drawing below run today; the event stream, the model pipeline, the grounding adapters and the stored state are decided but unwritten, and are named again under it.
 
 ```
  ┌──────────────────────────── browser ─────────────────────────────┐
@@ -36,11 +38,15 @@
     web search tool)      prices, no key)             free key)
 ```
 
+**What runs, and what is drawn ahead.** The browser app and the Python server both start, and `api/` answers three things for real: whether the server is up, what it calls itself, and the stored worked example. `domain/` holds the rules and nothing else. `[planned]` Four parts of the drawing have no code behind them. There is no event stream — every route today is an ordinary request and its answer. `engine/` holds identifier minting alone; nothing has ever called Anthropic's API. `grounding/` is an empty package; nothing has ever called Polymarket or FRED. There is no storage: no database file, no volume declared in either compose file, nothing kept between requests. Inside the browser box only a status screen exists; the canvas, the inspector, the world-state strip and the thesis dock are drawn because they are decided, not because they are written.
+
 Two halves, one contract: the backend publishes an OpenAPI description (a machine-readable list of every route and data shape); the frontend's TypeScript types are generated from it and committed, and continuous integration fails if regeneration would change them. The two halves cannot drift silently.
 
 ---
 
-## 2. The one rule that shapes everything `[planned]`
+## 2. The one rule that shapes everything `[built]`
+
+Half of this is mechanical today: the boundary that keeps the rules layer pure is checked on every pull request, and `validate` already refuses a bad map. The other half — a recorded model answer carrying a loop, refused by that same validator — waits for stack 04, because nothing calls a model yet.
 
 **The model proposes; the domain layer disposes.**
 
@@ -48,11 +54,15 @@ The language model never edits the graph. It returns *proposals* — one proposi
 
 This is why `domain/` is pure: no network, no model, no clock, no randomness except an explicit seed. It is the part of the system whose correctness is *proven by tests* rather than *requested of a model*, and it is the part a reviewer should read first.
 
-Enforced by: an import-boundary check in continuous integration (`domain/` may not import `engine/`, `api/`, `grounding/`, or the vendor SDK), and a recorded test in which the model returns a graph with a loop and the validator rejects it.
+Enforced by `test_domain_imports_nothing_impure`, in `backend/tests/unit/test_import_boundary.py`: it reads every file under `domain/` and fails if one of them imports `engine/`, `api/`, `grounding/`, or a model client. It runs in the `backend` check on every pull request, and two further tests in the same file check the checker itself, so a boundary test that has quietly stopped looking cannot pass by accident. The same checker is pointed the other way by `test_the_rules_layer_never_reads_the_examples`, so whether a map is valid can never come to depend on which worked examples we ship.
+
+The disposing half exists too: `validate` in `domain/validity.py` walks a whole map and returns every fault at once, each named in the claim's own words rather than by identifier. `[planned]` The recorded test — the model returns a graph with a loop and the validator rejects it — arrives with stack 04.
 
 ---
 
 ## 3. The flow of a generation `[planned]`
+
+Not one of the eight steps below exists. `engine/` holds identifier minting and nothing else, no route streams anything, and nothing here has ever called a model. It is written down so that stack 04 has a shape to fill rather than a blank page.
 
 ```
  1  user types a hypothesis (+ optional target, + optional own likelihood)
@@ -83,7 +93,7 @@ Two rows below are still **planned** and say so. The rest exist as code, and the
 | `Proposition` | A claim checkable by a date, judged by a named source. Kinds: `hypothesis`, `event`, `market` (names a contract to take a side of, or an instrument that moves), `not_tradeable` (names the reason) | Criteria, judge and resolve-by required (INV-1): `_claims_say_how_they_are_judged`, `test_validate_rejects_unresolvable_proposition`. A `market` claim names a payoff — `ContractPayoff` or `PricePayoff`, told apart by `kind`, neither naming a price — and a `not_tradeable` one a reason (INV-9): `test_validate_requires_payoff_on_market`, `test_validate_requires_reason_on_not_tradeable`. Identity of the trade — venue, contract, instrument — lives in `domain/`; its price lives in `grounding/` (ADR-0013) |
 | `Link` | A causal claim from one proposition to another: mechanism, strength (log-odds), lag, signal shape, `trigger` (one-time shove) or `sustain` (continuous hold), provenance, `reflexive`. It carries no self-reported confidence: the rationale is the argument, provenance is the receipt | Rationale required, and a provenance claiming evidence cites a source (INV-2): `_arrows_say_why` and `_arrows_claiming_evidence_cite_it`, `test_validate_rejects_link_without_rationale`, `test_validate_rejects_unsourced_documented_link` |
 | `Belief`, `Beliefs` | A likelihood with a range and an owner — model, user, market — in three named slots, never a dictionary | `0 ≤ lo ≤ p ≤ hi ≤ 1` refused at construction and re-checked over a whole map (INV-7): `_likelihoods_sit_inside_their_own_range`. Never averaged across owners (INV-11): `test_beliefs_never_merged`, which reads our own source code rather than trusting good intentions |
-| `Graph` | Propositions + links + which claim started it. Immutable | Exactly one hypothesis, at least one terminal, and no loops once reflexive links are set aside — each of which needs a delay (INV-5, INV-6, INV-9): `_exactly_one_starting_claim`, `_map_ends_somewhere_actionable`, `_no_loops_once_feedback_is_set_aside`, `_feedback_arrows_take_time`. Frozen: `test_models_are_frozen` |
+| `Graph` | Propositions + links + which claim started it. Immutable | Exactly one hypothesis, at least one terminal, and no loops once reflexive links are set aside — each of which needs a delay (INV-6, INV-9): `_exactly_one_starting_claim`, `_map_ends_somewhere_actionable`, `_no_loops_once_feedback_is_set_aside`, `_feedback_arrows_take_time`. Frozen: `test_models_are_frozen` |
 | `Intervention` | Six frozen types — `do`, `observe`, `insert`, `retune`, `refine`, `believe` — told apart by a `kind` field, which is what makes the generated TypeScript a tagged union. **The types exist; applying one is planned (stack 03a)** — nothing folds a branch onto a map yet | `believe` refuses any belief but the user's own, at construction: `test_believe_requires_user_owner`. The union discriminates on `kind`: `test_intervention_discriminator`. That `do` cuts a claim from its causes and `observe` does not (INV-3) is specified in `spec/multiverse/interventions.md` and enforced by nothing yet, because nothing applies an edit |
 | `Branch` | A name, an optional parent branch, and an ordered list of interventions. Holds no propositions, links or results | A branch *is* a patch: `test_branch_round_trip`. Replay from (base, branch, seed) (INV-5) arrives with `apply` in stack 03a |
 | `World` | **Planned (stack 03a).** A base graph with a branch applied and beliefs propagated | No type and no code today. The rule it will carry: only what is downstream of an edit may change (INV-4) |
@@ -93,21 +103,34 @@ Two rows below are still **planned** and say so. The rest exist as code, and the
 
 ---
 
-## 5. Where each invariant is enforced `[planned]`
+## 5. Where each invariant is enforced `[built]`
 
-| Invariant | Layer | How it is checked |
-|-----------|-------|-------------------|
-| INV-1, 2, 6, 9 (a proposition is checkable; a link says why; no loops; ends in a trade) | `domain/` validation | Property tests over generated graphs; the recorded-loop rejection test |
-| INV-3, 4, 5, 10 (assert vs observe; locality; branches are patches; refinement adds up) | `domain/` interventions and propagation | Property tests: identity, concatenation, locality, round-trip, marginalization; a state-machine test over random intervention sequences |
-| INV-7 (beliefs stay in range; two significant figures) | `domain/` + frontend chips | Property test on bounds; a rendering test that a chip never shows more than two significant figures |
-| INV-8, 12 (path product shown; no meaning in hue alone) | frontend | Component tests on the path bar and the encoding tokens; a review checklist |
-| INV-11 (owners never merged) | `domain/` + frontend | A test that no function returns one number derived from two owners |
-| INV-13 (CI needs no API key) | test suite | Recorded responses replayed with recording disabled in CI |
-| INV-14 (invalidation is observable in time) | `domain/` thesis derivation | Unit tests on the timing and observability filters |
+Four of the fourteen invariants are fully checked today, five are partly checked, and five wait for code that does not exist yet — applying an edit (stack 03a), the canvas (03b), the model boundary (04), the thesis (05), refinement (06). Every test named below is real and runs in `make test`.
+
+| Invariant | Enforced in | Named tests today | Still planned |
+|-----------|-------------|-------------------|---------------|
+| INV-1 — a claim is checkable: criteria, a named judge, a resolve-by date | `domain/validity.py` | `test_validate_rejects_unresolvable_proposition`, `test_valid_graphs_have_no_violations`, `test_every_resolve_by_date_falls_after_the_day_the_example_is_set_on` | — |
+| INV-2 — an arrow says why, and one claiming evidence cites it; every likelihood has an owner | `domain/validity.py`, `domain/belief.py` | `test_validate_rejects_link_without_rationale`, `test_validate_rejects_unsourced_documented_link`, `test_no_arrow_claims_evidence_it_does_not_cite`, `test_owner_matches_slot`, `test_prior_is_owned_by_the_model` | — |
+| INV-3 — asserting a claim is not observing it | `domain/intervention.py`; later propagation | `test_intervention_discriminator`, `test_intervention_rejects_an_unknown_kind` — the six kinds exist and are told apart by `kind` | The rule itself. Nothing applies an edit, so nothing can yet check that `do` leaves a claim's causes alone while `observe` may change them. Stack 03a |
+| INV-4 — locality: only what is still connected to the edit may move | `domain/` propagation | none | The affected-set test, one case per operation, over generated maps. Stack 03a |
+| INV-5 — the base is never touched; a branch is an ordered patch list; a world replays from (base, branch, seed) | `domain/branch.py`, `domain/graph.py` | `test_branch_round_trip`, `test_intervention_round_trip`, `test_seeds_are_whole_numbers`, `test_models_are_frozen`, `test_generated_models_are_frozen` — nothing on a map can be changed after it is built, and a branch survives a round trip through JSON with each edit restored to its own class | The three laws themselves: an empty branch changes nothing, two branches in sequence equal their concatenation, one seed replays one world. All three need `apply`. Stack 03a |
+| INV-6 — no loops once feedback arrows are set aside, and every feedback arrow takes time | `domain/validity.py` | `test_validate_rejects_cycles`, `test_an_arrow_from_a_claim_to_itself_is_a_loop`, `test_reflexive_links_have_positive_lag`, `test_the_map_has_a_feedback_arrow_and_it_takes_time` | — |
+| INV-7 — a likelihood sits inside its own range, and is shown at two significant figures | `domain/belief.py`, `domain/validity.py`; later the browser app | `test_belief_bounds_at_construction`, `test_belief_bounds_at_construction_over_raw_fields`, `test_validate_rejects_belief_out_of_range`, `test_every_likelihood_is_a_range_and_never_a_point` | The showing half: a chip never renders more than two significant figures. Stack 03b |
+| INV-8 — a path drawn on screen shows the product of its arrows | browser app | none | A component test on the path bar. Stack 03b |
+| INV-9 — every map ends in something to trade, or says why it cannot | `domain/validity.py` | `test_validate_requires_terminal`, `test_validate_requires_payoff_on_market`, `test_validate_requires_reason_on_not_tradeable`, `test_every_tradeable_ending_names_something_to_trade`, `test_the_ending_that_cannot_be_traded_says_why`, `test_the_two_endings_use_the_two_payoff_shapes` | — |
+| INV-10 — splitting a claim into finer claims adds back up | `domain/` propagation | none | A test that the parts recombine to the original within a small tolerance. Stack 06, with `refine` |
+| INV-11 — model, user and market likelihoods are never merged | `domain/` | `test_beliefs_never_merged`, which reads our own source code looking for an average taken across two owners, plus its four self-checks — `test_the_checker_catches_two_likelihoods_averaged`, `test_the_checker_catches_a_merge_hidden_in_a_structure`, `test_the_checker_leaves_honest_functions_alone`, `test_the_checker_is_pointed_at_the_real_rules_layer` | The same rule on the browser side, once three chips are drawn side by side. Stack 03b |
+| INV-12 — nothing carries meaning in colour alone | browser app | none | Component tests on glyphs, tail textures and stroke styles. Stack 03b |
+| INV-13 — the checks run with no model key | the test suite, `.github/workflows/ci.yml` | `test_healthz_is_ok_with_no_environment_variables_set`, `test_readyz_reports_not_ready_when_no_model_key_is_configured`, `test_readyz_treats_an_empty_key_as_no_key`, `test_readyz_reports_ready_when_a_model_key_is_configured`. Beyond the tests: `--record-mode=none` is on by default in `backend/pyproject.toml`, so an unrecorded call fails instead of dialling out, and `make test` unsets both keys before running | The recordings themselves. `backend/tests/cassettes/` is empty; the first one arrives with stack 04 |
+| INV-14 — the thing that would prove you wrong resolves in time, and in public | `domain/` thesis derivation | none | Unit tests on the timing and observability filters. Stack 05, with `Thesis` |
+
+Two more tests belong beside these, though they guard no numbered invariant: `test_domain_imports_nothing_impure` keeps the rules layer pure, and `test_the_rules_layer_never_reads_the_examples` keeps it independent of the worked examples we ship (§2).
 
 ---
 
 ## 6. Runtime `[built]`
+
+Everything below runs today except stored state, which is marked `[planned]` in its own bullet and has no code, no database file and no volume behind it.
 
 - **Development.** `docker compose watch` (or `make dev`) runs both halves with reload. The browser app answers on <http://localhost:5173> and the Python server on <http://localhost:8000>. Edited files under `backend/src` and `frontend/src` are copied into the running containers, which reload themselves; a change to a file that says *which packages are installed* — `backend/pyproject.toml`, `backend/uv.lock`, `frontend/package.json`, `frontend/package-lock.json` — rebuilds the image instead, because copying a file cannot install a package. The browser app does not start until the server answers its health check.
 - **Production-like.** `docker compose -f compose.yaml -f compose.prod.yaml up --build` (or `make prod`), on <http://localhost:8080>. Two multi-stage images. The server is a `python:3.12-slim` image holding only the built virtual environment — no package installer, no lock file, no source tree — run as a user that is not root. The browser app is a folder of built files served by `nginx:alpine`, and that same web server forwards anything beginning with `/api` to the Python server, so the whole app is one origin. The server is not published on the host at all: only the web server can reach it.
@@ -118,19 +141,22 @@ Two rows below are still **planned** and say so. The rest exist as code, and the
 
 ---
 
-## 7. Testing layers `[built]` in part
+## 7. Testing layers `[built]`
 
-Two of the four layers exist. The other two are named here so that adding them is filling a slot rather than inventing one.
+Four of the six rows below exist. Decision record 0008 named four layers; the worked-example row is a fifth that grew out of stack 02. The recorded model boundary and the evaluation set are named here so that adding them is filling a slot rather than inventing one.
 
 | Layer | What it covers | Where | State |
 |-------|----------------|-------|-------|
-| Pure domain, property-based | Graph rules, propagation, interventions, patch algebra — thousands of generated cases, failures shrunk to a minimal example | `backend/tests/unit/` | `[planned]` — the directory holds the import-boundary test; the rules it would test arrive with stack 02 |
-| Model boundary, recorded | Real vendor responses recorded once, scrubbed of keys, replayed; includes malformed and refused responses | `backend/tests/boundary/`, recordings in `backend/tests/cassettes/` | `[planned]` — the directory, the settings that strip keys from a recording, and the rule that an unrecorded call fails rather than dials out are all in place; the first recording arrives with stack 04 |
-| Routes | Each route answers, and answers the shape it says it does | `backend/tests/api/` | `[built]` |
-| Frontend | Component tests for the first screen; later, reducers and the inspector; one end-to-end smoke test | `frontend/src/**/*.test.tsx` | `[built]` for components; the end-to-end test is `[planned]` |
+| Pure rules, property-based | Map validity over maps nobody wrote by hand. `backend/tests/strategies.py` builds maps that are correct by construction and maps damaged on exactly one rule; the `hypothesis` library runs each test against hundreds of them and shrinks any failure to the smallest example that still breaks | `backend/tests/unit/domain/` | `[built]` — twenty-one property tests over `validate`. Propagation, interventions and patch algebra arrive with stack 03a |
+| Model boundary, recorded | Real vendor answers recorded once, scrubbed of keys, replayed; including malformed and refused answers | `backend/tests/boundary/`, recordings in `backend/tests/cassettes/` | `[planned]` — the directory, the settings that strip keys from a recording (`backend/tests/conftest.py`), and the rule that an unrecorded call fails rather than dials out are all in place; the first recording arrives with stack 04 |
+| Routes | Each route answers, and answers the shape it says it does | `backend/tests/api/` | `[built]` — health, about, and the two stored-example routes |
+| Worked example | The Strait of Hormuz map and its branch: every rule it must obey, and every shape it is there to exercise | `backend/tests/unit/fixtures/` | `[built]` |
+| Browser app | Component tests for the status screen; later the canvas, the reducers and the inspector; one end-to-end smoke test | `frontend/src/**/*.test.tsx` | `[built]` for components; the end-to-end test is `[planned]` |
 | Evaluation set | The four assignment examples run live; structural checks (no loops, ends in a trade, every link has a rationale, verify mode never fabricates a bridge) | `evals/` | `[planned]` — arrives with stack 04. `make eval` says so out loud rather than pretending |
 
-The one test that matters most today is `backend/tests/unit/test_import_boundary.py`: it reads every file under `domain/` and fails if any of them imports the engine, the routes, the grounding layer, or a model client. It is nearly empty of work now and load-bearing forever after — it is the rule "the model proposes; our code decides" made mechanical.
+`make test` today runs 137 server tests and 3 browser tests, all without a key and without the network. Coverage is measured on the rules layer alone — `backend/src/katalyst/domain/` — and stands at 100% of lines and branches; no other layer has a coverage threshold, on purpose (decision record 0008).
+
+The one test that matters most is still `backend/tests/unit/test_import_boundary.py`. `test_domain_imports_nothing_impure` reads every file under `domain/` — nine of them now — and fails if any imports the engine, the routes, the grounding layer, or a model client. It is the rule "the model proposes; our code decides" made mechanical.
 
 **Runs on every pull request**, in four checks named `backend`, `frontend`, `types-fresh` and `docker` (`.github/workflows/ci.yml`). None of them is given an API key, and none needs one. `types-fresh` regenerates `frontend/src/api/schema.ts` from the server's own description of itself and fails if the result differs from what is committed, which is what stops the two halves drifting apart.
 
@@ -140,9 +166,7 @@ Deliberately skipped in v1: snapshot tests of rendered graphs, load tests, cover
 
 ## 8. Repository layout `[built]`
 
-Python tests live inside `backend/`, next to the project they test, so `pytest` and `uv` run from one root (decided 2026-09-16). Directories that have no content yet are marked; nothing is created before it holds something.
-
-Python tests live inside `backend/`, next to the project they test, so `pytest` and `uv` run from one root (decided 2026-09-16).
+Python tests live inside `backend/`, next to the project they test, so `pytest` and `uv` run from one root (decided 2026-09-16). Nothing is created before it holds something, so a directory that is still empty is marked below: `grounding/`, `backend/tests/boundary/` and `backend/tests/cassettes/` hold a package marker and nothing else, and `evals/` does not exist at all.
 
 ```
 katalyst/
@@ -154,11 +178,14 @@ katalyst/
 ├── spec/                the spec, organized as a book by idea
 ├── backend/
 │   ├── pyproject.toml  uv.lock  .python-version
-│   ├── src/katalyst/   domain/  engine/  grounding/  api/  fixtures/  settings.py
-│   └── tests/          unit/  api/  boundary/  cassettes/  conftest.py
+│   ├── src/katalyst/   domain/  engine/  grounding/ [planned]  api/  fixtures/  settings.py
+│   └── tests/          unit/ (domain/  fixtures/)  api/  boundary/ [planned]
+│                       cassettes/ [planned]  conftest.py
+│                       strategies.py  the generators the property tests draw maps from
 ├── frontend/
 │   ├── package.json  package-lock.json  vite.config.ts  biome.jsonc
-│   └── src/            api/ (client and generated types)  styles/  test/
+│   └── src/            App.tsx and its test  api/ (client and generated types)
+│                       styles/ (design tokens)  test/ (test setup)
 ├── scripts/
 │   └── gen-types.sh    rewrites frontend/src/api/schema.ts from the server
 ├── docker/             Dockerfile.backend  Dockerfile.frontend  nginx.conf
@@ -195,10 +222,23 @@ katalyst/
 
 ## 10. Not yet built, and known unknowns
 
-Nothing under `backend/` or `frontend/` exists yet; stack 01 creates the skeleton. Open technical questions, dated:
+Stacks 00, 01 and 02 are merged. What that leaves, each with the stack that will build it:
 
-- **2026-09-16** Reflexive links (market → world, delayed): schema in stack 02, propagation deferred to stack 06.
-- **2026-09-16** Propagation engine: a deterministic topological sweep first, or seeded simulation from the start? ADR-0005 names the three conditions that force simulation.
-- **2026-09-16** Ensemble size for generation (how many independent runs to reconcile) and its cost per graph. Measure in stack 04.
-- **2026-09-16** Whether the GitHub web UI's stacked-PR view is enough at three PRs deep, or `git-spice` is needed.
-- **2026-09-17** Replay mode — with no model key, the four example hypotheses play from committed generation transcripts through the live event stream — is proposed in ADR-0012, pending Kent's acceptance. Nothing is built against it until then; it would land in stack 04.
+- **Applying an edit.** `apply`, `propagate`, and the `World` type. The six intervention types exist and a branch can carry an ordered list of them, but nothing folds a branch onto a map and no likelihood has ever moved. Stack 03a.
+- **The canvas.** Tiles, typed ports and wires, automatic layered layout, the ghost diff, the inspector. The browser app today is one status screen reading three routes. Stack 03b.
+- **The model pipeline.** `engine/` holds identifier minting and nothing else. No route streams, nothing has ever called a model, and `backend/tests/cassettes/` is empty. Stack 04.
+- **Grounding.** `grounding/` is an empty package. There is no Polymarket adapter and no FRED adapter, so a market likelihood on a map today is a number a person wrote down by hand with its source beside it. Stack 05.
+- **The thesis.** Legs, entry, invalidation, take-profit, the outcome distribution, tails, caveats, export. Stack 05.
+- **Probes.** `refine`, the simulated outcome distribution, value-of-information ranking, and the propagation of reflexive links — a market feeding back on the world it is measuring. Stack 06.
+- **Storage.** Nothing is kept between requests: no database file, no volume in either compose file, no session.
+
+Open technical questions, dated:
+
+- **2026-09-16** Ensemble size for generation — how many independent runs to reconcile into one map, and what a graph then costs. Measure in stack 04.
+- **2026-09-17** Replay mode — with no model key, the four example hypotheses play from committed generation transcripts through the live event stream — is proposed in decision record 0012 and awaits Kent's acceptance. Nothing is built against it until then; it would land in stack 04.
+
+Settled since this list was first written, kept here so the change is visible:
+
+- **Propagation engine** (asked 2026-09-16, settled 2026-09-17). Decision record 0005 already names seeded random simulation as the engine and permits stack 03a to ship a single deterministic pass only for as long as its types are the sampling engine's types. The stack-03a plan takes the sampling version from the start, behind a signature that will not change; the deterministic pass is then just the case where randomness is switched off.
+- **Reflexive links** (asked 2026-09-16, settled 2026-09-17). Schema in stack 02 — built, and the stored Hormuz example carries one, checked by `test_the_map_has_a_feedback_arrow_and_it_takes_time`. Propagation in stack 06.
+- **Stacked pull requests** (asked 2026-09-16, settled 2026-09-17). GitHub's native stacked pull requests work on this repository. `gh pr merge` refuses a stacked pull request and the asynchronous merge route does the job; the verified method is written down under *More Information* in decision record 0009.
