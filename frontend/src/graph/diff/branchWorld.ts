@@ -40,7 +40,6 @@ import type {
   DiffView,
   LinkView,
   Movement,
-  Slot,
   WorldView,
 } from "../../world/types";
 import { badgesByClaim, standingByClaim } from "./badges";
@@ -62,20 +61,37 @@ export const NO_ENGINE: Absence = {
     "connected. The old number would be the base map's, not this branch's.",
 };
 
-/** That slot, ready to be dropped into a claim. */
-const NO_ENGINE_SLOT: Slot = { absence: NO_ENGINE };
-
 /**
- * What the engine answered about this branch, when it has answered.
+ * Where the engine has got to with this branch.
  *
- * Both halves are needed together: the world is what the numbers are, and the
- * difference is what moved. Neither is worked out here.
+ * **Waiting is a state, not the absence of one.** The engine has been asked and
+ * has not answered, or has refused, or could not be reached — and in every one
+ * of those the screen owes the reader the same thing: the room the answer will
+ * take, and a sentence saying why it is not there. What it must never do is
+ * change size when the answer lands, so a claim the edit can reach keeps the
+ * same tile in both states and only the words inside it change.
+ *
+ * Left out altogether means there is no engine behind this map at all — the
+ * stored example standing in — and then nothing is reserved, because nothing is
+ * coming.
  */
-export interface Computed {
-  /** The branch world, exactly as the engine built it. */
-  readonly now: WorldView;
-  /** What the engine says moved between the two worlds. */
-  readonly change: DiffView;
+export type Engine =
+  | {
+      readonly at: "waiting";
+      /** What stands where the numbers would be, and why. */
+      readonly absence: Absence;
+    }
+  | {
+      readonly at: "answered";
+      /** The branch world, exactly as the engine built it. */
+      readonly now: WorldView;
+      /** What the engine says moved between the two worlds. */
+      readonly change: DiffView;
+    };
+
+/** What the engine answered, or nothing when it has not. */
+function answered(engine: Engine | undefined): { now: WorldView; change: DiffView } | undefined {
+  return engine?.at === "answered" ? engine : undefined;
 }
 
 /**
@@ -131,9 +147,33 @@ const WAY = {
  * have to say. Both readings are the engine's, printed at two significant
  * figures like every other number on screen, and nothing here subtracts them.
  *
- * @param moved The engine's reading of how far this claim moved.
+ * **Every claim the edit can reach gets this line, whether or not it moved and
+ * whether or not the engine has answered yet.** That is what stops the map
+ * jumping: a line that appears when the answer lands is a tile that grows when
+ * the answer lands, and a tile that grows after it has been placed either shoves
+ * its neighbours or sits on top of them. So the room is reserved from the moment
+ * the branch opens, and only the words inside it change — the reading when the
+ * claim moved, *no change* when the engine says it did not, and the reason it is
+ * not there yet while the engine is being asked.
+ *
+ * @param moved The engine's reading of how far this claim moved, when it did.
+ * @param waiting What to say instead when there is no reading: the engine's own
+ *   word for where it has got to, or nothing when it has answered and the claim
+ *   simply held still.
  */
-function movedBadge(moved: Movement): Badge {
+function movedBadge(moved: Movement | undefined, waiting: Absence | undefined): Badge {
+  if (moved === undefined) {
+    return waiting === undefined
+      ? {
+          words: "no change",
+          reason:
+            "Your edit can reach this claim and the engine compared the two worlds: its " +
+            "likelihood did not move by enough to report. The two numbers behind that are in " +
+            "the panel beside the map.",
+          movement: true,
+        }
+      : { words: waiting.words, reason: waiting.reason, movement: true };
+  }
   const way = WAY[moved.way];
   const agreed = moved.sameDirection.reading;
   return {
@@ -149,7 +189,21 @@ function movedBadge(moved: Movement): Badge {
 }
 
 /**
- * The endings the rail lists, in the engine's own order, with one substitution.
+ * Every ending the edit can reach, as the rail lists them.
+ *
+ * **The engine's rows first, in the engine's own order, and then the endings it
+ * left out.** The engine's `rows` hold only the endings that came out `shifted`,
+ * so a reader looking at that list alone cannot tell *"it did not move"* from
+ * *"it is not on this map"* — and silence that could mean either is the state
+ * the traceability rule exists to forbid. So the reachable endings the engine
+ * left out follow, greyed and unranked, in map order, each reading **no change**
+ * where the move would be.
+ *
+ * **Where the verdict comes from matters as much as the row.** *Did not move* is
+ * read off `ClaimDiff.state`, which the engine states for every claim in either
+ * world. The browser never decides it by comparing two numbers: that would be
+ * the browser re-running the shifted test with its own floor and its own bar,
+ * and two answers to that question is one too many.
  *
  * **A claim standing on the reader's own say-so has no move to report.** While a
  * supposition holds the claim is true in every version of the map, and the
@@ -158,18 +212,22 @@ function movedBadge(moved: Movement): Badge {
  * the certainty guard in front of it. So such a row reads the word instead, the
  * same word the tile reads, and says why.
  *
- * Nothing else about a row is touched: not its place in the list, not its
+ * Nothing else about a ranked row is touched: not its place in the list, not its
  * ranking, not its two columns.
  *
- * @param computed What the engine answered about this branch.
+ * @param painted The map with the edits, as it is drawn — which is where the
+ *   endings the edit can reach are known, and which claims stand on a
+ *   supposition.
+ * @param change What the engine answered.
  */
-export function railRows(computed: Computed): readonly DeltaRow[] {
+export function railRows(painted: WorldView, change: DiffView): readonly DeltaRow[] {
   const standing = new Map(
-    computed.now.claims.flatMap((claim) =>
+    painted.claims.flatMap((claim) =>
       claim.standing === undefined ? [] : [[claim.id, claim.standing] as const],
     ),
   );
-  return computed.change.rows.map((row) => {
+
+  const ranked = change.rows.map((row) => {
     const word = standing.get(row.claimId);
     if (word === undefined) {
       return row;
@@ -187,6 +245,51 @@ export function railRows(computed: Computed): readonly DeltaRow[] {
       },
     };
   });
+
+  const listed = new Set(ranked.map((row) => row.claimId));
+  const held: DeltaRow[] = painted.claims
+    .filter(
+      (claim) =>
+        (claim.kind === "market" || claim.kind === "not_tradeable") &&
+        claim.diff !== undefined &&
+        claim.diff !== "untouched" &&
+        !listed.has(claim.id) &&
+        change.claims.get(claim.id)?.state === "unchanged",
+    )
+    .map((claim) => ({
+      claimId: claim.id,
+      label: claim.claim,
+      kind: claim.kind,
+      move: {
+        absence: {
+          kind: "no_engine" as const,
+          words: "no change",
+          reason:
+            "This ending is on the map and your edit did not move it: the engine compared the " +
+            "two worlds and said so itself. It is listed so that holding still cannot be " +
+            "mistaken for not being here.",
+        },
+      },
+      rangeWidth: {
+        absence: {
+          kind: "no_engine" as const,
+          words: "—",
+          reason: "How firm a number is only says something about a number that moved.",
+        },
+      },
+      agreement: {
+        absence: {
+          kind: "no_engine" as const,
+          words: "—",
+          reason:
+            "Whether the versions of the map agreed on a direction only says something about a " +
+            "claim that had a direction.",
+        },
+      },
+      noChange: true,
+    }));
+
+  return [...ranked, ...held];
 }
 
 /**
@@ -206,17 +309,16 @@ export function railRows(computed: Computed): readonly DeltaRow[] {
  *
  * @param base The base world, exactly as the map was written.
  * @param branch The branch to fold onto it.
- * @param computed What the engine answered about this branch, when it has
- *   answered. Left out, the map with your edits shows structure and an absence
- *   wherever a likelihood would have moved — which is what it shows while the
- *   engine is being asked, and what it shows for good when there is no engine.
+ * @param engine Where the engine has got to with this branch. Left out, there
+ *   is no engine behind this map at all and every likelihood the edit could move
+ *   reads its absence for good.
  */
 export function bothPaintings(
   base: WorldView,
   branch: BranchView,
-  computed?: Computed,
+  engine?: Engine,
 ): { now: WorldView; before: WorldView } {
-  const now = branchWorld(base, branch, computed);
+  const now = branchWorld(base, branch, engine);
   const added = new Set(branch.claims.map((claim) => claim.id));
   const addedArrows = new Set(branch.links.map((link) => link.id));
   return {
@@ -266,11 +368,13 @@ function asArrows(links: readonly LinkView[]): Arrow[] {
  * @param base The base world, exactly as the map was written.
  * @param branch The branch: its edits in order, and whatever whole claims and
  *   arrows the map supplied for them.
- * @param computed What the engine answered, when it has answered. Its claims
+ * @param engine Where the engine has got to. Once it has answered, its claims
  *   carry the computed likelihoods, its badges are read off the world, and its
- *   difference says which claims moved.
+ *   difference says which claims moved. While it is still being asked, the room
+ *   those answers will take is reserved and says why it is empty.
  */
-export function branchWorld(base: WorldView, branch: BranchView, computed?: Computed): WorldView {
+export function branchWorld(base: WorldView, branch: BranchView, engine?: Engine): WorldView {
+  const computed = answered(engine);
   // The claims and arrows to draw. With the engine, they are the map its edits
   // left behind — which already holds whatever the branch added. Without it,
   // the base map plus whatever whole claims and arrows the branch supplied.
@@ -345,29 +449,38 @@ export function branchWorld(base: WorldView, branch: BranchView, computed?: Comp
       // **no surface prints that number**, and a reading of ".40 up to >.99" is
       // that number wearing the certainty guard's clothes. The badge pair says
       // *Supposed · Oct 1* instead, which is what actually happened.
+      const supposed = standing.get(claim.id) !== undefined;
       const moved =
-        state === "shifted" && standing.get(claim.id) === undefined
-          ? computed?.change.claims.get(claim.id)?.moved
-          : undefined;
+        state === "shifted" && !supposed ? computed?.change.claims.get(claim.id)?.moved : undefined;
+      // Which tiles reserve a line for how far their number moved: the ones the
+      // edit can reach, and only those. A claim it added, one it forced false
+      // and one it cannot reach have nothing to say there, and a claim standing
+      // on the reader's say-so says the word instead. **The same set in both
+      // states**, so the tile is the same size before and after the answer.
+      const reserves = (state === "downstream" || state === "shifted") && !supposed;
       return {
         ...claim,
         diff: state,
         moved,
         badges: [
           ...(badges.get(claim.id) ?? []),
-          ...(moved === undefined ? [] : [movedBadge(moved)]),
+          ...(reserves && engine !== undefined
+            ? [movedBadge(moved, engine.at === "waiting" ? engine.absence : undefined)]
+            : []),
         ],
         standing: standing.get(claim.id),
         beliefs: {
           ...claim.beliefs,
-          // With the engine, the model's number on this claim is the engine's
-          // own answer for this branch and stays exactly as it came. Without it,
-          // a claim the edit can reach shows an absence: the number on screen
-          // would be the base map's, not this branch's, and leaving it there
-          // would be the quietest lie in the product.
+          // With the engine's answer, the model's number on this claim is the
+          // engine's own for this branch and stays exactly as it came. Without
+          // it, a claim the edit can reach shows an absence — the engine's own
+          // word for where it got to when there is one, so that a branch it
+          // refused says *that* rather than "no engine yet". The number on
+          // screen would otherwise be the base map's, not this branch's, and
+          // leaving it there would be the quietest lie in the product.
           model:
             computed === undefined && diff.canMove.has(claim.id)
-              ? NO_ENGINE_SLOT
+              ? { absence: engine?.at === "waiting" ? engine.absence : NO_ENGINE }
               : claim.beliefs.model,
           user: ownNumber === undefined ? claim.beliefs.user : { reading: ownNumber },
         },
@@ -395,7 +508,7 @@ export function branchWorld(base: WorldView, branch: BranchView, computed?: Comp
           `${branch.edits.length === 1 ? "one edit" : `${branch.edits.length} edits`} folded ` +
           `onto it. What you can see of it is shape: which claim arrived, which arrows came ` +
           `with it, and which claims those arrows can reach. Every likelihood a branch would ` +
-          `move reads "no engine yet", because nothing has worked one out.`
+          `move reads its absence, because nothing has worked one out.`
         : computed.now.origin,
   };
 }

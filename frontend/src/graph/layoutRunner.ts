@@ -27,7 +27,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type LayoutEdge,
   type LayoutTile,
+  type PinnedTile,
   type Position,
+  pinsFor,
   readPositions,
   toElkGraph,
 } from "./elkGraph";
@@ -129,6 +131,12 @@ function inWords(reason: unknown): string {
  *   moves every column one step right, and it has to, because a cause cannot be
  *   drawn to the right of what it causes. So when this changes, the pins go and
  *   the whole thing is laid out again, once, over the union of both worlds.
+ *
+ * **The pins also go when the map keeps its shape but a box changes size.**
+ * The layout is handed a height per tile and the reader sees a tile of that
+ * height, and the two have to be the same box — that is what `geometry.ts` means
+ * by content-fit. A pin made for a shorter box no longer describes anything, so
+ * the whole map is laid out again; see `pinsFor` for why it is all or none.
  */
 export function useLayout(
   tiles: readonly LayoutTile[],
@@ -147,9 +155,12 @@ export function useLayout(
     [tiles, edges],
   );
 
-  // Where tiles already sit. Held across runs, because that is what pinning
-  // means: this is the memory that stops a late arrival moving an early one.
-  const placed = useRef(new Map<string, Position>());
+  // Where tiles already sit, and how tall they were when they were put there.
+  // Held across runs, because that is what pinning means: this is the memory
+  // that stops a late arrival moving an early one. The height is kept with the
+  // place because a pin is only good for the size it was made at — see
+  // `pinsThatStillHold`.
+  const placed = useRef(new Map<string, PinnedTile>());
   const laidOutFor = useRef(mapKey);
   const [layout, setLayout] = useState<Layout>({
     positions: new Map(),
@@ -168,18 +179,26 @@ export function useLayout(
       laidOutFor.current = mapKey;
     }
     const [boxes, wires] = JSON.parse(shape) as [[string, number][], [string, string, string][]];
+    const tiles: LayoutTile[] = boxes.map(([id, height]) => ({ id, height }));
+    // The pins to hold — all of them, or none. A map whose boxes have changed
+    // size is laid out again from scratch: holding a grown tile where its
+    // shorter self went runs it into whatever sits below.
+    const holding = pinsFor(placed.current, tiles);
     const graph = toElkGraph(
-      boxes.map(([id, height]) => ({ id, height })),
+      tiles,
       wires.map(([id, source, target]) => ({ id, source, target })),
-      placed.current,
+      holding,
     );
     laidOut(graph).then(
       (laidOut) => {
         if (!stillWanted) {
           return;
         }
-        const positions = readPositions(laidOut, placed.current);
-        placed.current = positions;
+        const positions = readPositions(laidOut, holding);
+        const heights = new Map(tiles.map((tile) => [tile.id, tile.height]));
+        placed.current = new Map(
+          [...positions].map(([id, at]) => [id, { at, height: heights.get(id) ?? 0 }]),
+        );
         setLayout((was) => ({
           positions,
           runs: was.runs + 1,

@@ -21,6 +21,7 @@ import {
   LAYOUT_OPTIONS,
   type LayoutEdge,
   type Position,
+  pinsFor,
   readPositions,
   toElkGraph,
 } from "../elkGraph";
@@ -368,6 +369,155 @@ describe("the union of two worlds", () => {
     // claim it pushes against, which is what a diff over it can then be read on.
     expect(once.get("S")?.x ?? 0).toBeLessThan(once.get("H")?.x ?? 0);
     expect(once.get("H")?.x ?? 0).toBeLessThan(once.get("B")?.x ?? 0);
+  });
+
+  /**
+   * The gap the layout leaves between two tiles that sit straight under one
+   * another, as `LAYOUT_OPTIONS` sets it. Read back rather than written down
+   * twice, so changing the setting changes what this checks.
+   */
+  const GAP = Number(LAYOUT_OPTIONS["elk.spacing.nodeNode"]);
+
+  /**
+   * Every pair of tiles in one column that leave less room between them than
+   * they need.
+   *
+   * **Two different gaps, and only one of them is `nodeNode`.** Where nothing
+   * passes between two tiles the layout leaves the full gap. Where a wire has to
+   * cross that column on its way somewhere further right, the layout puts the
+   * wire's lane between them instead, and the tiles sit closer with the lane in
+   * the middle — on the stored example the wires from the hypothesis to Brent
+   * run between the talks and the insurance premium, and take that room. That is
+   * the layout doing its job, not two tiles crowding.
+   *
+   * So what is checked is the thing that is always wrong: **a pair that
+   * overlaps, or touches.** A tile drawn taller than the box the layout reserved
+   * for it shows up here and nowhere else.
+   *
+   * @param placed Where every tile ended up.
+   * @param heights How tall each one will actually be drawn.
+   */
+  function collide(
+    placed: ReadonlyMap<string, Position>,
+    heights: ReadonlyMap<string, number>,
+  ): string[] {
+    const found: string[] = [];
+    const tiles = [...placed].map(([id, at]) => ({ id, at, height: heights.get(id) ?? 0 }));
+    for (const one of tiles) {
+      for (const other of tiles) {
+        if (one.id >= other.id || one.at.x !== other.at.x) {
+          continue;
+        }
+        const [above, below] = one.at.y <= other.at.y ? [one, other] : [other, one];
+        const between = below.at.y - (above.at.y + above.height);
+        if (between <= 0) {
+          found.push(`${above.id} runs into ${below.id}: ${between} between them`);
+        }
+      }
+    }
+    return found;
+  }
+
+  /** The tiles in one column, top to bottom, with the gaps between them. */
+  function column(
+    placed: ReadonlyMap<string, Position>,
+    heights: ReadonlyMap<string, number>,
+    ids: readonly string[],
+  ): number[] {
+    const tiles = ids
+      .map((id) => ({ id, at: placed.get(id), height: heights.get(id) ?? 0 }))
+      .filter((tile): tile is { id: string; at: Position; height: number } => tile.at !== undefined)
+      .sort((a, b) => a.at.y - b.at.y);
+    return tiles.slice(1).map((tile, i) => {
+      const above = tiles[i] as { at: Position; height: number };
+      return tile.at.y - (above.at.y + above.height);
+    });
+  }
+
+  // test_no_two_tiles_in_a_column_collide
+  it("never lets two tiles in a column run into each other, on either map", async () => {
+    // The map as it was written. Its one crowded column holds the talks, the
+    // insurance premium and OPEC's announcement, and the whole gap is left
+    // between the two of them that have nothing passing between.
+    const heights = new Map(BASE);
+    const asWritten = await layout(BASE, BASE_ARROWS, new Map());
+    expect(collide(asWritten, heights)).toEqual([]);
+    expect(column(asWritten, heights, ["N1", "C", "R"]).at(-1)).toBe(GAP);
+
+    // And the strike branch, where six of the eight tiles are taller than they
+    // were on the base map: each one that the edit can reach carries a line
+    // saying how far its number moved. **That is the case this test exists for.**
+    // Those tiles are placed on the branch's own layout and never at coordinates
+    // worked out for the shorter boxes, so the gap survives the growth.
+    const grown: [string, number][] = [
+      ["H", 320],
+      ["C", 224],
+      ["B", 208],
+      ["R", 152],
+      ["M1", 224],
+      ["M2", 224],
+      ["N1", 248],
+      ["S", 208],
+    ];
+    const branchArrows: LayoutEdge[] = [
+      ...BASE_ARROWS,
+      { id: "S->B", source: "S", target: "B" },
+      { id: "S->C", source: "S", target: "C" },
+      { id: "S->H", source: "S", target: "H" },
+    ];
+    const onTheBranch = await layout(grown, branchArrows, new Map());
+    expect(collide(onTheBranch, new Map(grown))).toEqual([]);
+    expect(column(onTheBranch, new Map(grown), ["N1", "C", "R"]).at(-1)).toBe(GAP);
+  });
+
+  // test_a_pin_is_dropped_when_its_tile_changes_size
+  it("never holds a tile at a place worked out for a box of another size", async () => {
+    // The failure this prevents, in one run: lay the map out, then grow two
+    // tiles and lay it out again with the old pins. A pin that survived the
+    // growth would hold each grown tile where its shorter self went, and the
+    // tile below it would be run into.
+    const first = await layout(BASE, BASE_ARROWS, new Map());
+    const placed = new Map(
+      [...first].map(([id, at]) => [id, { at, height: new Map(BASE).get(id) ?? 0 }]),
+    );
+
+    const grown: [string, number][] = BASE.map(([id, height]) =>
+      id === "C" || id === "M1" ? [id, height + 48] : [id, height],
+    );
+    const tiles = grown.map(([id, height]) => ({ id, height }));
+
+    // Every pin goes, not only the two that changed size. A tile's place in a
+    // column is decided by its neighbours as much as by itself, so keeping one
+    // neighbour pinned while the other is placed afresh is what puts the two of
+    // them in the same space.
+    expect([...pinsFor(placed, tiles).keys()]).toEqual([]);
+
+    const again = await layout(grown, BASE_ARROWS, pinsFor(placed, tiles));
+    expect(collide(again, new Map(grown))).toEqual([]);
+  });
+
+  // test_a_tile_arriving_keeps_every_pin
+  it("keeps every pin when a claim arrives and no box changes size", async () => {
+    // The other half of the same rule, and the half the reader feels: a map that
+    // grows must not move what is already drawn.
+    const first = await layout(BASE, BASE_ARROWS, new Map());
+    const placed = new Map(
+      [...first].map(([id, at]) => [id, { at, height: new Map(BASE).get(id) ?? 0 }]),
+    );
+    const withOneMore: [string, number][] = [...BASE, ["M3", 192]];
+    const tiles = withOneMore.map(([id, height]) => ({ id, height }));
+
+    const holding = pinsFor(placed, tiles);
+    expect([...holding.keys()].sort()).toEqual([...BASE.map(([id]) => id)].sort());
+
+    const again = await layout(
+      withOneMore,
+      [...BASE_ARROWS, { id: "B->M3", source: "B", target: "M3" }],
+      holding,
+    );
+    for (const [id] of BASE) {
+      expect(again.get(id)).toEqual(first.get(id));
+    }
   });
 
   // test_the_first_frame_never_shows_a_summary_tile

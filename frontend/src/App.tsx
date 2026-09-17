@@ -28,16 +28,18 @@ import { Outline } from "./components/Outline";
 import { Refusal } from "./components/Refusal";
 import { ShortcutsSheet } from "./components/ShortcutsSheet";
 import { MapCanvas } from "./graph/Canvas";
-import { bothPaintings, type Computed, railRows } from "./graph/diff/branchWorld";
+import { bothPaintings, type Engine, railRows } from "./graph/diff/branchWorld";
 import { endings, NO_SUMMARY_YET } from "./graph/diff/endings";
 import { tileHeight } from "./graph/geometry";
 import type { MapKeys } from "./keyboard/useMapKeys";
 import {
+  type Absence,
   ApiWorldSource,
   appendEdit,
   type BranchView,
   branchesOf,
   type ClaimView,
+  type DiffView,
   type Edit,
   FixtureWorldSource,
   forkBranch,
@@ -258,12 +260,45 @@ const WAVE_SETTLES_AFTER = 1200;
  * exactly what is true while a question is in flight: the engine has been asked
  * and has not answered, so nothing has worked this number through the map
  * **yet**. It is not a fourth kind of absence and it is not a spinner: the map
- * on screen is the last one that was worked out, the slots that would move keep
- * the words they already had, and the line under the map says what has been
- * asked for and where.
+ * on screen keeps its shape, the slots that will move say why they are empty,
+ * and the line under the map says what has been asked for and where.
  */
-const WHILE_ASKING =
-  "Asking the engine at /api/worlds for the map with this branch folded onto it.";
+const WHILE_ASKING: Absence = {
+  kind: "no_engine",
+  words: "no engine yet",
+  reason:
+    "The engine has been asked at /api/worlds for the map with this branch folded onto it, and " +
+    "has not answered. Nothing has worked this number through the map yet.",
+};
+
+/**
+ * What stands where a likelihood would go when the engine **refused** the
+ * branch.
+ *
+ * Not "no engine yet": the engine is there and it answered — it said the branch
+ * does not fit the map, and it said why. The words have to be true of that, and
+ * `spec/vocabulary.md`'s three rows are all about a number nobody has worked
+ * out rather than one that could not be. **A fourth row is proposed** — *the
+ * engine refused the branch these numbers would come from* → **not worked out**
+ * — and until that lands this uses those words with the reason naming the
+ * refusal, because the nearest existing row says the wrong thing.
+ */
+const REFUSED: Absence = {
+  kind: "no_engine",
+  words: "not worked out",
+  reason:
+    "The engine would not work this map out from this branch: the branch does not fit the map. " +
+    "Every reason is beside the map, and nothing on the map has changed.",
+};
+
+/** What stands there when the engine could not be reached at all. */
+function unreachable(reason: string): Absence {
+  return {
+    kind: "no_engine",
+    words: "not worked out",
+    reason: `The engine did not answer, so this number was never worked out. ${reason}`,
+  };
+}
 
 /**
  * Everything the engine has said about the branch that is open, and whether it
@@ -271,10 +306,32 @@ const WHILE_ASKING =
  */
 type Answered =
   | { at: "asking" }
-  | { at: "answered"; computed: Computed }
+  | { at: "answered"; computed: { now: WorldView; change: DiffView } }
   | { at: "refused"; reasons: readonly Reason[] }
   | { at: "failed"; reason: string }
   | { at: "nothing-open" };
+
+/**
+ * Where the engine has got to, in the one shape the picture reads.
+ *
+ * Every state but *nothing is open* reserves the room an answer will take and
+ * says why it is not there yet, so the map is the same size before and after the
+ * answer lands and nothing on it jumps.
+ */
+function engineState(answer: Answered): Engine | undefined {
+  switch (answer.at) {
+    case "answered":
+      return { at: "answered", now: answer.computed.now, change: answer.computed.change };
+    case "asking":
+      return { at: "waiting", absence: WHILE_ASKING };
+    case "refused":
+      return { at: "waiting", absence: REFUSED };
+    case "failed":
+      return { at: "waiting", absence: unreachable(answer.reason) };
+    case "nothing-open":
+      return undefined;
+  }
+}
 
 /**
  * How tall a box this claim's tile needs, with room for how far its number
@@ -396,6 +453,7 @@ function MapScreen({
     // a button is a new question here, and nothing else is.
   }, [source, base.baseId, open]);
 
+  const engine = engineState(answer);
   const computed = answer.at === "answered" ? answer.computed : undefined;
 
   // The numbers on the arrows, one at a time, kept once they arrive. Each one
@@ -403,8 +461,8 @@ function MapScreen({
   // that arrow and never again for the same branch, seed and arrow.
   const [wireNumbers, setWireNumbers] = useState<ReadonlyMap<string, Slot>>(new Map());
   const paintings = useMemo(
-    () => (open === undefined ? null : bothPaintings(base, open, computed)),
-    [base, open, computed],
+    () => (open === undefined ? null : bothPaintings(base, open, engine)),
+    [base, open, engine],
   );
 
   const painted = paintings === null ? base : showing === "now" ? paintings.now : paintings.before;
@@ -456,11 +514,11 @@ function MapScreen({
   const rows = useMemo(
     () =>
       computed !== undefined
-        ? railRows(computed)
+        ? railRows(paintings?.now ?? base, computed.change)
         : paintings === null
           ? []
           : endings(paintings.now),
-    [computed, paintings],
+    [computed, paintings, base],
   );
   const outline = useMemo(() => outlineOf(world), [world]);
 
@@ -796,7 +854,7 @@ function MapScreen({
           it waits. */}
       <div className="map-origin">
         <p className="map-origin__line">{world.origin}</p>
-        {answer.at === "asking" ? <p className="map-origin__line">{WHILE_ASKING}</p> : null}
+        {answer.at === "asking" ? <p className="map-origin__line">{WHILE_ASKING.reason}</p> : null}
         {answer.at === "failed" ? (
           <p className="map-origin__line">
             {`The engine did not answer, so this is the map's shape with an absence wherever a ` +

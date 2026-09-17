@@ -22,6 +22,67 @@ export interface Position {
 }
 
 /**
+ * Where a tile sits, and how tall it was when it was put there.
+ *
+ * The height is kept beside the place because a pin is only ever good for the
+ * boxes it was made with. See `pinsFor`.
+ */
+export interface PinnedTile {
+  /** Where it was put. */
+  readonly at: Position;
+  /** How tall it was when it was put there. */
+  readonly height: number;
+}
+
+/**
+ * The pins to hand the layout engine — all of them, or none.
+ *
+ * **A pin is only good for the boxes it was made with.** Pinning exists for a
+ * map that *grows*: a claim arriving must not shove the claims already drawn, so
+ * every tile that has a place keeps it to the pixel. A tile that **changes
+ * size** is a different question with a different answer, and holding a grown
+ * tile where its shorter self went runs it into whatever sits below.
+ *
+ * It has to be all or none, and the reason is worth writing down: a tile's place
+ * in a column is decided by its neighbours as much as by itself. Drop one tile's
+ * pin and keep its neighbour's, and the engine places the unpinned one freely
+ * while we force the pinned one back to a coordinate worked out for a map that
+ * no longer exists — and the two meet in the middle. So the moment any box is a
+ * different size from the one it was placed at, **every** pin goes and the map is
+ * laid out again from scratch.
+ *
+ * That costs nothing the reader can see. The layout is a pure function of the
+ * map, so the answer is the same every time; columns cannot slide, because which
+ * column a tile is in is decided by the arrows and never by a height; and the
+ * reader's place is kept by the view centring on whatever the keyboard is on,
+ * which is what `layout-and-zoom.md` asks for and what the canvas already does.
+ *
+ * @param placed Where tiles sat after the last layout, with the heights they
+ *   were placed at.
+ * @param tiles Every tile to place now, with the height it will be drawn at.
+ */
+export function pinsFor(
+  placed: ReadonlyMap<string, PinnedTile>,
+  tiles: readonly LayoutTile[],
+): Map<string, Position> {
+  const resized = tiles.some((tile) => {
+    const pin = placed.get(tile.id);
+    return pin !== undefined && pin.height !== tile.height;
+  });
+  if (resized) {
+    return new Map();
+  }
+  const holding = new Map<string, Position>();
+  for (const tile of tiles) {
+    const pin = placed.get(tile.id);
+    if (pin !== undefined) {
+      holding.set(tile.id, pin.at);
+    }
+  }
+  return holding;
+}
+
+/**
  * One tile, reduced to the two things the layout engine needs: what it is
  * called and how tall it is.
  *

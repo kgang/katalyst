@@ -276,7 +276,11 @@ describe("the second world", () => {
       ),
     };
 
-    const now = branchWorld(base(), supposed, { now: asTheEngineBuiltIt, change: engineSays });
+    const now = branchWorld(base(), supposed, {
+      at: "answered",
+      now: asTheEngineBuiltIt,
+      change: engineSays,
+    });
     const b = now.claims.find((claim) => claim.id === "B");
     expect(b?.standing?.words).toBe("Supposed · Oct 1");
     expect(b?.moved).toBeUndefined();
@@ -284,7 +288,7 @@ describe("the second world", () => {
 
     // And the rail says the word rather than the number, in the same place the
     // reading would have gone.
-    const listed = railRows({ now: asTheEngineBuiltIt, change: engineSays });
+    const listed = railRows(now, engineSays);
     expect(listed[0]?.move.reading).toBeUndefined();
     expect(listed[0]?.move.absence?.words).toBe("Supposed · Oct 1");
   });
