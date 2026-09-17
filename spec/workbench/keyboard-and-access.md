@@ -1,15 +1,250 @@
 # Keyboard and access — everything reachable, nothing by hue alone
 
-> **Stub.** Headings only, committed so the code above this pull request can branch off it. The chapter is being written on this branch; it cites decision record 0007 as accepted.
-
 ## Purpose
+
+A map you can only use with a mouse is a map you can only use slowly. This chapter puts the whole workbench on the keyboard — move along the wires, open a claim, fork a branch, flip between two worlds, without your hands leaving the keys — and it does the same job for the reader who never sees the canvas at all: the map also exists as a nested list, each claim read as a sentence, and a change announces itself out loud.
+
+It also owns one small rendering rule that carries a lot of weight. **INV-7** — honest numbers: every likelihood stays between 0 and 1 and is *shown at two significant figures with its range* — is a rule about arithmetic in the engine and a rule about pixels here. The pixel half is this chapter's: a chip never shows more than two significant figures, and never omits its range.
+
+Three chapters sit beside this one: `color-motion-type.md` carries the colour law and the motion budget, `tiles-ports-wires.md` says what is inside a tile and how a wire is drawn, and `inspector.md` says what the panel shows. This chapter says how you reach all of it without a mouse, and how a number is spelled.
 
 ## Data model
 
+### The key map
+
+```ts
+/** UX-9, the whole of it. Bound on the canvas root, not on individual tiles. */
+const KEYS = {
+  "Meta+k": "openPalette",   // ⌘K — the command palette
+  j: "nextSibling",          // down the column you are in
+  k: "previousSibling",      // up the column you are in
+  h: "backAlongAWire",       // toward causes
+  l: "forwardAlongAWire",    // toward effects
+  E: "intervene",            // open the intervention panel on the focused claim
+  B: "branch",               // fork a branch from here
+  " ": "toggleWorlds",       // Space — A ⇄ A′, a hard switch
+  "?": "openShortcutsSheet",
+  Escape: "closeTopOverlay",
+} as const;
+```
+
+### The two overlays
+
+```ts
+interface OverlayProps {
+  /** The canvas keeps drawing and stays live behind it. Never a blocking scrim. */
+  open: boolean;
+  /** Escape always closes. Nothing is pending; closing loses nothing. */
+  onClose(): void;
+}
+```
+
+### The outline
+
+```ts
+/** One item per claim. Built from the world, not from what happens to be on screen. */
+interface OutlineItem {
+  id: string;              // "H", "C", "B", …
+  sentence: string;        // the whole claim, read aloud, in one line
+  children: OutlineItem[]; // the claims this one causes, in wire order
+}
+```
+
+### The chip's input
+
+The belief chip takes a **`BeliefView`**, defined once in `tiles-ports-wires.md`. It carries the number at full precision — `0.347`, not `0.35` — together with its range and its owner. A slot with no number carries an **`Absence`** rather than a blank; `Known<T>` and `Absence` are defined once in `diff-view.md`.
+
+The chip rounds. Nothing upstream of the chip rounds. See B6.
+
+### Tokens this chapter reads
+
+From `frontend/src/styles/tokens.css`: **`--focus`**, the ring drawn around whatever the keyboard is on. A **contrast ratio** says how much lighter a mark is than what sits behind it; 4.5 to 1 is the floor for text, and 3 to 1 for a mark that is not text. The focus ring measures 12.1 to 1 against the dark surface and 5.7 to 1 against the light one — findable at a glance in either theme.
+
+Also `--text` and `--text-muted` (both clear 4.5 to 1 in either theme; the measured ratio is written beside each colour in that file), `--font-mono` for every number, and `--space-hair` for the gap between a glyph and the word beside it.
+
 ## Behaviour
+
+Worked on the Hormuz map (the cast is in [`README.md`](README.md)). This chapter uses H, C, B, R, M1, M2 and N1, the two wires between B and R, and the claim **S** that the strike branch adds. Columns are as `layout-and-zoom.md` lays them out.
+
+The **status line** referred to below is one line under the canvas, naming what the last keystroke did. It is *(proposed here)* — the plan does not name it, and it is in Open questions.
+
+### B1 — `j` and `k` walk a column
+
+`j` moves down, `k` moves up, within the column the focused tile is in, in the order the layout put them.
+
+Focus **C**, in column 1 alongside N1 and R. `j` reaches N1, `j` again reaches R, `j` again does nothing — *(proposed here)* **focus does not wrap**, because wrapping quietly teleports you to the top and you lose your place. The status line says *"last claim in this column"* rather than beeping.
+
+### B2 — `h` and `l` walk the wires, not the screen
+
+This is the part that matters. `l` follows a wire **out** of the focused claim, toward what it causes; `h` follows a wire **in**, toward what causes it. Neither has anything to do with where a tile sits on the glass.
+
+Focus **B**, the busiest claim on the map. Three wires come in — from H, from C, from R — and three go out — to M1, to M2, and the reflexive one back to R.
+
+- `h` from B reaches one of {H, C, R}.
+- `l` from B reaches one of {M1, M2, R}.
+
+**R is reachable both ways, from the same tile.** `R → B` is an ordinary arrow: announced restraint props the price back above the threshold. `B → R` is the feedback arrow: a run of sub-$68 settlements pressures OPEC+ revenue. Two different wires, opposite directions, same pair of claims. And `B → R` points *leftwards* on screen, because R sits in column 1 and B in column 2 — which is exactly why movement follows wires rather than geometry. Pressing `l` on B and landing on a tile to your left is correct.
+
+**Reflexive wires count here even though they do not count in the diff.** `diff-view.md` sets reflexive arrows aside when it works out which claims an edit can reach — which is why R comes out `untouched` on the strike branch — because that is a claim about what moved. Moving the keyboard, dimming the hover lens and building the outline are navigation, not a claim about what moved, so they follow every wire on the map.
+
+**When there are several wires**, the step lands on the neighbour nearest the focused tile's own vertical position, and the *others* become the `j`/`k` set at the tile you arrive on — so `h` then `j` reaches any of them in two keystrokes and nothing on the map is unreachable. The status line names the wire you just took: *"along the feedback arrow · 14 days"*. **This tie-break is proposed here; the plan does not name one — see Open questions.**
+
+When there is no wire in that direction, focus does not move and the status line says so. M1 and M2 cause nothing, so `l` from either is a quiet no-op, not a jump.
+
+### B3 — `E`, `B`, `Space`, `?`
+
+- **`E`** opens the intervention panel on the focused claim: the six buttons, word for word from `spec/vocabulary.md`'s Interface words table — **Suppose this is true** · **This happened** · **Add a claim** · **Change this push** · **Split this claim** · **My own number**. A panel beside the canvas, never a pop-up.
+- **`B`** forks a branch from the focused claim and names it.
+- **`Space`** flips A ⇄ A′ — the base world and the branch — as a **hard switch**, not a crossfade. What is painted in each is `diff-view.md`.
+- **`?`** opens the shortcuts sheet, which lists every key above and carries the line about dragging:
+
+  > **Tiles do not move.** The layout is automatic, left to right. Drag the background to pan, scroll to zoom. Pinning, grouping and annotating arrive as buttons, not as dragging.
+
+### B4 — What "no pop-ups" honestly means for a command palette
+
+UX-10 says **no modals**: one persistent Inspector, and confirmations are undoable toasts. But a command palette is conventionally the most modal thing in a product, so be exact about what we are promising.
+
+The palette and the shortcuts sheet are **overlays, not dialogs**. Four things make that true:
+
+1. **Nothing waits on them.** No state is half-committed while one is open. Close it and the app is exactly where it was.
+2. **The canvas stays live behind.** No dimming scrim, no `inert` page, no blur. The map keeps drawing.
+3. **`Escape` always closes**, as does clicking anywhere outside, as does running a command.
+4. **Neither is ever the only way to do anything.** Every command in the palette is also a button or a key.
+
+**The honest tension.** For a screen-reader or keyboard-only user, an overlay you can Tab straight out of by accident is worse than one you cannot. So while the palette is open, Tab cycles within its own list — a focus *ring*, not a barricade. Whether that ring is also declared `aria-modal="true"` in the markup is a genuine question, because the word "modal" would then be in our own accessibility tree while the product's copy says there are none. **Under Open questions.** What is not open: no dimmed page, no scrim, no "OK / Cancel", no spinner.
+
+### B5 — Reduced motion keeps the ordering and drops the tweening
+
+Under `prefers-reduced-motion: reduce` the interface loses the easing and keeps the sequence. **The table of what each of the three animations becomes is in `color-motion-type.md`, which owns the motion budget.**
+
+Two things this chapter adds to it. First: **never remove the ordering. The ordering is the causality.** That the premium claim resolves after the strait claim and before the oil claim is not decoration — it is the argument, drawn in time. Dropping the stagger and revealing everything at once throws away the one piece of meaning the animation carries and keeps the pretty part.
+
+Second: the ordering survives in the outline view too, which never had tweening to lose. A reader on the outline gets the causal order by construction — it is the shape of the tree — which is the clearest evidence that the order, not the motion, is the thing worth keeping.
+
+`frontend/src/styles/tokens.css` already sets `--duration-fast` to `0ms` under reduced motion.
+
+### B6 — The rendering rule that makes INV-7 visible
+
+**Two significant figures. Always the range. Rounded once, at the moment of paint.**
+
+The view model carries the number the world carries, at full precision. Only the chip rounds, and it rounds for display only — nothing downstream ever reads a rounded value. Round in the view model and you have thrown away precision the Inspector needs; round twice and `.347 → .35 → .4` and now the screen is lying by a whole step.
+
+Worked examples. `spec/graph/belief.md`'s open question 5 hands this table the job of settling how a range is spelled, so the table is **what this chapter proposes**, not what is settled:
+
+| Value carried | Chip reads *(proposed here)* | Why |
+|---|---|---|
+| `.35` | `.35` | Already two figures |
+| `.347` | `.35` | The third figure is 7, so the second rounds up |
+| `.0712` | `.071` | The leading zero is not significant; 7 and 1 are |
+| `.4999` | `.50` | Two figures, and the trailing zero is one of them — `.5` would claim less precision than we have |
+| `.06` | `.060` | Same rule, and it looks odd. **Open** |
+| `.995` | ? | Two defensible answers. **Open** — see below |
+| the range's two ends | two figures each, like the number | **Open** — the written examples disagree; see Open questions |
+
+The three Hormuz chips, in full:
+
+- H, the hypothesis: model `.35 (.22–.50)` · user `.55 (.40–.70)` · market — **no market**, with its reason beside it.
+- M1, the Polymarket contract: model `.61 (.45–.74)` · market `.48 (.45–.52)`. Thirteen points apart, side by side, never averaged — that gap is the trade (INV-11: model, user and market beliefs are stored and rendered separately, and no code path averages them).
+- S, the strike, on the branch: model `.060 (.020–.14)`.
+
+**The `.995` case, honestly.** Two significant figures of .995 is 1.0 — and `1.0` on a likelihood is a claim of certainty, which this product does not make about anything. Worse, the arithmetic does not even agree with itself: JavaScript stores .995 as 0.99499999999999999556, so `(0.995).toPrecision(2)` returns `"0.99"`, while rounding the decimal string half-up returns `"1.0"`. Two defensible answers, one number. Both are under Open questions, and the test pins whichever Kent picks.
+
+The chip also never drops its range to fit. If the column is too narrow for `.61 (.45–.74)`, the column gets wider or the layout changes — the range does not go. A number without its range is the fake-precise percentage the whole product is arguing against.
+
+The range means one specific thing and the chip's label says which: **how sure we are of the number, not how much the world can move.** That label, and the sentence behind it on hover, are written out word for word in `tiles-ports-wires.md`, which owns the chip.
+
+### B7 — The outline view
+
+The map also exists as a nested list with `role="tree"` — the standard markup for a collapsible hierarchy, so a screen reader announces levels and lets you walk them with arrow keys. It is not a fallback; it is the same world, read rather than drawn.
+
+**A map is not a tree**, so the outline is a spanning tree: start at the hypothesis, walk out along wires in the order the map lists them, and give each claim **exactly one item**, at its first arrival. A claim with several causes does not appear twice — instead its sentence names every incoming wire. Nothing is lost and the tree stays a tree. Claims with no incoming wire at all are roots; the hypothesis is always the first of them, and on the strike branch **S** is the second.
+
+Each item reads as a sentence. `trigger` arrows read **caused by**; `sustain` arrows read **held up by**; a negative strength reads **pushed the other way by**. Mode and sign arrive in words, so nothing here depends on seeing anything.
+
+The Hormuz map, spoken:
+
+> **H** — *"The Strait of Hormuz reopens to unrestricted commercial transit. Model .35, range .22 to .50. Your own number .55, range .40 to .70. The hypothesis — nothing on this map causes it. Three claims follow."*
+> - **B** — *"Brent crude settles below $68 for five sessions. Model .46, range .30 to .63. Caused by the strait reopening, two days later. Held up by the war-risk premium falling. Pushed the other way by OPEC+ restraint. Three claims follow."*
+>   - **M1** — *"A Polymarket contract, Brent below $70 on the 31st of October, resolves yes. Model .61, range .45 to .74. Market .48, range .45 to .52. A tradeable ending. Caused by Brent settling below $68, one day later."*
+>   - **M2** — *"The energy fund XLE underperforms the S&P 500 fund SPY by more than 3 per cent over 20 trading days. Model .54, range .38 to .68. No market — no venue quotes this. A tradeable ending. Caused by Brent settling below $68, three days later."*
+>   - **R** — *"OPEC+ announces output restraint. Model .24, range .12 to .40. Fed back into by Brent settling below $68, fourteen days later. It pushes back on Brent, already listed above."*
+> - **C** — *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4 per cent. Model .44, range .30 to .60. Held up by the strait reopening, the same day. It reaches Brent crude, already listed above."*
+> - **N1** — *"Omani-mediated United States–Iran talks resume publicly. Model .29, range .15 to .45. Not tradeable — no venue quotes a contract on a diplomatic round. Caused by the strait reopening, ten days later."*
+
+A claim sitting behind a **"+n more"** tile (`layout-and-zoom.md`) still gets its item. The outline is built from the world, never from what happens to be painted.
+
+### B8 — What the announcement can honestly say, today
+
+When a branch re-propagates, an `aria-live="polite"` region speaks one line. Polite means it waits for a pause rather than cutting across what is being read.
+
+Once the engine is connected, that line is:
+
+> *"Branch created. Six claims changed, one retracted."*
+
+**In this stack there is no engine, so no claim has changed, because nothing computed a change.** Saying "six claims changed" would be inventing exactly the state the second veto exists to stop. What *is* real is structure — which claims arrived, which your edit can reach, which it provably cannot — computed from the branch by the reducer in `diff-view.md` and needing no arithmetic at all. So today the line is:
+
+> *"Branch created. One claim added, six claims your edit can reach, one supposition retracted. No numbers yet."*
+
+Every count comes from somewhere nameable: the **added** and **downstream** counts from `diff-view.md`'s reducer — on the strike branch that is S added, six claims downstream (H, C, B, N1, M1, M2), and R `untouched`, because the only wire that could carry the edit to R is reflexive and the diff sets those aside; the **retracted** count from UX-14, which `tiles-ports-wires.md` renders on H's tile; and **no numbers yet** said out loud rather than left as a silence.
+
+When `ApiWorldSource` lands, "your edit can reach" becomes "changed" and the count becomes a computed one. Nothing is deleted at that point, because nothing false was said.
+
+### B9 — Focus, contrast, and nothing by hue alone
+
+Focus is **always** visible, drawn with `--focus`, on every interactive thing — tiles, chips, wires, buttons, palette rows, outline items. `outline: none` appears nowhere in the tree. Tab order follows the map's reading order, and Tab alone reaches everything.
+
+All text and all glyphs clear **4.5 to 1** against the surface behind them, in the dark theme and the light one. `tokens.css` writes the measured ratio in a comment beside every colour, so the claim is checkable by reading the file rather than by trusting it.
+
+**INV-12 — nothing is carried by hue alone.** Every direction of financial effect has a glyph and a sign as well as a hue; every tail risk is a hatch texture rather than a colour; every provenance is a three-step mark at the wire's tail. **The law itself lives in `color-motion-type.md`** — this chapter only depends on it, and the outline view is its strictest test: a rendering with no colour at all that still says everything.
+
+### B10 — The fifth build job
+
+The INVARIANTS table below names every test in this chapter. Two notes on top of it.
+
+`frontend/src/components/__tests__/beliefChip.test.tsx` is the one test that holds **NFR-1** (honesty: beliefs render at two significant figures with their interval, never `.347`) upright. Nothing else in the tree stops a fake-precise number reaching the screen.
+
+The build grows a fifth job, **`e2e`**, running the single Playwright test `frontend/e2e/hormuz.spec.ts`. **It has no model API key in its environment** — **INV-13**: the whole build runs with no model key, and the model boundary is exercised only through recorded responses. The `e2e` job needs none, because the screen it drives is fed by `GET /api/fixtures/hormuz`, which is a stored example and calls no model.
 
 ## INVARIANTS
 
+Each is *for all X, statement P holds*, and each names what checks it. "Visual review checklist line *n*" is line *n* of the twelve-line checklist in [`README.md`](README.md) — a checklist line is a checkable thing; it is checked by a person.
+
+| ID | Statement | Checked by |
+|---|---|---|
+| **INV-workbench.31** | For every interactive element in the app, it is reachable and operable with the keyboard alone | `frontend/e2e/hormuz.spec.ts`; visual review checklist line 9 (tab through the whole screen) |
+| **INV-workbench.32** | For every focused element, a focus ring drawn with `--focus` is visible against the surface behind it, in both themes | visual review checklist line 9; `frontend/e2e/hormuz.spec.ts` |
+| **INV-workbench.33** | For every focused claim and every press of `h` or `l`, the claim focus lands on is joined to it by a wire; focus never moves to a claim that is merely nearby on screen | `test_h_and_l_land_only_on_a_wired_neighbour` in `frontend/src/keyboard/__tests__/focusMap.test.ts`; visual review checklist line 9 (does arrow movement follow the wires?) |
+| **INV-workbench.34** | For every overlay in the app, `Escape` closes it, the canvas stays live behind it, and nothing is left pending by closing it — there is no dialog anywhere that must be dismissed | visual review checklist line 2 (is there a spinner, a pop-up, or a dialog you must dismiss?) |
+| **INV-workbench.35** | For every animation, under `prefers-reduced-motion: reduce` the ordering is preserved and the tweening is absent | visual review checklist line 10 |
+| **INV-workbench.36** | For every belief rendered anywhere in the app, the chip shows at most two significant figures and always shows its range | `test_chip_never_shows_more_than_two_significant_figures` in `frontend/src/components/__tests__/beliefChip.test.tsx`; visual review checklist line 4 |
+| **INV-workbench.37** | For every belief, the view model carries the full precision the world carried, and rounding happens exactly once, in the chip, at paint | `test_the_view_model_keeps_full_precision` in `beliefChip.test.tsx` |
+| **INV-workbench.38** | For every piece of text and every glyph, in both themes, the contrast ratio against the surface behind it is at least 4.5 to 1 | visual review checklist line 7 |
+| **INV-workbench.39** | For every claim in the world there is exactly one outline item, its sentence names every incoming wire, and the announcement names no number the world does not carry | `frontend/e2e/hormuz.spec.ts`; visual review checklist line 5 (is there a number nobody computed?) |
+
 ## ANTI-PATTERNS
 
+1. **Do not build the palette as a dialog over a dimmed page**, because a scrim and an "OK / Cancel" is the template look and the pop-up veto in one move. Build an overlay that closes on `Escape`, holds nothing pending, and lets the canvas keep drawing behind it.
+2. **Do not move focus by screen geometry**, because the tile nearest your arrow key is often not connected to the one you are on, and a map's meaning is its wires. Follow the wires, and say which wire you took.
+3. **Do not drop the ordering under reduced motion**, because the ordering *is* the causality — it is the one thing the animation was carrying. Drop the easing; keep the sequence.
+4. **Do not round in the view model**, because the Inspector needs the precision the chip threw away, and a number rounded twice drifts a whole step. Carry the full number; round once, in the chip, at paint.
+5. **Do not drop the range when a column is tight**, because a bare `.61` is the fake-precise number this product exists to argue against. Widen the column.
+6. **Do not say "six claims changed" before anything computed a change**, because a count nobody computed is a state nobody can trace. Say what is true — added, reachable, retracted — and say "no numbers yet" out loud.
+7. **Do not build the outline from the tiles on screen**, because a claim behind a "+n more" tile would silently vanish for the reader who needs the outline most. Build it from the world.
+8. **Do not lean on hue for anything**, because roughly one reader in twelve will not see the difference and a greyscale screenshot is line 3 of the visual review checklist. Every direction gets a glyph, every tail a texture, every provenance a mark.
+9. **Do not write `outline: none`**, anywhere, for any reason. A focus ring you cannot see is a keyboard interface you cannot use. Restyle the ring with `--focus`; never remove it.
+
 ## Open questions
+
+*Dated 2026-09-17. Each is something the plan does not settle; none is decided here.*
+
+1. **How does `h`/`l` pick among several wires?** B2 proposes "nearest on the cross-axis, and the rest become the `j`/`k` set where you land". The plan says only that movement follows wires. An alternative is that `h` opens a small chooser naming each wire — more explicit, one more keystroke. Needs Kent.
+2. **B and R are joined by two wires, one each way.** `l` from B reaches R along the feedback arrow; `h` from B reaches R along the ordinary one. Arriving at the same tile by opposite keys is honest and may still be confusing. Should the reflexive wire be excluded from `l`, and reachable only from the wire itself?
+3. **Is the palette's focus ring declared `aria-modal="true"`?** Trapping Tab is right for the reader who needs it most; putting the word "modal" in our accessibility tree while the product's copy says there are no modals is uncomfortable. The visual rule is not open — no scrim, no dismissal — only the markup.
+4. **What does the chip do with `.995`?** Two significant figures gives `1.0`, which claims a certainty the product never claims. And the two obvious implementations disagree: `toPrecision(2)` returns `.99` because the stored double is a hair under .995, while rounding the decimal string half-up returns `1.0`. Pick one — `1.0`, `.99`, or a `>.99` form — and the test pins it.
+5. **Does `.06` really render as `.060`?** Two significant figures says yes, and the strike claim's chip would read `.060 (.020–.14)`. Correct, and it reads like a lab notebook. Kent may prefer `.06 (.02–.14)`, which is one significant figure and a different rule.
+6. **Does the two-figure rule bind the range's two ends as well as the number?** The written examples disagree. `PRODUCT_REQUIREMENTS.md` NFR-1 and `spec/graph/belief.md` §B3 write `.35 (.2–.5)` — one figure on the ends. The plan's tile and `belief.md` §B5 write `.61 (.45–.75)` — two on all three. `belief.md`'s own open question 5 asks which is meant, wonders aloud whether a coarser range is the honest one, and hands the worked table to this chapter. B6's table proposes two figures everywhere. **Kent decides; nothing is being edited to match in the meantime.**
+7. **Does `j`/`k` wrap at the end of a column?** B1 proposes not, because wrapping teleports you. Unsaid by the plan.
+8. **Is there a status line, and what is in it?** B1, B2 and B4 lean on one line under the canvas naming what the last keystroke did — *"along the feedback arrow · 14 days"*, *"last claim in this column"*. It is proposed here; the plan does not name it.
+9. **Is there an announcement for ordinary focus movement?** The outline reads a claim when you land on it, but a sighted keyboard user moving quickly along wires gets only the status line. Whether that line is also an `aria-live` region, or whether that would be unbearable chatter, is untested.
+10. **How is the outline reached?** `role="tree"` markup exists in the page; whether it is always present and visually hidden, toggled by a key, or a panel beside the canvas is unsaid. The plan says only that it exists.
+11. **Where does the reason beside an empty market slot come from?** M2's `kind` is `market` — it is a tradeable ending — and it still has no market belief, because no venue quotes that pair. The fixture carries a reason for N1's untradeability but none for M2's missing price, so the outline sentence in B7 and the chip in `tiles-ports-wires.md` both need a source for those words.
