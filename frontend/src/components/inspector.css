@@ -22,7 +22,7 @@
  * them. A panel squeezed to nothing means selecting a claim shows the reader an
  * empty strip, which is this product's central answer gone missing. */
 .inspector {
-  flex: 1 1 auto;
+  flex: 1 1 18rem;
   min-width: 0;
   min-height: 18rem;
   overflow-y: auto;

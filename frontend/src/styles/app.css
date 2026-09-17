@@ -206,11 +206,17 @@ body {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  /* One hairline between one section and the next, drawn by the column showing
+     through a one-pixel gap rather than by a border on each section. A section
+     that is scrolling cuts a line of its text in half at its own bottom edge —
+     every scrolling thing does — and without a line there the cut half and the
+     next section's first line read as one word printed over another. */
+  gap: 1px;
   width: 336px;
   min-width: 0;
   overflow: hidden;
   border-left: 1px solid var(--hairline);
-  background: var(--surface-raised);
+  background: var(--hairline);
 }
 
 /* Which branch you are in, in the bar at the top. The hue is on the chip; the

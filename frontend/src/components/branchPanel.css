@@ -16,13 +16,14 @@
  * scrolls inside itself rather than pushing anything off the bottom. */
 .branch-panel {
   flex: 0 1 auto;
-  min-height: 9rem;
+  min-height: 8rem;
+  max-height: 28%;
   overflow-y: auto;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);
   padding: var(--space-2);
-  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-raised);
 }
 
 .branch-panel__heading {
@@ -260,7 +261,6 @@
   align-content: start;
   row-gap: var(--space-1);
   padding: var(--space-2);
-  border-bottom: 1px solid var(--hairline);
   background: var(--surface);
 }
 

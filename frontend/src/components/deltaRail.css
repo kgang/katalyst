@@ -12,14 +12,18 @@
  * is the section most likely to want more room than the column has — and it
  * takes what it can, keeps enough to read two rows, and scrolls the rest. */
 .delta-rail {
-  flex: 0 1 auto;
-  min-height: 12rem;
+  /* A share of the column of its own, rather than whatever the panel below
+     leaves: the panel's content is far longer, so sharing by content would
+     squeeze the rail down to its heading and put its rows — the reason the rail
+     exists — below its own fold. */
+  flex: 1 1 20rem;
+  min-height: 15rem;
   overflow-y: auto;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);
   padding: var(--space-2);
-  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-raised);
 }
 
 .delta-rail__heading {
