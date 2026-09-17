@@ -1,0 +1,50 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2Q2BMJN7JGS8JRDX4Z1D5WG",
+  "session_id": "8bebbda3-a2e7-4ac3-80a6-4aa787fd875f",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-17T06:55:13.044194Z",
+  "branch": "adr/03-engine-rules",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "ARCHITECTURE.md",
+    "docs/adr/0005-link-semantics-and-propagation.md",
+    "docs/adr/0014-a-supposition-ends-when-something-pushes-back.md",
+    "docs/adr/README.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "93f3d7b30642",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 154,
+    "cache_creation_tokens": 312596,
+    "cache_read_tokens": 12044009,
+    "output_tokens": 106640,
+    "api_call_count": 71
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-17T06:55:12.935618Z",
+    "agent_lines": 246,
+    "agent_removed": 3,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 246,
+    "total_lines_changed": 249,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
