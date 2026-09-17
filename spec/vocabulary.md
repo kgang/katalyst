@@ -1,4 +1,4 @@
-# 00 — Vocabulary
+# Vocabulary
 
 Every document, identifier, and UI label uses these words exactly. If a better word appears, change it here first and then everywhere else (L2.21: understanding enables composition; shared words are the interface).
 
@@ -16,8 +16,8 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 
 **Link.** An edge. A causal claim from one proposition to another.
 - `mode`: `trigger` — horizontal/sequential causality (dominoes): fires once when the parent becomes true, effect persists and decays; removing the parent later does not undo it. `sustain` — vertical causality (the desk holds the apple): the effect exists only while the parent holds; removing the parent retracts the effect.
-- `strength`: Δ log-odds applied to the child while the link is active.
-- `lag`: time from parent-true to link-active. `shape`: `impulse` (Dirac; decays with `half_life`) · `step` (Heaviside; holds) · `ramp` (grows over `lag`).
+- `strength`: how much the link shifts the child's odds while active, on a log-odds scale (so several links add up instead of multiplying).
+- `lag`: time from parent-true to link-active. `shape`: `impulse` (a one-time spike that fades with `half_life`) · `step` (switches on and holds) · `ramp` (builds up over `lag`).
 - `rationale`: the mechanism in one to three sentences. `sources[]`. `confidence`: `speculative` · `argued` · `documented`.
 - `provenance`: see below. `reflexive`: market → world feedback; requires `lag > 0` (INV-6).
 
@@ -34,8 +34,8 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 - `observe(n, value)` — learn. Updates ancestors as well as descendants. Distinct verb in the UI.
 - `insert(node, links[])` — "…but X happens." Adds a proposition and its links.
 - `retune(link, strength)` — the user disagrees with a number.
-- `refine(n → children[])` — expand a proposition into sub-propositions; children must marginalize to `n` (INV-10). The brainstorm's "search deeper lines".
-- `believe(n, belief)` — record the user's own belief on `n`. Lives in the branch so it replays and diffs; never alters `model` or `market` beliefs; not propagated in v1 (D8, INV-11). Propagating a user's world is a stretch (spec 06).
+- `refine(n → children[])` — split a proposition into finer sub-propositions; their combined likelihood must equal the original's (they *marginalize* back to `n`, INV-10). The brainstorm's "search deeper lines".
+- `believe(n, belief)` — record the user's own belief on `n`. Lives in the branch so it replays and diffs; never alters `model` or `market` beliefs; not propagated in v1 (D8, INV-11). Propagating a user's world is a stretch (see `probes/`).
 
 **Branch.** A named, ordered list of interventions over a base graph. A branch *is* a patch. Branches compose by concatenation; `apply(g, [])` is `g` (INV-5). Branches may have a parent branch.
 
@@ -55,7 +55,7 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 
 **Probe** (stretch). A modeling resource attached to one proposition: `monte_carlo` · `bayes_subnet` · `persona_redteam`. Output re-enters the graph as a `simulated` belief with its own rationale.
 
-**Value of information.** Sensitivity × interval width; ranks where a probe is worth its cost.
+**Value of information.** How much the trade depends on a proposition × how uncertain it is; ranks where a probe is worth its cost.
 
 ## The finale
 

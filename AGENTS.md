@@ -11,8 +11,9 @@ The goal of the project is to create a functional protoype of the concept behind
 | Where | What |
 |-------|------|
 | `PRODUCT_REQUIREMENTS.md` | The compressed seed: decisions, requirements, invariants, anti-patterns, roadmap as PR stacks |
+| `ARCHITECTURE.md` | The technical counterpart: layers, data flow, where each invariant is enforced, runtime, testing. Living; marks each section built or planned |
 | `docs/adr/` | Numbered decision records (MADR format: context, options, decision, consequences); `template.md`; `README.md` index. Higher number supersedes |
-| `spec/` | Feature specs with INVARIANTS and ANTI-PATTERNS; `00-vocabulary.md` is the shared language |
+| `spec/` | The spec as a book: one directory per idea (`graph/`, `multiverse/`, `thesis/`, `generation/`, `workbench/`, `probes/`), each with a landing page; `vocabulary.md` is the shared language |
 | `docs/research/` | Four independent research reports (2026-09-16) that fed the PRD; inputs, not decisions |
 | `docs/initial-brainstorming.md` | Kent's raw notes; the origin of trigger/sustain links and refinement |
 
@@ -20,9 +21,10 @@ The goal of the project is to create a functional protoype of the concept behind
 
 * **ADR-gated cadence.** An agent drafts the ADR and spec first; Kent accepts, rejects, or amends; only then is code written. Nothing is implemented against a `proposed` ADR. Decisions Kent has already taken are listed in `PRODUCT_REQUIREMENTS.md` §3 — do not re-litigate them.
 * **Disgust veto.** Two conditions end a line of work immediately: a template-looking UI, and any state that cannot be traced to an input, a rule, or a cited source.
-* **Vocabulary is the interface.** Use `spec/00-vocabulary.md` words exactly in docs, code, and UI copy.
+* **Vocabulary is the interface.** Use `spec/vocabulary.md` words exactly in docs, code, and UI copy.
 * **Every number can say why.** Beliefs carry owner, interval, and provenance; two significant figures; model, user, and market beliefs are never merged.
 * **Stacks tell the story.** One stack per spec; the bottom PR is docs-only; branch names are `<type>/<NN>-<slug>` with `NN` the stack number from the PRD roadmap. Conventional commits with `spec:` and `adr:` types in addition to the usual.
+* **ARCHITECTURE.md is living.** A pull request that changes a boundary, layer, data flow, or runtime dependency updates it in the same PR.
 * **Research reports are inputs.** Where a report and an ADR disagree, the ADR wins; where an ADR and the PRD disagree, fix the drift in the same PR.
 
 RULES FOR THIS REPO

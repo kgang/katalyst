@@ -2,7 +2,7 @@
 
 > A causal-chain workbench for finance. You state a hypothesis; it builds an auditable graph of downstream events toward tradeable effects; you bend any link and watch the multiverse re-propagate; it ends in a thesis with a stop-loss you can name.
 
-**Status:** living document (L1.11: there is no shipping, only current state). **Owner:** Kent Gang. **Reader:** the Catalyst team (see §2). **Derived from:** `ASSIGNMENT.md`, `docs/initial-brainstorming.md`, `docs/research/*`, and the 2026-09-16 interview (§3). **Governed by:** `AGENTS.md`; decisions in `docs/adr/`; detail in `spec/`.
+**Status:** living document (L1.11: there is no shipping, only current state). **Owner:** Kent Gang. **Reader:** the Catalyst team (see §2). **Derived from:** `ASSIGNMENT.md`, `docs/initial-brainstorming.md`, `docs/research/*`, and the 2026-09-16 interview (§3). **Governed by:** `AGENTS.md`. **Companions:** `ARCHITECTURE.md` (how the system is shaped — the technical counterpart to this document), `docs/adr/` (numbered decision records — a journal), `spec/` (the detailed spec, organized as a book by idea).
 
 ---
 
@@ -56,7 +56,7 @@ Settled by the owner; recorded here so no agent re-litigates them. Reasoning and
 
 ## 4. Vocabulary
 
-Every doc, identifier, and UI label uses these words exactly. Full definitions in `spec/00-vocabulary.md`.
+Every doc, identifier, and UI label uses these words exactly. Full definitions in `spec/vocabulary.md`.
 
 | Term | Meaning |
 |------|---------|
@@ -141,7 +141,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 ### 6.7 Thesis
 - **FR-25 (P0)** Thesis card: hypothesis, horizon, legs (instrument, direction, size, driving proposition, model p, market p, edge), entry, invalidation, take-profit, distribution (P1), tails, caveats (weakest links, unhedgeable sensitivities, crowding).
 - **FR-26 (P1)** Live read-only prices: Polymarket first, FRED second, Kalshi third. Shown beside model and user beliefs as the `market` belief. Cross-venue disagreement is surfaced, not averaged. FRED data renders the required attribution line ("This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis").
-- **FR-27 (P1)** Strategy export: a declarative JSON document (schema in `spec/`) with legs, conditions, and the graph references that justify each — the shape a downstream trading agent could ingest.
+- **FR-27 (P1)** Strategy export: a declarative JSON document (schema in `spec/thesis/`) with legs, conditions, and the graph references that justify each — the shape a downstream trading agent could ingest.
 
 ### 6.8 Grounding
 - **FR-28 (P1)** Evidence retrieval at generation time (server-side web search); sources attach to links with direction and weight.
@@ -192,20 +192,20 @@ Phrased as checkable statements. Each names the spec that owns it; specs name th
 
 | ID | Invariant | Owner |
 |----|-----------|-------|
-| INV-1 | Every proposition has non-empty `resolution.criteria`, `resolution.source`, `resolution.by` | `spec/01-causal-graph` |
-| INV-2 | Every link has `rationale` and `provenance`; `provenance ∈ {documented, historical, market_implied}` ⇒ `sources ≠ ∅`. Every belief has an `owner` | `spec/01-causal-graph` |
-| INV-3 | `do(n)` changes no ancestor of `n`; `observe(n)` may. The two are distinct operations with distinct UI verbs | `spec/02-interventions` |
-| INV-4 | Locality: for intervention `i` on `n`, every proposition outside `descendants(n) ∪ {n}` is byte-identical between base and branch | `spec/02-interventions` |
-| INV-5 | Base graph is immutable; a branch is an ordered patch list; `apply(g, [])` = `g`; `apply(apply(g,p),q)` = `apply(g, p+q)`; every world is replayable from `(base id, branch, seed)` | `spec/02-interventions` |
-| INV-6 | The graph has no loops (is a directed acyclic graph) after ignoring `reflexive` links; every `reflexive` link has `lag > 0` | `spec/01-causal-graph` |
-| INV-7 | `0 ≤ lo ≤ p ≤ hi ≤ 1` for every belief after any sequence of interventions; rendering is two significant figures with interval | `spec/01-causal-graph`, `spec/04-canvas` |
-| INV-8 | Any displayed path shows the product of its link probabilities | `spec/04-canvas` |
-| INV-9 | Every graph has ≥1 terminal of kind `market`, or ≥1 explicit `not_tradeable` terminal with a reason | `spec/01-causal-graph` |
-| INV-10 | After `refine(n → {c₁…cₖ})`, the marginal of the children equals `belief(n)` within a small tolerance | `spec/02-interventions` |
-| INV-11 | `model`, `user`, `market` beliefs are stored and rendered separately; no code path averages them | `spec/01-causal-graph`, `spec/04-canvas` |
-| INV-12 | No information is encoded in hue alone; every direction has a glyph, every tail a texture, every provenance a stroke | `spec/04-canvas` |
-| INV-13 | `ci.yml` runs with no `ANTHROPIC_API_KEY`; the model boundary is exercised only through recorded responses in CI | `spec/05-llm-boundary` |
-| INV-14 | The invalidation proposition resolves before its terminal and is publicly observable; otherwise it is listed as unhedgeable, never as a stop | `spec/03-thesis` |
+| INV-1 | **Checkable.** Every proposition has resolution criteria, a named adjudicating source, and a resolve-by date | `spec/graph/` |
+| INV-2 | **Says why.** Every link has a rationale and a provenance; a link that claims evidence (documented, historical, or market-implied) carries at least one source. Every belief has an owner | `spec/graph/` |
+| INV-3 | **Assert is not observe.** Asserting a proposition (`do`) changes nothing upstream of it; observing it (`observe`) may. Two operations, two verbs in the interface | `spec/multiverse/` |
+| INV-4 | **Locality.** After an intervention on a proposition, everything that is not that proposition or downstream of it is byte-identical between the base and the branch | `spec/multiverse/` |
+| INV-5 | **Branches are patches.** The base graph is never modified. A branch is an ordered list of interventions. Applying an empty branch changes nothing; applying two branches in sequence equals applying their concatenation. Every world replays exactly from (base, branch, seed) | `spec/multiverse/` |
+| INV-6 | **No loops.** Ignoring *reflexive* links (a market feeding back on the world), the graph has no cycles; every reflexive link carries a delay greater than zero | `spec/graph/` |
+| INV-7 | **Honest numbers.** Every belief satisfies 0 ≤ low ≤ p ≤ high ≤ 1 after any sequence of interventions, and is rendered at two significant figures with its range | `spec/graph/`, `spec/workbench/` |
+| INV-8 | **Chains multiply.** Any displayed path shows the product of its link probabilities beside the narrative headline | `spec/workbench/` |
+| INV-9 | **Ends in a trade.** Every graph has at least one tradeable terminal, or an explicit "not tradeable — because…" terminal | `spec/graph/` |
+| INV-10 | **Refinement adds up.** After a proposition is split into finer sub-propositions, their combined likelihood equals the original's within a small tolerance | `spec/multiverse/` |
+| INV-11 | **Three voices.** Model, user, and market beliefs are stored and rendered separately; no code path averages them | `spec/graph/`, `spec/workbench/` |
+| INV-12 | **Not by color alone.** Every direction has a glyph, every tail a texture, every provenance a stroke style | `spec/workbench/` |
+| INV-13 | **Keyless CI.** Continuous integration runs with no model API key; the model boundary is exercised only through recorded responses | `spec/generation/` |
+| INV-14 | **A stop you can see.** The invalidation proposition resolves before its terminal and is publicly observable; otherwise it is listed as unhedgeable, never used as a stop | `spec/thesis/` |
 
 ---
 
@@ -241,7 +241,7 @@ Each stack's bottom PR is docs-only (spec + ADR) and merges first. Branch names 
 
 | Stack | Name | Proves | Depends on |
 |-------|------|--------|-----------|
-| 00 | `docs/00-kickoff` | This document, ADR 0001–0010, `spec/` index and vocabulary, research | — |
+| 00 | `docs/00-kickoff` | This document, `ARCHITECTURE.md`, decision records 0001–0011, the `spec/` book skeleton (landing page per idea) and vocabulary, research | — |
 | 01 | `feat/01-skeleton` | Backend + frontend hello-world, Docker (dev + prod), CI, pre-commit, type generation | ADR-0002 accepted |
 | 02 | `feat/02-schema` | Pydantic domain models → OpenAPI → TS types; the Hormuz fixture graph (base + "Iran struck" branch) | ADR-0003/0004/0005 accepted |
 | 03a | `feat/03-engine` | Propagation, `do/observe/insert/retune`, patch algebra, locality, sensitivity sweep — pure, property-tested | 02 |
@@ -260,7 +260,7 @@ Dated so this section visibly ages.
 
 - **2026-09-16** Product name in the UI: "Katalyst" (repo) or something else? Owner's call.
 - **2026-09-16** Does the GitHub native stacked-PR preview work on `kgang/katalyst`? Verify before stack 01; fall back to `git-spice` (ADR-0009).
-- **2026-09-16** Strategy export schema (FR-27): mirror Polymarket negative-risk / Kalshi combo leg structure, or a simpler `legs[] + conditions[]`? Decide in `spec/03-thesis`.
+- **2026-09-16** Strategy export schema (FR-27): mirror Polymarket negative-risk / Kalshi combo leg structure, or a simpler `legs[] + conditions[]`? Decide in the strategy-export chapter of `spec/thesis/`.
 - **2026-09-16** Reflexive links (`market → world`, lag > 0): in v1 engine, or documented and deferred to stack 06? Leaning: schema in 02, propagation in 06.
 - **2026-09-16** Ensemble size N for FR-8 and its cost per generation. Measure in stack 04.
 
