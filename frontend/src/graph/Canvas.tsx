@@ -40,7 +40,7 @@ import "./canvas.css";
  * drawing library never has to rebuild its tiles because the object changed. */
 const TILE_TYPES = {
   claim: ({ data }: { data: ClaimNode["data"] }) => (
-    <Tile claim={data.claim} isHypothesis={data.isHypothesis} />
+    <Tile claim={data.claim} isHypothesis={data.isHypothesis} versions={data.versions} />
   ),
   overflow: ({ data }: { data: OverflowNode["data"] }) => <TileOverflow count={data.count} />,
 };
@@ -55,9 +55,9 @@ const SKY_GAP = 56;
 const ARROWHEAD = "katalyst-arrowhead";
 
 /**
- * How the map is framed the first time it is drawn: the whole of it, with a
- * margin of a twelfth of the window around it, and never blown up past life
- * size.
+ * How the map is framed the first time it is drawn: the whole of it — the one
+ * backwards wire's run over the top included — with a margin of a twelfth of
+ * the window around it, and never blown up past life size.
  *
  * The margin is as tight as it is on purpose. Whether the first frame shows the
  * full tiles or their summaries is decided by whether the whole map happens to
@@ -68,7 +68,10 @@ const ARROWHEAD = "katalyst-arrowhead";
  * which is the right answer there: the words stay legible and zooming in fills
  * the tiles.
  */
-const FIRST_FRAME = { padding: 0.08, maxZoom: 1, duration: 0 } as const;
+const FIRST_FRAME = { padding: 0.08, duration: 0 } as const;
+
+/** Never blown up past life size on the first frame, however small the map. */
+const FIRST_FRAME_MAX_ZOOM = 1;
 
 /** The surface itself. Lives inside the provider so it can move the view. */
 function MapSurface({ world }: { world: WorldView }) {
@@ -107,16 +110,44 @@ function MapSurface({ world }: { world: WorldView }) {
     [drawing],
   );
 
+  /**
+   * Everything the first frame has to hold: every tile, and the strip of empty
+   * space above them that the one backwards wire runs along.
+   */
+  const mapBounds = useCallback(() => {
+    const placed = [...layout.positions.entries()];
+    if (placed.length === 0) {
+      return null;
+    }
+    const left = Math.min(...placed.map(([, at]) => at.x));
+    const right = Math.max(...placed.map(([, at]) => at.x)) + TILE_WIDTH;
+    const top = Math.min(...placed.map(([, at]) => at.y));
+    const bottom = Math.max(...placed.map(([id, at]) => at.y + heightOf(id)));
+    const overhead = drawing.edges.some((edge) => edge.type === "feedback") ? SKY_GAP + 8 : 0;
+    return { x: left, y: top - overhead, width: right - left, height: bottom - top + overhead };
+  }, [drawing, layout, heightOf]);
+
   // Frame the whole map once, when it is first laid out, and never again.
   // Afterwards the view follows whatever the reader is looking at, because
   // losing your place because the map was rearranged is the single most
   // disorienting thing a canvas can do.
+  //
+  // The frame is worked out from the tiles *and* the sky the one backwards wire
+  // runs along, because the library's own framing only knows about tiles and
+  // would leave that wire hanging off the top edge — half a loop, which reads
+  // as a mistake rather than as a loop.
   useEffect(() => {
     if (layout.runs === 0) {
       return;
     }
     if (layout.runs === 1) {
-      flow.fitView(FIRST_FRAME);
+      const frame = mapBounds();
+      if (frame !== null) {
+        flow.fitBounds(frame, FIRST_FRAME);
+        if (flow.getZoom() > FIRST_FRAME_MAX_ZOOM) {
+          flow.zoomTo(FIRST_FRAME_MAX_ZOOM, { duration: 0 });
+        }
+      }
       return;
     }
     if (focused !== null) {
@@ -128,7 +159,7 @@ function MapSurface({ world }: { world: WorldView }) {
         });
       }
     }
-  }, [layout.runs, flow, focused, heightOf]);
+  }, [layout.runs, flow, focused, heightOf, mapBounds]);
 
   /**
    * Remember which tile the reader is on, and bring it into view if it is not.

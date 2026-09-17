@@ -180,6 +180,17 @@ export interface WorldView {
   /** Every arrow on the map. */
   readonly links: readonly LinkView[];
   /**
+   * How many versions of the map the engine ran to produce these numbers.
+   *
+   * Absent when nothing was computed — which is every world in this build,
+   * because the engine's route does not exist yet. It is the one thing that
+   * tells a belief chip whether its range was *computed* across many versions
+   * of the map or merely *stated* by whoever wrote the number down, and the
+   * chip says a different sentence for each. Nothing else reads it.
+   */
+  readonly versions?: number;
+
+  /**
    * Where these numbers came from, in one sentence a reader can check.
    *
    * It is printed under the map. A world whose numbers cannot say where they

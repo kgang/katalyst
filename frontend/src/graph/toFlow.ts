@@ -13,7 +13,10 @@ import { TILE_MIN_HEIGHT, tileHeight } from "./geometry";
 import { assignLayers, capLayers } from "./layers";
 
 /** A tile standing for one claim. */
-export type ClaimNode = Node<{ claim: ClaimView; isHypothesis: boolean }, "claim">;
+export type ClaimNode = Node<
+  { claim: ClaimView; isHypothesis: boolean; versions?: number },
+  "claim"
+>;
 
 /** A tile standing for the claims a column had no room for. */
 export type OverflowNode = Node<{ count: number }, "overflow">;
@@ -86,7 +89,7 @@ export function toFlow(world: WorldView): MapDrawing {
       type: "claim",
       position: { x: 0, y: 0 },
       draggable: false,
-      data: { claim, isHypothesis: claim.id === world.hypothesisId },
+      data: { claim, isHypothesis: claim.id === world.hypothesisId, versions: world.versions },
     });
   }
   for (const overflow of overflows) {

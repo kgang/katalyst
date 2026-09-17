@@ -129,10 +129,17 @@ export interface TileProps {
   readonly claim: ClaimView;
   /** True when this claim is the one the reader started from. */
   readonly isHypothesis: boolean;
+  /**
+   * How many versions of the map were run to produce this world's numbers.
+   *
+   * Absent means nothing computed them, and the model chip says so instead of
+   * describing a run that never happened.
+   */
+  readonly versions?: number;
 }
 
 /** One claim's tile. */
-export function Tile({ claim, isHypothesis }: TileProps) {
+export function Tile({ claim, isHypothesis, versions }: TileProps) {
   // How far the map is zoomed out. Below the threshold a tile stops showing
   // everything and shows a summary instead — the claim and the three chips —
   // because the alternative is type too small to read. The tile changes what it
@@ -140,7 +147,13 @@ export function Tile({ claim, isHypothesis }: TileProps) {
   const zoom = useStore((state) => state.transform[2]);
   const detail = zoom < SUMMARY_BELOW_ZOOM ? "summary" : "full";
 
-  const marketAbsence = claim.beliefs.market.absence;
+  // Only one claim in four prints why it has no market: the kind that ends the
+  // map without an instrument. That reason is a finding — somebody looked and
+  // wrote down what they found — and it belongs on the face of the tile. For
+  // every other claim "no market" is a fact about the world's plumbing, the
+  // chip says it in two words, and the sentence behind it is on the chip's
+  // shelf and in what the chip is called when it is read out loud.
+  const finding = claim.kind === "not_tradeable" ? claim.beliefs.market.absence : undefined;
   // As tall as this claim's own content, worked out the same way the layout
   // worked it out, so the box the map reserved and the box the browser draws
   // are the same box.
@@ -150,7 +163,7 @@ export function Tile({ claim, isHypothesis }: TileProps) {
   // take a gap above it, and the tile would have a step of dead space at the
   // bottom — which is the whole thing a clamped height is meant to avoid. When
   // the badges arrive, having one of those puts the foot there too.
-  const hasFoot = marketAbsence !== undefined || claim.evidence.length > 0;
+  const hasFoot = finding !== undefined || claim.evidence.length > 0;
 
   return (
     <article
@@ -221,7 +234,12 @@ export function Tile({ claim, isHypothesis }: TileProps) {
       <p className="tile__claim">{claim.claim}</p>
 
       <div className="tile__beliefs">
-        <BeliefChip owner="model" slot={claim.beliefs.model} standing={claim.standing} />
+        <BeliefChip
+          owner="model"
+          slot={claim.beliefs.model}
+          standing={claim.standing}
+          versions={versions}
+        />
         <BeliefChip owner="user" slot={claim.beliefs.user} />
         <BeliefChip owner="market" slot={claim.beliefs.market} />
       </div>
@@ -232,9 +250,7 @@ export function Tile({ claim, isHypothesis }: TileProps) {
         // the middle and whatever is left sits on the floor — and the eye can
         // read down a column without hunting for the line it wants.
         <div className="tile__foot">
-          {marketAbsence === undefined ? null : (
-            <p className="tile__absence">{marketAbsence.reason}</p>
-          )}
+          {finding === undefined ? null : <p className="tile__absence">{finding.reason}</p>}
 
           {claim.evidence.length === 0 ? null : (
             <ul className="tile__clippings">

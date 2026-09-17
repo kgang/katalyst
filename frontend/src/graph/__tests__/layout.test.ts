@@ -189,16 +189,17 @@ describe("how tall a tile is", () => {
     };
   }
 
+  /** The three slots, with no market number in the market slot. */
+  const noMarket = {
+    model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
+    user: { absence: { words: "—", reason: "You have not said." } },
+    market: { absence: { words: "no market", reason: "no venue quotes this claim" } },
+  } as const;
+
   it("is decided by the content, not fixed for every tile", () => {
-    const bare = tileHeight(claimOf("A short claim."));
-    const withReason = tileHeight(
-      claimOf("A short claim.", {
-        beliefs: {
-          model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-          user: { absence: { words: "—", reason: "You have not said." } },
-          market: { absence: { words: "no market", reason: "No venue quotes this claim." } },
-        },
-      }),
+    const bare = tileHeight(claimOf("A short claim.", { beliefs: noMarket }));
+    const deadEnd = tileHeight(
+      claimOf("A short claim.", { kind: "not_tradeable", beliefs: noMarket }),
     );
     const withClippings = tileHeight(
       claimOf("A claim long enough to take three whole lines of the tile it is written on.", {
@@ -209,8 +210,21 @@ describe("how tall a tile is", () => {
       }),
     );
 
-    expect(bare).toBeLessThan(withReason);
-    expect(withReason).toBeLessThan(withClippings);
+    expect(bare).toBeLessThan(deadEnd);
+    expect(deadEnd).toBeLessThan(withClippings);
+  });
+
+  it("gives room for a reason only to the claim that prints one", () => {
+    // Every claim without a market number says "no market" in two words on its
+    // chip. Only the kind that ends the map without an instrument prints why on
+    // the face of the tile, so only that one is given room for the sentence.
+    const short = "A short claim.";
+    expect(tileHeight(claimOf(short, { beliefs: noMarket }))).toBe(
+      tileHeight(claimOf(short, { kind: "market", beliefs: noMarket })),
+    );
+    expect(
+      tileHeight(claimOf(short, { kind: "not_tradeable", beliefs: noMarket })),
+    ).toBeGreaterThan(tileHeight(claimOf(short, { beliefs: noMarket })));
   });
 
   it("stays on the eight-pixel grid and inside the floor and the ceiling", () => {

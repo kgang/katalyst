@@ -136,7 +136,7 @@ describe("a belief chip", () => {
   });
 
   it("says in its label what the range means, and admits nothing is calibrated", () => {
-    render(<BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} />);
+    render(<BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} versions={2000} />);
 
     expect(
       screen.getByText(
@@ -150,6 +150,83 @@ describe("a belief chip", () => {
           "checked whether that 8-in-10 holds up; no claim on this map has resolved yet.",
       ),
     ).toBeInTheDocument();
+  });
+
+  // The test the decisions of 2026-09-17 asked for by name:
+  // test_model_chip_says_computed_only_when_a_world_computed_it
+  it("only claims its range was computed when a world computed it", () => {
+    // Nothing has run this number through a map, so the chip says the range is
+    // the one whoever wrote the number down stated, and says nothing at all
+    // about versions of the map.
+    const stated = render(<BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} />);
+    expect(screen.getByText("stated range · not computed")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This range is stated, not computed — it says how sure the elicitation was. " +
+          "Nothing has worked this number through the map yet.",
+      ),
+    ).toBeInTheDocument();
+    expect(stated.container.textContent).not.toContain("versions of this map");
+    expect(stated.container.textContent).not.toContain("uncalibrated");
+    stated.unmount();
+
+    // A world that ran two thousand versions may say so, and counts them out.
+    const computed = render(
+      <BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} versions={2000} />,
+    );
+    expect(computed.container.textContent).toContain("Across 2 000 versions of this map");
+    expect(computed.container.textContent).not.toContain("stated, not computed");
+
+    // And it counts out whatever number it was actually given, not a fixed one.
+    computed.unmount();
+    render(<BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} versions={16} />);
+    expect(screen.getByText(/Across 16 versions of this map/)).toBeInTheDocument();
+  });
+
+  // The certainty guard the decisions of 2026-09-17 asked for by name:
+  // test_chip_never_prints_a_certainty
+  it("never prints a certainty at either end", () => {
+    // Numbers that two-figure rounding would turn into `1.0` or `.0`, plus two
+    // very small ones that it would not, to show the guard only fires where it
+    // should. `.995` is here for a specific reason: a computer stores it a hair
+    // *below* .995, so a formatter that asks the machine for two figures prints
+    // `.99` — the one thing the rule forbids.
+    const awkward = [0.995, 0.9962, 0.999, 1, 0, 0.004, 0.0004];
+
+    for (const value of awkward) {
+      const { container, unmount } = render(
+        <BeliefChip owner="model" slot={known(value, value, value)} />,
+      );
+      const printed = [readingOf(container), ...underOf(container).split("–")];
+      for (const one of printed) {
+        expect(one).not.toBe("1.0");
+        expect(one).not.toBe("1");
+        expect(one).not.toBe(".0");
+        expect(one).not.toBe("0.0");
+        expect(significantFigures(one)).toBeLessThanOrEqual(2);
+      }
+      unmount();
+    }
+
+    // The worked table the shared chapter settles, row for row.
+    expect(toTwoFigures(0.35)).toBe(".35");
+    expect(toTwoFigures(0.347)).toBe(".35");
+    expect(toTwoFigures(0.0712)).toBe(".071");
+    expect(toTwoFigures(0.4999)).toBe(".50");
+    expect(toTwoFigures(0.06)).toBe(".060");
+    expect(toTwoFigures(0.0035)).toBe(".0035");
+    expect(toTwoFigures(0.00012)).toBe(".00012");
+    expect(toTwoFigures(0.995)).toBe(">.99");
+    expect(toTwoFigures(0.9962)).toBe(">.99");
+    expect(toTwoFigures(1)).toBe(">.99");
+    expect(toTwoFigures(0)).toBe("<.01");
+    // Rounding that carries into the next place keeps two figures, not three.
+    expect(toTwoFigures(0.0999)).toBe(".10");
+
+    // The guard applies to each end of the range on its own, unchanged: on one
+    // end here, on both in the second.
+    expect(toReading(0.9962, 0.988, 0.9995)).toBe(">.99 (.99–>.99)");
+    expect(toReading(0.9962, 0.9971, 0.9999)).toBe(">.99 (>.99–>.99)");
   });
 
   it("can be reached by the keyboard, and opens nothing that has to be dismissed", () => {

@@ -34,17 +34,55 @@ import "./beliefChip.css";
  * Print a number to two significant figures, the way this product prints one.
  *
  * A likelihood is between zero and one, so the leading zero is dropped: `.35`,
- * not `0.35`. Two significant figures means two digits that carry information —
- * `.060` is two of them, the six and the nought after it, and it is printed
- * with both because dropping the nought would claim less precision than we
- * have.
+ * not `0.35`. Two significant figures means two digits that carry information,
+ * and both of them are always printed — `.060` keeps its trailing nought,
+ * because dropping it would claim less precision than we have, and "two figures
+ * except when the second is a nought" would be a second rule for one ugly case.
+ *
+ * **It never prints a certainty.** Rounding to two figures turns .995 into
+ * `1.0`, and nothing at all into `.0`, and both are claims nobody on this map
+ * is entitled to make: one says the thing cannot fail, the other that it cannot
+ * happen. So those two print as what they actually are, `>.99` and `<.01`. The
+ * upper guard catches everything from .995 up, including 1 itself. The lower
+ * one is rarer than it looks: two figures keeps two digits however small the
+ * number gets, so `.0035` prints `.0035` and `.00012` prints `.00012`, and the
+ * only value that would ever print as `.0` is exactly zero.
+ *
+ * **Why it does not use the obvious shortcut.** A computer stores .995 as
+ * 0.99499999999999999556, so asking it directly for two figures gives `.99` —
+ * under the guard, and the chip would print the one thing the rule forbids. So
+ * the rounding is done on the number's own decimal digits instead: the shortest
+ * decimal that reads back as this exact number, its point shifted by counting
+ * rather than by multiplying, and then rounded half-up. `.995` shifts to
+ * exactly 99.5, which rounds to 100, which is 1, which is `>.99`.
  *
  * @param value A likelihood, at full precision.
  * @returns The number as it is shown on screen.
  */
 export function toTwoFigures(value: number): string {
-  const rounded = value.toPrecision(2);
-  return rounded.startsWith("0.") ? rounded.slice(1) : rounded;
+  if (!Number.isFinite(value) || value <= 0) {
+    return "<.01";
+  }
+  if (value >= 1) {
+    return ">.99";
+  }
+  // The shortest decimal that reads back as this exact number, split into its
+  // digits and where the point sits: .995 becomes "9.95" and -1.
+  const [mantissa = "0", place = "0"] = value.toExponential().split("e");
+  let exponent = Number(place);
+  // The two figures, as a whole number from 10 to 99. Shifting the point in the
+  // text and letting the parser read the result is what keeps .995 at 99.5
+  // rather than a hair under it.
+  let figures = Math.round(Number(`${mantissa}e1`));
+  if (figures >= 100) {
+    // Rounding up carried into the next place: .0999 becomes .10, not .100.
+    figures = 10;
+    exponent += 1;
+  }
+  if (exponent >= 0) {
+    return ">.99";
+  }
+  return `.${"0".repeat(-exponent - 1)}${figures}`;
 }
 
 /**
@@ -87,24 +125,48 @@ interface Note {
   readonly sentence: string;
 }
 
+/** Group a count in thousands the way the sentence below writes it: `2 000`. */
+function inThousands(count: number): string {
+  return count.toLocaleString("en-GB").replace(/,/g, " ");
+}
+
 /**
- * What the model chip says about itself.
+ * What the model chip says about itself — and there are two answers, because
+ * there are two different things a range can be.
  *
- * Both strings are fixed wording and neither is optional. The label names the
- * one thing a range is most often mistaken for, and the sentence admits in its
- * last clause that nothing here has been checked against a claim that actually
- * resolved — because no claim on this map has resolved yet.
+ * **When a world computed these numbers**, the range came out of running the
+ * map many times over, each run a coherent set of numbers the model would have
+ * stood behind, and the sentence says so and then admits in its last clause
+ * that nobody has checked the claim against anything that resolved.
+ *
+ * **When nothing computed them** — which is every number in this build, because
+ * the engine's route does not exist yet — the range is what whoever wrote the
+ * number down said about how sure they were. Saying "across 2 000 versions of
+ * this map" over a number nobody ran through a map would be the plainest kind
+ * of lie this product can tell, so it says the other thing instead.
+ *
+ * The chip picks between them by one fact: whether the world it is drawing
+ * reports how many versions were run. Nothing else changes when the engine
+ * lands.
  */
-function modelNote(p: number, lo: number, hi: number): Note {
+function modelNote(p: number, lo: number, hi: number, versions: number | undefined): Note {
+  if (versions === undefined) {
+    return {
+      label: "stated range · not computed",
+      sentence:
+        "This range is stated, not computed — it says how sure the elicitation was. " +
+        "Nothing has worked this number through the map yet.",
+    };
+  }
   return {
     label:
       `model interval, uncalibrated · how sure we are of ${toTwoFigures(p)} — ` +
       `not how much the world can move`,
     sentence:
-      `Across 2 000 versions of this map — each one a set of numbers this model would have ` +
-      `stood behind — the answer landed between ${toTwoFigures(lo)} and ${toTwoFigures(hi)} ` +
-      `eight times in ten. Nobody has checked whether that 8-in-10 holds up; no claim on ` +
-      `this map has resolved yet.`,
+      `Across ${inThousands(versions)} versions of this map — each one a set of numbers this ` +
+      `model would have stood behind — the answer landed between ${toTwoFigures(lo)} and ` +
+      `${toTwoFigures(hi)} eight times in ten. Nobody has checked whether that 8-in-10 holds ` +
+      `up; no claim on this map has resolved yet.`,
   };
 }
 
@@ -134,6 +196,7 @@ function readChip(
   owner: BeliefOwner,
   slot: Slot,
   standing: Standing | undefined,
+  versions: number | undefined,
 ): { reading: string; under: string | null; spoken: string; note: Note; numeric: boolean } {
   // A claim the reader has supposed true is true in every simulated world, so
   // the chip shows the word rather than a number. Inventing one — .98, or 1.0 —
@@ -165,7 +228,7 @@ function readChip(
   const { p, lo, hi } = slot.reading;
   const note =
     owner === "model"
-      ? modelNote(p, lo, hi)
+      ? modelNote(p, lo, hi, versions)
       : owner === "user"
         ? userNote(p, lo, hi)
         : marketNote(lo, hi);
@@ -186,13 +249,20 @@ export interface BeliefChipProps {
   readonly slot: Slot;
   /** A word shown instead of a likelihood, when the claim stands on the reader's say-so. */
   readonly standing?: Standing;
+  /**
+   * How many versions of the map were run to produce this number.
+   *
+   * Absent means nothing computed it, and the model chip then says so rather
+   * than describing a run that never happened.
+   */
+  readonly versions?: number;
 }
 
 /** One of the three belief chips on a tile. */
-export function BeliefChip({ owner, slot, standing }: BeliefChipProps) {
+export function BeliefChip({ owner, slot, standing, versions }: BeliefChipProps) {
   const noteId = useId();
   const [pinned, setPinned] = useState(false);
-  const { reading, under, spoken, note, numeric } = readChip(owner, slot, standing);
+  const { reading, under, spoken, note, numeric } = readChip(owner, slot, standing, versions);
 
   return (
     <span className="belief-chip" data-owner={owner} data-reading={numeric ? "number" : "words"}>

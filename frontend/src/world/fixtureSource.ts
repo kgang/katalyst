@@ -82,18 +82,32 @@ function clipping(evidence: Evidence): EvidenceClipping {
 }
 
 /**
- * Why a claim has no market number.
+ * Why a claim has no market number, in the words the shared vocabulary settles.
  *
- * A claim that ends the map without an instrument carries its own reason, in
- * the map's own words, and that is the one worth showing. Everything else falls
- * back to what an absent market slot means on the server: no venue quotes this
- * claim.
+ * These three sentences are written here and nowhere else, so that the chip,
+ * the tile and — later — the panel beside the map cannot drift apart about what
+ * "no market" means. `spec/vocabulary.md` is their source; change it there
+ * first and then here.
+ *
+ * A claim that *ends* the map without an instrument is the exception, and it is
+ * handled below: that one has a reason of its own, written down when the map
+ * was made, and it is a finding rather than a fact about our plumbing.
  */
+const NO_MARKET_REASON: Record<"market" | "event" | "hypothesis", string> = {
+  market: "no venue quotes this claim; what you would trade is on the payoff",
+  event: "no venue quotes this claim",
+  hypothesis: "no venue quotes this claim",
+};
+
+/** Why this claim has no market number. */
 function marketAbsence(proposition: Proposition): Slot {
-  if (proposition.kind === "not_tradeable" && proposition.not_tradeable_reason) {
-    return missing("no market", proposition.not_tradeable_reason);
+  if (proposition.kind === "not_tradeable") {
+    // A dead end says why it is a dead end, in the map's own words. This is the
+    // one reason a tile prints for itself, because it is an answer rather than
+    // an apology.
+    return missing("no market", proposition.not_tradeable_reason ?? NO_MARKET_REASON.event);
   }
-  return missing("no market", "No venue quotes this claim, so there is no price to read.");
+  return missing("no market", NO_MARKET_REASON[proposition.kind]);
 }
 
 /** Turn one claim from the server into the claim a tile draws. */

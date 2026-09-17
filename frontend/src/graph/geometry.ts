@@ -57,8 +57,11 @@ const CLAIM_LINE = 20.25;
 /** The three belief chips: owner, number and range, with the rule above them. */
 const BELIEF_RAIL = 67;
 
-/** The line saying why a slot has no number. Clamped to two lines. */
-const ABSENCE = 35;
+/**
+ * The line a dead end prints saying why nothing here can be traded. Clamped to
+ * two lines, and the only reason any tile prints for itself.
+ */
+const FINDING = 35;
 
 /** One evidence clipping, and the gap between two of them. */
 const CLIPPING = 21;
@@ -110,8 +113,8 @@ export function tileHeight(claim: ClaimView): number {
   // clippings. It is only there when there is something to put in it — and
   // when the badges arrive, having one of those will put it there too.
   const foot: number[] = [];
-  if (claim.beliefs.market.absence !== undefined) {
-    foot.push(ABSENCE);
+  if (claim.kind === "not_tradeable" && claim.beliefs.market.absence !== undefined) {
+    foot.push(FINDING);
   }
   const clippings = claim.evidence.length;
   if (clippings > 0) {
