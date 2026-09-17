@@ -106,7 +106,9 @@ class SourceDraft(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     url: str = Field(description="One address that opens, not a search query.")
-    title: str = Field(description="What a reader sees on arriving, in the publisher's words.")
+    # No title either: the title a reader sees is the one the search tool itself
+    # returned for that address, which is the honest source of it. A title the model
+    # typed would be a second copy that nothing reads (dropped 2026-09-17).
 ```
 
 ### The three things the model is structurally unable to do
@@ -341,7 +343,7 @@ The stream ends with one `done` event carrying **one** of seven reasons. **The r
 | 2 | `no_terminal` | **Override.** The map ends nowhere you can act on, even after the last ending-seeking call (B6) |
 | 3 | `depth_cap` · `width_cap` · `claim_cap` | The last open claim was closed by that cap: it sat at the depth cap, it already had its full width of children, or the map was full |
 | 4 | `refusal_cap` | The last open claim was closed by the refusals cap — three proposals in a row for it were refused. The map is finished, and one line was abandoned rather than ended. *(Named `model_stopped` until 2026-09-17; renamed because the model did not stop — our rules refused it — and a value must mean what it says. A model that answers `Stop` is the row below.)* |
-| 5 | `reached_terminal` | The last open claim answered `Stop`, or the claim it produced was an ending. The ordinary, good ending |
+| 5 | `reached_terminal` | None of the above: the last open claim closed because the model answered `Stop` for it. (An ending never joins the frontier, so producing one closes nothing; a line that reaches an ending is closed by the `Stop` that follows it.) The ordinary, good ending |
 
 There is no `search_cap`. Reaching the searches cap stops **searching**, not the generation ([`grounding.md`](grounding.md) B6), so it can never be what closed a claim.
 
@@ -449,7 +451,8 @@ Two more tests belong to this pull request and are stated where they are owned: 
 
 1. **Should `done.reason` carry `search_cap`?** As first asked: the shapes sheet listed the value, and under [`grounding.md`](grounding.md)'s rule nothing could ever choose it — reaching the searches cap turns searching off and the generation carries on.
    **Decided 2026-09-17, in the cross-chapter review: no. The value is gone**, and `Done.reason` has seven. A reason nobody can produce is a reason a reader will one day trust. [`streaming.md`](streaming.md) carries the seven.
-2. **Does the vendor's structured-output call take a discriminated union directly?** `Proposal` is a union of three shapes, and a structured-output format may want a single object at the top. If it does, the union is wrapped in a one-field object and nothing else changes — no field is renamed and no behaviour moves. Verified against the `claude-api` skill in the pipeline pull request, not guessed here.
+2. **Does the vendor's structured-output call take a discriminated union directly?**
+   **Answered 2026-09-17, when the pipeline was built: yes.** The client library's `messages.parse` takes the union of three shapes as it stands, so there is no one-field envelope and no field was renamed.
 3. **Should a vendor refusal and a malformed answer carry codes of their own?** Today both arrive as a `Refused` with an empty violation list and a plain sentence, so a reader cannot tell *the model declined* from *the answer did not parse* except by reading the sentence. Such a code would live in `engine/`, not in `domain/validity.py`, because neither is a fault in a map — the nineteen codes there stay nineteen.
 4. **A generated map can hold no feedback arrow.** `LinkDraft` has no `reflexive` field, so the one kind of arrow allowed to close a loop cannot be proposed, and a proposal that closes a loop is always refused. The shipped example has one such arrow, hand-written. Add the field in stack 06, when unrolling a feedback arrow over time actually does something?
 5. **Which day a generated claim's resolve-by date is checked against.** `validate` reads no clock, so a model that writes a date already past is not caught by the map's rules. `engine/` can see today. Is a stale date a violation, a warning on the world, or nothing? This is [`../graph/proposition.md`](../graph/proposition.md) Open questions 4, still open, and generation is the first caller that could answer it.

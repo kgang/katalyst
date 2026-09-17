@@ -35,7 +35,7 @@ class Source(BaseModel):
     retrieved: date | None   # the day our retrieval step fetched it
 ```
 
-`SourceDraft` — `url` and `title`, and deliberately no `retrieved` — is what a **model** may hand back, and it is defined in [`proposals.md`](proposals.md). The difference between the two shapes is the whole chapter: a draft is a claim about a document; a `Source` is a document our own search returned. The `retrieved` day is a fact about us, so there is nowhere for a model to write it.
+`SourceDraft` — a `url` and nothing else: deliberately no `retrieved`, and no `title`, because the title comes from the search tool's own result — is what a **model** may hand back, and it is defined in [`proposals.md`](proposals.md). The difference between the two shapes is the whole chapter: a draft is a claim about a document; a `Source` is a document our own search returned. The `retrieved` day is a fact about us, so there is nowhere for a model to write it.
 
 ### The search tool, as it is declared
 
@@ -45,7 +45,7 @@ Decision record 0006 settled the tool, and the specifics were re-verified agains
 {"type": "web_search_20260209", "name": "web_search", "max_uses": 1}
 ```
 
-- **`max_uses` is 1**, by the same rule that sets the run's budget: one proposal per call, one search per proposal. It is an argument, not a constant, and it is raised only once a measurement says it should be.
+- **`max_uses` is 1**, by the same rule that sets the run's budget: one proposal per call, one search per proposal. It is fixed for a whole run — a value that counted down call by call would rewrite the front of every request and lose the cache — it lives in one place, and it is raised only once a measurement says it should be.
 - **`code_execution` is not declared beside it.** This variant of the search tool already runs code for dynamic filtering; a second execution environment confuses the model (decision record 0006, and the skill's own note).
 - **The web fetch tool is not declared at all.** Fetching a page ourselves would produce a document the search never offered, which is exactly the thing this chapter refuses to call a source.
 - **A search error does not raise.** The answer comes back with a normal status and a result block whose content is a single error object — `max_uses_exceeded` is the one we expect. It is read as *no results*, never as a crash.
@@ -185,7 +185,7 @@ If the search returned an address where the count can be checked, it lands in `s
 
 The run's searches cap is the claims cap: thirty. Every call that declares the tool and uses it spends one, including the calls that follow a refusal — a retry costs what the first attempt cost, because it is a fresh question with a fresh search.
 
-When the budget is gone, **searching stops and the generation carries on.** Later calls declare no search tool at all, so there is nothing for the model to try and nothing to half-use. Those calls still propose claims and arrows; their arrows come back **`argued`**, and an arrow whose rationale is empty is refused as it always is.
+When the budget is gone, **searching stops and the generation carries on.** Later calls **may not search**: the tool stays declared, because the list of tools sits at the very front of the cached prompt and removing it would throw the whole cache away at full price, and each call is told the tool is not to be used (`tool_choice` set to none), so there is nothing for the model to try and nothing to half-use. *(Changed 2026-09-17 when the pipeline was built: the first draft took the tool off the list, which has the identical effect on the map and costs a full-price call.)* Those calls still propose claims and arrows; their arrows come back **`argued`**, and an arrow whose rationale is empty is refused as it always is.
 
 This is said out loud rather than hidden, because it is visible on screen anyway: the arrows added late in a large map carry two-dot origin marks where the early ones carry three. **Nothing in the interface disguises that, and nothing in the pipeline compensates for it.**
 
@@ -214,7 +214,7 @@ Local numbers come from one pool shared by the five chapters of this part. **Thi
 | **INV-generation.9** | For every recorded call in `backend/tests/cassettes/`, the `provenance` on every accepted arrow equals what the rule table gives when applied to that call's own search results — compared against the tool's result set read out of the same cassette, never against what the model said | `test_provenance_is_written_from_what_was_found` |
 | **INV-generation.10** | For every recorded call, every `Source` on every accepted arrow has an address the search tool returned in that same call, and every cited address it did not return appears in `sources_dropped` and in the transcript's note. No accepted arrow carries a source the tool never returned | `test_a_cited_url_the_search_never_returned_is_not_a_source` |
 | **INV-generation.11** | For a recorded call whose every citation the search never returned, the accepted arrow reads `argued`. For any map holding an arrow marked `documented`, `historical` or `market_implied` with an empty source list, `validate` returns exactly one `documented_without_source` | `test_expand_rejects_a_documented_arrow_that_cites_nothing` |
-| **INV-generation.12** | For every recorded run, the number of searches counted across its outcomes is at most the run's searches cap; every call made after the cap is reached declares no search tool; and the run still ends on one of the reasons in [`proposals.md`](proposals.md) B4, never on the cap itself | `test_a_run_stops_searching_at_its_search_cap` |
+| **INV-generation.12** | For every recorded run, the number of searches counted across its outcomes is at most the run's searches cap; every call made after the cap is reached is forbidden to search and makes no search; and the run still ends on one of the reasons in [`proposals.md`](proposals.md) B4, never on the cap itself | `test_a_run_stops_searching_at_its_search_cap` |
 | **INV-generation.13** | Read over our own source: no code path under `backend/src/katalyst/engine/` writes `historical` or `market_implied`. The companion check — that `engine/proposal.py` contains no field named `provenance` — is a line on the pull request's own done-list, run as a plain search | `test_provenance_is_written_from_what_was_found` (its source-reading half) |
 
 ---
