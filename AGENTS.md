@@ -15,6 +15,7 @@ The goal of the project is to create a functional protoype of the concept behind
 | `docs/adr/` | Numbered decision records (MADR format: context, options, decision, consequences); `template.md`; `README.md` index. Higher number supersedes |
 | `spec/` | The spec as a book: one directory per idea (`graph/`, `multiverse/`, `thesis/`, `generation/`, `workbench/`, `probes/`), each with a landing page; `vocabulary.md` is the shared language |
 | `docs/research/` | Four independent research reports (2026-09-16) that fed the PRD; inputs, not decisions |
+| `plans/` | **Local only, git-ignored.** Agent-to-agent handoffs, working notes, orchestration. Start at `plans/README.md`. Nothing here is a source of truth — anything durable moves into a root document, a decision record, or the spec |
 | `docs/initial-brainstorming.md` | Kent's raw notes; the origin of trigger/sustain links and refinement |
 
 ## Working agreements (interview, 2026-09-16)
