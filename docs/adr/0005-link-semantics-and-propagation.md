@@ -77,7 +77,7 @@ Rendering: two significant figures and the interval, always (`.35 (.2–.5)`); t
 
 ### Confirmation
 
-* Property tests in `tests/unit/domain/test_propagation.py`, run over many generated graphs: `test_probability_bounds` (INV-7), `test_propagation_idempotent`, `test_propagation_order_independent` (shuffling ties in the parents-first ordering), `test_trigger_persists_after_parent_reset`, `test_sustain_retracts_when_parent_removed`, `test_reflexive_requires_positive_lag`, `test_same_seed_same_world` (NFR-2).
+* Property tests in `backend/tests/unit/domain/test_propagation.py`, run over many generated graphs: `test_probability_bounds` (INV-7), `test_propagation_idempotent`, `test_propagation_order_independent` (shuffling ties in the parents-first ordering), `test_trigger_persists_after_parent_reset`, `test_sustain_retracts_when_parent_removed`, `test_reflexive_requires_positive_lag`, `test_same_seed_same_world` (NFR-2).
 * Golden test on the Hormuz fixture (stack 02): the "Iran struck next day" branch lowers the Brent-below-threshold terminal and raises the insurance terminal, in the directions the research gives.
 * Frontend rendering test: a belief chip never shows more than two significant figures and always shows an interval.
 * Review item at stacks 04, 05, and 06: if any of the three upgrade conditions holds and the single-pass version is still in place, block.

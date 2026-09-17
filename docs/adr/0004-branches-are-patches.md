@@ -58,7 +58,7 @@ Definitions (`spec/multiverse/` carries the full types):
 
 ### Confirmation
 
-* Property tests in `tests/unit/domain/test_patches.py`, each run over many generated graphs: `test_apply_identity` (applying no edits changes nothing), `test_apply_concat` (applying two patches in sequence equals applying them joined), `test_intervention_locality` (INV-4), `test_do_leaves_ancestors_unchanged` and `test_observe_may_change_ancestors` (INV-3), `test_refine_marginalizes` (INV-10, stack 06), `test_beliefs_never_merged` (INV-11 — no function returns a single number derived from two owners).
+* Property tests in `backend/tests/unit/domain/test_patches.py`, each run over many generated graphs: `test_apply_identity` (applying no edits changes nothing), `test_apply_concat` (applying two patches in sequence equals applying them joined), `test_intervention_locality` (INV-4), `test_do_leaves_ancestors_unchanged` and `test_observe_may_change_ancestors` (INV-3), `test_refine_marginalizes` (INV-10, stack 06), `test_beliefs_never_merged` (INV-11 — no function returns a single number derived from two owners).
 * A stateful test that drives random sequences of interventions and asserts, after every step, that the graph still has no loops and that every probability stays within its interval (INV-7).
 * Replay test: two worlds built from the same base graph, branch, and seed are byte-identical (NFR-2).
 * Review item: the API exposes `POST /branches` taking interventions, never a call that mutates a base graph in place.

@@ -35,7 +35,7 @@ The product's correctness claims are mathematical — an intervention touches on
 
 Chosen option: "A", because it puts the weight where the claims are (the domain), makes the boundary deterministic and key-free, and keeps prompt quality measurable without making the shared build slow, costly, or flaky.
 
-**Layer 1 — pure domain (`tests/unit/`).** The `hypothesis` library generates arbitrary valid graphs, branches, and intervention sequences. Named tests map to invariants:
+**Layer 1 — pure domain (`backend/tests/unit/`).** The `hypothesis` library generates arbitrary valid graphs, branches, and intervention sequences. Named tests map to invariants:
 
 | Invariant | Test |
 |---|---|
@@ -48,7 +48,7 @@ Chosen option: "A", because it puts the weight where the claims are (the domain)
 
 `GraphEditMachine`, a `RuleBasedStateMachine` — a generated *sequence* of random interventions rather than one random input — re-checks INV-4, INV-6 and INV-7 after every step. Target: ≥85 % of `domain/` covered.
 
-**Layer 2 — model boundary (`tests/boundary/`).** `pytest-recording` (a wrapper over vcrpy) saves each real HTTP exchange to a cassette file and replays it from then on. Tests carry `@pytest.mark.vcr`; the build runs `record_mode=none`, so an unrecorded call fails rather than dialling out; `filter_headers=["x-api-key", "authorization"]` strips credentials before anything is written; cassettes are committed under `tests/cassettes/`. `scripts/record-cassettes.sh` re-records with `--record-mode=rewrite` against a real key. One cassette deliberately holds a proposal that would close a loop, and the test asserts the validator rejects it (`test_expand_rejects_cycle`) — fitting the schema is not the same as being a valid graph (ADR-0003, ADR-0006).
+**Layer 2 — model boundary (`backend/tests/boundary/`).** `pytest-recording` (a wrapper over vcrpy) saves each real HTTP exchange to a cassette file and replays it from then on. Tests carry `@pytest.mark.vcr`; the build runs `record_mode=none`, so an unrecorded call fails rather than dialling out; `filter_headers=["x-api-key", "authorization"]` strips credentials before anything is written; cassettes are committed under `backend/tests/cassettes/`. `scripts/record-cassettes.sh` re-records with `--record-mode=rewrite` against a real key. One cassette deliberately holds a proposal that would close a loop, and the test asserts the validator rejects it (`test_expand_rejects_cycle`) — fitting the schema is not the same as being a valid graph (ADR-0003, ADR-0006).
 
 **Layer 3 — evals (`evals/`).** `evals/cases/*.yaml` hold the four `ASSIGNMENT.md` examples. `make eval` runs live against `claude-opus-5` and asserts structure, never wording: no loops; at least one `market` or `not_tradeable` terminal (INV-9); `rationale` and `provenance` on every link; a source on every link marked `documented` (INV-2); resolution criteria on every proposition (INV-1); Verify cases return a graded path or an explicit `no_path` verdict (FR-7); non-zero `cache_read_input_tokens` on a run's second call, proving the prompt cache is hit. Results go to `evals/runs/<date>.tsv`. Not in the build.
 
