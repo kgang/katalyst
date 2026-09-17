@@ -28,13 +28,15 @@ What this layer must never do
 
 What is here now
 ----------------
-The data shapes, and nothing that computes with them. `belief.py`, `proposition.py`
-and `link.py` hold the three things a map is made of; `graph.py` holds a whole
-map; `intervention.py` holds the six typed edits and `branch.py` the ordered list
-of them; `ids.py` holds the identifier names. `validity.py` decides whether a
-proposed map is well-formed, and returns every fault at once rather than the
-first. Folding a branch onto a map and working the likelihoods through arrive in
-a later stack.
+The data shapes. `belief.py`, `proposition.py` and `link.py` hold the three
+things a map is made of; `graph.py` holds a whole map; `intervention.py` holds
+the six typed edits and `branch.py` the ordered list of them; `ids.py` holds the
+identifier names. `validity.py` decides whether a proposed map is well-formed,
+and returns every fault at once rather than the first. `patch.py` folds a
+branch's edits onto a map, puts a chain of branches in order, and says which
+claims an edit is allowed to move. Working the likelihoods through — the
+arithmetic that turns a map and its edits into numbers — arrives in a later
+stack.
 """
 
 from katalyst.domain.belief import Belief, Beliefs
@@ -51,6 +53,7 @@ from katalyst.domain.intervention import (
     Retune,
 )
 from katalyst.domain.link import Days, Link, Provenance, Source
+from katalyst.domain.patch import Assignment, affected_set, apply, flatten
 from katalyst.domain.proposition import (
     BaseRate,
     ContractPayoff,
@@ -63,6 +66,7 @@ from katalyst.domain.proposition import (
 from katalyst.domain.validity import Violation, ViolationCode, validate
 
 __all__ = [
+    "Assignment",
     "BaseRate",
     "Belief",
     "Beliefs",
@@ -90,5 +94,8 @@ __all__ = [
     "Source",
     "Violation",
     "ViolationCode",
+    "affected_set",
+    "apply",
+    "flatten",
     "validate",
 ]
