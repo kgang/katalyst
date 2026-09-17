@@ -78,7 +78,7 @@ Defined once as pydantic models in `domain/`; the same models serve as the model
 
 | Type | What it is | Key rule |
 |------|-----------|----------|
-| `Proposition` | A claim checkable by a date, judged by a named source | Must carry criteria, source, resolve-by (INV-1) |
+| `Proposition` | A claim checkable by a date, judged by a named source | Must carry criteria, source, resolve-by (INV-1). Identity of the trade — venue, contract, instrument — lives in `domain/`; its price lives in `grounding/` (ADR-0013) |
 | `Link` | A causal claim from one proposition to another: mechanism, strength (log-odds), lag, signal shape, `trigger` (one-time shove) or `sustain` (continuous hold), provenance | Must carry a rationale and a provenance; evidence-claiming links carry sources (INV-2) |
 | `Belief` | A likelihood with a range and an owner: model, user, or market | Never averaged across owners (INV-11) |
 | `Graph` | Propositions + links; no loops except delayed reflexive links | Immutable once created (INV-5, INV-6) |
@@ -164,6 +164,7 @@ katalyst/
 | ADR-0009 | Conventional commits; numbered stacks; PR bases chained by agents, stacks assembled in the GitHub UI | accepted |
 | ADR-0010 | Polymarket and FRED as grounding sources; Metaculus and yfinance rejected | accepted |
 | ADR-0011 | The spec is a book by idea; this file is the living technical counterpart to the PRD | accepted |
+| ADR-0013 | A payoff names what you would trade — contract or price; what it costs is a live quote | accepted |
 
 ---
 
