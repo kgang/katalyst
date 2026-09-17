@@ -97,6 +97,23 @@ class Said(BaseModel):
     output_tokens: int = Field(default=0, description="Tokens of answer written.")
     cache_read_tokens: int = Field(default=0, description="Tokens recognised from an earlier call.")
     cache_write_tokens: int = Field(default=0, description="Tokens written into the cache.")
+    thinking_tokens: int = Field(
+        default=0,
+        description=(
+            "How many of those written tokens were the model thinking rather than "
+            "answering. Half to two-thirds of a call, measured on the first recorded "
+            "five, and never shown — so this is the only way to find out where a "
+            "minute went without running the whole thing again."
+        ),
+    )
+    seconds: float = Field(
+        default=0.0,
+        description=(
+            "How long this question took, wall clock, measured at the seam. The other "
+            "half of the same measurement: tokens say what was written, this says how "
+            "long the writing took."
+        ),
+    )
 
 
 # --- What our own code decided ----------------------------------------------
@@ -215,6 +232,10 @@ class Outcome(BaseModel):
     output_tokens: int = Field(default=0, description="Tokens of answer written.")
     cache_read_tokens: int = Field(default=0, description="Tokens recognised from an earlier call.")
     cache_write_tokens: int = Field(default=0, description="Tokens written into the cache.")
+    thinking_tokens: int = Field(
+        default=0, description="How many written tokens were thinking rather than answering."
+    )
+    seconds: float = Field(default=0.0, description="How long this question took, wall clock.")
 
 
 def costing(
@@ -239,6 +260,8 @@ def costing(
         output_tokens=said.output_tokens,
         cache_read_tokens=said.cache_read_tokens,
         cache_write_tokens=said.cache_write_tokens,
+        thinking_tokens=said.thinking_tokens,
+        seconds=said.seconds,
     )
 
 

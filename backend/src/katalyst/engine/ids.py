@@ -20,7 +20,17 @@ and it is what lets the stored Hormuz example use identifiers a person can read 
 a test fails.
 """
 
+import secrets
+
 from ulid import ULID
+
+A_SEED_FITS_IN = 64
+"""How many bits a minted seed has.
+
+Wide enough that two runs started in the same second do not collide, and narrow
+enough to be an ordinary whole number a person can copy out of a screen and paste
+back into a request to reproduce a run.
+"""
 
 
 def mint_id() -> str:
@@ -35,3 +45,22 @@ def mint_id() -> str:
         The identifier as a plain string, ready to pass into a domain model.
     """
     return str(ULID())
+
+
+def mint_seed() -> int:
+    """Make one new seed: the number every likelihood on a map is worked out from.
+
+    Minted here, at the edge, for the same reason an identifier is: it needs a
+    source of randomness, and the rules layer reads none. A request that leaves
+    the seed out gets one from here, and the generation's first event says which —
+    so a run is reproducible from the moment it starts.
+
+    **The browser never invents one.** It sends a seed only to reproduce a run it
+    was handed, which is the one case where a seed means something to whoever is
+    sending it; a number made up at the other end would be a number nobody
+    computed sitting inside the reproducibility of the answer.
+
+    Returns:
+        A whole number, positive, wide enough not to collide.
+    """
+    return secrets.randbits(A_SEED_FITS_IN)

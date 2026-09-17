@@ -1,15 +1,18 @@
 # The checks that run on every pull request and on every push to `main`.
 #
-# Five jobs, named exactly `backend`, `frontend`, `types-fresh`, `docker` and
-# `e2e`. The names are not decoration: decision record 0009 makes them the checks
-# that must pass before anything reaches `main`, so renaming one here would
-# quietly stop it being required.
+# Six jobs, named exactly `backend`, `frontend`, `types-fresh`, `docker`, `e2e`
+# and `recordings`. The names are not decoration: decision record 0009 makes them
+# the checks that must pass before anything reaches `main`, so renaming one here
+# would quietly stop it being required — and adding one here does not make it
+# required until somebody adds its name there.
 #
 #   backend      the Python half: style, types, tests
 #   frontend     the browser half: style, types, tests
 #   types-fresh  the browser's types still match the server's data shapes
 #   docker       both packaged images still build
 #   e2e          the one test that drives both halves in a real browser
+#   recordings   the committed recordings still parse, still show a refusal, and
+#                were made against the prompt that is shipping
 #
 # No job below is given an API key or any other secret, and no job needs one.
 # That is the rule INV-13 in `PRODUCT_REQUIREMENTS.md`: the whole suite passes
@@ -216,3 +219,31 @@ jobs:
       - name: Open the stored map, branch it, and read it with the keyboard
         run: npx playwright test
         working-directory: frontend
+
+  # The committed recordings a keyless clone plays back. It needs no key and has
+  # none, and it passes on an empty folder, so it is green from the commit that
+  # adds it and bites the moment the first recording lands.
+  #
+  # What it reads: every line parses, line one is a header, every line after it is
+  # one of the eight events with a payload that fits, the sequence obeys the
+  # stream's grammar and ends where a generation ends, no file stores likelihoods,
+  # every file shows at least one refusal, and every header names the prompt that
+  # is shipping today.
+  recordings:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv, the tool that installs Python packages
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install exactly the packages the lock file names
+        run: uv sync --frozen
+
+      - name: Read every committed recording
+        run: uv run python -m katalyst.engine.check_recordings

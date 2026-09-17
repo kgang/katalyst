@@ -27,6 +27,7 @@ from datetime import date
 from threading import Lock
 
 from anthropic.types import ParsedMessage, Usage, WebSearchResultBlock, WebSearchToolResultBlock
+from anthropic.types.output_tokens_details import OutputTokensDetails
 from anthropic.types.parsed_message import ParsedTextBlock
 from anthropic.types.refusal_stop_details import RefusalStopDetails
 from anthropic.types.server_tool_usage import ServerToolUsage
@@ -149,6 +150,7 @@ def an_answer(
     written: int = 100,
     read_from_cache: int = 0,
     written_to_cache: int = 0,
+    thinking: int | None = None,
     stopped: str = "end_turn",
 ) -> ParsedMessage[Proposal]:
     """Build one answer the way the service builds one.
@@ -162,6 +164,9 @@ def an_answer(
         written: Tokens of answer.
         read_from_cache: Tokens recognised from an earlier call.
         written_to_cache: Tokens written into the cache.
+        thinking: How many of the written tokens were thinking rather than
+            answering. Half of them when not said, which is roughly what the first
+            five recorded calls actually did.
         stopped: Why the model stopped writing.
 
     Returns:
@@ -195,7 +200,14 @@ def an_answer(
         role="assistant",
         stop_reason=stopped,  # type: ignore[arg-type]
         type="message",
-        usage=_usage(read_fresh, written, read_from_cache, written_to_cache, searches),
+        usage=_usage(
+            read_fresh,
+            written,
+            read_from_cache,
+            written_to_cache,
+            searches,
+            written // 2 if thinking is None else thinking,
+        ),
     )
 
 
@@ -245,13 +257,16 @@ def _a_block(said: object) -> ParsedTextBlock[object]:
     )
 
 
-def _usage(fresh: int, written: int, cached: int, into_cache: int, searches: int) -> Usage:
+def _usage(
+    fresh: int, written: int, cached: int, into_cache: int, searches: int, thinking: int = 0
+) -> Usage:
     """Build the counters the service reports on every answer."""
     return Usage(
         input_tokens=fresh,
         output_tokens=written,
         cache_read_input_tokens=cached,
         cache_creation_input_tokens=into_cache,
+        output_tokens_details=OutputTokensDetails(thinking_tokens=thinking),
         server_tool_use=ServerToolUsage(web_search_requests=searches, web_fetch_requests=0),
     )
 

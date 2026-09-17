@@ -67,7 +67,7 @@ None of it is a secret and none of it is read back on replay, and all of it is
 somebody's business but the reader's: which organisation and workspace paid for
 the call, what that account has bought and how much of it is left, and a handful
 of identifiers tying the exchange to one account's traffic. The recorder takes
-them out as it writes (`tests/boundary/conftest.py`); this is the net under that,
+them out as it writes (`tests/conftest.py`); this is the net under that,
 and it checks every recording wherever it was made.
 """
 

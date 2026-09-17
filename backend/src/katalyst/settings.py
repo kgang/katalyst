@@ -31,6 +31,12 @@ class Settings(BaseSettings):
         FRED_API_KEY: The key for the Federal Reserve Economic Data service, a
             public source of economic time series. First needed in stack 05,
             where a proposition can be grounded in a published series.
+        REPLAY_INSTANT: Whether a recorded generation plays back with no pause
+            between its events. Off by default, because the pause is what makes a
+            replay read as a map arriving rather than appearing. The test suite
+            and the build's own check turn it on; it is deliberately not
+            something a request can ask for, since a client that could skip the
+            pacing could skip the thing a recording exists to show.
     """
 
     model_config = SettingsConfigDict(
@@ -45,6 +51,7 @@ class Settings(BaseSettings):
 
     ANTHROPIC_API_KEY: str | None = None
     FRED_API_KEY: str | None = None
+    REPLAY_INSTANT: bool = False
 
 
 @lru_cache

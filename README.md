@@ -94,6 +94,8 @@ make eval     # says out loud that it arrives in stack 04, rather than pretendin
 make          # the whole list of tasks
 ```
 
+Two tasks call a model and spend real money, and neither runs unless you ask for it. `make record-cassettes` records the handful of real exchanges the tests replay. **`make record-demo` writes the recordings a keyless clone plays back** — one whole generation per example, into `backend/recordings/`, and it is the only thing that ever writes one. Take `ONLY=hormuz` to record a single example and `CAP=5` to lower the spending ceiling; `CAP` can only lower the limit written in code, never lift it. Both refuse to start with no key and say so. Re-run `make record-demo` whenever a prompt changes: a recording made against different words shows wording this program no longer uses, and the build says so rather than letting it pass unnoticed.
+
 The one end-to-end test is not in `make test`, because it wants a browser downloaded first. It starts both halves itself, so there is nothing to have running:
 
 ```sh

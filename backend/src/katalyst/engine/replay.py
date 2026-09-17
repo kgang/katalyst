@@ -1,0 +1,419 @@
+"""Playing a recorded generation back, so a reviewer with no key sees the real thing.
+
+Somebody clones this repository, starts it, opens the browser — and has no reason
+to spend money on a model key. Everything this prototype is judged on lives past
+that point: a map drawing itself claim by claim, the rules refusing the model in
+public, a step changed and the trades moving.
+
+**Replay puts all of it in front of them**, through the same route, the same
+stream and the same canvas the live path uses. The only substitution anywhere is
+where the bytes came from, and the screen says so.
+
+The file
+--------
+`backend/recordings/<example>.jsonl` — one JSON object per line, no surrounding
+array and no commas between lines, so a file can be written a line at a time
+while a run is still going, read a line at a time without holding it all in
+memory, and read as text in a diff.
+
+**Line one is the header; every line after it is one event.** They are told apart
+by one thing: an event line has an `event` key and the header does not. An event
+line carries exactly the two fields the wire carries, so the replayer writes them
+straight out without re-deriving anything — which is what makes "a recording is
+the stream, line for line" literally true rather than nearly true.
+
+Two events are not re-emitted from the file
+--------------------------------------------
+**The receipt is rebuilt.** A replay made no calls, so it says exactly that: zero
+calls, zero tokens, zero searches, zero dollars, the header's date and prompt
+fingerprint, and `mode: "replay"`. The whole tally is zeroed together rather than
+the dollars alone — a receipt showing tokens with no dollars would contradict its
+own price table. The model is copied from the recorded receipt, because the
+reader is entitled to know which model wrote this map, and the seconds are this
+replay's own clock.
+
+**The likelihoods are recomputed, and therefore never stored.** The header
+carries the seed, the accepted proposals carry the map, and the rules layer does
+the rest. So a recording holds no world at all: the files stay small, and replay
+and live agree by construction rather than by care. Store the numbers instead and
+the day propagation changes, the demo shows numbers the engine no longer
+produces and nothing goes red.
+
+What this file must never do
+----------------------------
+- Never write a recording. `make record-demo` is the only writer, and a
+  hand-edited file is a piece of state that traces to nobody.
+- Never guess which recording to play. The match is the person's own sentence,
+  exact after trimming — playing the Hormuz map back at somebody who asked about
+  photonic chips is worse than saying no, and afterwards it is indistinguishable
+  from the product working.
+- Never let the pacing change an event, an order or a number. It is cosmetic.
+- Never honour a seed from the request. The header's seed is the one the recorded
+  run had, and the numbers are recomputed from it.
+"""
+
+import json
+from collections.abc import Iterator
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from katalyst.domain import Graph, Insert, Link, Proposition, propagate
+from katalyst.engine import events
+from katalyst.engine.events import (
+    BeliefsPropagated,
+    Event,
+    GenerationStarted,
+    ProposalAccepted,
+    Receipt,
+)
+from katalyst.settings import get_settings
+
+RECORDINGS = Path(__file__).resolve().parents[3] / "recordings"
+"""Where the committed recordings live: `backend/recordings/`."""
+
+A_COMFORTABLE_PACE = 0.6
+"""Seconds between events when a recording is played at human speed.
+
+Cosmetic and nothing else: it never changes an event, an order or a number. The
+figure is chosen against a measurement rather than taste — a live proposal took
+about a minute to come back on the first five recorded calls, so a replay that
+raced would teach a reviewer that the product is faster than it is, and one that
+matched would be unwatchable. This is the slowest speed somebody will sit through
+and the fastest that still reads as *arriving* rather than *appearing*.
+"""
+
+
+class RecordedInsert(BaseModel):
+    """The single scripted "…but X happens" a keyless reviewer can make on this map."""
+
+    model_config = ConfigDict(frozen=True)
+
+    claim_in_words: str = Field(description="What the card offers, word for word.")
+    answer: Insert = Field(
+        description="The claim and its arrows, drafted live when the recording was made."
+    )
+
+
+class RecordingHeader(BaseModel):
+    """The first line of a recording: everything that is true of the whole file.
+
+    It must never carry a likelihood, a range or a world. Numbers are recomputed
+    from the seed, and a number stored here could one day disagree with the engine
+    that is running.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    base_id: str = Field(
+        description=(
+            "The identifier of the map this recording builds, minted when the "
+            "recording was made. Emphatically not the word `hormuz`: the file is "
+            "named for the launchpad card, and the map inside carries a minted "
+            "identifier so it can never be confused with the hand-written stored "
+            "example that already answers to that name."
+        )
+    )
+    seed: int = Field(description="The one number the rules layer re-propagates with.")
+    recording_date: date = Field(description="The day `make record-demo` wrote this file.")
+    prompt_hash: str = Field(description="The fingerprint of the prompt the run was made against.")
+    insert: RecordedInsert = Field(
+        description="The one scripted intervention this recording can answer."
+    )
+
+
+class RecordingSummary(BaseModel):
+    """One recording the first screen can offer, and when it was made."""
+
+    model_config = ConfigDict(frozen=True)
+
+    example: str = Field(description="The short name of the example, matching its file name.")
+    recording_date: date = Field(description="The day `make record-demo` wrote it.")
+
+
+class Recording(BaseModel):
+    """One whole recorded generation: its header and its events, in order."""
+
+    model_config = ConfigDict(frozen=True)
+
+    example: str = Field(description="The short name of the example, from the file's own name.")
+    header: RecordingHeader = Field(description="Everything true of the whole file.")
+    lines: tuple[tuple[str, dict[str, Any]], ...] = Field(
+        description="Every event after the header, as the name it travels under and its payload."
+    )
+
+    @property
+    def hypothesis(self) -> str:
+        """The sentence this recording was made from, read off its own first event."""
+        for name, payload in self.lines:
+            if name == events.NAMES[GenerationStarted]:
+                return str(payload.get("hypothesis", ""))
+        return ""
+
+
+def read(path: Path) -> Recording:
+    """Read one recording off disk.
+
+    Args:
+        path: The file to read.
+
+    Returns:
+        Its header and its events, in the order they were written.
+
+    Raises:
+        ValueError: If the file is empty, or its first line is not a header.
+    """
+    written = [one for one in path.read_text(encoding="utf-8").splitlines() if one.strip()]
+    if not written:
+        raise ValueError(f"{path.name} is empty; a recording is a header and its events")
+    header = RecordingHeader.model_validate_json(written[0])
+    lines: list[tuple[str, dict[str, Any]]] = []
+    for line in written[1:]:
+        said = json.loads(line)
+        lines.append((str(said["event"]), dict(said["data"])))
+    return Recording(example=path.stem, header=header, lines=tuple(lines))
+
+
+def every_recording(folder: Path | None = None) -> tuple[Recording, ...]:
+    """Read every recording in a folder, in a fixed order.
+
+    A folder with nothing in it gives nothing back, which is what lets the build's
+    own check be green from the commit that adds it.
+
+    Args:
+        folder: Where the recordings live. The committed folder when not said.
+
+    Returns:
+        Every recording, by file name.
+    """
+    # Resolved when asked rather than when this function was written, so that
+    # where the recordings live is a fact about the running program.
+    looking_in = RECORDINGS if folder is None else folder
+    if not looking_in.is_dir():
+        return ()
+    return tuple(read(one) for one in sorted(looking_in.glob("*.jsonl")))
+
+
+def summaries(folder: Path | None = None) -> tuple[RecordingSummary, ...]:
+    """List what this copy of the program can play back, and when each was made.
+
+    Read by the first screen before anything runs, which is how the sentence
+    record 0012 requires — *"No model key configured — these run from recordings
+    made on <date>"* — can name a date at all: the date lives on the receipt, and
+    the receipt arrives last.
+
+    Args:
+        folder: Where the recordings live. The committed folder when not said.
+
+    Returns:
+        One summary per recording, by file name.
+    """
+    return tuple(
+        RecordingSummary(example=one.example, recording_date=one.header.recording_date)
+        for one in every_recording(folder)
+    )
+
+
+def find(hypothesis: str, folder: Path | None = None) -> Recording | None:
+    """Find the recording made from this sentence, or nothing at all.
+
+    **Matched on the sentence, exact after trimming surrounding spaces** — the
+    same rule the scripted intervention uses, because one matching rule is easier
+    to trust than two. Never a nearest match: playing one map back at somebody who
+    asked about something else is worse than saying no, and afterwards it is
+    indistinguishable from the product working.
+
+    Args:
+        hypothesis: The sentence the person typed.
+        folder: Where the recordings live. The committed folder when not said.
+
+    Returns:
+        The one recording made from that sentence, or nothing at all.
+    """
+    wanted = hypothesis.strip()
+    for one in every_recording(folder):
+        if one.hypothesis.strip() == wanted:
+            return one
+    return None
+
+
+def play(recording: Recording) -> Iterator[Event]:
+    """Play one recording back as the events a live run would have emitted.
+
+    Every event comes straight out of the file except the receipt, which is
+    rebuilt to say that this run made no calls. The likelihoods are not in the
+    file at all: `beliefs_of` recomputes them, and whoever writes the bytes out
+    puts that event where the grammar requires.
+
+    Args:
+        recording: The recording to play.
+
+    Yields:
+        The events, in the order the file holds them.
+    """
+    for name, payload in recording.lines:
+        if name == events.NAMES[Receipt]:
+            yield _rebuilt(payload, recording)
+            continue
+        yield events.BY_NAME[name].model_validate(payload)
+
+
+def seconds_between(instant: bool | None = None) -> float:
+    """How long to wait between two events of a replay.
+
+    Pacing is presentation and nothing else, which is why it is **not** a field on
+    the request: a client that could ask for an instant replay would let anybody
+    who opened the network tab skip the thing the recording exists to show. It is
+    a setting, read here, and a caller may say so plainly instead.
+
+    Args:
+        instant: True to drop the delay to nothing, or nothing at all to let the
+            program's own settings decide.
+
+    Returns:
+        The seconds to wait between events.
+    """
+    if instant is None:
+        instant = get_settings().REPLAY_INSTANT
+    return 0.0 if instant else A_COMFORTABLE_PACE
+
+
+def beliefs_of(recording: Recording, world_sizes: tuple[int, int]) -> BeliefsPropagated:
+    """Work every likelihood through the map this recording built.
+
+    The one event a recording never stores. The header carries the seed, the
+    accepted proposals carry the map, and the rules layer does the rest — so a
+    replay and a live run end up running the identical map, branch and seed
+    through the identical arithmetic.
+
+    Args:
+        recording: The recording whose map to work through.
+        world_sizes: How many versions of the map to try, and how many worlds
+            under each.
+
+    Returns:
+        The event, ready to be written out where the grammar puts it.
+    """
+    versions, worlds = world_sizes
+    world = propagate(
+        map_of(recording),
+        (),
+        as_of=recording.header.recording_date,
+        seed=recording.header.seed,
+        versions=versions,
+        worlds=worlds,
+    )
+    return BeliefsPropagated(world=world)
+
+
+def map_of(recording: Recording) -> Graph:
+    """Build the map this recording's accepted proposals left behind.
+
+    Nothing is minted here: every identifier in the file was minted when the
+    recording was made, and reading them back is what makes a replayed map the
+    same map.
+
+    Args:
+        recording: The recording to read.
+
+    Returns:
+        The finished map, with the header's identifier on it.
+
+    Raises:
+        ValueError: If the recording holds no claim at all, which no committed
+            file can.
+    """
+    claims: list[Proposition] = []
+    arrows: list[Link] = []
+    for name, payload in recording.lines:
+        if name != events.NAMES[ProposalAccepted]:
+            continue
+        landed = ProposalAccepted.model_validate(payload)
+        if landed.proposition is not None:
+            claims.append(landed.proposition)
+        arrows.extend(landed.links)
+    if not claims:
+        raise ValueError(f"{recording.example} holds no claim; there is no map to rebuild")
+    return Graph(
+        id=recording.header.base_id,
+        propositions=tuple(claims),
+        links=tuple(arrows),
+        hypothesis_id=claims[0].id,
+    )
+
+
+def _rebuilt(recorded: dict[str, Any], recording: Recording) -> Receipt:
+    """Rebuild a recorded receipt as the receipt of the replay that is running now.
+
+    Args:
+        recorded: The receipt the original run emitted.
+        recording: The recording it came from, for its header.
+
+    Returns:
+        A receipt saying this run made no calls and cost nothing.
+    """
+    return Receipt(
+        model=str(recorded.get("model", "")),
+        calls=0,
+        input_tokens=0,
+        output_tokens=0,
+        cache_read_tokens=0,
+        searches=0,
+        dollars=0.0,
+        seconds=0.0,
+        mode="replay",
+        recording_date=recording.header.recording_date,
+        prompt_hash=recording.header.prompt_hash,
+    )
+
+
+def faults_in(recording: Recording, *, current_prompt_hash: str) -> list[str]:
+    """List everything wrong with one recording, in plain sentences.
+
+    What the build's own check reads. Every reason at once, never the first.
+
+    Args:
+        recording: The recording to check.
+        current_prompt_hash: The fingerprint of the prompt shipping today.
+
+    Returns:
+        One sentence per fault, or nothing at all when the file is sound.
+    """
+    found: list[str] = []
+    names = [name for name, _ in recording.lines]
+
+    unknown = sorted({one for one in names if one not in events.BY_NAME})
+    if unknown:
+        found.append(f"{recording.example} holds events nobody knows: {', '.join(unknown)}.")
+    for name, payload in recording.lines:
+        shape = events.BY_NAME.get(name)
+        if shape is None:
+            continue
+        try:
+            shape.model_validate(payload)
+        except ValidationError:
+            found.append(f"{recording.example} holds a {name} whose payload does not fit it.")
+            break
+
+    if not names or names[0] != events.NAMES[GenerationStarted]:
+        found.append(f"{recording.example} does not start where a generation starts.")
+    if not names or names[-1] != events.NAMES[events.Done]:
+        found.append(f"{recording.example} does not end where a generation ends.")
+    if events.NAMES[BeliefsPropagated] in names:
+        found.append(
+            f"{recording.example} stores likelihoods. They are recomputed from the seed, "
+            "so a stored one could disagree with the engine that is running."
+        )
+    if events.NAMES[events.ProposalRejected] not in names:
+        found.append(
+            f"{recording.example} shows no refusal. Watching the rules refuse the model is "
+            "half of what this product is, so every recording must hold at least one."
+        )
+    if recording.header.prompt_hash != current_prompt_hash:
+        found.append(
+            f"{recording.example} was made against a different prompt from the one shipping "
+            "today, so it shows wording this program no longer uses. Record it again."
+        )
+    return found

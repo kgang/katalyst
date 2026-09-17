@@ -11,7 +11,7 @@
 
 # These are names of tasks, not names of files to build. Saying so means `make
 # test` still works if a file called `test` ever appears.
-.PHONY: help dev up down prod test lint types eval record-cassettes
+.PHONY: help dev up down prod test lint types eval record-cassettes record-demo
 
 help: ## Show this list
 	@echo "Katalyst — make <task>"
@@ -51,7 +51,22 @@ types: frontend/node_modules ## Rewrite the browser app's types from the server'
 eval: ## Score what the language model proposes against saved examples
 	@echo "make eval arrives in stack 04, the stack that first asks a language model for anything."
 
-# --- the one task that spends money -----------------------------------------
+# --- the two tasks that spend money -----------------------------------------
+#
+# `record-demo` writes the files a keyless clone plays back: one whole generation
+# per example, one JSON object per line. It is the only thing that ever writes
+# one — a hand-edited recording is a piece of state that traces to nobody.
+#
+#   make record-demo                  every example, at the ceiling written in code
+#   make record-demo ONLY=hormuz      one of them
+#   make record-demo CAP=5            the same, with a lower ceiling
+#
+# CAP can only lower the $15 hard stop that is written in code, never lift it: a
+# cap a caller can raise is not a cap. A run that reaches it stops and says what
+# it spent and what it got.
+#
+# Re-run it whenever a prompt changes. A recording made against different words
+# shows wording this program no longer uses, and the build says so.
 #
 # Everything else in this file runs with no key. This one calls the model for
 # real and writes what it says into backend/tests/cassettes, so that every later
@@ -67,6 +82,10 @@ eval: ## Score what the language model proposes against saved examples
 #
 # Re-run this whenever a prompt changes. A recording made against different
 # words is a recording of a question we no longer ask.
+
+record-demo: ## Record an example running for real, so a keyless clone can watch it. Spends money; needs a key
+	cd backend && uv run python -m katalyst.engine.record \
+		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),)
 
 record-cassettes: ## Record the model's real answers for the tests to replay. Spends money; needs a key
 	cd backend && uv run pytest tests/boundary -m "not handmade" --record-mode=rewrite

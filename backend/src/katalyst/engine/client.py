@@ -47,10 +47,12 @@ What this file must never do
   tool that fetches a page of our choosing.
 """
 
+import time
 from collections.abc import Sequence
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import anthropic
+from anthropic import Omit, omit
 
 # A private path into the client library, used in exactly one place and never to
 # build a request: `wire_schema` below looks at what the library *would* send, so
@@ -59,6 +61,7 @@ import anthropic
 from anthropic.lib._parse._transform import transform_schema
 from anthropic.types import (
     MessageParam,
+    OutputConfigParam,
     ParsedMessage,
     TextBlockParam,
     ToolChoiceParam,
@@ -120,6 +123,27 @@ for to support a conclusion we already had.
 
 A search that fails does not raise. The answer comes back normally and the result
 block holds one error instead of a list of results, which reads as nothing found.
+"""
+
+HOW_HARD_TO_TRY: Literal["low", "medium", "high", "xhigh", "max"] | None = None
+"""How hard the model tries, pinned for the whole program rather than per call.
+
+`None` means the setting is not sent at all, which is where it stands today: the
+service's own default is `high`, and naming a value here — even the same one —
+puts a field in the request that was not there before. The request is what a
+recorded exchange is matched on, so changing this re-records every cassette and
+every demo recording, and that is a decision with a bill attached rather than a
+tuning knob.
+
+**It is a constant on purpose.** Changing how hard the model tries between calls
+would throw away the remembered prefix the whole run is reading back at a tenth
+of the price, so this may be edited but never varied.
+
+The reason to reach for it: the first five recorded calls spent **half to
+two-thirds of their written tokens thinking**, and took about a minute each.
+`medium` is the first thing to measure against the default, and the transcript
+now carries the thinking tokens and the seconds per call so that measurement
+needs no second experiment.
 """
 
 MAY_SEARCH: ToolChoiceParam = {"type": "auto"}
@@ -306,8 +330,13 @@ class Model:
         Raises:
             AnswerWeCouldNotRead: If what came back did not fit the shape.
         """
+        # Sent only when somebody has decided to send it; see `HOW_HARD_TO_TRY`.
+        trying: OutputConfigParam | Omit = (
+            {"effort": HOW_HARD_TO_TRY} if HOW_HARD_TO_TRY is not None else omit
+        )
         conversation: list[MessageParam] = [{"role": "user", "content": question}]
         rounds: list[ParsedMessage[Any]] = []
+        started = time.monotonic()
         for _ in range(TIMES_A_PART_FINISHED_ANSWER_IS_SENT_BACK + 1):
             try:
                 answer = self._client.messages.parse(
@@ -323,19 +352,20 @@ class Model:
                     tool_choice=MAY_SEARCH if may_search else MAY_NOT_SEARCH,
                     messages=conversation,
                     output_format=shape,
+                    output_config=trying,
                 )
             except ValidationError as did_not_fit:
                 raise AnswerWeCouldNotRead(_did_not_fit_the_shape(did_not_fit)) from did_not_fit
             rounds.append(answer)
             if answer.stop_reason != "pause_turn":
-                return what_it_said(rounds)
+                return what_it_said(rounds, seconds=time.monotonic() - started)
             # Part finished. The service picks up from its own turn, and adding a
             # "carry on" of our own would only confuse it.
             conversation = [*conversation, {"role": "assistant", "content": answer.content}]
-        return what_it_said(rounds)
+        return what_it_said(rounds, seconds=time.monotonic() - started)
 
 
-def what_it_said(rounds: Sequence[ParsedMessage[Any]]) -> Said:
+def what_it_said(rounds: Sequence[ParsedMessage[Any]], *, seconds: float = 0.0) -> Said:
     """Turn every round trip of one question into one answer in our own words.
 
     The only place a reply of the library's becomes a shape of ours. Pure: it
@@ -352,6 +382,9 @@ def what_it_said(rounds: Sequence[ParsedMessage[Any]]) -> Said:
     Args:
         rounds: Every round trip the question took, oldest first. The last one
             holds the answer.
+        seconds: How long the whole question took, measured by the caller that
+            made it. Passed in rather than read here, so this stays a pure
+            function of an answer and a test can hand it a fixed number.
 
     Returns:
         The answer, its search results, whether the model declined, and the sum of
@@ -375,6 +408,13 @@ def what_it_said(rounds: Sequence[ParsedMessage[Any]]) -> Said:
         output_tokens=sum(one.usage.output_tokens for one in rounds),
         cache_read_tokens=sum(one.usage.cache_read_input_tokens or 0 for one in rounds),
         cache_write_tokens=sum(one.usage.cache_creation_input_tokens or 0 for one in rounds),
+        thinking_tokens=sum(
+            one.usage.output_tokens_details.thinking_tokens
+            if one.usage.output_tokens_details
+            else 0
+            for one in rounds
+        ),
+        seconds=seconds,
     )
 
 

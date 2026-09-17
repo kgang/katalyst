@@ -38,7 +38,7 @@ What this file must never do
 - Never give two reasons for stopping, or a reason nothing can produce.
 """
 
-from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from typing import Literal, cast
@@ -127,7 +127,7 @@ def grow(
     answerer: Answerer,
     on: date,
     caps: Caps | None = None,
-) -> Iterator[Outcome | Finished]:
+) -> Generator[Outcome | Finished, None, None]:
     """Walk the frontier, one round at a time, until every line has closed.
 
     Hands back every outcome as it is folded in, oldest first, and then exactly
@@ -150,6 +150,11 @@ def grow(
 
     Yields:
         Each call's outcome in the order it was folded, then one `Finished`.
+
+    It is a generator rather than a list on purpose, and the caller may stop
+    reading it at any point: abandoning it is what makes "the run stops calling
+    the model when the client goes away" true without a flag to check. Close it
+    when you stop, so the round of calls in flight is let go of at once.
     """
     caps = caps or Caps()
     walk = _Walk(caps)

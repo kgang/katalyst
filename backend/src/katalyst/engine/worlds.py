@@ -57,6 +57,7 @@ from katalyst.domain import (
     introduced_by,
     propagate,
 )
+from katalyst.engine.transcript import held
 from katalyst.fixtures import EXAMPLES, StoredExample, find
 
 VERSIONS = 2_000
@@ -72,6 +73,66 @@ WORLDS = 8
 
 The inner loop: how the dice fall. The same number `propagate` defaults to.
 """
+
+MOST_VERSIONS = 8_000
+"""The most versions of the map one request may ask for. See `MOST_WORLDS`."""
+
+MOST_WORLDS = 16
+"""The most worlds one request may run under each version.
+
+**Measured, not chosen.** Both ceilings come from one measurement, taken on this
+machine on 2026-09-17 and written down here with it: the stored Hormuz example,
+seven claims over a sixty-one-day window, takes **394 milliseconds** at the two
+ceilings together — 8 000 versions of 16 worlds, 128 000 worlds in all. Working
+every likelihood through costs claims times days times worlds, and
+`spec/multiverse/propagation.md` measured that it is linear in the claims, so the
+largest map this program will build — thirty claims, its own cap — is about
+**1.7 seconds**. The worst request is a comparison, which builds two worlds, and
+the build machine runs about two and a half times slower than this one: **about
+eight and a half seconds**.
+
+The budget that sits against is a product judgement rather than a measurement,
+and it is said out loud: **ten seconds** is as long as somebody will wait for a
+world before deciding the program has stopped. What was measured is which loop
+sizes fit inside it.
+
+Neither ceiling is below the shipped default, and a request above one is refused
+rather than quietly reduced: a caller who asks for one run and silently gets a
+smaller one is reading numbers that answer a question nobody asked.
+"""
+
+
+def example_named(base_id: str) -> StoredExample | None:
+    """Find the map a request names: the stored examples first, then this run's own.
+
+    A reviewer who has just watched a map draw itself then wants to suppose
+    something on it, and the routes below need a map to fold a branch onto. So a
+    generated map answers here under the identifier it was minted with, for as
+    long as this process is holding it — and `(map, branch, seed)` keeps meaning
+    exactly what it means everywhere else.
+
+    Args:
+        base_id: The short name of a stored example, or the identifier of a map
+            this process generated.
+
+    Returns:
+        The example, or nothing at all when neither place has it.
+    """
+    stored = find(base_id)
+    if stored is not None:
+        return stored
+    generated = held.map_of(base_id)
+    day_zero = held.day_zero_of(base_id)
+    if generated is None or day_zero is None:
+        return None
+    return StoredExample(
+        id=base_id,
+        title="A map this program generated",
+        one_line="Built from a sentence somebody typed, and held for the life of this process.",
+        fixture_date=day_zero,
+        graph=generated,
+        branches=(),
+    )
 
 
 def no_such_example(base_id: str) -> str:
@@ -112,7 +173,7 @@ def build_world(
         One world, or the list of reasons the branch could not be folded, or
         nothing at all when no example is stored under that name.
     """
-    example = find(base_id)
+    example = example_named(base_id)
     if example is None:
         return None
     folded = _fold(example, branch)
@@ -198,7 +259,7 @@ def conditional(
         the answer could not be worked out, or nothing at all when no example is
         stored under that name.
     """
-    example = find(base_id)
+    example = example_named(base_id)
     if example is None:
         return None
     folded = _fold(example, branch)
