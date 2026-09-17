@@ -11,7 +11,7 @@ The goal of the project is to create a functional protoype of the concept behind
 | Where | What |
 |-------|------|
 | `PRODUCT_REQUIREMENTS.md` | The compressed seed: decisions, requirements, invariants, anti-patterns, roadmap as PR stacks |
-| `docs/adr/` | Numbered MADR 4.x decisions; `template.md`; `README.md` index. Higher number supersedes |
+| `docs/adr/` | Numbered decision records (MADR format: context, options, decision, consequences); `template.md`; `README.md` index. Higher number supersedes |
 | `spec/` | Feature specs with INVARIANTS and ANTI-PATTERNS; `00-vocabulary.md` is the shared language |
 | `docs/research/` | Four independent research reports (2026-09-16) that fed the PRD; inputs, not decisions |
 | `docs/initial-brainstorming.md` | Kent's raw notes; the origin of trigger/sustain links and refinement |
@@ -32,3 +32,5 @@ RULES FOR THIS REPO
 * More detailed descriptions, diagrams about particular systems or complex features should be written to ./spec
 * Specs should follow best practices regarding spec-driven development. Some key aspects of specs for this repo should include invariants and anti-patterns
 * This is an experimental prototype and I am a solo developer. However, I would like to use best practices regarding commit messages, PRs, and PR stacks to maintain the navigability, hygiene, and legibility of this repo.
+* Docs should avoid jargon, reference to other docs, or unexplained abbreviations and symbols. They should be self-contained as much as possible. That is, explain in doc what the concepts being referenced are. This also extends to doc strings and comments in the code.
+* Be concise, punchy, and succinct without sacrificing clarity. Use formatting as a communication and legibility aid.

@@ -8,23 +8,25 @@
 
 ## 1. What this is, in one screen
 
-**Input.** "The Strait of Hormuz is going to open next week." Optionally: "…and I want to know whether that gets me to *Brent under $70*." Optionally: what *you* believe (a prior, or "I don't know").
+**The hero use case, in one sentence.** You type an event you think will happen. Katalyst shows what it would cause, step by step, ending in trades — and lets you change any step to see how the trades change.
 
-**Output.** A directed graph of *resolvable propositions* — each with resolution criteria, a base rate, evidence, and three side-by-side beliefs: the model's, yours, and the market's — connected by *typed links* that state a mechanism, a strength, a lag, and a signal shape. The graph streams in as the model reasons. It terminates in market nodes: a ticker, a contract, a commodity level.
+**Input.** "The Strait of Hormuz is going to open next week." Optionally, a destination: "does that get me to Brent under $70?" Optionally, how likely *you* think it is — or "I don't know."
 
-**The move.** Click any node. Say "…but Iran is struck the next day." The base world is preserved; a branch forks; only downstream nodes re-propagate; a ghost overlay shows exactly what moved. Repeat. Compare worlds.
+**Output.** A map of cause and effect. Each box is a claim that can be checked by a date ("Brent closes under $70 by Nov 1, per ICE settlement"). Each box shows how likely it is as three numbers side by side: what the model thinks, what you think, and what the market is pricing. Each arrow states the mechanism, how strongly it pushes, and how long it takes. The map draws itself as the model reasons. It ends in things you can trade: a ticker, a contract, a commodity price.
 
-**The finale.** A thesis card: legs, entry condition, the one node whose flip kills the thesis (that *is* the stop-loss), the take-profit node, the black-swan rows listed rather than averaged, and an export a trading agent could ingest.
+**The move.** Click any box and change it: "…but Iran is struck the next day." The original map is kept. A new version forks off. Only the boxes downstream of your change update. A faded overlay shows exactly what moved. Do this as often as you like and compare versions.
 
-**Two doors, one graph.** *Explore:* given A, what B/C/D can I trade? *Verify:* is there a reasonable chain from A to B, and where is it weakest? Verify is Explore with a target; the same engine grows toward the target and grades the path.
+**The finale.** A thesis card: what to buy or sell, when to enter, the one event that would prove the idea wrong (that is your stop-loss), the event that means take profit, and the rare disasters listed one by one rather than hidden inside an average. Exportable in a form a trading system can read.
 
-**What it is not.** Not a chat UI with a graph stapled on. Not an oracle — it is a model of an argument, and every number is one click from why. Not an agent society. Not an execution venue.
+**Two doors, one map.** *Explore:* "Hormuz opens — what happens next, and what can I trade?" *Verify:* "Does Hormuz opening actually lead to cheaper oil — and where is that chain weakest?" Same map. Verify adds a destination, so the map grows toward it and grades every step. Explore is the first screen; Verify is one extra field, not a second product.
+
+**What it is not.** Not a chatbot with a diagram attached. Not an oracle: it lays out an argument, and every number can show why. Not a swarm of simulated agents. Not a place to execute trades.
 
 ---
 
 ## 2. Who reads this, and what "good" means to them
 
-Catalyst (`catalyst.app`) is 4–5 engineers from Jane Street / DRW / Citadel / Jump, seed-funded by Sequoia and Jump, already shipping natural-language → backtest → execution with a custom query language. They sit *downstream* of this tool. They will not be impressed by another front door to an LLM; they will be impressed by a tool that turns a vague belief into something with a venue, a strike, an entry, a stop, and a falsifiability test — and does so honestly (`docs/research/01`).
+Catalyst (`catalyst.app`) is 4–5 engineers from Jane Street / DRW / Citadel / Jump, seed-funded by Sequoia and Jump, already shipping natural-language → backtest → execution with a custom query language. They sit *downstream* of this tool. They will not be impressed by another front door to an LLM; they will be impressed by a tool that turns a vague belief into something with a venue, a strike, an entry, a stop, and a falsifiability test — and does so honestly.
 
 The brief names three wants: **(a)** how black-swan events affect risk, **(b)** which events trigger stop-loss / take-profit, **(c)** whether a hypothesized event actually leads to the desired financial effect. Each maps to a first-class surface below: the *Tail strip* (a), *Invalidation derivation* (b), *Verify door + conjunctive honesty bar* (c).
 
@@ -34,19 +36,19 @@ Craft is part of the requirement. The brief says "balance form and function"; th
 
 ## 3. Decisions taken (interview, 2026-09-16)
 
-These are settled by the owner and recorded here so no agent re-litigates them. Rationale and alternatives live in the ADRs.
+Settled by the owner; recorded here so no agent re-litigates them. Reasoning and rejected alternatives live in the numbered decision records under `docs/adr/`.
 
 | # | Question | Decision | ADR |
 |---|----------|----------|-----|
-| D1 | Hero use case | One graph, two doors. Both use cases supported; Explore canvas is the first screen; Verify = Explore with a target | — |
-| D2 | Truth source | LLM reasoning with explicit rationale, base rate, and interval on every link; market prices shown beside the model where a contract exists. **Stretch:** user can drill into a chosen node and spend modeling budget there (Monte Carlo, Bayesian sub-net, persona red-team) — the user decides where resolution matters | 0003, 0005 |
-| D3 | Aesthetic | *Workbench*: visual-programming rigor (typed ports, wires with signal shape) × rich node tiles with in-situ evidence collation, visualization, organizability × a simulation-game sense of world state and time. Not Linear-grade minimalism; not a game | 0007 |
-| D4 | Stack | Python (FastAPI, pydantic, uv) backend; React + TypeScript (Vite) frontend; types generated from OpenAPI | 0002 |
+| D1 | Hero use case | Type an event; see what it causes, step by step, ending in trades; change any step and watch the trades change. **Explore** ("what happens next?") is the first screen. **Verify** ("does A really lead to B?") is the same map with a destination added — one extra field, not a second mode | — |
+| D2 | Truth source | The model reasons out loud: every arrow states its mechanism, a base rate (how often this kind of thing has happened before), and a likelihood *range*, not a point. Where a real market prices the same event, that price sits beside the model's number. **Stretch:** pick any box and spend extra compute on it — thousands of random simulations, a small probability model, or role-played experts hunting for gaps — so the user decides where precision matters | 0003, 0005 |
+| D3 | Look and feel | *Workbench*: the rigor of a visual-programming tool (boxes with typed sockets, wires that show the signal's shape) × cards rich with evidence you can pin and arrange like a mood board × a simulation game's sense of world state and time. Not minimalist; not a game | 0007 |
+| D4 | Stack | Python backend (FastAPI web framework, pydantic data models, uv package manager); React + TypeScript frontend (Vite build tool). Frontend types are generated from the backend's API description so the two never drift | 0002 |
 | D5 | Disgust veto | (i) **Template UI** — default component-library look, spinner-then-dump, modals, hairball. (ii) **Not knowing why it did that** — any state not traceable to an input, a rule, or a cited source | all |
 | D6 | Thesis finale | Thesis card + live read-only market prices + declarative strategy export | 0010 |
 | D7 | Budget | Open-ended garden. Structure for continuous iteration; PR stacks tell the story | 0009 |
-| D8 | Whose judgment | User priors are first-class typed inputs, stored and diffed beside the model's and the market's. The tool amplifies a worldview and shows where it diverges; it does not replace judgment | 0004 |
-| D9 | Cadence | ADR-gated. Draft ADR + spec → owner accepts → implement. Nothing lands against a `proposed` ADR | 0001 |
+| D8 | Whose judgment | Your own likelihood estimates are stored as first-class inputs and shown beside the model's and the market's. The tool sharpens your view and shows where it differs; it never replaces it | 0004 |
+| D9 | Cadence | Decision-gated. Draft the decision record and spec → owner accepts → implement. Nothing lands against a `proposed` decision | 0001 |
 | D10 | PR stacks | GitHub native stacked PRs (public preview); verify on repo, fall back to `git-spice` | 0009 |
 | D11 | First slice | Engine and canvas in parallel on a shared schema stack | 0009 |
 
@@ -58,17 +60,17 @@ Every doc, identifier, and UI label uses these words exactly. Full definitions i
 
 | Term | Meaning |
 |------|---------|
-| **Hypothesis** | The user's root input. A proposition asserted by `do()`, carrying the user's prior |
+| **Hypothesis** | The user's root input: a proposition asserted as true (the `do` intervention below), carrying the user's own likelihood estimate |
 | **Proposition** (node) | A *resolvable* claim: criteria, adjudicating source, resolve-by date. Kinds: `hypothesis`, `event`, `market` (instrument-bearing terminal) |
-| **Link** (edge) | A causal claim from one proposition to another: `mode` (`trigger` — domino, fires once, decays; `sustain` — desk-holds-apple, effect retracts if cause is removed), `strength` (Δ log-odds), `lag`, `shape` (`impulse` \| `step` \| `ramp`), `half_life`, `rationale`, `sources`, `provenance` |
+| **Link** (edge) | A causal claim from one proposition to another: `mode` (`trigger` — domino, fires once, decays; `sustain` — desk-holds-apple, effect retracts if cause is removed), `strength` (how much it shifts the odds of the next proposition; on a log-odds scale so several links add up), `lag`, `shape` (`impulse` \| `step` \| `ramp`), `half_life`, `rationale`, `sources`, `provenance` |
 | **Provenance** | Where a number or link came from: `asserted` (model, no evidence) · `argued` (model + mechanism) · `documented` (cited sources) · `market_implied` (live price) · `historical` (event study) · `user` · `simulated` (probe) |
 | **Belief** | A probability with an honest interval `{p, lo, hi}` and an owner: `model` \| `user` \| `market`. The three are never merged |
-| **Graph** | A DAG of propositions and links. Cycles are legal only through `reflexive` links with `lag > 0`, which unroll in time |
+| **Graph** | Propositions and links with no loops (a directed acyclic graph). Loops are legal only through `reflexive` links — a market feeding back on the world — which must have a delay and unroll over time |
 | **Intervention** | One of `do` (assert; cut parents), `observe` (learn; update parents too), `insert` (add a proposition + links), `retune` (change a link), `refine` (expand a proposition into sub-propositions that must marginalize back), `believe` (record the user's own belief on a proposition; shown beside the model's, not propagated in v1) |
 | **Branch** | A named, ordered list of interventions over a base graph. A branch *is* a patch; branches compose by concatenation |
 | **World** | A base graph with a branch applied and beliefs propagated. The base world is a branch with zero interventions |
 | **Diff** | The structural and belief delta between two worlds: `unchanged` / `shifted` / `added` / `killed` per node, plus ranked terminal deltas |
-| **Probe** (stretch) | A modeling resource attached to one proposition: Monte Carlo, Bayesian sub-net, persona red-team. Output re-enters the graph as a `simulated` belief |
+| **Probe** (stretch) | Extra compute attached to one proposition: thousands of random simulations (Monte Carlo), a small probability model (Bayesian sub-net), or role-played experts hunting for gaps (persona red-team). Output re-enters the graph as a `simulated` belief |
 | **Thesis** | The compiled trade: legs, entry, invalidation node, take-profit node, distribution, tails, caveats |
 
 ---
@@ -102,12 +104,12 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 
 ### 6.1 Input and doors
 - **FR-1 (P0)** Natural-language hypothesis input. Explore door (no target) or Verify door (target proposition B).
-- **FR-2 (P0)** Elicit the user's prior at input as an interval slider with an explicit "I don't know" state. Stored as a `user` belief on the hypothesis; never overwritten by the model.
+- **FR-2 (P0)** Ask for the user's own likelihood estimate at input as a range slider with an explicit "I don't know" state. Stored as a `user` belief on the hypothesis; never overwritten by the model.
 - **FR-3 (P0)** Launchpad empty state seeds the four `ASSIGNMENT.md` examples as one-click cards. No illustration.
 
 ### 6.2 Generation
 - **FR-4 (P0)** The engine produces a graph in which every proposition is resolvable (INV-1) and every link carries mechanism, strength, lag, shape, provenance, and ≥1 source or an explicit `asserted` mark (INV-2).
-- **FR-5 (P0)** Generation streams. Propositions and links arrive incrementally over SSE and render as they arrive; layout reserves space so the graph grows without reflowing violently.
+- **FR-5 (P0)** Generation streams. Propositions and links arrive one at a time over server-sent events (a one-way stream from server to browser) and render as they arrive; layout reserves space so the graph grows without reflowing violently.
 - **FR-6 (P0)** Every graph terminates in ≥1 `market` proposition, or in an explicit "not tradeable — because…" terminal (INV-9).
 - **FR-7 (P0)** Verify door returns a graded path A→B or an explicit `no_path` verdict with the nearest reachable proposition. Never a fabricated bridge.
 - **FR-8 (P1)** Ensemble: N independent generations reconciled into one graph; run-to-run disagreement surfaces as link confidence.
@@ -124,7 +126,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 - **FR-15 (P0)** Re-propagation is local: only the intervened proposition and its descendants change; `sustain` links retract, `trigger` links do not (INV-4).
 - **FR-16 (P0)** Diff: ghost overlay of A under A′ in a shared union layout; delta rail of terminal changes ranked by |Δ| × confidence; one-line natural-language diff.
 - **FR-17 (P1)** Compare ≥3 branches as small multiples; at most 4 branches visible, rest collapsed to a list; branches must be named.
-- **FR-18 (P1)** `refine`: expand a proposition into sub-propositions; children must marginalize to the parent (INV-10). This is the brainstorm's "search deeper lines".
+- **FR-18 (P1)** `refine`: expand a proposition into sub-propositions; the children's combined likelihood must equal the parent's — they marginalize back (INV-10). This is the brainstorm's "search deeper lines".
 
 ### 6.5 Sensitivity and drill-down
 - **FR-19 (P1)** Sensitivity sweep: one-at-a-time flips of every proposition, ranking by adverse Δ on each terminal. Feeds FR-23 and FR-21.
@@ -134,7 +136,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 ### 6.6 Risk
 - **FR-22 (P0)** Tail strip: low-probability / high-magnitude propositions listed in a fixed strip with p, PnL, and a suggested hedge — never averaged into an expected value.
 - **FR-23 (P0)** Invalidation derivation: the stop-loss is the proposition whose flip most damages the terminal, filtered to those that resolve *before* the terminal and are *publicly observable*. Take-profit is the symmetric case. Sensitive-but-unobservable propositions are listed as *unhedgeable*.
-- **FR-24 (P1)** Payoff distribution from Monte Carlo: p10 / p50 / p90, CVaR₅, max drawdown, P(ruin). The actuarial "wiped out" case gets its own row.
+- **FR-24 (P1)** Payoff distribution from thousands of random simulations: the 10th / 50th / 90th-percentile outcomes, the average loss in the worst 5% of runs (CVaR₅), the largest peak-to-trough loss, and the chance of being wiped out. The actuarial "wiped out" case gets its own row.
 
 ### 6.7 Thesis
 - **FR-25 (P0)** Thesis card: hypothesis, horizon, legs (instrument, direction, size, driving proposition, model p, market p, edge), entry, invalidation, take-profit, distribution (P1), tails, caveats (weakest links, unhedgeable sensitivities, crowding).
@@ -143,11 +145,11 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 
 ### 6.8 Grounding
 - **FR-28 (P1)** Evidence retrieval at generation time (server-side web search); sources attach to links with direction and weight.
-- **FR-29 (P2)** Historical-analog panel: for a link, prior instances with an event-study CAR band.
-- **FR-30 (P2)** Pastcast self-test: run a chain on a resolved 2024–25 event with a date-frozen corpus and show the Brier score, including when it is bad.
+- **FR-29 (P2)** Historical-analog panel: for a link, past instances and how prices moved around them, with an uncertainty band (an event study).
+- **FR-30 (P2)** Pastcast self-test: run a chain on a resolved 2024–25 event with a date-frozen corpus and show the Brier score (the standard accuracy score for probability forecasts; lower is better), including when it is bad.
 
 ### 6.9 Persistence and sharing
-- **FR-31 (P0)** Sessions (graph + branches + transcripts) persist to a single SQLite file and are addressable by URL. No accounts in v1.
+- **FR-31 (P0)** Sessions (graph + branches + transcripts) persist to a single SQLite file (a one-file database, no server) and are addressable by URL. No accounts in v1.
 
 ---
 
@@ -159,14 +161,14 @@ The direction is D3. The research's "Instrument" craft rules (typography, color,
 - **UX-2 Ports and wires are typed.** Propositions have input and output ports; a link is a wire whose *stroke* encodes signal shape (impulse: dot-dash; step: solid; ramp: gradient) and whose *weight* encodes |strength|; `sustain` wires are double-stroked; `reflexive` wires loop with a visible lag chip. The midpoint chip shows the conditional probability in the Metaculus arrow-and-bar idiom.
 - **UX-3 World state is visible.** A strip shows the terminal instruments as gauges (Brent, a basket, a contract) with their model | user | market readings, re-ticking on intervention. Time is a scrubbable axis; lags are real distances.
 - **UX-4 Level of detail by zoom.** Far: worlds and their terminal deltas. Mid: wiring and belief chips. Near: the full tile with evidence. Text never shrinks below 11px; the tile changes representation instead.
-- **UX-5 Organizability.** Users can pin, group, and annotate tiles (mood-board affordance); auto-layout (ELK layered, left→right) is the default and re-layout preserves the focused tile's screen position. Dragging is either fully supported or absent — never half.
+- **UX-5 Organizability.** Users can pin, group, and annotate tiles (mood-board affordance); automatic layered layout (the ELK library, left→right) is the default and re-layout preserves the focused tile's screen position. Dragging is either fully supported or absent — never half.
 - **UX-6 Color is law.** Probability → luminance/opacity. Direction of financial effect → blue ▲ / amber ▼, always with glyph and sign, never red/green. Branch identity → a small ordered palette on lanes and chips only. Tail risk → hatch texture, not hue. Provenance → stroke style (`asserted` dashed). No information in hue alone (INV-12).
 - **UX-7 Motion budget.** Three animations: propagation wave (wires draw in causal order, ~200ms staggered), branch creation, belief number-roll. Everything else ≤120ms opacity. `prefers-reduced-motion` keeps ordering and drops tweening.
 - **UX-8 Streaming is the loading state.** No spinner. Skeleton tiles appear at their layer, claims stream in, wires draw, chips resolve last. Reasoning arrives as it is produced.
 - **UX-9 Keyboard first.** `⌘K` palette; `j/k` siblings; `h/l` layers along wires; `E` intervene; `B` branch; `Space` A⇄A′; `?` sheet. Focus is always visible.
 - **UX-10 No modals.** One persistent Inspector; confirmations are undoable toasts.
 - **UX-11 Typography.** One UI face and one tabular-figures mono for every number; three sizes, three weights; hierarchy by color and spacing. Not the component library's defaults.
-- **UX-12 Themes and access.** Dark-first, light verified, semantic tokens. All text and glyphs ≥4.5:1. The graph also exists as an outline (`role="tree"`) with an `aria-live` summary on re-propagation.
+- **UX-12 Themes and access.** Dark-first, light verified, semantic tokens. All text and glyphs ≥4.5:1. The graph also exists as an outline (`role="tree"`) with a screen-reader announcement (`aria-live`) when a branch re-propagates.
 - **UX-13 Empty and edge states.** Launchpad (FR-3); `no_path` verdict as a first-class card; "not tradeable — because…" terminal as a first-class card.
 
 ---
@@ -175,18 +177,18 @@ The direction is D3. The research's "Instrument" craft rules (typography, color,
 
 - **NFR-1 Honesty.** Beliefs render at two significant figures with their interval (`.35 (.2–.5)`), never `.347`. Every number is one click from rationale, sources, base rate.
 - **NFR-2 Determinism.** Propagation is pure and seeded; the same `(graph, branch, seed)` yields byte-identical worlds.
-- **NFR-3 Tests.** The domain layer is property-tested (hypothesis) against the invariants in §9; the LLM boundary is tested with committed cassettes; evals run out-of-band on the four assignment examples. CI is green with no API key (INV-13).
+- **NFR-3 Tests.** The core graph code is property-tested (the Hypothesis library generates thousands of random graphs and shrinks any failure to a minimal example) against the invariants in §9; the model boundary is tested with recorded API responses ("cassettes") committed to the repo; evals run out-of-band on the four assignment examples. CI is green with no API key (INV-13).
 - **NFR-4 Docker.** `docker compose up` yields a working app; `docker compose watch` gives hot reload for both halves; a production-ish compose builds slim images with healthchecks. No database service in v1.
-- **NFR-5 Legibility.** Every architectural decision is an ADR; every feature with invariants has a spec; every PR names the invariant it satisfies; conventional commits with `spec:` and `adr:` types.
+- **NFR-5 Legibility.** Every architectural decision is a numbered decision record; every feature with invariants has a spec; every PR names the invariant it satisfies; conventional commits with `spec:` and `adr:` types.
 - **NFR-6 Cost visibility.** Each generation records model, tokens, cache hits, and dollars; shown in the Inspector's transcript view.
 - **NFR-7 Performance.** 60 tiles render and re-layout in <100ms on a laptop; streaming first-paint within 1s of the first token.
-- **NFR-8 Secrets.** One `.env.example`; keys read once via settings; `gitleaks` in pre-commit; cassettes scrubbed.
+- **NFR-8 Secrets.** One `.env.example`; keys read once via settings; a secret scanner (`gitleaks`) runs before every commit; recorded API responses are scrubbed of keys.
 
 ---
 
 ## 9. Invariants
 
-Phrased as checkable predicates. Each names the spec that owns it; specs name the property test. If an invariant cannot name a test strategy, it is a wish and belongs in §6.
+Phrased as checkable statements. Each names the spec that owns it; specs name the property test. If an invariant cannot name a test strategy, it is a wish and belongs in §6.
 
 | ID | Invariant | Owner |
 |----|-----------|-------|
@@ -195,14 +197,14 @@ Phrased as checkable predicates. Each names the spec that owns it; specs name th
 | INV-3 | `do(n)` changes no ancestor of `n`; `observe(n)` may. The two are distinct operations with distinct UI verbs | `spec/02-interventions` |
 | INV-4 | Locality: for intervention `i` on `n`, every proposition outside `descendants(n) ∪ {n}` is byte-identical between base and branch | `spec/02-interventions` |
 | INV-5 | Base graph is immutable; a branch is an ordered patch list; `apply(g, [])` = `g`; `apply(apply(g,p),q)` = `apply(g, p+q)`; every world is replayable from `(base id, branch, seed)` | `spec/02-interventions` |
-| INV-6 | The graph is a DAG after ignoring `reflexive` links; every `reflexive` link has `lag > 0` | `spec/01-causal-graph` |
+| INV-6 | The graph has no loops (is a directed acyclic graph) after ignoring `reflexive` links; every `reflexive` link has `lag > 0` | `spec/01-causal-graph` |
 | INV-7 | `0 ≤ lo ≤ p ≤ hi ≤ 1` for every belief after any sequence of interventions; rendering is two significant figures with interval | `spec/01-causal-graph`, `spec/04-canvas` |
 | INV-8 | Any displayed path shows the product of its link probabilities | `spec/04-canvas` |
 | INV-9 | Every graph has ≥1 terminal of kind `market`, or ≥1 explicit `not_tradeable` terminal with a reason | `spec/01-causal-graph` |
-| INV-10 | After `refine(n → {c₁…cₖ})`, the marginal of the children equals `belief(n)` within ε | `spec/02-interventions` |
+| INV-10 | After `refine(n → {c₁…cₖ})`, the marginal of the children equals `belief(n)` within a small tolerance | `spec/02-interventions` |
 | INV-11 | `model`, `user`, `market` beliefs are stored and rendered separately; no code path averages them | `spec/01-causal-graph`, `spec/04-canvas` |
 | INV-12 | No information is encoded in hue alone; every direction has a glyph, every tail a texture, every provenance a stroke | `spec/04-canvas` |
-| INV-13 | `ci.yml` runs with no `ANTHROPIC_API_KEY`; the LLM boundary is exercised only through cassettes in CI | `spec/05-llm-boundary` |
+| INV-13 | `ci.yml` runs with no `ANTHROPIC_API_KEY`; the model boundary is exercised only through recorded responses in CI | `spec/05-llm-boundary` |
 | INV-14 | The invalidation proposition resolves before its terminal and is publicly observable; otherwise it is listed as unhedgeable, never as a stop | `spec/03-thesis` |
 
 ---
@@ -223,7 +225,7 @@ Phrased as *do not X, because Y; do Z instead.*
 10. Do not let a chain end in prose — every terminal is an instrument or an explicit "not tradeable" (INV-9).
 11. Do not type the stop-loss by hand — derive it from sensitivity (FR-23) and show the derivation.
 12. Do not put a database, auth, or multi-tenancy in v1 — three failure modes and zero value to the reader. SQLite file on a volume.
-13. Do not implement against a `proposed` ADR (D9).
+13. Do not implement against a `proposed` decision record (D9).
 
 ---
 
