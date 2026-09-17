@@ -19,3 +19,4 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0011](0011-spec-as-book-and-living-architecture.md) | Spec organized as a book by idea (unnumbered chapters); living `ARCHITECTURE.md` at the root | accepted | 2026-09-16 |
 | [0012](0012-replay-mode-from-recorded-transcripts.md) | Replay mode: a keyless reviewer walks the hero flow from recorded generation transcripts | accepted | 2026-09-17 |
 | [0013](0013-payoff-names-the-trade-quote-names-the-price.md) | `Payoff` splits into a contract shape and a price shape; the domain names the trade, the quote names the price | accepted | 2026-09-17 |
+| [0014](0014-a-supposition-ends-when-something-pushes-back.md) | A supposition is a hard fact until its cause is undermined; the range says how sure we are of the number, not how the dice fall | accepted | 2026-09-17 |

@@ -217,6 +217,7 @@ katalyst/
 | ADR-0011 | The spec is a book by idea; this file is the living technical counterpart to the PRD | accepted |
 | ADR-0012 | Replay mode: with no model key, the four example hypotheses play from committed generation transcripts through the same event stream | accepted |
 | ADR-0013 | A payoff names what you would trade — contract or price; what it costs is a live quote | accepted |
+| ADR-0014 | A supposition holds until its cause is undermined; the range is how sure we are of the number, computed from two thousand versions of the map | accepted |
 
 ---
 
@@ -239,6 +240,6 @@ Open technical questions, dated:
 
 Settled since this list was first written, kept here so the change is visible:
 
-- **Propagation engine** (asked 2026-09-16, settled 2026-09-17). Decision record 0005 already names seeded random simulation as the engine and permits stack 03a to ship a single deterministic pass only for as long as its types are the sampling engine's types. The stack-03a plan takes the sampling version from the start, behind a signature that will not change; the deterministic pass is then just the case where randomness is switched off.
+- **Propagation engine** (asked 2026-09-16, settled 2026-09-17). Decision record 0005 already names seeded random simulation as the engine and permits stack 03a to ship a single deterministic pass only for as long as its types are the sampling engine's types. The stack-03a plan takes the sampling version from the start, behind a signature that will not change; the deterministic pass is then just the case where randomness is switched off. **Amended 2026-09-17 by decision record 0014:** the engine is two nested loops — two thousand versions of the map, eight worlds under each — so the single deterministic pass is no longer an option at all; what a version is, how the band is read off it, and what makes a claim count as shifted are settled there.
 - **Reflexive links** (asked 2026-09-16, settled 2026-09-17). Schema in stack 02 — built, and the stored Hormuz example carries one, checked by `test_the_map_has_a_feedback_arrow_and_it_takes_time`. Propagation in stack 06.
 - **Stacked pull requests** (asked 2026-09-16, settled 2026-09-17). GitHub's native stacked pull requests work on this repository. `gh pr merge` refuses a stacked pull request and the asynchronous merge route does the job; the verified method is written down under *More Information* in decision record 0009.
