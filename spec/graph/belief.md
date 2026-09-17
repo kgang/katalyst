@@ -93,6 +93,19 @@ class Beliefs(BaseModel):
 
 **On the field named `model`.** It is legal. Pydantic protects names beginning with `model_` (so `model_config` and `model_dump` are reserved); plain `model` is not one of them. It stays `model` because that is the word the vocabulary uses, on the canvas and in the code alike.
 
+### What the range means
+
+Two kinds of not-knowing, and they are kept apart on purpose.
+
+* **How the dice fall** is already inside `p`. The event may happen or it may not; `p` says how often.
+* **How sure we are of the numbers we put in** is `lo` and `hi`. A wide range means *we are not certain what number to give you; more homework would move it*. It never means the event is more volatile.
+
+`lo` and `hi` are the **10th and 90th percentiles of the likelihood itself**. `.35 (.20–.49)` reads: *our number is .35; if we somehow learned the true likelihoods, about 8 times in 10 the answer would land between .20 and .49.*
+
+Where a computed range comes from: the engine draws **two thousand versions of the map**, each version taking every claim's likelihood from that claim's own stated range — one coherent set of numbers this model would have stood behind, never every low end at once. It runs eight worlds under each version, subtracts the wobble that comes from having run only eight, and reports the middle 80% of what is left. A stated `{p, lo, hi}` is read as a bell curve on the log-odds scale with its two halves fitted separately, so all three numbers are honoured exactly and the range can never leave 0–1. The arithmetic is decision record 0014's, and the propagation chapter of the multiverse part spells it out.
+
+**Nothing here is calibrated, and the interface says so.** No claim on any map has resolved yet, so the 8-in-10 has never been checked against the world. The chip's label is *model interval, uncalibrated · how sure we are of `.35` — not how much the world can move*, and the hover reads: *"Across 2 000 versions of this map — each one a set of numbers this model would have stood behind — the answer landed between .20 and .49 eight times in ten. Nobody has checked whether that 8-in-10 holds up; no claim on this map has resolved yet."* That copy belongs to `spec/workbench/`, which owns every word on screen; it is quoted here so the domain knows what its numbers are being asked to mean.
+
 ### Two rules, two places
 
 The range rule `0 ≤ lo ≤ p ≤ hi ≤ 1` is a **pydantic validator**: an out-of-range belief cannot be constructed at all. That is different from the "a `market` terminal needs a payoff" rules in [`proposition.md`](proposition.md), which are checked by `validate` and come back as messages the user reads. The line between them: *a rule that only our own arithmetic could break raises; a rule a well-formed model proposal could plausibly break becomes a violation with a plain sentence.*
@@ -114,7 +127,7 @@ Both are the model's number. They differ in what has been taken into account.
 | Plain meaning | What the model thinks about this claim **on its own**, before looking at what causes it | What the model thinks **after** the claim's causes have pushed on it |
 | Where it comes from | Elicited once, anchored on a base rate where there is one (see [`proposition.md`](proposition.md)) | Computed: start from the prior, add one push per active incoming link, on a scale where pushes add up (decision record 0005) |
 | When it is computed | At generation | By propagation, in stack 03a. Until then the Hormuz fixture stores an illustrative value and says so |
-| For the hypothesis | The same number — the root has no causes, so there is nothing to add | The same number |
+| For the hypothesis | `.35` — the root has no causes, so there is nothing to add | `.36` — a hair higher, and not a bug. The reported number is the average across two thousand versions of the map, and that average sits slightly above the middle one whenever `p` is below `.5` (decision record 0014) |
 | Owner | `model` | `model` |
 
 Keeping both is what lets the Inspector answer "why is this `.71` when the base rate says `.20`?" with a list: the prior, then each incoming link and the push it contributed. The audit trail *is* the arithmetic.
@@ -247,5 +260,7 @@ Two checks, one test name.
 1. **A belief has no provenance field.** Invariants INV-2 and INV-12 say provenance is encoded on every chip. Owner implies it for two of the three (`user`, and `market_implied` for a market), but a `model` belief anchored on a documented base rate and one asserted from nothing look identical. Add `provenance` to `Belief`, carry it on the proposition, or derive it from whether `base_rate.sources` is empty?
 2. **Where do a quote's `as_of`, venue and link live?** Decision record 0010's grounding-layer quote carries them; the domain `Belief` has four fields and no clock. Does the domain gain a small `MarketQuote` wrapper, or does the Inspector read them from the grounding cache alongside the belief?
 3. **What does the range actually mean?** Decision record 0005 says the Inspector labels it "model interval, uncalibrated" and that it mixes simulation noise with the elicited spread. Is `lo`–`hi` an 80 per cent band, a plausible minimum and maximum, or "the model's honest spread"? Nothing tests it today, and no calibration claim can be made until it is pinned down.
+   **Decided 2026-09-17 (decision record 0014):** an 80 per cent band, and about *our numbers* rather than about the world. `lo` and `hi` are the 10th and 90th percentiles of the likelihood itself, and the simulation noise is subtracted out rather than mixed in. See *What the range means* above.
 4. **Is a zero-width range legal?** `.35 (.35–.35)` satisfies every rule and claims certainty the model does not have. Leave it, or have `validate` warn?
+   **Decided 2026-09-17 (decision record 0014):** legal; almost always wrong; the Inspector says so. `0 ≤ lo ≤ p ≤ hi ≤ 1` is satisfied, so `Belief` constructs and `validate` does not reject it — `validate` returns violations, and a zero-width range is not a violation. It is legal for a reason: a claim pinned to a point is exactly the "what if we knew this exactly" case, and it is what `test_band_is_not_sampling_noise` sets up. It is almost always wrong because a stated range of zero says the model would never revise, which no elicited number earns. The Inspector reads the width out and says which stated ranges the width came from (decision record 0014's variance shares), so a zero says "nothing here is in doubt" in words, where a reader can disagree with it.
 5. **Two significant figures, precisely.** The honesty requirement's own example, `.35 (.2–.5)`, renders the point at two figures and the bounds at one. Deliberate — a coarser range is the honest one — or shorthand? And what is two significant figures for `p = 0.035` or `p = 0.9962`? One worked table in the workbench chapter settles it; the domain stores the full float either way.

@@ -23,7 +23,7 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 
 **Provenance.** Where a number or link came from. `asserted` (model, no evidence) · `argued` (model, mechanism stated) · `documented` (cited sources) · `market_implied` (a live price) · `historical` (event study) · `user` · `simulated` (a probe). Encoded on every chip and wire (INV-2, INV-12).
 
-**Belief.** `{p, lo, hi, owner}` with `owner ∈ {model, user, market}` and `0 ≤ lo ≤ p ≤ hi ≤ 1` (INV-7). The three owners are stored and rendered separately and never averaged (INV-11). Rendered at two significant figures with the interval.
+**Belief.** `{p, lo, hi, owner}` with `owner ∈ {model, user, market}` and `0 ≤ lo ≤ p ≤ hi ≤ 1` (INV-7). The three owners are stored and rendered separately and never averaged (INV-11). Rendered at two significant figures with the interval. `lo` and `hi` are the 10th and 90th percentiles of the likelihood itself — how sure we are of the number, not how much the world can move.
 
 **Graph.** Propositions + links. A DAG after removing `reflexive` links; reflexive links unroll in time (INV-6). Has exactly one hypothesis and ≥1 terminal (INV-9). Immutable once created; changes are branches.
 
@@ -42,6 +42,10 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 **World.** A base graph with a branch applied and beliefs propagated. Replayable from `(base_id, branch, seed)` (INV-5, NFR-2). The base world is the empty branch.
 
 **Diff.** Between two worlds: per proposition, `unchanged` · `shifted` (with before → after) · `added` · `killed`; plus a ranked list of terminal deltas and a one-line natural-language summary.
+
+**Version of the map.** One coherent set of numbers this model would have stood behind: every claim's likelihood drawn from its own stated range at once, never every low end together. The engine runs two thousand versions and eight worlds under each. The range on a computed number is the spread across versions; a change is read version by version, never by whether two ranges overlap.
+
+**Agreement.** The share of versions of the map in which a change moved the same way. Computed, never self-reported. A claim counts as `shifted` when it moved by .005 or more **and** agreement is at least 90%; agreement is then shown as its own column beside the change, never multiplied into the ranking. Stack 04 may compute a second agreement number — how far several independent generation runs agreed on a claim's likelihood (decision record 0014 defers that question). Same idea, same rule; wherever both could be meant, say which.
 
 **Locality.** An intervention changes only what is still connected to its subject in the graph the edit leaves behind (INV-4). Which claims those are depends on the operation, because the operations leave behind different graphs: `do` cuts the target's incoming arrows, so only the target and its descendants remain connected to it; `observe` cuts nothing, so its ancestors — and what those ancestors cause — are connected too. The per-operation **affected set** table in `multiverse/interventions.md` is the operational form, and the property test computes the set from the shape of the graph. The product's central correctness claim.
 
@@ -85,4 +89,4 @@ One more badge is **derived**: no button produces it. **Retracted · date · by 
 
 ## Words we do not use
 
-*Prediction* (we model arguments, not oracles) · *scenario* (ambiguous between branch and world) · *edge* when we mean a link (reserve *edge* for model-vs-market spread) · *node* in UI copy (say tile or proposition) · *confidence*, at all — there is no confidence field on anything. A link's standing is its `provenance` (a receipt we write), its rationale, and the range on the belief; a number for how much independent runs of the model disagreed is called *agreement* and is computed, never self-reported.
+*Prediction* (we model arguments, not oracles) · *scenario* (ambiguous between branch and world) · *edge* when we mean a link (reserve *edge* for model-vs-market spread) · *node* in UI copy (say tile or proposition) · *confidence*, at all — there is no confidence field on anything. A link's standing is its `provenance` (a receipt we write), its rationale, and the range on the belief; a number for how much things computed independently agreed is called *agreement* — defined under *The multiverse* above — and is computed, never self-reported.
