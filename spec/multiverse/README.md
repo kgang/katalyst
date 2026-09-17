@@ -27,8 +27,8 @@ Intervention (`do`, `observe`, `insert`, `retune`, `refine`, `believe`) · Branc
 
 | Chapter | Covers | Written in |
 |---------|--------|-----------|
-| `interventions.md` | The six operations, their preconditions, and what each may touch | stack 02 |
-| `branches-and-worlds.md` | Patch algebra, replay, seeds, naming, parent branches | stack 02 |
+| [`interventions.md`](interventions.md) | The six operations, their preconditions, and what each may touch | stack 02 — written |
+| [`branches-and-worlds.md`](branches-and-worlds.md) | Patch algebra, replay, seeds, naming, parent branches | stack 02 — written |
 | `propagation.md` | How likelihoods flow: adding link strengths on a log-odds scale, trigger vs sustain over time, lags and signal shapes, the seeded random-simulation engine | stack 03a |
 | `diff.md` | Per-proposition states (unchanged / shifted / added / killed), ranked terminal deltas, the one-line summary | stack 03a |
 
