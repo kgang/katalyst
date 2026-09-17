@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2Q2VNXQN30VBPYF39G03R37",
+  "strategy": "manual-commit",
+  "branch": "spec/03b-workbench",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "spec/workbench/color-motion-type.md",
+    "spec/workbench/diff-view.md",
+    "spec/workbench/inspector.md",
+    "spec/workbench/keyboard-and-access.md",
+    "spec/workbench/layout-and-zoom.md",
+    "spec/workbench/tiles-ports-wires.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
