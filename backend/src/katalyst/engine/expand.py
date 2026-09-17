@@ -1014,7 +1014,7 @@ def grow(
                     refused,
                 )
 
-    reason = _why_it_stopped(stopped_for, closed_by, ends_somewhere=_ends_somewhere(graph))
+    reason = _why_it_stopped(stopped_for, _lines_that_ended_short(graph, closed_by), graph)
     yield Finished(
         reason=reason,
         why=_in_one_sentence(reason, receipt, caps, graph),
@@ -1050,12 +1050,13 @@ def _keep_asking(ask: Any, receipt: Receipt, refused: int, caps: Caps) -> Any:
         outcome = ask()
         receipt = fold(receipt, outcome)
         yield outcome
-        if over_the_cap(receipt, caps.dollars):
-            return None, receipt, refused, True
+        spent = over_the_cap(receipt, caps.dollars)
         result = outcome.result
         if isinstance(result, Accepted) and result.proposition is not None:
-            return result.proposition, receipt, refused, False
+            return result.proposition, receipt, refused, spent
         refused += 1
+        if spent:
+            return None, receipt, refused, True
     return None, receipt, refused, False
 
 
@@ -1245,9 +1246,52 @@ def _lines_with_no_ending(graph: Graph) -> list[PropositionId]:
     )
 
 
-def _why_it_stopped(
-    stopped_for: str | None, closed_by: Mapping[PropositionId, str], *, ends_somewhere: bool
-) -> StoppingReason:
+def _lines_that_ended_short(graph: Graph, closed_by: Mapping[PropositionId, str]) -> set[str]:
+    """List the ways a line closed **without** ever reaching an ending.
+
+    A claim that closed while something further down it still ran on to an ending
+    did not end the story short — the story got where it was going, and which
+    claim happened to close last is not what a reader wants told. So a closing
+    counts here only when nothing downstream of that claim ends anywhere a person
+    could act on.
+
+    Args:
+        graph: The finished map.
+        closed_by: Why each closed claim closed.
+
+    Returns:
+        The set of reasons that closed a line short. Empty when every line ran to
+        an ending.
+    """
+    onward: dict[PropositionId, list[PropositionId]] = {}
+    for arrow in graph.links:
+        onward.setdefault(arrow.source, []).append(arrow.target)
+    kinds = {claim.id: claim.kind for claim in graph.propositions}
+
+    short: set[str] = set()
+    for claim_id, closing in closed_by.items():
+        reached = _walk_onward(onward, claim_id)
+        if not any(kinds.get(one) in TERMINAL_KINDS for one in reached):
+            short.add(closing)
+    return short
+
+
+def _walk_onward(
+    onward: Mapping[PropositionId, list[PropositionId]], start: PropositionId
+) -> set[PropositionId]:
+    """List every claim reached by following arrows out of one claim, itself included."""
+    reached = {start}
+    waiting = [start]
+    while waiting:
+        here = waiting.pop()
+        for next_claim in onward.get(here, []):
+            if next_claim not in reached:
+                reached.add(next_claim)
+                waiting.append(next_claim)
+    return reached
+
+
+def _why_it_stopped(stopped_for: str | None, ended_short: set[str], graph: Graph) -> StoppingReason:
     """Pick the one reason a run gives for stopping.
 
     The first of these that applies wins, and the order is the whole rule:
@@ -1257,30 +1301,41 @@ def _why_it_stopped(
     2. **The map ends nowhere you can act on**, even after the last
        ending-seeking call. It is the most important thing a reader can be told
        about a finished map.
-    3. **One of our caps stopped a line that was still open** — the claim cap
-       first because it is about the whole map, then the depth cap, then the width
-       cap. Our limit, so the person hears about it before the model's judgement.
-    4. **A line stopped short** — the model had nothing more to add, or three
-       proposals in a row were refused.
-    5. **Every line ran to an ending.** The ordinary, good ending.
+    3. **The map filled up.** The claim cap stopped the whole walk, the way the
+       money running out does, so it is read off what stopped the walk rather
+       than off any one claim.
+    4. **One of our caps cut a line short** — the depth cap, then the width cap.
+       Our limit, so the person hears about it before the model's judgement.
+    5. **A line stopped short by itself** — the model had nothing more to add
+       there, or three proposals in a row were refused.
+    6. **Every line ran to an ending.** The ordinary, good ending.
+
+    Every line-level reason above counts only where that line never reached an
+    ending. A claim that closed while something further down it ran on to a trade
+    did not end the story short, and which claim happened to close last is not
+    what a reader wants told.
+
+    Reaching the cap on searches is not in the list. It turns searching off and
+    the map keeps building, so it never ends a run.
 
     Args:
         stopped_for: The run-wide limit that ended the walk, if one did.
-        closed_by: Why each closed claim closed.
-        ends_somewhere: Whether the finished map ends anywhere you can act on.
+        ended_short: The ways a line closed without reaching an ending.
+        graph: The finished map.
 
     Returns:
         One reason.
     """
     if stopped_for == "spend_cap":
         return "spend_cap"
-    if not ends_somewhere:
+    if not _ends_somewhere(graph):
         return "no_terminal"
-    closings = set(closed_by.values())
-    for cap in ("claim_cap", "depth_cap", "width_cap"):
-        if cap in closings:
+    if stopped_for == "claim_cap":
+        return "claim_cap"
+    for cap in ("depth_cap", "width_cap"):
+        if cap in ended_short:
             return cast(StoppingReason, cap)
-    if "model_stopped" in closings:
+    if "model_stopped" in ended_short:
         return "model_stopped"
     return "reached_terminal"
 
