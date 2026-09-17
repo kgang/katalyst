@@ -29,6 +29,12 @@ export type Readiness = components["schemas"]["Readiness"];
 /** What the server calls itself, and which build is running. */
 export type About = components["schemas"]["About"];
 
+/** One stored example as it appears in a list, before the map itself is drawn. */
+export type FixtureSummary = components["schemas"]["FixtureSummary"];
+
+/** One stored example in full: the base map and the branches that go with it. */
+export type FixtureBundle = components["schemas"]["FixtureBundle"];
+
 /**
  * The typed caller. An empty base address keeps every request relative to
  * whatever address this page was served from.
@@ -81,4 +87,20 @@ export function readReadiness(): Promise<Readiness> {
 /** Ask what the server calls itself and which build is running. */
 export function readAbout(): Promise<About> {
   return read<About>("/api/about", () => server.GET("/api/about"));
+}
+
+/** Ask for the list of stored examples this server ships with. */
+export function readExampleList(): Promise<FixtureSummary[]> {
+  return read<FixtureSummary[]>("/api/fixtures", () => server.GET("/api/fixtures"));
+}
+
+/**
+ * Ask for one stored example in full: its map, and the branches that go with it.
+ *
+ * @param id The short name the example is asked for by, such as `hormuz`.
+ */
+export function readExample(id: string): Promise<FixtureBundle> {
+  return read<FixtureBundle>(`/api/fixtures/${id}`, () =>
+    server.GET("/api/fixtures/{fixture_id}", { params: { path: { fixture_id: id } } }),
+  );
 }

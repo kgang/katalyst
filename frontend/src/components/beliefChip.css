@@ -1,0 +1,139 @@
+/*
+ * The belief chip: three lines in a narrow column, and a shelf behind it.
+ *
+ * Every value here is a token from `tokens.css`. There are three type sizes in
+ * this product and no fourth one, so nothing below shrinks type to make text
+ * fit — where the words do not fit, fewer words are shown and the rest goes on
+ * the shelf.
+ */
+
+/* The chip is a column with a shelf behind it. It is deliberately not
+ * positioned, so that the shelf below measures itself against the whole tile
+ * rather than against this one narrow column, and all three chips open the same
+ * shelf in the same place. */
+.belief-chip {
+  display: block;
+  min-width: 0;
+  position: static;
+}
+
+/* The face: the three lines you can see, and the thing you can reach. A button
+ * because it really is one — pressing it pins the note open — and because a
+ * thing the keyboard can land on should be a thing the keyboard knows about. It
+ * looks nothing like a button: no fill, no border, no radius. */
+.belief-chip__face {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  justify-items: start;
+  row-gap: var(--space-hair);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Whose number this is. Never abbreviated: the three owners are the whole
+ * reason the chips exist, and a reader who cannot tell them apart is reading a
+ * single averaged number, which is the one thing this product will not show. */
+.belief-chip__owner {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The reading itself: the likelihood, or the words that stand where it would
+ * have been. Numbers go in the monospace face with fixed-width digits so that
+ * three chips side by side line up; words go in the interface face, because
+ * they are words. */
+.belief-chip__reading {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.belief-chip[data-reading="number"] .belief-chip__reading {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The range under the number — never omitted — or, on the reader's own empty
+ * slot, the invitation to fill it. */
+.belief-chip__under {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Holds its height when there is nothing to say, so three chips side by side
+   * keep the same baselines. */
+  min-height: 1.2em;
+}
+
+.belief-chip[data-reading="number"] .belief-chip__under {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- The shelf --------------------------------------------------------- *
+ * What the chip says about itself when you look at it: its label, then one
+ * sentence. It slides out of the bottom edge of the tile, on the tile's own
+ * surface, and it is not a pop-up — there is nothing to dismiss, no overlay
+ * behind it, and nothing underneath it stops working while it is open. Look
+ * away, or move the keyboard on, and it closes.
+ *
+ * It is positioned against the tile rather than against the chip, so all three
+ * chips open the same shelf in the same place and the eye does not have to
+ * chase it. */
+
+.belief-chip__note {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: grid;
+  row-gap: var(--space-hair);
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--duration-fast) ease-out;
+  pointer-events: none;
+}
+
+.belief-chip:hover .belief-chip__note,
+.belief-chip:focus-within .belief-chip__note,
+.belief-chip__note[data-pinned="yes"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+.belief-chip__note-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.belief-chip__note-sentence {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}

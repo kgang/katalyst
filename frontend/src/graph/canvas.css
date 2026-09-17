@@ -1,0 +1,160 @@
+/*
+ * The map surface.
+ *
+ * The drawing library ships two stylesheets. The bare one, which this app
+ * imports, is the handful of rules without which panning and zooming do not
+ * work: positions, transform origins, pointer handling. The full one carries
+ * the library's own look — its blue handles, its white boxes, its rounded
+ * buttons — and is never imported here. What that leaves is a set of the
+ * library's own custom properties, listed below, which is how a look is handed
+ * over rather than overridden.
+ */
+
+.canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--surface);
+}
+
+/* The library's own settings, set to ours. */
+.canvas .react-flow {
+  --xy-edge-stroke: var(--text-muted);
+  --xy-edge-stroke-width: 1.25;
+  --xy-background-color: var(--surface);
+  --xy-background-pattern-color: var(--hairline);
+  --xy-attribution-background-color: transparent;
+}
+
+/* Where our own drawing marks are defined. No size and no ink of its own; the
+ * wires reach into it for the arrowhead. */
+.canvas__marks {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.canvas__marks marker path {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- Wires, plainly ----------------------------------------------------- *
+ * One weight, one colour, our arrowhead. A wire is about to carry five
+ * different things at once — what kind of push it is, how hard, whether it has
+ * to keep holding, whether it loops back, and where it came from — and none of
+ * that is built yet. Drawing a placeholder that already looked encoded would be
+ * worse than drawing a plain line, because a reader would try to read it. */
+
+.canvas .react-flow__edge-path {
+  stroke-linecap: round;
+}
+
+/* ---- Tiles -------------------------------------------------------------- */
+
+/* A tile the keyboard is on. The ring is ours, drawn the same way as every
+ * other focus ring in the app, and it sits outside the tile's own outline so
+ * that it never hides the shape that says what kind of claim it is. */
+.canvas .react-flow__node:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* A tile whose belief chip has opened its shelf has to be drawn over the tile
+ * below it, or the shelf would slide out behind its neighbour. The drawing
+ * library writes each tile's stacking order straight onto the element, and a
+ * value written onto an element beats any rule written in a stylesheet — so
+ * this one rule has to insist, and it is the only one in the product that does. */
+.canvas .react-flow__node:has(.belief-chip:hover),
+.canvas .react-flow__node:has(.belief-chip:focus-within),
+.canvas .react-flow__node:has(.belief-chip__note[data-pinned="yes"]) {
+  /* biome-ignore lint/complexity/noImportantStyles: the drawing library writes this tile's stacking order onto the element itself, and nothing in a stylesheet can otherwise reach past it. */
+  z-index: 20 !important;
+}
+
+/* ---- The library's own furniture ---------------------------------------- *
+ * Two pieces survive with the bare stylesheet: the zoom buttons and the
+ * library's attribution link. Both are given our type, our colours and our
+ * hairlines, so neither reads as somebody else's component. */
+
+.canvas .react-flow__controls {
+  box-shadow: none;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-raised);
+  margin: var(--space-2);
+}
+
+.canvas .react-flow__controls-button {
+  width: var(--space-4);
+  height: var(--space-4);
+  max-width: none;
+  max-height: none;
+  padding: var(--space-1);
+  border: none;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.canvas .react-flow__controls-button + .react-flow__controls-button {
+  border-top: 1px solid var(--hairline);
+}
+
+.canvas .react-flow__controls-button:hover {
+  color: var(--text);
+}
+
+.canvas .react-flow__controls-button svg {
+  max-width: 12px;
+  max-height: 12px;
+  fill: currentColor;
+}
+
+/* The library asks to be named, and it should be. What it may not do is set the
+ * type size: ten pixels is below the smallest size anything in this product is
+ * allowed to be drawn at. */
+.canvas .react-flow__attribution {
+  font-size: var(--text-sm);
+  padding: var(--space-hair) var(--space-1);
+}
+
+.canvas .react-flow__attribution a {
+  color: var(--text-muted);
+}
+
+/* ---- When the layout fails ---------------------------------------------- *
+ * Printed on the surface, in the sentence the layout engine gave. Not a pop-up:
+ * there is nothing to dismiss and nothing behind it stops working. */
+
+.canvas__failure {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
+  right: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+/* ---- The one wire that runs backwards ----------------------------------- *
+ * A feedback arrow is the only one allowed to point the other way, and it is
+ * routed over the top of the map so that it never crosses a tile. The dashes
+ * say one thing and one thing only — *this one runs backwards* — and they are a
+ * placeholder: the work that gives the stroke its real job, saying what kind of
+ * push a wire carries, replaces this with a loop and the delay written on it. */
+
+.canvas .wire--feedback {
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+}
