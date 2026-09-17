@@ -1,0 +1,80 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2PPA8Q7CT886V3N172EDPVZ",
+  "session_id": "6426bff2-c00c-4e7a-9489-062009a5ee3f",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-17T03:24:43.526992Z",
+  "branch": "docs/00-kickoff",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "db79f351f37d",
+  "checkpoint_transcript_start": 472,
+  "transcript_lines_at_start": 472,
+  "compact_transcript_start": 67,
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 219464,
+    "cache_read_tokens": 1241967,
+    "output_tokens": 17268,
+    "api_call_count": 6
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01DEUN2Ej5DQ7AXbpu7r2Bni",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "claude-api"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "b18d00b44f13",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 149,
+        "end": 150,
+        "entry_ids": [
+          "37c3c2fe-4193-40a6-ad42-2a0d37192160"
+        ],
+        "tool_use_id": "toolu_01DEUN2Ej5DQ7AXbpu7r2Bni"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01DEUN2Ej5DQ7AXbpu7r2Bni"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: claude-api",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 7
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 245,
+      "user_lines_removed": 141,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "ARCHITECTURE.md": 148,
+        "docs/adr/0001-record-architecture-decisions.md": 14,
+        "docs/adr/0011-docs-journal-book-and-two-seeds.md": 74,
+        "docs/adr/README.md": 9
+      },
+      "user_removed_per_file": {
+        "ARCHITECTURE.md": 122,
+        "docs/adr/0001-record-architecture-decisions.md": 11,
+        "docs/adr/README.md": 8
+      }
+    }
+  ]
+}
