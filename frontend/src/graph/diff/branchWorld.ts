@@ -29,7 +29,7 @@
  *    through the map — so it fills in immediately and moves nothing else.
  */
 
-import { toShare, toTwoFigures } from "../../components/BeliefChip";
+import { toMovement, toShare, toTwoFigures } from "../../components/BeliefChip";
 import type {
   Absence,
   Badge,
@@ -126,20 +126,6 @@ export function tileState(
 }
 
 /**
- * The chevron and the word each direction goes by on a tile.
- *
- * Neither is a colour. The two hues this product keeps for a direction mean
- * *which way the money moves*, and a likelihood going up is not that: the arrow
- * into *Brent settles below $68* pushes that claim toward true while the price
- * it describes falls. So a move is a chevron, two readings and a word, and never
- * one of those two hues.
- */
-const WAY = {
-  up: { chevron: "▲", word: "up" },
-  down: { chevron: "▼", word: "down" },
-} as const;
-
-/**
  * How far this claim's number moved, as a line on its tile.
  *
  * It sits with the badges because it is one of the things the edits behind this
@@ -174,12 +160,11 @@ function movedBadge(moved: Movement | undefined, waiting: Absence | undefined): 
         }
       : { words: waiting.words, reason: waiting.reason, movement: true };
   }
-  const way = WAY[moved.way];
   const agreed = moved.sameDirection.reading;
   return {
-    words: `${toTwoFigures(moved.from)} ${way.chevron} ${toTwoFigures(moved.to)}`,
+    words: toMovement(moved.from, moved.to, moved.by, moved.way),
     reason:
-      `Your edit moved this claim ${way.word}, from ${toTwoFigures(moved.from)} to ` +
+      `Your edit moved this claim ${moved.way}, from ${toTwoFigures(moved.from)} to ` +
       `${toTwoFigures(moved.to)}, read on the day this claim is judged. ` +
       (agreed === undefined
         ? moved.sameDirection.absence.reason

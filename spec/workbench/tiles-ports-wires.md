@@ -165,7 +165,9 @@ Only the numerals are substituted — `2 000` is `versions`, and `.35`, `.20` an
 
 An absence is never silent, but *silent on the tile* and *silent* are different things: every absence carries its reason, on the tile or as the element's own accessible name, which is what a hover shows and what a screen reader reads.
 
-And one state that replaces the number entirely: **while a claim is supposed, the chip shows the word** — *Supposed · Oct 1* — never `1.0` and never `.98`. A supposition is treated as a hard fact in every simulated world, so there is no number to show, and inventing one would answer a question the user did not ask. (The engine does store `1.0` on such a claim so the path product has a factor to multiply; no surface but the path product ever reads it, and every other reader reads the claim's states and prints the word.)
+And one state that replaces the number entirely: **while an edit has fixed a claim's value, the chip shows the word** — *Supposed · Oct 1* where the user took it as given, *Happened · Oct 1* where they reported it as news — never `1.0`, never `.98` and never `>.99`. Either way the claim is settled in every simulated world, so there is no number to show, and inventing one would answer a question the user did not ask. (The engine stores `1.0` on such a claim — or `0.0` where the value fixed was false — so the path product has a factor to multiply; no surface but the path product ever reads it.)
+
+**The two are read from different places on the world, and that is the engine's shape rather than a quirk of ours.** A supposition can be undermined by a later edit, so whether it still holds is a fact about a *day*: the world's `states` carry it, and H reads *supposed* on the first of October and *pushed* by the day it is judged. News cannot be taken back — nothing undoes "this happened" — so it holds across the whole window and the world records it among the values its edits fixed.
 
 ### Typed ports
 
@@ -393,7 +395,7 @@ For every tile: exactly three chips are rendered, labelled model, user and marke
 
 - **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_draws_three_chips_and_never_a_fourth`.
 
-### INV-workbench.7 — A supposed claim shows the word
+### INV-workbench.7 — A claim whose value an edit fixed shows the word
 
 For every tile whose claim is supposed: the chip renders the word and the date, and renders no likelihood at all.
 
@@ -439,7 +441,7 @@ For every module under `frontend/src/graph/` and for the tile and chip component
 2. **Do not truncate a claim mid-word** to fit the clamp, because the half-word that is left reads as a rendering bug and costs the reader more than the missing line. **Instead:** wrap to three lines, ellipsize at a word boundary, and keep the full text in the Inspector.
 3. **Do not fetch a favicon for an evidence clipping**, because the packaged demo must draw its first frame with no outside request, and a missing favicon leaves a hole where a receipt should be. **Instead:** a letter monogram from the host name, drawn from data we already have.
 4. **Do not fill an empty slot with anything at all** — not `0.5`, not the model's number, not a blank, not a spinner. Because "no venue prices this" and "the engine has not run" are *findings*, and one of them is the finding that drives a chain to a not-tradeable ending. **Instead:** the words, and the reason beside them.
-5. **Do not show `1.0` or `.98` for a supposed claim.** A supposition is a hard fact in every simulated world, so there is no number, and a `.98` invites the reader to wonder about the other two per cent. **Instead:** the word and the date.
+5. **Do not show `1.0`, `.98` or `>.99` for a claim whose value an edit fixed.** Supposed or reported as news, it is settled in every simulated world, so there is no number — and a `.98` invites the reader to wonder about the other two per cent while a `>.99` is the stored certainty wearing the guard's clothes. **Instead:** the word and the date.
 6. **Do not put provenance back on the stroke**, because the stroke already says what kind of push the arrow is, and a wire that is dot-dash and dashed at once says neither. **Instead:** the three-step mark at the tail, and the exact word in the Inspector.
 7. **Do not compute the conditional likelihood in the browser**, because it is a whole extra propagation per arrow and the browser has no propagation engine. **Instead:** ask the engine for it lazily on hover, cache the answer, and read the push in words until it arrives.
 8. **Do not colour a wire**, because hue means "the money moves this way" and an arrow's sign does not — see *Strength, in two granularities*. **Instead:** the printed sign and the word.

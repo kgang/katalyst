@@ -49,7 +49,7 @@ import type {
   Selection,
   WorldView,
 } from "../world";
-import { toReading, toShare, toTwoFigures } from "./BeliefChip";
+import { toMovement, toReading, toShare, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
 import "./inspector.css";
@@ -216,6 +216,29 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
 
   return (
     <Section title="Why this number">
+      {/* A claim that moved only because some versions started counting more
+          says so here, as the first line of this section and above the
+          decomposition — because it is a fact about the *reading* of the number,
+          and the decomposition is the reading.
+          
+          Observing one claim reweights the versions of the map: a version under
+          which the observation was likely counts for more than one under which
+          it was a fluke. A claim with no causes can move by that alone, because
+          inside every single version its answer is its own prior in both worlds
+          and the paired difference is exactly zero. Without a word about it the
+          reader opens the claim and finds a number that moved, a prior, and
+          nothing in between to explain it.
+          
+          It is rendered exactly when the engine's own difference says so, and by
+          no other route: no comparison of a share against zero, no check for
+          whether a claim has incoming arrows, no inference from an empty
+          decomposition. */}
+      {claim.moved?.onlyReweighted === true ? (
+        <p className="inspector__reweighted">
+          this claim moved only because the observation made some versions count more.
+        </p>
+      ) : null}
+
       <dl className="inspector__decomposition">
         <dt className="inspector__step-label">it started at</dt>
         <dd className="inspector__step">
@@ -314,63 +337,58 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
  */
 function WhatYourEditDid({ claim }: { claim: ClaimView }) {
   const moved = claim.moved;
-  // A claim standing on the reader's own say-so has no move to report: while a
-  // supposition holds it is true in every version of the map, and the badge that
-  // says so is the whole of what happened to it.
+  // A claim whose value an edit fixed has no move to report: it is true — or
+  // false — in every version of the map, and the badge that says so is the
+  // whole of what happened to it.
   if (moved === undefined || claim.standing !== undefined) {
     return null;
   }
-  const way = moved.way === "up" ? { chevron: "▲", word: "up" } : { chevron: "▼", word: "down" };
   const agreed = moved.sameDirection.reading;
   // The engine's verdict on the claim, which is not the same thing as the two
-  // numbers: a claim can move a hair and still come out unchanged, because a
-  // move counts only when the versions of the map agree on which way it went.
+  // numbers: a claim can move a hair and still come out unchanged.
   const counted = claim.diff === "shifted";
+  // A claim that moved only by reweighting is a third case, and the two
+  // sentences below would both be false of it: the versions did not disagree
+  // about a direction, because not one version that counts moved at all. The
+  // sentence that *is* true of it is printed at the head of the decomposition,
+  // where the chapter puts it.
+  const reweighted = moved.onlyReweighted === true;
 
   return (
     <Section title="What your edit did">
       <p className="inspector__moved">
         <span className="inspector__mono">
-          {`${toTwoFigures(moved.from)} ${way.chevron} ${toTwoFigures(moved.to)}`}
+          {toMovement(moved.from, moved.to, moved.by, moved.way)}
         </span>
-        <span className="inspector__moved-word">
-          {counted ? way.word : `${way.word} · no change`}
-        </span>
+        <span className="inspector__moved-word">{counted ? moved.way : "no change"}</span>
       </p>
-      {counted ? null : (
+      {counted || reweighted ? null : (
         <p className="inspector__reason">
           The engine compared the two worlds and reports no change on this claim: a move counts only
           when the versions of the map agree on which way it went, and these did not.
         </p>
       )}
-      <dl className="inspector__pairs">
-        <dt>same direction</dt>
-        <dd>
-          {agreed === undefined ? (
-            moved.sameDirection.absence.words
-          ) : (
-            <span className="inspector__mono">{toShare(agreed)}</span>
-          )}
-        </dd>
-      </dl>
-      <p className="inspector__reason">
-        {agreed === undefined
-          ? moved.sameDirection.absence.reason
-          : "The share of the versions of the map — each one a set of numbers this model would " +
-            "have stood behind — in which this claim moved the same way. It is a column beside " +
-            "the move and never multiplied into it."}
-      </p>
-
-      {/* A claim with no causes of its own can move under **This happened**
-          without anything pushing on it: the observation makes the versions of
-          the map in which it was likely count for more, and the average shifts.
-          The engine says when that is the whole story; this prints the sentence
-          when it does, word for word, and nothing at all when it does not. */}
-      {moved.onlyReweighted === true ? (
-        <p className="inspector__reason">
-          this claim moved only because the observation made some versions count more.
-        </p>
-      ) : null}
+      {reweighted ? null : (
+        <>
+          <dl className="inspector__pairs">
+            <dt>same direction</dt>
+            <dd>
+              {agreed === undefined ? (
+                moved.sameDirection.absence.words
+              ) : (
+                <span className="inspector__mono">{toShare(agreed)}</span>
+              )}
+            </dd>
+          </dl>
+          <p className="inspector__reason">
+            {agreed === undefined
+              ? moved.sameDirection.absence.reason
+              : "The share of the versions of the map — each one a set of numbers this model " +
+                "would have stood behind — in which this claim moved the same way. It is a " +
+                "column beside the move and never multiplied into it."}
+          </p>
+        </>
+      )}
     </Section>
   );
 }

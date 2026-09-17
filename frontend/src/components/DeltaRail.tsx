@@ -27,7 +27,7 @@
 
 import { useId, useState } from "react";
 import type { DeltaRow, Known } from "../world";
-import { toShare, toTwoFigures } from "./BeliefChip";
+import { toMovement, toShare, toTwoFigures } from "./BeliefChip";
 import "./deltaRail.css";
 
 /** What the rail needs to draw itself. */
@@ -52,12 +52,6 @@ const KIND_WORDS: Record<string, string> = {
   event: "event",
   hypothesis: "hypothesis",
 };
-
-/** The chevron and the word each direction goes by. Neither is a colour. */
-const WAY = {
-  up: { chevron: "▲", word: "up" },
-  down: { chevron: "▼", word: "down" },
-} as const;
 
 /**
  * One cell: the number, or the words standing where it would have been.
@@ -106,10 +100,7 @@ function changeOf(row: DeltaRow): Known<string> {
   if (move === undefined) {
     return { absence: row.move.absence };
   }
-  const way = WAY[move.way];
-  return {
-    reading: `${toTwoFigures(move.from)} ${way.chevron} ${toTwoFigures(move.to)}`,
-  };
+  return { reading: toMovement(move.from, move.to, move.by, move.way) };
 }
 
 /** How firm the new number is: the width of its own range, printed like a likelihood. */
@@ -179,7 +170,7 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
                     <span className="delta-rail__kind">{KIND_WORDS[row.kind] ?? row.kind}</span>
                     {row.move.reading === undefined ? null : (
                       <span className="delta-rail__day">
-                        {`${WAY[row.move.reading.way].word} · largest on ${row.move.reading.largestOn}`}
+                        {`${row.move.reading.way} · largest on ${row.move.reading.largestOn}`}
                       </span>
                     )}
                   </p>

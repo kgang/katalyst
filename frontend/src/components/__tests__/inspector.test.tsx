@@ -251,6 +251,7 @@ describe("the panel, on a claim", () => {
       from: 0.356,
       to: 0.365,
       way: "up" as const,
+      by: 0.008968,
       sameDirection: { reading: 0 },
     };
     const sentence = "this claim moved only because the observation made some versions count more.";
@@ -300,6 +301,7 @@ describe("the panel, on a claim", () => {
                 from: 0.356,
                 to: 0.081,
                 way: "down",
+                by: -0.275,
                 sameDirection: { reading: 1 },
               },
             }),

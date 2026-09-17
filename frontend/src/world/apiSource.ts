@@ -141,35 +141,51 @@ function badgesFromTheWorld(
 }
 
 /**
- * Which claims are standing on the reader's say-so, on their own judging day.
+ * Which claims an edit has fixed the value of, on their own judging day.
  *
- * While a claim is supposed it is true in every version of the map, so the
- * engine stores a flat `1` for it — and **no surface prints that number.** Every
- * reader looks at the world's own states first and writes the word where the
- * likelihood would go, because "suppose this is true" answered with a likelihood
- * is a tool arguing with the person using it.
+ * **One rule, and it is not a rule about suppositions.** A claim whose value an
+ * edit fixed is true — or false — in every version of the map, so the engine
+ * stores a flat `1` or `0` for it, and **no surface but the path product prints
+ * that number.** Every other reader writes the word where the likelihood would
+ * go: *Supposed · Oct 1* where the reader took it as given, *Happened · Oct 1*
+ * where they reported it as news. Answering either with a likelihood is a tool
+ * arguing with the person using it — and `>.99` is that number wearing the
+ * certainty guard's clothes.
+ *
+ * **The two are found in different places, and that is the engine's shape rather
+ * than ours.** A supposition can be undermined by a later edit, so whether it
+ * still holds is a fact about a *day*, and the world's `states` carry it — H
+ * reads *supposed* on the first and *pushed* by the day it is judged. An
+ * observation is news: nothing takes it back, it holds across the whole window,
+ * and the world records it as an assignment rather than as a state.
  *
  * @param world The world as the engine built it.
  * @param claims The claims, so each one's resolve-by day can be found.
- * @param badges The badges, for the sentence behind the word.
+ * @param badges The badges, for the words and the sentence behind them.
  */
 function standingFromTheWorld(
   world: World,
   claims: readonly ClaimView[],
   badges: ReadonlyMap<string, readonly Badge[]>,
 ): Map<string, Standing> {
+  const observed = new Set(
+    world.assignments.filter((fixed) => fixed.kind === "observe").map((fixed) => fixed.target),
+  );
   const standing = new Map<string, Standing>();
   for (const claim of claims) {
     const at = whereItsDaySits(world, claim.resolvesBy);
-    if (at === null || world.states[claim.id]?.[at] !== "supposed") {
+    const isSupposed = at !== null && world.states[claim.id]?.[at] === "supposed";
+    const isNews = observed.has(claim.id);
+    if (!isSupposed && !isNews) {
       continue;
     }
-    const said = (badges.get(claim.id) ?? []).find((badge) => badge.words.startsWith("Supposed"));
+    const word = isSupposed ? "Supposed" : "Happened";
+    const said = (badges.get(claim.id) ?? []).find((badge) => badge.words.startsWith(word));
     standing.set(claim.id, {
-      words: said?.words ?? "Supposed",
+      words: said?.words ?? word,
       reason:
-        `${said?.reason ?? "You supposed this claim."} While a claim is supposed it is true ` +
-        `in every version of the map, so there is no likelihood to show.`,
+        `${said?.reason ?? "An edit fixed this claim's value."} It is settled in every version ` +
+        `of the map, so there is no likelihood to show.`,
     });
   }
   return standing;
@@ -270,6 +286,7 @@ function movement(row: ClaimDiff): Movement | undefined {
     // sign is a comparison against nought, not a subtraction: nothing here works
     // out how far anything moved.
     way: delta < 0 ? "down" : "up",
+    by: delta,
     sameDirection:
       agreement === null
         ? {
@@ -318,6 +335,7 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
           to: row.after,
           largestOn: row.at_day,
           way: row.peak_delta < 0 ? "down" : "up",
+          by: row.peak_delta,
         },
       },
       rangeWidth: { reading: row.range_width },

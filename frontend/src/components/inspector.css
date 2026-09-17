@@ -185,6 +185,16 @@
   color: var(--text);
 }
 
+/* The one sentence a claim that moved only by reweighting gets, at the head of
+ * the decomposition. It is set in the body size rather than the muted reason
+ * size: it is the reading of the number, not a footnote about it. */
+.inspector__reweighted {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-md);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
 /* ---- What your edit did: the two readings with a chevron between them ----- *
  * No hue: the two colours this product keeps for a direction mean which way the
  * money moves, and a likelihood going up is not that. The chevron is the glance
@@ -192,11 +202,19 @@
 
 .inspector__moved {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   column-gap: var(--space-2);
   margin: 0;
   font-size: var(--text-lg);
   color: var(--text);
+}
+
+/* The reading stays whole. Broken across two lines — `.36 · up by` above
+   `.0090` — it stops being one number and starts looking like two. The word
+   beside it wraps instead, which costs nothing. */
+.inspector__moved .inspector__mono {
+  white-space: nowrap;
 }
 
 .inspector__moved-word {

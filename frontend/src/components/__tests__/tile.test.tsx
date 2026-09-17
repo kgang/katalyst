@@ -48,6 +48,7 @@ const MOVED: ClaimView = aClaim({
     from: 0.456,
     to: 0.414,
     way: "down",
+    by: -0.0421,
     sameDirection: { reading: 0.9663 },
   },
   badges: [

@@ -349,9 +349,12 @@ A claim the user supposed true, and that a later edit in the same branch pushed 
 
 > **Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"**
 
-**While a claim is supposed, its tile shows the word where a likelihood would go** — *Supposed ·
-Oct 1*, not `1.0` and not `.98`. A supposition is a hard fact in every simulated world while it
-holds, so there is no number to show, and inventing one answers a question nobody asked.
+**While an edit has fixed a claim's value, its tile shows the word where a likelihood would go** —
+*Supposed · Oct 1* where the user took it as given, *Happened · Oct 1* where they reported it as
+news — not `1.0`, not `.98` and not `>.99`. Either way the claim is settled in every simulated world
+while it holds, so there is no number to show, and inventing one answers a question nobody asked.
+**This is one rule, not a rule about suppositions**: it reaches the chip, the movement row, the rail
+row and the panel alike, and nothing but the path product reads the stored number underneath.
 
 After the retraction the claim passes through three named states. **Every part of the line and the
 series is data, never inference** — and this stack has some of it and not the rest:
@@ -491,9 +494,10 @@ numbers in the browser. *Tests:* deltaRail › `test_lists_reachable_terminals_i
 row the two are rendered as their own columns, and no ordering function reads either. *Test:*
 deltaRail › `test_how_firm_and_same_direction_are_columns_not_factors`.
 
-**INV-workbench.48 — a supposed claim shows the word, and the retraction comes from the world.** For
-every claim under a live supposition, the tile renders **Supposed · date** where a likelihood would
-go and renders no likelihood for it at all; where a later edit undermined the supposition, both
+**INV-workbench.48 — a claim whose value an edit fixed shows the word, and the retraction comes from
+the world.** For every claim under a live supposition and every claim reported as news, the tile
+renders **Supposed · date** or **Happened · date** where a likelihood would go and renders no
+likelihood for it at all; where a later edit undermined the supposition, both
 states render in order with the arrow between them. And for every world that carries `retractions`,
 every **Retracted · date · by "…"** badge on screen is read from that record — its day, its arrow and
 its quoted claim — with no code path deriving one from the branch; a claim the world reports no
@@ -532,9 +536,9 @@ review checklist line 11**.
    about which change matters most, and an invented one is a lie in the exact place the reader came
    for the truth. **Instead:** map order, visibly arbitrary, until the engine supplies its own.
 
-5. **Do not render a supposed claim as `1.0`, `.98`, `>.99` or a full bar.** *Because* a number
-   invites the reader to wonder about the missing two per cent, and there is no such uncertainty.
-   **Instead:** the word, and its date.
+5. **Do not render a claim whose value an edit fixed as `1.0`, `.98`, `>.99` or a full bar** —
+   supposed or reported as news alike. *Because* a number invites the reader to wonder about the
+   missing two per cent, and there is no such uncertainty. **Instead:** the word, and its date.
 
 6. **Do not let a button move a number in this stack, and do not rewrite an edit in place.**
    *Because* a canvas that computes its own likelihoods is a second engine, and two engines

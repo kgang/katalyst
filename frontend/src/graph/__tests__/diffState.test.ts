@@ -239,7 +239,7 @@ describe("the second world", () => {
           "B",
           {
             state: "shifted" as const,
-            moved: { from: 0.4, to: 1, way: "up" as const, sameDirection: { reading: 1 } },
+            moved: { from: 0.4, to: 1, way: "up" as const, by: 0.6, sameDirection: { reading: 1 } },
           },
         ],
       ]),
@@ -248,7 +248,9 @@ describe("the second world", () => {
           claimId: "B",
           label: "Brent crude settles below $68 for five sessions.",
           kind: "market" as const,
-          move: { reading: { from: 0.4, to: 1, largestOn: "2026-10-02", way: "up" as const } },
+          move: {
+            reading: { from: 0.4, to: 1, largestOn: "2026-10-02", way: "up" as const, by: 0.6 },
+          },
           rangeWidth: { reading: 0 },
           agreement: { reading: 1 },
         },

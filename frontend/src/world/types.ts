@@ -292,6 +292,14 @@ export interface Movement {
   /** Which way it went. */
   readonly way: "up" | "down";
   /**
+   * How far it moved, as the engine reported it.
+   *
+   * Carried beside the two readings because a move can be smaller than the
+   * second significant figure: when the before and the after print the same,
+   * this is the only thing that says anything moved at all.
+   */
+  readonly by: number;
+  /**
    * The share of versions of the map that moved the same way. On screen this is
    * headed **same direction**; the word *agreement* is kept off the screen.
    */
@@ -754,6 +762,8 @@ export interface DeltaRow {
     readonly to: number;
     readonly largestOn: string;
     readonly way: "up" | "down";
+    /** How far it moved on that day, as the engine reported it. */
+    readonly by: number;
   }>;
   /** How firm: the width of this world's own range on the claim. */
   readonly rangeWidth: Known<number>;

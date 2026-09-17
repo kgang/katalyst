@@ -198,7 +198,7 @@ describe("asking the engine", () => {
     expect(world.warnings).toEqual(["Fewer worlds survived than usual."]);
   });
 
-  it("test_a_supposed_claim_gets_the_word_and_never_the_stored_one", async () => {
+  it("test_a_claim_whose_value_an_edit_fixed_gets_the_word_and_never_the_stored_one", async () => {
     const world = await new ApiWorldSource().readWorld({ baseId: "example", branch: BRANCH });
     const strike = world.claims.find((claim) => claim.id === "S");
 
@@ -207,7 +207,33 @@ describe("asking the engine", () => {
     // number: every reader looks at the world's states first and writes the
     // word where the likelihood would go.
     expect(strike?.standing?.words).toBe("Supposed · Oct 2");
-    expect(strike?.standing?.reason).toContain("true in every version of the map");
+    expect(strike?.standing?.reason).toContain("settled in every version of the map");
+  });
+
+  it("test_an_observed_claim_gets_the_word_too", async () => {
+    // One rule, not a rule about suppositions. A claim the reader reported as
+    // news is true in every version of the map that survived the report, so the
+    // engine stores a flat 1 on it exactly as it does for a supposition — and
+    // `>.99` on the chip is that number wearing the certainty guard's clothes.
+    // The two are found in different places: a supposition can be undermined, so
+    // whether it still holds is a fact about a day and lives in `states`; news
+    // cannot be taken back, holds across the window, and lives in the
+    // assignments.
+    vi.mocked(readWorld).mockResolvedValue({
+      ...WORLD,
+      assignments: [{ target: "S", value: true, at: null, by: 0, kind: "observe" }],
+      retractions: [],
+      states: { H: ["sampled", "sampled", "sampled"], S: ["sampled", "sampled", "sampled"] },
+      beliefs: {
+        ...WORLD.beliefs,
+        S: { p: 1, lo: 1, hi: 1, owner: "model" },
+      },
+    } as unknown as World);
+
+    const world = await new ApiWorldSource().readWorld({ baseId: "example", branch: BRANCH });
+    const news = world.claims.find((claim) => claim.id === "S");
+    expect(news?.standing?.words).toBe("Happened · Oct 1");
+    expect(news?.standing?.reason).toContain("settled in every version of the map");
   });
 
   it("test_the_world_supplies_the_badges_and_the_standing", async () => {

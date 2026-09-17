@@ -13,7 +13,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Known, Ranged } from "../../world";
-import { BeliefChip, toReading, toShare, toTwoFigures } from "../BeliefChip";
+import { BeliefChip, toMovement, toReading, toShare, toTwoFigures } from "../BeliefChip";
 
 /**
  * Count the significant figures in a printed number.
@@ -247,6 +247,30 @@ describe("a belief chip", () => {
     expect(toShare(0.9995)).toBe(">99%");
     expect(toShare(0)).toBe("0%");
     expect(toShare(0.0004)).toBe("<1%");
+  });
+
+  it("test_no_chevron_between_two_readings_that_print_the_same", () => {
+    // Two figures is the whole of what this product shows, so a move smaller
+    // than the second figure leaves the before and the after printing the same.
+    // A chevron between them says "it went up" and "it is where it was" in one
+    // breath, and reads as a fault in the tool. Where they print the same the
+    // row is the one reading and the size of the move in words.
+    //
+    // The numbers are the engine's own for observing the insurance premium,
+    // which moves the strait from .3557 to .3647 — nine thousandths, invisible
+    // at two figures.
+    expect(toMovement(0.3557703617587686, 0.36473832368251524, 0.008967961923746659, "up")).toBe(
+      ".36 · up by .0090",
+    );
+    expect(toMovement(0.456, 0.414, -0.0421, "down")).toBe(".46 ▼ .41");
+
+    // The size is printed by the same rule as every other number on screen, and
+    // that rule keeps two figures however small the number gets — so a tiny move
+    // reads as the tiny move it is. Only exactly nothing prints `<.01`, and a
+    // move of exactly nothing is not a move.
+    expect(toMovement(0.4, 0.4, 0.000004, "up")).toBe(".40 · up by .0000040");
+    // The sign is already said by the word, so only the size is printed.
+    expect(toMovement(0.4, 0.4, -0.000004, "down")).toBe(".40 · down by .0000040");
   });
 
   it("test_a_chip_is_reachable_by_keyboard_and_opens_no_dialog", () => {

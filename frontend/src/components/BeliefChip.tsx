@@ -123,6 +123,42 @@ export function toShare(share: number): string {
   return `${whole}%`;
 }
 
+/** The chevron and the word each direction goes by. Neither is a colour. */
+const WAY = {
+  up: { chevron: "▲", word: "up" },
+  down: { chevron: "▼", word: "down" },
+} as const;
+
+/**
+ * How far a number moved, in the one form every surface prints it in.
+ *
+ * **Never a chevron between two readings that print the same.** Two figures is
+ * the whole of what this product shows, and a move smaller than the second
+ * figure leaves the before and the after printing identically — `.36 ▲ .36`,
+ * which says "it went up" and "it is where it was" in the same breath and reads
+ * as a fault in the tool. So where the two readings differ the row is the pair
+ * with the chevron between them, and where they do not it is the one reading and
+ * the size of the move in words: `.36 · up by .0090`.
+ *
+ * The size is the engine's own, at two significant figures with the same guard
+ * as everything else — a move too small even for that prints `<.01`, which is
+ * true and is the honest end of the scale.
+ *
+ * @param from The first world's likelihood, at full precision.
+ * @param to The second world's likelihood, at full precision.
+ * @param by How far it moved, as the engine reported it. Its sign is already
+ *   said by `way`, so only its size is printed.
+ * @param way Which way it went, as the engine read it.
+ */
+export function toMovement(from: number, to: number, by: number, way: "up" | "down"): string {
+  const before = toTwoFigures(from);
+  const after = toTwoFigures(to);
+  if (before !== after) {
+    return `${before} ${WAY[way].chevron} ${after}`;
+  }
+  return `${after} · ${WAY[way].word} by ${toTwoFigures(Math.abs(by))}`;
+}
+
 /**
  * The whole reading, in the form a sentence would use: `.35 (.22–.50)`.
  *
