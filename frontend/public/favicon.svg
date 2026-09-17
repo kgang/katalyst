@@ -1,0 +1,15 @@
+<!--
+  The tab icon: the letter K on the dark canvas colour from the design tokens.
+  The two arms leaving one upright are the shape the product draws over and
+  over — one claim, and the things it causes branching away from it.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Katalyst">
+  <rect width="32" height="32" rx="7" fill="#0E1116" />
+  <path
+    d="M11.5 7.5 V24.5 M11.5 16 L20.5 7.5 M11.5 16 L20.5 24.5"
+    fill="none"
+    stroke="#5FD4C4"
+    stroke-width="2.6"
+    stroke-linecap="round"
+  />
+</svg>

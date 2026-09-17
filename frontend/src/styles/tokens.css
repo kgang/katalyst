@@ -1,0 +1,193 @@
+/*
+ * The design tokens for Katalyst.
+ *
+ * This file is the whole visual vocabulary of the product in one place: every
+ * colour, size, weight, space and duration the interface is allowed to use.
+ * Nothing else in the app writes a raw colour or a raw pixel number. Later work
+ * — the workbench canvas with its proposition tiles and causal wires — inherits
+ * these same names, so the first screen and the finished product cannot drift
+ * apart visually.
+ *
+ * Which product rules this serves (from PRODUCT_REQUIREMENTS.md section 7):
+ *
+ *   UX-6  "Colour is law."  Direction of financial effect is blue for up and
+ *         amber for down, never red and green, and always carried by a glyph
+ *         and a word as well as a hue. Tail risk (a rare, large outcome) is a
+ *         hatched texture rather than a colour, because texture survives every
+ *         kind of colour blindness and survives inverting light and dark.
+ *   UX-7  "Motion budget."  On this screen there is exactly one animation: a
+ *         placeholder fading into the value that replaced it. One duration
+ *         token controls it, and it becomes instant when the operating system
+ *         asks for reduced motion.
+ *   UX-11 "Typography."  One interface typeface, one monospace typeface with
+ *         fixed-width digits for every number, exactly three sizes and exactly
+ *         three weights. Hierarchy comes from colour and spacing, not size.
+ *   UX-12 "Themes and access."  Dark is the default; a light theme is defined
+ *         too. Every piece of text clears a contrast ratio of 4.5 to 1 against
+ *         the surface behind it, in both themes. The ratios are written beside
+ *         each colour below.
+ *
+ * How the two themes are chosen:
+ *   - The page ships dark, because `index.html` sets `data-theme="dark"` on the
+ *     html element. That attribute wins over everything else.
+ *   - `data-theme="light"` forces the light theme.
+ *   - Remove the attribute and the page follows the operating system: dark
+ *     unless the operating system asks for light.
+ */
+
+:root {
+  /* ---- Typefaces ------------------------------------------------------ *
+   * Inter for the interface and JetBrains Mono for every number.
+   *
+   * Why this pair, and not Geist: both are shipped as ordinary npm packages
+   * (`@fontsource-variable/...`) that carry the font files themselves, so the
+   * app draws its first frame with no request to any outside service and works
+   * with no network at all inside a container. The `geist` package publishes
+   * its fonts only through the Next.js font loader, which this app does not
+   * use. Inter is a neutral interface face that stays legible at 13 pixels;
+   * JetBrains Mono has fixed-width digits, so a number that changes does not
+   * make the column beside it jump sideways.
+   *
+   * The system fallbacks after each name are what a browser draws in the
+   * fraction of a second before the font file arrives. */
+  --font-interface:
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+
+  /* ---- Type scale: exactly three sizes, exactly three weights --------- *
+   * 13 / 15 / 22 pixels. A fourth size is not a small addition; it is a new
+   * rule everything afterwards has to obey, so there are three. */
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 22px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* ---- Spacing: an eight-pixel grid ----------------------------------- *
+   * Every margin, padding and gap is one of these. `--space-hair` is the one
+   * half-step, for the gap between a glyph and the word beside it. */
+  --space-hair: 4px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+  --space-6: 64px;
+
+  --radius: 6px;
+
+  /* ---- Motion --------------------------------------------------------- *
+   * One duration, used only for opacity. Nothing here moves position, scales,
+   * bounces or loops. */
+  --duration-fast: 120ms;
+
+  /* ---- Dark theme: the default ---------------------------------------- *
+   * Contrast ratios below are measured against `--surface` (#0E1116), whose
+   * own ratio against white is 18.9 to 1. It is a very dark blue-grey rather
+   * than pure black: pure black against bright text vibrates at small sizes,
+   * and leaves no darker shade to fall back on. */
+  color-scheme: dark;
+
+  --surface: #0e1116;
+  /* The page behind everything. */
+  --surface-raised: #151a21;
+  /* A panel sitting on the page: lighter, no shadow. */
+  --hairline: rgb(233 237 243 / 10%);
+  /* A one-pixel border at 10% of the text colour. Separation without chrome. */
+
+  --text: #e9edf3;
+  /* 16.1 to 1 on --surface, 14.9 to 1 on --surface-raised. */
+  --text-muted: #98a2b1;
+  /* 7.3 to 1 on --surface, 6.8 to 1 on --surface-raised. Quiet, still readable. */
+
+  --accent: #5fd4c4;
+  /* 10.5 to 1 on --surface. A teal used sparingly — a state glyph, the mark in
+   * the icon. Deliberately not the same hue as --dir-up, so that "this is fine"
+   * can never be mistaken for "this moves the position up". */
+
+  --dir-up: #6fb3ff;
+  /* 8.6 to 1 on --surface. Financial effect upward. Always drawn with an
+   * upward glyph and a sign as well (UX-6, and invariant INV-12). */
+  --dir-down: #f0b23c;
+  /* 10.0 to 1 on --surface. Financial effect downward. Blue and amber, never
+   * red and green: red-green fails the most common form of colour blindness,
+   * and carries loss-and-gain baggage that is wrong half the time. */
+
+  --tail: repeating-linear-gradient(
+    45deg,
+    rgb(233 237 243 / 0%) 0 3px,
+    rgb(233 237 243 / 28%) 3px 4px
+  );
+  /* Tail risk — a rare outcome large enough to matter — is marked with this
+   * diagonal hatch, never with a colour. A texture is still a texture in
+   * greyscale, in a screenshot, and to a colour-blind reader. */
+
+  --focus: #7ce0d0;
+  /* The ring drawn around whatever the keyboard is on. Bright enough to find at
+   * a glance: 12.1 to 1 on --surface, far above the 3 to 1 a non-text mark
+   * needs. */
+}
+
+/* Light theme, forced by the html element's data-theme attribute. */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --surface: #f7f8fa;
+  --surface-raised: #ffffff;
+  --hairline: rgb(16 20 26 / 10%);
+
+  --text: #10141a;
+  /* 17.4 to 1 on --surface, 18.5 to 1 on --surface-raised. */
+  --text-muted: #5b6577;
+  /* 5.5 to 1 on --surface, 5.9 to 1 on --surface-raised. */
+
+  --accent: #0f766e;
+  /* 5.2 to 1 on --surface, 5.5 to 1 on --surface-raised. */
+
+  --dir-up: #1f5fcc;
+  /* 5.5 to 1 on --surface, 5.9 to 1 on --surface-raised. */
+  --dir-down: #96590a;
+  /* 5.3 to 1 on --surface, 5.6 to 1 on --surface-raised. Amber has to go dark
+   * and slightly brown on a white page to clear 4.5 to 1; the glyph and the
+   * word carry the meaning either way. */
+
+  --tail: repeating-linear-gradient(45deg, rgb(16 20 26 / 0%) 0 3px, rgb(16 20 26 / 24%) 3px 4px);
+
+  --focus: #0d6e66;
+  /* 5.7 to 1 on --surface. */
+}
+
+/* No data-theme attribute at all: follow the operating system. Dark stays the
+ * default, because only an explicit request for light lands here. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --surface: #f7f8fa;
+    --surface-raised: #ffffff;
+    --hairline: rgb(16 20 26 / 10%);
+
+    --text: #10141a;
+    --text-muted: #5b6577;
+
+    --accent: #0f766e;
+
+    --dir-up: #1f5fcc;
+    --dir-down: #96590a;
+
+    --tail: repeating-linear-gradient(45deg, rgb(16 20 26 / 0%) 0 3px, rgb(16 20 26 / 24%) 3px 4px);
+
+    --focus: #0d6e66;
+  }
+}
+
+/* When the operating system asks for less movement, the one animation on this
+ * page becomes instant. The value still replaces the placeholder; it just does
+ * not fade (UX-7). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+  }
+}

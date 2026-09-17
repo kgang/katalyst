@@ -52,7 +52,7 @@ Chosen option: "A", because Polymarket and FRED are free or keyless, documented,
 
 ### Confirmation
 
-* `tests/boundary/test_grounding_polymarket.py` and `test_grounding_fred.py` — tests against recorded responses, asserting the `MarketBelief` shape, `provenance=market_implied`, and a cache hit on the second call.
+* `backend/tests/boundary/test_grounding_polymarket.py` and `test_grounding_fred.py` — tests against recorded responses, asserting the `MarketBelief` shape, `provenance=market_implied`, and a cache hit on the second call.
 * `test_market_belief_never_merged` — no code path in `domain/` or `api/` combines a `market` belief with a `model` or `user` one: a search-based guard plus a unit test on the thesis-card builder.
 * Frontend: the FRED attribution line is present in the rendered Inspector whenever a FRED value is shown (vitest).
 * The "sources considered and rejected" list from `docs/research/04-engineering-structure.md` §8 is mirrored in `spec/thesis/`.
