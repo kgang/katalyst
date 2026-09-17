@@ -26,8 +26,8 @@ ClaimState = Literal["unchanged", "shifted", "added", "killed"]
 # shifted   — present in both, moved by 0.005 or more, and moved the same way in
 #             at least 90% of the versions of the map
 # added     — present in world B and not in world A
-# killed    — present in both, and in B it is either assigned false or has no path
-#             of arrows left from the hypothesis. Never "its number got small"
+# killed    — present in both, and assigned false in world B. Never "its number got
+#             small", and never "it lost its path from the hypothesis" (see B2)
 
 
 class ClaimDiff(BaseModel):          # proposed here — the plan names the four states, not this shape
@@ -42,7 +42,7 @@ class ClaimDiff(BaseModel):          # proposed here — the plan names the four
 
 `agreement` is carried on **every** claim present in both worlds, not only the shifted ones, so a reader — or a test — can check the rule that decided a claim's state without recomputing anything. It is `None` only for an `added` claim, which has no world A to be compared against.
 
-`before` and `after` are read on **the claim's own resolve-by day** — the day the claim is judged, which every claim has (INV-1, the product rule that a claim without resolution criteria, a named judge and a date is not a claim). That is the number the claim's tile shows, so it is the number its state has to be about.
+`before` and `after` are read on **the claim's own resolve-by day** — the day the claim is judged, which every claim has (INV-1, the product rule that a claim without resolution criteria, a named judge and a date is not a claim). That is the number the claim's tile shows, so it is the number its state has to be about. When a claim is still `supposed` on its own resolve-by day, `before` and `after` carry the stored `1.0` (or `0.0` for a claim supposed false) so that `delta` stays ordinary arithmetic — but any surface showing that row reads `states` first and prints the word, *Supposed · date*, never `1.0`, because no surface except a path product may print that number ([`propagation.md`](propagation.md)).
 
 ### The ranked change list
 
@@ -60,7 +60,7 @@ class DeltaRow(BaseModel):
 
 One row per **terminal** — a claim of kind `market` (it names an instrument) or `not_tradeable` (it names the reason there is nothing to trade) — that came out `shifted`. Ordered by `rank`, largest first. The **delta rail** is the interface's name for this list beside a diff.
 
-`range_width` is **proposed here** to be the width of the 10-to-90 band of the paired difference itself at `at_day` — how unsure we are of *this move*, not of either world's number. On the measured Hormuz case below that is `.06`, the width of `+.07` to `+.13`. The other reading — the width of world B's own band on that claim — is under Open questions.
+`range_width` is **the width of world B's own 10-to-90 band on that claim at `at_day`** — `hi` minus `lo`, the same quantity the claim's tile shows (Kent, 2026-09-17). Taking it from the tile rather than from the difference is what keeps the rail and the tile from ever disagreeing about how firm a number is.
 
 ### The whole difference
 
@@ -129,15 +129,17 @@ For the Hormuz walkthrough, world A is the base world (the empty branch) and wor
 The checks run in this order, and the first that matches wins.
 
 1. **`added`** — the claim is in world B and not in world A. `S` is added: the base map has never heard of it.
-2. **`killed`** — the claim is in both, and in world B it is either **assigned false** by a `do` or an `observe`, or **has no path of arrows left from the hypothesis** in the map that branch left behind. Nothing else. A claim whose likelihood fell to `.02` is a claim that moved a long way; it is `shifted`, and calling it `killed` would tell the user their argument was cut when it was merely losing.
+2. **`killed`** — the claim is in both, and in world B it is **assigned false** by a `do` or an `observe`. That is the whole rule (Kent, 2026-09-17). A claim whose likelihood fell to `.02` is a claim that moved a long way; it is `shifted`, and calling it `killed` would tell the user their argument was cut when it was merely losing.
 3. **`shifted`** — the claim is in both, it moved by 0.005 or more on its own resolve-by day, **and** it moved the same way in at least 90% of the versions of the map. Both halves, always. B3 says why.
 4. **`unchanged`** — the claim is in both and fails either half.
 
-A claim present in world A and missing from world B cannot happen: there is no delete operation, and "this is out of the picture" is expressed as `do(n, false)` or as an assertion upstream that cuts it off ([`interventions.md`](interventions.md) anti-pattern 5).
+A claim present in world A and missing from world B cannot happen: there is no delete operation, and "this is out of the picture" is expressed as `do(n, false)`, which forces the claim false ([`interventions.md`](interventions.md) anti-pattern 5).
 
-**On the Hormuz branch.** `S` is `added`. `H`, `C`, `B`, `M1`, `M2` and `N1` are `shifted` — every one of them is downstream of H or of S. `R` is `unchanged`, and for a reason worth reading: R's only incoming arrow is `B → R`, the feedback arrow from the market back onto the world, and feedback arrows are carried as data and not unrolled over time until stack 06. So R reads its own prior in both worlds. Nothing on this branch is `killed`.
+**On the Hormuz branch.** `S` is `added`. `H`, `C`, `B`, `M1`, `M2` and `N1` are `shifted` — every one of them is downstream of H or of S. `R` is `unchanged`, and for a reason worth reading: R's only incoming arrow is `B → R`, the feedback arrow from the market back onto the world, and *the map the engine works through is the map with feedback arrows set aside* — [`interventions.md`](interventions.md)'s named rule, which every chapter cites rather than re-deciding, and which `test_a_feedback_arrow_never_carries_a_change` pins. So R reads its own prior in both worlds. Nothing on this branch is `killed`.
 
-**Both halves of `killed`, shown.** Add `Do(target="C", value=False)` to a branch and C is `killed` — forced false, its tile struck through, still on the map and still in the record. Separately, `Do(target="B", value=True)` cuts B's incoming arrows, which removes `H → B`; from that moment no path of arrows runs from the hypothesis H to M1, M2 or R, so those three are `killed` — cut off from the argument the map is making, even though they still move because B is supposed true. The state says the claim has left the argument. The delta rail still has a number for it.
+**`killed`, shown.** Add `Do(target="C", value=False)` to a branch and C is `killed` — forced false, its tile struck through, still on the map and still in the record.
+
+**Why `killed` is not also "cut off from the hypothesis".** That second half was tried and dropped (Kent, 2026-09-17), and the fixture shows why. `Do(target="B", value=True)` cuts B's incoming arrows, which removes `H → B`, so no path of arrows runs from the hypothesis H to M1, M2 or R any more — and under the dropped rule all three would have read *killed* while B, supposed true, was pushing M1 and M2 harder than anything else on the map. Two unrelated facts were wearing one word. Losing the last path is a fact about the **path**, not about the claim's value, so it is reported where paths are reported: the Inspector's path bar says *"no path from the hypothesis reaches this claim any more"* in those words (`spec/workbench/inspector.md`).
 
 ### B3 — How `shifted` is decided: the paired difference, never band overlap
 
@@ -148,6 +150,8 @@ Subtract world A's version *k* from world B's version *k*, for all 2 000 version
 
 A claim is `shifted` when the move is at least `0.005` in size **and** agreement is at least `90%`.
 
+**On screen the rail heads this column *same direction*, and the range-width column beside it *how firm*** (Kent, 2026-09-17). The field names stay `agreement` and `range_width`; the headings say in the reader's words what each column answers, and keeping *agreement* off the screen here leaves the word free for stack 04's run-to-run number.
+
 **Why never band overlap, measured on this fixture.** Supposing the strait opens, B's band in the base world and B's band in the branch world **overlap by a third**, and yet **100% of versions move the same way**: `+.10`, with a 10-to-90 band on the difference itself of `+.07` to `+.13`. Reading the overlap would report "no change" about the single clearest change on the map. The two bands overlap because each one is wide for its own reason — we are unsure what number to give you — while the *difference* between them is tight, because both were computed from the same numbers.
 
 A second measured warning from the same fixture, so nobody builds a demo on it: supposing the strait opens **widens** B's band, `.292` to `.323`, because the curve that turns log-odds into a likelihood is steeper near `.45`. A supposition collapses its own target's band and does not reliably narrow anything downstream. The honest thing to show is the **share** of B's band that H's own range explains, which goes from 2.6% to 0% — that is FR-21's "where to spend modeling budget" number, carried on the world and first read on screen in stack 06.
@@ -155,17 +159,21 @@ A second measured warning from the same fixture, so nobody builds a demo on it: 
 ### B4 — The ranked change list: two factors, and only two
 
 ```
-rank = |peak_delta| × min(provenance weight of each arrow on the shortest path
-                          from the edit's subject to this terminal)
+rank = |peak_delta| × min(provenance weight of each arrow on the best-backed route
+                          from a differing edit's subject to this terminal)
 ```
 
-How big the move is, times what the weakest arrow behind it is worth. That is FR-16's "the size of the move × the weakest backing on the path", made arithmetic.
+How big the move is, times what the weakest arrow behind it is worth. That is FR-16's "the size of the move × the weakest backing on the best-backed route", made arithmetic.
 
 **`range_width` and `agreement` are columns and never factors.** They answer two different questions — *how unsure are we of this number* and *how sure are we of its direction* — and a trader weighs them separately from *how big is it*. Blend any of the three into one score and the reader can no longer tell which one is talking. Worse, multiplying width in would push down exactly the claims FR-21 floats: a wide band is the signal that says *go and research this*, and a ranking that buries wide claims gives the opposite advice.
 
-**What the shortest path is measured from**, for a branch of several edits, is **proposed here**: the subjects of every edit in branch B that branch A does not also have, taking the shortest path from whichever of them is nearest, and reading the path without regard to arrow direction — because `observe` is allowed to move a claim *upstream* of its subject, where no forward path exists. Both readings are under Open questions.
+**Which route the weakest arrow is read along** (Kent, 2026-09-17). Over every path from **any** differing edit's subject to the terminal — the subjects of the edits branch B has and branch A does not — take the one whose weakest arrow is strongest. That is the **widest bottleneck**: the route whose narrowest point is as wide as possible, the way a lorry driver picks the road with the highest low bridge rather than the shortest one. It is a ten-line variant of the usual shortest-path walk. Neither "shortest" nor "which subject" survives in the rule: a change that could have reached a terminal along a well-backed route is ranked by that route, whichever edit started it, because that route is the best case the reader is entitled to.
 
-**On the Hormuz branch.** World A is the base world, so all three edits count and the subjects are H (supposed) and S (inserted, then supposed). To M1 the nearest subjects are H and S, both two arrows away — `H → B` then `B → M1`, or `S → B` then `B → M1` — and all four of those arrows are `argued`, so the weakest weight is `0.6`. To M2 the picture is the same two arrows deep through `B → M2`, again `0.6`. To N1 the nearest subject is H itself, one arrow, `H → N1`, which is `asserted`, so the weakest weight is `0.3`. If M2 and N1 had moved by the same amount, M2 would rank twice as high — which is the whole point: the arrow into N1 is a story about which way the causality runs, and the rail says so by putting it lower.
+The route is read over **the same map the affected set is computed over** — *the map the engine works through is the map with feedback arrows set aside*, [`interventions.md`](interventions.md)'s named rule. So for five of the six operations the route simply follows the arrows, and for `observe`, the one edit that may move a claim *upstream* of its subject, the affected set already reaches upstream and so does the route. There is no second direction rule to remember and no exception to carve out.
+
+**On the Hormuz branch.** World A is the base world, so all three edits count and the differing subjects are H (supposed) and S (inserted, then supposed). Every route from either of them to M1 or M2 ends in `B → M1` or `B → M2` and passes only through `argued` arrows, so the best-backed route's weakest arrow is worth `0.6`. Every route to N1 must end in `H → N1`, which is the only arrow into N1 and is `asserted`, so the bottleneck is `0.3` however well-backed the rest of the route is. If M2 and N1 had moved by the same amount, M2 would rank twice as high — which is the whole point: the arrow into N1 is a story about which way the causality runs, and the rail says so by putting it lower.
+
+**The Inspector's path-product bar walks this same route** and names its steps. One path-choosing rule, used twice, so the bar and the rail can never point at two different chains through the same map. When two routes are equally well-backed the **shorter** one is taken, and if they are still level, the one whose first differing arrow comes earlier in the map's own list of arrows *(proposed here)* — the rank does not care, because tied routes give the same weight, but the bar names its steps, so the choice has to be the same every time. On the Hormuz map every arrow into M1 is `argued`, so `H → B → M1` wins over `H → C → B → M1` by being shorter.
 
 ### B5 — Which day a number is read on
 
@@ -200,7 +208,15 @@ on 2026-10-31" from .62 to .41 by 2026-10-09 and leaves 1 claim untouched.
 
 The one untouched claim is R, for the reason in B2. The three numbers are illustrative — the sentence is what is settled here, not the values.
 
-Nothing about this sentence is written by a language model, and the diff route needs no model key to answer. Free prose would be a fourth place for a number to come from, with nothing to trace it to.
+**When no ending shifted, there is a second fixed sentence:**
+
+```
+"<edit in the user's words> moves no ending and leaves <n> claims untouched."
+```
+
+It is used whenever the rail is empty — after a `believe`, because the user's own number is not pushed through the map in this version, or after a `retune` whose effect lands below the 0.005 floor. That is a real answer and not an error: *you changed something and nothing at the endings moved* is exactly what the user needs to hear, and an empty rail with no sentence beside it reads as a bug.
+
+Nothing about either sentence is written by a language model, and the diff route needs no model key to answer. Free prose would be a fourth place for a number to come from, with nothing to trace it to.
 
 ### B7 — The sensitivity sweep
 
@@ -242,19 +258,19 @@ This chapter uses the local numbers `INV-multiverse.18` through `.30`. `.1`–`.
 
 **INV-multiverse.20 — `shifted` is exactly the two halves.** For all such world pairs and all claims present in both and not `killed`: the state is `shifted` if and only if `delta` is at least `0.005` in size **and** `agreement` is at least `0.90`. Both numbers are carried on every such claim, so the rule can be read straight off the `Diff`. A pair whose bands overlap heavily but which moves the same way in every version comes out `shifted`; a pair that moved far but inconsistently in direction does not. Test: `test_shifted_needs_agreement`.
 
-**INV-multiverse.21 — `killed` means forced false or cut off.** For all such world pairs: a claim's state is `killed` if and only if world B assigns it false, or no path of arrows reaches it from the hypothesis in world B's map. In particular, for any threshold, a claim whose `after` falls below it while it is neither assigned false nor cut off is never `killed`. Test: `test_killed_is_forced_false_or_cut_off`.
+**INV-multiverse.21 — `killed` means forced false.** For all such world pairs: a claim's state is `killed` if and only if world B assigns it false, by a `do` or an `observe`. So, for any threshold, a claim whose `after` falls below it is never `killed` unless it was assigned false; and a claim that lost its last path from the hypothesis but was not assigned false is not `killed` either — that fact belongs to the path, not to the state. Test: `test_killed_means_forced_false`.
 
-**INV-multiverse.22 — the rank has two factors and no more.** For all such world pairs and all rows: `rank` equals the size of `peak_delta` times the smallest provenance weight on the shortest path from the differing edits' subjects to that row's claim. Rebuilding the same diff with every `range_width` and every `agreement` replaced by any other number leaves every `rank` and the whole ordering unchanged. Test: `test_rank_has_two_factors`.
+**INV-multiverse.22 — the rank has two factors and no more.** For all such world pairs and all rows: `rank` equals the size of `peak_delta` times the weakest provenance weight on the **best-backed route** — over every path from any differing edit's subject to that row's claim, in the map with feedback arrows set aside, the route whose weakest arrow is strongest. No other route to that claim has a stronger weakest arrow. Rebuilding the same diff with every `range_width` and every `agreement` replaced by any other number leaves every `rank` and the whole ordering unchanged. Test: `test_rank_has_two_factors`.
 
 **INV-multiverse.23 — the rail holds ranked terminals and nothing else.** For all such world pairs: `rows` contains exactly the claims of kind `market` or `not_tradeable` whose state is `shifted`, ordered by `rank` from largest to smallest. Test: `test_delta_rail_holds_ranked_terminals`.
 
 **INV-multiverse.24 — a row is read on the day of largest divergence.** For all such world pairs and all rows: no day in the window has a divergence **larger in size** between the two worlds' series for that claim than `at_day` does; `peak_delta` is the signed divergence on that day, and `before` and `after` are the two worlds' likelihoods on that same day. `at_day` is always one of the days the series actually carries — which matters when a window longer than 180 days has been sampled down to 180 points, because the peak is then chosen among those points and no other. Test: `test_delta_row_reads_the_peak_day`.
 
-**INV-multiverse.25 — locality shows up in the difference.** For all maps `g` from `graphs()`, all branches `b` from `branches(g)` and all seeds `s`: every claim outside the branch's affected set — the claims an edit is allowed to move, which INV-4, the product's locality rule, defines as those still connected to the edit's subject in the map the edit leaves behind — comes out `unchanged`. The test computes the affected set itself from the shape of the map and never asks the engine what it touched. Test: `test_diff_states_respect_locality`.
+**INV-multiverse.25 — locality shows up in the difference.** For all maps `g` from `graphs()`, all branches `b` from `branches(g)` and all seeds `s`: every claim outside the branch's affected set — the claims an edit is allowed to move, which INV-4, the product's locality rule, defines as those still connected to the edit's subject in the map the edit leaves behind, with feedback arrows set aside ([`interventions.md`](interventions.md)'s named rule) — comes out `unchanged`. The test computes the affected set itself from the shape of the map and never asks the engine what it touched. Test: `test_diff_states_respect_locality`.
 
 **INV-multiverse.26 — a difference replays.** For all maps `g`, all branch pairs `a`, `b` and all seeds `s`: two independently computed diffs from `(g, a, b, s)` serialize to identical bytes (INV-5 and NFR-2, the rules that a world is replayable from its base map, its branch and its seed). Test: `test_diff_replays_from_base_branches_seed`.
 
-**INV-multiverse.27 — the summary is the template, filled in.** For all such world pairs with at least one row: `summary` matches the sentence in B6 exactly — with the branch's `label` (or, for a branch of one edit, that edit's words), the top row's claim, its `before`, `after` and `at_day`, and the count of `unchanged` claims substituted in, and *claim* written in the singular when that count is 1 — and contains no number that is not already in the `Diff`. Test: `test_summary_matches_the_template`.
+**INV-multiverse.27 — the summary is one of two fixed sentences, filled in.** For all such world pairs: `summary` matches one of the two sentences in B6 exactly — the first when `rows` is not empty, the second when it is. Both take the branch's `label` (or, for a branch of one edit, that edit's words) and the count of `unchanged` claims, with *claim* written in the singular when that count is 1; the first also takes the top row's claim, `before`, `after` and `at_day`. Neither contains a number that is not already in the `Diff`. Test: `test_summary_matches_the_template`.
 
 **INV-multiverse.28 — a sensitivity row names its budget.** For all maps `g`, branches `b` and seeds `s`: `sensitivity` returns one row per claim in the world, each carrying the budget it was produced at — `versions` 250 and `worlds` 8 — and each row's `deltas` covers every terminal on the map. Test: `test_sensitivity_rows_name_their_budget`.
 
@@ -270,7 +286,7 @@ This chapter uses the local numbers `INV-multiverse.18` through `.30`. `.1`–`.
 
 **2. Do not fold range width or agreement into the rank.** *Because* "this moved a lot", "we are unsure how much" and "we are sure which way" are three separate facts a trader weighs separately, and one blended score hides which is talking; multiplying width in would also sink exactly the wide claims FR-21 is trying to float as the ones worth researching. **Do** rank on two factors — the size of the move times the weakest backing on the path — and show width and agreement as their own columns.
 
-**3. Do not call a small number `killed`.** *Because* `killed` means a claim was forced false or cut off from the hypothesis, and using it for "the likelihood got low" tells the user their argument was severed when it is merely losing — two completely different things to act on. **Do** report a large move as `shifted` with its before and after, and reserve `killed` for an assignment to false or a lost path.
+**3. Do not call a small number `killed`, and do not call a lost path `killed` either.** *Because* `killed` means one thing — the claim was forced false — and stretching it to cover "the likelihood got low" tells the user their argument was severed when it is merely losing, while stretching it to cover "no path reaches this from the hypothesis" puts one word on two unrelated facts: on the fixture a claim can lose its last path and still be the biggest mover on the map. **Do** report a large move as `shifted` with its before and after, reserve `killed` for an assignment to false, and let the Inspector's path bar say *"no path from the hypothesis reaches this claim any more"* where that is what happened.
 
 **4. Do not infer a difference by matching two maps.** *Because* a difference reconstructed after the fact cannot tell "the user supposed this" from "the model happened to number it differently this run", cannot recover the order the edits were made in, and turns a free, exact answer into a guess — the same reason [`branches-and-worlds.md`](branches-and-worlds.md) refuses to derive a branch by diffing two maps. **Do** build both worlds from one base map, one seed and two branches, and read the difference off the two results.
 
@@ -284,15 +300,19 @@ This chapter uses the local numbers `INV-multiverse.18` through `.30`. `.1`–`.
 
 ## Open questions
 
-Raised 2026-09-17. The first three need Kent; the last three name who owns them.
+Raised 2026-09-17. The first four were settled the same day and their answers are recorded in place below. The last two stay open and name who owns them.
 
-1. **Which subject the shortest path starts from, when a branch holds several edits.** The ranking is defined from "the edit's subject", and the showcase branch has three edits. This chapter proposes the nearest subject among the edits branch B has and branch A does not, which makes the rank read as "the best-backed way this change could have reached here". The alternatives are the last edit's subject only, or one row per edit.
+1. **Which subject the path starts from, when a branch holds several edits.** The ranking was defined from "the edit's subject", and the showcase branch has three edits. The draft proposed the nearest subject.
+   **Decided 2026-09-17:** the question disappears, because "shortest" and "which subject" both leave the rule. The rank reads the **best-backed route** — over every path from *any* differing edit's subject to the terminal, the one whose weakest arrow is strongest. See B4.
 
-2. **Whether that path is read with or against the arrows.** `observe` is the one operation allowed to move a claim *upstream* of its subject, so a terminal can shift with no forward path from the subject to it, and the rank would have no second factor at all. This chapter proposes reading the path without regard to arrow direction. If Kent would rather the rank stayed strictly causal, a terminal reached only upstream needs a stated weight rather than a gap.
+2. **Whether that path is read with or against the arrows.** `observe` is the one operation allowed to move a claim *upstream* of its subject, so a terminal could shift with no forward path from the subject to it, leaving the rank without its second factor.
+   **Decided 2026-09-17:** the route is read over **the same map the affected set is computed over**, so the question answers itself — five operations follow the arrows, and `observe`'s affected set already reaches upstream, so its routes do too. Feedback arrows are set aside in both, by [`interventions.md`](interventions.md)'s named rule. See B4.
 
-3. **What `range_width` measures.** Proposed here: the width of the 10-to-90 band of the paired difference at `at_day` — how unsure we are of *this move*. The alternative is the width of world B's own band on that claim, which is what the tile shows. They answer different questions and the column heading has to say which.
+3. **What `range_width` measures.** The draft proposed the width of the paired difference's own band.
+   **Decided 2026-09-17:** the width of **world B's own 10-to-90 band on that claim at `at_day`** — the same quantity the tile shows, so the rail and the tile cannot disagree. On screen the column is headed *how firm*. See the Data model and B3.
 
-4. **A claim cut off from the hypothesis can still move.** Suppose a claim partway down the map and everything below it is `killed` by the second half of the rule, yet those claims still have numbers and still change, because they are downstream of the supposed claim. The state says the claim has left the argument; the rail still has a row for it. Which the tile leads with is `spec/workbench/`'s call, and this chapter raises it rather than settling it.
+4. **A claim cut off from the hypothesis can still move.** Losing the last path from the hypothesis was going to be the second half of `killed`, and on the fixture such a claim can be the biggest mover on the map — the state would have said it left the argument while the rail showed it moving hardest.
+   **Decided 2026-09-17:** it is not a diff state at all. `killed` means forced false, full stop. Losing the path is a fact about the **path**, reported by the Inspector's path bar — *"no path from the hypothesis reaches this claim any more"* (`spec/workbench/inspector.md`). See B2.
 
 5. **Whether the rail should ever show an unshifted terminal.** Today a terminal that failed either half of the test is absent from `rows`, so a reader cannot tell "it did not move" from "it is not on this map". A greyed row saying *no change* may be better than silence; that is an interface question and `spec/workbench/` owns it.
 

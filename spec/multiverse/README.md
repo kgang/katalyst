@@ -19,7 +19,7 @@ Intervention (`do`, `observe`, `insert`, `retune`, `refine`, `believe`) · Branc
 | ID | Statement |
 |----|-----------|
 | INV-3 | `do` changes no ancestor of the target; `observe` may. They are distinct operations with distinct verbs in the interface |
-| INV-4 | Locality: an intervention changes only what is still connected to its subject in the graph the edit leaves behind; every other proposition is byte-identical between base and branch. The per-operation affected set in [`interventions.md`](interventions.md) is the operational form |
+| INV-4 | Locality: an intervention changes only what is still connected to its subject in the graph the edit leaves behind; every other proposition is byte-identical between base and branch. The per-operation affected set in [`interventions.md`](interventions.md) is the operational form, and the same chapter holds the one rule about feedback arrows: *what can move* is read off the map with feedback arrows set aside, because this engine never works one through |
 | INV-5 | The base graph is immutable; a branch is an ordered patch list; applying an empty branch is the identity; applying two branches in sequence equals applying their concatenation; every world replays from (base, branch, seed) |
 | INV-10 | After splitting a proposition into finer sub-propositions, their combined likelihood equals the original's within a small tolerance |
 
