@@ -173,7 +173,7 @@ The route is read over **the same map the affected set is computed over** — *t
 
 **On the Hormuz branch.** World A is the base world, so all three edits count and the differing subjects are H (supposed) and S (inserted, then supposed). Every route from either of them to M1 or M2 ends in `B → M1` or `B → M2` and passes only through `argued` arrows, so the best-backed route's weakest arrow is worth `0.6`. Every route to N1 must end in `H → N1`, which is the only arrow into N1 and is `asserted`, so the bottleneck is `0.3` however well-backed the rest of the route is. If M2 and N1 had moved by the same amount, M2 would rank twice as high — which is the whole point: the arrow into N1 is a story about which way the causality runs, and the rail says so by putting it lower.
 
-**The Inspector's path-product bar walks this same route** and names its steps. One path-choosing rule, used twice, so the bar and the rail can never point at two different chains through the same map.
+**The Inspector's path-product bar walks this same route** and names its steps. One path-choosing rule, used twice, so the bar and the rail can never point at two different chains through the same map. When two routes are equally well-backed the **shorter** one is taken, and if they are still level, the one whose first differing arrow comes earlier in the map's own list of arrows *(proposed here)* — the rank does not care, because tied routes give the same weight, but the bar names its steps, so the choice has to be the same every time. On the Hormuz map every arrow into M1 is `argued`, so `H → B → M1` wins over `H → C → B → M1` by being shorter.
 
 ### B5 — Which day a number is read on
 
