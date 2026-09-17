@@ -155,7 +155,7 @@ A claim present in world A and missing from world B cannot happen: there is no d
 Subtract world A's version *k* from world B's version *k*, for all 2 000 versions. Because the versions stream does not depend on the branch, the elicitation noise cancels and what is left is the edit — this is *common random numbers*, the standard trick for comparing two runs of the same simulation. Two numbers come out of those 2 000 paired differences:
 
 * **the move** — the average paired difference, which is what `delta` and `peak_delta` report;
-* **agreement** — the share of versions whose paired difference has the same sign as that average, **each version counted by as much as it counted for the two numbers** (the rule is stated once just below). It is the vocabulary's word for a number the machine computes rather than one anything self-reports. Here it means the share of versions of the map that moved the same way; stack 04's run-to-run agreement across generations is the other sense, and the vocabulary asks us to say which.
+* **agreement** — the share of versions whose paired difference has the same sign as that average, **each version counted by as much as it counted for the two numbers** (the rule is stated once just below). It is the vocabulary's word for a number the machine computes rather than one anything self-reports. Here it means the share of versions of the map that moved the same way; a run-to-run agreement across independent generations would be the other sense — decision record 0015 says stack 04 builds none — and the vocabulary asks us to say which.
 
 A claim is `shifted` when the move is at least `0.005` in size **and** agreement is at least `90%`.
 
