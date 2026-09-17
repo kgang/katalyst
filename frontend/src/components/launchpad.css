@@ -1,0 +1,136 @@
+/*
+ * The first screen.
+ *
+ * Two lists, both of them plain lists of text with a hairline between the rows.
+ * No card shadows, no rounded blue buttons, no illustration — the words are the
+ * interface, and the only thing that separates one row from the next is a line
+ * at a tenth of the text colour.
+ */
+
+.launchpad {
+  display: grid;
+  row-gap: var(--space-5);
+}
+
+/* ---- The two doors ------------------------------------------------------ */
+
+.doors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.door {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-1) var(--space-2);
+}
+
+.door + .door {
+  border-top: 1px solid var(--hairline);
+}
+
+.door__name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.door__line {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* ---- The examples -------------------------------------------------------- */
+
+.examples {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.example {
+  display: grid;
+  row-gap: var(--space-hair);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2);
+  text-align: left;
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--text);
+}
+
+/* The one card that opens something. It is a row of text that answers to a
+ * click, not a button with a fill: the fill would be the loudest thing on a
+ * quiet screen, and what it opens is the point, not the pressing of it. */
+.example--live {
+  cursor: pointer;
+}
+
+.example--live:hover {
+  background: var(--surface);
+}
+
+.example__claim {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.example__line {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* The line that says what happens if you take this row up on its offer. */
+.example__action {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin-top: var(--space-hair);
+  font-size: var(--text-sm);
+  color: var(--accent);
+}
+
+.example--live .example__action::after {
+  content: "→";
+  font-family: var(--font-mono);
+}
+
+.example__action--waiting {
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+/* Said out loud rather than implied by a greyed-out button: this one is not
+ * built yet, and the words beside it say what is missing. */
+.example__badge {
+  padding: 0 var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* One hairline between rows, and nothing else separating them. Written last so
+ * that it comes after the rules for the rows themselves rather than before,
+ * which is the order that makes the cascade easy to follow. */
+.examples > li + li {
+  border-top: 1px solid var(--hairline);
+}
