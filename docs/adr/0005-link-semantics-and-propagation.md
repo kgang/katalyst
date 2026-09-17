@@ -1,6 +1,6 @@
 ---
 # ADR-0005: Links carry trigger/sustain mode, log-odds strength, lag and shape; beliefs propagate by seeded forward Monte Carlo
-status: proposed
+status: accepted
 date: 2026-09-16
 decision-makers: Kent Gang
 consulted: docs/research/02-causal-modeling-formalisms.md, docs/initial-brainstorming.md

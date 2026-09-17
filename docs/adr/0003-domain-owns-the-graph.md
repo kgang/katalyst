@@ -1,6 +1,6 @@
 ---
 # ADR-0003: The causal graph is a validated DAG owned by the domain layer; the LLM only proposes
-status: proposed
+status: accepted
 date: 2026-09-16
 decision-makers: Kent Gang
 consulted: docs/research/02-causal-modeling-formalisms.md, docs/research/01-landscape-and-competitors.md, docs/research/04-engineering-structure.md

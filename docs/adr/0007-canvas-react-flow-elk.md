@@ -1,6 +1,6 @@
 ---
 # ADR-0007: Build the Workbench canvas on React Flow v12 with ELK layered layout
-status: proposed
+status: accepted
 date: 2026-09-16
 decision-makers: Kent Gang
 consulted: docs/research/03-ui-ux-directions.md, docs/research/04-engineering-structure.md

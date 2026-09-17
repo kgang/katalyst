@@ -155,14 +155,14 @@ katalyst/
 |--------|----------|--------|
 | ADR-0001 | Decision records in a standard markdown template; nothing is built against a `proposed` record | accepted |
 | ADR-0002 | Python backend + React/TypeScript frontend; frontend types generated from the API description | accepted |
-| ADR-0003 | The domain layer owns graph validity; the model only proposes | proposed |
-| ADR-0004 | Branches are patch lists over an immutable base; assert and observe are distinct | proposed |
-| ADR-0005 | Typed links (trigger/sustain, log-odds strength, lag, shape) propagated by seeded simulation | proposed |
-| ADR-0006 | Vendor SDK, `claude-opus-5`, schema-guaranteed output, one proposal per call, streamed | proposed |
-| ADR-0007 | React Flow canvas with automatic layered layout; own the look; no modals | proposed |
-| ADR-0008 | Four testing layers; recorded responses so CI needs no key | proposed |
+| ADR-0003 | The domain layer owns graph validity; the model only proposes | accepted |
+| ADR-0004 | Branches are patch lists over an immutable base; assert and observe are distinct | accepted |
+| ADR-0005 | Typed links (trigger/sustain, log-odds strength, lag, shape) propagated by seeded simulation | accepted |
+| ADR-0006 | Vendor SDK, `claude-opus-5`, schema-guaranteed output, one proposal per call, streamed | accepted |
+| ADR-0007 | React Flow canvas with automatic layered layout; own the look; no modals | accepted |
+| ADR-0008 | Four testing layers; recorded responses so CI needs no key | accepted |
 | ADR-0009 | Conventional commits; numbered stacks; PR bases chained by agents, stacks assembled in the GitHub UI | accepted |
-| ADR-0010 | Polymarket and FRED as grounding sources; Metaculus and yfinance rejected | proposed |
+| ADR-0010 | Polymarket and FRED as grounding sources; Metaculus and yfinance rejected | accepted |
 | ADR-0011 | The spec is a book by idea; this file is the living technical counterpart to the PRD | accepted |
 
 ---

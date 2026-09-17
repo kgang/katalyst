@@ -1,6 +1,6 @@
 ---
 # ADR-0010: Ground market beliefs with Polymarket and FRED behind a GroundingSource protocol
-status: proposed
+status: accepted
 date: 2026-09-16
 decision-makers: Kent Gang
 consulted: docs/research/04-engineering-structure.md, docs/research/01-landscape-and-competitors.md

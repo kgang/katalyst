@@ -1,6 +1,6 @@
 ---
 # ADR-0008: Four test layers; the LLM boundary is tested with committed cassettes and CI needs no API key
-status: proposed
+status: accepted
 date: 2026-09-16
 decision-makers: Kent Gang
 consulted: docs/research/04-engineering-structure.md, docs/research/02-causal-modeling-formalisms.md

@@ -1,6 +1,6 @@
 ---
 # ADR-0004: Branches are ordered patch lists over an immutable base graph; do and observe are distinct
-status: proposed
+status: accepted
 date: 2026-09-16
 decision-makers: Kent Gang
 consulted: docs/research/02-causal-modeling-formalisms.md, docs/research/03-ui-ux-directions.md, docs/research/04-engineering-structure.md
