@@ -75,7 +75,7 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 | What | Value |
 |---|---|
 | Width | **280 px**, fixed, so the layout engine can place a tile before the browser has finished measuring its text |
-| Height | Clamped: at least 96 px, at most 216 px *(proposed here)*, both multiples of 8 |
+| Height | **Content-fit, clamped 152–272 px**, on the eight-pixel grid, and **computed from the content** — how many lines the claim takes, whether there are clippings, whether the tile carries its own reason. Never measured from the screen, so layout stays a pure function and one number sets the box, the claim's line clamp and the height handed to the layout engine |
 | Internal padding | **12 px** — `--space-1` plus `--space-hair`, the one half-step the spacing scale allows |
 | Every other margin and gap | From the eight-pixel scale: `--space-1`, `--space-2`, `--space-3` |
 | Border | One hairline at `--hairline`, which is 10% of the text colour |
@@ -87,7 +87,7 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 | # | Region | How it is drawn |
 |---|---|---|
 | 1 | **The claim** | `--font-interface`, `--text-md` (15 px), `--weight-medium`, `--text`. Wraps to at most **three lines**, then ellipsized — **never truncated mid-word**. The full sentence lives in the Inspector |
-| 2 | **Three belief chips** — model, user, market | A three-up row, always three, always in that order. Numbers in `--font-mono` with fixed-width digits, `--text-sm`, `--weight-medium`, `--text`; labels in `--text-muted` |
+| 2 | **Three belief chips** — model, user, market | A three-up row, always three, always in that order. Each chip is three stacked lines: owner, number, range. Numbers and ranges in `--font-mono` with fixed-width digits, `--text-sm`; the number `--weight-medium` in `--text`, the owner and the range `--weight-regular` in `--text-muted`. On a `not_tradeable` ending the market chip prints that claim's own stored reason beneath it — part of this region, not a seventh thing |
 | 3 | **Evidence clippings** | At most two. Each is a **letter monogram** plus one line: monogram in `--font-mono`, `--weight-semibold`, `--text-muted`; line in `--font-interface`, `--text-sm`, `--text-muted`, one line, ellipsized. A leading `+` or `−` says whether the item supports the claim or cuts against it |
 | 4 | **The resolve-by date** | `--font-mono`, `--text-sm`, `--text-muted`. The day we will know |
 | 5 | **A kind silhouette** | The tile's own outline, four of them. **Shape carries the kind; hue never does** |
@@ -112,30 +112,58 @@ All four differ in outline alone, so all four survive a greyscale screenshot and
 
 The three voices are stored and drawn separately and **never averaged** — INV-11, the product rule that says no code path merges them. If the model says `.61` and the market says `.48`, the gap is the thing worth trading, and `.545` is a number nobody holds.
 
-**The format is two significant figures and the range, always:** `.61 (.45–.74)`. Never `.6134`, never a bare `.61`. The rendering rule itself — how two significant figures is computed for awkward numbers like `.035`, and the fact that the range is never dropped — belongs to [`keyboard-and-access.md`](keyboard-and-access.md), which owns it for the whole part.
+**A chip is three stacked lines**: the owner, then the number, then the range beneath it.
 
-**The model chip's label is, word for word:**
+```
+model          user           market
+.61            —              .48
+.45–.74                       .45–.52
+```
+
+Stacked, because three numbers and three ranges strung along one line of a 280-pixel tile is a row of digits nobody parses. The one-line form `.61 (.45–.74)` is still the canonical spelling and is used everywhere the chip is not: in prose, in the outline view, and as the chip's own accessible name, so a screen reader hears one phrase rather than three fragments.
+
+**Two significant figures on the number and on both ends of the range, always.** Never `.6134`, and never a number with its range dropped. Two consequences worth naming here because they change what a reader sees: `.06` prints **`.060`**, because two figures means two figures; and a chip never prints `1.0` or `.0` — it prints **`>.99`** and **`<.01`**, because a chip that prints certainty has said something no elicited number earns. The rounding table and its awkward cases live in [`keyboard-and-access.md`](keyboard-and-access.md) B6, which owns the rule for the whole part.
+
+#### What the model chip says about its own range
+
+The range means *how sure we are of the number*, not how much the world can move — the second is already inside the likelihood, and a reader who confuses them reads a wide band as a volatile event. Which sentence says so depends on **whether anything actually computed this number**, and the world says: `WorldView` carries an optional `versions` — how many versions of the map the engine ran — defined in [`diff-view.md`](diff-view.md).
+
+**`versions` present — the number was computed.** The label and the hover are decision record 0014's, word for word:
 
 > **model interval, uncalibrated** · how sure we are of `.35` — not how much the world can move
 
-**and hovering it gives the sentence in full, word for word:**
-
 > "Across 2 000 versions of this map — each one a set of numbers this model would have stood behind — the answer landed between .20 and .49 eight times in ten. Nobody has checked whether that 8-in-10 holds up; no claim on this map has resolved yet."
 
-Only the numerals are substituted — `.35`, `.20` and `.49` are that chip's own `p`, `lo` and `hi`, rendered by the same two-significant-figure rule. Every other word is fixed. Two things that sentence does on purpose: it says *eight times in ten* rather than naming a percentile, and its last clause admits that nothing is calibrated. Neither is optional. The reason both matter is decision record 0014: the range says **how sure we are of the number**, not how much the world can move — the second is already inside the likelihood, and a reader who mixes them up will read a wide band as a volatile event.
+Only the numerals are substituted — `2 000` is `versions`, and `.35`, `.20` and `.49` are that chip's own `p`, `lo` and `hi` under the rounding rule. Every other word is fixed. Two things that sentence does on purpose: it says *eight times in ten* rather than naming a percentile, and its last clause admits that nothing is calibrated. Neither is optional.
 
-**The four states of a chip:**
+**`versions` absent — nothing computed this number.** The label and the hover are the *stated* pair, the same two sentences the Inspector prints under a prior:
+
+> **stated range · not computed**
+
+> "This range is stated, not computed — it says how sure the elicitation was. Nothing has worked this number through the map yet."
+
+**In this stack every chip shows the stated sentence**, because nothing here computes: the numbers come from the stored example, whose own comments call them illustrative. The day the engine's world route is switched on, `versions` arrives on the world and the computed sentence appears **with no change to this component** — which is the whole reason the choice is made from data rather than from a flag somebody remembers to set.
+
+**The states of a chip:**
 
 | State | What the chip shows | Where its reason is |
 |---|---|---|
-| A number | `.61 (.45–.74)`, with a small bar behind it painted from the likelihood ramp | — |
-| An empty `user` slot — `kind: "not_said"` | **—**, an em dash, and it is a control: it invites your own number | On the control: *"no number from you yet — say what you think"* |
-| An empty `market` slot — `kind: "no_market"` | **no market** | Beside the words, on the tile |
+| A number | the three stacked lines, with a small bar behind the number painted from the likelihood ramp | — |
+| An empty `user` slot — `kind: "not_said"` | **—**, an em dash, and it is a control: it invites your own number | The control's own label: *"no number from you yet — say what you think"* |
+| An empty `market` slot — `kind: "no_market"` | **no market**, and nothing else | The hover shelf, the accessible name and the Inspector |
 | No number yet — `kind: "no_engine"` | **no engine yet** | Beside the words, on the tile |
 
-An absence is never silent. Two of the three print their reason on the tile; the empty user slot keeps the tile quiet and carries its reason as the control's own label, which is what a hover shows and what a screen reader reads.
+**Why "no market" is two words and no more.** The tile is not the place for the explanation: on most maps most claims have no contract, and a sentence repeated down a column is noise that crowds out the claims. The reason is still one hover away, it is written once in [`../vocabulary.md`](../vocabulary.md) rather than composed per tile, and it is chosen by the claim's `kind`:
 
-And one state that replaces the number entirely: **while a claim is supposed, the chip shows the word** — *Supposed · Oct 1* — never `1.0` and never `.98`. A supposition is treated as a hard fact in every simulated world, so there is no number to show, and inventing one would answer a question the user did not ask.
+| `kind` | The reason a reader gets |
+|---|---|
+| `market` | "no venue quotes this claim; what you would trade is on the payoff" |
+| `event`, `hypothesis` | "no venue quotes this claim" |
+| `not_tradeable` | **its own stored reason, printed on the tile** — that one is a finding, not a gap |
+
+An absence is never silent, but *silent on the tile* and *silent* are different things: every absence carries its reason, on the tile or as the element's own accessible name, which is what a hover shows and what a screen reader reads.
+
+And one state that replaces the number entirely: **while a claim is supposed, the chip shows the word** — *Supposed · Oct 1* — never `1.0` and never `.98`. A supposition is treated as a hard fact in every simulated world, so there is no number to show, and inventing one would answer a question the user did not ask. (The engine does store `1.0` on such a claim so the path product has a factor to multiply; no surface but the path product ever reads it, and every other reader reads the claim's states and prints the word.)
 
 ### Typed ports
 
@@ -188,7 +216,7 @@ Strength is how far an arrow shifts its target's odds, on a scale where several 
 | 1.25 to under 2.25 | 3 px |
 | 2.25 and over | 4 px |
 
-**Words — five bands** *(proposed here — [`../graph/link.md`](../graph/link.md) anchors ±0.5, ±1.0, ±2.0 and ±3.0; this table fills the gaps between them and adds a band below 0.25)*, because prose can carry a distinction a hairline cannot.
+**Words — five bands**: [`../graph/link.md`](../graph/link.md)'s four anchors — ±0.5, ±1.0, ±2.0, ±3.0 — with the gaps between them filled and one band added below 0.25. Five rather than four because prose can carry a distinction a hairline cannot.
 
 | Size of `strength` | Positive | Negative |
 |---|---|---|
@@ -236,7 +264,7 @@ The lens **multiplies** the opacity already in place rather than replacing it. T
 
 The lens is transient — it follows the pointer and leaves nothing behind. Which tiles are on the path is **reachability**: follow arrows up and down from the hovered tile. Following arrows is not arithmetic.
 
-**The lens follows every wire, reflexive ones included.** A reflexive arrow is a market feeding back on the world, and it is still a wire you can walk, so a claim reached only through one is on the path and stays lit. That is deliberately not how the diff states are computed — those set reflexive arrows aside — because the lens is *navigation* and a diff state is a *claim about what an edit moved*. [`diff-view.md`](diff-view.md) states that rule once and says why.
+**The lens follows every wire, feedback arrows included.** The rule is written once, in [`../multiverse/interventions.md`](../multiverse/interventions.md): *the map the engine works through is the map with feedback arrows set aside; anything that asks "what can move" reads that map, and anything that asks "what can I walk to" reads the whole map.* The lens asks what you can walk to, so a claim reached only through a feedback arrow stays lit — while the diff states, which are a claim about what an edit moved, set those arrows aside. Every chapter cites that one sentence rather than deciding it again.
 
 ### The canvas does no arithmetic
 
@@ -257,8 +285,12 @@ Worked on the Hormuz map (the cast is in [`README.md`](README.md)), which is wha
 H draws at 280 px with its top-left corner cut. The claim, *"The Strait of Hormuz reopens to unrestricted commercial transit."*, fits on two lines. Below it, three chips:
 
 ```
-model   .35 (.22–.50)      user   .55 (.40–.70)      market   no market · no venue quotes this claim
+model          user           market
+.35            .55            no market
+.22–.50        .40–.70
 ```
+
+The market chip reads **no market** and nothing else; hovering it gives the reason for a hypothesis, *"no venue quotes this claim"*. Both numbered chips carry the **stated** label — *stated range · not computed* — because this world has no `versions`, and nothing has worked either number through the map.
 
 Two evidence clippings, each a monogram and a line: **B** `+ An Omani-mediated round is reported, with both sides attending.` and **L** `− Three tankers remain held and no release has been announced.` Then the resolve-by date, 1 November 2026 — the day we will know. No badges, because nothing has been done to this tile yet.
 
@@ -266,11 +298,11 @@ The chips are the whole argument in one row: the model says `.35`, the user said
 
 ### B2 — a tradeable ending, and the edge
 
-M1 draws with a ticket-stub bottom edge. Its chips read `model .61 (.45–.74)` and `market .48 (.45–.52)`, with the user slot an em dash inviting a number. The 13 points between the model and the market is the edge somebody would trade — shown as two chips side by side and never as one number, because the moment they are merged the reason for the screen is gone. The difference itself is named and computed on the thesis card, in a much later stack, and labelled a difference rather than a belief.
+M1 draws with a ticket-stub bottom edge. Its model chip reads `.61` over `.45–.74` and its market chip `.48` over `.45–.52`; the user slot is an em dash inviting a number. The 13 points between the model and the market is the edge somebody would trade — shown as two chips side by side and never as one number, because the moment they are merged the reason for the screen is gone. The difference itself is named and computed on the thesis card, in a much later stack, and labelled a difference rather than a belief.
 
 ### B3 — three kinds of absence, in one screenshot
 
-N1, the ending that cannot be traded, draws with an open dashed right edge and a market chip reading **no market** with the reason the fixture stores: *"No venue quotes a contract on a diplomatic round…"*. C's user chip is an em dash, and hovering it reads *"no number from you yet — say what you think"*. And on the second world of the diff, where this stack has no numbers at all, every model chip reads **no engine yet** with that as its reason.
+N1, the ending that cannot be traded, draws with an open dashed right edge and a market chip reading **no market** — and beneath it, on the tile, the reason the fixture stores: *"No venue quotes a contract on a diplomatic round…"*. That reason is printed rather than hidden because on a `not_tradeable` ending it is the finding, not a gap; on H and B the same chip says **no market** and keeps its reason on the hover. C's user chip is an em dash, and hovering it reads *"no number from you yet — say what you think"*. And on the second world of the diff, where this stack has no numbers at all, every model chip reads **no engine yet** with that as its reason.
 
 Three absences, three different sentences, and not one blank, zero or placeholder anywhere. That last one is the point of the design rather than an apology for it: numbers nobody computed are exactly the state a user cannot trace, so this stack ships none, and the slot says why it is empty instead.
 
@@ -319,9 +351,9 @@ Local numbers in this part are `INV-workbench.<n>`. This chapter holds **1 – 1
 
 ### INV-workbench.1 — The tile's geometry
 
-For every tile rendered from any map: its width is exactly 280 px, its height is between 96 and 216 px, every margin and gap is a value from the spacing scale, its border is one hairline at `--hairline`, and it casts no shadow.
+For every tile rendered from any map: its width is exactly 280 px; its height is computed from its content, lands between 152 and 272 px, and is a multiple of 8; every margin and gap is a value from the spacing scale; its border is one hairline at `--hairline`; and it casts no shadow. The height is never read back from the rendered element, so the same input always gives the same number.
 
-- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_is_280_wide_and_on_the_eight_pixel_grid`.
+- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_is_280_wide_and_on_the_eight_pixel_grid` and `test_tile_height_is_content_fit_within_152_and_272`.
 - **Also:** visual review checklist line 8 — measure the tile, do not eyeball it.
 
 ### INV-workbench.2 — The claim is never cut mid-word
@@ -338,17 +370,20 @@ For every tile: the rendered regions are exactly those in the six-things table, 
 
 ### INV-workbench.4 — Two significant figures, and the range, always *(refines INV-7)*
 
-For every belief rendered in a chip: the likelihood shows at most two significant figures, and the range is present.
+For every belief rendered in a chip: the likelihood and both ends of its range show at most two significant figures; the range is present; and the chip never prints `1.0` or `.0` — those print as `>.99` and `<.01`.
 
-- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_chip_never_shows_more_than_two_significant_figures` and `test_chip_never_omits_the_range`. This is decision record 0005's promised frontend rendering test, and it is the one test that holds the honesty requirement up — NFR-1: *every belief renders at two significant figures with its interval, never `.347`.*
+- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range` and `test_chip_never_prints_a_certainty`. This is decision record 0005's promised frontend rendering test, and it is the one test that holds the honesty requirement up — NFR-1: *every belief renders at two significant figures with its interval, never `.347`.*
 - **Also:** visual review checklist line 4 — is any number on screen showing more than two significant figures, or missing its range?
 
-### INV-workbench.5 — An absent number is an absence with a reason
+### INV-workbench.5 — Every number says where it came from, and every absence says why
 
-For every chip whose number is absent: the chip renders that absence's words, or its dash-with-invitation, **and** a non-empty reason — on the tile, or as the element's own accessible name — and renders no digit at all. There is no input for which the chip renders blank, `0`, or a stand-in value.
+Two statements, one subject: a chip never leaves a reader guessing what it is looking at.
 
-- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_every_absence_renders_words_and_a_reason`.
-- **Also:** visual review checklist line 5 — is there a number nobody computed, an empty slot filled in rather than left as an absence with a reason?
+- For every chip whose number is **absent**: the chip renders that absence's words, or its dash-with-invitation, **and** a non-empty reason, and renders no digit at all. The reason counts whether it is printed on the tile or carried as the element's own accessible name — and for every absence but a `not_tradeable` ending's, the accessible name is where it lives. There is no input for which the chip renders blank, `0`, or a stand-in value.
+- For every **model chip that has a number**: it renders the computed label and hover sentence exactly when the world carries `versions`, and the stated label and hover sentence exactly when it does not. There is no input for which it claims a computation over a number nothing computed.
+
+- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_every_absence_renders_words_and_a_reason` and `test_model_chip_says_computed_only_when_a_world_computed_it`.
+- **Also:** visual review checklist line 5 — is there a number nobody computed, an empty slot filled in rather than left as an absence with a reason, or a number whose origin cannot be named in one click?
 
 ### INV-workbench.6 — Three voices, never merged *(refines INV-11)*
 
@@ -415,8 +450,10 @@ For every module under `frontend/src/graph/` and for the tile and chip component
 
 *Raised 2026-09-17.*
 
-1. **The model chip's hover sentence names two thousand versions of the map — and in this stack the number came from the fixture.** The sentence is word for word what a *computed* number can say about itself. A number read from `beliefs.model` in the stored example was not computed by anybody, and the fixture says so in its own comments. As written, a hover over H would claim an arithmetic that has not run, which is precisely the state a user cannot trace. Two candidate fixes, neither decided here: the version count and the band come from the world and render as an absence with a reason when the world is a fixture; or the chip gains one extra sentence naming where its number came from. **Needs Kent.**
+1. **The model chip's hover sentence claimed an arithmetic that had not run.** Record 0014's sentence is word for word what a *computed* number may say about itself, and in this stack every number comes from the stored example, which computed nothing.
+   **Decided 2026-09-17 (Kent, K3):** two sentences, chosen by whether the world carries `versions`. The body of this chapter now gives both, word for word, and says that in this stack every chip shows the stated one. No flag, no per-tile copy, and nothing to remember to switch when the engine lands.
 2. **Two significant figures for an awkward number.** The table is in [`keyboard-and-access.md`](keyboard-and-access.md) B6; `.995` and `.06` are still open there.
-3. **The "no market" reason when the world carries none.** The fixture stores a reason only on the one not-tradeable ending. For H, C, B and R the chip falls back to the plain fact — *"no venue quotes this claim"* — which is true but generic. Should an unpriced claim carry its own sentence, and if so, who writes it?
-4. **How many badges fit.** The overridden-assertion badge is long — *Supposed · Oct 1 → Retracted · Oct 2 · by "…"* — and a 280-pixel tile with a three-line claim and a height clamp has room for roughly one such line. What happens to a tile carrying three badges is not settled.
+3. **The "no market" reason when the world carries none.**
+   **Decided 2026-09-17 (Kent, K7):** the tile says **no market** and nothing else; the reason lives on the hover, in the accessible name and in the Inspector, is written once in [`../vocabulary.md`](../vocabulary.md), and is chosen by the claim's `kind` — except on a `not_tradeable` ending, which keeps its own stored reason on the tile because that one is a finding. In the body above.
+4. **How many badges fit.** The overridden-assertion badge is long — *Supposed · Oct 1 → Retracted · Oct 2 · by "…"* — and even at the 272-pixel clamp a tile with a three-line claim has room for about one such line. What happens to a tile carrying three badges is not settled.
 5. **Two clippings from the same publisher** give the same monogram twice, and a host name that starts with a digit gives a monogram that reads as a number. A two-letter monogram fixes both and is harder to read at a glance.

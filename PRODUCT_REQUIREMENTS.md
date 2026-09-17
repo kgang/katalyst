@@ -176,7 +176,7 @@ The direction is D3. The research's "Instrument" craft rules (typography, color,
 
 ## 8. Non-functional requirements
 
-- **NFR-1 Honesty.** Beliefs render at two significant figures with their interval (`.35 (.2–.5)`), never `.347`. Every number is one click from rationale, sources, base rate.
+- **NFR-1 Honesty.** Beliefs render at two significant figures — the number and both ends of its range — with their interval (`.35 (.22–.50)`), never `.347`, and never as a certainty: what would round to `1.0` prints `>.99`, and what would round to `.0` prints `<.01`. Every number is one click from rationale, sources, base rate.
 - **NFR-2 Determinism.** Propagation is pure and seeded; the same `(graph, branch, seed)` yields byte-identical worlds.
 - **NFR-3 Tests.** The core graph code is property-tested (the Hypothesis library generates thousands of random graphs and shrinks any failure to a minimal example) against the invariants in §9; the model boundary is tested with recorded API responses ("cassettes") committed to the repo; evals run out-of-band on the four assignment examples. CI is green with no API key (INV-13).
 - **NFR-4 Docker.** `docker compose up` yields a working app; `docker compose watch` gives hot reload for both halves; a production-ish compose builds slim images with healthchecks. No database service in v1.

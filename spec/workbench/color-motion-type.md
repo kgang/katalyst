@@ -56,7 +56,7 @@ It is drawn in exactly two places: the fill of the small bar inside a belief chi
 
 1. **It never carries text.** A number is always drawn in `--text`, so it always clears 4.5 to 1. The ramp paints a bar, which is a meaningful graphic and needs 3 to 1. Each token carries its measured ratio in a comment, as every existing token does.
 2. **It never paints a whole tile.** Tile-wide brightness and opacity are already spent: [`diff-view.md`](diff-view.md) paints the old world faint and desaturates a killed claim, and the hover lens dims everything off the path. Three meanings on one channel means none of them reads.
-3. **Five steps are a glance, never a reading.** The exact number is printed beside the bar every time, so nobody is ever asked to tell `--p-2` from `--p-3` by eye.
+3. **Five steps are a glance, never a reading.** The bar sits behind the chip's number line, and the exact number and its range are printed every time, so nobody is ever asked to tell `--p-2` from `--p-3` by eye.
 
 ### Direction — and what is *not* direction
 
@@ -64,7 +64,7 @@ It is drawn in exactly two places: the fill of the small bar inside a belief chi
 
 The trap, and it is a live one on this map: **the sign of a push is not a direction of financial effect.** The arrow from *the strait reopens* to *Brent crude settles below $68* is `+1.6` — positive, because it makes that claim come out **true** more often — and the thing the claim describes is a **falling** price. Colour that arrow amber and you have said the opposite of what it means. A push's sign is carried by its printed sign and by a word (*toward* or *against*), never by a direction hue. The words are in [`tiles-ports-wires.md`](tiles-ports-wires.md).
 
-In this stack the direction channel has almost nothing to paint: there is no thesis card, no world-state strip, no live price, and the delta rail's `.61 → .18 ▼` needs the engine. The law is written now anyway, so that two unused tokens cannot be quietly borrowed for something else in the meantime.
+In this stack the direction channel has almost nothing to paint: there is no thesis card, no world-state strip, no live price, and the delta rail's `.61 → .18 ▼` needs the engine — as do its two columns, which read **how firm** and **same direction** on screen. The law is written now anyway, so that two unused tokens cannot be quietly borrowed for something else in the meantime.
 
 ### Tail risk — defined, and deliberately unused here
 
@@ -127,7 +127,7 @@ Worked on the Hormuz map (the cast is in [`README.md`](README.md)). This chapter
 
 The map draws. With no clicks at all a reader can tell four things:
 
-- **H is less likely than M1.** H's chip bar is `--p-1` (`.35`), M1's is `--p-3` (`.61`), and both print their number and range beside the bar.
+- **H is less likely than M1.** H's chip bar is `--p-1` (`.35`), M1's is `--p-3` (`.61`), and each chip prints its owner, its number and its range on three stacked lines over that bar.
 - **H → B is a strong one-time shove; C → B is a gentler standing one.** H → B is dot-dash (an `impulse`: a spike that fades) and three steps wide. C → B is solid (a `step`: switched on and held), doubled because it is a `sustain` arrow, and two steps wide.
 - **Nothing on this map has a document behind it.** Every arrow's tail mark shows two dots (`argued` — a mechanism was stated, nothing was fetched), except H → N1, which shows one (`asserted` — a story rather than a mechanism).
 - **No hue appears anywhere.** There is no financial direction to show yet, no tail is marked, and there is one branch. The base map is deliberately a monochrome picture.
@@ -229,5 +229,5 @@ For every piece of text rendered: its size is one of `--text-sm`, `--text-md`, `
 1. **Three teals on one screen.** `--accent` is a teal meaning "this is fine", `--focus` is a brighter teal meaning "the keyboard is here", and the branch palette adds a third. Either they are far enough apart to tell at a glance, or the branch teal is dropped for a fourth hue that is not amber. Needs settling when the branch tokens are written, in pull request 3.
 2. **The five `--p-n` values, and the light theme.** Five brightness steps clearly distinguishable against near-black are easy; five against white are harder, because a light surface leaves less room beneath it before a bar reads as flat black. Whether the light ramp runs the same direction or inverts is not settled.
 3. **What branch creation actually animates.** The budget spends one of its three moves on it and nothing says which property moves. Proposed above: the lane colour and the name chip arriving over about 200 milliseconds, with no bounce.
-4. **Does the hatch survive being zoomed out?** `--tail` repeats every 4 pixels; below about 0.6 zoom that is a grey smear, which is a texture that has stopped being one. [`layout-and-zoom.md`](layout-and-zoom.md) owns the threshold, and the hatch may need a coarser variant or the tail marking may need to become a glyph when zoomed out. Nothing in this stack draws a tail, so it can wait — but not past the stack that does.
+4. **Does the hatch survive being zoomed out?** `--tail` repeats every 4 pixels, so at the zoom floor of `11/22 = 0.5` it is a grey smear — a texture that has stopped being one. The thresholds are [`layout-and-zoom.md`](layout-and-zoom.md)'s and are derived rather than chosen: summary tiles below `11/13 ≈ 0.85`, floor at `0.5`, both consequences of "text never below 11 pixels". The hatch may need a coarser variant, or the tail marking may need to become a glyph when zoomed out. Nothing in this stack draws a tail, so it can wait — but not past the stack that does.
 5. **The hover lens dims to 15%; the ghost world paints at 20%.** Both are opacity, one channel carrying two meanings. [`diff-view.md`](diff-view.md) owns the ghost's value and the rule that the lens *multiplies* what is already there rather than replacing it, so an off-path ghost lands near 3% and disappears. Both are proposals pending Kent; what is settled here is only that one channel may not carry two meanings without such a rule.

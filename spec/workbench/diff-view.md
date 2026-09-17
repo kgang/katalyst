@@ -63,7 +63,8 @@ export interface Absence {
   reason: string;
 }
 
-/** `shifted` needs two numbers, so it arrives with the engine and is never produced here. */
+/** `killed` is forced false, full stop. `shifted` needs two numbers, so it arrives with the
+    engine and is never produced here. */
 export type DiffState = "added" | "killed" | "downstream" | "untouched" | "shifted";
 
 /** `branchId: null` is the base world, the empty branch; the seed makes a world replay. */
@@ -76,6 +77,9 @@ export interface WorldView {
   links: LinkView[];
   terminals: DeltaRow[];        // what the delta rail draws
   headline: Known<string>;      // the one-line plain-English diff (FR-16)
+  /** How many versions of the map the engine ran to produce these numbers.
+      Absent when nothing was computed — which is what picks the chip's sentence. */
+  versions?: number;
 }
 
 /** One claim as this stack reads it. `TileProps` and `ClaimDetail` are projections of it. */
@@ -104,7 +108,7 @@ export interface LinkView {
   lag: number;                           // days
   shape: "impulse" | "step" | "ramp";
   halfLife: number | null;               // impulse only
-  reflexive: boolean;
+  reflexive: boolean;                    // a feedback arrow: a market acting back on the world
   rationale: string;
   sources: readonly { url: string; title: string; retrieved: Known<string> }[];
   provenance: "documented" | "historical" | "market_implied"
@@ -116,8 +120,8 @@ export interface DeltaRow {
   claimId: string;
   label: string;                                     // the terminal's own words
   move: Known<{ from: number; to: number; largestOn: string }>;
-  rangeWidth: Known<number>;                         // how firm the number is
-  agreement: Known<number>;                          // share of versions moving the same way
+  rangeWidth: Known<number>;   // "how firm": the width of the new world's own range on this claim
+  agreement: Known<number>;    // "same direction": the share of versions that moved the same way
 }
 ```
 
@@ -131,7 +135,8 @@ takes one. `TileProps` and `WireProps` there, and `ClaimDetail` and `LinkDetail`
 
 **One field, two spellings, said once here.** The server's wire name is `range_width`; the view
 model's is `rangeWidth`. Same number, and neither is ever shown — the rail's column is headed **how
-firm**.
+firm**. Likewise the field `agreement`, whose column reads **same direction**: the bare word
+*agreement* is left free on screen for stack 04's run-to-run number.
 
 ### Component props
 
@@ -182,44 +187,44 @@ and **every one is computed from the branch alone**:
 | State | Computed from the branch by | Drawn as |
 |---|---|---|
 | `added` | The claim arrives in an `insert` | Solid, with an accent ring |
-| `killed` | The claim is the target of a **Suppose this is false**, or the edits leave it with no path from the hypothesis | Ghosted, struck through, desaturated |
+| `killed` | The claim is the target of a **Suppose this is false** — full stop | Ghosted, struck through, desaturated |
 | `downstream` | The claim is in the affected set of at least one edit — a claim your change **can** move | Drawn live, its number slot reading *"no engine yet"* |
 | `untouched` | Everything else. Byte-identical, and the canvas can say so without hedging | Neutral |
 
-**Following arrows is reachability, not arithmetic.** No strength is added, no likelihood is moved,
-no shape is evaluated. Which claims each operation reaches is the affected-set table in
-[`../multiverse/interventions.md`](../multiverse/interventions.md); the browser reads that table.
+**`killed` means forced false and nothing else** (Kent, 2026-09-17). "No path from the hypothesis
+reaches this claim any more" is a fact about a *route*, not a state of a claim, and the Inspector's
+path bar reports it in those words. No claim is ever **only in A**, either, because no edit removes
+one. Nothing in the Hormuz bundle supposes a claim false, so `killed` is drawn but not exercised by
+the worked example; a unit test over a hand-built branch covers it.
 
-**Which arrows count — the rule, stated once** *(proposed here, pending Kent)*. Reachability for
-diff states is computed over the map the loop check sees — **reflexive arrows set aside** — because
-in this version of the engine a reflexive arrow is carried as data and never worked through (it is
-unrolled in stack 06), so nothing an edit does can travel along one. The hover lens, `h`/`l` and the
-outline follow **every** wire, reflexive ones included, because they are navigation and not a claim
-about what an edit moved. When stack 06 unrolls reflexive arrows, this rule and the server's
-affected set change together.
+**Following arrows is reachability, not arithmetic** — no strength is added, no likelihood is
+moved, no shape is evaluated. Which claims each operation reaches, and which arrows count, are both
+settled in [`../multiverse/interventions.md`](../multiverse/interventions.md): the affected-set
+table, and one named rule — *the map the engine works through is the map with feedback arrows set
+aside*. Anything asking **what can move** reads that map, these diff states included; anything
+asking **what can I walk to** reads the whole map — the hover lens, `h`/`l`, the outline.
 
 On the strike branch: **S** is `added`; **H** is `downstream`, because S → H was inserted *after*
 the supposition on H and so is live; **C** and **B** are `downstream` from H and again directly from
-S; **N1** through H → N1; **M1** and **M2** from B. And, resting on the rule above:
+S; **N1** through H → N1; **M1** and **M2** from B. And, as a consequence of that rule:
 
 > **R — *OPEC+ announces output restraint* — is `untouched`. Nothing on this branch can reach it.**
 
-R's only incoming arrow is B → R, the **reflexive** arrow — the feedback from a price outcome back
-onto what producers do. Set it aside and R has no incoming arrow at all: an ancestor of B, never a
-descendant of anything this branch touches. So the screen can say out loud: *your strike moves the
-oil price, the insurance premium, both contracts and the diplomatic ending — and it cannot move
-OPEC's announcement.* That sentence is the product, and `INV-workbench.41` and `.42` below pin it.
+R's only incoming arrow is B → R, the **feedback** arrow — a price outcome acting back on what
+producers do. Set aside, R has no incoming arrow at all: an ancestor of B, never a descendant of
+anything this branch touches. So the screen can say out loud: *your strike moves the oil price, the
+insurance premium, both contracts and the diplomatic ending — and it cannot move OPEC's
+announcement.* That sentence is the product, and `INV-workbench.41` and `.42` below pin it.
 
 ### B3 — The fifth state arrives with the engine, and nothing is deleted
 
 `shifted` — `.61 → .18` with a directional chevron — needs two numbers to compare, so it cannot
 exist here. When `ApiWorldSource` is switched on in stack 04 the empty slots fill and `shifted`
-appears. **Nothing written in this stack is deleted then, because nothing false was written.**
-
-The authority then changes hands: the server's `affected_set` becomes the truth and the browser's
-structural states become a **hint that must agree with it**, pinned by a component test on the
-Hormuz branch. A browser quietly disagreeing with the engine about what an edit reached is the
-traceability veto wearing a disguise.
+appears. **Nothing written in this stack is deleted then, because nothing false was written.** The
+authority changes hands: the server's `affected_set` becomes the truth and the browser's structural
+states become a **hint that must agree with it**, pinned by a component test on the Hormuz branch. A
+browser quietly disagreeing with the engine about what an edit reached is the traceability veto
+wearing a disguise.
 
 ### B4 — A ⇄ A′ is a hard switch, never a crossfade
 
@@ -237,13 +242,15 @@ line each, in the order the engine gave them:
 
 > the Polymarket Brent contract · `.61 → .18` ▼ · largest on Oct 9
 
-with **two columns that are never folded into the rank**. On screen they are headed **how firm** and
-**agreement** *(proposed here)*; `rangeWidth` and `agreement` are field names and never appear:
+That order is the size of the move times the **weakest arrow on the best-backed route** from any of
+the branch's edits to that ending — the route whose weakest arrow is strongest. Two factors and no
+more; the engine computes it, the rail renders it in the order given, and beside it sit **two
+columns that are never folded into the rank**:
 
-| Column | The question it answers |
-|---|---|
-| **how firm** | *How firm is this number?* How wide the band is — how much more homework could still move it |
-| **agreement** | *Did it point the same way whatever numbers we started from?* The share of the 2 000 versions of the map that moved in the same direction |
+| Column on screen | The question it answers | Field |
+|---|---|---|
+| **how firm** | *How firm is this number?* The width of the new world's own range on that claim — the same quantity the tile shows, so the rail and the tile cannot disagree | `rangeWidth` |
+| **same direction** | *Did it point the same way whatever numbers we started from?* The share of the 2 000 versions of the map that moved in the same direction | `agreement` |
 
 Different questions, weighed separately by a trader, which is why they are columns and not one
 score. Folding width into the rank would sink exactly the claims that most deserve attention.
@@ -253,16 +260,21 @@ terminals the edit can reach, in **map order**, each with an absence and a reaso
 will go:
 
 ```
-                                                   change          how firm    agreement
-M1  Polymarket "Brent below $70 on 2026-10-31"     no engine yet   —           —
-M2  XLE underperforms SPY by more than 3%          no engine yet   —           —
-N1  Omani-mediated talks resume                    no engine yet   —           —
+                                                   change          how firm   same direction
+M1  Polymarket "Brent below $70 on 2026-10-31"     no engine yet   —          —
+M2  XLE underperforms SPY by more than 3%          no engine yet   —          —
+N1  Omani-mediated talks resume                    no engine yet   —          —
 ```
 
 Each dash carries the same reason as the change beside it: no engine yet. All three endings are
 reachable here, so all three are listed; R is not a terminal and never appears. **A rail that
 invented an ordering would be inventing the one thing the rail exists to tell you** — map order is
 visibly arbitrary and says so; a fabricated ranking looks like an answer.
+
+**The one-line summary above the rail** (FR-16) has a fixed second form for the case where the rail
+has nothing to report: *"<edit> moves no ending and leaves <n> claims untouched."* Both forms are
+sentences the world carries. Before the engine the summary is an absence with its reason, like every
+other computed thing on this screen.
 
 ### B6 — UX-14: an assertion a later edit overrode says so
 
@@ -283,17 +295,19 @@ series is data, never inference** — and this stack has some of it and not the 
 | **Supposed · Oct 1** | Oct 1; H shows the word, not a number | The assignment itself: an earlier supposition on H, with its date | **No** — the branch carries it |
 | **Retracted · Oct 2 · by "…"** | Oct 2 | A `sustain` arrow into H inserted afterwards, and the later edit that makes its source true; the quoted words are S's own `claim` field | **No** — structure and dates, the same reachability the four states use |
 | **withdrawn** | Oct 2 – Oct 4, `.35`, labelled *"withdrawn — no live push yet"* | The `states` series: the cause of the opposing arrow became true on the 2nd, so we stop taking the user's word; S → H's three-day delay has not run | **Yes** |
-| **pushed** | Oct 5 onward, about `.07` | The `states` series: the delay has run and S → H's −1.9 push lands on the prior | **Yes** |
+| **pushed** | Oct 5 onward, about `.070` | The `states` series: the delay has run and S → H's −1.9 push lands on the prior | **Yes** |
 
 So in this stack H's tile carries the badge pair and its order, its number slot reads *"no engine
 yet"*, and the series is absent with its reason. As with the affected set, the browser's derived
-badge becomes a hint the world must agree with once the engine lands.
+badge becomes a hint the world must agree with once the engine lands. (`.070`, not `.07`: two
+significant figures on every number, the rule [`keyboard-and-access.md`](keyboard-and-access.md)
+owns.)
 
-**The three-day gap between the badge's date and the day the number moves is honest, not a rounding
-error to be smoothed away.** A supposition ends the day its undermining *cause* becomes true, not
-the day that arrow's push arrives — otherwise "do I still take your word for this" would hang on a
-delay parameter, and changing a lag from three days to thirty would let the supposition outlive the
-news (decision record 0014).
+**The three-day gap between the badge's date and the day the number moves is honest, not something
+to smooth away.** A supposition ends the day its undermining *cause* becomes true, not the day that
+arrow's push arrives — otherwise "do I still take your word for this" would hang on a delay
+parameter, and changing a lag from three days to thirty would let the supposition outlive the news
+(decision record 0014).
 
 ### B7 — The branch panel: a sequence, not a surprise
 
@@ -357,15 +371,15 @@ a state and no state is read from a number. *Test:* diffState ›
 
 **INV-workbench.42 — what an edit cannot reach is said so.** For every claim outside the affected
 set of every edit in the branch, the state is `untouched`. On the Hormuz strike branch that set is
-exactly `{R}` — **which rests on the reflexive rule in B2** and changes with it. *Tests:* diffState ›
-`test_r_comes_out_untouched`; `frontend/e2e/hormuz.spec.ts` ›
+exactly `{R}`. *Tests:* diffState › `test_r_comes_out_untouched`; `frontend/e2e/hormuz.spec.ts` ›
 `test_the_fully_separated_claim_does_not_change`.
 
 **INV-workbench.43 — the browser never out-votes the engine.** For the Hormuz branch, every state
-the browser computed equals the state derived from the server's `affected_set` — which holds only
-while both set reflexive arrows aside, as B2 proposes. Until stack 03a lands the test is skipped
-with its reason written in it, never deleted. *Test:* diffState ›
-`test_agrees_with_the_servers_affected_set`.
+the browser computed equals the state derived from the server's `affected_set`. Both read the map
+with feedback arrows set aside, which is why they can agree at all; the day stack 06 unrolls them,
+`test_a_feedback_arrow_never_carries_a_change` in the domain fails loudly and points at the one
+sentence to change. Until stack 03a lands this test is skipped with its reason written in it, never
+deleted. *Test:* diffState › `test_agrees_with_the_servers_affected_set`.
 
 **INV-workbench.44 — `shifted` is never produced without two numbers.** For every pair of worlds in
 which either side's likelihood is absent, no claim is `shifted`. *Test:* diffState ›
@@ -381,9 +395,9 @@ checklist line 5**.
 renders the reachable terminals in the order the base map stores them, independent of every number
 on the world. *Test:* deltaRail › `test_lists_reachable_terminals_in_map_order`.
 
-**INV-workbench.47 — how firm and agreement are never folded into the rank.** For every rail row the
-two are rendered as their own columns, and no ordering function reads either. *Test:* deltaRail ›
-`test_never_sorts_by_width_or_agreement`.
+**INV-workbench.47 — how firm and same direction are never folded into the rank.** For every rail
+row the two are rendered as their own columns, and no ordering function reads either. *Test:*
+deltaRail › `test_never_sorts_by_width_or_agreement`.
 
 **INV-workbench.48 — a supposed claim shows the word.** For every claim under a live supposition,
 the tile renders **Supposed · date** where a likelihood would go and renders no likelihood for it at
@@ -420,9 +434,9 @@ review checklist line 11**.
    about which change matters most, and an invented one is a lie in the exact place the reader came
    for the truth. **Instead:** map order, visibly arbitrary, until the engine supplies its own.
 
-5. **Do not render a supposed claim as `1.0`, `.98` or a full bar.** *Because* a number invites the
-   reader to wonder about the missing two per cent, and there is no such uncertainty. **Instead:**
-   the word, and its date.
+5. **Do not render a supposed claim as `1.0`, `.98`, `>.99` or a full bar.** *Because* a number
+   invites the reader to wonder about the missing two per cent, and there is no such uncertainty.
+   **Instead:** the word, and its date.
 
 6. **Do not let a button move a number in this stack, and do not rewrite an edit in place.**
    *Because* a canvas that computes its own likelihoods is a second engine, and two engines
@@ -433,29 +447,11 @@ review checklist line 11**.
 
 ## Open questions
 
-*Raised 2026-09-17.*
+*Raised 2026-09-17. Four questions this chapter opened were settled by Kent the same day and now
+read as statements in the body: which arrows carry a change (B2), what `killed` means (B2), which
+columns the rail shows (B5), and what the one-line summary says when nothing moved (B5).*
 
-1. **Does a reflexive arrow carry reachability?** **Proposed in B2:** it does not — reachability is
-   computed over the map the loop check sees, reflexive arrows set aside, because this version of
-   the engine never works one through; navigation still follows them. That is what makes **R**
-   `untouched` on the strike branch, and stack 03a is being asked to set them aside in
-   `affected_set` too so the two agree. **Kent has the last word.** If the answer goes the other
-   way, R becomes `downstream`, `INV-workbench.42` and `.43` change with it, and the demo loses its
-   clearest sentence.
-
-2. **Is `killed` reachable on any branch we ship?** Nothing in the Hormuz bundle forces a claim false
-   or cuts one off from the hypothesis, so the state is drawn but never exercised by the worked
-   example. Either a second fixture branch earns it, or a unit test over a hand-built branch covers
-   it.
-
-3. **How does the ghost paint a claim that is both `killed` and only in A?** `killed` is ghosted,
-   struck through and desaturated; the A painting is already 20% and dashed, and the two together
-   may be invisible. That wants an eye on a screenshot, not a rule written in advance.
-
-4. **What does the one-line plain-English diff say before the engine?** FR-16 asks for a sentence,
-   and half of any such sentence is about numbers this stack does not have. A structural half may be
-   useful, or worse than an absence with a reason.
-
-5. **Does the retraction badge need the world, or is the branch enough for good?** This stack derives
+1. **Does the retraction badge need the world, or is the branch enough for good?** This stack derives
    it from the branch. Once the world carries the retraction, two derivations of one line exist, and
-   one should become the only one — probably the world's.
+   one should become the only one — probably the world's. **Owner:** stack 04, when
+   `ApiWorldSource` is switched on.

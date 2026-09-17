@@ -53,25 +53,13 @@ interface ClaimDetail {
   rangeShares?: Record<string, number>;// the reserved band slot; stack 06, nothing reads it here
   pathProduct: Known<PathProduct>;     // INV-8; arrives on the world, never multiplied here
 }
-
-/** The arrow half. See "a push", below, for what `strength` is. */
-interface LinkDetail {
-  rationale: string;                   // the mechanism, one to three sentences
-  strength: number;
-  mode: "trigger" | "sustain";
-  lag: number;                         // days
-  shape: "impulse" | "step" | "ramp";
-  halfLife: number | null;             // impulse only
-  reflexive: boolean;
-  sources: readonly { url: string; title: string; retrieved: Known<string> }[];
-  provenance: "documented" | "historical" | "market_implied"
-            | "argued" | "user" | "asserted" | "simulated";
-}
 ```
 
-`Known<T>` and `Absence` — a value, or a kind of absence with the sentence that goes beside it — are
-defined once in [`diff-view.md`](diff-view.md). Every optional value on this panel is one, so no
-code path can render an absence as anything but its reason.
+`LinkDetail` is `LinkView` with nothing added and nothing left out: the panel draws `rationale`,
+`strength`, `mode`, `lag`, `shape`, `halfLife`, `sources` and `provenance`, in that order — B4 shows
+the result. `Known<T>` and `Absence` — a value, or a kind of absence with the sentence that goes
+beside it — are defined once in [`diff-view.md`](diff-view.md); every optional value here is one, so
+no code path can render an absence as anything but its reason.
 
 **A push**, which the panel shows for every arrow, is a link's `strength`: a signed amount added on
 the **log-odds scale** — the scale on which separate influences add up instead of multiplying. A
@@ -79,10 +67,9 @@ positive push moves the claim at the arrow's head toward coming true; a negative
 
 **Tokens read:** `--surface-raised` (the panel), `--hairline` (its one edge and its rules), `--text`
 and `--text-muted`, `--font-mono` for every number, `--space-1` … `--space-4`, the likelihood ramp
-`--p-0` … `--p-4`, `--accent`, `--focus`. All are defined in
-[`color-motion-type.md`](color-motion-type.md); this chapter defines none. A direction is rendered
-only through `DirectionReadout`, which owns those tokens
-([`color-motion-type.md`](color-motion-type.md)).
+`--p-0` … `--p-4`, `--accent`, `--focus` — all defined in
+[`color-motion-type.md`](color-motion-type.md), where a direction is also rendered only through
+`DirectionReadout`, which owns those tokens. This chapter defines none.
 
 **Shared components:** `OriginMark` (the three-step provenance mark) and the belief chip. Each is
 **one component**, drawn by the wire and the tile as well, so the mark on a wire and the word in
@@ -95,11 +82,6 @@ this panel cannot drift apart.
 Worked on the Hormuz map (the cast is in [`README.md`](README.md)). This chapter uses **B** *Brent
 crude settles below $68 for five sessions* — the busiest claim on the map, three arrows in (**H**,
 **C**, **R**) and three out (**M1**, **M2**, and back to R) — and the arrow **H → B**.
-
-**One note on B's numbers.** The `.46 (.30–.63)` below is the fixture's stored illustrative value
-today. Stack 03a is changing the fixture so every `beliefs.model` equals its own `prior` — *nothing
-computed yet* — after which this row reads the prior's numbers. Nothing in this chapter rests on
-`.46`.
 
 ### B1 — A claim, top to bottom
 
@@ -119,16 +101,12 @@ BASE RATE
 
 PRIOR
   .28 (.15–.42)          model
-  the prior's range is stated, not computed — it says how sure the
-  elicitation was
 
 BELIEFS
   model    .46 (.30–.63)
-  model interval, uncalibrated · how sure we are of .46 — not how much
-  the world can move
-  ┌ why is this band wide? ────────────────────────────────┐
-  │  (reserved — ships in stack 06)                        │
-  └────────────────────────────────────────────────────────┘
+  stated range · not computed
+  This range is stated, not computed — it says how sure the elicitation
+  was. Nothing has worked this number through the map yet.
   user     —
   market   no market · no venue quotes this claim
 
@@ -143,20 +121,28 @@ Four things to read off that:
 
 * **The resolution triple is never optional.** Criteria, the source that adjudicates, and the date —
   all three, on every claim (INV-1, *checkable*: a claim nobody can score is not a claim).
-* **Four things are genuinely absent on B, and each absence says which kind it is.** "No venue
-  quotes this" is a *finding* — it drives a chain toward an ending nobody can trade — not a missing
-  field. The **user** slot is the one absence drawn as a bare dash: an invitation to type your own
+* **Which sentence sits under the model row is decided by one field.** `WorldView.versions` — how
+  many versions of the map the engine ran — is present only when something was computed. **Absent**,
+  as here and everywhere in this stack, the row reads the **stated** pair above and **the reserved
+  band slot is not drawn at all**: there is no computed band for it to explain. **Present**, the row
+  reads record 0014's *model interval, uncalibrated · how sure we are of `.46` — not how much the
+  world can move*, and the slot appears beneath it. The two sentences are written once and shared
+  with the belief chip ([`tiles-ports-wires.md`](tiles-ports-wires.md)) so they cannot drift. The
+  stated form is literally true of B: stack 03a's fixture change makes every `beliefs.model` equal
+  its own `prior`, so `.46 (.30–.63)` becomes the prior's numbers and the sentence describes exactly
+  what the row holds.
+* **Four things are genuinely absent on B, and each absence says which kind it is.** The **tile**
+  shows `no market` and nothing else; **this panel is where the reason is read** — chosen by the
+  claim's `kind` and written once in [`../vocabulary.md`](../vocabulary.md). B is an `event`, so it
+  reads *"no venue quotes this claim"*; a `market` claim adds *"; what you would trade is on the
+  payoff"*; a `not_tradeable` ending has its own stored reason, which is a finding and stays on its
+  tile too. The **user** slot is the one absence drawn as a bare dash: an invitation to type your own
   number, where a sentence would read as an error rather than an offer.
 * **Three beliefs, three owners, never merged** (INV-11). On B only the model has spoken; on **M1**
   all three do — `model .61 (.45–.74)`, `market .48 (.45–.52)`, `user —` — and the thirteen points
   between the first two is the edge somebody would be trading. That gap is the product's output, and
-  no function anywhere may average it away.
-* **The uncalibrated label belongs to the *computed* number, not the prior.** Decision record 0014
-  defines it for a likelihood the engine worked out, so it sits under the model row and substitutes
-  that row's number. A wide range never means the event is more volatile; it means more homework
-  would move our number. The chip and its hover sentence are
-  [`tiles-ports-wires.md`](tiles-ports-wires.md)'s; the panel repeats the label because the reserved
-  slot sits directly under it.
+  no function anywhere may average it away. The panel writes a belief on one line; the **tile**
+  stacks it — owner, number, range beneath ([`tiles-ports-wires.md`](tiles-ports-wires.md)).
 
 ### B2 — The decomposition: a number that can say why
 
@@ -177,17 +163,19 @@ Three rules about it:
 
 ### B3 — The reserved slot: "why is this band wide?"
 
-Directly under the model belief's range there is a slot, and **in this stack it is empty**. What it
-will hold, in stack 06, is one sentence naming the claim whose own starting number explains most of
-the band:
+Where the model row carries a *computed* band — that is, where `WorldView.versions` is present —
+there is a slot directly under it, and **in this stack nothing ever draws it**, because nothing is
+computed yet. What it will hold, in stack 06, is one sentence naming the claim whose own prior
+explains most of the band:
 
-> **92% of this band is B's own starting number; pin that down and the band goes from 29 points
-> to 8.**
+> **92% of this band is B's own prior; pin that down and the band goes from 29 points to 8.**
 
 That sentence is computed from `World.range_shares` — each stated range's share of this claim's
 band, which the engine gets out of the same two thousand versions of the map it already runs, at no
 extra cost. It is the honest answer to *where should I spend the next hour of research*, and it
-replaces the older sensitivity-times-width ranking (FR-21, decision record 0014 §C).
+replaces the older sensitivity-times-width ranking (FR-21, decision record 0014 §C — both amended
+2026-09-17 to say *prior* rather than *base rate*, because B has no base rate and what varies
+between versions is the prior).
 
 **It ships in stack 06, not here.** In this stack the panel leaves the slot in place, leaves a
 comment in the component naming `range_shares` and pointing at this paragraph, and **renders
@@ -224,11 +212,12 @@ WHERE IT CAME FROM
 
 * **The push is read back in words as well as a number.** `+1.6 — a strong push toward` is data
   already on the link and needs no arithmetic, which is why the wire's midpoint chip can show it
-  before the engine exists. The five bands the words come from are proposed in
-  [`tiles-ports-wires.md`](tiles-ports-wires.md) and this panel uses them: on this map `+0.7` reads
-  *a nudge toward*, `−0.4` *a nudge against*, `−2.4` *a strong push against*. The chip writes
-  `+1.6 · a strong push toward` and the panel `+1.6 — a strong push toward`; that difference is the
-  plan's.
+  before the engine exists. The words come from the **five bands** in
+  [`tiles-ports-wires.md`](tiles-ports-wires.md) — [`../graph/link.md`](../graph/link.md)'s four
+  anchors with the gaps filled and one band below 0.25 (Kent, 2026-09-17) — and this panel uses
+  them: on this map `+0.7` reads *a nudge toward*, `−0.4` *a nudge against*, `−2.4` *a strong push
+  against*. The chip writes `+1.6 · a strong push toward` and the panel `+1.6 — a strong push
+  toward`; that difference is the plan's.
 * **Mode is a sentence, not a word to look up.** `trigger` is the domino; `sustain` is the desk
   holding the apple — remove the desk and the apple falls, which is the arrow that makes the Hormuz
   showcase work.
@@ -249,24 +238,36 @@ reaches — a real outcome nobody can trade — is worth saying out loud.
 ### B5 — The path-product bar (INV-8)
 
 Select a claim and a bar appears beside the story sentence showing the **multiplied-out likelihood
-of the steps in the path from the hypothesis to it**. A chain of four plausible steps is not a
-plausible chain, and the product is the number that says so. Selecting **M1**:
+of the steps of one route from the hypothesis to it**, and naming those steps. A chain of four
+plausible steps is not a plausible chain, and the product is the number that says so.
+
+**Which route: the best-backed one** — over every route from the hypothesis to the claim, the one
+whose *weakest arrow is strongest*. That is the same route the delta rail's ranking uses
+([`diff-view.md`](diff-view.md)), so the product has one path-choosing rule in the whole product,
+used twice. On Hormuz, M1 is reached by `H → B → M1` and by `H → C → B → M1`; every arrow on both is
+`argued`, so their weakest arrows tie, and the tie goes to **the shorter** *(proposed here — the
+rule for ties belongs in `spec/multiverse/diff.md`, which stack 03a writes)*. The bar shows
+`H → B → M1`:
 
 ```
-H → C → B → M1        the strait reopens, insurers reprice, Brent settles
-                      below $68, and the Polymarket contract resolves YES
+H → B → M1            the strait reopens, Brent settles below $68, and the
+                      Polymarket contract resolves YES
 path likelihood       —  no engine yet
 ```
 
 * **The product arrives on the world. This stack renders it and never multiplies anything itself.**
   If it is absent the bar says so with its reason; it does not fall back to computing.
-* **When no path is shown the bar reads "no path shown".** It never disappears, because a missing
-  bar looks like a bar nobody needed.
+* **Three things the bar can say, and they are not the same thing.** The number, when there is one.
+  **"no path shown"** — nothing is selected, or no route was asked for; the absent-number case.
+  **"no path from the hypothesis reaches this claim any more"** — a fact about the map after your
+  edits, and the place that fact now lives: it stopped being a diff state on the tile (Kent,
+  2026-09-17) because it is a property of the *route*, not of the claim. The bar never disappears; a
+  missing bar looks like a bar nobody needed.
 * **The honest wart, stated beside the number rather than hidden:** the factors are each read on
-  their **own resolve-by day** — H by Nov 1, C by Oct 31, B by Nov 15, M1 by Oct 31 — so the product
-  multiplies numbers read on different days. It is still the most honest single number available for
-  a chain, and **it is not a joint probability**. The panel says that in those words (decision
-  record 0014 §E).
+  their **own resolve-by day** — H by Nov 1, B by Nov 15, M1 by Oct 31 — so the product multiplies
+  numbers read on different days. It is still the most honest single number available for a chain,
+  and **it is not a joint probability**. The panel says that in those words (decision record
+  0014 §E).
 
 ### B6 — Every number is one click from its why
 
@@ -318,9 +319,11 @@ number displayed is derived by arithmetic in the browser; each is a field on the
 map. In particular the decomposition renders only when `decomposition` is present, and no line of it
 is computed here. *Test:* inspector › `test_never_derives_a_displayed_number`.
 
-**INV-workbench.55 — the reserved band slot renders nothing in this stack.** For every claim, the
-"why is this band wide?" slot renders no text, and no component reads `range_shares`. *Test:*
-inspector › `test_the_band_slot_is_empty`.
+**INV-workbench.55 — which sentence, and the band slot.** For every claim, the sentence under the
+model row is the stated one when `WorldView.versions` is absent and record 0014's when it is
+present, and the "why is this band wide?" slot is drawn only in the second case. In this stack no
+component reads `range_shares` and the slot never renders. *Tests:* inspector ›
+`test_picks_the_sentence_from_versions`, `test_the_band_slot_is_never_drawn_without_versions`.
 
 **INV-workbench.56 — the mark and the word come from one component.** For every one of the seven
 provenance values, the mark beside the word in this panel is produced by the same `OriginMark`
@@ -328,9 +331,11 @@ component the wire renders, from the same input. *Test:* inspector ›
 `test_the_panels_mark_matches_the_wires_mark`; **visual review checklist line 3**.
 
 **INV-workbench.57 — the path bar renders, never multiplies.** For every selected claim the bar
-either shows the product the world supplied or says `no path shown`; there is no multiplication in
-the component. *Test:* `frontend/src/components/__tests__/pathBar.test.tsx` ›
-`test_renders_the_product_and_never_computes_one`.
+shows the product the world supplied, or `no path shown`, or *no path from the hypothesis reaches
+this claim any more* — three distinct readings, never one standing in for another — and there is no
+multiplication in the component. *Tests:*
+`frontend/src/components/__tests__/pathBar.test.tsx` › `test_renders_the_product_and_never_computes_one`,
+`test_tells_no_route_apart_from_no_number`.
 
 **INV-workbench.58 — every claim can be scored.** For every claim the panel opens, the resolution
 criteria, the adjudicating source and the resolve-by date all render, none optional and none
@@ -356,10 +361,11 @@ source with no retrieval day is never rendered as though it had one. *Test:* ins
    nobody able to say which is right. **Instead:** render the block the world carries, and an
    absence with its reason until it does.
 
-3. **Do not put a plausible sentence in the reserved band slot to show what it will look like.**
-   *Because* a sentence naming a percentage nobody computed is a number nobody computed wearing
-   words — the exact state a reader cannot trace. **Instead:** leave the slot, leave the comment
-   naming `range_shares`, render nothing, and let stack 06 fill it.
+3. **Do not put a plausible sentence in the reserved band slot to show what it will look like, and
+   do not print the uncalibrated label over a number nothing computed.** *Because* a sentence naming
+   a percentage nobody computed is a number nobody computed wearing words, and "uncalibrated" over a
+   stated range claims an arithmetic that never ran. **Instead:** the stated sentence and no slot
+   until `versions` says otherwise; a comment naming `range_shares`; stack 06 fills it.
 
 4. **Do not average, blend or reconcile the three owners** — stated as an anti-pattern in
    [`tiles-ports-wires.md`](tiles-ports-wires.md), which owns the belief chip. Here it means three
@@ -383,36 +389,25 @@ source with no retrieval day is never rendered as though it had one. *Test:* ins
 
 ## Open questions
 
-*Raised 2026-09-17.*
+*Raised 2026-09-17. Four questions this chapter opened were settled by Kent the same day and now
+read as statements in the body: which words a push reads back as (five bands, B4), which route the
+path bar shows (B5), which sentence sits under the model row (B1), and where the "no market" reason
+comes from (B1).*
 
-1. **What do pushes other than `+1.6` read back as?** The five bands are proposed in
-   [`tiles-ports-wires.md`](tiles-ports-wires.md); this panel uses them. Whether five bands or
-   [`../graph/link.md`](../graph/link.md)'s four anchors is the rule needs one answer.
+1. **Where does "falsified if" come from?** FR-10 lists it among the panel's contents and no field on
+   a claim carries it: the resolution criteria read backwards, or a genuinely missing field on
+   `Proposition`. **Owner:** `spec/graph/proposition.md`.
 
-2. **Which path does the path-product bar show when several reach the claim?** M1 is reached by
-   H → B → M1 and by H → C → B → M1. Shortest, strongest, weakest-link, or all of them stacked?
-   INV-8 settles the honesty rule, not the choice.
-
-3. **Does the Inspector print the uncalibrated sentence in full?** The chip's hover gives the whole
-   paragraph — *"Across 2 000 versions of this map … Nobody has checked whether that 8-in-10 holds
-   up"*. The panel has room without a hover, and hover-only text is unreachable by keyboard; but on
-   every claim it may be four lines of noise.
-
-4. **Where does the "no market" reason come from on an ordinary claim?** A `not_tradeable` ending
-   carries `not_tradeable_reason` and can quote it. An `event` claim such as B carries nothing, so
-   the panel supplies the words itself — a sentence the interface wrote rather than a field it read.
-   Either every claim gains somewhere to put the reason, or the wording is written down once in the
-   vocabulary.
-
-5. **Where does "falsified if" come from?** FR-10 lists it among the panel's contents and no field on
-   a claim carries it. The resolution criteria read backwards, or a genuinely missing field on
-   `Proposition`.
-
-6. **Where do generation cost and the transcript live?** NFR-6 says the Inspector shows model,
+2. **Where do generation cost and the transcript live?** NFR-6 says the Inspector shows model,
    tokens, cache hits and dollars per generation. Nothing generates in this stack, so no section is
-   specified and none is drawn.
+   specified and none is drawn. **Owner:** stack 04, with streaming.
 
-7. **May the panel show an arrow's pushes before the engine, without the result line?** The
+3. **May the panel show an arrow's pushes before the engine, without the result line?** The
    per-arrow lines are data on the links; only prior-plus-pushes-equals-result needs the engine. A
    half block might be useful, or might read as a sum somebody forgot to finish. Left as an absence
-   with a reason for now.
+   with a reason for now. **Owner:** this chapter, once there are screenshots to look at.
+
+4. **"no reference class recorded for this claim"** *(proposed here)* is wording the interface wrote
+   rather than a field it read, exactly as the "no market" sentences were before Kent settled them.
+   If it is kept, it belongs beside them in [`../vocabulary.md`](../vocabulary.md). **Owner:**
+   `vocabulary.md`.

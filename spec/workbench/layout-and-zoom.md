@@ -45,7 +45,10 @@ Decision record 0007 measures ELK at 50–150 milliseconds on sixty tiles. On th
 ```ts
 /** What the page sends the layout worker. */
 interface LayoutRequest {
-  /** Every tile to place. Width is always 280; height is clamped and measured. */
+  /** Every tile to place. Width is always 280. Height varies per tile: content-fit,
+   *  clamped to 152–272 pixels, on the 8-pixel grid, **computed from the content** and
+   *  never measured off the screen — so layout stays a pure function of the map
+   *  (`tiles-ports-wires.md` owns the height rule). */
   tiles: { id: string; width: 280; height: number; pinnedAt?: { x: number; y: number } }[];
   /** Every wire. `reflexive` wires are marked here and set aside before layering. */
   wires: { id: string; from: string; to: string; reflexive: boolean }[];
@@ -126,7 +129,13 @@ So when a claim arrives downstream of what is already drawn — a second market 
 
 A layered layout cannot assign columns to a graph with a loop in it. So the layout pass removes every arrow marked `reflexive` before it starts, assigns columns to what is left, and puts the reflexive arrow back for drawing. The loop is real, it is on screen, and it takes no part in deciding who sits where.
 
-It therefore points *backwards*: B is in column 2, R is in column 1. That is correct and it is the honest shape of feedback. **Setting a reflexive arrow aside is a layout decision here and a diff decision in `diff-view.md`** — which is also why R comes out `untouched` on the strike branch — but never a navigation decision: `keyboard-and-access.md` follows every wire, reflexive ones included. **How that wire looks — the loop, the lag chip reading "14 days" — is `tiles-ports-wires.md`.** This chapter only guarantees that the wire exists, that it never decides a column, and that removing it can never fail: INV-6 (no loops except through reflexive arrows, each with a delay greater than zero) is already enforced in the engine, so a map that reaches the canvas is one the loop check has passed.
+It therefore points *backwards*: B is in column 2, R is in column 1. That is correct and it is the honest shape of feedback.
+
+Setting feedback arrows aside is not this chapter's invention. It is one rule, written once in `spec/multiverse/interventions.md` (Kent, 2026-09-17):
+
+> *The map the engine works through is the map with feedback arrows set aside. Anything that asks **what can move** reads that map — the affected set, diff states, propagation's ordering, layering. Anything that asks **what can I walk to** reads the whole map — the hover lens, `h`/`l`, the outline.*
+
+Layering asks what can move, so it reads the map with `B → R` removed. That is also why R comes out `untouched` on the strike branch. `test_a_feedback_arrow_never_carries_a_change` fails loudly the day stack 06 unrolls feedback arrows in time, and points at the one sentence to change. **How that wire looks — the loop, the lag chip reading "14 days" — is `tiles-ports-wires.md`.** This chapter only guarantees that the wire exists, that it never decides a column, and that removing it can never fail: INV-6 (no loops except through reflexive arrows, each with a delay greater than zero) is already enforced in the engine, so a map that reaches the canvas is one the loop check has passed.
 
 ### B5 — Seven tiles per column, then "+n more"
 
@@ -134,20 +143,31 @@ No column paints more than seven tiles. The eighth and beyond collapse into one 
 
 Hormuz never reaches the cap; a generated map does. The rule exists because a column of eighteen tiles is a wall, and a wall is the hairball problem wearing a different hat.
 
-**A collapsed claim's wires do not disappear.** A wire that vanishes is a state a user cannot trace, which is the second veto. The wires of the hidden claims attach to the "+n more" tile. *How they bundle, and how the tile expands, the plan does not say — see Open questions.*
+**Which seven survive, and what "+n more" does** (Kent, 2026-09-17): the seven that survive are the **first seven in the layout's own within-column order** — the order ELK already produced, so nothing new has to be ranked and the answer is the same every run. Activating the "+n more" tile **opens the outline view filtered to that column** (`keyboard-and-access.md`), which is a list that already exists, already reads each claim as a sentence, and already works on the keyboard. Nothing expands in place, so the cap is never briefly broken.
+
+**A collapsed claim's wires do not disappear.** A wire that vanishes is a state a user cannot trace, which is the second veto. The wires of the hidden claims attach to the "+n more" tile. *How they bundle is still open — see Open questions.*
 
 ### B6 — Level of detail: the tile changes representation, it does not shrink
 
-Below **0.6 zoom** a tile paints its **summary**: the claim and the three belief chips inside the same kind silhouette, nothing else. The outline never goes — it is the tile's shape, and dropping it would lose the claim's kind at exactly the zoom where you are scanning for one. At 0.6 and above the tile paints in full — claim, chips, evidence clippings, resolve-by date (`tiles-ports-wires.md`).
+**There is one rule, and the two thresholds are consequences of it** (Kent, 2026-09-17). The rule: **no text ever lands below 11 pixels on the glass.** There is no counter-scaling anywhere — a tile at 0.7 zoom really is drawn at 0.7, text and all — so the thresholds are arithmetic, not taste:
 
-**Text never renders below 11 device pixels.** The way that rule is held is worth stating, because it is not a clamp: the type scale's smallest size is `--text-sm` at 13 px, two above the floor, and *(proposed here)* the summary tile counter-scales its text against the viewport zoom so the claim line keeps a constant size on the glass. The tile's own 280 pixels are unchanged in graph coordinates; only the text holds its size on the glass, which is why open question 5 exists. Zooming out therefore packs *more tiles* onto the screen rather than making anything smaller to read — that is what "changes representation instead of shrinking" means in practice.
+| Consequence | Sum | Why |
+|---|---|---|
+| **Summary below ≈ 0.85 zoom** | 11 ÷ 13 = 0.846… | A full tile's smallest type is `--text-sm`, 13 px. Below 0.846 that text lands under 11 px on the glass, so the tile must change representation first |
+| **Zoom floor 0.5** | 11 ÷ 22 = 0.5 | A summary tile's type is `--text-lg`, 22 px. At 0.5 it lands at exactly 11 px. You cannot zoom out past that, because the next pixel out is unreadable |
+
+**This supersedes the 0.6 threshold in the plan and in decision record 0007, dated 2026-09-17.** 0.6 was a chosen number; 0.846 is a derived one, and deriving it is what makes the 11-pixel promise true rather than approximately true.
+
+Below the summary threshold a tile paints its **summary**: the claim and the three belief chips inside the same kind silhouette, nothing else. The outline never goes — it is the tile's shape, and dropping it would lose the claim's kind at exactly the zoom where you are scanning for one. Above it the tile paints in full — claim, chips, evidence clippings, resolve-by date (`tiles-ports-wires.md`).
+
+**The honest cost.** Measured on the Hormuz map: on a 1440-pixel-wide window the first frame is summary tiles, because `fitView` cannot fit the map any larger. At 1600 wide it is full tiles, at about 11.4 pixels — legible, and only just. A narrow window therefore opens on summaries and you zoom in to read. That is the price of the promise, and it is cheaper than the alternative, which is text nobody can read at a zoom the interface offered them.
 
 UX-4 (level of detail by zoom) names three rungs. This stack builds two of them:
 
 | UX-4 rung | What it shows | Where |
 |---|---|---|
-| **Near** | The full tile, with evidence | This stack — at or above 0.6 zoom |
-| **Mid** | Wiring and belief chips | This stack — below 0.6 zoom, the summary tile |
+| **Near** | The full tile, with evidence | This stack — at or above 0.85 zoom |
+| **Mid** | Wiring and belief chips | This stack — between the 0.5 floor and 0.85, the summary tile |
 | **Far** | Worlds and their terminal deltas | **Not this stack.** It needs several worlds side by side (FR-17, three or more branches as small multiples), which arrives later |
 
 ### B7 — The union of two worlds is laid out once
@@ -166,7 +186,9 @@ The Hormuz strike branch adds **S**, a confirmed military strike on Iranian terr
 
 **Read that against B1 and notice what happened: every base claim moved one column right.** It had to. S causes H, so S must sit before H, and everything H causes shifts with it. Pinning cannot prevent this, because pinning orders tiles *inside* a column and does not decide which column a tile is in.
 
-This is honest, not a bug — a claim that causes your hypothesis genuinely belongs upstream of it, and that is the whole point of the Hormuz branch. But it means entering the diff is a re-layout that moves everything, and `setCenter` on the focused tile is the only thing holding your place. Whether that is enough is an open question below.
+**Following focus is enough, and columns are not pinned** (Kent, 2026-09-17). Two reasons. The shift is a **rigid translation** — every base tile moves the same 400 pixels, so relative to any other base tile nothing has moved at all, and `setCenter` on the focused tile makes even that invisible. And pinning the columns would be worse than the shift it prevents: S would have to stay where the base map had nothing, which puts a cause to the right of its effect and breaks the one promise the layout exists to make.
+
+One rule makes it land well: **creating a claim moves focus to it.** So the moment the strike branch is made, focus is on S and `setCenter` frames S — you are looking at the thing you just added, not hunting for it.
 
 A claim present in both worlds has exactly one coordinate. That is the property that makes a ghost overlay readable at all: if the two worlds were laid out separately, every tile would appear to have moved and nothing would stand out.
 
@@ -195,9 +217,9 @@ Each is *for all X, statement P holds*, and each names what checks it. "Visual r
 | **INV-workbench.22** | For every map and every claim added strictly downstream of the tiles already placed, every already-placed tile's coordinates are identical before and after | `test_pinned_tiles_keep_their_positions` in `layout.test.ts` |
 | **INV-workbench.23** | For every map and every re-layout of it, no already-placed tile changes its order within its column | `test_within_layer_order_is_stable` in `layout.test.ts` |
 | **INV-workbench.24** | For every base map and branch, layout runs once over their union, and every claim present in both worlds has exactly one coordinate | `test_union_layout_is_stable` in `layout.test.ts` |
-| **INV-workbench.25** | For every map opened, `fitView` is called exactly once; every later layout calls `setCenter` on the focused tile and the focused tile stays in the viewport | `test_fit_view_runs_once_then_set_center` in `layout.test.ts`; `frontend/e2e/hormuz.spec.ts` |
-| **INV-workbench.26** | For every map, no column paints more than seven tiles, and where one would, the surplus sits behind a single "+n more" tile whose n equals the number hidden | `test_layer_cap_collapses_the_rest` in `layout.test.ts`; visual review checklist line 6 (is the map layered left to right, or a hairball?) |
-| **INV-workbench.27** | For every zoom below 0.6 every tile paints its summary; at 0.6 and above every tile paints in full; at no zoom does any text render below 11 device pixels | `test_summary_below_the_zoom_threshold` in `layout.test.ts`; visual review checklist line 7 (is any text below 11 pixels?) |
+| **INV-workbench.25** | For every map opened, `fitView` is called exactly once; every later layout calls `setCenter` on the focused tile and the focused tile stays in the viewport; and every newly created claim takes focus | `test_fit_view_runs_once_then_set_center` in `layout.test.ts`; `frontend/e2e/hormuz.spec.ts` |
+| **INV-workbench.26** | For every map, no column paints more than seven tiles; where one would, the first seven in the layout's within-column order are painted and the rest sit behind a single "+n more" tile whose n equals the number hidden | `test_layer_cap_collapses_the_rest` in `layout.test.ts`; visual review checklist line 6 (is the map layered left to right, or a hairball?) |
+| **INV-workbench.27** | For every zoom from the 0.5 floor to the ceiling, the smallest rendered type size × the zoom is at least 11 — below ≈0.85 because the tile has switched to its summary, above it because 13 × 0.85 already clears 11 | `test_no_text_lands_under_eleven_pixels_at_any_zoom` in `layout.test.ts`, a sweep over the whole zoom range; visual review checklist line 7 (is any text below 11 pixels?) |
 | **INV-workbench.28** | For every tile in every state, `draggable` is false | `test_no_tile_is_draggable` in `layout.test.ts` |
 | **INV-workbench.29** | For every map, column assignment is computed on the graph with reflexive arrows removed, and every reflexive arrow is still drawn | `test_reflexive_links_are_set_aside_for_layering` in `layout.test.ts` |
 | **INV-workbench.30** | For every map of sixty tiles, the worker's `elapsedMs` is under 100 milliseconds (NFR-7) — see B9 on what the budget covers | `test_sixty_tiles_lay_out_under_100ms` in `layout.test.ts` |
@@ -206,7 +228,7 @@ Each is *for all X, statement P holds*, and each names what checks it. "Visual r
 
 1. **Do not run ELK on the main thread**, because a 150-millisecond freeze eats keystrokes and stutters the scroll, and the user reads that as a slow product rather than as a busy layout. Post to the worker and render the previous coordinates until the new ones arrive.
 2. **Do not call `fitView` after every layout**, because the map jumps to a new framing each time and the user loses the tile they were reading. Frame once on open; `setCenter` on the focused tile thereafter.
-3. **Do not scale text down with the zoom**, because an unreadable label is worse than no label and invites the reader to zoom in and out hunting for a legible size. Switch the tile to its summary at 0.6 and hold the text at a constant size on the glass.
+3. **Do not let text land under 11 pixels on the glass**, because an unreadable label is worse than no label. Switch the tile to its summary at 0.85 and stop the zoom at 0.5 — and do not counter-scale the text to dodge the rule, because a tile whose contents ignore the zoom stops being a picture of the map.
 4. **Do not make tiles "a bit" draggable**, because a tile that moves and then snaps back reads as a bug. Offer no drag at all and say so in the shortcuts sheet.
 5. **Do not hide a wire when its tile collapses into "+n more"**, because a wire that vanishes is a state nobody can trace — the second veto. Attach it to the "+n more" tile.
 6. **Do not feed reflexive arrows into the layering pass**, because a layered algorithm has no answer for a loop and will either fail or invent an order. Remove them, assign columns, put them back for drawing.
@@ -217,11 +239,9 @@ Each is *for all X, statement P holds*, and each names what checks it. "Visual r
 
 *Dated 2026-09-17. Each is something the plan does not settle; none is decided here.*
 
-1. **How does "+n more" expand?** The plan caps a column at seven and names the tile; it does not say what happens when you activate it. Three candidates: it expands in place and that column temporarily exceeds the cap; it opens the outline view (`keyboard-and-access.md`) filtered to that column; or it is not expandable at all in this stack and only names the count. Needs Kent.
-2. **Which seven survive the cap?** Unsaid. The first seven in ELK's within-column order is the cheap answer; "the seven with a path to a tradeable ending" is the useful one. They differ, and the second one is the product's opinion showing through.
-3. **How do a collapsed claim's wires bundle?** One thick wire to the "+n more" tile with a count on it, or n thin wires all landing on the same socket? The first is legible; the second is literal. The chapter only requires that no wire disappears.
-4. **Is `setCenter` enough when the whole map shifts a column?** B7 shows the Hormuz branch moving every base claim one column right, because the added claim causes the hypothesis. The focused tile stays put; everything else slides. An alternative is to pin column assignment as well as position for the union layout (ELK offers an interactive layering strategy that reads existing x-coordinates), at the cost of a wider picture. Needs Kent, and the answer belongs in `diff-view.md` too.
-5. **What is the minimum zoom?** The counter-scaling proposed in B6 holds the summary tile's text at a constant size on the glass while the tile itself keeps its 280 graph pixels — so zooming out eventually overlaps the text of neighbouring tiles. The plan names the 0.6 threshold and no floor, and it does not name the counter-scaling either.
-6. **Should 280 and 120 become tokens?** Every other pixel number in the product lives in `frontend/src/styles/tokens.css`. The tile width and the column gutter currently would not. Adding them touches a file this stack's wire agent owns (the new colour block), so it is a coordination question, not a design one.
-7. **Does UX-4's "far" rung need its own zoom threshold?** This stack has one threshold and two renderings. When several worlds appear side by side, "far" will need a second — and possibly a different interaction altogether, since at that scale you are choosing a world rather than reading a map.
-8. **What does NFR-7's 100 milliseconds actually cover, and what happens when it is missed?** "Render and re-layout" reads as ELK plus paint; `elapsedMs` measures ELK alone. Decision record 0007 already puts ELK alone at up to 150 milliseconds on sixty tiles, so on the pessimistic reading the budget is missed before anything is drawn. Either the invariant measures `elapsedMs` and the budget is a layout budget, or it measures both and the number needs revisiting. Until Kent says, INV-workbench.30 measures `elapsedMs` and the test records the real figure so the gap is visible rather than hidden.
+1. **How do a collapsed claim's wires bundle?** One thick wire to the "+n more" tile with a count on it, or n thin wires all landing on the same socket? The first is legible; the second is literal. The chapter requires only that no wire disappears. *(Which seven survive, and what activating "+n more" does, were* **Decided 2026-09-17** *— both are in B5.)*
+2. **Should 280 and 120 become tokens?** Every other pixel number in the product lives in `frontend/src/styles/tokens.css`. The tile width and the column gutter currently would not. Adding them touches a file this stack's wire agent owns (the new colour block), so it is a coordination question, not a design one.
+3. **Does UX-4's "far" rung need its own zoom threshold?** This stack has a floor, one threshold and two renderings. When several worlds appear side by side, "far" will need a third number — and probably a different interaction altogether, since at that scale you are choosing a world rather than reading a map.
+4. **What does NFR-7's 100 milliseconds actually cover, and what happens when it is missed?** "Render and re-layout" reads as ELK plus paint; `elapsedMs` measures ELK alone. Decision record 0007 already puts ELK alone at up to 150 milliseconds on sixty tiles, so on the pessimistic reading the budget is missed before anything is drawn. Either the invariant measures `elapsedMs` and the budget is a layout budget, or it measures both and the number needs revisiting. Until Kent says, INV-workbench.30 measures `elapsedMs` and the test records the real figure so the gap is visible rather than hidden.
+
+**Decided 2026-09-17 and now in the body:** which seven tiles survive the cap and what "+n more" opens (B5) · the two zoom numbers and the removal of counter-scaling (B6) · whether following focus is enough when the union layout shifts every column, and the rule that creating a claim moves focus to it (B7) · the minimum zoom, which is 0.5 and falls out of the 11-pixel rule (B6).
