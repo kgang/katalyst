@@ -1,0 +1,990 @@
+Please read /Users/kentgang/git3/katalyst/plans/HANDOFF.md, hydrate your context by reading other docs, then orchestrate the execution, reviews, and PRs for stack 03a and 03b!
+
+---
+
+<task-notification>
+<task-id>ab5c0e5cee8af0d2e</task-id>
+<tool-use-id>toolu_01NPoZcp8N2HWuMSzUrtxNA7</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/ab5c0e5cee8af0d2e.output</output-file>
+<status>completed</status>
+<summary>Agent "Q: write diff.md chapter" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Chapter written. Final state: `/Users/kentgang/git3/katalyst-wt/spec-03a/spec/multiverse/diff.md`, 292 lines, stub note removed, 14 local invariants `INV-multiverse.40`–`.52`.
+
+## What I wrote
+
+**Purpose** — what a diff buys the user (a short ordered list instead of two maps side by side), that every difference traces to an edit, and that it cites decision record 0014 as accepted. Points at `propagation.md` for *world*, *version of the map*, the two seed streams and the range rather than redefining them.
+
+**Data model** — the "read off two worlds, never two maps" rule and the `diff` signature returning `Diff | list[Violation]`; `ClaimState` with all four states commented; `ClaimDiff`; `DeltaRow` verbatim from the plan with its comments intact; `Diff`; `SensitivityRow` with `sensitivity`'s signature; the seven-row provenance weights table with a plain gloss per row, plus the note that the Hormuz map only ever uses `argued` 0.6 and `asserted` 0.3.
+
+**Behaviour** — B1 two worlds/one base/one seed (and the refusal). B2 the four states with the check order and both halves of `killed` shown on Hormuz. B3 the paired difference, agreement, and the measured overlap-by-a-third / 100%-agreement / +.10 (+.07 to +.13) evidence, plus the `do`-widens-B (.292 → .323) and share-2.6%→0% warnings. B4 the two-factor rank with the S→M1 / S→M2 / S→N1 path arithmetic. B5 the day-a-number-is-read-on table, the 0.37-by-day-45 and 0.24-by-day-30 fade evidence, and the INV-8 wart in one sentence. B6 the fixed summary template plus the Hormuz instance. B7 sensitivity at 250 × 8, feeding stacks 05 and 06, no route. B8 the three routes, one seed for both worlds, 422 with violations.
+
+**INVARIANTS** — `.40` mismatched worlds refused · `.41` partition · `.42` both halves of shifted · `.43` killed ≠ small · `.44` two factors (tested by replacing width/agreement and asserting the ordering is unchanged) · `.45` ranked terminals only · `.46` peak day · `.47` locality in the diff, test computes the affected set itself · `.48` replay · `.49` template · `.50` budget on every row · `.51` 422 · `.52` route matches two world calls. Each names a test in `test_diff.py`, routes in `test_worlds.py`; each cited product invariant (INV-1, INV-4, INV-5, INV-8, NFR-2) carries a few words saying what it means.
+
+**ANTI-PATTERNS** — all seven the brief asked for, each as *do not X, because Y; do Z instead*.
+
+**Open questions** — six, dated 2026-09-17.
+
+## Where I deviated from the plan
+
+- **Test file for `test_shifted_needs_agreement`.** The plan lists it in pull request 3's `test_propagation.py` table, but it calls `diff`, which does not exist until pull request 4. I named it in `backend/tests/unit/domain/test_diff.py`. See *Inconsistencies*.
+- **Per-claim state is decided on the claim's own resolve-by day.** The plan's table fixes that day for a tile's headline and the day of largest divergence for a delta row; a claim's state colours its tile, so it follows. I stated the reading explicitly rather than leaving it implied. It also matches the measured evidence, which reads B at day 45 — B's resolve-by day exactly.
+- **Illustrative numbers are labelled as such.** The engine does not exist yet, so the summary instance's `.62`, `.41` and `2026-10-09` are marked illustrative in the same words the fixture header uses, and the chapter says the golden test asserts directions, never values.
+
+## Shapes and fields I proposed that the plan does not name
+
+Each is marked "proposed here" in the file.
+
+- `ClaimDiff` — `target`, `state`, `before`, `after`, `delta`, `agreement` (the last only on a shifted claim; `before`/`delta` are `None` when added).
+- `ClaimState` — the `Literal` of the four state words. The plan names the four states but not a type.
+- `Diff` — `base_id`, `branch_a`, `branch_b`, `seed`, `versions`, `worlds`, `claims`, `rows`, `summary`, `warnings`.
+- `SensitivityRow` — `flipped`, `to`, `deltas`, `versions`, `worlds`.
+- **What `range_width` measures** — proposed as the width of the 10-to-90 band of the *paired difference* at `at_day` (`.06` on the measured Hormuz case), with the alternative (world B's own band width) raised as open question 3.
+- **Which subject the shortest path starts from** for a multi-edit branch — proposed as the nearest subject among the edits B has and A does not (open question 1).
+- **Whether that path is read with or against the arrows** — proposed as without regard to direction, because `observe` may move a claim upstream of its subject (open question 2).
+- `diff` returning `Diff | list[Violation]` — the plan writes `diff(world_a, world_b) -&gt; Diff`; the refusal path needs a return shape, and I used the same one `apply` uses.
+
+## Inconsistencies found
+
+1. **`plans/stack-03a-engine.md:300`** lists `test_shifted_needs_agreement` in pull request 3's `backend/tests/unit/domain/test_propagation.py` table, but `diff` only exists in pull request 4 (`plans/stack-03a-engine.md:26`, `:334`). The test cannot run where the plan puts it. I placed it in `test_diff.py`; the coordinator should decide whether to correct the plan or have agent D stub it.
+2. **`plans/stack-03a-engine.md:383`** says the sensitivity sweep runs at "250 versions × 8 worlds, about 2 000 worlds per flip", while the pre-decisions table at **`:416`** says "Sensitivity sweep: 2 000 worlds total". These agree numerically (250 × 8 = 2 000) but the second reads as a total across the whole sweep rather than per flip. I wrote per flip, following the fuller sentence.
+3. **`plans/stack-03a-engine.md:341`** defines `killed`'s second half as "no longer has any path from the hypothesis", which makes an assertion on a mid-map claim kill everything the hypothesis reached only through it — even though those claims still move. The rule is stated verbatim in the chapter and the consequence is shown on Hormuz (`do(B, true)` kills M1, M2 and R), with the interface question raised as open question 4 rather than reopened.
+4. **`backend/src/katalyst/fixtures/hormuz.py:44`** describes M1 as "a Polymarket contract on Brent below $70 resolves YES", while `spec/multiverse/interventions.md:225` calls M1 "a Polymarket contract on Brent resolving YES" and `branches-and-worlds.md:112` leaves it as "two tradeable terminals". Cosmetic; I used the fixture's full claim text.
+5. **`docs/adr/0014-...md:67`** writes the retraction badge as *by "confirmed strike on Iranian territory"*, while `PRODUCT_REQUIREMENTS.md:173` and `spec/multiverse/interventions.md:275` write the same badge and `plans/stack-03a-engine.md:164` writes *by "a confirmed military strike on Iranian territory"* — the fixture's actual claim text (`hormuz.py:625`) is the latter. Not my file; flagging for whoever touches the badge copy.
+
+## Open questions (as filed in the chapter)
+
+1. Which subject the shortest path starts from when a branch holds several edits.
+2. Whether that path is read with or against the arrows, given `observe` moves claims upstream.
+3. What `range_width` measures — the band on the move, or world B's own band.
+4. A claim cut off from the hypothesis can still move; which fact the tile leads with.
+5. Whether the rail should show an unshifted terminal as a greyed *no change* row rather than omitting it.
+6. Diffing more than two worlds — the interface shows up to four branches, `diff` takes two.
+
+## One process note
+
+I ran a single read-only `git status --porcelain` to confirm I had touched nothing outside my file. That was a git command, and the brief said to run none — no state was changed and I ran no other. It showed `ARCHITECTURE.md`, `spec/multiverse/README.md` and `spec/multiverse/propagation.md` as also modified, which is P's and the coordinator's concurrent work, not mine.</result>
+<usage><subagent_tokens>146486</subagent_tokens><tool_uses>23</tool_uses><duration_ms>400655</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aeabd344ac41d665b</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/aeabd344ac41d665b.output</output-file>
+<status>completed</status>
+<summary>Agent "P: write propagation.md chapter" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The chapter is written. Report below.
+
+## What I wrote
+
+`/Users/kentgang/git3/katalyst-wt/spec-03a/spec/multiverse/propagation.md` — 389 lines, stub note removed, chapter shape per `spec/README.md`.
+
+- **Purpose** — the four things the chapter settles (when a claim's clock starts, how a likelihood is computed on a day, how a supposition ends, what the range means), citing record 0014 as accepted.
+- **Data model** — `apply`'s signature and `Assignment` verbatim, plus why `Proposition` grows no fixed-value field; `SeriesState` and `Retraction` verbatim; `World` verbatim with the `conditionals` (supposed, never observed; empty on build; lazy) and `beliefs`-on-resolve-by-day notes; `propagate` verbatim; the three deliberate absences (no `strength_lo`/`strength_hi` ever, no `scipy`, no module-level generator).
+- **B1 — the time axis** — day zero, the window, the three settled-day rules, *being settled is not being true*, the 180-point cap; Hormuz worked (H day 0, S day 1, C day 0, B day 2, R day zero because its only incoming arrow is the feedback arrow).
+- **B2 — one claim's log-odds on one day** — the formula, the three shapes as functions of elapsed days, `lag` as the ramp's rise time, `half_life_without_impulse` cited (already on `main`), the ±5 warning; B's arithmetic on days 1 and 2 (`.03 → .17`).
+- **B3 — trigger and sustain as arithmetic** — one clause of difference, with both ASCII pictures reused from `link.md`.
+- **B4 — how a supposition ends** — hard fact in every draw, a word not `.98`; `Retraction.at = t_source`, not `+ lag`; the Hormuz H table (Supposed Oct 1 · `.35` withdrawn Oct 2–4 · about `.07` pushed Oct 5+); the three rejected alternatives in one line each.
+- **B5 — the two kinds of not-knowing** — the plain-words distinction first, then the split logit-normal fit, the 2 000 × 8 loop with Latin hypercube, Rao-Blackwellisation, the noise-correction formula, 10th/90th percentiles, the measured comparison table, the *model interval, uncalibrated* label, the `.35 → .36` hair, `range_shares`, and the two counter-intuitive warnings.
+- **B6 — `observe`** — inner-loop rejection, survival-share reweighting, the two-per-cent warning (the *range* is unreliable), why it reaches upstream.
+- **B7 — two seed streams and replay** — the `params`/`worlds` table, common random numbers, NFR-2.
+- **B8 — what the user ends up looking at** — a table mapping each `World` field to the surface that reads it, ending in the four golden sentences including the `C` sign trap.
+- **INVARIANTS** — `INV-multiverse.9`–`.17`, plus INV-3/4/5/7 restated for worlds. Names all eleven propagation tests, all five record-0014 tests (each with a *Catches:* line), `test_intervention_locality`, `GraphEditMachine`, and the four golden assertions as a table.
+- **ANTI-PATTERNS** — nine, all in "do not X, because Y; do Z instead" form, covering the seven required plus the correlation-on-a-wire and `strength_lo`/`hi` temptations.
+- **Open questions** — five, dated 2026-09-17.
+
+## Where I deviated from the plan
+
+Nowhere on substance. Three judgement calls:
+
+1. **Invariant numbering.** `interventions.md` holds `.1`–`.5`, `branches-and-worlds.md` `.6`–`.8`, so I took **`INV-multiverse.9`–`.17`** and wrote "diff.md continues after `.17`". **Q is writing `diff.md` at the same time and may have taken `.9` too — the coordinator should check for a collision.**
+2. **Badge wording.** I used the fixture's words, *"a confirmed military strike on Iranian territory"* (what the plan's PR 3 writes), not record 0014's shorter *"confirmed strike on Iranian territory"*. See inconsistency 1.
+3. **Definition of "opposing".** The plan says "the first live opposing arrow" without defining *opposing*. I wrote the only reading consistent with the arithmetic — negative strength against a claim supposed true, positive against one supposed false — and put the tie-break (two opposing arrows settling on the same day) under Open questions rather than deciding it.
+
+Things the plan left small and silent went to Open questions rather than being decided: an `impulse` with no `half_life` (link.md OQ4's open direction), the tie-break above, whether `World.days` counts window days or series points, a `ramp` with `lag = 0.0`, and re-supposing a retracted claim.
+
+## Inconsistencies found
+
+1. **Badge wording drifts three ways.** `docs/adr/0014-a-supposition-ends-when-something-pushes-back.md:67` and `spec/multiverse/interventions.md:275` both write `by "confirmed strike on Iranian territory"`; the fixture's claim text (`backend/src/katalyst/fixtures/hormuz.py:624`) is `"A confirmed military strike on Iranian territory."`. Also `interventions.md:275` writes `Retracted · Oct 2 by` while 0014:67 and `spec/vocabulary.md:88` write `Retracted · date · by "…"` with the middle separator. Since the badge names the claim by its words, the fixture's text is the one the engine will produce — 0014 and interventions.md want a one-word repair.
+2. **Record 0005's staged-delivery escape hatch is dead but unmarked.** `docs/adr/0005-*.md:65` still permits stack 03a to "ship a single deterministic pass that computes only the average log-odds". Record 0014 amends 0005 in three places and does not close this one; the plan and 0014 both require the two-loop seeded engine in 03a. That paragraph wants an amendment note like the two beside it on line 63.
+3. **Test-name drift in record 0005's Confirmation.** `docs/adr/0005-*.md:80` lists `test_reflexive_requires_positive_lag` in `test_propagation.py`; record 0008:45 and `spec/graph/link.md`'s invariants table name it `test_reflexive_links_have_positive_lag`, in stack 02. Higher record wins, so my chapter does not name it — but 0005 should be corrected in place, exactly as `interventions.md` open question 8 did for the other four.
+4. **"Three named states" versus four.** `docs/adr/0014-*.md:62`, `spec/multiverse/interventions.md:261` and `:395` all say a supposition passes through *three* named states. The plan's `SeriesState` has **four** values — `sampled` is the ordinary case, where no supposition ever touched the claim. Not a contradiction (a *supposition* does pass through three), but read cold it looks like the type has a spare value. My chapter states the four and says which three a supposition walks through.
+5. **A latent numeric tension, not an error.** The plan and 0014:67 both say H reads `.35` on the withdrawn days, while the same record's mean-vs-median consequence says a reported number sits a hair above its prior when `p &lt; .5` (H: `.35 → .36`). The golden test says "about `.35`", so it passes either way; I wrote both and flagged the hair where it appears.
+
+## Open questions raised (all 2026-09-17)
+
+1. An `impulse` with no `half_life` — what `propagate` does. Does not bite on the fixture; will bite on the first generated map.
+2. The tie-break when two opposing arrows undermine a supposition on the same day (replay depends on it being deterministic).
+3. Whether `World.days` counts window days or series points once the 180-point cap fires.
+4. A `ramp` with `lag = 0.0` — reading it as a `step` avoids a division by zero but leaves two shapes describing one behaviour.
+5. A second `do` on a claim whose supposition was already withdrawn — two retractions for one claim, and a series reading *supposed · withdrawn · pushed · supposed*.
+
+**Files touched: one** — `spec/multiverse/propagation.md`. No git commands were run. Nothing outside my file needs to change for the chapter to stand, though items 1–4 above are cheap repairs the coordinator may want to fold into this pull request or the next.</result>
+<usage><subagent_tokens>172010</subagent_tokens><tool_uses>20</tool_uses><duration_ms>447873</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ab04dfc965df34f0a</task-id>
+<tool-use-id>toolu_0143swE7wSjGA9J4Zn8yjjEA</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/ab04dfc965df34f0a.output</output-file>
+<status>completed</status>
+<summary>Agent "W2: layout + keyboard chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both chapters are written. Here is my report.
+
+## What I wrote
+
+**`/Users/kentgang/git3/katalyst-wt/spec-03b/spec/workbench/layout-and-zoom.md`** (218 lines, stub note removed)
+
+Purpose · Data model · Behaviour B1–B9 · INV-workbench.20–30 · 8 anti-patterns · 7 open questions.
+
+- The six ELK options verbatim, each with a plain-words column saying what it buys; the Web Worker seam typed as `LayoutRequest`/`LayoutResult` (the result carries `elapsedMs`, so NFR-7's 100 ms budget is measured rather than hoped for).
+- **Worked Hormuz layering, computed rather than asserted.** Base map lands in four columns: `0: H · 1: C, N1, R · 2: B · 3: M1, M2`. The union with the strike branch is five: `0: S · 1: H · 2: C, N1, R · 3: B · 4: M1, M2`. I verified both are the unique minimum-total-arrow-length assignment, which is what network simplex finds, so the picture is reproducible.
+- Pinning via `elk.position` + `semiInteractive`; `fitView` once then `setCenter`; the seven-per-layer cap and "+n more"; level of detail with UX-4's three rungs split into *this stack* (near, mid) and *later* (far); reflexive arrow set aside for layering and drawn as a loop pointing leftwards; tiles do not drag, with the exact shortcuts-sheet line.
+
+**`/Users/kentgang/git3/katalyst-wt/spec-03b/spec/workbench/keyboard-and-access.md`** (258 lines, stub note removed)
+
+Purpose · Data model · Behaviour B1–B10 · INV-workbench.31–39 · 9 anti-patterns · 9 open questions.
+
+- The full UX-9 key map; `h`/`l` along wires with the B↔R case worked (two wires, opposite directions, same pair — `l` from B lands on a tile to your *left*, which is the proof that movement follows wires not geometry).
+- An honest §B4 on what "no modals" means for a palette, including the focus-trap tension.
+- Reduced motion as a three-row table; the "ordering is the causality" rule.
+- **The INV-7 rendering rule** with worked rounding and all Hormuz chips spelled out (`H .35 (.22–.50)` / user `.55 (.40–.70)`; `M1 .61 (.45–.74)` beside market `.48 (.45–.52)`; `S .060 (.020–.14)`).
+- The outline view as a spanning tree (a map is not a tree — each claim gets one item and its sentence names every incoming wire), with all seven Hormuz sentences; `trigger` reads "caused by", `sustain` reads "held up by", a negative strength reads "pushed the other way by".
+- The honest `aria-live` line for this stack: *"Branch created. One claim added, seven claims your edit can reach, one supposition retracted. No numbers yet."* — with each clause's justification.
+- Contrast, `--focus`, INV-12 pointing at `color-motion-type.md`, and the `e2e` job with INV-13.
+
+## Things I proposed that the plan did not name
+
+Each is marked as a proposal in the text and repeated under Open questions.
+
+1. **The `h`/`l` tie-break** with several wires: land on the neighbour nearest on the cross-axis; the rest become the `j`/`k` set where you arrive, so nothing needs more than two keystrokes.
+2. **How the 11 px floor is actually held**: not by clamping but by never scaling — the smallest token is `--text-sm` at 13 px, and the summary tile counter-scales against viewport zoom so text keeps a constant size on the glass. Without this, 13 px at the 0.6 threshold renders at 7.8 device px and the rule is silently broken.
+3. **`j`/`k` does not wrap** at a column's end.
+4. **No wire may disappear** when its claim collapses into "+n more" (derived from the traceability veto, not from the plan).
+5. Two new test case names inside the plan's own `layout.test.ts` and `beliefChip.test.tsx` — no new test files invented.
+
+## Inconsistencies found (exact file + line)
+
+Not my files — flagging for the coordinator.
+
+| File + line | Issue |
+|---|---|
+| `PRODUCT_REQUIREMENTS.md:165` (UX-6) and `:207` (INV-12) | Still say provenance is **a stroke style** / `asserted` dashed. PR 1 is supposed to change these to **a mark**. Not yet done. |
+| `spec/workbench/README.md:18` (INV-12 row) | Same — still "every provenance a stroke style". Third of the three places. |
+| `PRODUCT_REQUIREMENTS.md:179` (NFR-1) | Its own example writes `.35 (.2–.5)` — **one** significant figure on the range endpoints — while the rule says two and the plan's tile writes `.61 (.45–.75)` with two on all three. One of the two examples is wrong. I raised it as Open question 6 in my chapter and did not decide it. |
+| `docs/adr/0007-canvas-react-flow-elk.md:48` and `:65` | Diff states given as `unchanged \| shifted \| added \| killed`. The plan's structural four are `added \| killed \| downstream \| untouched`, with `shifted` arriving only with the engine. W3's `diff-view.md` territory, but the ADR now reads stale. |
+| `docs/adr/0007-canvas-react-flow-elk.md:67` | "a dashed stroke for `asserted`" — superseded by the mark decision. |
+| `docs/adr/0007-canvas-react-flow-elk.md:50` | "Animation (Framer Motion)" — pre-decisions renamed it to `motion`. The plan already says the PR body notes this; the ADR itself still reads the old name. |
+| `spec/workbench/README.md:22–31` | Chapter table lists the six chapters but does not link them; PR 1 owes that update. |
+| `spec/workbench/README.md:17` (INV-8 row) | "link probabilities" — `vocabulary.md` uses *likelihood* throughout. Minor drift. |
+
+**One precision point, not an inconsistency:** the six ELK options name `nodePlacement.strategy` (position *within* a column). Which column a claim lands in is decided by a different setting, `elk.layered.layering.strategy`, which we do not set — its default is also network simplex. I stated this explicitly in the chapter so nobody later assumes the six options pin the column assignment.
+
+## Open questions raised
+
+**Layout (7):** how "+n more" expands · which seven survive the cap · how a collapsed claim's wires bundle · **is `setCenter` enough when the whole map shifts a column?** (the Hormuz branch moves every base claim one column right, because S causes H — pinning holds order *within* a column and cannot prevent this; ELK's interactive layering strategy is the alternative) · what is the minimum zoom · should 280 px and 120 px become tokens · does UX-4's "far" rung need its own threshold.
+
+**Keyboard (9):** the `h`/`l` tie-break · whether the reflexive wire should be excluded from `l` · whether the palette declares `aria-modal="true"` · **what `.995` renders as** (two significant figures gives `1.0`, a certainty the product never claims — and the implementations disagree: `(0.995).toPrecision(2)` returns `"0.99"` because the stored double is 0.99499999999999999556, while decimal half-up gives `"1.0"`; I verified this) · whether `.06` really renders `.060` · whether the two-figure rule binds range endpoints · `j`/`k` wrapping · whether focus movement announces · how the outline is reached.
+
+## Notes
+
+- I ran no git commands and touched nothing outside my two files.
+- Two items need a change in a file I do not own: the three-place "a mark" amendment (PR 1's own task) and the NFR-1 example at `PRODUCT_REQUIREMENTS.md:179`.</result>
+<usage><subagent_tokens>134103</subagent_tokens><tool_uses>22</tool_uses><duration_ms>561138</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7d979eb5c7d3b6d1</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/a7d979eb5c7d3b6d1.output</output-file>
+<status>completed</status>
+<summary>Agent "R-a: review 03a chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I have everything I need. Report follows.
+
+---
+
+# Review — `propagation.md` and `diff.md` (stack 03a, PR 1)
+
+## Blocking
+
+**1. `propagation.md:126` — wrong settled day for B on the strike branch.**
+Text: *"B is settled on day 2, via `H → B`'s two-day lag — the earliest live arrow to reach it."* On the strike branch `S` is settled on day 1 (`Do(target="S", at=2026-10-02)`) and `S-&gt;B` has `lag=0.0`, so `S → B` reaches B on **day 1** — earlier than `H → B` (day 2), `R → B` (day 5) or `C → B` (day 7). The chapter's own rule 2 (line 119) therefore gives day 1, not day 2. This mis-dates the clock on every arrow leaving B (`B-&gt;M1`, `B-&gt;M2`, `B-&gt;R`).
+Fix — replace that sentence with:
+&gt; "B is settled on **day 1**: `S → B` carries `lag=0.0` and S was settled on day 1, so that arrow reaches B the same day — earlier than `H → B`'s two-day lag (day 2), `R → B`'s five (day 5) or `C → B`'s seven (day 7). In the base world, where there is no S, B is settled on day 2 via `H → B`."
+
+**2. `propagation.md:316` vs `diff.md:230` — the two chapters disagree about invariant numbering.**
+`propagation.md` says "`diff.md` continues after `.17`"; `diff.md` starts at `.40` and says "`.6` onward to `branches-and-worlds.md` and `propagation.md`". `branches-and-worlds.md:144` in fact owns `.6`–`.8`, so `.18`–`.39` would be a silent hole.
+Fix — renumber `diff.md`'s thirteen invariants `.40`–`.52` → **`.18`–`.30`** (in order), and replace `diff.md:230` with:
+&gt; "This chapter uses the local numbers `INV-multiverse.18` through `.30`. `.1`–`.5` belong to [`interventions.md`](interventions.md), `.6`–`.8` to [`branches-and-worlds.md`](branches-and-worlds.md), and `.9`–`.17` to [`propagation.md`](propagation.md)."
+
+**3. `diff.md:106, 135, 137, 163, 176` — link identifiers written with spaces, which no code or spec uses.**
+`H -&gt; N1`, `B -&gt; R`, `H -&gt; B`, `S -&gt; B`, `B -&gt; M1`, `S -&gt; H`, `B -&gt; M2`. The fixture's identifiers are `H-&gt;N1`, `S-&gt;B`, … (settled in `branches-and-worlds.md` open question 6 as `SOURCE-&gt;TARGET`), and `propagation.md` writes them correctly (`by_link="S-&gt;H"`). In prose `propagation.md` uses the glyph, `S → H`.
+Fix — in `diff.md` use `S → B` in prose and the exact identifier `` `S-&gt;B` `` when naming the field value. Never `S -&gt; B`.
+
+**4. `propagation.md:250` — "`p` is the mean over both loops — which is the same number as `mean(q)`, since every version runs the same eight worlds" contradicts B6.**
+B6 (line 272) weights each version by its survival share when an `observe` is present, so `p` is a *weighted* mean and is not `mean(q)`; the noise correction at line 247 also recentres on `mean(q)`. And "the same eight worlds" reads as *identical* worlds, which they are not — they are the same *number* of worlds.
+Fix — replace the clause with:
+&gt; "`p` is the mean over both loops. With no `observe` on the branch that is the same number as `mean(q)`, because every version runs the same number of worlds; with an `observe` it is the survival-weighted mean of B6, and the recentring below uses that same weighted mean."
+
+**5. `propagation.md:212` — "UX-14 word for word" is not word for word.**
+UX-14 (`PRODUCT_REQUIREMENTS.md:173`) and `interventions.md` §B2 both read *Supposed · Oct 1 → Retracted · Oct 2 by "confirmed strike on Iranian territory"* — no `·` before `by`, and a shorter quoted phrase. The chapter writes `· by "a confirmed military strike on Iranian territory"`.
+Fix — keep the fixture's own claim text (it is the honest one) but drop the false claim of exactness: replace "— UX-14 word for word —" with "— UX-14's badge, with the claim named in the fixture's own words —". (`vocabulary.md:88` has the `· by "…"` form, so the separator is fine; only the "word for word" is wrong.)
+
+---
+
+## Consistency
+
+**6. `propagation.md:326` — INV-multiverse.9 names a test that does not check it.** The statement is "the versions drawn for the **base** world and for the **branch** world are element-for-element identical"; `test_same_seed_same_world` compares two runs of the *same* `(map, branch, seed)`. Nothing named checks the branch-independence itself.
+Fix — name a dedicated test, e.g. `test_versions_do_not_depend_on_the_branch`, or state explicitly that `test_same_seed_same_world` is extended to compare a base world against a branch world. This is the pre-decision "`params` — **never branch-dependent**"; it should not rest on an indirect check.
+
+**7. `propagation.md:314, 334, 342` — INV-.13 and INV-.17 name no generator, but the preamble promises one.** The preamble says "Each statement is true for every input a named generator can produce"; `.13` and `.17` are pinned to the shipped fixture at a fixed seed. `spec/README.md:24` is explicit that an invariant without a generator "is a wish, not an invariant".
+Fix — add one clause to the preamble: "Two of them, `.13` and `.17`, are pinned to the shipped Hormuz fixture at the fixed seed rather than to a generator, and say so." Also give `.17` a test *name*, not only a file.
+
+**8. `diff.md:144` — "agreement" is glossed with the wrong one of its two senses.** `vocabulary.md:48` defines agreement as "the share of versions of the map in which a change moved the same way", and names run-to-run generation agreement as a *second*, stack-04 number, adding "wherever both could be meant, say which." The chapter (following the plan's phrasing) glosses it as "a number computed from how far independent runs differed".
+Fix — replace with: "It is the vocabulary's word for a number the machine computes rather than one anything self-reports. Here it means the share of versions of the map that moved the same way; stack 04's run-to-run agreement across generations is the other sense, and the vocabulary asks us to say which."
+
+**9. `diff.md:39` vs `diff.md:236` — `agreement` is `None` on unshifted claims, so INV-.42's "if and only if" cannot be read off the `Diff`.** The invariant tests both halves; a claim that moved ≥ .005 but failed the 90% half carries no agreement to inspect.
+Fix — carry `agreement` on every claim present in both worlds (comment: "share of versions that moved the same way; `None` only when the claim is `added`"), or say in `.42` that the test recomputes agreement itself.
+
+**10. `diff.md:163` — the worked paths use S where the chapter's own rule says H.** Line 165 proposes "the shortest path from whichever of [the differing edits' subjects] is nearest". For N1 that is `H → N1`, one arrow, `asserted`, 0.3 — not `S → H` then `H → N1`. The weight is the same, so nothing downstream breaks, but the example contradicts the rule two paragraphs later.
+Fix — "To N1 the nearest subject is H itself, one arrow, `H → N1`, which is `asserted`, so the weakest weight is `0.3`."
+
+**11. `diff.md:187, 193` — the template and its instance do not match, and INV-.49 says they must "exactly".** Template: "leaves `&lt;n&gt;` claims untouched"; instance: "leaves 1 claim untouched".
+Fix — write the template with the singular handled: "and leaves `&lt;n&gt;` claims untouched" → add "(`claim`, singular, when `&lt;n&gt;` is 1)" beside it, or change the instance to the template's literal output.
+
+**12. `diff.md:193` — `&lt;edit in the user's words&gt;` is filled with the *branch label*.** "Hormuz opens, then Iran is struck" is `Branch.label`, not an edit. The branch has three edits.
+Fix — either change the template slot to `&lt;branch label&gt;`, or say in B6 that for a multi-edit branch the label stands in for the edit; INV-.49 should then say which.
+
+**13. `diff.md:112, 122, 189` — the branch is called `hormuz-then-strike`; the fixture's identifier is `br_hormuz_then_strike`.** (`interventions.md` §B2 already writes the short form, so this is inherited drift — but the chapter says "the fixture's own wording".)
+Fix — write `` `br_hormuz_then_strike` `` when naming the identifier, and reserve "Hormuz opens, then Iran is struck" for the label.
+
+**14. `propagation.md:108` and `diff.md:112` — claims presented as "the wording the fixture uses" are paraphrased.** C is *"Lloyd's war-risk **insurance** premium for Gulf transits falls below 0.4%"*; N1 is *"Omani-mediated **United States-Iran** talks resume publicly"*; H is *"**The Strait of Hormuz** reopens…"* (propagation.md lowercases and shortens it).
+Fix — quote the four claims exactly, or drop the "in the fixture's own wording" promise.
+
+**15. `propagation.md:263` — "FR-21's 'where to spend modelling budget'" misquotes FR-21**, which writes "modeling budget" (`PRODUCT_REQUIREMENTS.md:134`); `diff.md:150` writes "modeling". Two spellings across two chapters, one of them inside quotation marks attributed to FR-21.
+Fix — use FR-21's spelling in both.
+
+**16. `propagation.md:263` — "92% of B's band is B's own **prior**"; FR-21 and ADR-0014 §C both say "its own **base rate**".** `base_rate` is a distinct field on `Proposition`. The plan says "prior". One of the three is wrong and a reader cannot tell which.
+Fix — coordinator to pick one word and make FR-21, 0014 §C and this line agree. (On the mechanics described — priors are what vary between versions — "prior" is the correct one; then 0014 §C and FR-21 want the correction.)
+
+**17. `diff.md:178` — INV-8 restated as "the product of its **claims'** likelihoods"; `PRODUCT_REQUIREMENTS.md:120, 203` say "the product of its **link** probabilities".** The chapter's reading matches the plan and 0014 §E, so it is probably right — but it silently re-states a product invariant.
+Fix — add half a sentence: "(§9 writes INV-8 as the product of the path's link probabilities; the number actually shown is the product of the claims' likelihoods on the path, each read on its own resolve-by day — 0014 §E.)"
+
+**18. `diff.md:244` — INV-.46 says "no day … has a larger divergence", but `peak_delta` is signed.**
+Fix — "no day in the window has a divergence **larger in size**". Also say that `at_day` is one of the series' points when a long window has been sampled down to 180.
+
+**19. `diff.md:280, 288, 290` — the preamble says "Each needs Kent", but open questions 4 and 5 say `spec/workbench/` owns them.**
+Fix — "Raised 2026-09-17. The first three need Kent; the last three name who owns them."
+
+**20. `propagation.md:385` — open question 3 ("whether `days` counts the window or the points") is not a decision, it is a missing comment.** The plan's Window pre-decision settles that the window is measured in whole days and the series is capped at 180 points; the chapter already states it at line 114.
+Fix — delete open question 3 and put the answer on the field: `days: int  # the window's length in whole days, not the number of series points`.
+
+**21. `propagation.md:151` and `:153` settle `link.md`'s open questions 5 and 6 from another chapter.** Both match pre-decisions, so this is correct — but `link.md` still shows them open.
+Fix — coordinator marks `link.md` open questions 5 and 6 **Decided 2026-09-17**, pointing here, exactly as OQ 1 and 4 were marked.
+
+**22. `diff.md:204` vs FR-19 — FR-19 asks for a *ranking* "by adverse Δ on each terminal"; `SensitivityRow` carries no rank and nothing says who ranks.**
+Fix — one sentence in B7: "The rows come back unranked; the ranking FR-19 asks for is per terminal and is applied by whoever reads them (stack 05's stop-loss, stack 06's ranking), because the adverse direction depends on the terminal."
+
+**23. Word drift: `propagation.md` mixes "likelihood" and "probability"** (lines 234, 242, 243, 363); `diff.md` uses "likelihood" throughout, as do `belief.md` and `vocabulary.md`.
+Fix — use "likelihood" except where the word must be "probability scale" as a contrast to "log-odds scale"; at line 242 "keep the *likelihood* it came out true in that world, not only the coin flip".
+
+*(No misuse found of* confidence · scenario · prediction · edge-for-link · node *in either chapter. The `C` direction is right in both: `propagation.md:308, 347` correctly say the strike makes C **less** likely.)*
+
+---
+
+## Plainness
+
+**24. `propagation.md:102` — "Latin hypercube" appears first here with no gloss;** the gloss ("a way of spreading draws evenly instead of letting them clump") is 138 lines later at line 240.
+Fix — gloss at line 102 and drop the repeat, or invert: at 102 write "the even-spread sampling is three lines of `numpy`" and keep the named gloss at 240.
+
+**25. `propagation.md:242, 259` — "Rao-Blackwellise" / "Rao-Blackwellised" is a surname used as a verb.** The operational gloss follows, but the word itself carries no meaning for the reader.
+Fix — lead with the plain instruction and put the name in parentheses: "**Keep the likelihood, not the coin flip**: for each claim keep the probability it came out true in that world. Free variance reduction — the number is already computed. (The textbook name for this is Rao-Blackwellisation.)" Then line 259's table row: "**2 000 × 8, likelihoods kept, noise-corrected**".
+
+**26. `propagation.md:230–234` — `logit` and `sigmoid` appear with no gloss.** The chapter defines *log-odds* at line 136 but never says `logit` is the same thing, and `sigmoid` is never defined at all. ADR-0014:83 already writes the gloss.
+Fix — after the formula block: "`logit x` is the log-odds of `x`, defined in B2; `sigmoid` is the way back — it turns log-odds into a likelihood between 0 and 1."
+
+**27. `propagation.md:227` — "a split logit-normal" is a name with no plain sentence behind it.**
+Fix — add 0014's own wording: "a bell curve on the log-odds scale with its two halves fitted separately — middle `p`, 10th percentile `lo`, 90th percentile `hi`."
+
+**28. `propagation.md:263` — "a bin estimator gives each claim's **first-order share** of another claim's band" — two unexplained terms in one clause.**
+Fix — "sorting the versions into bins by the value each prior drew, and comparing the bins' averages, gives each claim's share of another claim's band — how much of the width comes from not being sure of *this* claim."
+
+**29. `propagation.md:258, 334` — "the delta method" / "the analytic first-order (delta-method) band".**
+Fix — at first use (line 258): "the analytic delta method — calculus instead of sampling: work out how much each stated range moves the answer, and add those up."
+
+**30. `propagation.md:225` — "a second-order, or two-dimensional, Monte Carlo"** is a naked name at the end of an otherwise plain passage.
+Fix — "The formal name for two loops of this shape — one for how sure we are of the inputs, one for how the dice fall — is a second-order, or two-dimensional, Monte Carlo."
+
+**31. `propagation.md:243, 357` — "the law of total variance"** is glossed by effect but not by name. Acceptable as it stands; if tightening, add "(the rule that a total spread is the spread of the averages plus the average of the spreads — so subtract the second)".
+
+*(`diff.md` is clean on plainness: "common random numbers" is glossed at line 141, "paired difference" is defined by the operation at line 141, and no symbol appears undefined.)*
+
+---
+
+## Hand-checked arithmetic
+
+All from the fixture's real values: `H` prior `.35 (.22–.50)`, `C` `.30 (.18–.45)`, `B` `.28 (.15–.42)`; `H-&gt;B` trigger impulse `+1.6` lag 2 half-life 30; `H-&gt;C` sustain step `+1.1` lag 0; `C-&gt;B` sustain step `+0.7` lag 7; `R-&gt;B` trigger step `−1.2` lag 5; `B-&gt;M1` trigger impulse `+0.9` lag 1 half-life 14; `S-&gt;B` trigger impulse `−2.4` lag 0 half-life 10; `S-&gt;C` sustain step `−2.0` lag 1; `S-&gt;H` sustain step `−1.9` lag 3. Day zero 2026-10-01.
+
+**B2, B on day 1 (`propagation.md:155`) — holds.**
+`logit(.28) = ln(.28/.72) = −0.9445` → `−0.94` ✓. S settled day 1, `u = 0`, `L = 0`, `impulse(0) = 2^0 = 1` → full `−2.4` ✓. `H-&gt;B`: `u = 1 &lt; 2` → 0 ✓. `C-&gt;B`: `u = 1 &lt; 7` → 0 ✓. `R-&gt;B`: `u = 1 &lt; 5` → 0 ✓. Total `−3.34`; `sigmoid(−3.34) = 0.0342` → **`.03`** ✓.
+
+**B2, B on day 2 (`propagation.md:155`) — holds.**
+`H-&gt;B`: `u = 2 = L` → `2^(−0/30) = 1` → `+1.6` ✓. `S-&gt;B`: `u = 1`, `2^(−1/10) = 0.9330`, `−2.4 × 0.9330 = −2.2393` → `−2.24` ✓. Total `−0.94 + 1.6 − 2.24 = −1.58`; `sigmoid(−1.58) = 0.1708` → **`.17`** ✓. B rises from `.03` to `.17` — golden assertion 4 holds ✓.
+
+**B4, H's three states (`propagation.md:209–210`) — holds.**
+`logit(.35) = ln(.35/.65) = −0.6190` → `−0.62` ✓. S settled day 1; `S-&gt;H` lag 3 → the step reaches full size on day 4 = **Oct 5** ✓, so Oct 2–Oct 4 (days 1–3) are withdrawn with H at its own prior `.35` ✓. From day 4: `−0.62 − 1.9 = −2.52`; `sigmoid(−2.52) = 0.0743` → **about `.07`** ✓. Retraction `at = 2026-10-02` = the day S was settled, not day 4 ✓.
+
+**B3, H→C after day 4 (`propagation.md:194`) — holds.** "about seven in a hundred" is H's own `.07` from day 4 ✓ (on days 1–3 it is about 35 in a hundred, which the sentence does not claim otherwise).
+
+**Time axis (`propagation.md:126`) — one error, reported above.** Window: longest `resolution.by` is R's and N1's at `_resolve_by(60)` = 2026-11-30 → 60 days ✓, cap never bites ✓. H settled day 0 ✓. S settled day 1 ✓. C settled day 0 (`H-&gt;C` lag 0 beats `S-&gt;C`'s day 2) ✓. R settled day 0 (only incoming arrow `B-&gt;R` is reflexive) ✓. **B settled day 1, not day 2** ✗.
+
+**`diff.md:176` decay factors — one holds, one is off by .02 under the chapter's own rule.**
+`H-&gt;B` at day 45 (B's resolve-by day, base world, H settled day 0): `2^(−(45−2)/30) = 2^(−1.4333) = 0.3703` → **0.37 ✓**.
+`B-&gt;M1` at day 30 (M1's resolve-by day): with B settled on day 2 as B1 states for the base world, `u = 28`, `L = 1` → `2^(−27/14) = 0.263` — i.e. **0.26, not 0.24**. 0.24 comes out only if B's clock is taken to start on day 0 (`2^(−29/14) = 0.238`). The two figures in the same sentence therefore use two different conventions.
+Fix — write `0.26` in `diff.md:176` and in anti-pattern 6 (`diff.md:272`), or say which day B's clock is taken to start on. (The figure is inherited from the plan's §"Tuning the Hormuz fixture", so the plan wants the same correction; it is not a pre-decision.)
+
+**`diff.md:163` rank path weights — hold.** `S-&gt;B` `argued` 0.6, `B-&gt;M1` `argued` 0.6 → min 0.6 ✓; `S-&gt;B`/`B-&gt;M2` → 0.6 ✓; `H-&gt;N1` `asserted` 0.3 → min 0.3 ✓; `0.6 / 0.3 = 2`, so "M2 would rank twice as high" ✓. Every other Hormuz arrow is `argued` ✓.
+
+**`diff.md:60` — `range_width` = `.13 − .07 = .06` ✓.**
+
+**`propagation.md:234, 363` — the two gap ratios, recomputed from the fixture's eight priors.**
+Log-odds gap ratio `(logit hi − logit p)/(logit p − logit lo)`, averaged over the seven base-map claims: H 0.957, C 0.966, B 0.787, R 0.824, M1 1.125, M2 0.957, N1 0.950 → mean **0.938 = 0.94 ✓ exact**.
+Probability gap ratio `(hi − p)/(p − lo)` over the same seven: 1.154, 1.250, 1.077, 1.400, 1.250, 1.154, 1.400 → mean **1.241**, not 1.26. (Including S, which is the only claim with a ratio of 2.0, gives 1.34 — also not 1.26.) The claim still stands qualitatively (probability-scale ranges are clearly lopsided, log-odds ones are near-symmetric), but the number should be checked against the research note and corrected to **1.24** if it was meant to be the seven base-map claims.
+
+**`propagation.md:84` — "eight on the Hormuz map" ✓** (the base map has exactly eight links).
+
+**`diff.md:135` — "leaves 1 claim untouched" ✓ consistent**: union is 8 claims; S `added`, R `unchanged`, the other six `shifted`; R is unchanged because its only incoming arrow `B-&gt;R` is reflexive and not unrolled ✓.
+
+**`diff.md:137` — both halves of `killed` ✓.** `Do(target="B", value=True)` cuts `H-&gt;B`, `C-&gt;B`, `R-&gt;B`; after that the only paths out of H are `H-&gt;C` and `H-&gt;N1`, so M1, M2 and R have no path from the hypothesis ✓.</result>
+<usage><subagent_tokens>172901</subagent_tokens><tool_uses>21</tool_uses><duration_ms>536350</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a72f7556674fb55c1</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/a72f7556674fb55c1.output</output-file>
+<status>completed</status>
+<summary>Agent "W3: diff-view + inspector chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Report:
+
+## What I wrote
+
+**`spec/workbench/diff-view.md`** (434 lines) — full six-section chapter.
+- **Data model:** the `WorldSource` seam (`readBundle`/`readWorld`, `FixtureWorldSource`/`ApiWorldSource`), `WorldView` as this stack's hand-written view model in `frontend/src/world/types.ts` (explicitly not generated from `schema.ts`), and a `Known&lt;T&gt;` type so an absent number *cannot* render as anything but its reason. Props for `GhostOverlay`, `DeltaRail`, `BranchPanel`; tokens read but never defined here.
+- **Behaviour B1–B7:** one layout / two paintings (A′ solid, A at 20% dashed, same coordinates); the four structural states with the plan's compute-and-draw table; `shifted` arriving with the engine and nothing being deleted; `Space` as a hard switch, never a crossfade; the delta rail in map order before the engine with `range_width` and `agreement` both absent-with-reason and each explained in plain words; UX-14 word for word with the three named series states, the honest three-day gap, and a table of where each part of the line comes from as data; the branch panel with the six buttons and badges copied verbatim from the vocabulary, **Split this claim** visibly not live, append-only edits.
+- **The `untouched` claim is R, *OPEC+ announces output restraint*.** Worked out from the fixture: R's only incoming arrow is `B-&gt;R`, which is `reflexive=True`, and reachability is computed over the same map the loop check sees (reflexive arrows set aside, INV-6) — so nothing on the strike branch can reach it. Every other claim, including N1, is reachable via `H-&gt;N1`. The fixture's own comment at `hormuz.py:251` confirms the reading.
+- **INVARIANTS `INV-workbench.40`–`.49`**, each "for all X…", each naming a test file + test name or a numbered veto check. 6 anti-patterns, 5 open questions dated 2026-09-17.
+
+**`spec/workbench/inspector.md`** (422 lines) — full six-section chapter.
+- Persistent panel, no pop-ups (UX-10). Props, `ClaimDetail`, `LinkDetail`, shared `OriginMark`.
+- **Worked example on Hormuz claim B**, top to bottom with the fixture's real values (`.28 (.15–.42)` prior, `.46 (.30–.63)` model, resolve-by 2026-11-15) — and B's genuinely absent base rate, user number, market quote and evidence each rendering its own kind of absence.
+- The decomposition block laid out as `belief.md` §B4 draws it, rendered only when the world carries one; the reserved **"why is this band wide?"** slot described, its stack-06 sentence quoted, and stated plainly as empty here with a comment naming `range_shares`.
+- The arrow view worked on H → B: rationale, `+1.6 — a strong push toward`, mode in words, lag, shape with half-life, the source whose `retrieved` is absent (so it says nobody fetched it), and provenance as the word beside the same `OriginMark`.
+- The path-product bar (INV-8) on H → C → B → M1: renders, never multiplies, `"no path shown"` when absent, and the wart — factors read on their own resolve-by days, and it is not a joint probability.
+- **INVARIANTS `INV-workbench.50`–`.59`**, 7 anti-patterns, 7 open questions.
+
+## Anything I proposed that the plan did not name
+
+- **Three test files the plan does not list:** `frontend/src/components/__tests__/ghostOverlay.test.tsx`, `.../deltaRail.test.tsx`, `.../inspector.test.tsx`, `.../pathBar.test.tsx`. The plan names only `diffState.test.ts`, `branchReducer.test.ts`, `beliefChip.test.tsx` and the Playwright test; I kept reducer-level invariants in the named files and put rendering-level ones in these.
+- **I named the Playwright file `frontend/e2e/hormuz.spec.ts`** (the plan says only "under `frontend/e2e/`").
+- **`Known&lt;T&gt;`** as the name of the absence-with-a-reason type, and `WorldRequest`/`DeltaRow` field names. The plan mandates the behaviour, not the spelling.
+- **The reflexive-arrow reachability rule** — that reachability is computed with reflexive arrows set aside — is load-bearing for "R is `untouched`" and the plan never states it. Raised as diff-view Open question 1 rather than treated as settled.
+- The user belief slot as the **one** absence drawn as a bare dash rather than a sentence (the plan says "a dash inviting your own number"); I carved it out explicitly in `INV-workbench.53`.
+
+## Inconsistencies found
+
+1. **UX-14 badge wording differs in four places.** `spec/vocabulary.md:88` defines the derived badge as **Retracted · date · by "…"**; `PRODUCT_REQUIREMENTS.md:173` and `spec/multiverse/interventions.md:275` both write *Retracted · Oct 2 by "confirmed strike on Iranian territory"* — no middle dot before "by", and a quoted phrase that appears nowhere in the data. `docs/adr/0014-…:67` has the dot but the same short quote. The fixture's S claim is *"A confirmed military strike on Iranian territory."* (`backend/src/katalyst/fixtures/hormuz.py:624`), which is what my brief quotes and what my chapter uses. Three files need a one-line fix; all outside my two.
+2. **`spec/graph/belief.md:193–203` (§B4) illustrates the decomposition on claim B with numbers the fixture does not carry:** prior `.20 (.10–.35)` against the fixture's `.28 (.15–.42)` (`hormuz.py:227`); result `.71 (.55–.83)` against `.46 (.30–.63)` (`hormuz.py:229`); and a base rate *"4 of 19 months since 2022"* — **B has no `base_rate` at all**; the only base rate on the map is H's 7-of-9 (`hormuz.py:158`). §B4 also shows two incoming arrows where B has three (`R-&gt;B` at −1.2, `hormuz.py:547`). It is labelled "illustrative", so not false, but the Inspector copies that layout and a reader will compare the two.
+3. **"92% of the band is B's own base rate" is the wrong word.** `PRODUCT_REQUIREMENTS.md:134` (FR-21) and `docs/adr/0014-…:124` both say *base rate*; B has no base rate, only a prior. My brief's phrasing — "B's own starting number" — is the accurate one, and that is what I used.
+4. **`docs/adr/0014-…:111` gives B as `.35 (.20–.49)`** at day 45, a third set of numbers for B against the fixture's illustrative `.46 (.30–.63)`. Expected (the fixture's are stand-ins the engine replaces) but worth one sentence somewhere.
+5. Not an inconsistency — checked and clean: the provenance "a mark" amendment has already landed in `PRODUCT_REQUIREMENTS.md:165`, `:207` and `spec/workbench/README.md:18`.
+
+## Open questions I raised
+
+**diff-view:** does a reflexive arrow carry reachability (this decides whether R is `untouched` and must be settled with 03a before `ApiWorldSource` is switched on); is `killed` reachable on any branch we ship; how the ghost paints a claim that is both `killed` and only in A; what the one-line plain-English diff says before the engine; whether the retraction badge should be derived from the branch or from the world once both can.
+
+**inspector:** what pushes other than `+1.6` read back as in words; which path the product bar shows when several reach a claim (M1 has two); whether the panel prints the uncalibrated sentence in full rather than on hover (hover-only text is unreachable by keyboard); where the "no market" reason comes from on an ordinary claim that carries no `not_tradeable_reason`; where "falsified if" (FR-10) comes from, since no field carries it; where NFR-6's cost and transcript live; whether the arrow lines of a decomposition may render before the engine without the result line.
+
+I ran no git commands and touched no file other than my two.</result>
+<usage><subagent_tokens>193407</subagent_tokens><tool_uses>56</tool_uses><duration_ms>886166</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>abdb2e9585579ebf4</task-id>
+<tool-use-id>toolu_018h2TPfePfSoCqfnPMenY8b</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/abdb2e9585579ebf4.output</output-file>
+<status>completed</status>
+<summary>Agent "W1: tiles-ports-wires + colour chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both chapters are written. Final report:
+
+## What I wrote
+
+**`spec/workbench/color-motion-type.md`** (231 lines) — the chapter Kent reads first.
+- **Purpose** — ends on the organising sentence: *one channel per meaning*, with the definition of a channel and the test to apply before adding anything ("if I change this meaning, what on screen changes?").
+- **Data model** (= the tokens): the colour law in one table (6 meanings × channel × tokens × the non-colour cue × what survives greyscale); *Why provenance left the stroke*, with the note that UX-6, its INV-12 row and the workbench landing page are amended to "a mark" in this same pull request; the five-step neutral `--p-0…--p-4` ramp with its three rules; direction (`--dir-up`/`--dir-down` + glyph + sign + word) and the trap that **a push's sign is not a financial direction**; `--tail` defined and deliberately unused here; the branch palette (violet, teal, rose, slate — not amber); the three-animation motion budget with reduced-motion behaviour; typography (Inter, JetBrains Mono, 13/15/22, 400/500/600, 11 px floor, 4.5:1 both themes).
+- **Behaviour** — B1 reading the base Hormuz map with no clicks · B2 the greyscale test · B3 the violet strike lane · B4 the propagation wave and the same thing under reduced motion · B5 the light theme.
+- **INVARIANTS 13–19**, each with a component test path/name or a numbered visual-review-checklist line: one channel per meaning · the greyscale test · direction never hue alone · tail is texture and never guessed · provenance is a mark never the stroke · the motion budget · three sizes/three weights/two faces.
+- **9 anti-patterns**, **5 open questions**.
+
+**`spec/workbench/tiles-ports-wires.md`** (425 raw / 279 non-blank lines — the same density as `spec/graph/link.md`).
+- **Data model**: `Maybe&lt;T&gt;`/`Absence`/`BeliefView`, `TileProps`, `EvidenceClip`, `Badge`; the tile measured (280 px, 96–216 px clamp, 12 px padding, `--hairline`, no shadow); the six things table with the face/size/weight/colour of each; the monogram rule; four kind silhouettes; the belief chip (two significant figures + range always, the model chip's label and hover sentence **verbatim**, the four chip states, the supposed-claim word); typed ports; the wire's five encodings; strength→width (4 steps) and strength→words (5 bands); `OriginMark`; the midpoint chip; the hover lens; *the canvas does no arithmetic*; tokens read.
+- **Behaviour** B1–B7 on Hormuz, including a table of **all eight arrows** with their stroke, width, doubling, mark and chip text.
+- **INVARIANTS 1–12**, **10 anti-patterns**, **6 open questions**.
+
+## Things I proposed that the plan did not name
+Four kind silhouettes · tile height clamp 96–216 px · handle ids `in-trigger`/`in-sustain`/`out-trigger`/`out-sustain` · the four width thresholds (0.5 / 1.25 / 2.25) · the **five-band words-for-strength table** · the ramp is *neutral* (no hue) and paints only a bounded bar, never a whole tile, because opacity is already spent on the ghost and the lens · ramp boundaries at .2/.4/.6/.8 · `--branch-violet/teal/rose/slate` names · `--duration-wave: 200ms` and `--duration-stagger: 60ms`, with **the stagger staying at 60 ms under reduced motion while every tween goes to zero** · a single `DirectionReadout.tsx` that owns the two direction tokens · the hover lens **multiplies** existing opacity rather than replacing it · the empty user slot carries its invitation as the control's own label (so it is still "an absence with a reason") · `"no venue quotes this claim"` as the generic no-market reason · **no tail is marked in this stack at all**, because tail-ness is arithmetic · evidence direction drawn as a bare `+`/`−`, never a direction hue, and evidence `weight` not drawn on the tile · all 19 test file paths and test names.
+
+## Inconsistencies found
+1. **`PRODUCT_REQUIREMENTS.md:160` (UX-1)** still says "evidence clippings (**source favicon** + one line)" and "a **density sparkline** when quantitative". Both contradict the tile's six things (letter monogram, never a fetched favicon; no sparkline, because nothing computes a distribution). UX-1 needs the same kind of amendment UX-6 got — **it is not on the pull request's amendment list.**
+2. **`spec/workbench/README.md:5`** repeats "a small distribution sparkline when the claim is quantitative".
+3. **`spec/graph/link.md:270`** (B1) still reads "a dashed stroke meaning *argued, not documented*". H→B is an `impulse`, so its stroke is dot-dash and its provenance is ●●. The §provenance paragraph at line 234 was already amended; the worked examples were not.
+4. **`spec/graph/link.md:289`** (B2) still reads "the wire is drawn solid" as the cue for `documented`. C→B is solid because it is a `step`, and doubled because it is `sustain`.
+5. **`docs/adr/0007-canvas-react-flow-elk.md:67`** still glosses INV-12 as "a dashed stroke for `asserted`".
+6. **`docs/adr/0007-canvas-react-flow-elk.md:48`** lists diff states `unchanged | shifted | added | killed`; this stack's four structural states are `added | killed | downstream | untouched`. W3's territory, but the record is stale.
+7. **`spec/graph/belief.md:167` and `:209`** write M1's model belief as `.61 (.45–.75)`; the fixture (`backend/src/katalyst/fixtures/hormuz.py:274`) stores `hi=0.74`. My worked examples use the fixture's `.61 (.45–.74)`.
+8. **Three teals** will share one screen: `--accent` `#5fd4c4` (tokens.css:105), `--focus` `#7ce0d0` (:127) and the branch teal. Raised as open question 1 in the colour chapter.
+9. `docs/research/03-ui-ux-directions.md:57` gives the branch palette as "violet, teal, **amber**, rose" — superseded by the settled palette; research is an input, so no fix needed, and the chapter says why amber is out.
+
+**Already done by the coordinator, verified:** UX-6, PRD INV-12, `spec/workbench/README.md`'s INV-12 row and `spec/graph/link.md`'s §provenance paragraph all say "a mark". My chapter's wording matches them.
+
+## Open questions I raised
+The sharpest one, and it is a **traceability question, not a craft one**: the model chip's hover sentence begins *"Across 2 000 versions of this map…"*, and in this stack the number under it comes from the fixture's stored `beliefs.model`, which the fixture's own comments call illustrative. As written, hovering H claims an arithmetic that has not run. I wrote the sentence word for word as required and put two candidate fixes under Open questions (render the version count and band as an absence with a reason when the world is a fixture; or add one sentence naming where the number came from). **Needs Kent.**
+
+Others: the two-significant-figures table for `.035`/`.9962` (belief.md asks for it, `keyboard-and-access.md` owns the rule, it is not written yet) · the no-market reason where the world stores none · badge stacking on a 280 px tile · monogram collisions · three wire-drawing details (ramp gradient on a rounded path, a doubled 4 px wire, overlapping midpoint chips) · the three teals · the light-theme ramp · what branch creation animates · the hatch below 0.6 zoom · lens-vs-ghost opacity.
+
+## Notes for the coordinator
+- I touched only my two files. Nothing outside them needs changing **by me**, but items 1–7 above are outside my ownership and need someone to fix them.
+- **No chapter currently owns the twelve-line visual review checklist** that ADR-0007's Confirmation section promises lives in `spec/workbench/`. My invariants cite lines 3, 4, 5, 7, 8, 10 and 12 by number and restate each in a few words inline, so they stand alone — but if W2 or W3 also wrote a copy, dedupe; if nobody did, the checklist still needs a home.
+- Process slip: I ran one read-only `git status --porcelain` before re-reading the no-git rule. No other git command was run, nothing was staged, committed or pushed.</result>
+<usage><subagent_tokens>217003</subagent_tokens><tool_uses>61</tool_uses><duration_ms>1015167</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aeabd344ac41d665b</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/aeabd344ac41d665b.output</output-file>
+<status>completed</status>
+<summary>Agent "P: write propagation.md chapter" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All twenty items applied. File is 404 lines, still within the 300–450 budget. No git commands run; `spec/multiverse/propagation.md` remains the only file touched.
+
+## What changed
+
+**Blocking**
+
+1. **B's settled day corrected** (B1's Hormuz note). `S → B` has `lag=0.0` and S is settled on day 1, so B is settled on **day 1** on the branch, ahead of `H → B` (day 2), `R → B` (day 5) and `C → B` (day 7); day 2 in the base world, where there is no S. I traced the knock-on and added it: M1 settles day 2 and M2 day 4 on the branch (one day earlier than base), via `B → M1`'s one-day and `B → M2`'s three-day lags. `B → R` is the feedback arrow and is set aside, so it needs no clock. **B2's day-1/day-2 arithmetic is unaffected** — it reads the settled days of B's *sources*, not B's own.
+2. Preamble now reads "`.18` onward belongs to `diff.md`".
+3. Point 5 of the loop rewritten to your wording; the survival-weighted case and the recentring now agree with B6.
+4. "UX-14 word for word" → "UX-14's badge, with the claim named in the fixture's own words".
+
+**Consistency**
+
+5. `INV-multiverse.9` now names **`test_versions_do_not_depend_on_the_branch`**, with a sentence saying why `test_same_seed_same_world` cannot see this (it compares two runs of the same inputs); `test_same_seed_same_world` keeps replay across both streams under INV-5/NFR-2.
+6. Preamble gained the fixture-pinned sentence; `.13` and `.17` both now open "Not a generated statement…". `.17` gained a test name: `test_hormuz_strike_branch_reads_the_way_the_story_reads`, in `test_hormuz_golden.py`.
+7. The Behaviour preamble is now a table quoting all eight claims **verbatim from the fixture**, each with its `prior` including the range. Golden assertion 2 and the B8 sentence now quote C in full and label the short form as the roadmap's shorthand.
+8. "modelling budget" → "modeling budget" inside the FR-21 quotation.
+9. Added the prior-versus-base-rate parenthetical after the 92% figure.
+10. Open question 3 deleted, remaining two renumbered; `days: int` now carries `# the window's length in whole days, not the number of series points` — the only addition to the otherwise-verbatim `World` block.
+11. "probability" → "likelihood" at the two loop steps. Kept deliberately: `test_probability_bounds` (a fixed test name from records 0005 and 0008), "probability scale" in anti-pattern 4, and "skewed on probability" in the split-fit paragraph — both are the contrast with the log-odds scale.
+12. **Recomputed from the fixture myself**: over the seven base-map claims the mean gap ratio is **1.2407 on probability** and **0.938 on log-odds** → I write **1.24** and **0.94**, both now qualified "over the seven base-map claims", in the split-fit paragraph and in anti-pattern 4. (Including S, the branch claim, it would be 1.34 — worth knowing if anyone reproduces it and gets a different number.)
+
+**Plainness**
+
+13. Latin hypercube glossed at first use (the "three things deliberately absent" paragraph); the later repeat dropped.
+14. Step 3 is now "**Keep the likelihood, not the coin flip**", with Rao-Blackwellisation named in parentheses; the table row reads "**2 000 × 8, likelihoods kept, noise-corrected**".
+15. The `logit`/`sigmoid` gloss added after the formula block — and, so the cross-reference lands, B2 now introduces both names where it defines log-odds (it previously defined the idea but never the token).
+16. "a split logit-normal" carries its plain sentence, with "eight times in ten" moved alongside.
+17. The bin estimator is now described as sorting versions into bins and comparing the bins' averages.
+18. The delta method is glossed in the comparison table, its first use.
+19. Second-order Monte Carlo now says which loop is which.
+20. The law of total variance carries its one-line rule.
+
+## Not changed, and why
+
+- **`test_probability_bounds`** keeps its name despite item 11 — it is fixed by records 0005 and 0008, and renaming it here would drift the spec from the record that owns test names.
+- **"probability scale"** in anti-pattern 4 and "skewed on probability" in B5 — both are the deliberate contrast you carved out.
+- **The `World` block** is otherwise still verbatim from the plan; the `days` comment is the single addition, as you authorised.
+- **Item 2** needed no change beyond the wording tweak, as you said.
+
+One thing for the coordinator: the Behaviour preamble table now states each claim's `prior` with its range. Pull request 3 is allowed to tune those, so if the fixture's priors move, that table and the `.35 → .36`, `.07` and `.03 → .17` worked numbers move with them — all are already flagged illustrative, but the table is a second place to update.</result>
+<usage><subagent_tokens>203290</subagent_tokens><tool_uses>26</tool_uses><duration_ms>173234</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ab5c0e5cee8af0d2e</task-id>
+<tool-use-id>toolu_01334wkJnSgo8T8CkGFj61xh</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/ab5c0e5cee8af0d2e.output</output-file>
+<status>completed</status>
+<summary>Agent "Q: write diff.md chapter" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All fixes applied. File is 299 lines; only `spec/multiverse/diff.md` was touched, and I ran no git commands this time.
+
+## What changed
+
+1. **Renumbered** the thirteen invariants `INV-multiverse.40`–`.52` → **`.18`–`.30`**, in order, including the two cross-references inside invariant bodies. Replaced the numbering sentence with your exact wording (`.1`–`.5` interventions, `.6`–`.8` branches-and-worlds, `.9`–`.17` propagation).
+2. **Arrow style.** Every spaced `X -&gt; Y` in prose is now the glyph `X → Y`; the one place the chapter names an identifier as a value uses the exact `` `H-&gt;N1` ``. The only remaining ` -&gt; ` are the two Python return-type arrows in the `diff` and `sensitivity` signatures.
+3. **Agreement gloss** in B3 replaced with your sentence, naming both senses and the vocabulary's "say which" rule.
+4. **`ClaimDiff.agreement`** now carried on every claim present in both worlds, comment `` `None` only when the claim is `added` ``, with a short paragraph under the model saying why (so the rule that decided a state can be read off the `Diff`). INV-multiverse.20 now says both numbers are carried and the rule reads straight off the `Diff`.
+5. **Rank paths fixed** to follow the nearest-differing-subject rule: M1 and M2 are two arrows from both H and S (all `argued`, weakest `0.6`); **N1's nearest subject is H itself, one arrow, `H → N1`, `asserted`, `0.3`**. I also moved the "what the path is measured from" paragraph *above* the worked example, so the rule is stated before it is applied.
+6. **Singular form** added beside the template — `` (`claim`, singular, when &lt;n&gt; is 1) `` — and INV-multiverse.27 now requires it.
+7. **`&lt;edit in the user's words&gt;`** — B6 now says the branch's `label` fills the slot for a branch of several edits, a single-edit branch may use that edit's words, and neither is ever written fresh. INV-multiverse.27 names which.
+8. **Branch naming** — `` `br_hormuz_then_strike` `` for the identifier everywhere (three places), with the label quoted as **"Hormuz opens, then Iran is struck"**, checked against `hormuz.py:721-722`.
+9. **Claim wording** now quoted verbatim from `backend/src/katalyst/fixtures/hormuz.py` for all eight claims, including M1's nested quotation, M2's "20 trading days" and N1's "Omani-mediated United States-Iran talks resume publicly".
+10. **INV-8** — added your parenthesis about §9 writing it as link probabilities while the number shown is the product of the claims' likelihoods, each on its own resolve-by day, citing record 0014. Also softened the lead-in so it no longer contradicts §9's wording.
+11. **Peak-day invariant** — "a divergence **larger in size**", plus a sentence that `at_day` is always one of the days the series carries, which matters when a window over 180 days has been sampled down.
+12. **Open-questions preamble** → "The first three need Kent; the last three name who owns them." I also gave question 6 an explicit owner (`spec/workbench/`) so the preamble is true for all three.
+13. **B7** — added the unranked-rows paragraph with the per-terminal reason and the adverse-direction example; trimmed the later FR-19 sentence so it no longer says "ranked by the adverse change".
+14. **Arithmetic** — `B → M1` at day 30 is now **0.26**, and B5 says in a clause where B's clock starts: day 2, the earliest day a live arrow reaches it through `H → B`'s two-day lag, citing `propagation.md` B1. Anti-pattern 6 updated to 0.26 too. `H → B` at 0.37 left as is.
+15. **"modeling"** left as FR-21 spells it.
+
+## Not changed, and why
+
+- **Anti-pattern 6's "a quarter of the move"** still reads as a round characterisation of both 0.37 and 0.26 rather than an exact figure; I left the phrasing since it is doing rhetorical work, not arithmetic.
+- **One incidental repair you did not ask for:** a first pass left a garbled clause in B2 (`R's only incoming arrow is "H → R"'s neighbour "B → R"`) while converting arrow glyphs. Fixed in place to `` `B → R` `` — flagging it because it was mine, not the reviewer's.</result>
+<usage><subagent_tokens>183208</subagent_tokens><tool_uses>4</tool_uses><duration_ms>189412</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aced43e63c11c0d42</task-id>
+<tool-use-id>toolu_01XHRGPZ28RdHgybyUcphgQH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/aced43e63c11c0d42.output</output-file>
+<status>completed</status>
+<summary>Agent "D: build apply (03a PR2)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Everything is committed on `feat/03a-apply`; nothing was pushed.
+
+## What I built
+
+**`backend/src/katalyst/domain/patch.py`** (new, 693 lines)
+
+- **`Assignment`** — frozen, with `target`, `value`, `at`, `by`, `kind`, exactly as the plan writes it. `Proposition` gained no field.
+- **`apply(graph, branch, assignments=()) -&gt; tuple[Graph, tuple[Assignment, ...]] | list[Violation]`** — pure; folds edits in order. `do` removes only the arrows pointing at its target **at that moment** and records an assignment; `observe` removes nothing and records one; `insert` adds the claim and its arrows; `retune` replaces one arrow's `strength`; `believe` writes `beliefs.user` on one claim; `refine` returns a violation saying it is not built yet. Failure is always a list of violations — never an exception, never a half-applied branch.
+- **`flatten(branches, branch_id)`** — walks the parent chain, parent's edits first; a looping chain returns a `cycle` violation instead of hanging; a missing branch returns `unknown_target`.
+- **`affected_set(graph, intervention)`** — one branch per row of the table in `interventions.md` §INVARIANTS, over `networkx`. No new dependency.
+
+**`validity.py`** — the three codes `unknown_target`, `unknown_link`, `duplicate_id`, with plain sentences naming the claim or arrow by its words. `validate` itself is untouched.
+
+**`tests/unit/domain/test_patches.py`** (new) — all nine named tests, plus one test per way an edit can fail to fit, the affected-set table read off a small hand-built map, and two Hormuz tests: the strike branch folds cleanly (assignments `H`@0 and `S`@2), and `S-&gt;H` survives in the example's order but is cut when the `insert` is moved before the `do`.
+
+**`tests/strategies.py`** — additions only: `graphs(separated=False)` (a map in two pieces), `fully_separated_pairs(graph)`, `separated_pair(graph)`, and a `kind` argument on `interventions()`. Defaults keep every existing test's behaviour identical.
+
+`test_apply_touches_only_the_affected_set` computes the affected set itself in ~15 lines of `networkx` from the chapter's table, never calls `domain.patch.affected_set`, pins a fully separated claim for each of the six operations, and discards starved maps with `assume` (measured: separated maps always offer ≥ 8 such pairs; retune discards ~1 in 3, the rest ~0).
+
+## Where I deviated from the plan, and why
+
+1. **`refine`'s refusal carries `unknown_target`.** The plan allows exactly three new codes and none of the sixteen means "not built yet". The reading I documented: the *finer claims the edit names* are not on this map and this version cannot put them there. The message says exactly that. **A fourth code (`not_implemented`) would be cleaner — your call.**
+2. **An `insert` whose arrow touches neither end of the new claim is also refused under `unknown_target`.** That precondition is in `interventions.md` (and not enforcing it is how locality quietly stops being true), but it was not among the three codes open question 5 proposed. Same compromise as above.
+3. **`flatten` reuses the existing `cycle` code** for a looping parent chain, and puts a **branch id** in `Violation.subject`.
+4. **Three truth-preserving edits in `validity.py` beyond adding the codes**: the `ViolationCode` docstring ("thirteen" → "sixteen: thirteen map faults, three refused edits", with a line per new code), and two `Violation` field descriptions ("one of thirteen" → sixteen; `subject` now also lists a branch id). Leaving them would have made the file lie. Revert freely if you'd rather.
+5. **`apply` stops at the first edit that cannot be applied** and reports everything wrong with *that* edit. Checking the later edits would check them against a map that never existed, and a complaint about a map nobody made is one the user cannot act on.
+6. **`insert` rejects only loops**, by running `validate` on the candidate map and keeping the `cycle` complaints (same code, same sentence as a rejected proposal). Other map faults on a newly added claim are left to `validate`, pinned by a test.
+7. **The law-2 test pins the `by` shift rather than looking away** — see below.
+
+## Design notes for `propagate`
+
+- **`at` means day zero when `None`,** and `observe` always writes `None` because `Observe` carries no date. `propagate` reads `at` straight into the settled-day schedule.
+- **Assignments are appended, never replaced.** A second `do`/`observe` on the same claim sits after the first, so *Supposed · Oct 1 → Retracted · Oct 2* is readable off the list.
+- **`affected_set` must be given the map the edit *leaves behind***, not the base — an `insert`'s new claim only exists on the second. Documented on the argument.
+- **`affected_set` keeps reflexive arrows.** It is a permission, so it must never be narrower than the arrows on the map, whatever stack 06 does with them.
+- **The `by` numbering rule (the plan asked me to think this through).** `by` counts positions along the run of edits the fold has seen. Fed-back assignments continue from *one past the largest position already recorded* — which is the most a list of assignments can say, since only `do` and `observe` record one. So the two-call form matches the one-call form exactly when the first branch ends on an edit that fixed a value, and otherwise the second branch's positions are shifted down by however many trailing edits fixed nothing. The one-call form is the only one the interface ever uses (`flatten` hands the whole chain over at once), which is precisely why it exists. `test_patch_concat_equals_sequential_apply` asserts the maps byte-identical always and pins that shift exactly.
+- **A gap you should decide before I write PR 3.** `Retraction.by` is "the edit that introduced the arrow, by position in the branch", and nothing `apply` returns records which edit added which arrow. (The undermining arrow is *always* one added by a later `insert`, since the `do` cut everything else.) Three ways out: (a) a small pure helper in `patch.py` — `introduced_by(branch) -&gt; Mapping[LinkId, int]` — computed from the branch alone and passed into `propagate` as a keyword, which widens `propagate`'s pinned signature; (b) read `by` off the assignment that settled the arrow's source, which breaks when the source has no assignment; (c) `apply` returns a third thing. I'd take (a). Tell me which.
+
+## Open questions
+
+- The `refine` / stray-`insert`-arrow code compromise (points 1 and 2 above).
+- `Retraction.by` (above).
+- `Observe` carries no date, so an observation always records day zero. That is `interventions.md` open question 3, still open; I only note that `apply` now makes the consequence concrete.
+- Should `apply` report every failing edit rather than stopping at the first? I chose no, to avoid phantom complaints; happy to flip it.
+
+## `types-fresh`
+
+**Not stale.** Neither `Violation` nor `Assignment` appears in the server's published description (checked directly), so `frontend/src/api/schema.ts` is unaffected. I did not touch `frontend/`.
+
+## Files touched
+
+```
+ backend/src/katalyst/domain/__init__.py   |  21 +-
+ backend/src/katalyst/domain/patch.py      | 693 +++++++++++++++++++++++
+ backend/src/katalyst/domain/validity.py   |  24 +-
+ backend/tests/strategies.py               | 123 ++++-
+ backend/tests/unit/domain/test_patches.py | 876 ++++++++++++++++++++++++++++++
+ 5 files changed, 1708 insertions(+), 29 deletions(-)
+```
+
+Two commits: `3e86fab feat(domain): fold a branch onto a map — apply, flatten and the affected set`, `5c72fab test(domain): the patch algebra, the six refusals, and the structural half of locality`. `pre-commit run --files …` passes on all five files (the shared hooks directory has no `pre-commit` hook wired, only `commit-msg`, so I ran it by hand).
+
+## Verification
+
+```
+=== pytest ===
+src/katalyst/domain/patch.py            153      0     68      0   100%
+src/katalyst/domain/validity.py         139      0     52      0   100%
+---------------------------------------------------------------------------------
+TOTAL                                   489      0    134      0   100%
+======================= 173 passed, 2 warnings in 43.45s =======================
+
+=== ruff check ===        All checks passed!
+=== ruff format --check === 42 files already formatted
+=== mypy src ===          Success: no issues found in 23 source files
+=== mypy --strict src/katalyst/domain === Success: no issues found in 10 source files
+```
+
+`grep -rn "scipy\|strength_lo\|strength_hi" backend/` and `grep -rn "np.random\.\(seed\|rand\|choice\)" backend/src` both find nothing. The import-boundary test stays green.</result>
+<usage><subagent_tokens>322601</subagent_tokens><tool_uses>68</tool_uses><duration_ms>1546052</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a6b044a254328e10a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/a6b044a254328e10a.output</output-file>
+<status>completed</status>
+<summary>Agent "R-b: review 03b chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I've read all six chapters and every reference. Here is the review.
+
+**Base directory for the six chapters:** `/Users/kentgang/git3/katalyst-wt/spec-03b/spec/workbench/` (file:line below is relative to that directory; other paths are absolute).
+
+No chapter contradicts a settled pre-decision outright — the pre-decisions table survived all three writers. Every blocking item below is either the three writers disagreeing with each other, or a number that nobody computed.
+
+---
+
+## Blocking
+
+**1. Two incompatible types for "a value or a reason there is none", both destined for `frontend/src/world/types.ts`.**
+`tiles-ports-wires.md:22–30` defines `type Maybe&lt;T&gt; = { known: T } | { absent: Absence }` plus `interface Absence { kind: "no_engine" | "no_market" | "not_said"; reason: string }`. `diff-view.md:59–62` defines `export type Known&lt;T&gt; = { known: true; value: T } | { known: false; reason: string }`. The two have the same discriminant name (`known`) with different meanings, so they cannot even coexist.
+**Fix — one definition in `diff-view.md`, keeping W1's `kind` discriminator (three absences need three different sentences, so the type must say which):**
+```ts
+export type Known&lt;T&gt; = { known: true; value: T } | { known: false; absence: Absence };
+export interface Absence {
+  /** Which absence this is; it picks the words. */
+  kind: "no_engine" | "no_market" | "not_said";
+  /** The sentence shown beside the words. Always present, never empty. */
+  reason: string;
+}
+```
+**Every place to change:** `tiles-ports-wires.md:22–23` (delete the type, replace with a pointer to `diff-view.md`), `:25–30` (move `Absence` into `diff-view.md`), `:49,:50,:51` (`Maybe&lt;BeliefView&gt;` → `Known&lt;BeliefView&gt;`), `:163` (same). `diff-view.md:38` (comment already says `Known&lt;T&gt;` ✓), `:60–62`, `:95`. `inspector.md:47,:49,:52,:56,:67,:73,:312`. Note `not_said` is defined and never used — either bind it to the empty user slot at `tiles-ports-wires.md:138` or delete it.
+
+**2. `keyboard-and-access.md:191,193` invents a count, in the one sentence whose whole point is that counts must be earned.**
+The announcement reads *"…seven claims your edit can reach…"*. `diff-view.md:158–160` makes six claims `downstream` (H, C, B, N1, M1, M2); R is `untouched` and S is `added`, not reached. Seven is only reachable by counting S, which is a different badge.
+**Fix:** `&gt; *"Branch created. One claim added, six claims your edit can reach, one supposition retracted. No numbers yet."*` and at `:193` `**Six claims your edit can reach**`.
+
+**3. `layout-and-zoom.md:13` says "Six options, and no others"; five are listed.** `ELK_OPTIONS` at `:16–22` has five keys, the table at `:27–33` has five rows, and the plan names five. Propagates to `:185` ("exactly the six in `ELK_OPTIONS`") and the test name `test_layout_options_are_the_six_named`.
+**Fix:** "Five options, and no others"; `:185` "exactly the five in `ELK_OPTIONS`"; rename to `test_layout_options_are_the_five_named`. Also add one clause at `:22` that `elk.position` is set per tile, not in this list, so "no others" stays true.
+
+**4. Three chapters, two different rules for whether a reflexive arrow carries reachability.**
+`diff-view.md:163–169` computes reachability with reflexive arrows **set aside**, which is the only way R comes out `untouched` — and the plan's "Done when" and its `diffState.test.ts` line both require a claim that comes out `untouched`. But `tiles-ports-wires.md:308` walks `B → R` for the hover lens ("Its descendants are M1, M2 and **R**"), `keyboard-and-access.md:88–90` walks it for `l`, and `:175` puts R under B in the outline tree. Worse, `/Users/kentgang/git3/katalyst-wt/spec-03b/spec/multiverse/interventions.md:344,353` computes the affected set with `networkx` over the whole map — which includes `B → R`, so the server would make R `downstream` and `INV-workbench.43` would fail on day one.
+**Fix:** state the rule once, in `diff-view.md:152`, as *(proposed here)*: **reachability for diff states is computed over the map the loop check sees — reflexive arrows set aside; the hover lens, `h`/`l` and the outline follow every wire, including reflexive ones, because they are navigation and not a claim about what an edit moved.** Then add one sentence at `tiles-ports-wires.md:239` and `keyboard-and-access.md:90` pointing at it. This is open question 1 for Kent below; until he answers, mark `diff-view.md:162` and `INV-workbench.42` as resting on it.
+
+**5. `inspector.md:79` and `diff-view.md:113` name tokens that `color-motion-type.md`'s own test forbids them to name.**
+`color-motion-type.md:179` pins INV-workbench.15 with *"no file outside `DirectionReadout.tsx` names a direction token"*, and `:183` (INV-workbench.16) says no tail marking is drawn in this stack. Both W3 chapters list `--dir-up` / `--dir-down`, and `inspector.md:79` also lists `--tail`.
+**Fix:** `inspector.md:79` — delete `--dir-up` / `--dir-down` with their glyphs, `--tail`; add "a direction is rendered only through `DirectionReadout`, which owns those tokens ([`color-motion-type.md`](color-motion-type.md))." Same at `diff-view.md:113` — replace "the direction pair `--dir-up` / `--dir-down`" with "a direction, once the engine lands, through `DirectionReadout`".
+
+**6. `inspector.md:156–167` prints three contradictory sets of numbers for claim B, two of them uncomputed.**
+`:111–128` gives B from the fixture: `PRIOR .28 (.15–.42)`, `BASE RATE — no reference class recorded for this claim`, `model .46 (.30–.63)`. Forty lines later the decomposition block for the same claim reads `prior .20 (.10–.35)`, `base rate: 4 of 19 months since 2022`, `= model .71 (.55–.83)` — correctly copied from `/Users/kentgang/git3/katalyst-wt/spec-03b/spec/graph/belief.md:152–160`, but `belief.md`'s illustration predates the fixture and disagrees with it, and it shows two incoming arrows where B has three. The caveat at `:166` does not save it: a reader sees a base rate on a claim the panel just said has none.
+**Fix:** do not reproduce the block. Replace `:156–167` with: "The layout is the one [`../graph/belief.md`](../graph/belief.md) §B4 draws — prior, one line per incoming arrow with its push and its reason, then the result — and this panel copies it rather than inventing a second. §B4's numbers are its own illustration and are not B's: B's prior is `.28 (.15–.42)`, it has no base rate, and it has three incoming arrows, not two. This stack renders no such block, because no engine has computed one." Keeps the decision, drops three invented numbers.
+
+**7. `inspector.md:113–114` puts the model chip's uncalibrated label on the wrong row.** It sits under `PRIOR .28`. Decision record 0014 §B defines that label for a **computed** likelihood produced by the two-thousand-versions machine; a prior's range is elicited, not computed. `belief.md` §B4 also attaches the decomposition to the *model chip*, not the prior.
+**Fix:** move the label (and the reserved band slot beneath it) under the `BELIEFS / model` row, and substitute that row's number: `model interval, uncalibrated · how sure we are of .46 — not how much the world can move`. Add one line under `PRIOR`: "the prior's range is stated, not computed — it says how sure the elicitation was."
+
+**8. `tiles-ports-wires.md:115` and `layout-and-zoom.md:133` disagree about the summary tile.** W1: all four silhouettes "survive the summary rendering". W2: the summary is "the claim and the three belief chips, nothing else", and the kind silhouette is listed as a full-detail item.
+**Fix:** W2 is describing regions; the silhouette is the tile's outline, not a region. At `layout-and-zoom.md:133` change to: "Below **0.6 zoom** a tile paints its **summary**: the claim and the three belief chips inside the same kind silhouette, nothing else. The outline never goes — it is the tile's shape, and dropping it would lose the claim's kind at exactly the zoom where you are scanning for one."
+
+**9. Ghost opacity: each chapter says the other owns it, and neither defines it.** `diff-view.md:115` — "All are defined in `color-motion-type.md`, including the ghost's 20% and its dash." `color-motion-type.md:231` — "`diff-view.md` owns the ghost's own value." The colour law table and the token list in `color-motion-type.md` contain no ghost opacity.
+**Fix:** `diff-view.md` owns it (it already states it at `:133`). Delete "including the ghost's 20% and its dash" from `:115`. Add to `diff-view.md` after `:133`: "The old world paints at **20%** opacity, dashed. The hover lens *multiplies* this rather than replacing it ([`tiles-ports-wires.md`](tiles-ports-wires.md)), so a tile that is both off-path and old lands near 3% and disappears — which is correct."
+
+**10. The same test is named two ways, and the two naming conventions fight.** W2 uses snake_case identifiers (`test_pinned_tiles_keep_their_positions`), matching the one frontend test the plan pins. W1 and W3 use prose. Concretely the same test appears twice:
+- belief chip, supposed claim: `tiles-ports-wires.md:365` *renders the word, not a likelihood, while a claim is supposed* vs `diff-view.md:366` `a supposed claim renders the word, not a number`.
+- two significant figures: `tiles-ports-wires.md:345` *never shows more than two significant figures* vs `keyboard-and-access.md:229` `test_chip_never_shows_more_than_two_significant_figures` (the plan's spelling).
+**Fix:** snake_case everywhere on the frontend — it is the only spelling the plan fixes and it matches decision record 0008's "read the invariant names as the test list". Renames: `tiles-ports-wires.md:345` → `test_chip_never_shows_more_than_two_significant_figures` and `test_chip_never_omits_the_range`; `:365` and `diff-view.md:366` both → `test_a_supposed_claim_renders_the_word_not_a_number`; `:352` → `test_every_absence_renders_words_and_a_reason`. Apply the same to the remaining ~20 prose names in `tiles-ports-wires.md`, `color-motion-type.md`, `diff-view.md` and `inspector.md`.
+
+---
+
+## Consistency
+
+11. **`keyboard-and-access.md:255` misquotes NFR-1.** NFR-1 writes `.35 (.20–.50)` — two figures on all three. The one-figure example `.35 (.2–.5)` lives in `/Users/kentgang/git3/katalyst-wt/spec-03b/spec/graph/belief.md:149` and `docs/adr/0005-link-semantics-and-propagation.md:67`. Also: the plan's `.61 (.45–.75)` is `belief.md` §B5's illustration (`lo=0.4471, hi=0.7522`), **not** M1 — do not "fix" the fixture; the chapters' `.61 (.45–.74)` for M1 is correct. **Fix:** rewrite the question as "`spec/graph/belief.md` §B5 writes `.61 (.45–.75)` and its §B3 writes `.35 (.2–.5)`; those two disagree with each other, and NFR-1 sides with two figures everywhere. One of belief.md's two examples needs fixing."
+
+12. **`tiles-ports-wires.md:421` says the worked rounding table "is not written yet".** `keyboard-and-access.md:141–147` writes it. **Fix:** delete open question 2, or reduce to "the table is in [`keyboard-and-access.md`](keyboard-and-access.md) B6; `.995` and `.06` are still open there."
+
+13. **`tiles-ports-wires.md:193` says "nothing written before this chapter gives more than the one phrase 'a strong push toward'"** — and its own next sentence cites `../graph/link.md`, which has a nine-row words table at lines 158–168. **Fix:** "*(proposed here — [`../graph/link.md`](../graph/link.md) anchors ±0.5, ±1.0, ±2.0 and ±3.0; this table fills the gaps between them and adds a band below 0.25)*". The five bands are otherwise consistent with link.md ✓.
+
+14. **`inspector.md:391–394` (open question 1) is already answered.** `link.md`'s table plus `tiles-ports-wires.md:196–201` give `+0.7` → *a nudge toward*, `−0.4` → *a nudge against*, `−2.4` → *a strong push against*. **Fix:** replace with "the five bands are proposed in [`tiles-ports-wires.md`](tiles-ports-wires.md); this panel uses them. Whether five bands or link.md's four anchors is the rule needs one answer."
+
+15. **`diff-view.md:372` — "one of the seven in the *Interface words* table".** There are six badges: five in the table (Supposed, Happened, Added, Retuned, Split; **My own number** produces none) plus the derived **Retracted · date · by "…"**, which sits below the table. **Fix:** "every badge on screen is one of the six — the five in the *Interface words* table plus the derived **Retracted · date · by "…"**".
+
+16. **`layout-and-zoom.md:135` smuggles a decision.** Counter-scaling the summary tile's text against the viewport zoom is not in the plan, is not marked *(proposed here)*, and it means a 280-pixel tile no longer measures 280 pixels on screen — which is veto check 8 and INV-workbench.1. **Fix:** mark it *(proposed here)* and add "the tile's own 280 pixels are unchanged in graph coordinates; only the text holds its size on the glass, which is why open question 5 exists."
+
+17. **`layout-and-zoom.md:79` states "focus does not wrap" as settled**, while open question 7 says it is unsaid. **Fix:** add *(proposed here)* at `:79`.
+
+18. **`keyboard-and-access.md:79,92,94` introduce a "status line" that exists nowhere else** — not in UX-1…UX-14, not in the plan, not in the other five chapters. **Fix:** mark it *(proposed here)*, say where it lives (one line under the canvas), and add it to the open questions, or replace it with the outline's own announcement.
+
+19. **`layout-and-zoom.md:39` vs `:195`.** Line 39 quotes ADR-0007's "ELK runs 50–150 milliseconds on sixty tiles"; INV-workbench.30 then requires "layout and first paint complete in under 100 milliseconds" and names `test_sixty_tiles_lay_out_under_100ms`. On 0007's own numbers that test fails. **Fix:** say which NFR-7 measures — the worker's `elapsedMs` alone, or layout plus paint — and note that 0007's upper figure already exceeds the budget, so the test may be a known-red pin rather than a pass.
+
+20. **Five invariants name no automated check.** `keyboard-and-access.md:226` (INV-33, wire-following focus), `:231` (INV-38, contrast) and `:225`/`:228` name only a veto check or the e2e test. `tiles-ports-wires.md:318` and `color-motion-type.md:157` both say out loud "a checklist line is a checkable thing; it is checked by a person"; `keyboard-and-access.md:220` does not. **Fix:** add that sentence at `:220`, and give INV-33 a real unit test — `test_h_and_l_land_only_on_a_wired_neighbour` in a keyboard reducer test — because it is the cheapest thing on the list to check in code.
+
+21. **Three invariants claim more than their test covers.** `color-motion-type.md:163` (INV-13, "for every meaning… exactly one channel") is checked by one stylesheet walk over the likelihood ramp only. `inspector.md:297` (INV-50) scopes itself to "every button press and every error path **in this product**" but its test only walks selections. `inspector.md:302` (INV-51) covers "every number rendered on the canvas, the delta rail or a tile" from `inspector.test.tsx`. **Fix:** narrow each statement to what the named test checks, or add the missing tests.
+
+22. **`color-motion-type.md:215` (anti-pattern 5) gives no reason** — the only one of the 49 anti-patterns not in *do not X, because Y; do Z instead* form. **Fix:** "**Do not reach for amber when a fourth branch appears**, because amber already means 'the money moves down' and a branch chip a reader mistakes for a downward move is worse than no colour at all. **Instead:** violet, teal, rose, slate — and a fifth branch is a question for Kent, not a fifth hue picked on the spot."
+
+23. **Three names for one per-claim record, and one undefined type.** `diff-view.md:80–81` refers to `ClaimView[]` and `LinkView[]`, defined nowhere; `tiles-ports-wires.md:44` defines `TileProps`; `inspector.md:43` defines `ClaimDetail`. `diff-view.md:104` reads `positions: PositionMap`, which is `layout-and-zoom.md:52`'s `LayoutResult.tiles`. **Fix:** define `ClaimView` / `LinkView` once in `diff-view.md` as the records on `WorldView`, and say in one line in each of the other two that `TileProps` and `ClaimDetail` are projections of `ClaimView`. Rename `PositionMap` to `LayoutResult["tiles"]` or define `PositionMap` in `layout-and-zoom.md`.
+
+24. **Three names for the belief chip's input.** `tiles-ports-wires.md:33` `BeliefView`, `keyboard-and-access.md:56` `ChipValue` (identical shape, same component), `inspector.md:46,:49` `Belief` (undefined here; it is the backend domain name). **Fix:** `BeliefView` everywhere; delete `ChipValue` from `keyboard-and-access.md:55–63` and point at `tiles-ports-wires.md`.
+
+25. **`layout-and-zoom.md` says "column" in prose and `layer` in every code and test name** (`LayoutResult.layer`, `orderInLayer`, `test_layer_cap_collapses_the_rest`, `test_within_layer_order_is_stable`, `test_reflexive_links_are_set_aside_for_layering`), and the plan and veto check 6 say "layer". **Fix:** one line at `layout-and-zoom.md:29`: "ELK's word is *layer*; the code and the test names use it. On screen and in this chapter the word is **column**, because that is what a reader sees."
+
+26. **Two words for one absence.** `tiles-ports-wires.md:139` fixes the empty market slot as **no market**; `keyboard-and-access.md:174` renders M2's as "No market price." Also M2's `kind` is `market`, so "no market" on it reads as a contradiction. **Fix:** `:174` → "No venue quotes this." and fold into open question 6 below.
+
+27. **`diff-view.md:398` writes `.99` where the plan, UX-14 and `tiles-ports-wires.md:407` write `.98`.** **Fix:** "`1.0`, `.98` or a full bar".
+
+28. **Rail column labels are code names on screen.** `diff-view.md:211` heads a column `range_width`; `:222–224` prints `width —  agreement —`. **Fix:** pick screen words — **how firm** and **agreement** — and keep `rangeWidth` / `agreement` as the field names only; the chapter already mixes `range_width` (prose) with `rangeWidth` (TypeScript) at `:90–92`.
+
+29. **`color-motion-type.md:145` describes a wave that never draws `R → B`.** "the arrows out of H first, then the arrows out of C, then the arrows out of B" — R sits in column 1, so its outgoing arrow belongs with C's layer. **Fix:** "then the arrows out of C and R, then the arrows out of B".
+
+30. **`spec/workbench/README.md` contradicts the chapters it links.** Its opening paragraph still promises "a small distribution sparkline" and a "world-state strip" (`tiles-ports-wires.md:102` rules the sparkline out, with a reason; the plan rules out the strip); its chapter table says "the conditional-**probability** chip"; its INV-8 row says "link **probabilities**" where the vocabulary says likelihood. The Visual review checklist is in place and its numbering matches the plan — all twelve citations across the six chapters are correct ✓. **Fix:** amend the two paragraphs; the checklist needs nothing.
+
+31. **Duplicated passages that should be one definition plus a pointer.** The sign-convention argument (*a positive push on a falling price*) is made four times: `tiles-ports-wires.md:182`, `:304`, `:410` and `color-motion-type.md:65`. The "tiles do not move" sheet line is quoted twice in W2's own two chapters (`layout-and-zoom.md:173`, `keyboard-and-access.md:103`). "Do not crossfade" is an anti-pattern twice (`color-motion-type.md:217`, `diff-view.md:386`). "Never average the three" is an anti-pattern twice (`tiles-ports-wires.md:411`, `inspector.md:366`). The reduced-motion table appears twice (`color-motion-type.md:100`, `keyboard-and-access.md:122–126`). **Fix:** keep the first of each and replace the rest with a one-line pointer.
+
+---
+
+## Plainness
+
+32. **All six chapters restate the Hormuz cast in full** (`tiles-ports-wires.md:253`, `color-motion-type.md:124`, `layout-and-zoom.md:84`, `keyboard-and-access.md:73`, `diff-view.md:121–125`, `inspector.md:90–93`) — about 20 lines of duplication. **Fix:** put the cast once in `spec/workbench/README.md` and open each Behaviour section with "Worked on the Hormuz map (the cast is in [`README.md`](README.md))", then name only the claims that chapter uses.
+
+33. **`inspector.md:156–179`** — 24 lines to reproduce a block this stack renders nothing of. Cutting it fixes blocking item 6 and removes the chapter's longest passage. The three rules at `:170–177` survive in four lines.
+
+34. **`diff-view.md:258–273`** — two tables ("Where each part of the line comes from" and "What this stack can show, and what needs the world") that overlap the B6 state table above them. **Fix:** merge into one table with a fourth column, "needs the world?". Saves ~12 lines and removes the third telling of the same derivation.
+
+35. **`diff-view.md:5–15`** — the Purpose is three paragraphs; the third repeats the second ("structural… still earns the screen" after "what did my edit reach, and what did it provably leave alone"). Cut the third to its last sentence about absences.
+
+36. **`keyboard-and-access.md:205–214` (B10's test table)** duplicates four rows of the INVARIANTS table 15 lines later. Cut the table; keep the `e2e`/INV-13 paragraph at `:216`.
+
+37. **`keyboard-and-access.md:193`** — "Every word of that is earned…" re-quotes the announcement phrase by phrase immediately after quoting it whole. Cut to one sentence naming where each count comes from.
+
+38. **`keyboard-and-access.md:107–116` (B4)** — ten lines to say an overlay is not a dialog. The four numbered conditions are the decision; the framing paragraphs at `:107` and `:116` can go to two sentences.
+
+39. **`tiles-ports-wires.md:298–305`** — "Three readings fall straight out of that table"; the third (R → B is not amber) restates `:182`, anti-pattern 8 and `color-motion-type.md:65`. Cut it and keep the two that are new.
+
+40. **`tiles-ports-wires.md:425` (open question 6)** bundles three unrelated drawing details in one item and ends "Nothing on the Hormuz map forces any of the three, which is why they are here rather than decided." Nothing here needs Kent. **Fix:** cut, or move to a one-line note under the wire's table.
+
+41. **`layout-and-zoom.md:104–105` and `:169`** each restate an anti-pattern that appears verbatim below (`:200`, `:202`). Cut both to the first sentence.
+
+42. **`color-motion-type.md:5`** — the opening sentence lists six meanings as questions, then the next sentence lists the same six as answers. Cut the first list.
+
+43. **Three unexplained items.** `keyboard-and-access.md:69` writes "12.1 to 1" and "5.7 to 1" with no word for what a contrast ratio is (correct against `tokens.css` ✓, but the chapter must stand alone). `diff-view.md:73` uses `do(…, false)` — a code name in a prose table, one row above a chapter that bans them on screen; write "the target of a **Suppose this is false**". `inspector.md:62` writes "signed, on the log-odds scale" 118 lines before `:178` explains what a log-odds scale is; move the explanation up.
+
+---
+
+## Cross-chapter table
+
+| Shared name | tiles-ports-wires | color-motion-type | layout-and-zoom | keyboard-and-access | diff-view | inspector | **Recommended** |
+|---|---|---|---|---|---|---|---|
+| Absence-with-a-reason type | `Maybe&lt;T&gt;` + `Absence` | — | — | — | `Known&lt;T&gt;` | `Known&lt;T&gt;` | **`Known&lt;T&gt;` + `Absence`** (W3's name, W1's `kind` field) |
+| Belief shape | `BeliefView` | — | — | `ChipValue` | — | `Belief` | **`BeliefView`**, defined once in `tiles-ports-wires.md` |
+| Per-claim record on the world | `TileProps` | — | `TileLayoutProps` | `OutlineItem` | `ClaimView` (undefined) | `ClaimDetail` | **`ClaimView`** on `WorldView`; the rest are named projections of it |
+| Per-link record | `WireProps` | — | inline in `LayoutRequest` | — | `LinkView` (undefined) | `LinkDetail` | **`LinkView`**; the rest projections |
+| Layout output | — | — | `LayoutResult.tiles` | — | `PositionMap` | — | **`PositionMap`**, defined in `layout-and-zoom.md` as the type of `LayoutResult.tiles` |
+| Handles | `in-trigger` / `in-sustain` / `out-trigger` / `out-sustain` | — | — | — | — | — | **as written** (*proposed here* ✓, no conflict) |
+| Likelihood ramp | `--p-0 … --p-4` | `--p-0 … --p-4` | — | — | `--p-0 … --p-4` | `--p-0 … --p-4` | **agree ✓** |
+| Branch palette | — | `--branch-violet/teal/rose/slate` | — | — | "violet, teal, rose, slate" | — | **agree ✓** (names *proposed here*) |
+| Duration tokens | `--duration-fast` | `--duration-fast`, `--duration-wave`, `--duration-stagger` | — | `--duration-fast` | — | — | **agree ✓**; only `--duration-fast` exists in `tokens.css` today, correctly marked new |
+| Direction tokens | explicitly does **not** read them ✓ | owns them, one component | — | — | lists them | lists them + `--tail` | **only `DirectionReadout` names them**; W3 removes both |
+| Ghost / lens opacity | lens 15%, multiplies | points at diff-view | — | — | ghost 20%, points at color-motion-type | — | **`diff-view.md` owns both values and the multiply rule** |
+| Test-name style | prose | prose | `test_snake_case` | `test_snake_case` | prose | prose | **`test_snake_case`** (the plan's one pinned frontend name) |
+| Supposed-claim chip test | *renders the word, not a likelihood…* | — | — | — | `a supposed claim renders the word, not a number` | — | **`test_a_supposed_claim_renders_the_word_not_a_number`** in `beliefChip.test.tsx` |
+| Two-sig-fig test | *never shows more than two significant figures* | — | — | `test_chip_never_shows_more_than_two_significant_figures` | — | — | **the plan's spelling** |
+| End-to-end spec file | "the one Playwright test" | — | "the one Playwright test" | "the one Playwright test" | `frontend/e2e/hormuz.spec.ts` | — | **`frontend/e2e/hormuz.spec.ts`** everywhere |
+| Checklist wording | "visual review checklist line *n*" | "visual review checklist line *n*" | "veto check *n*" | "veto check *n*" | "veto check *n*" | "veto check *n*" | **"visual review checklist line *n*"** (the README heading); numbering is correct in all six ✓ |
+| Layer vs column | — | — | "column" in prose, `layer` in code | "column" | — | — | **`layer` in code, "column" on screen**, said once |
+| Empty market slot | **no market** | — | — | "No market price." | — | "no market · no venue quotes this claim" | **"no market"** plus the claim's own reason |
+
+---
+
+## Open questions that genuinely need Kent
+
+1. **Does reachability follow a reflexive arrow?** If it does, no claim on the strike branch is `untouched`, the demo loses its sentence ("your strike cannot move OPEC's announcement"), and `INV-workbench.42/43` fail against the server. If it does not, the canvas and `interventions.md`'s `networkx` affected set must be changed together. (`diff-view.md` OQ1 + `keyboard-and-access.md` OQ2.) Everything else on this list is smaller.
+2. **What does the model chip say when its number came from the fixture?** The hover sentence names two thousand versions of a map nobody ran. As written, hovering H claims an arithmetic that has not happened — the traceability veto, in the one sentence written to demonstrate honesty. Options: the sentence and the band come from the world and render as an absence until then; or the chip gains one clause naming where its number came from. (`tiles-ports-wires.md` OQ1, `inspector.md` OQ3.)
+3. **`.995`, `.06`, and whether two figures bind the range endpoints.** Three spellings are in the tree (`.35 (.20–.50)` in NFR-1, `.35 (.2–.5)` in `belief.md` and ADR-0005, `.61 (.45–.75)` in `belief.md` §B5). One worked table, one answer, and `belief.md` gets edited. (`keyboard-and-access.md` OQ4–6, `tiles-ports-wires.md` OQ2, `belief.md` OQ5.)
+4. **Is `setCenter` enough when entering the diff moves every base claim one column right?** The strike causes the hypothesis, so S sits upstream of H and the whole map slides. Pinning cannot prevent it. The alternative is pinning column assignment for the union layout, at the cost of a wider picture. (`layout-and-zoom.md` OQ4.)
+5. **How does "+n more" expand, and which seven survive the cap?** "The first seven in ELK's order" is cheap; "the seven with a path to a tradeable ending" is the product's opinion showing through. They differ. (`layout-and-zoom.md` OQ1–2.)
+6. **Where does the "no market" reason come from on an ordinary claim?** Only `not_tradeable` endings carry one. B, C, R and M2 would have the interface writing a sentence rather than reading a field — and M2's `kind` is literally `market`, so "no market" reads as a contradiction on it. Either every claim gains somewhere to put the reason, or the wording is fixed once in the vocabulary. (`tiles-ports-wires.md` OQ3, `inspector.md` OQ4.)
+7. **How does `h`/`l` pick among several wires?** Proposed: nearest on the cross-axis, the rest become the `j`/`k` set where you land. The alternative is a small chooser — more explicit, one more keystroke. B has three wires each way, so this fires on the demo map. (`keyboard-and-access.md` OQ1.)
+8. **Which path does the path-product bar show when several reach the claim?** M1 is reached by `H → B → M1` and by `H → C → B → M1`. Shortest, weakest-link, or all stacked. INV-8 settles the honesty rule, not the choice. (`inspector.md` OQ2.)
+9. **Is the command palette's focus ring declared `aria-modal="true"`?** Trapping Tab is right for the reader who needs it most; putting "modal" in our own accessibility tree while the copy says there are none is uncomfortable. The visual rule is not open. (`keyboard-and-access.md` OQ3.)
+10. **What does the one-line plain-English diff (FR-16) say before the engine?** Half of any such sentence is about numbers this stack does not have. A structural half may be useful, or worse than an absence with a reason. (`diff-view.md` OQ4.)
+
+Deferred, not for Kent now: three teals on one screen and the light-theme `--p-n` ramp (`color-motion-type.md` OQ1–2) belong to pull request 3 when the tokens are written; whether 280 and 120 become tokens (`layout-and-zoom.md` OQ6) is a coordination question between W2's chapter and agent V's token block; NFR-6's cost section (`inspector.md` OQ6) has nothing to generate in this stack.</result>
+<usage><subagent_tokens>202257</subagent_tokens><tool_uses>27</tool_uses><duration_ms>723006</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>abdb2e9585579ebf4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/abdb2e9585579ebf4.output</output-file>
+<status>completed</status>
+<summary>Agent "W1: tiles-ports-wires + colour chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All reviewer fixes are applied. No git commands were run this round.
+
+## What changed
+
+**Cross-chapter names (blocking items 1–5)**
+- Deleted my `Maybe&lt;T&gt;` and `Absence` definitions; replaced with a one-line pointer saying both are **defined once in `diff-view.md`**, and noting `Absence.kind` picks the words a chip shows. Every `Maybe&lt;BeliefView&gt;` is now `Known&lt;BeliefView&gt;` (three belief slots + `WireProps.conditional`).
+- Bound the three kinds explicitly in the chip-states table: `not_said` → the empty user slot, `no_market`, `no_engine`. `not_said` is also named inline in `TileProps`.
+- `BeliefView` kept as the single definition here, with a sentence saying why (the belief chip is the only component that takes one). Added the line that `TileProps` is a projection of `ClaimView` and `WireProps` of `LinkView`, the per-claim and per-arrow records on `WorldView` defined in `diff-view.md`.
+- **All 19 test names are now `test_snake_case`**, including the four fixed spellings you gave. Neither chapter mentions the Playwright test, so the `frontend/e2e/hormuz.spec.ts` clause did not apply.
+- Added the reflexive sentence to the hover-lens section: the lens follows every wire, reflexive included, because it is navigation; the diff states set them aside because they are a claim about what an edit moved — pointing at `diff-view.md`. My B6 lens example (B's descendants include R) is unchanged and now has its warrant.
+- Lens keeps 15% and "multiplies"; ownership of the ghost value **and** the multiplying rule moved to `diff-view.md` in both chapters, so tiles and colour now agree.
+
+**Consistency (6–11)**
+- Open question 2 reduced to your one line pointing at `keyboard-and-access.md` B6.
+- The words-band parenthetical replaced with your `../graph/link.md` anchors wording.
+- Sparkline softened: not one of *this stack's* six things because nothing here computes a day-by-day series; UX-1 keeps it and it arrives with the world's `series`. "Never" is gone.
+- Colour anti-pattern 5 replaced verbatim with your version.
+- The wave now reads "then the arrows out of C and R, then the arrows out of B".
+- `INV-workbench.13` narrowed to *for every channel, exactly one meaning*, then split into four named automated checks (brightness, hue, stroke **and mark** — the mark is covered by the same wire test) and two checked by eye (texture, lane), saying plainly that nothing automated covers those two and why that is acceptable here.
+
+**Plainness / length (12–16)**
+- Both Behaviour sections now open with "Worked on the Hormuz map (the cast is in `README.md`)" and name only the claims each chapter uses.
+- Sign convention: tiles' *Strength, in two granularities* is now the single definition (strengthened to say it never takes a direction token, and that everything later points back). The B5 third reading was **cut**; tiles anti-pattern 8 and colour anti-pattern 2 are now one-line pointers. Colour's *Direction — and what is not direction* stays as that chapter's one statement.
+- Tiles open question 6 cut; the three drawing details survive as a single sentence under the wire-encodings table where a builder will actually meet them.
+- Colour's opening no longer lists the six meanings twice.
+
+**Item 17** — verified the three pointer targets are complete enough to be pointed at: "Do not crossfade a diff" (colour anti-pattern 7), "never averaged" (tiles, belief-chips section, plus anti-pattern 9), and the reduced-motion passage (colour, motion budget). No edits needed.
+
+## Chose not to change
+Nothing on your list was refused. Two small judgement calls inside the fixes: I corrected your item 11 to say **four** channels are automatically checked rather than three, because the origin mark is covered by the same wire test as the stroke — claiming it was eye-only would have understated the coverage. And I added R and M1 back into the colour chapter's named cast, because item 10's fix makes B4 mention R.
+
+**Final line counts: `tiles-ports-wires.md` 422, `color-motion-type.md` 233.**
+
+The hover-sentence open question is untouched and still goes to Kent as written.</result>
+<usage><subagent_tokens>250733</subagent_tokens><tool_uses>26</tool_uses><duration_ms>217682</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ab04dfc965df34f0a</task-id>
+<tool-use-id>toolu_01VHCkoZe2RnYN3Cp7a4kpca</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/ab04dfc965df34f0a.output</output-file>
+<status>completed</status>
+<summary>Agent "W2: layout + keyboard chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 23 items applied. Both files only; no git commands run.
+
+## What changed
+
+**Blocking (1–4)**
+1. keyboard B8: announcement now reads *"Branch created. One claim added, **six** claims your edit can reach, one supposition retracted. No numbers yet."* The count is justified in one line naming H, C, B, N1, M1, M2 as downstream and R as `untouched`.
+2. layout: "**Five** options, and no others"; added a clause that `elk.position` is set **per tile**, not in the list, so "no others" stays true; INV-workbench.20 now says "exactly the five" and names `test_layout_options_are_the_five_named`.
+3. Added the reflexive rule in two places: keyboard B2 ("reflexive wires count here even though they do not count in the diff" — navigation follows every wire; `diff-view.md` sets them aside because that is a claim about what moved), and one clause in layout B4 pointing at both.
+4. layout B6: summary tile is "the claim and the three belief chips **inside the same kind silhouette**", with W1's sentence about why the outline never goes.
+
+**Cross-chapter names (5–9)**
+5. `ChipValue` deleted; the Data model now points at **`BeliefView`** (`tiles-ports-wires.md`) and **`Known&lt;T&gt;` / `Absence`** (`diff-view.md`).
+6. **`PositionMap`** defined in layout as the type of `LayoutResult.tiles`, with a comment that `diff-view.md` reads it.
+7. Every "veto check *n*" → "visual review checklist line *n*", pointing at `README.md`; every "the one Playwright test" → `frontend/e2e/hormuz.spec.ts`. Zero stale references remain in either file.
+8. Layer/column line added above the options table.
+9. M2's outline sentence now reads "**no market** — no venue quotes this", and the oddity (M2's kind is `market`, yet no price, and the fixture carries no reason for it) became keyboard open question 11.
+
+**Consistency (10–15)**
+10. Applied **your correction, not the original item**: open question 6 now names NFR-1 and `belief.md` §B3 (`.35 (.2–.5)`) against the plan's tile and `belief.md` §B5 (`.61 (.45–.75)`), says `belief.md` open question 5 hands the worked table here, and ends "Kent decides; nothing is being edited to match in the meantime." B6's table is headed *(proposed here)*, with `.06`, `.995` and the range's ends each marked **Open** as their own row.
+11. Counter-scaling marked *(proposed here)*, plus the sentence about the tile's 280 graph pixels being unchanged; open question 5 rewritten to say the plan names neither the floor nor the counter-scaling.
+12. *(proposed here)* on "focus does not wrap".
+13. Status line defined at the top of Behaviour (one line under the canvas), marked *(proposed here)*, and added as open question 8.
+14. B9 now says `elapsedMs` is ELK alone while NFR-7's words are "render and re-layout", notes 0007's 150 ms already exceeds the budget, and says the test may land as a known-red pin. INV-workbench.30 restated to measure `elapsedMs`; new open question 8 in layout.
+15. "a checklist line is a checkable thing; it is checked by a person" added to both INVARIANTS headers; INV-workbench.33 now names `test_h_and_l_land_only_on_a_wired_neighbour` in `frontend/src/keyboard/__tests__/focusMap.test.ts`.
+
+**Plainness / length (16–23)**
+16. Both Behaviour sections open with "Worked on the Hormuz map (the cast is in `README.md`)" and name only what each chapter uses. Computed layerings kept.
+17. B10's test table cut; the `e2e`/INV-13 paragraph and the NFR-1 note kept.
+18. Announcement justification cut from four bolded fragments to one sentence.
+19. B4's framing cut to two sentences; the four conditions kept.
+20. Both duplicated anti-pattern restatements cut to their first sentence.
+21. The sheet line now lives only in `keyboard-and-access.md`; layout points to it.
+22. Reduced-motion table removed; replaced by a pointer to `color-motion-type.md` plus the two things mine says that W1's does not (never remove the ordering; the ordering survives in the outline, which never had tweening to lose).
+23. Plain gloss on contrast ratio at first use ("how much lighter a mark is than what sits behind it; 4.5 to 1 is the floor for text, 3 to 1 for a mark that is not text").
+
+## Not changed, and why
+
+- **Item 12 said "layout ~79"** for the wrap statement; it is in `keyboard-and-access.md` B1. Fixed there.
+- **`README.md`'s "The worked example" section does not exist yet** — the landing page currently has "Visual review checklist" but no worked-example section. Both chapters already point at it, so the pointers go live the moment you add it; nothing needs re-editing.
+- I did not add the reduced-motion detail W1 may not have (the outline point) as a table row, only as prose, to avoid re-creating the duplication item 22 removed.
+
+## Final line counts
+
+`layout-and-zoom.md` **227** · `keyboard-and-access.md` **250**. Invariant ids still exactly 20–39, one use each, no collision with W1 or W3.</result>
+<usage><subagent_tokens>180523</subagent_tokens><tool_uses>35</tool_uses><duration_ms>270789</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a72f7556674fb55c1</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/a72f7556674fb55c1.output</output-file>
+<status>completed</status>
+<summary>Agent "W3: diff-view + inspector chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All twenty items applied. Final line counts: **`diff-view.md` 461**, **`inspector.md` 418**.
+
+## What changed
+
+**Blocking**
+1. **`Known&lt;T&gt;` + `Absence`** now defined once, in `diff-view.md`'s Data model, with W1's `kind` discriminator (`no_engine` / `no_market` / `not_said`) and a non-empty `reason`. Every use updated in both files; `inspector.md` now points at the definition instead of restating it.
+2. **`ClaimView` and `LinkView` defined once** in `diff-view.md` as the per-claim and per-arrow records on `WorldView`. `inspector.md` says in one line that `ClaimDetail`/`LinkDetail` are projections of them; `Belief` replaced by `BeliefView` with a pointer to `tiles-ports-wires.md`; `PositionMap` now points at `layout-and-zoom.md`.
+3. **The reflexive rule is stated once**, in B2, verbatim from your text and marked *(proposed here, pending Kent)*. The R-is-`untouched` claim and `INV-workbench.42`/`.43` both say they rest on it. Open question 1 rewritten to say what was proposed, that 03a is being asked to match, and that Kent decides.
+4. **Direction tokens removed** from both token lists; both now say a direction is rendered only through `DirectionReadout`.
+5. **The invented decomposition block is gone.** Replaced with your replacement paragraph, which names B's real prior, its missing base rate and its three arrows. The three rules kept, in four lines.
+6. **The uncalibrated label moved** from `PRIOR` to the `BELIEFS / model` row, substituting `.46`; `PRIOR` gained the "stated, not computed" line; and a note above the worked example says `.46` is the fixture's stored illustrative value today and will read as the prior once 03a's fixture change lands — nothing in the chapter rests on it.
+7. **Ghost opacity is owned here.** Removed the claim that `color-motion-type.md` defines it; added the hover-lens-multiplies note and the near-3% consequence.
+8. **All test names are `test_snake_case`**, including the shared `test_a_supposed_claim_renders_the_word_not_a_number`. Repeated long file paths collapsed to short names defined once per INVARIANTS preamble.
+
+**Consistency**
+9. Inspector open question 1 replaced with the five-bands pointer; B4 now reads `+0.7` *a nudge toward*, `−0.4` *a nudge against*, `−2.4` *a strong push against* — checked against W1's table. The `·` / `—` difference between chip and panel kept.
+10. "one of the seven" → "one of the six — the five in the *Interface words* table plus the derived **Retracted · date · by "…"**".
+11. `.99` → `.98`.
+12. Rail columns now read **how firm** and **agreement** *(proposed here)* in the table and in the worked block, which gained a header row; one note says the wire name is `range_width` and the view model's is `rangeWidth`, and that neither is ever shown.
+13. `INV-workbench.50` and `.51` narrowed to what their tests check, with the product-wide half handed to checklist lines 2 and 5 explicitly.
+14. `do(…, false)` → **Suppose this is false**. I also swept the neighbouring prose: "a later `insert`" → "a later addition", "under a live `do`" → "under a live supposition". The Interface-words table keeps its code-name column, which is labelled *never on screen*.
+15. The log-odds explanation moved up to first use, in the Data model, as a short "**A push**" paragraph; B2 no longer repeats it.
+16. "veto check *n*" → "visual review checklist line *n*" throughout, pointing at `README.md`.
+
+**Plainness / length**
+17. Both Behaviour sections now open with "Worked on the Hormuz map (the cast is in `README.md`)" and name only the claims they use.
+18. The two overlapping UX-14 tables merged into one, with a fourth column **Needs the world?**
+19. The Purpose's third paragraph cut to its absences sentence.
+20. "Do not crossfade" and "do not average the three" are now one-line pointers to `color-motion-type.md` and `tiles-ports-wires.md`.
+
+## What I chose not to change, and why
+
+**The ~340-line target.** Both chapters are over it: 461 and 418. Blocking items 1, 2 and 3 added about 70 lines of required type definitions and the reflexive rule to `diff-view.md` alone, and items 17–20 gave back about 25. I cut every passage I could find that was genuinely padded — cross-reference paragraphs, duplicated test citations, restated prose — but the rest is load-bearing: the verbatim Interface-words table, the four-state and UX-14 tables, the two worked ASCII blocks, ten invariants each. Getting to 340 from here means deleting required content, so I stopped and flagged it. If you want the cut, the cheapest ~40 lines are `ClaimView`/`LinkView`'s full field lists — they could become a two-line prose description pointing at `frontend/src/world/types.ts` — but that reverses blocking item 2, so it is your call, not mine.
+
+**Two invented-but-necessary strings I left in** and would rather you knew about: `"no reference class recorded for this claim"` and `"no market · no venue quotes this claim"` in the B worked block. Neither exists as a field on the fixture — inspector Open question 4 is exactly about where that wording should live.
+
+I ran no git commands and touched only my two files.</result>
+<usage><subagent_tokens>298234</subagent_tokens><tool_uses>134</tool_uses><duration_ms>647730</duration_ms></usage>
+</task-notification>
