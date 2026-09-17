@@ -58,10 +58,11 @@ from katalyst.engine.events import (
     ProposalAccepted,
     ProposalRejected,
     Receipt,
+    growth_event,
 )
 from katalyst.engine.grow import Finished, grow
 from katalyst.engine.ids import mint_id, mint_seed
-from katalyst.engine.outcome import Accepted, Caps, Outcome, Refused
+from katalyst.engine.outcome import Caps
 from katalyst.engine.prompt import prompt_hash
 from katalyst.engine.transcript import (
     Transcript,
@@ -354,7 +355,7 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
             held.remember(working, None)
             if not makes_an_event(step):
                 continue
-            yield _growth(step, at)
+            yield growth_event(step, at)
             at += 1
     finally:
         walking.close()
@@ -441,25 +442,6 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
             yield event.model_copy(update={"seconds": time.monotonic() - started})
             continue
         yield event
-
-
-def _growth(outcome: Outcome, at: int) -> Event:
-    """Turn one folded outcome into the event that says what happened to it."""
-    result = outcome.result
-    if isinstance(result, Accepted):
-        return ProposalAccepted(
-            at=at,
-            proposition=result.proposition,
-            links=result.links,
-            frontier=outcome.frontier,
-        )
-    refused = result if isinstance(result, Refused) else None
-    return ProposalRejected(
-        at=at,
-        claim_in_words="" if refused is None else refused.claim_in_words,
-        violations=() if refused is None else refused.violations,
-        frontier=outcome.frontier,
-    )
 
 
 def _line_from(event: ProposalAccepted | ProposalRejected, at: int) -> TranscriptLine:

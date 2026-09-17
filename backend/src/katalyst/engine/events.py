@@ -48,6 +48,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from katalyst.domain import Link, Proposition, PropositionId, Violation, World
 from katalyst.engine.grow import StoppingReason
+from katalyst.engine.outcome import Accepted, Outcome, Refused
 from katalyst.engine.verify import Verdict
 
 
@@ -295,3 +296,31 @@ def payload_of(event: Event) -> str:
     recording can be compared with a live run without either being re-read.
     """
     return json.dumps(json.loads(event.model_dump_json()), separators=(",", ":"), sort_keys=True)
+
+
+def growth_event(outcome: Outcome, at: int) -> ProposalAccepted | ProposalRejected:
+    """Turn one folded outcome into the event that says what happened to it.
+
+    The one place an outcome becomes something on the wire, so the stream and the
+    recorder cannot drift into saying it two ways.
+
+    Args:
+        outcome: What happened to one proposal, and what it cost.
+        at: Where it sits in the transcript, counting from 0.
+
+    Returns:
+        The growth event. A model that had nothing more to say makes none of
+        these, and the caller checks that before asking.
+    """
+    result = outcome.result
+    if isinstance(result, Accepted):
+        return ProposalAccepted(
+            at=at, proposition=result.proposition, links=result.links, frontier=outcome.frontier
+        )
+    refused = result if isinstance(result, Refused) else None
+    return ProposalRejected(
+        at=at,
+        claim_in_words="" if refused is None else refused.claim_in_words,
+        violations=() if refused is None else refused.violations,
+        frontier=outcome.frontier,
+    )

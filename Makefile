@@ -11,7 +11,7 @@
 
 # These are names of tasks, not names of files to build. Saying so means `make
 # test` still works if a file called `test` ever appears.
-.PHONY: help dev up down prod test lint types eval record-cassettes record-demo
+.PHONY: help dev up down prod test lint types eval record-cassettes record-demo run-demo
 
 help: ## Show this list
 	@echo "Katalyst — make <task>"
@@ -65,8 +65,18 @@ eval: ## Score what the language model proposes against saved examples
 # cap a caller can raise is not a cap. A run that reaches it stops and says what
 # it spent and what it got.
 #
-# Re-run it whenever a prompt changes. A recording made against different words
-# shows wording this program no longer uses, and the build says so.
+# `run-demo` is the same run meant as a measurement: it keeps everything and
+# writes no recording. One code path, one flag.
+#
+# **Either way the run is kept.** Whatever becomes of it, both print the whole
+# receipt and the reason it stopped, and write everything the run produced —
+# every proposal with the seconds and thinking tokens it took, the receipt, the
+# map — into `backend/.runs/`, which is not committed. A run that cost money and
+# left nothing behind is an afternoon nobody can account for.
+#
+# Re-run `record-demo` whenever a prompt changes. A recording made against
+# different words shows wording this program no longer uses, and the build says
+# so.
 #
 # Everything else in this file runs with no key. This one calls the model for
 # real and writes what it says into backend/tests/cassettes, so that every later
@@ -85,6 +95,10 @@ eval: ## Score what the language model proposes against saved examples
 
 record-demo: ## Record an example running for real, so a keyless clone can watch it. Spends money; needs a key
 	cd backend && uv run python -m katalyst.engine.record \
+		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),)
+
+run-demo: ## Run an example for real as a measurement, and write no recording. Spends money; needs a key
+	cd backend && uv run python -m katalyst.engine.record --measure-only \
 		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),)
 
 record-cassettes: ## Record the model's real answers for the tests to replay. Spends money; needs a key
