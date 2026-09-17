@@ -72,6 +72,45 @@ function layoutEngine(): LayoutEngine {
   return engine;
 }
 
+/**
+ * How long the background thread gets before the page does the work itself.
+ *
+ * The background thread is the normal path and it answers in well under a tenth
+ * of a second. But a thread that never answers leaves every tile stacked in the
+ * top left corner with nothing on screen saying why — which is the "why did it
+ * do that" failure in its purest form. Some browsers, and some browsers under
+ * instrumentation, will not run the layout engine's own worker script at all.
+ *
+ * So after this long the page lays the map out on its own thread instead. That
+ * costs a few dropped frames once; a map that never arrives costs everything.
+ */
+const THREAD_PATIENCE = 2000;
+
+/** What the race below hands back when the background thread has not answered. */
+const TOO_SLOW = Symbol("the background thread has not answered");
+
+/**
+ * Lay the map out on the background thread, or — if that thread does not answer
+ * — on this one.
+ *
+ * The fallback is loaded only if it is needed, so the packaged app does not
+ * carry a second copy of the layout engine unless a reader's browser makes it
+ * necessary.
+ */
+async function laidOut(graph: Parameters<LayoutEngine["layout"]>[0]) {
+  const answer = await Promise.race([
+    layoutEngine().layout(graph),
+    new Promise<typeof TOO_SLOW>((settle) => {
+      setTimeout(() => settle(TOO_SLOW), THREAD_PATIENCE);
+    }),
+  ]);
+  if (answer !== TOO_SLOW) {
+    return answer;
+  }
+  const onThisThread = await import("elkjs/lib/elk.bundled.js");
+  return new onThisThread.default().layout(graph);
+}
+
 /** Say what went wrong in a sentence, whatever was thrown. */
 function inWords(reason: unknown): string {
   return reason instanceof Error ? reason.message : "The layout engine stopped without saying why.";
@@ -134,28 +173,26 @@ export function useLayout(
       wires.map(([id, source, target]) => ({ id, source, target })),
       placed.current,
     );
-    layoutEngine()
-      .layout(graph)
-      .then(
-        (laidOut) => {
-          if (!stillWanted) {
-            return;
-          }
-          const positions = readPositions(laidOut, placed.current);
-          placed.current = positions;
-          setLayout((was) => ({
-            positions,
-            runs: was.runs + 1,
-            laidOutFor: mapKey,
-            failure: null,
-          }));
-        },
-        (reason: unknown) => {
-          if (stillWanted) {
-            setLayout((was) => ({ ...was, failure: inWords(reason) }));
-          }
-        },
-      );
+    laidOut(graph).then(
+      (laidOut) => {
+        if (!stillWanted) {
+          return;
+        }
+        const positions = readPositions(laidOut, placed.current);
+        placed.current = positions;
+        setLayout((was) => ({
+          positions,
+          runs: was.runs + 1,
+          laidOutFor: mapKey,
+          failure: null,
+        }));
+      },
+      (reason: unknown) => {
+        if (stillWanted) {
+          setLayout((was) => ({ ...was, failure: inWords(reason) }));
+        }
+      },
+    );
     return () => {
       stillWanted = false;
     };

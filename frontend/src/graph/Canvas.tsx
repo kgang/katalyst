@@ -418,10 +418,18 @@ function MapSurface({
       if (under === null) {
         return;
       }
-      onSelect(under);
       if (under.kind === "wire") {
+        // **Landing on a wire does not select it, and that is not an
+        // oversight.** The drawing library rebuilds a wire's element when it
+        // becomes selected, and rebuilding the element the keyboard is standing
+        // on drops focus to the page — which made tabbing through the map
+        // impossible, because the wires come before the tiles. So a wire fills
+        // the panel when you press Enter on it, and the focus is put back on the
+        // rebuilt wire straight afterwards, which is what the effect below is
+        // for. Pointing at one with the mouse is unchanged.
         return;
       }
+      onSelect(under);
       onFocused(under.id);
     },
     [onSelect, whatIsUnder, onFocused],
@@ -438,6 +446,18 @@ function MapSurface({
     return map;
   }, [layout, heightOf]);
 
+  /**
+   * Find a tile or a wire on the glass by the identifier it carries.
+   *
+   * By reading each element's own identifier rather than by asking the page for
+   * a match: a wire is named after its two ends — `H->B` — and the arrow in the
+   * middle of that is not a character an address for an element may contain.
+   */
+  const onTheGlass = useCallback((kind: "node" | "edge", id: string): HTMLElement | undefined => {
+    const all = surface.current?.querySelectorAll<HTMLElement>(`.react-flow__${kind}`) ?? [];
+    return [...all].find((one) => one.dataset.id === id);
+  }, []);
+
   const claimWords = useCallback(
     (id: string) => world.claims.find((claim) => claim.id === id)?.claim ?? id,
     [world],
@@ -453,14 +473,33 @@ function MapSurface({
       // the same thing: the panel beside the map reads it out. Nothing opens
       // over the map.
       onSelect({ kind: "claim", id });
-      surface.current
-        ?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`)
-        ?.focus();
+      onTheGlass("node", id)?.focus();
     },
     onStatus,
     keys,
     words: claimWords,
   });
+
+  // A wire the reader has just asked for, so that focus can be put back on it
+  // once the drawing library has rebuilt it.
+  const askedForWire = useRef<string | null>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the selection is not read inside — it is what this is waiting for. The wire is rebuilt because the selection changed, so the selection is exactly the right thing to hang this on.
+  useEffect(() => {
+    const id = askedForWire.current;
+    if (id === null) {
+      return;
+    }
+    askedForWire.current = null;
+    // Two frames, not none. The drawing library keeps its own record of what is
+    // selected and rebuilds the wire's element from it a frame later, so putting
+    // focus back on the element that is there right now would put it on the one
+    // about to be thrown away.
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => onTheGlass("edge", id)?.focus());
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selection, onTheGlass]);
 
   // The keyboard map, bound once on the page. On the page rather than on the map
   // itself, because a key bound to the element you happen to be standing on is a
@@ -470,17 +509,29 @@ function MapSurface({
     const onKey = (event: KeyboardEvent): void => {
       // A collapsed tile is reached with the keyboard like any other, and Enter
       // opens what is behind it — the same thing a press does.
-      const at = (event.target as HTMLElement | null)?.closest<HTMLElement>(".react-flow__node");
+      const target = event.target as HTMLElement | null;
+      const at = target?.closest<HTMLElement>(".react-flow__node");
       if (event.key === "Enter" && at?.dataset.id?.startsWith(OVERFLOW_PREFIX) === true) {
         event.preventDefault();
         openColumn(Number(at.dataset.id.slice(OVERFLOW_PREFIX.length)));
+        return;
+      }
+      // Enter on a wire reads it out in the panel beside the map — the same
+      // thing pointing at it does. It is Enter rather than merely landing on it
+      // because of what the comment above `onFocus` explains.
+      const wire = target?.closest<HTMLElement>(".react-flow__edge");
+      if ((event.key === "Enter" || event.key === " ") && wire?.dataset.id !== undefined) {
+        event.preventDefault();
+        askedForWire.current = wire.dataset.id;
+        onSelect({ kind: "wire", id: wire.dataset.id });
+        onStatus(`this arrow, read out in the panel beside the map`);
         return;
       }
       onKeyDown(event);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onKeyDown, openColumn]);
+  }, [onKeyDown, openColumn, onSelect, onStatus]);
 
   return (
     <div
@@ -509,6 +560,14 @@ function MapSurface({
         elementsSelectable={true}
         nodesFocusable={true}
         edgesFocusable={true}
+        // Selecting a wire must not lift it above the others. The drawing
+        // library's default is to re-sort the wires when one is selected so the
+        // selected one draws on top — and re-sorting them moves the element the
+        // keyboard is standing on, which drops focus to the page and makes
+        // tabbing through the map impossible. Nothing here needs the lift: a
+        // selected wire is marked by a ring, and how wires cross is settled by
+        // routing rather than by drawing order.
+        elevateNodesOnSelect={false}
         onNodeMouseEnter={(_, node) => setPointingAt(node.id)}
         onNodeMouseLeave={() => setPointingAt(null)}
         // As far out as the map goes, and no further: past this the summary
