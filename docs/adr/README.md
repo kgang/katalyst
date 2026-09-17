@@ -8,7 +8,7 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 |---|-------|--------|------|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions in MADR 4.x, no tooling, ADR-gated cadence | accepted | 2026-09-16 |
 | [0002](0002-python-backend-react-frontend.md) | Python/FastAPI backend with a React/TypeScript frontend; OpenAPI-generated types | accepted | 2026-09-16 |
-| [0003](0003-domain-owns-the-graph.md) | The domain layer owns graph validity; the LLM only proposes | accepted | 2026-09-16 |
+| [0003](0003-domain-owns-the-graph.md) | The domain layer owns graph validity; the LLM only proposes (rule 2 amended 2026-09-17: up to three fresh proposals, none told why the last was refused) | accepted | 2026-09-16 |
 | [0004](0004-branches-are-patches.md) | Branches are ordered patch lists over an immutable base; `do` ≠ `observe`; beliefs never merged | accepted | 2026-09-16 |
 | [0005](0005-link-semantics-and-propagation.md) | Typed links (trigger/sustain, log-odds, lag, shape) propagated by seeded forward Monte Carlo | accepted | 2026-09-16 |
 | [0006](0006-llm-boundary-structured-outputs.md) | LLM boundary: Anthropic SDK, `claude-opus-5`, structured outputs, one proposal per call, SSE | accepted | 2026-09-16 |
@@ -20,3 +20,4 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0012](0012-replay-mode-from-recorded-transcripts.md) | Replay mode: a keyless reviewer walks the hero flow from recorded generation transcripts | accepted | 2026-09-17 |
 | [0013](0013-payoff-names-the-trade-quote-names-the-price.md) | `Payoff` splits into a contract shape and a price shape; the domain names the trade, the quote names the price | accepted | 2026-09-17 |
 | [0014](0014-a-supposition-ends-when-something-pushes-back.md) | A supposition is a hard fact until its cause is undermined; the range says how sure we are of the number, not how the dice fall | accepted | 2026-09-17 |
+| [0015](0015-a-claim-starts-with-the-range-the-model-stated.md) | A claim starts with the range the model stated, labelled as stated — not yet an ensemble, and whole maps are never reconciled | accepted | 2026-09-17 |

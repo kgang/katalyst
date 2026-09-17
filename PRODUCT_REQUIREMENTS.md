@@ -112,7 +112,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 - **FR-5 (P0)** Generation streams. Propositions and links arrive one at a time over server-sent events (a one-way stream from server to browser) and render as they arrive; layout reserves space so the graph grows without reflowing violently.
 - **FR-6 (P0)** Every graph terminates in ≥1 `market` proposition, or in an explicit "not tradeable — because…" terminal (INV-9).
 - **FR-7 (P0)** Verify door returns a graded path A→B or an explicit `no_path` verdict with the nearest reachable proposition. Never a fabricated bridge.
-- **FR-8 (P1)** Ensemble: N independent generations reconciled into one graph; run-to-run disagreement surfaces as link *agreement* — a number computed from how far the independent runs differed, never a self-report by the model.
+- **FR-8 (P1)** Where a claim's starting number and range come from: **the likelihood and range the model stated in its proposal**, stamped as a `model` belief by us, shown under the label *model interval, uncalibrated*, and never merged with a user's or a market's number (amended 2026-09-17; decision record 0015). **No ensemble in v1**: no claim is asked about twice, no map is generated several times over, and **two maps are never reconciled into one** — `spec/multiverse/diff.md` anti-pattern 4, *do not infer a difference by matching two maps*, is the warrant. A **measured run-to-run number** — how far independent generations differed about a claim, computed and never self-reported — is deferred, and the word *agreement* is kept free on screen for the day one exists. One condition reopens it and no other: if FR-30's pastcast shows stated ranges missing badly against the evaluation scorecard, measure whether re-asking widens them *toward the truth* — the **median** of several answers, never a "trimmed mean" of three, which is only the middle one — and decide then.
 - **FR-9 (P1)** Adversarial critique pass before beliefs are final. **(P2)** Persona red-teams ("Lloyd's underwriter", "OPEC desk") that propose *missing* propositions and links — hypothesis diversity, not outcome simulation.
 
 ### 6.3 Audit
@@ -268,7 +268,6 @@ Status as of 2026-09-17; the numbers are pull requests on `kgang/katalyst`. A st
 Dated so this section visibly ages. An answered question moves to the list below rather than disappearing, so the change stays visible.
 
 - **2026-09-16** Strategy export schema (FR-27): mirror Polymarket negative-risk / Kalshi combo leg structure, or a simpler `legs[] + conditions[]`? Decide in the strategy-export chapter of `spec/thesis/`.
-- **2026-09-16** Ensemble size N for FR-8 — how many independent generations to reconcile into one map — and its cost per generation. Measure in stack 04.
 
 ### Answered
 
@@ -276,6 +275,7 @@ Dated so this section visibly ages. An answered question moves to the list below
 - **Asked 2026-09-16, answered 2026-09-17.** Does the GitHub native stacked-PR preview work on `kgang/katalyst`? **Yes**, and stacks 01 and 02 were merged that way; `git-spice` was not needed. The command-line tool `gh` refuses to merge a stacked pull request and points at an asynchronous merge route instead; that route, and the one trap in it, are written down under *More Information* in decision record 0009.
 - **Asked 2026-09-16, answered 2026-09-17.** Reflexive links (`market → world`, lag > 0): **schema in stack 02, propagation deferred to stack 06.** The schema is built, and the stored Hormuz example carries such a link with a delay on it.
 - **Asked 2026-09-17, answered 2026-09-17.** Replay mode (FR-13) — a reviewer with no model key walks the hero flow on the four example hypotheses, played from committed generation transcripts through the live event stream. Written down as decision record 0012 and accepted the same day; built in stack 04.
+- **Asked 2026-09-16, answered 2026-09-17 — and the question changed.** Ensemble size N for FR-8 — how many independent generations to reconcile into one map, and the cost of each — has no answer, because no map is reconciled against another and no generation is run twice. Decision record 0015 ships the range the model stated, labelled as stated, and refuses whole-map reconciliation outright: `spec/multiverse/diff.md` anti-pattern 4, *do not infer a difference by matching two maps*, is the warrant. What remains open is a different question, and it is asked of a measurement rather than of a number: **would re-asking a claim widen its range toward the truth?** FR-30's pastcast, read against the evaluation scorecard built in stack 04, is the test, and it is the one thing that reopens this. FR-8 is amended to match.
 
 ---
 
