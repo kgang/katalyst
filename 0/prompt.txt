@@ -2539,3 +2539,137 @@ One thing worth flagging: **M1's market belief is now above its model belief** (
 Final line counts: `layout-and-zoom.md` **247** · `keyboard-and-access.md` **269**. My two files only; no git commands run.</result>
 <usage><subagent_tokens>227933</subagent_tokens><tool_uses>11</tool_uses><duration_ms>96767</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a72f7556674fb55c1</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/a72f7556674fb55c1.output</output-file>
+<status>completed</status>
+<summary>Agent "W3: diff-view + inspector chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>No stale numbers remain. Here is the change list.
+
+## `diff-view.md` (457 → 463 lines)
+
+| Was | Now | Why |
+|---|---|---|
+| B3: "`shifted` — `.61 → .18` with a directional chevron" | "a before and an after with a directional chevron" | `.61` was M1's deleted hand-written model belief; the fixture no longer carries it |
+| B5 rail example: `the Polymarket Brent contract · .61 → .18 ▼ · largest on Oct 9` | `the terminal's own words · before → after ▼ · largest on *day*`, plus a new sentence: the engine writes every part of the row, the base world puts that contract at `.46 (.32–.60)`, and what the strike branch makes of it is the engine's to say | Both halves of the old pair were invented. `.46 (.32–.60)` is a number I can vouch for; the branch's terminal numbers are asserted nowhere I could verify — the golden test pins directions and bounds, not values — so I did not invent a replacement |
+| B6 table, **withdrawn** row: `.35` | `.36`, and "so H reads its own prior again" | The computed withdrawn value |
+| B6 table, **pushed** row: "about `.070`" | "about `.080`" | The computed pushed value, at two significant figures |
+| B6 note: "(`.070`, not `.07` …)" | "(`.080`, not `.08` …)", plus one clause explaining `.36` against H's stated prior of `.35` — reading a prior back through the engine lands a hair high below one half, which record 0014 predicts and the golden series confirms | A reader comparing the table to the fixture would otherwise think `.36` was a typo |
+
+Checked and correct as they stood: the rail's three terminal labels against the fixture's claim and contract titles, H's dates, the branch-panel block, the Interface-words table.
+
+## `inspector.md` (413 → 417 lines)
+
+| Line | Was | Now |
+|---|---|---|
+| ~97 | `by 2026-11-15` | `by 2026-10-15` |
+| ~106 | `model .46 (.30–.63)` | `model .28 (.15–.42)` — the prior's numbers, under the stated sentence |
+| ~128 | computed-case example "how sure we are of `.46`" | "how sure we are of `.40`" — B's computed value |
+| ~132 | the hedge: "stack 03a's fixture change makes every `beliefs.model` equal its own `prior`, so `.46 (.30–.63)` becomes the prior's numbers" | replaced by a statement of fact: every `beliefs.model` in the fixture equals its `prior` because nothing has been computed into it, so the stated sentence describes exactly what the row holds; run the engine and B comes out `.40 (.25–.55)` |
+| ~142 | M1 `model .61 (.45–.74)`, `market .48 (.45–.52)`, "thirteen points … is the edge" | read from the fixture: `model .40 (.28–.55)` beside `market .48 (.45–.52)`, **eight points** apart; run the engine and the model side is `.46 (.32–.60)`, **two points** apart — with the rule stated: say which source a number came from before calling the gap an edge, because the gap is only tradeable once the engine has written the model's half |
+| ~171 | "92% of this band is B's own prior … 29 points to 8" | "65% of this band is B's own prior … 30 points to 12" |
+| ~267 | "H by Nov 1, B by Nov 15, M1 by Oct 31" | "H by Nov 1, B by **Oct 15**, M1 by Oct 31 — three different days, **and not even in order**" |
+
+The bullet count above the worked block went back from four to five, since splitting the stated-sentence point from the fixture-equals-prior point made five again.
+
+Checked against the current fixture and left unchanged because they are still true: B4's whole H → B block (strength `+1.6`, lag 2 days, `impulse`, **half gone after 30 days**, that exact rationale, one EIA source with no retrieval day, `●● argued`); B2's correction of `belief.md` §B4 (which still carries its own illustrative `.20` / `.71` / a base rate B does not have / two arrows where B has three — so the correction is now more useful, not less); the five strength bands and their 0.25 floor.
+
+## One thing I did not do
+
+`B-&gt;M1`'s half-life is indeed 30, not 14 — I verified it in the fixture — but neither chapter ever quoted it, so there was nothing to correct. The only half-life either file mentions is `H-&gt;B`'s, which is also 30 and was already right.
+
+No git commands run; only my two files touched.</result>
+<usage><subagent_tokens>363227</subagent_tokens><tool_uses>20</tool_uses><duration_ms>166445</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ad205cba8b3ed402d</task-id>
+<tool-use-id>toolu_01USwrgQrouGbbrvWPbQVnwH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/ad205cba8b3ed402d.output</output-file>
+<status>completed</status>
+<summary>Agent "V: wires, colour law, Inspector (03b PR3)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Committed on `feat/03b-diff-and-keys` in `/Users/kentgang/git3/katalyst-wt/feat-03b-diff`; not pushed. Servers stopped.
+
+## The rule, in two sentences
+
+Plates are placed in **one pass over the whole map, in the order the map lists its arrows**: each is offered spots along its own wire — the natural one first, then further along the same run, then stepped clear to one side and the other by the socket rule — and takes the first whose rectangle touches no tile, no tail mark and no plate already placed. And a clear band between two rows of tiles is no longer a single line: when two arrows want the same gap, the band is divided into **a lane each**, so their wires never coincide and neither can their readings.
+
+## What changed
+
+**New — `frontend/src/graph/wires/plates.ts`.** The pass. `socketsFor` derives where a wire leaves and arrives from the tile box alone (38% / 62% down the tile, 8 px off the edge — `Tile.tsx`'s own numbers, with a test pinning them to the real values); `plateSize` works a plate's box out from the words it will hold, the way `geometry.ts` works a tile's height out from its claim; `planPlates` walks the wires in map order and takes the first clear spot. Obstacles are the tiles (4 px margin), the tail marks, and the plates already placed (6 px margin). Nothing is measured off the page.
+
+**`route.ts`.** `freeCorridor` became `freeBand` — it hands back the whole clear gap instead of its midline — and `planRoutes` now gathers which arrows want which band *before* giving any of them a line, then divides each shared band into lanes evenly, in map order. Keyed by the **band**, not by the strip: the strait and the strike cross different stretches of the map but want the same gap between the same two rows, and it is the gap that has to be shared out. `freeCorridor` is kept as the one-line form for its old callers.
+
+**`CausalWire.tsx`.** Takes `data.plateAt` when the pass gave it one, and keeps its own placement as the fallback so it still draws standalone in a test. `MARK_STANDOFF` moved to `plates.ts` so the pass and the drawing read one number.
+
+**The reveal wart.** A plate and a mark are drawn in `.react-flow__edgelabel-renderer`, a different layer from the wire's own `&lt;g&gt;`, so the rule in `canvas.css` that reveals the wires a column at a time could not reach them — the reading arrived a beat before the wire. Each now carries its wire's `--wave-delay` and the same `wire-arrives` animation. Verified in the DOM mid-arrival: wire `B-&gt;M1` delay `0.18s`, its plate `0.18s`, marks likewise.
+
+**`Canvas.tsx` — the one file outside the wires, 11 lines.** The pass has to be handed every wire at once, so `mode`, `strength` and `lag` now travel with the routable list, `planPlates` is called beside `planRoutes`, and `plateAt` plus `wave` come back in the `data` the wire already carried.
+
+## The probe's numbers
+
+Unit test (`plates.test.ts`, 14 tests) over both maps — the stored example and the union, both with the layout positions read off the running app:
+
+| | plate×plate | plate×tile | plate×mark | mark×mark | plates placed |
+|---|---|---|---|---|---|
+| base map | 0 | 0 | 0 | 0 | 8 of 8 |
+| union with the strike | 0 | 0 | 0 | 0 | 11 of 11 |
+
+Plus `test_the_same_map_places_the_same_way_every_time` and `test_two_wires_sharing_a_corridor_get_a_lane_each` (the strait's lane and the strike's differ by more than 8 px).
+
+Browser probe on the **union**, all boxes read from the rendered page:
+
+| framing | zoom | wires | plates | overlaps | smallest text on the glass |
+|---|---|---|---|---|---|
+| default | 0.846 | 11 | 11 | **0** | 11.0 px |
+| panel hidden (`P`) | 0.846 | 11 | 11 | **0** | 11.0 px |
+| zoomed in | 1.218 | 11 | 11 | **0** | 13 px |
+
+(Was: three collisions at the default framing — `S→B` × `H→B`, `R→B` × `C→B`, and one plate on a tile corner.)
+
+## Screenshots — `…/scratchpad/v-shots/`
+
+- `20-union-panel-hidden.png` — the union with the panel hidden; every plate separate, the two corridor wires in their own lanes
+- `21-union-default.png` — the union at the default framing, panel open
+- `22-union-close.png` — zoomed in two notches, plates at full detail
+- `23-union-greyscale.png` — greyscale of `20`; every pattern, doubling and dot count still reads
+
+## Check tails
+
+```
+&gt; biome ci . &amp;&amp; node scripts/no-library-stylesheet.mjs
+Checked 100 files in 44ms. No fixes applied.
+&gt; tsc -b --noEmit
+&gt; vitest run
+ Test Files  22 passed (22)
+      Tests  176 passed | 1 skipped (177)
+```
+
+```
+&gt; npx playwright test
+Running 1 test using 1 worker
+  ✓  1 [chromium] › e2e/hormuz.spec.ts:94:1 › the stored example, opened and edited by keyboard alone (970ms)
+  1 passed (2.1s)
+```
+
+162 → 176 tests (the 14 new placement tests); 1 skipped is the pre-existing `test_agrees_with_the_servers_affected_set`, waiting on stack 03a.
+
+## `git log --oneline -3`
+
+```
+9516215 fix(canvas): every plate placed in one pass over the whole map
+ac073a8 chore(frontend): keep the linter out of the browser test's output folders
+874e0b2 ci(e2e): one browser test, both halves started for it, and no key anywhere
+```
+
+One thing worth your eye: on the union the strait and the strike share a 48 px gap, so their two lanes land about 11 px apart — they read as two parallel wires crossing to the oil price, which is true, but it is tight. If you would rather they were further apart, the answer is to push the second wire to the *next* free band instead of sharing, which is a few lines in `planRoutes`.</result>
+<usage><subagent_tokens>755554</subagent_tokens><tool_uses>45</tool_uses><duration_ms>927571</duration_ms></usage>
+</task-notification>
