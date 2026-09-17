@@ -11,7 +11,7 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0003](0003-domain-owns-the-graph.md) | The domain layer owns graph validity; the LLM only proposes (rule 2 amended 2026-09-17: up to three fresh proposals, none told why the last was refused) | accepted | 2026-09-16 |
 | [0004](0004-branches-are-patches.md) | Branches are ordered patch lists over an immutable base; `do` ≠ `observe`; beliefs never merged | accepted | 2026-09-16 |
 | [0005](0005-link-semantics-and-propagation.md) | Typed links (trigger/sustain, log-odds, lag, shape) propagated by seeded forward Monte Carlo | accepted | 2026-09-16 |
-| [0006](0006-llm-boundary-structured-outputs.md) | LLM boundary: Anthropic SDK, `claude-opus-5`, structured outputs, one proposal per call, SSE | accepted | 2026-09-16 |
+| [0006](0006-llm-boundary-structured-outputs.md) | LLM boundary: Anthropic SDK, `claude-opus-5`, structured outputs, one proposal per call, SSE (grounding amended 2026-09-17: `documented` only from a source the search itself returned; an arrow that finds nothing is `argued`) | accepted | 2026-09-16 |
 | [0007](0007-canvas-react-flow-elk.md) | Canvas: React Flow v12 + ELK layered layout + Motion; typed ports; ghost diff; no modals | accepted | 2026-09-16 |
 | [0008](0008-testing-layers-and-cassettes.md) | Five testing layers (amended 2026-09-17); VCR cassettes so CI runs without an API key; evals out-of-band | accepted | 2026-09-16 |
 | [0009](0009-git-workflow-stacked-prs.md) | Conventional commits, `<type>/<NN>-<slug>` branches, GitHub native stacked PRs (git-spice fallback) | accepted | 2026-09-16 |
@@ -19,5 +19,5 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0011](0011-spec-as-book-and-living-architecture.md) | Spec organized as a book by idea (unnumbered chapters); living `ARCHITECTURE.md` at the root | accepted | 2026-09-16 |
 | [0012](0012-replay-mode-from-recorded-transcripts.md) | Replay mode: a keyless reviewer walks the hero flow from recorded generation transcripts | accepted | 2026-09-17 |
 | [0013](0013-payoff-names-the-trade-quote-names-the-price.md) | `Payoff` splits into a contract shape and a price shape; the domain names the trade, the quote names the price | accepted | 2026-09-17 |
-| [0014](0014-a-supposition-ends-when-something-pushes-back.md) | A supposition is a hard fact until its cause is undermined; the range says how sure we are of the number, not how the dice fall | accepted | 2026-09-17 |
+| [0014](0014-a-supposition-ends-when-something-pushes-back.md) | A supposition is a hard fact until its cause is undermined; the range says how sure we are of the number, not how the dice fall (amended 2026-09-17: the direction is read with the number's own weights) | accepted | 2026-09-17 |
 | [0015](0015-a-claim-starts-with-the-range-the-model-stated.md) | A claim starts with the range the model stated, labelled as stated — not yet an ensemble, and whole maps are never reconciled | accepted | 2026-09-17 |

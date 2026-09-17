@@ -82,7 +82,7 @@ Every event is re-emitted unchanged **except two** (Kent, decision S4, 2026-09-1
 | `recording_date` | the header's date |
 | `prompt_hash` | the header's hash |
 | `dollars` | `0.0` |
-| `calls`, `input_tokens`, `output_tokens`, `cache_read_tokens` | all zero — this run made none and used none |
+| `calls`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `searches` | all zero — this run made no calls, used no tokens and searched for nothing |
 | `model` | copied from the recorded receipt: the model that actually wrote this map, which the reader is entitled to know |
 | `seconds` | how long *this* replay took to play |
 
@@ -112,11 +112,33 @@ The delay is an argument with a default the builder picks, and the default is pi
 
 ### B1 — The keyless first screen
 
-The first screen asks `GET /api/readyz`, the one route that reports whether a model key is configured and never reports the key itself. No key, and recordings on disk:
+The first screen asks `GET /api/readyz` — the one route it reads, and the one place the environment is looked at. It reports whether a model key is configured, never the key itself, and **what can be replayed** (settled 2026-09-17):
+
+```python
+class RecordingSummary(BaseModel):
+    """One recording the first screen can offer, and when it was made."""
+    example: str              # the short name of the example, matching its file name
+    recording_date: date      # the day `make record-demo` wrote it
+
+
+class Readiness(BaseModel):
+    """The answer to "can this program do its job yet?"."""
+    status: Literal["ready", "not_ready"]
+    model_key_present: bool
+    replayable: tuple[RecordingSummary, ...]
+```
+
+**`status` must not read `not_ready` for a program that can replay.** A copy of Katalyst with no key and four recordings can draw four maps, refuse proposals in public, and take every intervention at full fidelity; calling that *not ready* would be the screen lying about itself in the one place it exists to be honest. `status` is `not_ready` only when there is neither a key nor anything to replay.
+
+One name for the day a recording was made — **`recording_date`**, here, on the header, and on the `Receipt` event. Never `recorded_on`, never `made_on`.
+
+With no key, and recordings on disk:
 
 * The four launchpad cards are offered as replays, and the screen says so, **word for word**:
 
   > **No model key configured — these four run from recordings made on \<date\>.**
+
+  The date comes from `replayable`, and from nowhere else.
 
 * The free-text hypothesis field is **visibly disabled, carrying that same sentence** — never silently inert, which teaches the user that the product is broken rather than that this copy of it is unconfigured.
 * A `replay` badge sits on the canvas for the whole session.
@@ -125,11 +147,15 @@ Key present, and the same four run live, untouched by any recording. There is no
 
 ### B2 — Hormuz, replayed
 
-The reviewer presses the Hormuz card. The browser calls `POST /api/generate` exactly as it would live — same route, same body, same reader.
+The reviewer presses the Hormuz card. The browser calls `POST /api/generate` exactly as it would live — same route, same body, same reader — carrying the card's sentence, *"The Strait of Hormuz is going to open next week"*.
 
-The server has no key, so `engine/replay.py` serves the stream: header read, `base_id` and `seed` in hand, then each event line written out as `event:` and `data:`, spaced by the cosmetic delay. Skeleton tiles, claims, wires in causal order, refusals in the strip beside the map — the canvas cannot tell, and that is the point.
+**Which recording plays is decided by the sentence, not by the card.** The replayer compares the request's `hypothesis` against each recording's own `generation_started.hypothesis`, **exact after trimming surrounding spaces** — the same rule `RecordedInsert` uses for the scripted intervention, because one matching rule is easier to trust than two. Nothing matches, and the answer is one plain sentence saying this copy has no recording for that sentence. **Never a nearest match**: playing the Hormuz map back at somebody who asked about photonic chips is worse than saying no, and it is indistinguishable afterwards from the product working.
 
-Where `beliefs_propagated` belongs, the replayer stops, hands `domain/` the map the accepted proposals built plus the header's seed, and emits the world it gets back. Then the rebuilt `receipt` — `mode: "replay"`, zero dollars, the recording's date and hash — then `done`.
+**The recording's seed wins.** The request may carry a seed or leave it out — on this path it makes no difference, because the header's seed is the one the recorded run had, and the numbers are recomputed from it. A replay that honoured a seed from the request would produce a world the recording never showed, under a badge saying *replay*.
+
+The server has no key, so `engine/replay.py` serves the stream: header read, `base_id` and `seed` in hand, then each event line written out as `event:` and `data:`, spaced by the cosmetic delay. Skeleton tiles, claims, wires in causal order, refusals in the strip beside the map, skeletons coming down as each growth event's `frontier` shrinks — the canvas cannot tell, and that is the point.
+
+Where `beliefs_propagated` belongs, the replayer stops, hands `domain/` the map the accepted proposals built plus the header's seed, and emits the world it gets back. Then the rebuilt `receipt` — `mode: "replay"`, zero dollars, zero searches, the recording's date and hash — then `done`.
 
 ### B3 — Everything the reviewer does next is live arithmetic
 
@@ -149,7 +175,7 @@ There is no fuzzy matching, and there will not be. Drafting a claim from a sente
 
 The reviewer types a sentence of their own. The route answers, plainly:
 
-> **drafting a new claim needs a model key.**
+> *"drafting a new claim needs a model key."*
 
 Not an error, not a stack trace, not a disabled button with no explanation. It is the one thing in the whole replayed flow that genuinely needs a key, and saying so is more honest than hiding the button.
 
@@ -185,14 +211,15 @@ The consequence, said plainly so nobody is surprised by it: **change a prompt an
 
 ### B9 — The `recordings` build job
 
-A sixth job beside `backend`, `frontend`, `types-fresh`, `docker` and `e2e`. **It has no key and needs none** (INV-13: continuous integration runs with no model key, and the model boundary is exercised only through recorded answers). It checks, for every file under `backend/recordings/`:
+A sixth job beside `backend`, `frontend`, `types-fresh`, `docker` and `e2e`. **It has no key and needs none** (INV-13: continuous integration runs with no model API key, and the model boundary is exercised only through recorded responses). It checks, for every file under `backend/recordings/`:
 
 1. every line parses as JSON, and line 1 is a header with all its fields;
 2. every line after the first is one of the eight events, with a payload that validates against it;
 3. the sequence obeys the grammar in [`streaming.md`](streaming.md), ends in `done`, and holds no `beliefs_propagated`;
 4. at least one line is a `proposal_rejected`;
 5. the header carries one recorded intervention, and its `Insert` validates;
-6. the header's `prompt_hash` equals the current prompt's.
+6. the header's `prompt_hash` equals the current prompt's;
+7. no two files carry the same `generation_started.hypothesis` after trimming, so the match in B2 can never be ambiguous.
 
 **It passes on an empty folder**, so it is green from the commit that adds it and stays green until the first recording lands. `gitleaks`, the secret scanner that already runs before every commit, scans this folder too (NFR-8: no key in a committed file).
 
@@ -257,4 +284,4 @@ Raised 2026-09-17.
 1. **Nobody has measured a recording yet.** Record 0012 budgets a few hundred kilobytes for four runs and says that past a megabyte we drop the stored reasoning and keep the proposals. Measure the first Hormuz file the day it is written, put the figure in `STATUS.md`, and decide then — not from an estimate.
 2. **Where the identifier of a replayed map is resolved.** A finished replay hands the browser a map with an identifier, and every edit afterwards goes through the world routes, which look up stored examples. Today the answer is "the generations this process is holding, looked up after the stored examples" ([`streaming.md`](streaming.md)). Stack 05's SQLite store (FR-31) may want that lookup instead; revisit there.
 3. **One recorded intervention per example, or two?** One is enough to prove the mechanism and it is what record 0012 settled. A second — an insert that the validator *refuses* — would show the reviewer the rejection path on an intervention as well as on a proposal, for the price of one more drafted claim per recording. Worth asking once the cost of a recording is measured.
-4. **`GET /api/readyz` reads `not_ready` with no key**, which understates a program that can replay four full examples. Either the launchpad reads `model_key_present` and ignores `status`, or the route grows a field naming the replayable examples and each one's `recording_date` — which record 0012's on-screen sentence needs from somewhere. Raised in [`streaming.md`](streaming.md) too; one field on `backend/src/katalyst/api/health.py`.
+4. **Whether a recording should carry the wall-clock gaps of the run that made it**, so pacing could follow the real rhythm — a fast proposal, then a slow one that searched — instead of a fixed delay. It would read more like the live product and cost four numbers per file. It would also make "pacing is cosmetic and changes nothing" a longer sentence than it is now, so it needs a reason better than *nicer*. Ask after somebody has watched a live run and a replay back to back.

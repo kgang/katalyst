@@ -92,7 +92,7 @@ class Violation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     code: ViolationCode = Field(
-        description="Which rule was broken. One of eighteen stable strings."
+        description="Which rule was broken. One of nineteen stable strings."
     )
     subject: str = Field(
         description=(

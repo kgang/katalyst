@@ -1,10 +1,10 @@
-# Evaluation — recorded answers in the build, a scorecard out of band
+# Evaluation — recorded responses in the build, a scorecard out of band
 
 ## Purpose
 
 Two questions get asked about a pipeline that calls a language model, and they want opposite things from a test suite.
 
-**"Does the code still do what it did?"** must be answered on every push, in seconds, with no key, deterministically. So the model boundary is exercised through **cassettes** — real exchanges with the vendor, recorded once and replayed from disk from then on. An unrecorded call fails the test rather than dialling out. That is INV-13: continuous integration runs with no model key.
+**"Does the code still do what it did?"** must be answered on every push, in seconds, with no key, deterministically. So the model boundary is exercised through **cassettes** — real exchanges with the vendor, recorded once and replayed from disk from then on. An unrecorded call fails the test rather than dialling out. That is INV-13: continuous integration runs with no model API key, and the model boundary is exercised only through recorded responses.
 
 **"Is the prompt any good?"** cannot be answered that way. It needs live calls, it costs money, and the same question asked twice gives two different maps. So it is answered **out of the build**, by hand, when we choose to pay: `make eval` runs the four example hypotheses live and prints a scorecard.
 
@@ -74,7 +74,7 @@ They are the four hypotheses in `ASSIGNMENT.md`, and they are two of each door, 
 
 | # | Hypothesis | Door | Destination | What it is for |
 |---|---|---|---|---|
-| 1 | *The Strait of Hormuz is going to open next week.* | **Verify** | *Brent crude settles below $68 for five sessions.* | The assignment's own first use case, word for word: does the opening logically lead to oil prices falling? A route should exist, and the eval asserts only that a graded route or an honest refusal comes back — never which route |
+| 1 | *The Strait of Hormuz is going to open next week.* | **Verify** | *Brent crude settles below $68 for five sessions.* | The assignment's own first use case, word for word: does the opening logically lead to oil prices falling? A path should exist, and the eval asserts only that a graded path or an honest refusal comes back — never which path |
 | 2 | *Republicans win the House but Democrats take the Senate during the Midterm.* | **Explore** | — | A hypothesis in a different domain entirely, with no oil in it. It is here to catch a prompt that has quietly learned one subject |
 | 3 | *Models more capable than Fable get export restricted by the United States.* | **Verify** | *Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.* | **Deliberately unreachable.** Export controls on frontier models have no mechanism that reaches Gulf shipping insurance. This case exists to prove that no code path invents a bridge (FR-7) |
 | 4 | *Photonic chips get adopted faster than expected.* | **Explore** | — | A slow, diffuse, long-horizon hypothesis — the kind that tempts a model into vague claims. Every claim it produces still has to be checkable (INV-1) |
@@ -91,7 +91,7 @@ Seven checks. Every one is a count or a shape; not one is a judgement about a se
 | 2 | At least one `market` or `not_tradeable` ending | INV-9 — a chain ends in an instrument or an explicit statement that there is none, never in prose |
 | 3 | A rationale on every arrow, and at least one source on every arrow marked `documented` | INV-2 — a link that claims evidence has to carry it |
 | 4 | Resolution criteria, a named judge and a resolve-by date on every claim | INV-1 — a claim that cannot be checked is a vibe |
-| 5 | A Verify case answers with a graded route **or** an explicit `no_path` naming the nearest claim reached; case 3 answers `no_path` | FR-7 — never a fabricated bridge |
+| 5 | A Verify case answers with a graded **path** or an explicit `no_path` naming the nearest claim reached; case 3 answers `no_path` | FR-7 — never a fabricated bridge |
 | 6 | Non-zero cache reads on a run's second call | Decision record 0006 caches the system prompt. **A run whose cache reads stay at zero is a bug, not a slow day** |
 | 7 | The run stopped for a named reason, and the receipt's dollars are under the run's cap | NFR-6 and Kent's G5 — a run that cannot say what it cost is a run nobody can budget |
 
@@ -120,7 +120,7 @@ class CaseScore(BaseModel):
                                     # outside the accept step — see below
 
     verdict: Literal["reached", "no_path"] | None   # None on an Explore case
-    path_length: int | None         # steps in the graded route; None when there is none
+    path_length: int | None         # steps in the graded path; None when there is none
 
     stopped_for: str                # the Done.reason the stream ended with
     violations: int                 # what domain.validate still finds. Zero, or the run is a bug
@@ -129,7 +129,9 @@ class CaseScore(BaseModel):
     input_tokens: int
     output_tokens: int
     cache_read_tokens: int
-    searches: int                   # web searches this run made
+    searches: int                   # web searches this run made — off the receipt,
+                                    # which carries it because search is billed apart
+                                    # from tokens
     dollars: float
     seconds: float
 

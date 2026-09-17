@@ -184,7 +184,14 @@ class Refused(BaseModel):
 
 
 class Stopped(BaseModel):
-    """The model has nothing more to add on this line, or gave us nothing to check."""
+    """The model has nothing more to add on this line.
+
+    A `Stopped` makes **no event**. It leaves a line in the transcript, and
+    the claim it closed is simply missing from the `frontier` of the next
+    growth event. It must never be turned into an event of its own: a stop is
+    the absence of a proposal, and an event announcing an absence is one more
+    thing a reader has to reconcile with the picture in front of them.
+    """
 
     kind: Literal["stopped"]
     why: str                          # one plain sentence, shown in the transcript
@@ -206,7 +213,11 @@ class Outcome(BaseModel):
     cache_read_tokens: int
 ```
 
-`Accepted` and `Refused` carry exactly what the `proposal_accepted` and `proposal_rejected` events carry; the stream's own shapes, their order, and the position field `at` belong to [`streaming.md`](streaming.md).
+**The four counters fold one-for-one onto the `receipt` event**: `input_tokens`, `output_tokens`, `cache_read_tokens` and **`searches`**. Searches are billed apart from tokens, so a reader handed only the three token counts could not re-derive `dollars` — which is why `searches` is on the receipt and not only in this chapter (cross-chapter review, 2026-09-17).
+
+`Accepted` and `Refused` carry what the `proposal_accepted` and `proposal_rejected` events carry, and the stream adds the same two fields to both: `at`, the position in the transcript, and **`frontier`, the claims still open to expand**. Both growth events say what is still open, so a claim closed by its third refusal drops out of the frontier on the very event that refused it, and the browser can take its skeleton away at once rather than leaving a rectangle where nothing will arrive. The event shapes themselves, and their order, belong to [`streaming.md`](streaming.md).
+
+**`at` counts transcript lines, not events**, so a client will see gaps: a `Stopped` takes a line and emits nothing. A gap in the numbers means a line stopped growing, and the `frontier` on the next growth event says which.
 
 ### The caps, and what each one does
 
@@ -285,7 +296,7 @@ Then `domain.validate` runs on the map the proposal would leave behind — not o
 
 ### B2 — a refusal is an event, and every reason comes back at once
 
-Expanding `B`, the model proposes an arrow instead of a claim: `B → H`, *"cheaper crude reduces the incentive to close the strait."* Read on its own it is a reasonable sentence. Added to the map it closes `H → C → B → H`.
+Expanding `B`, the model proposes an arrow instead of a claim: `B → H`, *"cheaper crude reduces the incentive to close the strait."* Read on its own it is a reasonable sentence. Added to the map it closes `H → B → H`, because `H → B` is already drawn.
 
 ```
 Refused(
@@ -295,6 +306,8 @@ Refused(
                         message='These claims form a loop with no delay in it: …'),),
 )
 ```
+
+The message is quoted in full in B4's worked run, step 6, because it is interface copy and the browser chapter draws it word for word.
 
 The arrow is **not** added. The map the person is looking at is untouched, because nothing was mutated — the proposal was a candidate map, and it lost. `proposal_rejected` goes out carrying the validator's own sentence, and the browser shows it beside the map. A generation that hides its misses has deleted half the product (`test_expand_rejects_cycle`, `test_expand_surfaces_a_refusal_as_a_rejected_proposal`).
 
@@ -306,9 +319,11 @@ Two kinds of failure are not the validator's and arrive the same way. **A model 
 
 Decision record 0003 originally allowed *one targeted re-prompt naming those violations*. Kent chose otherwise, and the record carries a dated amendment saying so.
 
-**The rule: up to three fresh proposals in a row for one frontier claim, and the next call is never told what was wrong.** Every attempt that does not end in an accepted proposal counts — a validator refusal, a model refusal, or an answer that did not fit the shape — because the cap is on attempts, not on kinds of failure. Three in a row closes that frontier claim; the line simply stops growing there. Each attempt is its own event, and all three are shown.
+**The rule: up to three fresh proposals in a row for one frontier claim, and the next call is never told what was wrong.** Three in a row closes that frontier claim; the line simply stops growing there. Each attempt is its own event, and all three are shown.
 
-Worked: expanding `B`, the model proposes `B → H` and is refused for the loop. The next call is the *same* call — the same map, the same frontier claim, the same prompt — with no mention of the loop, no mention of the refusal, and nothing new to read. It proposes `B → M1`, the Polymarket contract, and that is accepted.
+**Anything that is not an accepted proposal counts toward the three** — a rejection by the validator, a refusal by the vendor, an answer that did not fit the shape. **One rule, not three.** The cap is on attempts, because what has run out is our willingness to keep paying for this line, and that is the same whichever way the attempt failed. *Settled by the coordinator on 2026-09-17, as the one-rule reading of Kent's G4:* record 0003's amendment speaks only of proposals the validator turned down, and three separate counters would mean a line could be asked nine times while every count stayed under three.
+
+Worked: expanding `B`, the model proposes `B → H` and is refused for the loop. The next call is the *same* call — the same map, the same frontier claim, the same prompt — with no mention of the loop, no mention of the refusal, and nothing new to read. It proposes `M2`, the pair trade, and that is accepted, which puts `B`'s count back to zero.
 
 **Why the silence.** Violation text in a prompt steers the model toward *passing the validator* rather than toward being right, and the two are not the same target. It is the same argument that keeps the model's hands off `provenance`: the moment a check is described to the thing being checked, the check stops measuring anything (`test_a_refused_claim_is_asked_again_without_being_told_why`).
 
@@ -316,25 +331,50 @@ Worked: expanding `B`, the model proposes `B → H` and is refused for the loop.
 
 ### B4 — how a generation ends, and the one reason it gives
 
-A claim of kind `market` or `not_tradeable` is an **ending**: there is nothing downstream of a trade, so an ending never joins the frontier. A generation therefore stops when the frontier empties, or when a cap trips.
+A claim of kind `market` or `not_tradeable` is an **ending**: there is nothing downstream of a trade, so an ending never joins the frontier. A generation stops when the frontier is **empty** — every line closed, whether by an ending, by a `Stop`, by a cap, or by three refusals in a row.
 
-The stream ends with one `done` event carrying **one** reason, chosen by this order — the first that applies wins:
+The stream ends with one `done` event carrying **one** of seven reasons. **The rule: the reason names what closed the last claim that was still open**, with two overrides above it. One rule, so two readers cannot get two answers.
 
 | # | `done.reason` | Chosen when |
 |---|---|---|
-| 1 | `spend_cap` | The running receipt reached the run's spending cap. Checked after every call, before anything else |
-| 2 | `no_terminal` | The map ends nowhere you can act on, even after the last ending-seeking call (B6) |
-| 3 | `depth_cap` · `width_cap` · `claim_cap` | A cap stopped a line that was still open. Our limit, so the person hears about it before the model's judgement |
-| 4 | `model_stopped` | At least one line closed short — the model answered `Stop`, or three proposals in a row were refused — and no cap tripped |
-| 5 | `reached_terminal` | Every line ran to an ending. The ordinary, good ending |
+| 1 | `spend_cap` | **Override.** The running receipt reached the run's spending cap. Checked after every call, so nothing further is asked |
+| 2 | `no_terminal` | **Override.** The map ends nowhere you can act on, even after the last ending-seeking call (B6) |
+| 3 | `depth_cap` · `width_cap` · `claim_cap` | The last open claim was closed by that cap: it sat at the depth cap, it already had its full width of children, or the map was full |
+| 4 | `refusal_cap` | The last open claim was closed by the refusals cap — three proposals in a row for it were refused. The map is finished, and one line was abandoned rather than ended. *(Named `model_stopped` until 2026-09-17; renamed because the model did not stop — our rules refused it — and a value must mean what it says. A model that answers `Stop` is the row below.)* |
+| 5 | `reached_terminal` | The last open claim answered `Stop`, or the claim it produced was an ending. The ordinary, good ending |
 
-Worked, Hormuz: `H` → `C` → `B`, then `B` proposes `M1`, `M2` and `N1`; `H` also proposes `N1`'s line. Every open claim either reaches an ending or answers `Stop`; three of the map's claims are endings, two tradeable and one not. The frontier empties with every line at an ending, no cap tripped: `done.reason = "reached_terminal"`, with the tallies of claims, arrows and refusals beside it.
+There is no `search_cap`. Reaching the searches cap stops **searching**, not the generation ([`grounding.md`](grounding.md) B6), so it can never be what closed a claim.
 
-`done.reason` never carries `no_path`. Whether a Verify run found a route is a fact about the *route*, reported once on the `verdict` event and nowhere else — two derivations of one line eventually disagree (Kent, 2026-09-17).
+`done.reason` never carries `no_path` either. Whether a Verify run found a path is a fact about the *path*, reported once on the `verdict` event and nowhere else — two derivations of one line eventually disagree (Kent, 2026-09-17).
+
+#### The worked run, step by step
+
+One Hormuz generation through the Explore door, at the default caps: depth 5, width 3, 30 claims. `at` is the position in the transcript, from 0. The browser chapter draws this exact run, so nothing here is approximate.
+
+0. **`proposal_accepted`** — the hypothesis `H`, *"The Strait of Hormuz is open to unrestricted commercial transit for 14 consecutive days"*, from the one `StartingClaim` call. `proposition=H`, `links=()` — a hypothesis has nothing causing it. `frontier=(H,)`. *Every claim the canvas draws arrives on a `proposal_accepted`, and this is the first.*
+1. **`proposal_accepted`** — expanding `H`: a `ClaimProposal` for `C`, *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%"*, with the arrow `H → C`. `frontier=(H, C)`.
+2. **`proposal_accepted`** — expanding `H`: a `ClaimProposal` for `N1`, *"Omani-mediated United States-Iran talks resume publicly"*, kind `not_tradeable` with its own stored reason, and the arrow `H → N1`. `N1` is an ending, so it never joins the frontier. `frontier=(H, C)`.
+3. **`proposal_accepted`** — expanding `C`: a `ClaimProposal` for `B`, *"Brent crude settles below $68 for five sessions"*, with the arrow `C → B`. This is the call worked in full in B1, and the arrow whose source is worked in [`grounding.md`](grounding.md) B1. `frontier=(H, C, B)`.
+4. **`proposal_accepted`** — expanding `H`: a **`LinkProposal`**, `H → B` — both ends are already on the map, so no claim is minted and `proposition` is `None`. `H` now causes three claims and the width cap closes it: **`frontier=(C, B)`**, and `H`'s skeleton goes on this event. *B's second incoming arrow can only arrive this way: one `ClaimProposal` brings one claim with one incoming arrow.*
+5. **`proposal_accepted`** — expanding `B`: a `ClaimProposal` for `M1`, *"A Polymarket contract 'Brent below $70 on 2026-10-31' resolves YES"*, kind `market` with a contract payoff, and the arrow `B → M1`. An ending. `frontier=(C, B)`.
+6. **`proposal_rejected`** — expanding `B`: a `LinkProposal`, `B → H`, *"cheaper crude reduces the incentive to close the strait"*. It closes `H → B → H`. One violation, code `cycle`, and the message word for word:
+
+   > These claims form a loop with no delay in it: "The Strait of Hormuz is open to unrestricted commercial transit for 14 consecutive days" → "Brent crude settles below $68 for five sessions" → "The Strait of Hormuz is open to unrestricted commercial transit for 14 consecutive days". Mark the arrow where a market feeds back on the world as reflexive and give it a delay, or remove one arrow.
+
+   `frontier=(C, B)` — unchanged, because this is only `B`'s first refusal.
+7. **`proposal_accepted`** — expanding `B` again, with a prompt byte-identical to step 6's: a `ClaimProposal` for `M2`, *"The energy fund XLE underperforms the S&P 500 fund SPY by more than 3% over 20 trading days"*, kind `market` with a price payoff, and the arrow `B → M2`. An ending. `B`'s refusal count goes back to zero. `frontier=(C, B)`.
+8. **no event** — expanding `C`: a `Stop`. A transcript line, and nothing on the wire.
+9. **no event** — expanding `B`: a `Stop`. `B` was the last open claim, and it answered `Stop`.
+
+Then the closing events, which carry no `at`: **`beliefs_propagated`** with the whole world, **`receipt`**, and **`done`** with `reason="reached_terminal"`, `claims=6`, `links=6`, `rejected=1`.
+
+Two things a reader should notice. **Steps 8 and 9 leave gaps in the numbering** — a client sees 7 then the closing events, and the missing positions are the two stops. And **no event ever says "this claim is closed"**: the frontier on step 4 stopped naming `H`, and the frontier after step 7 is the last one anyone sees. When `beliefs_propagated` arrives the frontier is empty by definition, so every skeleton still on screen goes at once.
+
+The generated map is not the shipped fixture and does not pretend to be: it has six claims where the fixture has seven, and no `B → R` feedback arrow, because `LinkDraft` carries no `reflexive` field and nothing can propose one.
 
 ### B5 — the spending cap stops the run and says what it bought
 
-`engine/receipt.py` folds every `Outcome`'s counters into the run's one receipt, and **the running receipt is checked against the spending cap after every call.** Over the cap, the generation stops where it is: `done.reason = "spend_cap"`, and one plain sentence naming what was spent and what was got — *"This run reached its spending limit of <cap>. It spent <spent> and built <n> claims and <n> arrows."* No dollar figure is written into this chapter, because every one of those slots is filled by the receipt at run time.
+`engine/receipt.py` folds every `Outcome`'s counters into the run's one receipt, and **the running receipt is checked against the spending cap after every call.** Over the cap, the generation stops where it is: `done.reason = "spend_cap"`, and one plain sentence naming what was spent and what was got — *"This run reached its spending limit of <cap>. It spent <spent> and built <n> claims and <n> arrows."* No figure is written into that sentence, because every one of its slots is filled from the receipt at run time.
 
 What was built is kept, not thrown away: a partial map with a visible reason beats a blank screen with a silent one. The price table lives in `engine/pricing.py` and nothing else, with the day it was read beside it and the `claude-api` skill named — prices change, and memory is unreliable (`test_a_run_stops_at_its_spending_cap_and_says_so`).
 
@@ -342,9 +382,9 @@ The ceiling *across* runs is a working agreement kept in `STATUS.md`; nothing is
 
 ### B6 — no ending reached: one last call, then an honest card
 
-If the caps are hit and the map ends nowhere you can act on, the engine makes **one last call per open claim, asking only for an ending** — a claim of kind `market` or `not_tradeable`, with no further expansion behind it. It is the same `ClaimProposal` shape and the same validation; only the question changes.
+When expansion has stopped — the frontier empty, or every open claim capped — and the map ends nowhere you can act on, the engine makes **one last call per open claim, asking only for an ending**: a claim of kind `market` or `not_tradeable`, with no further expansion behind it. It is the same `ClaimProposal` shape and the same validation; only the question changes.
 
-Worked: a run capped at depth 5 whose deepest claims are all `event`s. The last call on each open claim asks for the ending it leads to. One comes back as `N1` — *"Omani-mediated United States-Iran talks resume publicly"*, kind `not_tradeable`, with its own stored reason: no venue quotes a diplomatic round. The map now satisfies INV-9 and the run ends on its cap's own name.
+Worked: a run whose deepest claims all sit at the depth cap and are all `event`s. The last call on each open claim asks for the ending it leads to. One comes back as `N1` — *"Omani-mediated United States-Iran talks resume publicly"*, kind `not_tradeable`, with its own stored reason: no venue quotes a diplomatic round. The map now satisfies INV-9, the `no_terminal` override no longer applies, and the run reports what actually closed its last open claim — here `depth_cap`.
 
 If that still fails, the stream ends `done.reason = "no_terminal"` and the browser says so in plain words. **The engine never writes a claim the model did not propose.** Adding a terminal ourselves to make the map legal would be a claim with no author, which is the one state this product refuses to show (`test_a_generation_that_reaches_no_ending_says_so`).
 
@@ -352,7 +392,7 @@ If that still fails, the stream ends `done.reason = "no_terminal"` and the brows
 
 A Verify run carries a destination in the person's own words. It is turned into a claim by one `StartingClaim` call and added to the map **up front**, as an ordinary `event`. Every expansion call is told what it is, and expansion is steered toward it.
 
-**Reached.** The person asks: *does the strait opening reach a Polymarket contract on Brent below $70?* The map runs `H` → `C` → `B` → `M1`. The `verdict` event carries `kind="reached"`, the path `(H, C, B, M1)`, and `product` — the multiplied-out likelihood of that path, read off the world, never multiplied here. The route shown is the **best-backed route**: over every route from the hypothesis to the destination, the one whose weakest arrow is strongest. That is the same rule the delta rail's ranking and the Inspector's path bar already use (Kent, 2026-09-17) — one path-choosing rule, used three times. Record 0014 states the honest caveat beside it: a path's multiplied-out likelihood multiplies numbers each read on a different day, and it is not a joint probability. Say so next to it.
+**Reached.** The person asks: *does the strait opening reach a Polymarket contract on Brent below $70?* The map runs `H` → `C` → `B` → `M1`. The `verdict` event carries `kind="reached"`, the path `(H, C, B, M1)`, and `product` — the multiplied-out likelihood of that path, read off the world, never multiplied here. The path shown is the **best-backed path**: over every path from the hypothesis to the destination, the one whose weakest arrow is strongest. That is the same rule the delta rail's ranking and the Inspector's path bar already use (Kent, 2026-09-17) — one path-choosing rule, used three times. Record 0014 states the honest caveat beside it: a path's multiplied-out likelihood multiplies numbers each read on a different day, and it is not a joint probability. Say so next to it.
 
 **Not reached.** The person asks instead: *does the strait opening reach Iranian crude exports returning to pre-sanction levels?* Nothing the model proposed gets there. The `verdict` event carries `kind="no_path"`, an empty path, `nearest="B"` — the claim the map did reach that sits closest to the destination — and one plain sentence saying so.
 
@@ -407,7 +447,8 @@ Two more tests belong to this pull request and are stated where they are owned: 
 
 *Raised 2026-09-17, when this chapter was written.*
 
-1. ~~**`done.reason` carried `search_cap`, and nothing could choose it.**~~ **Closed 2026-09-17: the value is gone.** Under [`grounding.md`](grounding.md)'s rule, reaching the searches cap turns searching off and the generation carries on, so no run can end for that reason — and a reason nobody can produce is a reason a reader will one day trust. [`streaming.md`](streaming.md) carries the seven reasons that remain.
+1. **Should `done.reason` carry `search_cap`?** As first asked: the shapes sheet listed the value, and under [`grounding.md`](grounding.md)'s rule nothing could ever choose it — reaching the searches cap turns searching off and the generation carries on.
+   **Decided 2026-09-17, in the cross-chapter review: no. The value is gone**, and `Done.reason` has seven. A reason nobody can produce is a reason a reader will one day trust. [`streaming.md`](streaming.md) carries the seven.
 2. **Does the vendor's structured-output call take a discriminated union directly?** `Proposal` is a union of three shapes, and a structured-output format may want a single object at the top. If it does, the union is wrapped in a one-field object and nothing else changes — no field is renamed and no behaviour moves. Verified against the `claude-api` skill in the pipeline pull request, not guessed here.
 3. **Should a vendor refusal and a malformed answer carry codes of their own?** Today both arrive as a `Refused` with an empty violation list and a plain sentence, so a reader cannot tell *the model declined* from *the answer did not parse* except by reading the sentence. Such a code would live in `engine/`, not in `domain/validity.py`, because neither is a fault in a map — the nineteen codes there stay nineteen.
 4. **A generated map can hold no feedback arrow.** `LinkDraft` has no `reflexive` field, so the one kind of arrow allowed to close a loop cannot be proposed, and a proposal that closes a loop is always refused. The shipped example has one such arrow, hand-written. Add the field in stack 06, when unrolling a feedback arrow over time actually does something?

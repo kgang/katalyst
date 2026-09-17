@@ -187,7 +187,9 @@ The run's searches cap is the claims cap: thirty. Every call that declares the t
 
 When the budget is gone, **searching stops and the generation carries on.** Later calls declare no search tool at all, so there is nothing for the model to try and nothing to half-use. Those calls still propose claims and arrows; their arrows come back **`argued`**, and an arrow whose rationale is empty is refused as it always is.
 
-This is said out loud rather than hidden, because it is visible on screen anyway: the arrows added late in a large map carry two-dot origin marks where the early ones carry three. **Nothing in the interface disguises that, and nothing in the pipeline compensates for it.** The receipt records how many searches ran, so a reader can see which runs hit the ceiling.
+This is said out loud rather than hidden, because it is visible on screen anyway: the arrows added late in a large map carry two-dot origin marks where the early ones carry three. **Nothing in the interface disguises that, and nothing in the pipeline compensates for it.**
+
+Each call's search count travels on its `Outcome` and is folded into **`Receipt.searches`**, beside the three token counts, so a reader can see which runs hit the ceiling. It is a field on the receipt rather than a number this chapter keeps to itself for a hard reason: **a web search is billed apart from tokens**, so `Receipt.dollars` cannot be re-derived from the token counts alone (cross-chapter review, 2026-09-17).
 
 Reaching the cap is **not** a reason for a generation to end. A complete map with some unbacked arrows is a better answer than a truncated map, and the origin marks say which arrows are which (`test_a_run_stops_searching_at_its_search_cap`).
 

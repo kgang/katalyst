@@ -42,6 +42,9 @@ class ProposalRejected(BaseModel):      # event: proposal_rejected
     at: int
     claim_in_words: str                 # what the model wrote. Never minted, never a tile
     violations: tuple[Violation, ...]   # domain/validity.py's own codes and sentences
+    frontier: tuple[PropositionId, ...] # claims still open. BOTH growth events say it, so a
+                                        # claim closed by its third refusal loses its
+                                        # skeleton at once
 
 
 class BeliefsPropagated(BaseModel):     # event: beliefs_propagated
@@ -50,7 +53,7 @@ class BeliefsPropagated(BaseModel):     # event: beliefs_propagated
 
 
 class Verdict(BaseModel):               # event: verdict — the Verify door only
-    """Whether a route from the hypothesis to the destination exists, and how good it is."""
+    """Whether a path from the hypothesis to the destination exists, and how good it is."""
     kind: Literal["reached", "no_path"]
     path: tuple[PropositionId, ...]     # empty on no_path
     product: float | None               # the multiplied-out likelihood of that path (INV-8)
@@ -65,6 +68,8 @@ class Receipt(BaseModel):               # event: receipt  (NFR-6)
     input_tokens: int
     output_tokens: int
     cache_read_tokens: int
+    searches: int                       # web searches this run made. Billed apart from
+                                        # tokens, so `dollars` cannot be re-derived without it
     dollars: float
     seconds: float
     mode: Literal["live", "replay"]
@@ -75,7 +80,7 @@ class Receipt(BaseModel):               # event: receipt  (NFR-6)
 class Done(BaseModel):                  # event: done
     """The generation finished. One reason, and the size of what was built."""
     reason: Literal["reached_terminal", "depth_cap", "width_cap", "claim_cap",
-                    "spend_cap", "model_stopped", "no_terminal"]
+                    "spend_cap", "refusal_cap", "no_terminal"]
     claims: int
     links: int
     rejected: int
@@ -88,7 +93,11 @@ class Failed(BaseModel):                # event: failed
 
 `Proposition`, `Link`, `Violation`, `World` and `PropositionId` are the rules layer's own types, defined in [`../graph/`](../graph/) and [`../multiverse/`](../multiverse/). Nothing here redefines them; the stream carries them whole, so what the browser draws is what `domain/` computed.
 
-### Three things worth saying about the shapes
+### Four things worth saying about the shapes
+
+**`GenerationStarted.seed` is always a number, even though the request's seed is optional.** A request may leave `seed` out, and then `engine/ids.py` mints one and this event says which — so the run is reproducible from the moment it starts, by the same `(base map, branch, seed)` triple as everything else (INV-5: every world replays from those three). **The browser never invents a seed.** It sends one only to reproduce a run it was handed, which is the one case where a seed means something to the person sending it; a browser that made one up would be putting a number nobody computed into the reproducibility triple. On replay, neither is used: the recording's header carries the seed the recorded run had, and that one wins ([`replay.md`](replay.md)).
+
+**Both growth events carry `frontier`.** `proposal_rejected` says which claims are still open for the same reason `proposal_accepted` does — so the browser can take a skeleton down the instant a claim closes, rather than leaving a rectangle standing where nothing will ever arrive. See "Where the first tile comes from" below for the two closures that make no event of their own.
 
 **`ProposalAccepted.proposition` is optional because two different proposals are accepted through it.** A proposal that adds a claim carries the claim and its one incoming arrow. A proposal that only joins two claims already on the map carries no claim at all — `proposition` is `None` and `links` holds the one new arrow. One event covers both, because from the browser's side both are "the map got bigger"; splitting them would be a ninth event whose only difference is a field that is already nullable.
 
@@ -97,20 +106,20 @@ class Failed(BaseModel):                # event: failed
 **No field is written twice in one stream** (Kent, decision S3, 2026-09-17). `no_path` appears on `Verdict` and nowhere else — `Done.reason` says why the *generation* stopped, which is a different question from whether a route was found, and a generation that reaches every cap can still find its route. `mode`, `recording_date` and `prompt_hash` appear on `Receipt` and nowhere else — `GenerationStarted` used to carry them, and two places to read one fact eventually disagree. The same rule already governs the retraction badge in [`../multiverse/diff.md`](../multiverse/diff.md).
 
 > **Then how does the replay badge appear at the start, when `mode` arrives at the end?**
-> It does not come from the stream. The first screen already asked `GET /api/readyz`, which reports `model_key_present` and never the key itself, and it therefore knows before the first keystroke whether anything it runs will be a replay. The receipt's `mode` is the *stored* record of what happened, read afterwards in the Inspector. The badge is a fact about the session; the receipt is a fact about the run. See [`replay.md`](replay.md).
+> It does not come from the stream. The first screen already asked `GET /api/readyz`, which reports `model_key_present`, never the key itself, and — settled 2026-09-17 — **`replayable`, the examples that can be played and the day each was recorded**. So before the first keystroke the screen knows whether anything it runs will be a replay, and knows the date record 0012's sentence has to print. The receipt's `mode` is the *stored* record of what happened, read afterwards in the Inspector. The badge is a fact about the session; the receipt is a fact about the run. The shape is in [`replay.md`](replay.md).
 
 ### The seven reasons a generation stops
 
-`Done.reason` has seven values and each says a different true thing. The rules that produce them belong to [`proposals.md`](proposals.md); this is the vocabulary.
+`Done.reason` has seven values and each says a different true thing. **One rule picks it, and [`proposals.md`](proposals.md) B4 owns that rule: the reason names what closed the last claim that was still open**, with `spend_cap` and `no_terminal` as overrides above it. This is the vocabulary.
 
 | Reason | What happened |
 |---|---|
-| `reached_terminal` | Every open claim closed and the map ends in at least one `market` or `not_tradeable` claim (INV-9 — every map ends in something you could trade, or an explicit statement that you could not). The ordinary, good ending |
-| `depth_cap` | The map grew as many layers from the hypothesis as the run allowed |
-| `width_cap` | A claim was given as many children as the run allowed |
-| `claim_cap` | The map reached as many claims in total as the run allowed |
+| `reached_terminal` | The last open claim closed on an ending or on the model answering `Stop`, and the map ends in at least one `market` or `not_tradeable` claim (INV-9 — every map ends in something you could trade, or an explicit statement that you could not). The ordinary, good ending |
+| `depth_cap` | The last open claim sat as many layers from the hypothesis as the run allowed |
+| `width_cap` | The last open claim already had as many children as the run allowed |
+| `claim_cap` | The last open claim closed because the map held as many claims in total as the run allowed |
 | `spend_cap` | The running receipt reached the run's spending cap (Kent, G5). `Failed` is not used: stopping on budget is a decision, not a fault |
-| `model_stopped` | A line closed short — the model answered `Stop`, or three proposals in a row were refused — with no cap tripped |
+| `refusal_cap` | The last open claim closed because three proposals in a row for it were refused — one line was abandoned rather than ended. Not called `model_stopped`: the model did not stop, our rules refused it |
 | `no_terminal` | The map ends nowhere anybody could act on, even after the one last ending-seeking call per open claim, and the stream says so rather than inventing one |
 
 **There is deliberately no `search_cap`.** The searches-per-generation cap (Kent, S2) stops the *searching*, not the generation: past the cap, calls stop declaring the search tool and later arrows come back `argued` instead of `documented`, and the run carries on to a proper ending. A complete map with some unbacked arrows is a better answer than a truncated one, and the origin marks on the wires say which arrows are which. [`grounding.md`](grounding.md) holds the rule. A reason nobody can choose is a reason a reader would one day trust, so the value is not in the literal at all.
@@ -125,6 +134,15 @@ On the stream they still arrive as **`proposal_accepted` events with an empty `l
 
 A starting claim the rules layer refuses is a `proposal_rejected` like any other, carrying the person's own sentence in `claim_in_words`. If the hypothesis itself cannot be made checkable there is no map to build, and the stream ends in `failed` with one plain sentence — the grammar below allows `failed` to cut in after any event, including the first.
 
+#### And where a tile that never arrives goes away
+
+Two things close a claim without adding anything to the map, and **neither makes an event of its own**: the model answering `Stop` on that claim, and its third refusal in a row. Both are still recorded — a `Stop` leaves a line in the transcript, and each refusal is already a `proposal_rejected` — but neither gets a ninth event name, because the browser does not need to be *told* a claim closed. It reads it:
+
+* **the next growth event's `frontier` no longer names that claim**, which is why both growth events carry `frontier` and not just the accepted one; and
+* **on `beliefs_propagated`, every skeleton goes** — the frontier is empty by definition once the map is finished.
+
+So no rectangle ever stands on the canvas waiting for something that is not coming, and no event exists whose only job is to say that nothing happened.
+
 ### The grammar
 
 A legal stream is exactly this, read left to right:
@@ -135,12 +153,13 @@ growth   :=  ( proposal_accepted | proposal_rejected )*
 finish   :=  beliefs_propagated  verdict?  receipt  done
 ```
 
-with four rules the grammar cannot carry on its own:
+with five rules the grammar cannot carry on its own:
 
 1. **`failed` cuts.** After any event, `failed` may replace everything that was still expected. A stream that ends in `failed` is legal at any length; nothing follows it.
-2. **`receipt` is always the second-to-last event**, in both endings — before `done` and before `failed`. A run that broke after ten calls still cost ten calls, and NFR-6 (every generation records model, tokens, cache reads and dollars) does not have an exception for runs that went wrong. A run that broke before its first call emits a receipt of zeroes, which is also true.
-3. **`verdict` appears exactly when the request named a `target`**, and never otherwise. It comes after `beliefs_propagated` because `product` — the multiplied-out likelihood of the route (INV-8: any displayed path shows the product of its steps) — is read off the propagated world.
+2. **`receipt` is always the second-to-last event**, in both endings — before `done` and before `failed`. A run that broke after ten calls still cost ten calls, and NFR-6 (every generation records model, tokens, cache reads, searches and dollars) does not have an exception for runs that went wrong. A run that broke before its first call emits a receipt of zeroes, which is also true.
+3. **`verdict` appears exactly when the request named a `target`**, and never otherwise. It comes after `beliefs_propagated` because `product` — the multiplied-out likelihood of the path (INV-8: any displayed path shows the product of its steps) — is read off the propagated world.
 4. **`at` starts at 0 and rises by one** across `proposal_accepted` and `proposal_rejected` together.
+5. **A claim that has left `frontier` never returns to it**, and the frontier is empty by the time `beliefs_propagated` arrives. The frontier grows when an accepted claim joins it and shrinks when one closes; it never re-opens a claim, which is what lets the browser take a skeleton down and leave it down.
 
 Three consequences fall straight out, and each is a named test.
 
@@ -169,7 +188,9 @@ The three counts on `done` are written here as gaps on purpose: they are whateve
 * The answer's media type is `text/event-stream` and it is sent with `Cache-Control: no-store`.
 * **The response is a plain `StreamingResponse`** (Kent, S5). Not `sse-starlette`: one fewer runtime dependency, and — the reason that decided it — a library that sends a periodic heartbeat comment line would put a line into every recording that means nothing, and a line in a file that means nothing is a line somebody eventually parses. The generator writes the two lines itself.
 * **There is no heartbeat, and no keep-alive line.** A generation emits something every few seconds by its nature, so there is nothing to keep alive.
-* **Nothing between the server and the browser may buffer the body.** A proxy that buffers turns the growing map into a spinner-then-dump, which is the exact thing FR-5 and UX-8 forbid, and it does it silently in the packaged build while working perfectly in development. `docker/nginx.conf` forwards `/api/` and must switch buffering off on that route; the stream pull request checks it against the packaged image, not only against the dev server.
+* **Nothing between the server and the browser may buffer the body — a requirement on the packaged build, not just on the code.** A proxy that buffers holds every event until the last one is written and then delivers them all at once: the growing map becomes a spinner-then-dump, which is the exact thing FR-5 and UX-8 forbid, and it does it *silently in the packaged image while working perfectly in development*. `docker/nginx.conf` forwards `/api/` to the server and, as written today, buffers it. Switching buffering off on that location is part of the stream pull request, which owns the file.
+
+  **The test that proves it is a timing one, and it is the only one in this chapter:** drive `POST /api/generate` through the packaged image and assert that **the first event is received before the last one is written**. It needs no fixed number of milliseconds — it is an ordering claim, not a latency claim — and it fails loudly on a buffering proxy, which no unit test can.
 
 ### The transport: `POST`, read as a stream — not `EventSource`
 
@@ -200,9 +221,13 @@ All under `/api/`, like everything else, in `backend/src/katalyst/api/generate.p
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed` |
-| `POST /api/generate/insert` | `{base_id, branch, claim_in_words, at}` | One `Insert` intervention — a claim and its arrows, drafted and already validated — for the browser to append to its branch |
+| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed` |
+| `POST /api/generate/insert` | `{base_id, branch, claim_in_words, position}` | One `Insert` intervention — a claim and its arrows, drafted and already validated — for the browser to append to its branch |
 | `GET /api/generate/{generation_id}/transcript` | — | The transcript of a generation this process still holds; `404` with a plain sentence when it does not |
+
+**`seed` is the one optional field with a rule behind it.** Left out, `engine/ids.py` mints one and `generation_started` says which; sent, it reproduces a run the browser was handed. **The browser never invents a seed** — the three world routes still *require* one, because by then the run has a seed and asking for a world under a different one is asking a different question. On replay the recording's header seed wins over anything in the request.
+
+**`position` is the place in the branch the new edit goes — and it is `position`, not `at`.** `at` is already two things: a transcript position on a stream event, and a date on an edit. A third meaning on a third shape is how a field stops meaning what it says.
 
 **`insert` is the one intervention that calls the model.** Anti-pattern 2 in `PRODUCT_REQUIREMENTS.md` §10 forbids re-prompting for a whole map after an edit, and names one exception: `insert`, over the affected subtree only. The other five edits — *Suppose this is true*, *This happened*, *Change this push*, *Split this claim*, *My own number* — are pure arithmetic in `domain/`, which is why a reviewer with no key still gets the whole multiverse at full fidelity.
 
@@ -214,7 +239,11 @@ With no key, this route declines in plain words rather than failing: *"drafting 
 
 `versions` — how many versions of the map to try — and `worlds` — how many worlds to run under each — are today bounded **below** only: `versions > 0` and `worlds > 1` on the three world routes. That is one guard short. A request for a hundred million versions is not refused; it is accepted and the server works on it until something else gives out.
 
-**Both get an upper bound, on this route and on the three world routes** (Kent, S2). Two named constants live in `backend/src/katalyst/engine/worlds.py` beside `VERSIONS` and `WORLDS`, the defaults they already sit next to. Their values are **measured, not chosen**: the largest run that still finishes inside NFR-7's budget (60 tiles render and re-layout in under 100 milliseconds; the engine's own timings are in [`../multiverse/propagation.md`](../multiverse/propagation.md)) on the machine the timings were taken on, written down with the measurement and the date beside them. The ceiling is never below the shipped default.
+**Both get an upper bound, on this route and on the three world routes** (Kent, S2). Two named constants live in `backend/src/katalyst/engine/worlds.py` beside `VERSIONS` and `WORLDS`, the defaults they already sit next to.
+
+**The budget they are measured against is the server's own, not the browser's.** NFR-7's hundred milliseconds is a *rendering* budget — sixty tiles drawn and laid out again — and it has nothing to say about how long `propagate` may run. The quantity that matters here is the one [`../multiverse/propagation.md`](../multiverse/propagation.md) already times: how long one world takes to work through, at the shipped loop sizes, on the machine those timings were taken on. The ceiling is **the largest pair of loop sizes that keeps one request inside the time a person will wait for a world before assuming the app has stopped**, measured the same way and written down with the measurement and the date beside it, in that chapter's units.
+
+The values are **measured, not invented**, and the ceiling is never below the shipped default. Until they are measured, nothing may quote one.
 
 **A request above the ceiling is refused, never clamped.** Clamping is a repair: the caller asks for one run and silently gets a different one, and every number that comes back is answering a question nobody asked. Refusal is a `422` naming the field and the ceiling, which pydantic's `le=` produces for free. Test: `test_a_run_above_the_loop_ceilings_is_refused_not_clamped`.
 
@@ -236,10 +265,10 @@ Worked on the assignment's own examples. The map's cast — **H** the hypothesis
 
 ### B1 — Explore: a sentence becomes a map
 
-The user types *"Photonic chips get adopted faster than expected"*, leaves the destination field empty, and presses Explore.
+The user types *"Photonic chips get adopted faster than expected"*, leaves the destination field empty, and presses **Build the map**.
 
-1. `POST /api/generate` with the sentence, no `target`, and a seed.
-2. `generation_started` arrives at once — before any model call has returned — carrying the generation's identifier and the seed. The canvas puts a reserved rectangle on screen. **This is what NFR-7's "first paint within a second" means for a pipeline that returns whole proposals**: the first thing the user sees is the map beginning, not a word of the model's.
+1. `POST /api/generate` with the sentence, no `target`, and **no seed** — the browser has not been handed a run to reproduce, so it does not invent one.
+2. `generation_started` arrives at once — before any model call has returned — carrying the generation's identifier and **the seed the server just minted**, so the run is reproducible from its first event. The canvas puts a reserved rectangle on screen. **This is what NFR-7's "first paint within a second" means for a pipeline that returns whole proposals**: the first thing the user sees is the map beginning, not a word of the model's.
 3. The first `proposal_accepted` at `at: 0` carries the **hypothesis itself**, turned into a checkable claim, with an empty `links` tuple — it has no cause. The reserved rectangle becomes a real tile.
 4. More `proposal_accepted` events arrive, one every few seconds, each with one claim, its incoming arrow, and the claims still open. Tiles fill their reserved space; a wire draws only once both of its ends exist.
 5. `proposal_rejected` events are mixed in among them — the same counter, the same stream — each with the validator's own sentence. They go in the strip beside the map, never on the canvas: a refused claim was never minted and has no identifier to draw.
@@ -252,9 +281,9 @@ No `verdict`: there was no destination to grade.
 
 The user types *"The Strait of Hormuz is going to open next week"* and, in the destination field, *"Brent crude settles below $68 for five sessions"*.
 
-Same as B1, with `target` set, and one more event: after `beliefs_propagated`, a `verdict` with `kind: "reached"`, the route as a list of claim identifiers, `product` — the multiplied-out likelihood of that route — and one plain sentence. `nearest` is `None`, because the destination itself was reached.
+Same as B1, with `target` set, and one more event: after `beliefs_propagated`, a `verdict` with `kind: "reached"`, the graded **path** as a list of claim identifiers, `product` — the multiplied-out likelihood of that path — and one plain sentence. `nearest` is `None`, because the destination itself was reached.
 
-### B3 — Verify: no route, and no bridge
+### B3 — Verify: no path, and no bridge
 
 The user types *"Models more capable than Fable get export restricted by the United States"* and asks for *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%"*.
 
@@ -262,7 +291,7 @@ The map grows. Nothing it grows connects export controls on frontier models to G
 
 **`Done.reason` is not `no_path`**, and it never can be: the generation stopped because it hit a cap, and `no_path` is the answer to a different question (Kent, S3). The browser draws the `no_path` card from the verdict (UX-13: the `no_path` verdict is a first-class card, not an error state).
 
-Nothing in the code can produce a route here. There is no path that adds an arrow to make one, which is what the deliberately unreachable eval case exists to prove — [`evaluation.md`](evaluation.md).
+Nothing in the code can produce a path here. There is no code path that adds an arrow to make one, which is what the deliberately unreachable eval case exists to prove — [`evaluation.md`](evaluation.md).
 
 ### B4 — The user closes the tab
 
@@ -280,7 +309,7 @@ It reads the `event:` line, does not recognise the name, skips to the blank line
 
 ### B6 — "…but Iran is struck the next day"
 
-On a finished Hormuz map the user presses **Add a claim** and types the sentence. The browser calls `POST /api/generate/insert` with the map's identifier, the branch built so far, the sentence, and the position in the branch where the edit goes.
+On a finished Hormuz map the user presses **Add a claim** and types the sentence. The browser calls `POST /api/generate/insert` with the map's identifier, the branch built so far, the sentence, and `position` — where in the branch the new edit goes.
 
 The answer is one `Insert` — the claim, complete with how and when it will be checked, and the arrows attaching it to the map — already run through `domain.validate`. The browser appends it to the branch and asks the world routes for a new world and a new diff. Nothing about the rest of the map is re-prompted: anti-pattern 2 allows the subtree the insert touches and not one claim more.
 
@@ -334,7 +363,7 @@ Local numbers in `spec/generation/` come from one shared pool. **This chapter ho
 
 Raised 2026-09-17.
 
-1. **`GET /api/readyz` says `not_ready` when there is no key, but with recordings committed the program can do a great deal.** The first screen reads this route (that is what it is for), so either the launchpad reads `model_key_present` and ignores `status`, or `Readiness` grows a field naming the examples that can be replayed and the day each was recorded. [`replay.md`](replay.md) needs the date to print record 0012's sentence, so something must carry it. One field on `backend/src/katalyst/api/health.py`; nobody owns that file this stack.
+1. **What an `insert` costs, and where that cost shows.** NFR-6 says every generation records model, tokens, cache reads, searches and dollars — and an insert is a model call that this route answers **once, with an `Insert` and no `receipt` event**, because it is not a stream. So the money it spends has nowhere to be seen today. Three candidates, none obviously right: the route returns the intervention and a small receipt beside it; the cost is folded into the transcript of the generation that produced the map, which is the map the insert is editing; or the browser's receipt strip grows a running total for the session. The third is the only one that survives a page reload badly. Raised by the workbench chapter and assigned here; decide before the insert route is written, because the answer changes the route's answer shape.
 2. **How many generations a process should hold before it drops the oldest.** It is an argument with a default, and the default wants one measurement: the size of a finished thirty-claim map and its transcript in memory. Measure it with the first Hormuz generation, alongside the cost measurement that is already going into `STATUS.md`.
 3. **Should `Failed` carry a stable code beside its sentence?** Every other refusal in this codebase does — `Violation` has a code the browser switches on and a sentence the person reads. `Failed` has only the sentence today, which is enough for "say something honest" and not enough for "offer the right next step". Decide when there is a second thing the browser would do differently.
 4. **Whether a generation should be resumable once stack 05's store exists.** FR-31 puts transcripts in SQLite; at that point the events so far are on disk and resumption becomes cheap. It is still not obviously *wanted*: a reviewer whose connection dropped would rather start again than join a run half-finished. Ask on top of stack 05, not before.

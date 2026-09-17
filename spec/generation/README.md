@@ -14,13 +14,13 @@ Every generation records what it cost. And with no model key, the four example h
 
 Proposal · Rejection · Generation receipt · Grounding · Streaming · Transcript · Recording · Replay · Cassette · Eval case · Scorecard.
 
-The first five are in [`../vocabulary.md`](../vocabulary.md); the rest are defined in the chapters below, where they are used.
+**All of them are defined in the chapters below, where they are used** — [`../vocabulary.md`](../vocabulary.md) carries the words the interface says out loud, and none of these eleven is one of them. A later sweep may promote the ones that earn a place there.
 
 ## Invariants this part owns
 
 | ID | Statement |
 |----|-----------|
-| INV-13 | Continuous integration runs with no model key; the model boundary is exercised only through recorded answers |
+| INV-13 | Continuous integration runs with no model API key; the model boundary is exercised only through recorded responses |
 
 **Local invariant numbers (`INV-generation.<n>`) come from one pool shared by all five chapters**, so a reader can cite one without saying which chapter it is in. The blocks:
 
@@ -44,4 +44,4 @@ The first five are in [`../vocabulary.md`](../vocabulary.md); the rest are defin
 
 **Three things this part deliberately does not cover.** FR-9's adversarial critique pass is **out of stack 04** (Kent, 2026-09-17): it roughly doubles the calls and its value cannot be read without a scorecard to compare against, so it is revisited in stack 07. There is **no ensemble and no reconciliation of two maps** (decision record 0015): the range a proposal states ships as stated, labelled *uncalibrated*. And **the stream cannot be resumed** — the transport decision rules it out, and there is nothing to resume from until stack 05 stores a transcript. The pastcast self-test (FR-30) is stack 07's, and [`evaluation.md`](evaluation.md) carries the dated question.
 
-Decision records behind this part: ADR-0003 (the model proposes, our code disposes), ADR-0006 (the model boundary — one proposal per call, structured output, search, caching, refusals), ADR-0008 (the testing layers and the recorded answers), ADR-0012 (replay from recorded generations), ADR-0015 (a claim's starting number and range come from what the model stated, labelled — not from an ensemble).
+Decision records behind this part: ADR-0003 (the model proposes, our code disposes), ADR-0006 (the model boundary — one proposal per call, structured output, search, caching, refusals), ADR-0008 (the testing layers and the recorded responses), ADR-0012 (replay from recorded generations), ADR-0015 (a claim's starting number and range come from what the model stated, labelled — not from an ensemble).
