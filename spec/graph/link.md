@@ -133,12 +133,6 @@ class Link(BaseModel):
             "'documented', 'historical' or 'market_implied' (INV-2)."
         ),
     )
-    confidence: Literal["speculative", "argued", "documented"] = Field(
-        description=(
-            "How sure the model is that the mechanism it just described is real. The model's certainty "
-            "about its own claim. Never a probability, and never rendered as one."
-        )
-    )
     provenance: Provenance = Field(
         description=(
             "Where this link and its number came from, as a fact about our pipeline. Set by `engine/` "
@@ -234,12 +228,9 @@ A link marked `reflexive` is that feedback arrow, and it is the **only** kind of
 
 **Defined now, computed with in stack 06.** Nothing unrolls a reflexive link over time until then. Until stack 06 a reflexive link is data on the canvas: drawn, readable, and excluded from the loop check. See `validity.md` for how the loop check removes reflexive links before looking for cycles.
 
-### `confidence` versus `provenance`
+### `provenance` — a receipt, not a claim
 
-The two fields answer different questions, and keeping them apart is what lets the canvas draw an honest arrow.
-
-- **`confidence` is about the mechanism.** How sure the model is that the arrow it just drew describes something that really works this way. It is the model's certainty about its own claim, and it travels with the claim. `speculative` — a plausible story the model cannot defend in detail. `argued` — a mechanism it can state step by step. `documented` — a mechanism it believes is written down in the literature. Note the vocabulary's warning: *confidence* here never means a probability, and is never rendered as one.
-- **`provenance` is about where the number came from.** A fact about our pipeline, recorded by `engine/` from what actually happened during generation. The model never declares it (decision record 0003, rule 5). This is what the canvas encodes as a stroke style, so a user can see at a glance which arrows have documents behind them and which are the model talking (INV-2, INV-12).
+**`provenance` says where this link and its number came from.** It is a fact about our pipeline, recorded by `engine/` from what actually happened during generation; the model never declares it (decision record 0003, rule 5). It is what the canvas encodes as a stroke style, so a user can see at a glance which arrows have documents behind them and which are the model talking (INV-2, INV-12).
 
 | `provenance` | Set when |
 |---|---|
@@ -251,9 +242,7 @@ The two fields answer different questions, and keeping them apart is what lets t
 | `user` | A person typed it — a `retune` of a strength, or a hand-added link |
 | `simulated` | A probe produced it (stretch; see [`../probes/`](../probes/)) |
 
-The short version: **confidence is a claim the model makes; provenance is a receipt we write.** A link can be `confidence: documented` and `provenance: argued` — the model believes the mechanism is in the literature, but our retrieval step came back empty-handed, so we do not get to say documented. That combination is legal and informative, and it is exactly the case the two fields exist to distinguish.
-
-The two lists share the words `argued` and `documented`, which is a real collision. It is raised under Open questions, not settled here.
+**There is no second field beside it.** A link once carried `confidence` — the model's own grading of how sure it was that the mechanism it had just described is real. It was dropped on 2026-09-17 and the reasoning is in Open questions 1. What it claimed to carry is carried by three things that are already here: the receipt above, the rationale sentence, and the range on the belief the arrow feeds.
 
 ---
 
@@ -273,7 +262,6 @@ The user types the hypothesis. The map comes back with two arrows out of `H`, an
 | `shape` | `impulse` | `step` |
 | `half_life` | `30.0` | `None` |
 | `rationale` | "The war-risk premium priced into crude unwinds once transit data confirms the lane is open. It is a one-time repricing, not a standing discount." | "Underwriters reprice Gulf hulls only while the lane actually stays open. The low rate is held up by the openness, not caused once by it." |
-| `confidence` | `argued` | `argued` |
 | `provenance` | `argued` | `argued` |
 | `sources` | `()` | `()` |
 | `reflexive` | `False` | `False` |
@@ -291,7 +279,6 @@ C → B   mode=sustain  strength=+0.7  lag=7.0  shape=step  half_life=None
         rationale="Lower war-risk premiums cut the delivered cost of a Gulf
                    cargo, and the saving shows up in the physical differential
                    within about a week."
-        confidence=documented
         provenance=documented
         sources=(Source(url="https://lloydslist.com/…",
                         title="War risk rates and voyage economics in the Gulf",
@@ -357,6 +344,7 @@ Two things that read like invariants but are **not**, because no rule in `valida
 Raised 2026-09-16. Each needs Kent.
 
 1. **`confidence` and `provenance` share two words.** Both lists contain `argued` and `documented`, so `confidence="documented", provenance="argued"` is legal and reads like a contradiction until you know the rule. Options: rename `confidence` to `mechanism_confidence` and give it its own words (`hunch` / `reasoned` / `textbook`); drop `confidence` and let `provenance` plus the rationale carry it; or keep both and rely on the Inspector labelling them. The two fields do carry different information — one is the model's certainty about a mechanism, the other is a receipt from our pipeline — so the question is naming, not existence.
+   **Decided 2026-09-17:** the second option — `confidence` is dropped for version 1, and the field is gone from the model above. Four reasons, in order of weight. Nothing consumed it: no invariant named it, no code read it, and the canvas gives stroke style to `provenance`, not to this (UX-6 in `PRODUCT_REQUIREMENTS.md` §7). It was a self-report by the one component we have already decided not to trust to declare its own quality — the same argument that keeps the model's hands off `provenance` (decision record 0003, rule 5). It cost a third elicited item on every link, against decision record 0005's deliberate budget of one number and one sentence per arrow. And `PRODUCT_REQUIREMENTS.md` FR-8 already uses the word "confidence" for something else entirely: run-to-run *agreement* across independent generations, which is computed, not claimed. What the field claimed to carry is carried by `provenance`, the rationale sentence and the range on the belief. If stack 04's ensemble wants to show how much the independent runs disagreed about an arrow, it adds a computed `agreement` field — a receipt, not a self-report. No decision record was needed: decision record 0005's table of link fields never listed `confidence`.
 2. **The shapes sheet names `Source` but not its fields.** The three above (`url`, `title`, `retrieved`) are a proposal. Does a source need a publisher, a quoted snippet, or an access date distinct from the retrieval date?
 3. **`sources: list[Source]` versus tuples everywhere.** The shapes sheet's `Link` row writes `list[Source]`, while its immutability row says collections are tuples and its `Graph` row uses tuples. Written here as `tuple[Source, ...]`, which is the rule the rest of the sheet follows. Confirm.
 4. **`half_life` on a non-`impulse` link has no violation code.** The twelve codes in the shapes sheet do not cover it, so today a `step` link carrying a half-life is accepted and the field ignored. Add a thirteenth code, make it a pydantic field validator, or leave it documented and ignored?

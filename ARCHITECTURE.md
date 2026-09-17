@@ -2,7 +2,7 @@
 
 > The technical counterpart to `PRODUCT_REQUIREMENTS.md`. That document says what the tool must do and why; this one says how the system is shaped, where each rule is enforced, and how it runs. It describes the system **as built and as planned**, and each section says which.
 
-**Living document.** Last verified: 2026-09-16. Any pull request that changes a boundary, a layer, a data flow, or a runtime dependency updates this file in the same PR. A stale architecture doc is worse than none: it is the "not knowing why it did that" failure in written form.
+**Living document.** Last verified: 2026-09-17. Any pull request that changes a boundary, a layer, a data flow, or a runtime dependency updates this file in the same PR. A stale architecture doc is worse than none: it is the "not knowing why it did that" failure in written form.
 
 **Status markers.** `[planned]` — decided, not yet in the repo. `[built]` — in the repo and covered by the tests named. `[stretch]` — designed for, not scheduled.
 
@@ -80,7 +80,7 @@ Two rows below are still **planned** and say so. The rest exist as code, and the
 
 | Type | What it is | Key rule, and what enforces it |
 |------|-----------|----------|
-| `Proposition` | A claim checkable by a date, judged by a named source. Kinds: `hypothesis`, `event`, `market` (names a contract to take a side of, or an instrument that moves), `not_tradeable` (names the reason) | Criteria, judge and resolve-by required (INV-1): `_claims_say_how_they_are_judged`, `test_validate_rejects_unresolvable_proposition`. A `market` claim names a payoff — `ContractPayoff` or `PricePayoff`, told apart by `kind`, neither naming a price — and a `not_tradeable` one a reason (INV-9): `test_validate_requires_payoff_on_market`, `test_validate_requires_reason_on_not_tradeable` |
+| `Proposition` | A claim checkable by a date, judged by a named source. Kinds: `hypothesis`, `event`, `market` (names a contract to take a side of, or an instrument that moves), `not_tradeable` (names the reason) | Criteria, judge and resolve-by required (INV-1): `_claims_say_how_they_are_judged`, `test_validate_rejects_unresolvable_proposition`. A `market` claim names a payoff — `ContractPayoff` or `PricePayoff`, told apart by `kind`, neither naming a price — and a `not_tradeable` one a reason (INV-9): `test_validate_requires_payoff_on_market`, `test_validate_requires_reason_on_not_tradeable`. Identity of the trade — venue, contract, instrument — lives in `domain/`; its price lives in `grounding/` (ADR-0013) |
 | `Link` | A causal claim from one proposition to another: mechanism, strength (log-odds), lag, signal shape, `trigger` (one-time shove) or `sustain` (continuous hold), provenance, `reflexive`. It carries no self-reported confidence: the rationale is the argument, provenance is the receipt | Rationale required, and a provenance claiming evidence cites a source (INV-2): `_arrows_say_why` and `_arrows_claiming_evidence_cite_it`, `test_validate_rejects_link_without_rationale`, `test_validate_rejects_unsourced_documented_link` |
 | `Belief`, `Beliefs` | A likelihood with a range and an owner — model, user, market — in three named slots, never a dictionary | `0 ≤ lo ≤ p ≤ hi ≤ 1` refused at construction and re-checked over a whole map (INV-7): `_likelihoods_sit_inside_their_own_range`. Never averaged across owners (INV-11): `test_beliefs_never_merged`, which reads our own source code rather than trusting good intentions |
 | `Graph` | Propositions + links + which claim started it. Immutable | Exactly one hypothesis, at least one terminal, and no loops once reflexive links are set aside — each of which needs a delay (INV-5, INV-6, INV-9): `_exactly_one_starting_claim`, `_map_ends_somewhere_actionable`, `_no_loops_once_feedback_is_set_aside`, `_feedback_arrows_take_time`. Frozen: `test_models_are_frozen` |
@@ -107,50 +107,68 @@ Two rows below are still **planned** and say so. The rest exist as code, and the
 
 ---
 
-## 6. Runtime `[planned]`
+## 6. Runtime `[built]`
 
-- **Development.** `docker compose watch` runs both halves with hot reload: source changes sync into the containers; dependency-file changes rebuild. The frontend waits on the backend's health check.
-- **Production-ish.** Two multi-stage images: a slim Python image containing only the built virtual environment, and a static-file image serving the built frontend with `/api` proxied to the backend on the same origin (no cross-origin configuration to explain).
-- **State.** One SQLite file (a single-file database, no server) on a volume. No database service, no accounts, no multi-tenancy in v1.
-- **Configuration.** `.env.example` lists every variable; the real `.env` is git-ignored; values are read once in `settings.py` and the process fails fast with a clear message if a required key is missing.
-- **Health.** `/api/healthz` (process is up; depends on nothing) and `/api/readyz` (reports whether a model key is configured, never the key). Every browser-facing route lives under `/api/`, so the static-file server forwards one prefix.
+- **Development.** `docker compose watch` (or `make dev`) runs both halves with reload. The browser app answers on <http://localhost:5173> and the Python server on <http://localhost:8000>. Edited files under `backend/src` and `frontend/src` are copied into the running containers, which reload themselves; a change to a file that says *which packages are installed* — `backend/pyproject.toml`, `backend/uv.lock`, `frontend/package.json`, `frontend/package-lock.json` — rebuilds the image instead, because copying a file cannot install a package. The browser app does not start until the server answers its health check.
+- **Production-like.** `docker compose -f compose.yaml -f compose.prod.yaml up --build` (or `make prod`), on <http://localhost:8080>. Two multi-stage images. The server is a `python:3.12-slim` image holding only the built virtual environment — no package installer, no lock file, no source tree — run as a user that is not root. The browser app is a folder of built files served by `nginx:alpine`, and that same web server forwards anything beginning with `/api` to the Python server, so the whole app is one origin. The server is not published on the host at all: only the web server can reach it.
+- **Versions.** Python 3.12 (`backend/.python-version`, `python:3.12-slim`), packages installed by `uv` 0.12 taken from the image its authors publish, Node 24 (a long-term-support release). The same versions are pinned in the Dockerfiles and in the four checks, so a laptop's newer Node cannot make a pull request pass that a deployment would fail.
+- **State.** `[planned]` One SQLite file (a single-file database, no server) on a volume. No database service, no accounts, no multi-tenancy in v1. Nothing is stored yet — the app keeps nothing between requests, and no volume is declared in either compose file.
+- **Configuration.** `.env.example` lists every variable; the real `.env` is git-ignored, and `docker compose` reads it from the top of the repository on its own. Values are read once in `settings.py`. Both keys (`ANTHROPIC_API_KEY`, `FRED_API_KEY`) are optional today: the app starts, the first screen loads, and every test passes without either.
+- **Health.** `/api/healthz` (the process is up; depends on nothing) and `/api/readyz` (reports whether a model key is configured, never the key). Every browser-facing route lives under `/api/`, so the static-file server forwards one prefix. The container health check calls `/api/healthz` using Python's own `urllib`, because the small images carry neither `curl` nor `wget`.
 
 ---
 
-## 7. Testing layers `[planned]`
+## 7. Testing layers `[built]` in part
 
-| Layer | What it covers | Runs in CI? |
-|-------|----------------|-------------|
-| Pure domain, property-based | Graph rules, propagation, interventions, patch algebra — thousands of generated cases, failures shrunk to a minimal example | Yes, milliseconds |
-| Model boundary, recorded | Real vendor responses recorded once, scrubbed of keys, replayed; includes malformed and refused responses | Yes, no key needed |
-| Evaluation set | The four assignment examples run live; structural checks (no loops, ends in a trade, every link has a rationale, verify mode never fabricates a bridge) | No — manual, costs money |
-| Frontend | Component tests for reducers and the inspector; one end-to-end smoke: type → graph → intervene → downstream changes, upstream does not | Yes |
+Two of the four layers exist. The other two are named here so that adding them is filling a slot rather than inventing one.
+
+| Layer | What it covers | Where | State |
+|-------|----------------|-------|-------|
+| Pure domain, property-based | Graph rules, propagation, interventions, patch algebra — thousands of generated cases, failures shrunk to a minimal example | `backend/tests/unit/` | `[planned]` — the directory holds the import-boundary test; the rules it would test arrive with stack 02 |
+| Model boundary, recorded | Real vendor responses recorded once, scrubbed of keys, replayed; includes malformed and refused responses | `backend/tests/boundary/`, recordings in `backend/tests/cassettes/` | `[planned]` — the directory, the settings that strip keys from a recording, and the rule that an unrecorded call fails rather than dials out are all in place; the first recording arrives with stack 04 |
+| Routes | Each route answers, and answers the shape it says it does | `backend/tests/api/` | `[built]` |
+| Frontend | Component tests for the first screen; later, reducers and the inspector; one end-to-end smoke test | `frontend/src/**/*.test.tsx` | `[built]` for components; the end-to-end test is `[planned]` |
+| Evaluation set | The four assignment examples run live; structural checks (no loops, ends in a trade, every link has a rationale, verify mode never fabricates a bridge) | `evals/` | `[planned]` — arrives with stack 04. `make eval` says so out loud rather than pretending |
+
+The one test that matters most today is `backend/tests/unit/test_import_boundary.py`: it reads every file under `domain/` and fails if any of them imports the engine, the routes, the grounding layer, or a model client. It is nearly empty of work now and load-bearing forever after — it is the rule "the model proposes; our code decides" made mechanical.
+
+**Runs on every pull request**, in four checks named `backend`, `frontend`, `types-fresh` and `docker` (`.github/workflows/ci.yml`). None of them is given an API key, and none needs one. `types-fresh` regenerates `frontend/src/api/schema.ts` from the server's own description of itself and fails if the result differs from what is committed, which is what stops the two halves drifting apart.
 
 Deliberately skipped in v1: snapshot tests of rendered graphs, load tests, coverage thresholds outside `domain/`, more than one end-to-end test.
 
 ---
 
-## 8. Repository layout `[planned]`
+## 8. Repository layout `[built]`
+
+Python tests live inside `backend/`, next to the project they test, so `pytest` and `uv` run from one root (decided 2026-09-16). Directories that have no content yet are marked; nothing is created before it holds something.
 
 Python tests live inside `backend/`, next to the project they test, so `pytest` and `uv` run from one root (decided 2026-09-16).
 
 ```
 katalyst/
 ├── AGENTS.md  ASSIGNMENT.md  PRODUCT_REQUIREMENTS.md  ARCHITECTURE.md   enduring context
+├── README.md            what this is, and how to run it
+├── Makefile             every task: dev  up  down  prod  test  lint  types  eval
 ├── docs/adr/            numbered decision records (a journal)
-├── docs/research/       the four research reports that fed the PRD
+├── docs/research/       the four research reports that fed the requirements
 ├── spec/                the spec, organized as a book by idea
 ├── backend/
-│   ├── pyproject.toml  uv.lock
-│   ├── src/katalyst/   domain/  engine/  grounding/  api/  settings.py
-│   └── tests/          unit/ (domain)  boundary/ (recorded)  api/  cassettes/
+│   ├── pyproject.toml  uv.lock  .python-version
+│   ├── src/katalyst/   domain/  engine/  grounding/  api/  fixtures/  settings.py
+│   └── tests/          unit/  api/  boundary/  cassettes/  conftest.py
 ├── frontend/
-│   └── src/            api/ (generated types)  graph/  features/  components/
-├── evals/              golden inputs and structural assertions; run by hand
+│   ├── package.json  package-lock.json  vite.config.ts  biome.jsonc
+│   └── src/            api/ (client and generated types)  styles/  test/
+├── scripts/
+│   └── gen-types.sh    rewrites frontend/src/api/schema.ts from the server
 ├── docker/             Dockerfile.backend  Dockerfile.frontend  nginx.conf
-├── scripts/            gen-types  record-cassettes  eval
-├── compose.yaml  compose.prod.yaml  .env.example
-└── .github/workflows/ci.yml     jobs: backend · frontend · types-fresh · docker
+├── compose.yaml        both halves, with reload, while working
+├── compose.prod.yaml   the same two, packaged, laid over the file above
+├── .env.example  .dockerignore  .pre-commit-config.yaml  .cz.toml
+├── evals/              [planned] saved examples and structural checks; run by hand
+└── .github/
+    ├── workflows/ci.yml        checks: backend · frontend · types-fresh · docker
+    └── pull_request_template.md
 ```
 
 ---
@@ -170,6 +188,7 @@ katalyst/
 | ADR-0009 | Conventional commits; numbered stacks; PR bases chained by agents, stacks assembled in the GitHub UI | accepted |
 | ADR-0010 | Polymarket and FRED as grounding sources; Metaculus and yfinance rejected | accepted |
 | ADR-0011 | The spec is a book by idea; this file is the living technical counterpart to the PRD | accepted |
+| ADR-0013 | A payoff names what you would trade — contract or price; what it costs is a live quote | accepted |
 
 ---
 

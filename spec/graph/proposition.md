@@ -16,7 +16,7 @@ Every collection is a `tuple`, not a `list`, because a frozen object holding a l
 
 ```python
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -135,18 +135,72 @@ class Evidence(BaseModel):
 ```
 
 ```python
-class Payoff(BaseModel):
-    """What a `market` terminal is actually worth: instrument, side, size of move.
+class ContractPayoff(BaseModel):
+    """A position in one named contract on one named venue: the yes side, or the no side.
 
-    This is what makes a terminal tradeable rather than merely interesting.
+    Used when a real venue already quotes this exact claim, which is the happy
+    case: a Polymarket contract on Brent below $70 settles on the same fact the
+    proposition does.
+
+    The boundary this class sits on: **the domain names what you would trade;
+    the grounding layer names what it costs.** So there is a venue, a contract
+    and a side here, and no price. What the contract trades at, how wide the
+    bid-offer spread is, and the moment we looked are a market belief, fetched
+    live from the venue when the thesis card needs it (decision record 0010). A
+    price written into this class would be stale the moment it was written, and
+    the domain reads no clock (decision record 0003).
     """
 
     model_config = ConfigDict(frozen=True)
 
+    kind: Literal["contract"] = "contract"
+    venue: str = Field(
+        description=(
+            "Where the contract trades, named as the venue names itself: "
+            "'Polymarket'. This is what tells the grounding layer whom to ask."
+        )
+    )
+    contract_id: str = Field(
+        description=(
+            "The venue's own identifier for the contract, so a quote can be "
+            "fetched later without guessing from the title."
+        )
+    )
+    title: str = Field(
+        description=(
+            "The contract's title in the venue's words, so a reader recognises "
+            "it on the venue's own page: 'Brent below $70 on 2026-10-31'."
+        )
+    )
+    side: Literal["yes", "no"] = Field(
+        description=(
+            "'yes' if the position pays out when the claim comes true, 'no' if "
+            "it pays out when the claim fails."
+        )
+    )
+
+
+class PricePayoff(BaseModel):
+    """A position in something with a price: which way, and how far it moves.
+
+    Used when no venue quotes the claim itself but something whose price the
+    claim moves can be bought or sold — a fund, a ticker, a futures contract, or
+    one traded against another.
+
+    The same boundary as `ContractPayoff`: **the domain names what you would
+    trade; the grounding layer names what it costs.** The instrument and the
+    expected move are written here; the price you would pay for it, the spread,
+    and the moment we looked are a market belief (decision record 0010).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: Literal["price"] = "price"
     instrument: str = Field(
         description=(
-            "The thing you would buy or sell, named the way its venue names it: "
-            "a Polymarket contract title, a ticker, a futures contract."
+            "What you would buy or sell, named the way its venue names it: a "
+            "ticker, a futures contract, or one traded against another written "
+            "out in full — 'XLE against SPY'."
         )
     )
     direction: Literal["long", "short"] = Field(
@@ -155,14 +209,30 @@ class Payoff(BaseModel):
             "'short' if it makes money when the claim fails."
         )
     )
-    magnitude: float = Field(
+    move: float = Field(
         ge=0.0,
         description=(
-            "How far the instrument is expected to move if the claim resolves "
-            "true, as a fraction: 0.03 means three per cent. The side is carried "
-            "by `direction`, so this number is never negative."
+            "How far the instrument's price is expected to move if the claim "
+            "comes out true, as a fraction of that price: 0.03 is three per "
+            "cent. Which way it moves is carried by `direction`, so this number "
+            "is never negative. It is not a return on a position: a return needs "
+            "an entry price, and prices are not kept here."
         ),
     )
+
+
+Payoff = Annotated[ContractPayoff | PricePayoff, Field(discriminator="kind")]
+"""What you would trade on a `market` terminal: a contract, or a price.
+
+Read the `kind` field to know which of the two it is — `"contract"` or
+`"price"`. That makes this a *discriminated union*: a reader, and the TypeScript
+types generated for the browser, can tell the two shapes apart from one field
+without guessing from which others happen to be present. It is the same pattern
+the six interventions use (`../multiverse/interventions.md`).
+
+Neither shape carries a price. That is the rule stated in both docstrings above
+and settled in decision record 0013.
+"""
 ```
 
 ```python
@@ -227,8 +297,9 @@ class Proposition(BaseModel):
     payoff: Payoff | None = Field(
         default=None,
         description=(
-            "What you would trade. Required when `kind` is `market` — required by "
-            "`validate`, not by this class. See `validity.md`."
+            "What you would trade: a contract on a venue, or a position in "
+            "something with a price. Required when `kind` is `market` — required "
+            "by `validate`, not by this class. See `validity.md`."
         ),
     )
     not_tradeable_reason: str | None = Field(
@@ -303,17 +374,19 @@ Every chain has to land somewhere you could put money, or admit that it does not
 ```
 H ──▶ C ──▶ B ──┬──▶ M1   market   a Polymarket contract "Brent below $70 on
 │           ▲   │                  2026-10-31" resolves YES
-└───────────┘   │                  payoff: long the contract; magnitude 1.08
+└───────────┘   │                  payoff: contract — Polymarket, side yes
                 │
                 ├──▶ M2   market   the energy fund XLE underperforms the S&P 500
                 │                  fund SPY by more than 3% over 20 days
-                │                  payoff: short XLE against SPY; magnitude 0.03
+                │                  payoff: price — short XLE against SPY, move 0.03
                 │
                 └──▶ R ──▶ B       OPEC+ announces output restraint, and restraint
                                    props the price back up
 ```
 
-H reaches B twice: directly, along the arrow that loops beneath `C`, and the long way through `C` itself. The `B → R → B` in the last row is one loop drawn flat — the same `B` twice — and it is legal only because `B → R` is the market feeding back on the world, marked reflexive and carrying a delay. [`link.md`](link.md) owns all of that. The two magnitudes read under different answers to open question 1 below — M2's `0.03` is a three per cent move in the instrument, which is what the field description says; M1's `1.08` is a return on the position, which is reading (b), and the entry price it assumes has no field on `Payoff` today.
+H reaches B twice: directly, along the arrow that loops beneath `C`, and the long way through `C` itself. The `B → R → B` in the last row is one loop drawn flat — the same `B` twice — and it is legal only because `B → R` is the market feeding back on the world, marked reflexive and carrying a delay. [`link.md`](link.md) owns all of that.
+
+The two payoffs read under **one** rule, and it is the rule the two shapes exist to enforce: *the domain names what you would trade; the grounding layer names what it costs.* M1 is a **contract payoff** — a real venue quotes this exact claim, so the terminal names the venue (Polymarket), the venue's identifier for the contract, its title, and the side you would take (yes). What the contract costs is deliberately absent: it is fetched live as a market belief when the thesis card is built, which is why the old `1.08` — a return on a position, which silently assumed an entry price no field ever held — has gone. M2 is a **price payoff** — no venue quotes "XLE underperforms SPY by 3%", so the terminal names the instrument (XLE against SPY), the direction (short), and how far the price is expected to move if the claim comes out true (`move` of 0.03, three per cent). Decision record 0013 has the argument.
 
 A different assignment example lands in the other state. *"Photonic chips get adopted faster than expected"* runs into a wall: no venue quotes datacentre transceiver share, and the listed pure-plays are too thin to trade honestly.
 
@@ -324,7 +397,7 @@ P ──▶ … ──▶ N1  not_tradeable
                 under $40m a day — too thin to express this at size."
 ```
 
-That is a real answer, and the product says it out loud. What it must never do is end the chain in a sentence with no `kind` of its own. If the model proposes a `market` terminal with no `payoff`, `validate` returns `market_without_payoff` naming the claim — *"the tradeable claim 'a Polymarket contract on Brent below $70 on 2026-10-31 resolves YES' does not name an instrument, a direction and a size"* — and the proposal is refused, not patched.
+That is a real answer, and the product says it out loud. What it must never do is end the chain in a sentence with no `kind` of its own. If the model proposes a `market` terminal with no `payoff`, `validate` returns `market_without_payoff` naming the claim — *"the tradeable claim 'a Polymarket contract on Brent below $70 on 2026-10-31 resolves YES' does not say what you would trade"* — and the proposal is refused, not patched.
 
 ### B3 — Evidence attaches to a claim with a direction and a weight
 
@@ -390,7 +463,9 @@ Generators live in `backend/tests/strategies.py`: `propositions()` and `graphs()
 *Raised 2026-09-16.*
 
 1. **`Payoff.magnitude` units.** Currently "the expected move as a fraction". Is that (a) a move in the instrument's price, (b) a return on the position, or (c) a position size? The thesis card's `legs` (stack 05) need one answer, and B2 above has to use two different readings to describe two ordinary terminals.
+   **Decided 2026-09-17:** none of the three, because the field is gone. `Payoff` becomes two shapes — a contract payoff and a price payoff, told apart by `kind`. A price payoff carries `move`, which is reading (a): a fractional move in the instrument's price. Reading (b) needs an entry price, and prices belong to the grounding layer, not the domain. A contract payoff carries no size at all: its side is `yes` or `no`, and what it costs is the live quote. See decision record 0013.
 2. **Should `Payoff` name its venue?** Decision record 0010 puts venue, `as_of` and a link on the grounding layer's quote, not on the domain. A terminal that names "a Polymarket contract" without saying which one is weaker than INV-9 implies.
+   **Decided 2026-09-17:** yes, for a contract. `ContractPayoff` carries `venue`, `contract_id` and `title` — which contract you would trade is *identity*, and identity is what the domain is for. `as_of`, the price and the spread stay on the grounding layer's market belief, exactly as decision record 0010 has them. See decision record 0013.
 3. **A `Source` type.** A link's sources are a named `Source` type ([`link.md`](link.md) owns it). Here, `BaseRate.sources` and `Evidence.url` are plain web-address strings. If `Source` becomes a record — title, publisher, date retrieved — do these two adopt it?
 4. **A resolve-by date in the past.** Checkable in principle, but the domain reads no clock (decision record 0003), so `validate` cannot see "today". Does the check live in `engine/`, and is a stale date a violation or a warning?
 5. **A payoff on a non-market proposition.** There is no violation code for it, so it is currently legal and meaningless. Add `payoff_on_non_market`, or leave it alone?
