@@ -128,6 +128,108 @@
   /* The ring drawn around whatever the keyboard is on. Bright enough to find at
    * a glance: 12.1 to 1 on --surface, far above the 3 to 1 a non-text mark
    * needs. */
+
+  /* ==== THE COLOUR LAW: ADDED FOR THE WIRES AND THE PANEL ================ *
+   * Everything from here to the end of this block is new. No value above it
+   * changed.
+   *
+   * The organising rule is **one channel per meaning**. A channel is one thing
+   * the eye can vary on its own — brightness, hue, texture, stroke pattern,
+   * stroke width, shape, position. Six meanings, six channels, and no channel
+   * doing two jobs, because every failure in this area is two meanings
+   * fighting over one channel.
+   *
+   *   how likely a claim is  -> brightness, the five-step ramp below
+   *   which way money moves   -> hue, --dir-up and --dir-down above, never alone
+   *   tail risk               -> texture, --tail above
+   *   what kind of push       -> the wire's stroke: pattern, width, doubling
+   *   where an arrow came from-> a mark of one, two or three dots at its tail
+   *   which branch you are in -> the four branch hues below, plus a name chip
+   *
+   * Only the first and the last are colours defined here. The stroke and the
+   * mark are deliberately colourless: every wire is drawn in --text-muted, and
+   * a wire's hue says nothing at all. */
+
+  /* ---- How likely a claim is: a five-step neutral ramp ----------------- *
+   * Five brightnesses of the same blue-grey as the surface. Neutral on
+   * purpose: any hue in here would be a second voice in the channel that means
+   * "which way the money moves".
+   *
+   *   --p-0  0 to under .2      --p-3  .6 to under .8
+   *   --p-1  .2 to under .4     --p-4  .8 to 1
+   *   --p-2  .4 to under .6
+   *
+   * Three rules on it. It never carries text — a number is always drawn in
+   * --text, so it always clears 4.5 to 1, while the ramp paints a bar, which
+   * is a graphic and needs 3 to 1. It never paints a whole tile, because
+   * tile-wide brightness is already spent on the old world in a diff and on
+   * the hover lens. And five steps are a glance, never a reading: the exact
+   * number and its range are printed beside the bar every time.
+   *
+   * Ratios below are measured against --surface-raised, the panel a bar is
+   * drawn on, and then against --surface. The lowest step clears 3 to 1, so
+   * even a bar for an unlikely claim is a bar somebody can see. */
+  --p-0: #646a73;
+  /* 3.2 to 1 on --surface-raised, 3.5 to 1 on --surface. */
+  --p-1: #7f858e;
+  /* 4.7 to 1 on --surface-raised, 5.1 to 1 on --surface. */
+  --p-2: #9ba1a9;
+  /* 6.7 to 1 on --surface-raised, 7.3 to 1 on --surface. */
+  --p-3: #b9bdc5;
+  /* 9.3 to 1 on --surface-raised, 10.0 to 1 on --surface. */
+  --p-4: #d5dae0;
+  /* 12.4 to 1 on --surface-raised, 13.4 to 1 on --surface. */
+
+  /* ---- What kind of push an arrow is: the four stroke widths ----------- *
+   * Width comes from the size of a push regardless of its sign. Four steps,
+   * not a continuous ramp, because a fifth is not tellable apart at a
+   * hairline. Which step a push lands in is a comparison against three
+   * thresholds — a lookup, not arithmetic — and the thresholds are written
+   * down in `graph/wires/encodings.ts` beside the words they pair with. */
+  --wire-1: 1px;
+  --wire-2: 2px;
+  --wire-3: 3px;
+  --wire-4: 4px;
+  /* The clear gap down the middle of a wire that has to keep holding. A
+   * `sustain` wire is drawn as two parallel strokes with this between them; a
+   * `trigger` wire is a single stroke. */
+  --wire-gap: 2px;
+
+  /* ---- Which branch you are in ---------------------------------------- *
+   * Four hues, used only on a branch's lane and its chips and never on a
+   * tile's meaning. Every branch also carries a name chip with its label, so a
+   * branch is readable with no colour at all.
+   *
+   * **Not amber.** Amber already means "the money moves down", and one hue
+   * cannot mean two things.
+   *
+   * Nothing in this build draws a branch — the branch panel is the next piece
+   * of work — so these four are defined and unused. They are written now so
+   * that nobody borrows a direction hue for a lane in the meantime.
+   *
+   * The teal is deliberately darker and bluer than --accent and --focus, which
+   * are also teals. See the note in `styles/__tests__/colourLaw.test.ts`. */
+  --branch-violet: #b193f2;
+  /* 7.5 to 1 on --surface, 6.9 to 1 on --surface-raised. */
+  --branch-teal: #2f93b0;
+  /* 5.3 to 1 on --surface, 4.9 to 1 on --surface-raised. */
+  --branch-rose: #f18aa6;
+  /* 8.0 to 1 on --surface, 7.4 to 1 on --surface-raised. */
+  --branch-slate: #98a8c2;
+  /* 7.8 to 1 on --surface, 7.3 to 1 on --surface-raised. */
+
+  /* ---- Two more durations --------------------------------------------- *
+   * The motion budget is three moves and no more: wires drawing in causal
+   * order, a branch arriving, and a likelihood rolling from its old figure to
+   * its new one. Everything else is an opacity change of at most
+   * --duration-fast.
+   *
+   * Nothing in this build spends either of these yet — no wire draws itself in
+   * and no number moves. They are named here because the ordering below, under
+   * reduced motion, is a rule about them: the tweening goes and the ordering
+   * stays, because the ordering is the causality. */
+  --duration-wave: 200ms;
+  --duration-stagger: 60ms;
 }
 
 /* Light theme, forced by the html element's data-theme attribute. */
@@ -157,6 +259,36 @@
 
   --focus: #0d6e66;
   /* 5.7 to 1 on --surface. */
+
+  /* ==== THE COLOUR LAW, IN LIGHT ========================================= *
+   * The ramp runs the other way here, and that is the point rather than an
+   * oversight. On a near-black page a more likely claim is a brighter bar; on
+   * a white page a brighter bar would be a bar you cannot see. What is
+   * constant in both themes is what the eye actually reads: **more likely is
+   * more contrast against the page.** So the light ramp goes from the faintest
+   * step a reader can still see up to nearly the text colour.
+   *
+   * Every step clears 3 to 1 against both surfaces, which is what a bar — a
+   * graphic rather than a word — has to clear. */
+  --p-0: #868c97;
+  /* 3.2 to 1 on --surface, 3.4 to 1 on --surface-raised. */
+  --p-1: #6e747f;
+  /* 4.4 to 1 on --surface, 4.7 to 1 on --surface-raised. */
+  --p-2: #565c66;
+  /* 6.3 to 1 on --surface, 6.7 to 1 on --surface-raised. */
+  --p-3: #414851;
+  /* 8.7 to 1 on --surface, 9.2 to 1 on --surface-raised. */
+  --p-4: #2e353e;
+  /* 11.7 to 1 on --surface, 12.4 to 1 on --surface-raised. */
+
+  --branch-violet: #6338c4;
+  /* 6.8 to 1 on --surface, 7.3 to 1 on --surface-raised. */
+  --branch-teal: #0a5a72;
+  /* 7.2 to 1 on --surface, 7.7 to 1 on --surface-raised. */
+  --branch-rose: #a32f52;
+  /* 6.4 to 1 on --surface, 6.8 to 1 on --surface-raised. */
+  --branch-slate: #44527a;
+  /* 7.2 to 1 on --surface, 7.7 to 1 on --surface-raised. */
 }
 
 /* No data-theme attribute at all: follow the operating system. Dark stays the
@@ -180,14 +312,36 @@
     --tail: repeating-linear-gradient(45deg, rgb(16 20 26 / 0%) 0 3px, rgb(16 20 26 / 24%) 3px 4px);
 
     --focus: #0d6e66;
+
+    /* The colour law in light, repeated here for the reader who has asked for
+     * no theme at all and whose operating system asks for a light page. Same
+     * values as the forced light theme above, and the same reason: more likely
+     * is more contrast against the page. */
+    --p-0: #868c97;
+    --p-1: #6e747f;
+    --p-2: #565c66;
+    --p-3: #414851;
+    --p-4: #2e353e;
+
+    --branch-violet: #6338c4;
+    --branch-teal: #0a5a72;
+    --branch-rose: #a32f52;
+    --branch-slate: #44527a;
   }
 }
 
-/* When the operating system asks for less movement, the one animation on this
- * page becomes instant. The value still replaces the placeholder; it just does
- * not fade (UX-7). */
+/* When the operating system asks for less movement, the tweening goes and the
+ * ordering stays (UX-7).
+ *
+ * *Tweening* is the in-between frames that make a change look like a movement.
+ * Those go: a value still replaces the placeholder, and a wire still arrives,
+ * but neither takes any time doing it. What does **not** go is
+ * `--duration-stagger`, the gap between one layer of the map and the next,
+ * because that gap is the order the argument runs in — the ordering is the
+ * causality, and removing it would remove the one thing the movement was for. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-fast: 0ms;
+    --duration-wave: 0ms;
   }
 }
