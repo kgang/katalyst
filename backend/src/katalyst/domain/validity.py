@@ -53,8 +53,21 @@ ViolationCode = Literal[
     "dangling_link",
     "market_without_payoff",
     "not_tradeable_without_reason",
+    "unknown_target",
+    "unknown_link",
+    "duplicate_id",
 ]
-"""The thirteen things that can be wrong with a map.
+"""The sixteen things that can be wrong: thirteen faults in a map, three refused edits.
+
+The first thirteen are what `validate` finds in a map. The last three are what
+folding a branch onto a map finds in an *edit*, and no map can have them:
+
+* `unknown_target` — the edit names a claim that is not on this map, or asks for
+  claims this version cannot put on one. The subject is the claim at fault; for a
+  chain of branches that cannot be put in order, it is the branch at fault.
+* `unknown_link` — the edit names an arrow that is not on this map.
+* `duplicate_id` — an edit adds a claim or an arrow under an identifier that is
+  already in use.
 
 Stable strings: the browser switches on them, tests assert on them, and they are
 never renamed without a migration.
@@ -90,13 +103,12 @@ class Violation(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    code: ViolationCode = Field(
-        description="Which rule was broken. One of thirteen stable strings."
-    )
+    code: ViolationCode = Field(description="Which rule was broken. One of sixteen stable strings.")
     subject: str = Field(
         description=(
-            "The identifier of the thing at fault: a proposition id, a link id, or the graph's own "
-            "id for faults about the map as a whole. Never shown to the user."
+            "The identifier of the thing at fault: a proposition id, a link id, the graph's own "
+            "id for faults about the map as a whole, or a branch id when a chain of branches "
+            "cannot be put in order. Never shown to the user."
         )
     )
     message: str = Field(
