@@ -1,0 +1,120 @@
+# syntax=docker/dockerfile:1
+
+# The Python half of Katalyst: the server that turns a hypothesis into a map.
+#
+# One file, two images.
+#
+#   dev   Everything needed to work on the code. The test, lint and type
+#         packages are installed, and the server restarts itself whenever a
+#         source file changes.
+#   prod  What a deployment would run. Only the packages the server needs while
+#         answering requests, no package installer left lying around, and a user
+#         that is not root.
+#
+# Choose one with `--target dev` or `--target prod`. `compose.yaml` chooses
+# `dev`; `compose.prod.yaml` chooses `prod`.
+#
+# The build context is the repository root, which is why the paths below begin
+# with `backend/`. The `.dockerignore` file next to `compose.yaml` keeps `.git`,
+# installed packages and built output out of the build entirely.
+
+# `uv` is the tool that installs Python packages. It is taken from the image its
+# authors publish, pinned to the 0.12 series, and copied into an image that
+# already carries the exact Python this project asks for. Building the virtual
+# environment against that same Python is what makes it safe, further down, to
+# copy the finished environment into a fresh image and run it there.
+FROM ghcr.io/astral-sh/uv:0.12 AS uv
+
+# --- what both images start from --------------------------------------------
+
+FROM python:3.12-slim AS base
+
+# Print as it happens instead of holding output in a buffer, so container logs
+# show what the server is doing while it is doing it.
+ENV PYTHONUNBUFFERED=1
+# `uv` puts the virtual environment here. Naming it explicitly means every stage
+# below agrees on one location.
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+# Putting that environment's programs first on the search path is what lets the
+# start command below say `uvicorn` rather than a full directory path.
+ENV PATH="/app/.venv/bin:${PATH}"
+# Copy packages into the environment rather than hard-linking them. The package
+# cache and the environment can end up on different disks inside a container,
+# and a hard link cannot cross disks.
+ENV UV_LINK_MODE=copy
+
+WORKDIR /app
+
+# --- the image you work in --------------------------------------------------
+
+FROM base AS dev
+
+COPY --from=uv /uv /usr/local/bin/uv
+
+# The two dependency files are copied on their own first, before the source.
+# As long as neither changes, the slow install below is reused from the previous
+# build even when every line of the source has changed.
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-install-project
+
+# Now the source. `uv sync` again installs the project itself, pointed at
+# `/app/src` rather than copied, so an edited file takes effect immediately.
+COPY backend/ ./
+RUN uv sync --frozen
+
+EXPOSE 8000
+
+# `--reload` restarts the server when a file under `/app/src` changes.
+# `compose.yaml` copies edited files into that directory while the container
+# runs, which is what makes `docker compose watch` reload the server.
+# `--host 0.0.0.0` answers on every address inside the container, without which
+# nothing outside it could reach the server.
+CMD ["uvicorn", "katalyst.api.main:app", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--reload", "--reload-dir", "/app/src"]
+
+# --- the image a deployment would run ---------------------------------------
+
+# This stage builds the virtual environment. Nothing from it ships except that
+# environment.
+FROM base AS build
+
+COPY --from=uv /uv /usr/local/bin/uv
+
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project --compile-bytecode
+
+COPY backend/ ./
+# `--no-dev` leaves out the test, lint and type packages.
+# `--compile-bytecode` does Python's one-time compilation work now, during the
+# build, so the first request after a start is not slowed down by it.
+# `--no-editable` copies this project's own code into the environment instead of
+# pointing at `/app/src`, which is what lets the next stage take the environment
+# and nothing else.
+RUN uv sync --frozen --no-dev --no-editable --compile-bytecode
+
+FROM python:3.12-slim AS prod
+
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:${PATH}"
+
+# A program that is broken into should be able to do as little as possible, so
+# it does not run as the administrator of its own container. The number is fixed
+# rather than picked by the system so that file ownership is the same in every
+# build.
+RUN useradd --create-home --uid 10001 katalyst
+
+WORKDIR /app
+
+# The whole image, in one line: the environment built above, and the Python it
+# was built against. No package installer, no lock file, no tests, no source
+# tree — the project's own code is inside the environment.
+COPY --from=build --chown=katalyst:katalyst /app/.venv /app/.venv
+
+USER katalyst
+
+EXPOSE 8000
+
+# No `--reload` here: a deployment has no source to watch, and the file watcher
+# would only cost memory.
+CMD ["uvicorn", "katalyst.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

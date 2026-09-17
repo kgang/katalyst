@@ -1,0 +1,105 @@
+# How to run both halves of Katalyst on one machine while working on the code.
+#
+#   docker compose up      build what is missing, then start both halves
+#   docker compose watch   the same, and copy files into the running containers
+#                          as you edit them, so both halves reload themselves
+#   docker compose down    stop both halves and remove their containers
+#
+# Then open http://localhost:5173. The browser app only ever asks for addresses
+# beginning with `/api`, and its dev server hands those to the Python server, so
+# everything the browser sees is on one address.
+#
+# The Python server is also published on http://localhost:8000 so that its
+# routes, and the description it publishes of itself, can be opened directly.
+#
+# To run the packaged versions of these same two services instead, add the
+# second file:
+#
+#   docker compose -f compose.yaml -f compose.prod.yaml up --build
+
+# The name every container, network and volume here is prefixed with. Without
+# it Docker Compose uses the name of the directory this file sits in, so the
+# same app would be called something different on every machine.
+name: katalyst
+
+services:
+  # The Python server: the rules, the map, and the routes the browser calls.
+  backend:
+    build:
+      # The whole repository, because the two images are built from files in
+      # `backend/`, `frontend/` and `docker/`. `.dockerignore` says what is left
+      # out.
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      target: dev
+    environment:
+      # Written as bare names on purpose: the value is taken from your shell, or
+      # from a `.env` file in this directory, and is never written down here.
+      # Both are optional. Without them the app starts, the stored example loads
+      # and every test passes; `/api/readyz` says plainly which are missing.
+      #
+      # The key for the language model that proposes claims and the arrows
+      # between them. First needed in stack 04.
+      - ANTHROPIC_API_KEY
+      # The key for Federal Reserve Economic Data, a public source of economic
+      # time series. First needed in stack 05.
+      - FRED_API_KEY
+    ports:
+      - "8000:8000"
+    healthcheck:
+      # Ask the server's own health route whether it is answering. Written in
+      # Python because these are the small images: they carry no `curl` and no
+      # `wget`, and Python is the one thing they are guaranteed to have.
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:8000/api/healthz").read()
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      # Long enough for the first start, which is slower than the rest. Failures
+      # during this window do not count against the retries above.
+      start_period: 30s
+    develop:
+      watch:
+        # Copy edited source straight into the running container. The server is
+        # started with a file watcher, so it restarts by itself.
+        - action: sync
+          path: ./backend/src
+          target: /app/src
+        # Changing which packages the server uses cannot be done by copying a
+        # file, so these two build the image again.
+        - action: rebuild
+          path: ./backend/pyproject.toml
+        - action: rebuild
+          path: ./backend/uv.lock
+
+  # The browser app, served by the build tool's own dev server.
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      target: dev
+    environment:
+      # Where the dev server forwards `/api` to. On this private network the
+      # Python server answers to the name `backend`, not to `localhost`, which
+      # inside a container means the browser app's own container.
+      - KATALYST_API_URL=http://backend:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        # Do not start until the server answers its health route. Without this
+        # the first page load can arrive before the server is listening and show
+        # an error that has nothing to do with the code.
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+        - action: rebuild
+          path: ./frontend/package.json
+        - action: rebuild
+          path: ./frontend/package-lock.json

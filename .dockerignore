@@ -1,0 +1,50 @@
+# What never enters a container build.
+#
+# Before running the instructions in `docker/Dockerfile.backend` or
+# `docker/Dockerfile.frontend`, Docker copies this directory to the builder.
+# Everything named here stays behind: it is either large, or output an image
+# builds for itself, or local state that would carry one machine's setup into an
+# image that is meant to run anywhere.
+
+# The repository's history. Images do not read it, and it is the largest thing
+# here.
+.git
+.gitattributes
+.gitignore
+
+# Packages installed for one particular machine. Each image installs its own,
+# built for the operating system inside it.
+**/node_modules
+**/.venv
+
+# Built output. The images build this themselves, from the source.
+frontend/dist
+**/*.egg-info
+**/__pycache__
+**/*.pyc
+
+# Caches and local state left behind by the test, lint and build tools.
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.hypothesis
+**/.vite
+**/*.tsbuildinfo
+.coverage
+
+# Keys. They are handed to a container when it starts, never built into an
+# image, where anyone with the image could read them back out.
+.env
+.env.*
+
+# Writing and settings. Nothing inside an image reads any of it.
+docs/
+spec/
+plans/
+evals/
+scripts/
+.github/
+.claude/
+.codex/
+.entire/
+*.md

@@ -1,0 +1,123 @@
+# Checks that run on your own machine before a commit is made, so that the same
+# checks in a pull request have nothing left to find.
+#
+# First time, in the top of the repository:
+#
+#     uv tool install pre-commit          # or: brew install pre-commit
+#     pre-commit install                  # wires it into this clone's git hooks
+#
+# To run everything by hand over every file:
+#
+#     pre-commit run --all-files
+#
+# Each entry below names the repository a check comes from and pins the exact
+# version, so the same check behaves the same for everyone and does not change
+# under us when its authors release something new.
+#
+# Type checking is not here. It is slower than the rest and belongs in the pull
+# request checks, where waiting is free.
+
+# `pre-commit install` normally wires in only the before-a-commit checks. Saying
+# so here means it also wires in the one that reads the commit message.
+default_install_hook_types: [pre-commit, commit-msg]
+
+# Two files are written by a machine, not by a person, and must be left exactly
+# as the machine wrote them:
+#
+#   frontend/src/api/schema.ts    generated from the server's description of
+#                                 itself; a pull request check regenerates it
+#                                 and compares character for character, so any
+#                                 tidying here would make that check fail
+#   frontend/package-lock.json    written by npm
+#   backend/uv.lock               written by uv
+exclude: ^(frontend/src/api/schema\.ts|frontend/package-lock\.json|backend/uv\.lock)$
+
+repos:
+  # --- the Python half ------------------------------------------------------
+  # One tool, two jobs: `ruff-check` finds mistakes, `ruff-format` lays the code
+  # out. The version matches the one pinned in `backend/uv.lock`, so the check
+  # here and the check in a pull request cannot disagree.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-check
+        files: ^backend/
+        args: [--fix]
+      - id: ruff-format
+        files: ^backend/
+
+  # --- the browser half -----------------------------------------------------
+  # Biome is the one tool that both checks and formats the browser app.
+  # `biome ci` reports and changes nothing, which is what a check should do.
+  #
+  # Unlike every other entry here, this one runs the copy of Biome that
+  # `frontend/package-lock.json` pins rather than a copy pre-commit installs.
+  # Two reasons, both concrete:
+  #
+  #   * Biome refuses to run from a directory above its own settings file. Its
+  #     settings are `frontend/biome.jsonc`, and pre-commit runs every check
+  #     from the top of the repository, so Biome has to be started inside
+  #     `frontend/`. `npm --prefix frontend run lint` does exactly that.
+  #   * It is then the same Biome, run the same way, as `make lint` and the
+  #     `frontend` check on a pull request. One version, one result.
+  #
+  # It needs `npm` and the browser app's packages installed, which anyone
+  # editing files under `frontend/` has. It is skipped entirely when a commit
+  # touches nothing there.
+  - repo: local
+    hooks:
+      - id: biome
+        name: biome (the browser app's checker and formatter)
+        language: system
+        entry: npm --prefix frontend run lint
+        files: ^frontend/
+        # Biome is told which files to look at by its own settings file, not by
+        # a list of names on the command line.
+        pass_filenames: false
+
+  # --- secrets --------------------------------------------------------------
+  # Looks through what is about to be committed for anything shaped like a key
+  # or a password, and refuses the commit if it finds one. It also reads the
+  # recorded model answers under `backend/tests/cassettes/`, which is the one
+  # place in this repository a real key could plausibly end up by accident.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # --- small things that go wrong in every repository -----------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Every file ends with exactly one newline, so the last line of a diff is
+      # never "\ No newline at end of file".
+      - id: end-of-file-fixer
+      # No spaces or tabs left at the end of a line, which are invisible and
+      # show up as changes nobody made.
+      - id: trailing-whitespace
+      # A file over half a megabyte is almost always a mistake — a build output
+      # or a dependency that should not be in the history at all.
+      - id: check-added-large-files
+      # Every YAML file can actually be read back.
+      - id: check-yaml
+        name: check-yaml (every file but the packaged-run overrides)
+        exclude: ^compose\.prod\.yaml$
+      - id: check-yaml
+        name: check-yaml (the packaged-run overrides)
+        files: ^compose\.prod\.yaml$
+        # That one file contains `!reset` and `!override`, two words Docker
+        # Compose understands and a general YAML reader does not. `--unsafe`
+        # checks that the file's shape is valid without trying to make sense of
+        # those two words.
+        args: [--unsafe]
+
+  # --- the commit message itself --------------------------------------------
+  # Checks that the message follows the convention set out in `.cz.toml`: a
+  # type, an optional scope, a colon, and a summary. This runs when the message
+  # is written, not when files are staged, which is why `pre-commit run
+  # --all-files` skips it.
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.18.1
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]

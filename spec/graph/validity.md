@@ -131,7 +131,7 @@ Eleven rules, twelve codes — "exactly one hypothesis" fails in two different d
 | 1 | Every claim says how it will be judged, by whom, and by when | INV-1 | `missing_resolution` | `test_validate_rejects_unresolvable_proposition` | 02 |
 | 2 | Exactly one claim is the hypothesis the user started from | INV-graph.4 | `no_hypothesis`, `multiple_hypotheses` | `test_validate_requires_exactly_one_hypothesis` | 02 |
 | 3 | The map ends somewhere you can act on: at least one `market` or `not_tradeable` claim | INV-9 | `no_terminal` | `test_validate_requires_terminal` |
-| 4 | A `market` claim names an instrument, a direction and a size | INV-9 | `market_without_payoff` | `test_validate_requires_payoff_on_market` |
+| 4 | A `market` claim says what you would trade | INV-9 | `market_without_payoff` | `test_validate_requires_payoff_on_market` |
 | 5 | A `not_tradeable` claim says why there is nothing to trade | INV-9 | `not_tradeable_without_reason` | `test_validate_requires_reason_on_not_tradeable` |
 | 6 | Every arrow says why one claim moves the other | INV-2 | `missing_rationale` | `test_validate_rejects_link_without_rationale` |
 | 7 | An arrow whose provenance claims evidence — `documented`, `historical` or `market_implied` — cites at least one source | INV-2 | `documented_without_source` | `test_validate_rejects_unsourced_documented_link` |
@@ -146,7 +146,7 @@ Eleven rules, twelve codes — "exactly one hypothesis" fails in two different d
 | `no_hypothesis` | This map has no starting claim. Exactly one claim must be the hypothesis. |
 | `multiple_hypotheses` | This map has `<n>` starting claims: "…", "…". A map has exactly one. |
 | `no_terminal` | This map does not end anywhere you can act on. Add a claim that names an instrument, or one that says why there is nothing to trade. |
-| `market_without_payoff` | The tradeable claim "…" does not name an instrument, a direction and a size. |
+| `market_without_payoff` | The tradeable claim "…" does not say what you would trade. |
 | `not_tradeable_without_reason` | The claim "…" is marked not tradeable but does not say why. |
 | `missing_rationale` | The arrow from "…" to "…" does not say why one causes the other. |
 | `documented_without_source` | The arrow from "…" to "…" is marked as `<provenance>` but cites no source. |

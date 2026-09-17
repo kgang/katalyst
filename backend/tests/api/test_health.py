@@ -66,6 +66,21 @@ def test_readyz_reports_not_ready_when_no_model_key_is_configured(
     assert response.json() == {"status": "not_ready", "model_key_present": False}
 
 
+def test_readyz_treats_an_empty_key_as_no_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Copying .env.example unfilled sets the key to an empty string; that is not a key."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    from katalyst.settings import get_settings
+
+    get_settings.cache_clear()
+
+    response = client.get("/api/readyz")
+
+    assert response.json() == {"status": "not_ready", "model_key_present": False}
+    get_settings.cache_clear()
+
+
 @pytest.mark.usefixtures("settings_from_environment")
 def test_readyz_reports_ready_when_a_model_key_is_configured(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
