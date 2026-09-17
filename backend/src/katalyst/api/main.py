@@ -16,7 +16,7 @@ Run it during development with:
 from fastapi import FastAPI
 
 from katalyst import __version__
-from katalyst.api import about, health
+from katalyst.api import about, fixtures, health
 
 API_PREFIX = "/api"
 """Every browser-facing route hangs below this. There are no exceptions."""
@@ -35,3 +35,4 @@ app = FastAPI(
 
 app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(about.router, prefix=API_PREFIX)
+app.include_router(fixtures.router, prefix=API_PREFIX)

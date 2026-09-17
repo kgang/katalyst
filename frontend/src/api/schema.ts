@@ -87,6 +87,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fixtures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fixtures
+         * @description List the worked examples this program ships with.
+         *
+         *     The list is enough to draw a chooser: a name to ask for, a title to show,
+         *     and a sentence saying what the example is about. The maps themselves are not
+         *     included, because a map is large and a chooser does not draw one.
+         *
+         *     Returns:
+         *         One entry per stored example, in the order they are offered.
+         */
+        get: operations["list_fixtures_api_fixtures_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fixtures/{fixture_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Fixture
+         * @description Give back one worked example in full: its base map and its branches.
+         *
+         *     Args:
+         *         fixture_id: The short name of the example, as the list route gives it.
+         *
+         *     Returns:
+         *         The base map and the branches that go with it.
+         *
+         *     Raises:
+         *         HTTPException: With status 404 and a sentence naming the examples that do
+         *             exist, when nothing is stored under that name. The sentence is what
+         *             the screen shows, so it is written for a reader rather than for a log.
+         */
+        get: operations["read_fixture_api_fixtures__fixture_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -108,6 +166,301 @@ export interface components {
             version: string;
         };
         /**
+         * BaseRate
+         * @description How often this kind of thing has happened before: k times out of n.
+         *
+         *     The outside view — the anchor a likelihood starts from before anything
+         *     specific to this case is considered. Optional, because some claims have no
+         *     honest reference class, and absent is better than invented.
+         */
+        BaseRate: {
+            /**
+             * Reference Class
+             * @description The set of past cases being counted, stated precisely enough that someone else could recount them: 'Hormuz closure or disruption episodes since 1980 that ended within 90 days'.
+             */
+            reference_class: string;
+            /**
+             * K
+             * @description How many cases in that set came out true.
+             */
+            k: number;
+            /**
+             * N
+             * @description How many cases are in that set altogether.
+             */
+            n: number;
+            /**
+             * Sources
+             * @description Web addresses where the count can be checked. Empty means the count is the model's own recollection, and nothing downstream of it may claim to be documented.
+             * @default []
+             */
+            sources: string[];
+        };
+        /**
+         * Belief
+         * @description A likelihood with an honest range and a name on it.
+         *
+         *     `p` is the likelihood, `lo` and `hi` are the range around it, and `owner`
+         *     says whose number this is. There are exactly three owners and no code path
+         *     ever combines two of them into one number.
+         *
+         *     A belief is a number, never text. This layer does not round it and does not
+         *     store it as a string; rounding happens once, at the moment of display.
+         */
+        Belief: {
+            /**
+             * P
+             * @description How likely the claim is to come out true, from 0 (certainly not) to 1 (certainly yes).
+             */
+            p: number;
+            /**
+             * Lo
+             * @description The bottom of the honest range around `p`. Never above `p`.
+             */
+            lo: number;
+            /**
+             * Hi
+             * @description The top of the honest range around `p`. Never below `p`.
+             */
+            hi: number;
+            /**
+             * Owner
+             * @description Whose number this is: the model's estimate, the user's own, or a live price at a venue.
+             * @enum {string}
+             */
+            owner: "model" | "user" | "market";
+        };
+        /**
+         * Beliefs
+         * @description The three voices on one claim: the model's, the user's, and a market's.
+         *
+         *     Three named slots, deliberately not a dictionary, so that nothing can loop
+         *     over them and average them by accident. `model` is always present. `user` is
+         *     absent until the user says what they think. `market` is absent when no venue
+         *     quotes this claim — and absent means the words "no market", never a blank and
+         *     never a stand-in number.
+         *
+         *     The field named `model` is legal. Pydantic protects names beginning with
+         *     `model_`, so `model_config` and `model_dump` are reserved; plain `model` is
+         *     not one of them. It stays `model` because that is the word the shared
+         *     vocabulary uses, on the canvas and in the code alike.
+         */
+        Beliefs: {
+            /** @description What the model thinks, with this claim's causes taken into account. Always present. */
+            model: components["schemas"]["Belief"];
+            /** @description What the user thinks. Written only by the `believe` intervention. None means the user has not said. */
+            user?: components["schemas"]["Belief"] | null;
+            /** @description What a venue is currently pricing, read live and read-only. None means no venue quotes this claim. */
+            market?: components["schemas"]["Belief"] | null;
+        };
+        /**
+         * Believe
+         * @description Record what the *user* thinks the likelihood of one claim is.
+         *
+         *     The user's number is a first-class input, not a correction. It is written to
+         *     the user's own slot and sits beside the model's and the market's; it never
+         *     overwrites either of them and they are never averaged together. In this
+         *     version it is not pushed through the map.
+         */
+        Believe: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "believe";
+            /**
+             * Target
+             * @description The claim the user is putting a number on.
+             */
+            target: string;
+            /** @description The user's likelihood with its honest range. Its owner must be 'user'; a belief owned by the model or by a market is rejected. */
+            belief: components["schemas"]["Belief"];
+        };
+        /**
+         * Branch
+         * @description A named, ordered list of edits over a base map. A branch *is* a patch.
+         *
+         *     It holds no propositions, no links, no likelihoods and no results — only the
+         *     edits. Everything a branch shows on screen is computed from the base map plus
+         *     this list, which is what makes a branch cheap to create, exact to replay, and
+         *     impossible to drift from the original it forked out of.
+         */
+        Branch: {
+            /**
+             * Id
+             * @description This branch's identifier.
+             */
+            id: string;
+            /**
+             * Label
+             * @description The name the user reads: 'Hormuz opens, then Iran is struck'. Required — an unnamed branch is unusable once there are three of them.
+             */
+            label: string;
+            /**
+             * Parent
+             * @description The branch this one continues from, whose edits are applied first. None means this branch forks directly off the untouched base map.
+             */
+            parent?: string | null;
+            /**
+             * Interventions
+             * @description The edits, in the order the user made them. Order matters: an edit can act on what an earlier edit added. An empty list is the base world.
+             * @default []
+             */
+            interventions: (components["schemas"]["Do"] | components["schemas"]["Observe"] | components["schemas"]["Insert"] | components["schemas"]["Retune"] | components["schemas"]["Refine"] | components["schemas"]["Believe"])[];
+        };
+        /**
+         * Do
+         * @description Suppose a claim is true — and cut it loose from whatever would have caused it.
+         *
+         *     This is what a hypothesis is. The user is pulling a lever, not reporting news,
+         *     so nothing upstream of the claim may move: supposing the strait opens must not
+         *     quietly raise the odds that a diplomatic deal happened. To record something
+         *     that actually happened, use `Observe` instead.
+         */
+        Do: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "do";
+            /**
+             * Target
+             * @description The claim being supposed true or false.
+             */
+            target: string;
+            /**
+             * Value
+             * @description True to suppose the claim holds; False to suppose it does not.
+             */
+            value: boolean;
+            /**
+             * At
+             * @description The day the supposition takes effect. Links out of the target measure their delay from this day. None means the map's own start date.
+             */
+            at?: string | null;
+        };
+        /**
+         * Evidence
+         * @description One published item that supports or undercuts a claim.
+         *
+         *     Evidence moves no number by itself in this version. It is what the Inspector —
+         *     the persistent side panel beside the canvas — shows when the user asks why a
+         *     likelihood is what it is, and it is what lets the panel say "two for, one
+         *     against" without re-reading the sources.
+         */
+        Evidence: {
+            /**
+             * Claim
+             * @description What the source says, in one sentence, in our words.
+             */
+            claim: string;
+            /**
+             * Url
+             * @description Where to read it, so the reader can check us.
+             */
+            url: string;
+            /**
+             * Direction
+             * @description 1 if this supports the proposition, -1 if it cuts against it. There is no 0: an item that points neither way is not attached at all.
+             * @enum {integer}
+             */
+            direction: 1 | -1;
+            /**
+             * Weight
+             * @description How much this item counts, from 0 (barely) to 1 (decisive). Elicited and unitless; shown as a bar, never as a decimal.
+             */
+            weight: number;
+        };
+        /**
+         * FixtureBundle
+         * @description One stored example in full: the base map and the branches that go with it.
+         *
+         *     A branch is an ordered list of edits, not a second copy of the map, so the
+         *     whole bundle is one map plus a few small lists of changes.
+         */
+        FixtureBundle: {
+            /**
+             * Id
+             * @description The short name this example is asked for by, such as "hormuz".
+             */
+            id: string;
+            /**
+             * Title
+             * @description What the example is called on screen.
+             */
+            title: string;
+            /**
+             * Fixture Date
+             * Format: date
+             * @description The day the example is set on. Every resolve-by date in it is a span from this day, so the example reads the same whenever it is opened.
+             */
+            fixture_date: string;
+            /** @description The base map: every claim, every arrow, and which claim started it. */
+            graph: components["schemas"]["Graph"];
+            /**
+             * Branches
+             * @description The branches that go with this example, each an ordered list of edits over the base map. The base map itself is never changed by one.
+             */
+            branches: components["schemas"]["Branch"][];
+        };
+        /**
+         * FixtureSummary
+         * @description One stored example as it appears in a list, before the map itself is drawn.
+         */
+        FixtureSummary: {
+            /**
+             * Id
+             * @description The short name this example is asked for by, such as "hormuz".
+             */
+            id: string;
+            /**
+             * Title
+             * @description What the example is called on screen.
+             */
+            title: string;
+            /**
+             * One Line
+             * @description The example in one sentence, for a list where the map is not drawn.
+             */
+            one_line: string;
+        };
+        /**
+         * Graph
+         * @description A whole cause-and-effect map: claims, the arrows between them, and which claim started it.
+         *
+         *     A graph is immutable. Nothing edits one in place — a change is an intervention
+         *     recorded on a branch, and applying a branch produces a new graph. A graph is a
+         *     proposal until the validity rules have returned an empty list for it; nothing
+         *     reaches the canvas before that.
+         */
+        Graph: {
+            /**
+             * Id
+             * @description Minted by our code, never by the model.
+             */
+            id: string;
+            /**
+             * Propositions
+             * @description Every claim on the map, in no particular order. A tuple, so it cannot be appended to.
+             */
+            propositions: components["schemas"]["Proposition"][];
+            /**
+             * Links
+             * @description Every arrow on the map. Each names a source and a target that must be present above.
+             */
+            links: components["schemas"]["Link"][];
+            /**
+             * Hypothesis Id
+             * @description The claim the user started from. Must name a proposition present in `propositions` — that much is checked when the object is built. That the named claim is actually of kind 'hypothesis', and that no second one exists, is checked by the validity rules.
+             */
+            hypothesis_id: string;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
          * Health
          * @description The answer to "is this program running?".
          */
@@ -118,6 +471,216 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * Insert
+         * @description Add a new claim to the map, together with the arrows that connect it.
+         *
+         *     This is the "…but X also happens" move. The new claim and its arrows arrive as
+         *     one edit, so the map is never left holding a claim that causes nothing and is
+         *     caused by nothing.
+         */
+        Insert: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "insert";
+            /** @description The new claim, complete with how and when it will be checked. */
+            proposition: components["schemas"]["Proposition"];
+            /**
+             * Links
+             * @description The arrows that attach the new claim to the map. Each one has the new claim at one end and an existing claim at the other.
+             */
+            links: components["schemas"]["Link"][];
+        };
+        /**
+         * Link
+         * @description A causal claim from one proposition to another: A makes B more, or less, likely.
+         *
+         *     A link is an argument, not a correlation. It must say why it thinks the
+         *     mechanism is real (`rationale`), how hard it pushes (`strength`), how long the
+         *     push takes to arrive (`lag`), what the push looks like over time (`shape`),
+         *     and whether the push survives its cause going away (`mode`).
+         *
+         *     A link must never carry a number without a reason. A link with no rationale,
+         *     or one claiming evidence it does not cite, is rejected with a message — never
+         *     quietly patched up. Those two checks belong to the map's validity rules, not
+         *     to this class, because a well-formed model proposal breaks them often and the
+         *     user has to be told which arrow it was.
+         */
+        Link: {
+            /**
+             * Id
+             * @description Minted by our code, never by the model.
+             */
+            id: string;
+            /**
+             * Source
+             * @description The cause. The proposition this arrow starts at. Must name a proposition in the same graph.
+             */
+            source: string;
+            /**
+             * Target
+             * @description The effect. The proposition this arrow ends at. Must name a proposition in the same graph.
+             */
+            target: string;
+            /**
+             * Mode
+             * @description How the push behaves when the cause goes away. 'trigger': a one-time shove — once the cause becomes true the effect is pushed and stays pushed, fading on its own; undoing the cause later does not undo it (a toppled domino). 'sustain': a continuous hold — the push exists only while the cause holds, and vanishes the moment it stops (an apple on a desk).
+             * @enum {string}
+             */
+            mode: "trigger" | "sustain";
+            /**
+             * Strength
+             * @description How far this link shifts the target's log-odds while the push is at full size. Signed: positive makes the target claim more likely to be TRUE, negative less likely. Log-odds is the scale on which separate pushes add up instead of multiplying. This is not a probability and is not capped at 1. Roughly: +1 triples the odds, -1 cuts them to a third.
+             */
+            strength: number;
+            /**
+             * Lag
+             * @description Days from the cause becoming true to the push reaching full size. 0.0 means the same day. Must be greater than 0 when `reflexive` is true.
+             */
+            lag: number;
+            /**
+             * Shape
+             * @description What the push does over time. 'impulse': nothing during the lag, then a spike that decays by `half_life`. 'step': nothing during the lag, then full size, held. 'ramp': climbs from nothing to full size across the lag, then held.
+             * @enum {string}
+             */
+            shape: "impulse" | "step" | "ramp";
+            /**
+             * Half Life
+             * @description Days for an 'impulse' push to fall to half its size. Meaningful only when `shape` is 'impulse'; None for 'step' and 'ramp'.
+             */
+            half_life?: number | null;
+            /**
+             * Rationale
+             * @description The mechanism in one to three plain sentences: why this cause moves this effect. Required on every link. An empty rationale is a violation, not a default.
+             */
+            rationale: string;
+            /**
+             * Sources
+             * @description What backs the link. At least one is required when `provenance` claims evidence — 'documented', 'historical' or 'market_implied'.
+             * @default []
+             */
+            sources: components["schemas"]["Source"][];
+            /**
+             * Confidence
+             * @description How sure the model is that the mechanism it just described is real. The model's certainty about its own claim. Never a probability, and never rendered as one.
+             * @enum {string}
+             */
+            confidence: "speculative" | "argued" | "documented";
+            /**
+             * Provenance
+             * @description Where this link and its number came from, as a fact about our pipeline. Set from what actually happened; the model never fills this in.
+             * @enum {string}
+             */
+            provenance: "asserted" | "argued" | "documented" | "market_implied" | "user" | "historical" | "simulated";
+            /**
+             * Reflexive
+             * @description True when this arrow is a market feeding back on the world — a price outcome changing what people do. A reflexive link is allowed to close a loop, and must have a lag greater than 0.
+             * @default false
+             */
+            reflexive: boolean;
+        };
+        /**
+         * Observe
+         * @description Record that a claim actually came true (or false) — this is news, not a lever.
+         *
+         *     Unlike `Do`, the claim's causes are left connected, so learning it may also
+         *     revise what we believe about what caused it, and therefore about everything
+         *     those causes lead to. This is the one operation allowed to move things
+         *     upstream.
+         */
+        Observe: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "observe";
+            /**
+             * Target
+             * @description The claim that has been observed to be true or false.
+             */
+            target: string;
+            /**
+             * Value
+             * @description True if the claim came out true; False if it came out false.
+             */
+            value: boolean;
+        };
+        /**
+         * Payoff
+         * @description What a `market` terminal is actually worth: instrument, side, size of move.
+         *
+         *     This is what makes a terminal tradeable rather than merely interesting.
+         */
+        Payoff: {
+            /**
+             * Instrument
+             * @description The thing you would buy or sell, named the way its venue names it: a Polymarket contract title, a ticker, a futures contract.
+             */
+            instrument: string;
+            /**
+             * Direction
+             * @description 'long' if the position makes money when the claim comes true, 'short' if it makes money when the claim fails.
+             * @enum {string}
+             */
+            direction: "long" | "short";
+            /**
+             * Magnitude
+             * @description How far the instrument is expected to move if the claim resolves true, as a fraction: 0.03 means three per cent. The side is carried by `direction`, so this number is never negative.
+             */
+            magnitude: number;
+        };
+        /**
+         * Proposition
+         * @description A claim that will be true or false by a date, judged by a named source.
+         *
+         *     The unit the whole map is built from. Never a vibe ("tensions ease"); always
+         *     a check ("at least 14 consecutive days of unrestricted commercial transit
+         *     through the Strait of Hormuz per Lloyd's List, by 2026-11-01").
+         *
+         *     Frozen. A proposition is never edited in place; a change to one is an
+         *     intervention recorded on a branch.
+         */
+        Proposition: {
+            /**
+             * Id
+             * @description This proposition's identifier, minted by our code before the proposition is built.
+             */
+            id: string;
+            /**
+             * Claim
+             * @description The claim in one sentence, as a person would say it out loud. The precise, settleable version lives in `resolution.criteria`.
+             */
+            claim: string;
+            /**
+             * Kind
+             * @description What this proposition is for: `hypothesis` is the user's root input, `event` a step in the middle, `market` an ending that names an instrument, `not_tradeable` an ending that names why there is none.
+             * @enum {string}
+             */
+            kind: "hypothesis" | "event" | "market" | "not_tradeable";
+            /** @description How and when this claim gets settled, and by whom. */
+            resolution: components["schemas"]["Resolution"];
+            /** @description The model's likelihood for this claim before its causes are taken into account. Always owned by `model`. */
+            prior: components["schemas"]["Belief"];
+            /** @description The three likelihoods shown side by side: the model's (causes taken into account), the user's, and the market's. Never merged. */
+            beliefs: components["schemas"]["Beliefs"];
+            /** @description How often this kind of thing has happened before, when there is an honest reference class. None means there is not one. */
+            base_rate?: components["schemas"]["BaseRate"] | null;
+            /**
+             * Evidence
+             * @description Published items for and against, each with a direction and a weight. Empty is honest; invented sources are not.
+             * @default []
+             */
+            evidence: components["schemas"]["Evidence"][];
+            /** @description What you would trade. Required when `kind` is `market` — required by the map's validity rules, not by this class. */
+            payoff?: components["schemas"]["Payoff"] | null;
+            /**
+             * Not Tradeable Reason
+             * @description Why this chain ends without an instrument, in one plain sentence. Required when `kind` is `not_tradeable` — again by the validity rules.
+             */
+            not_tradeable_reason?: string | null;
         };
         /**
          * Readiness
@@ -135,6 +698,129 @@ export interface components {
              * @description Whether a key for the language model is configured. The key itself is never included in this answer.
              */
             model_key_present: boolean;
+        };
+        /**
+         * Refine
+         * @description Split one claim into finer claims that must add back up to it.
+         *
+         *     "US election goes this way" becomes a claim per state. The finer claims
+         *     replace the original as the thing the map reasons about, and their combined
+         *     likelihood has to equal the original's — otherwise splitting a claim would
+         *     quietly change the map's answer. The type exists from this stack; the
+         *     operation is applied later.
+         */
+        Refine: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "refine";
+            /**
+             * Target
+             * @description The claim being split.
+             */
+            target: string;
+            /**
+             * Into
+             * @description The finer claims that replace it. At least two.
+             */
+            into: components["schemas"]["Proposition"][];
+            /**
+             * Reconcile
+             * @description How the finer claims are made to agree with the original. 'marginalize' means their combined likelihood must equal the original's, within a small tolerance.
+             * @default marginalize
+             * @constant
+             */
+            reconcile: "marginalize";
+        };
+        /**
+         * Resolution
+         * @description How a claim gets settled: the test, who applies it, and by when.
+         *
+         *     Every proposition has one. A claim with no resolution is a vibe, and a
+         *     likelihood attached to a vibe can never be scored, right or wrong.
+         */
+        Resolution: {
+            /**
+             * Criteria
+             * @description The test, written so that two people reading it would agree on the answer. 'At least 14 consecutive days of unrestricted commercial transit', not 'shipping returns to normal'.
+             */
+            criteria: string;
+            /**
+             * Source
+             * @description Who or what applies the test: a named publication, exchange, agency or venue. 'Lloyd's List transit counts', not 'the news'.
+             */
+            source: string;
+            /**
+             * By
+             * Format: date
+             * @description The date by which the test has been applied. After this date the claim is true or false — never still open.
+             */
+            by: string;
+        };
+        /**
+         * Retune
+         * @description Change how hard one arrow pushes — and change nothing else about it.
+         *
+         *     The user disagrees with the model's number on a single link. This edit reaches
+         *     exactly one field of exactly one link: its `strength`. It cannot touch the
+         *     arrow's mechanism, its delay, its shape, which two claims it joins, or any
+         *     belief anywhere.
+         */
+        Retune: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "retune";
+            /**
+             * Link
+             * @description The one arrow whose push is being changed.
+             */
+            link: string;
+            /**
+             * Strength
+             * @description The new push, on a log-odds scale — the scale on which separate influences add together instead of multiplying. Signed: a negative number pushes the downstream claim toward false.
+             */
+            strength: number;
+        };
+        /**
+         * Source
+         * @description Something a reader can open to check what we are claiming.
+         *
+         *     A source exists because our retrieval step actually fetched a document, or
+         *     because a person typed one in. It is never something the model reports having
+         *     read. A source is never invented to make a link look better than it is.
+         */
+        Source: {
+            /**
+             * Url
+             * @description Where the reader goes to check it. One address that opens, not a search query.
+             */
+            url: string;
+            /**
+             * Title
+             * @description What the reader will see when they get there, in the publisher's words, not ours.
+             */
+            title: string;
+            /**
+             * Retrieved
+             * @description The day our retrieval step fetched it. None when a person supplied the source by hand.
+             */
+            retrieved?: string | null;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
     };
     responses: never;
@@ -201,6 +887,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["About"];
+                };
+            };
+        };
+    };
+    list_fixtures_api_fixtures_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixtureSummary"][];
+                };
+            };
+        };
+    };
+    read_fixture_api_fixtures__fixture_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fixture_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixtureBundle"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
