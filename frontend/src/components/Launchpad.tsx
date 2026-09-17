@@ -13,7 +13,7 @@
  * would think the tool was broken rather than unfinished.
  */
 
-import type { FixtureSummary } from "../world";
+import type { FixtureSummary } from "../api/client";
 import "./launchpad.css";
 
 /** One of the two ways into the tool. */

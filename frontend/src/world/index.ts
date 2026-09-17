@@ -7,12 +7,7 @@
  */
 
 export { ApiWorldSource } from "./apiSource";
-export {
-  type FixtureSummary,
-  FixtureWorldSource,
-  monogramFor,
-  readExampleList,
-} from "./fixtureSource";
+export { FixtureWorldSource, monogramFor } from "./fixtureSource";
 export type { FixtureBundle, WorldSource } from "./source";
 export type {
   Absence,

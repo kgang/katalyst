@@ -16,6 +16,7 @@ vi.mock("./api/client", () => ({
   readHealth: vi.fn(),
   readReadiness: vi.fn(),
   readAbout: vi.fn(),
+  readExampleList: vi.fn(),
 }));
 
 // The map draws on a canvas the simulated page cannot measure, and what it

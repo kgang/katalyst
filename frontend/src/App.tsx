@@ -15,17 +15,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { About, Health, Readiness } from "./api/client";
-import { readAbout, readHealth, readReadiness } from "./api/client";
+import type { About, FixtureSummary, Health, Readiness } from "./api/client";
+import { readAbout, readExampleList, readHealth, readReadiness } from "./api/client";
 import { Launchpad } from "./components/Launchpad";
 import { MapCanvas } from "./graph/Canvas";
-import {
-  type FixtureSummary,
-  FixtureWorldSource,
-  readExampleList,
-  type WorldSource,
-  type WorldView,
-} from "./world";
+import { FixtureWorldSource, type WorldSource, type WorldView } from "./world";
 
 /**
  * Everything the screen can know about one thing it asked for. Three states and

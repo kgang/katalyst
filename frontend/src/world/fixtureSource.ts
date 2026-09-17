@@ -17,8 +17,8 @@
  * carried, untouched and at full precision, to the component that prints it.
  */
 
-import createClient from "openapi-fetch";
-import type { components, paths } from "../api/schema";
+import { readExample } from "../api/client";
+import type { components } from "../api/schema";
 import type { FixtureBundle, WorldSource } from "./source";
 import type {
   Absence,
@@ -30,57 +30,9 @@ import type {
   WorldView,
 } from "./types";
 
-/** One stored example as it appears in a list, before the map itself is drawn. */
-export type FixtureSummary = components["schemas"]["FixtureSummary"];
-
 type Proposition = components["schemas"]["Proposition"];
 type Belief = components["schemas"]["Belief"];
 type Evidence = components["schemas"]["Evidence"];
-
-/**
- * The typed caller. An empty base address keeps every request relative to
- * whatever address this page was served from, so the same line is correct in
- * development, where the build tool forwards `/api` to the server, and in the
- * packaged app, where one web server does the same.
- */
-const server = createClient<paths>({ baseUrl: "" });
-
-/**
- * Make one request and return its reading, or throw an error whose message is
- * already a sentence the screen can print as it stands.
- *
- * The screen never translates a numbered reply into words of its own; it prints
- * what it was told, and this is where the telling is written.
- *
- * @param address The route being read, named in the failure so a reader can see
- *   which request went wrong.
- * @param request The already-typed call to make.
- */
-async function read<Reading>(
-  address: string,
-  request: () => Promise<{ data?: Reading; response: Response }>,
-): Promise<Reading> {
-  let answer: { data?: Reading; response: Response };
-  try {
-    answer = await request();
-  } catch {
-    throw new Error(`Could not reach the server at ${address}. It may not be running.`);
-  }
-  if (answer.data === undefined) {
-    const numbered = answer.response.status;
-    const reason =
-      numbered === 502 || numbered === 503 || numbered === 504
-        ? `Nothing answered at ${address} — the server may not be running.`
-        : `The request to ${address} came back with no reading.`;
-    throw new Error(`${reason} The reply was numbered ${numbered}.`);
-  }
-  return answer.data;
-}
-
-/** Ask the server for the list of stored examples it ships with. */
-export function readExampleList(): Promise<FixtureSummary[]> {
-  return read<FixtureSummary[]>("/api/fixtures", () => server.GET("/api/fixtures"));
-}
 
 /**
  * Turn a likelihood from the server into a filled slot, unchanged.
@@ -189,10 +141,7 @@ function toLink(link: components["schemas"]["Link"]): LinkView {
 export class FixtureWorldSource implements WorldSource {
   /** The base map and its branches, exactly as the route serves them. */
   async readBundle(id: string): Promise<FixtureBundle> {
-    const address = `/api/fixtures/${id}`;
-    return read<FixtureBundle>(address, () =>
-      server.GET("/api/fixtures/{fixture_id}", { params: { path: { fixture_id: id } } }),
-    );
+    return readExample(id);
   }
 
   /**
