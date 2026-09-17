@@ -34,6 +34,12 @@ describe("the status strip", () => {
     serverAnswersNormally();
     render(<App />);
 
+    // Before any answer arrives, each value cell holds a bar of the same height
+    // where the value will land, and each row says in words what it is waiting
+    // for. There is no spinner anywhere on the page.
+    expect(document.querySelectorAll(".placeholder")).toHaveLength(3);
+    expect(screen.getAllByText("asking the server")).toHaveLength(3);
+
     // The server is reachable and said so in one word.
     expect(await screen.findByText("reachable")).toBeInTheDocument();
     expect(screen.getByText("ok")).toBeInTheDocument();
