@@ -264,6 +264,7 @@ Dated so this section visibly ages.
 - **2026-09-16** Strategy export schema (FR-27): mirror Polymarket negative-risk / Kalshi combo leg structure, or a simpler `legs[] + conditions[]`? Decide in the strategy-export chapter of `spec/thesis/`.
 - **2026-09-16** Reflexive links (`market → world`, lag > 0): in v1 engine, or documented and deferred to stack 06? Leaning: schema in 02, propagation in 06.
 - **2026-09-16** Ensemble size N for FR-8 and its cost per generation. Measure in stack 04.
+- **2026-09-17** Replay mode — a reviewer with no model key walks the hero flow on the four example hypotheses, played from committed generation transcripts (FR-13) through the live event stream. Proposed in decision record 0012; pending acceptance, then built in stack 04.
 
 ---
 

@@ -188,6 +188,7 @@ katalyst/
 | ADR-0009 | Conventional commits; numbered stacks; PR bases chained by agents, stacks assembled in the GitHub UI | accepted |
 | ADR-0010 | Polymarket and FRED as grounding sources; Metaculus and yfinance rejected | accepted |
 | ADR-0011 | The spec is a book by idea; this file is the living technical counterpart to the PRD | accepted |
+| ADR-0012 | Replay mode: with no model key, the four example hypotheses play from committed generation transcripts through the same event stream | proposed |
 | ADR-0013 | A payoff names what you would trade — contract or price; what it costs is a live quote | accepted |
 
 ---
@@ -200,3 +201,4 @@ Nothing under `backend/` or `frontend/` exists yet; stack 01 creates the skeleto
 - **2026-09-16** Propagation engine: a deterministic topological sweep first, or seeded simulation from the start? ADR-0005 names the three conditions that force simulation.
 - **2026-09-16** Ensemble size for generation (how many independent runs to reconcile) and its cost per graph. Measure in stack 04.
 - **2026-09-16** Whether the GitHub web UI's stacked-PR view is enough at three PRs deep, or `git-spice` is needed.
+- **2026-09-17** Replay mode — with no model key, the four example hypotheses play from committed generation transcripts through the live event stream — is proposed in ADR-0012, pending Kent's acceptance. Nothing is built against it until then; it would land in stack 04.
