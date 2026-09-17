@@ -50,12 +50,14 @@ class Graph(BaseModel):
 
 
 ViolationCode = Literal[
+    # Fourteen faults in a map — what `validate` finds.
     "missing_resolution",
     "missing_rationale",
     "documented_without_source",
     "cycle",
     "reflexive_without_lag",
     "half_life_without_impulse",
+    "impulse_without_half_life",
     "belief_out_of_range",
     "no_terminal",
     "no_hypothesis",
@@ -63,10 +65,15 @@ ViolationCode = Literal[
     "dangling_link",
     "market_without_payoff",
     "not_tradeable_without_reason",
+    # Four refused edits — what `apply` finds. See *Refusing an edit* below.
+    "unknown_target",
+    "unknown_link",
+    "duplicate_id",
+    "edit_not_applicable",
 ]
-"""The thirteen things that can be wrong with a map. Stable strings: the browser
-switches on them, tests assert on them, and they are never renamed without a
-migration."""
+"""Eighteen stable strings: fourteen things that can be wrong with a **map**, and
+four reasons an **edit** cannot be folded onto one. The browser switches on them,
+tests assert on them, and they are never renamed without a migration."""
 
 
 class Violation(BaseModel):
@@ -82,12 +89,13 @@ class Violation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     code: ViolationCode = Field(
-        description="Which rule was broken. One of thirteen stable strings."
+        description="Which rule was broken. One of eighteen stable strings."
     )
     subject: str = Field(
         description=(
-            "The identifier of the thing at fault: a proposition id, a link id, or the graph's own id "
-            "for faults about the map as a whole. Never shown to the user."
+            "The identifier of the thing at fault: a proposition id, a link id, the graph's own id "
+            "for faults about the map as a whole, or — for a refused edit — the branch's id. "
+            "Never shown to the user."
         )
     )
     message: str = Field(
@@ -125,7 +133,7 @@ Rules for messages: name the claim by its words, never by its identifier; say wh
 
 ### The rules
 
-Twelve rules, thirteen codes — "exactly one hypothesis" fails in two different directions. The table is split in two so it fits on a screen; the `code` column joins them.
+Thirteen rules, fourteen codes — "exactly one hypothesis" fails in two different directions. The table is split in two so it fits on a screen; the `code` column joins them. These are the faults in a **map**; the four reasons an **edit** is refused are a separate list, below.
 
 | # | Rule, in plain words | Serves | Code | Test |
 |---|---|---|---|---|
@@ -141,6 +149,7 @@ Twelve rules, thirteen codes — "exactly one hypothesis" fails in two different
 | 10 | Every reflexive arrow takes time: `lag > 0` | INV-6 | `reflexive_without_lag` | `test_reflexive_links_have_positive_lag` |
 | 11 | A half-life appears only on an arrow whose push fades: `shape` is `impulse` | INV-graph.15 | `half_life_without_impulse` | `test_validate_rejects_half_life_without_impulse` | 02 |
 | 12 | Every likelihood sits between 0 and 1 with low ≤ p ≤ high | INV-7 | `belief_out_of_range` | `test_validate_rejects_belief_out_of_range` | 02 |
+| 13 | A push that fades says how fast: `shape` is `impulse` only with a `half_life` | INV-graph.16 | `impulse_without_half_life` | `test_validate_rejects_impulse_without_half_life` | 03a |
 
 | Code | Message pattern |
 |---|---|
@@ -156,6 +165,7 @@ Twelve rules, thirteen codes — "exactly one hypothesis" fails in two different
 | `cycle` | These claims form a loop with no delay in it: "…" → "…" → "…". Mark the arrow where a market feeds back on the world as reflexive and give it a delay, or remove one arrow. |
 | `reflexive_without_lag` | The feedback arrow from "…" to "…" has no delay. A market cannot change the world it is measuring in zero time. |
 | `half_life_without_impulse` | The arrow from "…" to "…" gives a half-life, but only a spike fades; a step or a ramp has nothing to fade. |
+| `impulse_without_half_life` | The arrow from "…" to "…" is a spike that fades, but does not say how fast. Give it a half-life in days, or make it a step. |
 | `belief_out_of_range` | The `<owner>` likelihood on "…" is `<p>`, with a range of `<lo>` to `<hi>`, which is not a range around that number between 0 and 1. |
 
 **`dangling_link` is the one case where a message cannot name both ends**, because one of them does not exist. It names the end that does.
@@ -166,13 +176,30 @@ Twelve rules, thirteen codes — "exactly one hypothesis" fails in two different
 
 **Rule 12, likelihoods, is checked twice on purpose.** `Belief` already refuses to be built with `lo > p` or `hi > 1` — that is a field check on the model itself, so a `Graph` assembled through our own models can never contain a bad one, and `belief_out_of_range` will never fire from that direction. The rule exists here anyway as the net under maps that arrive some other way: a hand-edited fixture file, a stored map read back after the shapes have changed, a future path that builds beliefs from raw numbers. Belief construction is [`belief.md`](belief.md); the after-any-intervention version of the same guarantee is `test_belief_bounds_after_any_sequence`, owned by [`belief.md`](belief.md). Whether a code that is currently unreachable from inside the models should exist at all is under Open questions.
 
-**Rule 11 rejects rather than ignores.** A half-life is how many days a spike takes to fall to half its size, so it says something only about an `impulse`; a `step` switches on and holds and a `ramp` climbs and then holds, and neither has anything to fade. The field could have been quietly ignored on those two shapes, and for a while it was. It is refused instead, because a number we accept and then ignore forever is a number the user cannot account for — the same argument as *Reject; never repair* below. The case the other way round, an `impulse` with no half-life, stays legal: it wants a sensible default rather than a refusal, and choosing that default belongs to propagation. Decided 2026-09-17; see [`link.md`](link.md), Open questions 4.
+**Rules 11 and 13 reject rather than ignore — the same rule, checked both ways.** A half-life is how many days a spike takes to fall to half its size, so it says something only about an `impulse`; a `step` switches on and holds and a `ramp` climbs and then holds, and neither has anything to fade. The field could have been quietly ignored on those two shapes, and for a while it was. It is refused instead, because a number we accept and then ignore forever is a number the user cannot account for — the same argument as *Reject; never repair* below. Decided 2026-09-17; see [`link.md`](link.md), Open questions 4.
+
+**Decided 2026-09-17, the other direction too.** An `impulse` with no half-life used to be legal, on the reasoning that it wanted a sensible default and that choosing one belonged to propagation. It is now rule 13 and code `impulse_without_half_life`. Propagation has no honest default to choose: reading a missing half-life as "no decay" turns the arrow into a `step` and silently overrides the author's choice of shape, and any other number would be invented by us and attributed to the model. So the shape and its parameters must **agree, checked both ways** — a spike says how fast it fades, and only a spike says it. Reject, never repair. The consequence for `propagate` is that it never meets one: [`../multiverse/propagation.md`](../multiverse/propagation.md) evaluates `impulse` with the half-life it is guaranteed to have. Every `impulse` in the Hormuz fixture already names one, so nothing shipped changes.
 
 **Rules 4 and 5 are validity rules, not field rules.** `Proposition.payoff` and `Proposition.not_tradeable_reason` are optional fields on one class, so a `market` claim with no payoff can be *built*. It just cannot be *valid*. That is deliberate: a model proposal with the wrong combination comes back as a `Violation` carrying a sentence the user can read, not as a pydantic exception carrying a stack trace.
 
 #### The order of the list
 
 Violations come back in the order of the rule table above, and within a rule sorted by `subject`. The list is therefore deterministic: the same map always produces the same list, which is what lets the interface rank them and the tests compare them directly.
+
+### Refusing an edit — four more codes *(decided 2026-09-17)*
+
+The fourteen rules above describe a **map**. An **edit** can fail for reasons that have nothing to do with the map being malformed — it can simply not fit the map it was handed. Those come back through the same `Violation` shape, from `apply` rather than from `validate`, and they carry four codes of their own. They arrive with `apply` in **stack 03a**; [`../multiverse/interventions.md`](../multiverse/interventions.md) owns which edit produces which.
+
+| Code | Raised when | Message pattern |
+|---|---|---|
+| `unknown_target` | The edit names a claim this map does not have | This map has no claim "…". |
+| `unknown_link` | It names an arrow this map does not have | This map has no arrow from "…" to "…". |
+| `duplicate_id` | An `insert` reuses an identifier already on the map | The claim "…" is already on this map. |
+| `edit_not_applicable` | The edit cannot be folded onto this map as written | Splitting a claim is not built yet — it arrives in stack 06. (Or: the arrow "…" does not touch the claim being added. Or: this branch's chain of parents loops back on itself.) |
+
+`edit_not_applicable` is the one that covers more than one case, and it is deliberately not a bin for everything: it means *the edit is well-formed and names things that exist, and still cannot be applied*. Keeping it separate is what lets `unknown_target` go on meaning exactly what it says.
+
+**`apply` stops at the first edit that does not fit**, and reports every violation *that edit* produced. That is different from `validate`, which walks every rule over the whole map. The reason is ordering: a branch's edits build on each other, so an edit after the failure may name a claim or arrow the failed edit would have added, and reporting its faults would blame the user for an artefact of the stop. One broken edit, all of its reasons.
 
 ### Reject; never repair
 
@@ -254,7 +281,7 @@ The generators live in `backend/tests/strategies.py`, built on `hypothesis`, a P
 
 Every invariant below is therefore two-sided: valid maps must pass clean, and a specific damage must produce a specific code. The **Stack** column says when the invariant starts running: everything about `validate` is stack 02; anything about applying a branch waits for stack 03a.
 
-Local numbers (`INV-graph.<n>`) are unique across the whole of `spec/graph/`. **This chapter holds `INV-graph.4` through `INV-graph.8`, and `INV-graph.15`**, and restates `INV-graph.1` from [`link.md`](link.md) because the rule that enforces it lives here.
+Local numbers (`INV-graph.<n>`) are unique across the whole of `spec/graph/`. **This chapter holds `INV-graph.4` through `INV-graph.8`, and `INV-graph.15` and `INV-graph.16`**, and restates `INV-graph.1` from [`link.md`](link.md) because the rule that enforces it lives here.
 
 | ID | Statement | Test | Stack |
 |---|---|---|---|
@@ -264,7 +291,8 @@ Local numbers (`INV-graph.<n>`) are unique across the whole of `spec/graph/`. **
 | **INV-7** | For all graphs from `graphs()`, `[]`. For all from `broken_graphs("belief_out_of_range")` — built by bypassing the model constructors — exactly one `belief_out_of_range` | `test_validate_rejects_belief_out_of_range` | 02 |
 | **INV-9** | For all graphs from `graphs()`, `[]`. For all from `broken_graphs("no_terminal")`, exactly one `no_terminal`; likewise `market_without_payoff` and `not_tradeable_without_reason` | `test_validate_requires_terminal`, `test_validate_requires_payoff_on_market`, `test_validate_requires_reason_on_not_tradeable` | 02 |
 | **INV-graph.1** | Stated in [`link.md`](link.md): both ends of every arrow name a claim on the same map. For all graphs from `broken_graphs("dangling_link")`, exactly one `dangling_link` | `test_validate_rejects_dangling_link` | 02 |
-| **INV-graph.15** | For all links drawn from `links()`: `half_life` is `None` unless `shape` is `impulse`. For all graphs from `broken_graphs("half_life_without_impulse")`, `validate` returns exactly one `half_life_without_impulse` violation. The converse — an `impulse` with no half-life — is deliberately not asserted; such a map is valid | `test_validate_rejects_half_life_without_impulse`, `test_an_impulse_without_a_half_life_is_still_legal` | 02 |
+| **INV-graph.15** | For all links drawn from `links()`: `half_life` is `None` unless `shape` is `impulse`. For all graphs from `broken_graphs("half_life_without_impulse")`, `validate` returns exactly one `half_life_without_impulse` violation | `test_validate_rejects_half_life_without_impulse` | 02 |
+| **INV-graph.16** | The mirror, decided 2026-09-17. For all links drawn from `links()`: `half_life` is a number whenever `shape` is `impulse`. For all graphs from `broken_graphs("impulse_without_half_life")`, `validate` returns exactly one `impulse_without_half_life` violation. Read with the row above: the shape and its parameters must agree, both ways, so `propagate` never meets a spike with no decay to evaluate. This replaces `test_an_impulse_without_a_half_life_is_still_legal`, which asserted the opposite | `test_validate_rejects_impulse_without_half_life` | 03a |
 | **INV-graph.4** | For all graphs from `graphs()`, exactly one proposition has `kind == "hypothesis"` and it is the one named by `hypothesis_id`. For all from `broken_graphs("no_hypothesis")`, exactly one `no_hypothesis`; for all from `broken_graphs("multiple_hypotheses")`, exactly one `multiple_hypotheses` | `test_validate_requires_exactly_one_hypothesis` | 02 |
 | **INV-graph.5** | For all graphs drawn from `broken_graphs(r1, r2, r3)` with three distinct rule names, `validate` returns exactly three violations and their codes are exactly `{r1, r2, r3}` — it never stops at the first | `test_validate_reports_every_violation` | 02 |
 | **INV-graph.6** | For all graphs from `broken_graphs(*rules)`, calling `validate` twice returns two equal lists, and the codes appear in the order of the rule table above, ties broken by `subject` | `test_violations_are_ordered_stably` | 02 |
