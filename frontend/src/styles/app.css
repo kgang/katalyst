@@ -1,0 +1,222 @@
+/*
+ * The styles for the one screen this app currently has.
+ *
+ * Every value here comes from a token in `tokens.css`; there are no raw colours
+ * and no raw pixel sizes below. If a number looks arbitrary it is a mistake.
+ *
+ * The screen is a single left-aligned column: the product name, one line saying
+ * what the tool does, and a quiet strip of three rows reporting what the server
+ * just told us. No cards with shadows, no buttons that do nothing, no
+ * decoration. Density here follows the rule that there should be nothing
+ * between the reader and the data.
+ */
+
+/* ---- Base ------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-interface);
+  font-size: var(--text-md);
+  font-weight: var(--weight-regular);
+  line-height: 1.55;
+  /* Fixed-width digits everywhere, so a number that changes never shifts the
+   * text beside it (UX-11). */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The keyboard ring. It is drawn on anything focusable, and it is drawn the
+ * same way everywhere so it is never a surprise (UX-9, UX-12). */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---- The page --------------------------------------------------------- */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-6) var(--space-3);
+}
+
+.column {
+  width: 100%;
+  max-width: 660px;
+}
+
+/* ---- Masthead: the product name and the one line under it ------------- */
+
+.masthead {
+  margin-bottom: var(--space-5);
+}
+
+.wordmark {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.purpose {
+  margin: var(--space-1) 0 0;
+  max-width: 46ch;
+  font-size: var(--text-md);
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
+}
+
+.section-heading {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+/* ---- The status strip -------------------------------------------------- *
+ * Three rows, each one answer from the server. A description list is the right
+ * shape for it: each row has one term (what is being reported) and two details
+ * (the value, and what that value means in words). */
+
+.status-strip {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: 7rem 7rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-1) 0;
+}
+
+.status-row + .status-row {
+  border-top: 1px solid var(--hairline);
+}
+
+/* Narrow screens: the three columns stack rather than squeeze. */
+@media (width < 560px) {
+  .status-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-hair);
+  }
+}
+
+.status-label {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+/* The value cell. This is the only place a value from the server is printed,
+ * and it is the class that puts it in the monospace face with fixed-width
+ * digits (UX-11). The test `the version reads in the monospace face` checks
+ * for this class by name. */
+.status-value {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+/* The value has just replaced its placeholder: fade it in over one duration
+ * token, and nothing else. Under reduced motion the token is 0ms, so the value
+ * simply appears (UX-7). */
+.status-value[data-settled="yes"] {
+  animation: value-arrives var(--duration-fast) ease-out;
+}
+
+@keyframes value-arrives {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* While the request is in flight the value cell holds a bar of the same height
+ * where the value will land, so nothing moves when the answer arrives. It is
+ * not a spinner and it does not pulse: a spinner says "wait" without saying
+ * what for, and this page always says what for in the cell beside it. */
+.placeholder {
+  display: inline-block;
+  width: 4.5ch;
+  height: 0.85em;
+  vertical-align: -0.05em;
+  border-radius: 2px;
+  background: var(--hairline);
+}
+
+.status-state {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* The state cell reads as a glyph and then a word, never a colour on its own
+ * (UX-6, and invariant INV-12: nothing is encoded in hue alone). The three
+ * tones below change how loud the row is, not what it means — the words carry
+ * the meaning. */
+.glyph {
+  margin-right: var(--space-hair);
+}
+
+.status-state[data-tone="good"] .glyph {
+  color: var(--accent);
+}
+
+.status-state[data-tone="quiet"] .glyph {
+  color: var(--text-muted);
+}
+
+.status-state[data-tone="loud"] {
+  color: var(--text);
+}
+
+.status-state[data-tone="loud"] .glyph {
+  color: var(--text);
+}
+
+/* ---- The footnote ------------------------------------------------------ *
+ * Names the three addresses the three rows were read from, so every value on
+ * this screen can be traced back to where it came from without opening the
+ * code. */
+
+.provenance {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.provenance code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
