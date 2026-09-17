@@ -31,8 +31,10 @@ What is here now
 The data shapes, and nothing that computes with them. `belief.py`, `proposition.py`
 and `link.py` hold the three things a map is made of; `graph.py` holds a whole
 map; `intervention.py` holds the six typed edits and `branch.py` the ordered list
-of them; `ids.py` holds the identifier names. Folding a branch onto a map and
-working the likelihoods through arrive in a later stack.
+of them; `ids.py` holds the identifier names. `validity.py` decides whether a
+proposed map is well-formed, and returns every fault at once rather than the
+first. Folding a branch onto a map and working the likelihoods through arrive in
+a later stack.
 """
 
 from katalyst.domain.belief import Belief, Beliefs
@@ -58,6 +60,7 @@ from katalyst.domain.proposition import (
     Proposition,
     Resolution,
 )
+from katalyst.domain.validity import Violation, ViolationCode, validate
 
 __all__ = [
     "BaseRate",
@@ -85,4 +88,7 @@ __all__ = [
     "Resolution",
     "Retune",
     "Source",
+    "Violation",
+    "ViolationCode",
+    "validate",
 ]
