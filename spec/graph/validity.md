@@ -70,6 +70,8 @@ ViolationCode = Literal[
     "unknown_link",
     "duplicate_id",
     "edit_not_applicable",
+    # One refused comparison — what `diff` finds. See *Refusing an edit* below.
+    "worlds_not_comparable",
 ]
 """Eighteen stable strings: fourteen things that can be wrong with a **map**, and
 four reasons an **edit** cannot be folded onto one. The browser switches on them,
