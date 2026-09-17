@@ -53,6 +53,7 @@ RULE_ORDER: tuple[tuple[str, ...], ...] = (
     ("cycle",),
     ("reflexive_without_lag",),
     ("half_life_without_impulse",),
+    ("impulse_without_half_life",),
     ("belief_out_of_range",),
 )
 """The rules in the order the chapter lists them, which is the order faults come back in.
@@ -223,21 +224,23 @@ def test_validate_rejects_half_life_without_impulse(graph: Graph) -> None:
     assert "only a spike fades" in faults[0].message
 
 
-@given(graphs())
+@given(broken_graphs("impulse_without_half_life"))
 @many
-def test_an_impulse_without_a_half_life_is_still_legal(graph: Graph) -> None:
-    """The case the other way round is left alone on purpose.
+def test_validate_rejects_impulse_without_half_life(graph: Graph) -> None:
+    """A spike that never says how fast it fades is refused, the same way round as its mirror.
 
-    An arrow whose push is a spike but names no half-life wants a sensible default
-    rather than a refusal, and choosing that default belongs to the code that works
-    the numbers through. It is the remaining half of open question 4 in
-    `spec/graph/link.md`.
+    One idea checked from both sides: a shape and the numbers describing it have to
+    agree. A push that holds may not carry a half-life, and a push that does
+    nothing but fade must say how fast. Without one there is no decay to work out,
+    and whatever the engine did with such an arrow would be a number nobody wrote.
+
+    Reject, never repair — no default half-life is invented anywhere.
     """
-    spikes_without_a_half_life = tuple(
-        one.model_copy(update={"shape": "impulse", "half_life": None}) for one in graph.links
-    )
+    faults = validate(graph)
 
-    assert validate(graph.model_copy(update={"links": spikes_without_a_half_life})) == []
+    assert [fault.code for fault in faults] == ["impulse_without_half_life"]
+    assert faults[0].subject in {one.id for one in graph.links}
+    assert "does not say how fast" in faults[0].message
 
 
 @given(broken_graphs("belief_out_of_range"))

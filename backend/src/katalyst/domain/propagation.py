@@ -51,6 +51,7 @@ import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
+from types import MappingProxyType
 from typing import Literal
 
 import networkx
@@ -112,6 +113,9 @@ SERIES_CAP = 180
 LOWEST_SURVIVAL = 0.02
 """Below this share of worlds surviving an observation, the world warns loudly."""
 
+NOTHING_ADDED: Mapping[LinkId, int] = MappingProxyType({})
+"""What "nobody said which edit added which arrow" looks like: an empty, unchangeable map."""
+
 LOUD_STRENGTH = 5.0
 """A push beyond this is roughly 1% to 99% on a coin flip, and is worth a second look."""
 
@@ -153,12 +157,13 @@ class Retraction(BaseModel):
     by_claim: PropositionId = Field(
         description="That arrow's source — the claim the tile names in its badge."
     )
-    by: int | None = Field(
-        default=None,
+    by: int = Field(
+        ge=0,
         description=(
             "Which edit introduced the arrow, as its position in the branch, counting "
-            "from 0. None means nobody said which edit added it — the arrow may have "
-            "been on the base map all along, or the caller did not pass the list."
+            "from 0. Always known, and that is a theorem rather than a convention: "
+            "supposing a claim cuts every arrow pointing at it at that moment, so any "
+            "arrow that later pushes against it was added afterwards, by an edit."
         ),
     )
 
@@ -177,6 +182,13 @@ class World(BaseModel):
     fade are visible rather than hidden, and `states` says, for each of those days,
     whether the number is the ordinary sampled one, a supposition holding, a
     supposition withdrawn with no push yet, or a push that has landed.
+
+    **A claim whose supposition is holding reads 1 — exactly 1, range and all, or
+    0 when it was supposed false.** That number is there so that a chain of claims
+    multiplied together has a factor for it, and for nothing else: **no surface may
+    print it.** Every reader looks at `states` first and prints the word *Supposed*
+    where the number would go, because "suppose this is true" answered with a
+    likelihood is a tool arguing with the person using it.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -219,8 +231,17 @@ class World(BaseModel):
             "day, with the range that says how sure we are of it."
         )
     )
+    series_days: tuple[int, ...] = Field(
+        description=(
+            "Which day of the window each point of every series stands for, counting from "
+            "zero. Ordinarily every day. Past 180 days the series is drawn at fewer, "
+            "unevenly spaced days — every claim's own resolve-by day is always among them, "
+            "so a tile's headline number is always a point of the line drawn beneath it — "
+            "and then this is the only thing that says where those points sit."
+        )
+    )
     series: Mapping[PropositionId, tuple[float, ...]] = Field(
-        description="One likelihood per day of the window, for the scrubbable time axis."
+        description=("One likelihood for each of the days above, for the scrubbable time axis.")
     )
     states: Mapping[PropositionId, tuple[SeriesState, ...]] = Field(
         description="One named state per day, the same length as the series."
@@ -293,6 +314,15 @@ class Versions:
     likelihood: Mapping[PropositionId, Numbers]
     """Each version's answer for each claim, one row per version and one column per day."""
 
+    inner_spread: Mapping[PropositionId, Numbers]
+    """How much the worlds inside each version disagreed, per version and per day.
+
+    What the noise correction needs. With this and the likelihoods above, a reader
+    can rebuild any day's band exactly as the world reports it — which is how a
+    difference between two worlds gets each world's band on whichever day it wants
+    to read the change on, without a world carrying millions of numbers itself.
+    """
+
 
 def propagate(
     graph: Graph,
@@ -302,7 +332,7 @@ def propagate(
     seed: int,
     versions: int = 2_000,
     worlds: int = 8,
-    introduced_by: Mapping[LinkId, int] | None = None,
+    introduced_by: Mapping[LinkId, int] = NOTHING_ADDED,
 ) -> World:
     """Work every likelihood on a map through time, and say how sure we are of each.
 
@@ -328,20 +358,33 @@ def propagate(
         worlds: The inner loop — how many worlds to run under each version. At
             least two, or there is no inner spread to subtract.
         introduced_by: Which edit added each arrow, by position in the branch, so a
-            withdrawn supposition can name the edit responsible. None means nobody
-            said, and a retraction then leaves that field empty rather than
-            guessing.
+            supposition something undermined can name the edit responsible. Leaving
+            it out is only safe when no supposition can be undermined; when one is,
+            and its arrow is not in here, that is a broken promise between our own
+            two pieces of code and it is said out loud rather than guessed at.
 
     Returns:
         One world: a likelihood and a range for every claim on the day it is
         judged, a likelihood and a named state for every day of the window, every
         supposition that was undermined, and a sentence for anything the reader
         should be told.
+
+    Raises:
+        ValueError: If a supposition was undermined by an arrow that `introduced_by`
+            does not account for. The one thing this file raises for, and why is in
+            `_retractions`.
     """
-    setup = _prepare(graph, assignments, as_of, introduced_by)
+    setup = _prepare(graph, assignments, as_of)
     sample = _draw(setup, seed=seed, versions=versions, worlds=worlds)
     return _world_from(
-        graph, assignments, setup, sample, seed=seed, versions=versions, worlds=worlds
+        graph,
+        assignments,
+        setup,
+        sample,
+        _retractions(setup, introduced_by),
+        seed=seed,
+        versions=versions,
+        worlds=worlds,
     )
 
 
@@ -361,7 +404,7 @@ def versions_of(world: World) -> Versions:
         each version drew for each claim, and each version's answer for each claim
         on each day.
     """
-    setup = _prepare(world.graph, world.assignments, world.day_zero, None)
+    setup = _prepare(world.graph, world.assignments, world.day_zero)
     sample = _draw(setup, seed=world.seed, versions=world.versions, worlds=world.worlds)
     return Versions(
         days=tuple(int(one) for one in setup.points),
@@ -369,10 +412,33 @@ def versions_of(world: World) -> Versions:
         reweighted=setup.observation_reach,
         priors=sample.priors,
         likelihood=sample.likelihood,
+        inner_spread=sample.inner_spread,
     )
 
 
 # --- Everything that is decided before a single random number is drawn -----
+
+
+@dataclass(frozen=True)
+class _Spell:
+    """One stretch of days over which one edit's fixed value holds on one claim.
+
+    A claim can be fixed more than once — supposed, then reported, then supposed
+    again — and each edit's word holds from its own day until the next edit on the
+    same claim has something to say. A supposition also stops holding early, on the
+    day something undermined it, and the claim is worked out like any other from
+    then until the stretch ends.
+    """
+
+    kind: Literal["do", "observe"]
+    value: bool
+    starts: int
+    ends: int | None
+    """The first day this stretch no longer holds. None means it runs to the end."""
+    undermined_on: int | None
+    """The day a supposition was undermined, inside this stretch. None means it was not."""
+    undermined_by: Link | None
+    """The arrow that undermined it, if one did."""
 
 
 @dataclass(frozen=True)
@@ -382,14 +448,11 @@ class _Setup:
     claims: Mapping[PropositionId, Proposition]
     order: tuple[PropositionId, ...]
     arrows_into: Mapping[PropositionId, tuple[Link, ...]]
-    in_force: Mapping[PropositionId, Assignment]
+    spells: Mapping[PropositionId, tuple[_Spell, ...]]
     settled: Mapping[PropositionId, int]
-    retractions: tuple[Retraction, ...]
-    retracted_on: Mapping[PropositionId, int]
     day_zero: date
     days: int
     points: NDArray[numpy.int64]
-    series_at: NDArray[numpy.int64]
     read_at: Mapping[PropositionId, int]
     shape_rows: Mapping[LinkId, Numbers]
     observation_reach: frozenset[PropositionId]
@@ -397,24 +460,19 @@ class _Setup:
     warnings: tuple[str, ...]
 
 
-def _prepare(
-    graph: Graph,
-    assignments: tuple[Assignment, ...],
-    as_of: date,
-    introduced_by: Mapping[LinkId, int] | None,
-) -> _Setup:
+def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> _Setup:
     """Work out everything about a world that chance has no say in.
 
     The window, the order claims are worked through in, the day each claim's clock
-    starts, which suppositions a later edit undermined and on which day, and what
-    the reader should be warned about. All of it is the same in every one of the
-    sixteen thousand draws, which is exactly why it is computed once.
+    starts, which stretch of days each fixed value holds over, which suppositions
+    something undermined and on which day, and what the reader should be warned
+    about. All of it is the same in every one of the sixteen thousand draws, which
+    is exactly why it is computed once.
 
     Args:
         graph: The map a fold left behind.
         assignments: Every value that fold fixed, in order.
         as_of: Day zero.
-        introduced_by: Which edit added each arrow, or nothing.
 
     Returns:
         Everything the draw below needs and nothing that depends on a seed.
@@ -426,68 +484,67 @@ def _prepare(
         claim_id: tuple(one for one in ordinary if one.target == claim_id) for claim_id in claims
     }
 
-    in_force = {one.target: one for one in assignments if one.target in claims}
-    settled = _settled_days(order, arrows_into, in_force, as_of)
+    fixed_on: dict[PropositionId, list[Assignment]] = {claim_id: [] for claim_id in claims}
+    for one in assignments:
+        if one.target in fixed_on:
+            fixed_on[one.target].append(one)
+    settled = _settled_days(order, arrows_into, fixed_on, as_of)
 
     days = _window_length(graph, as_of)
-    points, series_at = _days_to_work_out(claims, as_of, days)
+    points = _days_to_work_out(claims, as_of, days)
     read_at = {
         claim_id: int(numpy.searchsorted(points, _day_index(one.resolution.by, as_of, days)))
         for claim_id, one in claims.items()
     }
 
     shape_rows = {one.id: _shape_row(one, settled[one.source], points) for one in ordinary}
-    retractions = _retractions(claims, arrows_into, in_force, settled, as_of, introduced_by)
-    retracted_on = {one.target: (one.at - as_of).days for one in retractions}
-    states = _states(claims, arrows_into, in_force, settled, retracted_on, shape_rows, points)
+    spells = {
+        claim_id: _spells_on(fixed_on[claim_id], arrows_into[claim_id], settled, as_of)
+        for claim_id in claims
+    }
 
     return _Setup(
         claims=claims,
         order=order,
         arrows_into=arrows_into,
-        in_force=in_force,
+        spells=spells,
         settled=settled,
-        retractions=retractions,
-        retracted_on=retracted_on,
         day_zero=as_of,
         days=days,
         points=points,
-        series_at=series_at,
         read_at=read_at,
         shape_rows=shape_rows,
-        observation_reach=_observation_reach(claims, ordinary, in_force),
-        states={claim_id: states[claim_id] for claim_id in claims},
+        observation_reach=_observation_reach(claims, ordinary, spells),
+        states=_states(claims, spells, shape_rows, points),
         warnings=_warnings_about(graph, claims, days),
     )
 
 
 def _ordinary_arrows(graph: Graph, claims: Mapping[PropositionId, Proposition]) -> tuple[Link, ...]:
-    """List the arrows the arithmetic actually uses, in a settled order.
+    """List the arrows the arithmetic actually uses, **in the order the map carries them**.
 
     A feedback arrow — a market changing the world it is measuring — is left out:
     it is carried as data in this version and worked through by a later stack, the
     same way the map's own loop check leaves it out. An arrow with an end that is
     not on the map is left out too; it already has its own complaint.
 
-    Sorted by identifier so that the pushes on a claim are always added up in the
-    same order, which is what keeps two runs byte-identical.
+    The order is the map's own, and that order means something: folding a branch
+    appends each `insert`'s arrows after the ones already there, so an arrow's
+    place on the map is the order it arrived in. That is both a settled order to
+    add the pushes on a claim up in — so two runs agree to the last digit — and
+    the tie-break when two arrows undermine a supposition on the very same day.
 
     Args:
         graph: The map to read.
         claims: Every claim on it, by identifier.
 
     Returns:
-        The ordinary arrows, in identifier order.
+        The ordinary arrows, in the order the map carries them.
     """
     return tuple(
-        sorted(
-            (
-                one
-                for one in graph.links
-                if not one.reflexive and one.source in claims and one.target in claims
-            ),
-            key=lambda one: one.id,
-        )
+        one
+        for one in graph.links
+        if not one.reflexive and one.source in claims and one.target in claims
     )
 
 
@@ -544,17 +601,16 @@ def _window_length(graph: Graph, day_zero: date) -> int:
 
 
 def _days_to_work_out(
-    claims: Mapping[PropositionId, Proposition],
-    day_zero: date,
-    days: int,
-) -> tuple[NDArray[numpy.int64], NDArray[numpy.int64]]:
+    claims: Mapping[PropositionId, Proposition], day_zero: date, days: int
+) -> NDArray[numpy.int64]:
     """Choose which days of the window to work the numbers out on.
 
-    Ordinarily every day. Past 180 days the series is drawn at 180 evenly spaced
-    points instead, because nobody scrubs a two-year axis a day at a time and the
-    arithmetic is the same at every point. Each claim's own resolve-by day is
-    always worked out exactly, whether or not it is one of those points, so the
-    number on a tile never comes from a neighbouring day.
+    Ordinarily every day. Past 180 days that is more points than anybody scrubs
+    through, so the series is drawn at 180 evenly spaced days instead — **and every
+    claim's own resolve-by day is always among them**. That is not a nicety: a
+    tile's headline number is read on the claim's own resolve-by day, and if that
+    day were not on the claim's own series the number on the tile would not be a
+    point of the line drawn beneath it.
 
     Args:
         claims: Every claim on the map, by identifier.
@@ -562,36 +618,33 @@ def _days_to_work_out(
         days: How long the window is.
 
     Returns:
-        The days to work out, in order, and where in that list the series' own days
-        sit.
+        The days to work out, in order.
     """
-    if days + 1 <= SERIES_CAP:
-        series_days = numpy.arange(days + 1, dtype=numpy.int64)
-    else:
-        series_days = numpy.unique(
-            numpy.rint(numpy.linspace(0, days, SERIES_CAP)).astype(numpy.int64)
-        )
-    read_days = numpy.array(
+    judged = numpy.array(
         sorted({_day_index(one.resolution.by, day_zero, days) for one in claims.values()}),
         dtype=numpy.int64,
     )
-    points = numpy.union1d(series_days, read_days).astype(numpy.int64)
-    return points, numpy.searchsorted(points, series_days).astype(numpy.int64)
+    if days + 1 <= SERIES_CAP:
+        return numpy.arange(days + 1, dtype=numpy.int64)
+    spare = max(2, SERIES_CAP - len(judged))
+    evenly = numpy.rint(numpy.linspace(0, days, spare)).astype(numpy.int64)
+    return numpy.union1d(judged, evenly).astype(numpy.int64)
 
 
 def _settled_days(
     order: Sequence[PropositionId],
     arrows_into: Mapping[PropositionId, Sequence[Link]],
-    in_force: Mapping[PropositionId, Assignment],
+    fixed_on: Mapping[PropositionId, Sequence[Assignment]],
     day_zero: date,
 ) -> dict[PropositionId, int]:
     """Say which day each claim's clock starts on — the day it is *settled*.
 
     Three rules, in order. If an edit fixed the claim's value, its clock starts on
-    the day that value holds from. Otherwise it starts on the earliest day a live
-    incoming arrow reaches it: the day that arrow's cause was settled, plus the
-    arrow's delay, rounded up to a whole day. A claim with neither is settled on
-    day zero, because the map carries no timing information about it at all.
+    the earliest day any of them holds from. Otherwise it starts on the earliest
+    day a live incoming arrow reaches it: the day that arrow's cause was settled,
+    plus the arrow's delay, rounded up to a whole day. A claim with neither is
+    settled on day zero, because the map carries no timing information about it at
+    all.
 
     **Being settled is not being true.** A claim with nothing fixing it is sampled
     from its own prior in every draw; its clock starting says only when the arrows
@@ -601,7 +654,7 @@ def _settled_days(
     Args:
         order: Every claim, causes first.
         arrows_into: The ordinary arrows pointing at each claim.
-        in_force: The value fixed on each claim, where one was.
+        fixed_on: Every value fixed on each claim, in the order the edits were made.
         day_zero: The day the window starts on.
 
     Returns:
@@ -609,15 +662,11 @@ def _settled_days(
     """
     settled: dict[PropositionId, int] = {}
     for claim_id in order:
-        fixed = in_force.get(claim_id)
-        if fixed is not None:
-            settled[claim_id] = _day_index(fixed.at, day_zero)
+        fixed = fixed_on[claim_id]
+        if fixed:
+            settled[claim_id] = min(_day_index(one.at, day_zero) for one in fixed)
             continue
-        arrivals = [
-            math.ceil(settled[one.source] + one.lag)
-            for one in arrows_into[claim_id]
-            if one.source in settled
-        ]
+        arrivals = [math.ceil(settled[one.source] + one.lag) for one in arrows_into[claim_id]]
         settled[claim_id] = min(arrivals) if arrivals else 0
     return settled
 
@@ -630,11 +679,15 @@ def _shape_row(link: Link, settled: int, points: NDArray[numpy.int64]) -> Number
     afterwards. A **step** is nothing through the delay, then full size, held. A
     **ramp** climbs from nothing to full size across the delay, then holds.
 
-    A spike that names no half-life has nothing to say about how fast it fades, so
-    it is treated as holding at full size and the world says so in a warning — an
-    ignored field is a number the reader cannot account for, and this one is at
-    least said out loud. A ramp with no delay at all has no rise time, so it
-    arrives at full size on the day itself.
+    A ramp with no delay at all needs no special case: the days at or past the
+    delay are settled first, which for a delay of nothing is every day from the
+    cause onwards, and the climb is then left with no days to climb over. Such a
+    ramp behaves as a step, as a consequence of the shape rather than as a rule.
+
+    A spike always says how fast it fades — a spike that does not is a fault in the
+    map, refused by its own rules before it ever reaches here. The line below is
+    the net under a map that arrived some other way, and it holds the push rather
+    than dividing by nothing.
 
     Args:
         link: The arrow.
@@ -645,18 +698,16 @@ def _shape_row(link: Link, settled: int, points: NDArray[numpy.int64]) -> Number
         One number per day, between 0 and 1.
     """
     elapsed = points.astype(numpy.float64) - settled
-    if link.shape == "step":
-        return (elapsed >= link.lag).astype(numpy.float64)
-    if link.shape == "ramp":
-        if link.lag <= 0.0:
-            return (elapsed >= 0.0).astype(numpy.float64)
-        # Clipped before the division rather than after, so a delay small enough
-        # to be a rounding error does not divide its way to infinity first.
-        return numpy.clip(elapsed, 0.0, link.lag) / link.lag
     landed = elapsed >= link.lag
     row = numpy.zeros_like(elapsed)
+    row[landed] = 1.0
+    if link.shape == "step":
+        return row
+    if link.shape == "ramp":
+        climbing = (elapsed >= 0.0) & ~landed
+        row[climbing] = elapsed[climbing] / link.lag
+        return row
     if link.half_life is None or link.half_life <= 0.0:
-        row[landed] = 1.0
         return row
     row[landed] = 2.0 ** (-(elapsed[landed] - link.lag) / link.half_life)
     return row
@@ -672,111 +723,166 @@ def _opposing(arrows: Sequence[Link], supposed: bool) -> list[Link]:
     return [one for one in arrows if (one.strength < 0.0) == supposed and one.strength != 0.0]
 
 
-def _retractions(
-    claims: Mapping[PropositionId, Proposition],
-    arrows_into: Mapping[PropositionId, Sequence[Link]],
-    in_force: Mapping[PropositionId, Assignment],
+def _spells_on(
+    fixed: Sequence[Assignment],
+    arrows: Sequence[Link],
     settled: Mapping[PropositionId, int],
     day_zero: date,
-    introduced_by: Mapping[LinkId, int] | None,
-) -> tuple[Retraction, ...]:
-    """Find every supposition a later edit undermined, and say which day it ended on.
+) -> tuple[_Spell, ...]:
+    """Work out which stretch of days each edit's word holds over, on one claim.
 
-    A supposition ends on the day the **cause** of the first live opposing arrow
-    was settled — not the day that arrow's push reaches full size. When two
-    opposing arrows' causes are settled on the same day the earlier identifier
-    wins, so that the badge is the same on every run; the spec leaves that
-    tie-break open and replay needs *some* settled answer.
+    Each edit's word holds from its own day until the next edit on the same claim
+    has something to say, because a later assignment overrides an earlier one. A
+    supposition also stops early, on the day the **cause** of the first arrow
+    pushing against it was settled — not the day that arrow's push reaches full
+    size, because tying the end of a supposition to the arrival would tie "do I
+    still take your word for this" to a delay parameter.
 
-    A supposition undermined before it even began ends on the day it began, so a
-    retraction never predates the supposition it ends.
+    A user may suppose a claim again after it was undermined. The second
+    supposition holds from its own day until something undermines it again, and the
+    series then reads supposed, withdrawn, pushed, supposed — which falls straight
+    out of "a later assignment overrides an earlier one" rather than needing a rule
+    of its own.
+
+    When two arrows undermine a supposition on the very same day, the one that
+    arrived on the map first wins. That is the arrow's own place on the map, which
+    is the order the edits added them in: the base map's arrows, then each `insert`'s
+    arrows in the order it listed them. Some settled answer is needed or the badge
+    would name a different arrow on different runs and a world would stop replaying.
 
     Args:
-        claims: Every claim on the map, by identifier.
-        arrows_into: The ordinary arrows pointing at each claim.
-        in_force: The value fixed on each claim, where one was.
+        fixed: Every value fixed on this claim, in the order the edits were made.
+        arrows: The ordinary arrows pointing at it, in the order the map carries them.
         settled: The day each claim's clock starts on.
         day_zero: The day the window starts on.
-        introduced_by: Which edit added each arrow, or nothing.
 
     Returns:
-        One retraction per undermined supposition, in claim order.
+        One stretch per edit, in the order the edits were made.
     """
-    found: list[Retraction] = []
-    for claim_id in sorted(claims):
-        fixed = in_force.get(claim_id)
-        if fixed is None or fixed.kind != "do":
-            continue
-        against = _opposing(arrows_into[claim_id], fixed.value)
-        if not against:
-            continue
-        first = min(against, key=lambda one: (settled[one.source], one.id))
-        ended = max(settled[claim_id], settled[first.source])
-        found.append(
-            Retraction(
-                target=claim_id,
-                at=day_zero + timedelta(days=ended),
-                by_link=first.id,
-                by_claim=first.source,
-                by=None if introduced_by is None else introduced_by.get(first.id),
+    where = {one.id: index for index, one in enumerate(arrows)}
+    days = [_day_index(one.at, day_zero) for one in fixed]
+    spells: list[_Spell] = []
+    for index, one in enumerate(fixed):
+        starts = days[index]
+        ends = days[index + 1] if index + 1 < len(days) else None
+        undermined_on, undermined_by = None, None
+        if one.kind == "do":
+            against = [
+                (max(starts, settled[arrow.source]), where[arrow.id], arrow)
+                for arrow in _opposing(arrows, one.value)
+            ]
+            live = [entry for entry in against if ends is None or entry[0] < ends]
+            if live:
+                undermined_on, _, undermined_by = min(live, key=lambda entry: entry[:2])
+        spells.append(
+            _Spell(
+                kind=one.kind,
+                value=one.value,
+                starts=starts,
+                ends=ends,
+                undermined_on=undermined_on,
+                undermined_by=undermined_by,
             )
         )
+    return tuple(spells)
+
+
+def _retractions(setup: _Setup, introduced_by: Mapping[LinkId, int]) -> tuple[Retraction, ...]:
+    """Write down every supposition something undermined, and which edit is to blame.
+
+    **Which edit added the undermining arrow is always known**, and that is a
+    theorem rather than a convention: supposing a claim cuts every arrow pointing
+    at it at that moment, so any arrow that later pushes against it was added
+    afterwards, by an edit with a position in the branch.
+
+    Args:
+        setup: Everything chance has no say in.
+        introduced_by: Which edit added each arrow, by position in the branch.
+
+    Returns:
+        One retraction per supposition that ended, claim by claim.
+
+    Raises:
+        ValueError: If an arrow that undermined a supposition is not in the list of
+            which edit added what. That is the one thing this file raises for, and
+            it is a broken promise between our own two pieces of code rather than
+            anything a user did: whoever asked for this world folded a branch onto
+            the map and then did not say which edit added which arrow.
+    """
+    found: list[Retraction] = []
+    for claim_id in sorted(setup.spells):
+        for spell in setup.spells[claim_id]:
+            if spell.undermined_on is None or spell.undermined_by is None:
+                continue
+            arrow = spell.undermined_by
+            if arrow.id not in introduced_by:
+                raise ValueError(
+                    "A supposition was undermined by an arrow that nothing says was added "
+                    "by an edit. Every arrow that can undermine a supposition was added "
+                    "after it, so the branch's edits have to be passed in alongside the "
+                    "values they fixed."
+                )
+            found.append(
+                Retraction(
+                    target=claim_id,
+                    at=setup.day_zero + timedelta(days=spell.undermined_on),
+                    by_link=arrow.id,
+                    by_claim=arrow.source,
+                    by=introduced_by[arrow.id],
+                )
+            )
     return tuple(found)
 
 
 def _states(
     claims: Mapping[PropositionId, Proposition],
-    arrows_into: Mapping[PropositionId, Sequence[Link]],
-    in_force: Mapping[PropositionId, Assignment],
-    settled: Mapping[PropositionId, int],
-    retracted_on: Mapping[PropositionId, int],
+    spells: Mapping[PropositionId, Sequence[_Spell]],
     shape_rows: Mapping[LinkId, Numbers],
     points: NDArray[numpy.int64],
 ) -> dict[PropositionId, tuple[SeriesState, ...]]:
     """Name what each claim's every day is, so the canvas knows when a number would mislead.
 
-    Before a supposition takes effect, and on a claim no supposition ever touched,
+    On a claim no supposition ever touched, and on any day before one takes effect,
     the day is `sampled`. While a supposition holds it is `supposed`, and the tile
-    shows the word rather than a likelihood. Once the supposition has been
-    undermined the day is `withdrawn` until an opposing push is actually live, and
-    `pushed` after that. The gap between the two — the day the world changed and
-    the day the push arrives — is the honest shape of the answer, not a bug to
-    hide, which is the whole reason these words exist.
+    shows the word rather than a likelihood. Once something has undermined it the
+    day is `withdrawn` until an opposing push is actually live, and `pushed` after
+    that. The gap between the two — the day the world changed and the day the push
+    arrives — is the honest shape of the answer, not a bug to hide, which is the
+    whole reason these words exist.
+
+    A claim reported to have happened is `sampled` throughout: an observation is
+    news rather than a lever, so there is no word standing in for a number.
 
     Args:
         claims: Every claim on the map, by identifier.
-        arrows_into: The ordinary arrows pointing at each claim.
-        in_force: The value fixed on each claim, where one was.
-        settled: The day each claim's clock starts on.
-        retracted_on: The day each undermined supposition ended.
+        spells: Which stretch of days each fixed value holds over, per claim.
         shape_rows: How big each arrow's push is on each day.
         points: The days to work out.
 
     Returns:
-        One word for each day worked out, per claim. The world keeps only the ones
-        the series itself carries.
+        One word per day, per claim.
     """
     named: dict[PropositionId, tuple[SeriesState, ...]] = {}
     untouched: SeriesState = "sampled"
     for claim_id in claims:
-        fixed = in_force.get(claim_id)
-        if fixed is None or fixed.kind != "do":
+        suppositions = [one for one in spells[claim_id] if one.kind == "do"]
+        if not suppositions:
             named[claim_id] = (untouched,) * len(points)
             continue
-        begins = settled[claim_id]
-        ends = retracted_on.get(claim_id)
-        against = _opposing(arrows_into[claim_id], fixed.value)
-        live = numpy.zeros(len(points), dtype=bool)
-        for one in against:
-            live |= shape_rows[one.id] > 0.0
-        days: list[SeriesState] = []
-        for index, day in enumerate(int(one) for one in points):
-            if day < begins:
-                days.append("sampled")
-            elif ends is None or day < ends:
-                days.append("supposed")
-            else:
-                days.append("pushed" if live[index] else "withdrawn")
+        days: list[SeriesState] = [untouched] * len(points)
+        for spell in suppositions:
+            pushing = (
+                shape_rows[spell.undermined_by.id] > 0.0
+                if spell.undermined_by is not None
+                else numpy.zeros(len(points), dtype=bool)
+            )
+            for index, day in enumerate(int(one) for one in points):
+                if day < spell.starts or (spell.ends is not None and day >= spell.ends):
+                    continue
+                if spell.undermined_on is None or day < spell.undermined_on:
+                    days[index] = "supposed"
+                else:
+                    days[index] = "pushed" if pushing[index] else "withdrawn"
         named[claim_id] = tuple(days)
     return named
 
@@ -784,7 +890,7 @@ def _states(
 def _observation_reach(
     claims: Mapping[PropositionId, Proposition],
     arrows: Sequence[Link],
-    in_force: Mapping[PropositionId, Assignment],
+    spells: Mapping[PropositionId, Sequence[_Spell]],
 ) -> frozenset[PropositionId]:
     """List the claims an observation is evidence about.
 
@@ -805,22 +911,26 @@ def _observation_reach(
     Args:
         claims: Every claim on the map, by identifier.
         arrows: The ordinary arrows.
-        in_force: The value fixed on each claim, where one was.
+        spells: Which stretch of days each fixed value holds over, per claim.
 
     Returns:
         The claims an observation is evidence about. Empty when nothing was
         observed.
     """
-    observed = [one for one in in_force.values() if one.kind == "observe"]
+    observed = [
+        claim_id
+        for claim_id, stretches in spells.items()
+        if any(one.kind == "observe" for one in stretches)
+    ]
     if not observed:
         return frozenset()
     walkable: networkx.DiGraph[PropositionId] = networkx.DiGraph()
     walkable.add_nodes_from(sorted(claims))
     walkable.add_edges_from((one.source, one.target) for one in arrows)
     reached: set[PropositionId] = set()
-    for one in observed:
-        causes = networkx.ancestors(walkable, one.target)
-        reached |= {one.target} | networkx.descendants(walkable, one.target) | causes
+    for claim_id in sorted(observed):
+        causes = networkx.ancestors(walkable, claim_id)
+        reached |= {claim_id} | networkx.descendants(walkable, claim_id) | causes
         for cause in causes:
             reached |= networkx.descendants(walkable, cause)
     return frozenset(reached)
@@ -848,11 +958,6 @@ def _warnings_about(
                 f"The arrow {ends} pushes by {link.strength}, which is past the point where a "
                 "coin flip becomes a near certainty. The map is still legal; the number is "
                 "worth a second look."
-            )
-        if link.shape == "impulse" and (link.half_life is None or link.half_life <= 0.0):
-            said.append(
-                f"The arrow {ends} is a spike with nothing saying how fast it fades, so it is "
-                "treated as holding at full size."
             )
     if days + 1 > SERIES_CAP:
         said.append(
@@ -1138,13 +1243,14 @@ def _one_pass(
         came_true = coins[claim_id][:, :, None] < answer
 
         starts = _point_of(setup.points, setup.settled[claim_id])
-        fixed = setup.in_force.get(claim_id)
-        if fixed is not None:
-            held = _days_held(setup, claim_id, fixed)
-            if fixed.kind == "observe":
-                surviving &= came_true[:, :, starts] == fixed.value
-            answer = numpy.where(held, DRAWING(1.0 if fixed.value else 0.0), answer)
-            came_true = numpy.where(held, fixed.value, came_true)
+        for spell in setup.spells[claim_id]:
+            if spell.kind == "observe":
+                at = _point_of(setup.points, spell.starts)
+                surviving &= came_true[:, :, at] == spell.value
+        held, word = _fixed_days(setup, claim_id)
+        if held.any():
+            answer = numpy.where(held[None, None, :], word[None, None, :], answer)
+            came_true = numpy.where(held[None, None, :], word[None, None, :] > 0.5, came_true)
 
         truth[claim_id] = came_true
         fired[claim_id] = came_true[:, :, starts]
@@ -1167,20 +1273,33 @@ def _point_of(points: NDArray[numpy.int64], day: int) -> int:
     return min(int(numpy.searchsorted(points, day)), len(points) - 1)
 
 
-def _days_held(setup: _Setup, claim_id: PropositionId, fixed: Assignment) -> Flags:
-    """Say which of the worked-out days a fixed value actually holds on.
+def _fixed_days(setup: _Setup, claim_id: PropositionId) -> tuple[Flags, Draws]:
+    """Say which of the worked-out days a fixed value holds on, and what it was fixed to.
 
-    A value holds from the day it was fixed. A supposition also stops holding on
-    the day a later edit undermined it, after which the claim is worked out like
-    any other — its own prior plus every live arrow, each arriving on its own
-    delay. An observation is never undermined: it is news, not a lever.
+    Each edit's word holds from its own day until the next edit on the same claim
+    has something to say. A supposition also stops on the day something undermined
+    it, after which the claim is worked out like any other — its own prior plus
+    every live arrow, each arriving on its own delay — until that stretch runs out.
+    An observation is never undermined: it is news, not a lever.
+
+    Args:
+        setup: Everything chance has no say in.
+        claim_id: The claim.
+
+    Returns:
+        Which days a value holds on, and the value itself on each of them.
     """
     days = setup.points
-    held = days >= setup.settled[claim_id]
-    ends = setup.retracted_on.get(claim_id)
-    if ends is not None:
-        held &= days < ends
-    return held[None, None, :]
+    held = numpy.zeros(len(days), dtype=bool)
+    word = numpy.zeros(len(days), dtype=DRAWING)
+    for spell in setup.spells[claim_id]:
+        stop = spell.undermined_on if spell.undermined_on is not None else spell.ends
+        covered = days >= spell.starts
+        if stop is not None:
+            covered &= days < stop
+        held |= covered
+        word[covered] = 1.0 if spell.value else 0.0
+    return held, word
 
 
 def _per_version(answer: Draws, surviving: Flags, weighted: bool) -> tuple[Numbers, Numbers]:
@@ -1336,6 +1455,7 @@ def _world_from(
     assignments: tuple[Assignment, ...],
     setup: _Setup,
     sample: _Sample,
+    retractions: tuple[Retraction, ...],
     *,
     seed: int,
     versions: int,
@@ -1348,6 +1468,7 @@ def _world_from(
         assignments: Every value those edits fixed, in the order they were made.
         setup: Everything chance had no say in.
         sample: What the two loops produced.
+        retractions: Every supposition something undermined.
         seed: The one number every draw came from.
         versions: The outer loop.
         worlds: The inner loop.
@@ -1377,8 +1498,8 @@ def _world_from(
             hi=float(numpy.clip(top[read], 0.0, 1.0)),
             owner="model",
         )
-        series[claim_id] = tuple(float(one) for one in middle[setup.series_at])
-        drawn[claim_id] = tuple(setup.states[claim_id][one] for one in setup.series_at)
+        series[claim_id] = tuple(float(one) for one in middle)
+        drawn[claim_id] = setup.states[claim_id]
 
     said = list(setup.warnings)
     if setup.observation_reach and sample.survival < LOWEST_SURVIVAL:
@@ -1396,9 +1517,10 @@ def _world_from(
         worlds=worlds,
         day_zero=setup.day_zero,
         days=setup.days,
+        series_days=tuple(int(one) for one in setup.points),
         graph=graph,
         assignments=assignments,
-        retractions=setup.retractions,
+        retractions=retractions,
         beliefs=beliefs,
         series=series,
         states=drawn,

@@ -135,6 +135,7 @@ BREAKABLE_RULES: tuple[str, ...] = (
     "missing_rationale",
     "documented_without_source",
     "half_life_without_impulse",
+    "impulse_without_half_life",
     "cycle",
     "reflexive_without_lag",
     "dangling_link",
@@ -155,6 +156,7 @@ INDEPENDENTLY_BREAKABLE: tuple[str, ...] = (
     "missing_rationale",
     "documented_without_source",
     "half_life_without_impulse",
+    "impulse_without_half_life",
     "cycle",
     "reflexive_without_lag",
     "dangling_link",
@@ -736,6 +738,33 @@ def _break_half_life_without_impulse(draw: Any, graph: Graph) -> Graph:
     )
 
 
+def _break_impulse_without_half_life(draw: Any, graph: Graph) -> Graph:
+    """Make one arrow's push a spike and take away the number saying how fast it fades.
+
+    Added rather than changed, so this damage and the one above it — a half-life
+    on a push that holds — can be done to the same map at once without landing on
+    the same arrow and cancelling out. It runs alongside an ordinary arrow that is
+    already there, so it closes no loop and dangles from nothing.
+    """
+    joined = draw(st.sampled_from([one for one in graph.links if not one.reflexive]))
+    fading = draw(
+        links(
+            identifier=_added_arrow_id(graph),
+            source=joined.source,
+            target=joined.target,
+            reflexive=False,
+        )
+    )
+    return graph.model_copy(
+        update={
+            "links": (
+                *graph.links,
+                fading.model_copy(update={"shape": "impulse", "half_life": None}),
+            ),
+        }
+    )
+
+
 def _break_cycle(draw: Any, graph: Graph) -> Graph:
     """Add an ordinary arrow running back the way an existing one came.
 
@@ -827,6 +856,7 @@ BREAKERS = {
     "missing_rationale": _break_missing_rationale,
     "documented_without_source": _break_documented_without_source,
     "half_life_without_impulse": _break_half_life_without_impulse,
+    "impulse_without_half_life": _break_impulse_without_half_life,
     "cycle": _break_cycle,
     "reflexive_without_lag": _break_reflexive_without_lag,
     "dangling_link": _break_dangling_link,
@@ -854,7 +884,7 @@ def broken_graphs(draw: Any, *rules: str) -> Graph:
         *rules: The codes of the rules to break. Naming none gives an undamaged map.
 
     Raises:
-        KeyError: If a name is not one of the thirteen.
+        KeyError: If a name is not one of the fourteen.
     """
     graph = draw(graphs())
     for rule in BREAKABLE_RULES:

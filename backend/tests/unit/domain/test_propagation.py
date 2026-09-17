@@ -52,6 +52,7 @@ from katalyst.domain import (
     apply,
     introduced_by,
     propagate,
+    validate,
     versions_of,
 )
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ
@@ -285,20 +286,21 @@ def test_propagation_idempotent(data: st.DataObject) -> None:
 @given(st.data())
 @many
 def test_propagation_order_independent(data: st.DataObject) -> None:
-    """Writing the claims and arrows down in a different order changes nothing.
+    """Writing the claims down in a different order changes nothing.
 
     Causes are worked out before effects, and claims no arrow orders relative to
     one another are put in a settled order of their own rather than the order they
-    happened to be typed in. Each claim's random numbers come from its own
+    happened to be written down in. Each claim's random numbers come from its own
     identifier for the same reason.
+
+    The **arrows** are not shuffled here, and that is deliberate: an arrow's place
+    on the map is the order it arrived in — folding a branch appends each new
+    arrow after the ones already there — and that order decides which arrow a badge
+    names when two undermine a supposition on the same day. Shuffling the arrows
+    would be shuffling a record of what happened, not a tie nobody has broken.
     """
     graph = data.draw(graphs())
-    shuffled = graph.model_copy(
-        update={
-            "propositions": tuple(reversed(graph.propositions)),
-            "links": tuple(reversed(graph.links)),
-        }
-    )
+    shuffled = graph.model_copy(update={"propositions": tuple(reversed(graph.propositions))})
 
     plain = _folded(graph)
     reordered = _folded(shuffled)
@@ -577,33 +579,147 @@ def test_retraction_dates_from_the_cause_not_the_push() -> None:
     assert set(slow.states["top"][2:]) == {"withdrawn"}
 
 
-def test_a_retraction_says_nothing_when_nobody_said_which_edit_added_the_arrow() -> None:
-    """Told no list of edits, a retraction leaves the field empty rather than guessing.
+def test_a_retraction_always_names_the_edit_that_added_the_arrow() -> None:
+    """Which edit added an undermining arrow is always known, and the engine says so loudly.
 
-    Which edit added an arrow is a fact about a branch, not about a map, so the map
-    the fold leaves behind cannot answer it. An engine that guessed would put a
-    number on the badge that points at the wrong edit.
+    It is a theorem rather than a convention: supposing a claim cuts every arrow
+    pointing at it at that moment, so any arrow that later pushes against it must
+    have been added afterwards, by an edit with a position in the branch. An engine
+    that shrugged and left the badge blank would be hiding a broken promise between
+    two pieces of our own code — so it is the one thing this file raises for.
     """
     graph = _two_step_map()
-    with_an_opposing_arrow = graph.model_copy(
-        update={
-            "links": (*graph.links, _arrow("middle", "top", strength=-2.0, mode="sustain")),
-        }
-    )
-    folded = apply(
-        with_an_opposing_arrow,
-        Branch(
-            id="branch-plain",
-            label="Just the one supposition",
-            interventions=(Do(target="top", value=True, at=DAY_ZERO + timedelta(days=5)),),
+    strike = _claim("strike")
+    branch = Branch(
+        id="branch-undermining",
+        label="Suppose the first, then knock it over",
+        interventions=(
+            Do(target="top", value=True, at=DAY_ZERO),
+            Insert(
+                proposition=strike,
+                links=(_arrow("strike", "top", strength=-3.0, mode="sustain", lag=1.0),),
+            ),
+            Do(target="strike", value=True, at=DAY_ZERO + timedelta(days=2)),
         ),
     )
+    folded = apply(graph, branch)
     assert not isinstance(folded, list)
     left_behind, fixed = folded
 
-    world = propagate(left_behind, fixed, as_of=DAY_ZERO, seed=SEED, **SMALL)
+    told = propagate(
+        left_behind,
+        fixed,
+        as_of=DAY_ZERO,
+        seed=SEED,
+        introduced_by=introduced_by(branch),
+        **SMALL,
+    )
+    assert [one.by for one in told.retractions] == [1]
 
+    with pytest.raises(ValueError, match="added by an edit"):
+        propagate(left_behind, fixed, as_of=DAY_ZERO, seed=SEED, **SMALL)
+
+
+def test_a_claim_can_be_supposed_again_after_it_was_undermined() -> None:
+    """Supposing a claim a second time works, and the second word holds from its own day.
+
+    A later edit overrides an earlier one, so a user who watched their supposition
+    withdrawn can simply say it again. The second one holds from its own day until
+    something undermines it again — a **new** arrow, because supposing a claim
+    cuts every arrow pointing at it at that moment, including the one that
+    undermined the first supposition. One retraction per ending.
+    """
+    graph = _two_step_map()
+    world = _folded(
+        graph,
+        Do(target="top", value=True, at=DAY_ZERO),
+        Insert(
+            proposition=_claim("first-strike"),
+            links=(_arrow("first-strike", "top", strength=-3.0, mode="sustain", lag=1.0),),
+        ),
+        Do(target="first-strike", value=True, at=DAY_ZERO + timedelta(days=1)),
+        Do(target="top", value=True, at=DAY_ZERO + timedelta(days=5)),
+        Insert(
+            proposition=_claim("second-strike"),
+            links=(_arrow("second-strike", "top", strength=-3.0, mode="sustain", lag=1.0),),
+        ),
+        Do(target="second-strike", value=True, at=DAY_ZERO + timedelta(days=7)),
+    )
+
+    assert world.states["top"][:10] == (
+        "supposed",
+        "supposed",
+        "supposed",
+        "supposed",
+        "supposed",
+        "supposed",
+        "supposed",
+        "withdrawn",
+        "pushed",
+        "pushed",
+    )
+    assert [(one.target, one.at, one.by_claim) for one in world.retractions] == [
+        ("top", DAY_ZERO + timedelta(days=7), "second-strike")
+    ]
+
+
+def test_supposing_a_claim_again_cuts_what_undermined_it() -> None:
+    """Saying it again cuts the arrow that knocked it down, exactly as saying it the first time did.
+
+    This is the one consequence of re-supposing worth reading twice. Supposing a
+    claim cuts every arrow pointing at it **at that moment** — that is what the
+    first supposition did, and the second one does the same thing to the arrow that
+    undermined the first. The arrow is gone from the map the fold leaves behind, so
+    the world worked out from that map has nothing that ever pushed against the
+    claim, and the series reads `supposed` throughout with no retraction at all.
+
+    It is not a number the reader cannot account for: the branch still lists all
+    four edits in order, and the arrow's removal is the third edit doing exactly
+    what the second verb on the box says it does.
+    """
+    graph = _two_step_map()
+    world = _folded(
+        graph,
+        Do(target="top", value=True, at=DAY_ZERO),
+        Insert(
+            proposition=_claim("strike"),
+            links=(_arrow("strike", "top", strength=-3.0, mode="sustain", lag=1.0),),
+        ),
+        Do(target="strike", value=True, at=DAY_ZERO + timedelta(days=1)),
+        Do(target="top", value=True, at=DAY_ZERO + timedelta(days=5)),
+    )
+
+    assert set(world.states["top"]) == {"supposed"}
     assert world.retractions == ()
+    assert "strike->top" not in {one.id for one in world.graph.links}
+
+
+def test_two_arrows_on_the_same_day_are_broken_by_which_arrived_first() -> None:
+    """When two arrows undermine a supposition on one day, the one added first names the badge.
+
+    Some settled answer is needed or the badge would name a different arrow on
+    different runs and a world would stop replaying. The answer is the order the
+    arrows arrived on the map: the base map's first, then each `insert`'s in the
+    order it listed them — which is exactly the order a map carries them in.
+    """
+    graph = _two_step_map()
+    both = _claim("both")
+    world = _folded(
+        graph,
+        Do(target="top", value=True, at=DAY_ZERO),
+        Insert(
+            proposition=both,
+            links=(
+                _arrow("both", "top", strength=-3.0, mode="sustain", lag=1.0),
+                _arrow("both", "top", strength=-4.0, mode="sustain", lag=5.0).model_copy(
+                    update={"id": "both->top-again"}
+                ),
+            ),
+        ),
+        Do(target="both", value=True, at=DAY_ZERO + timedelta(days=1)),
+    )
+
+    assert [one.by_link for one in world.retractions] == ["both->top"]
 
 
 # --- The range is how sure we are of the numbers, not how the dice fell ------
@@ -762,34 +878,11 @@ def test_a_claim_with_no_cause_and_no_assignment_starts_its_clock_at_day_zero() 
     assert world.series["ending"][0] < world.series["ending"][5]
 
 
-def test_a_feedback_arrow_is_carried_and_never_worked_through() -> None:
-    """A market feeding back on the world is data on the canvas, not arithmetic.
-
-    It is set aside here exactly as the map's own loop check sets it aside, which
-    is what lets a claim reachable only through one be shown as provably untouched.
-    A later stack unrolls it over time, and the two rules change together.
-    """
-    graph = _map(
-        (_claim("top", kind="hypothesis"), _claim("ending", kind="market")),
-        (_arrow("top", "ending", strength=3.0, reflexive=True, lag=1.0),),
-    )
-    alone = _map(
-        (_claim("top", kind="hypothesis"), _claim("ending", kind="market")),
-        (),
-    )
-
-    with_feedback = _folded(graph, Do(target="top", value=True, at=DAY_ZERO))
-    without_it = _folded(alone, Do(target="top", value=True, at=DAY_ZERO))
-
-    assert with_feedback.series["ending"] == without_it.series["ending"]
-
-
 def test_a_long_window_is_drawn_at_a_manageable_number_of_points() -> None:
-    """A window of years is drawn at 180 points and the world says so.
+    """A window of years is drawn at about 180 days rather than one point per day.
 
-    Nobody scrubs a two-year axis a day at a time, and the number on a tile is
-    still worked out on the claim's own resolve-by day rather than at whichever
-    point happens to fall nearby.
+    Nobody scrubs a two-year axis a day at a time. The world says which day each
+    point stands for, because past the cap they are no longer one a day.
     """
     graph = _map(
         (
@@ -802,8 +895,31 @@ def test_a_long_window_is_drawn_at_a_manageable_number_of_points() -> None:
     world = _folded(graph)
 
     assert world.days == 900
-    assert len(world.series["ending"]) == 180
+    assert len(world.series["ending"]) < 190
+    assert len(world.series_days) == len(world.series["ending"])
+    assert world.series_days[0] == 0
+    assert world.series_days[-1] == 900
     assert any("180" in one for one in world.warnings), world.warnings
+
+
+@given(st.data())
+@a_few
+def test_a_long_window_still_keeps_every_resolve_by_day(data: st.DataObject) -> None:
+    """Whatever the cap drops, it never drops a day a claim is judged on.
+
+    A tile's headline number is read on the claim's own resolve-by day. If that day
+    were not one of the points its series carries, the number on the tile would not
+    be a point of the line drawn underneath it — and a reader scrubbing to the
+    claim's own date would land somewhere near it and read something else.
+    """
+    graph = data.draw(graphs())
+    world = _folded(graph)
+    assume(world.days + 1 > 180)
+
+    judged = {
+        min((one.resolution.by - world.day_zero).days, world.days) for one in graph.propositions
+    }
+    assert judged <= {max(0, one) for one in world.series_days}
 
 
 def test_an_arrow_that_pushes_harder_than_a_near_certainty_is_called_out() -> None:
@@ -821,24 +937,6 @@ def test_an_arrow_that_pushes_harder_than_a_near_certainty_is_called_out() -> No
     world = _folded(graph)
 
     assert any("second look" in one for one in world.warnings), world.warnings
-
-
-def test_a_spike_that_never_says_how_fast_it_fades_is_said_out_loud() -> None:
-    """A spike with no half-life has nothing to fade by, so it holds — and the world says so.
-
-    A field quietly ignored is a number the reader cannot account for. The map is
-    still legal, so this is a sentence rather than a refusal, and it is the open
-    question the chapter raises rather than an answer to it.
-    """
-    graph = _map(
-        (_claim("top", kind="hypothesis"), _claim("ending", kind="market")),
-        (_arrow("top", "ending", strength=2.0, shape="impulse", lag=0.0, half_life=None),),
-    )
-
-    world = _folded(graph, Do(target="top", value=True, at=DAY_ZERO))
-
-    assert any("holding at full size" in one for one in world.warnings), world.warnings
-    assert world.series["ending"][0] == world.series["ending"][20]
 
 
 def test_a_ramp_with_no_rise_time_arrives_at_once() -> None:
@@ -968,22 +1066,24 @@ def test_an_arrow_that_pushes_neither_way_undermines_nothing() -> None:
 
 
 @pytest.mark.parametrize("half_life", (None, 0.0))
-def test_a_spike_with_nothing_to_fade_by_holds(half_life: float | None) -> None:
-    """A half-life of nothing at all, written either way, leaves the spike at full size.
+def test_a_spike_with_nothing_to_fade_by_is_a_fault_in_the_map(half_life: float | None) -> None:
+    """A spike that never says how fast it fades is refused by the map's own rules.
 
-    Neither `None` nor nought says how fast a spike fades, so neither can be
-    evaluated, and the honest answer is to hold the push and say so rather than
-    divide by nothing or quietly drop the arrow.
+    Neither nothing at all nor nought says how fast a spike fades, so neither can
+    be evaluated, and no default is invented anywhere — reject, never repair. The
+    engine still has a net under it for a map that arrived some other way, and the
+    net holds the push at full size rather than dividing by nothing; but such a map
+    never reaches the engine through this product, because `validate` refuses it.
     """
     graph = _map(
         (_claim("top", kind="hypothesis"), _claim("ending", kind="market")),
         (_arrow("top", "ending", strength=2.0, shape="impulse", lag=0.0, half_life=half_life),),
     )
 
+    if half_life is None:
+        assert [one.code for one in validate(graph)] == ["impulse_without_half_life"]
     world = _folded(graph, Do(target="top", value=True, at=DAY_ZERO))
-
     assert world.series["ending"][0] == world.series["ending"][20]
-    assert any("holding at full size" in one for one in world.warnings), world.warnings
 
 
 def test_a_value_fixed_on_a_claim_that_is_not_on_the_map_is_ignored() -> None:

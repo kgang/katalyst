@@ -575,29 +575,58 @@ def test_an_arrow_with_an_end_off_the_map_moves_nothing() -> None:
     )
 
 
-def test_a_feedback_arrow_is_set_aside_like_the_loop_check_sets_it_aside() -> None:
-    """Nothing an edit does travels along a feedback arrow, so nothing on its far side moves.
+@given(st.data())
+@a_few
+def test_a_feedback_arrow_never_carries_a_change(data: st.DataObject) -> None:
+    """A claim reachable only through a feedback arrow is byte-identical in the two worlds.
 
-    A market feeding back on the world is carried as data in this version and
-    never worked through — a later stack unrolls it over time — so a claim
-    reachable only through one provably cannot move. That is what lets the product
-    point at a claim and say *your change could not reach this*, which is the
-    whole promise; counting the arrow would leave nothing on the worked example
-    outside the branch's reach and nothing to point at.
+    A feedback arrow is a market changing the world it is measuring. In this
+    version it is **carried as data and never worked through** — a later stack
+    unrolls it over time — so nothing an edit does can travel along one, and a
+    claim on the far side of one provably cannot move. That is the rule Kent named
+    on 2026-09-17, and it is what lets the product point at a claim and say *your
+    change could not reach this*; on the worked example that claim is OPEC+
+    restraint, whose only incoming arrow is the feedback arrow out of Brent.
 
-    The two rules change together: the day the arithmetic works a feedback arrow
-    through, it belongs back in the affected set.
+    **The day a later stack unrolls feedback arrows, this test fails**, and the one
+    sentence to change is in `spec/multiverse/interventions.md`, where the rule is
+    written down once and every other chapter cites it. It is not a bug in this
+    test; it is this test doing its job.
+
+    The map is a generated one in two pieces, with a feedback arrow added from the
+    edit's subject across to the other piece, so that arrow is the only route
+    between them.
     """
-    graph = _two_piece_map().model_copy(
+    graph = data.draw(graphs(separated=True))
+    subject, pinned = data.draw(separated_pair(graph))
+    joined = graph.model_copy(
         update={
             "links": (
-                *_two_piece_map().links,
-                _example_arrow("ending", "apart", reflexive=True),
+                *graph.links,
+                _example_arrow(subject, pinned, reflexive=True),
             )
         }
     )
+    edit = Do(target=subject, value=data.draw(st.booleans()), at=None)
 
-    assert affected_set(graph, Do(target="third", value=True)) == frozenset({"third", "ending"})
+    base = _world_of(joined)
+    supposed = _world_of(joined, edit)
+
+    assert pinned not in affected_set(joined, edit)
+    assert supposed.beliefs[pinned] == base.beliefs[pinned]
+    assert supposed.series[pinned] == base.series[pinned]
+    assert supposed.states[pinned] == base.states[pinned]
+
+
+def test_the_strike_branch_cannot_reach_opec_on_the_worked_example() -> None:
+    """The same rule on the shipped example: OPEC+ restraint is outside every edit's reach.
+
+    R's only incoming arrow is `B -> R`, the market feeding back on the world, so
+    none of the strike branch's three edits can reach it — and it is the claim the
+    interface can show as untouched with something behind the word.
+    """
+    for edit in HORMUZ_THEN_STRIKE.interventions:
+        assert "R" not in affected_set(HORMUZ, edit)
 
 
 # --- The refusals, one per way an edit can fail to fit ---------------------
@@ -654,7 +683,10 @@ def test_splitting_a_claim_says_it_is_not_built_yet() -> None:
     """`refine` has a shape and no behaviour, and says so rather than half-doing it.
 
     Refusing out loud is the point: a silently dropped edit is exactly the state
-    the user cannot account for.
+    the user cannot account for. The two refusals are different faults and carry
+    different codes — a claim that is not there is `unknown_target`, and a claim
+    that is there but cannot be split yet is `edit_not_applicable`, which means
+    "this edit cannot be folded onto this map as written".
     """
     graph = _two_piece_map()
     finer = (_example_claim("finer-one"), _example_claim("finer-two"))
@@ -663,9 +695,10 @@ def test_splitting_a_claim_says_it_is_not_built_yet() -> None:
     not_on_the_map = apply(graph, _branch(Refine(target="missing", into=finer)))
 
     assert isinstance(on_the_map, list)
-    assert [one.code for one in on_the_map] == ["unknown_target"]
+    assert [one.code for one in on_the_map] == ["edit_not_applicable"]
     assert "not built yet" in on_the_map[0].message
     assert isinstance(not_on_the_map, list)
+    assert [one.code for one in not_on_the_map] == ["unknown_target"]
     assert "splits a claim that is not on this map" in not_on_the_map[0].message
 
 
@@ -723,7 +756,9 @@ def test_adding_a_claim_with_an_arrow_that_does_not_touch_it_is_refused() -> Non
 
     An arrow between two claims that are already on the map is not part of that
     edit: it would move a claim that is nowhere near the one being added, which
-    is how the locality rule quietly stops being true.
+    is how the locality rule quietly stops being true. Both claims it names are on
+    the map, so nothing is missing — the edit simply cannot be folded on as
+    written, which is what `edit_not_applicable` says.
     """
     newcomer = _example_claim("newcomer")
     elsewhere = Insert(
@@ -734,7 +769,7 @@ def test_adding_a_claim_with_an_arrow_that_does_not_touch_it_is_refused() -> Non
     folded = apply(_two_piece_map(), _branch(elsewhere))
 
     assert isinstance(folded, list)
-    assert [one.code for one in folded] == ["unknown_target"]
+    assert [one.code for one in folded] == ["edit_not_applicable"]
     assert folded[0].subject == "newcomer"
     assert "does not name the claim this edit adds" in folded[0].message
 
@@ -829,7 +864,7 @@ def test_a_chain_of_branches_that_loops_is_refused_rather_than_walked() -> None:
     walked = flatten({first.id: first, second.id: second}, first.id)
 
     assert isinstance(walked, list)
-    assert [one.code for one in walked] == ["cycle"]
+    assert [one.code for one in walked] == ["edit_not_applicable"]
     assert walked[0].subject == "branch-one"
     assert "continues from itself" in walked[0].message
     assert "The first branch" in walked[0].message
@@ -843,7 +878,7 @@ def test_a_chain_of_branches_with_one_missing_is_refused() -> None:
     without_anything = flatten({}, "branch-gone")
 
     assert isinstance(without_parent, list)
-    assert [one.code for one in without_parent] == ["unknown_target"]
+    assert [one.code for one in without_parent] == ["edit_not_applicable"]
     assert "The child branch" in without_parent[0].message
     assert isinstance(without_anything, list)
     assert "no branch stored under the name" in without_anything[0].message
@@ -924,6 +959,23 @@ def _world_of(graph: Graph, *edits: Intervention) -> World:
     )
 
 
+def _same_on_the_days_they_share(base: World, branched: World, claim_id: str) -> None:
+    """Check one claim reads the same in two worlds, on every day both of them carry.
+
+    Two worlds of the same map are drawn at the same days. Two worlds a claim was
+    added between can be drawn at slightly different ones, because past the
+    180-point cap every claim's own resolve-by day is kept among the points and a
+    new claim brings a new one. Comparing the days they share is the whole of what
+    can be compared, and it is every day the two would be shown side by side on.
+    """
+    where = {day: index for index, day in enumerate(base.series_days)}
+    for index, day in enumerate(branched.series_days):
+        if day not in where:
+            continue
+        assert branched.series[claim_id][index] == base.series[claim_id][where[day]], day
+        assert branched.states[claim_id][index] == base.states[claim_id][where[day]], day
+
+
 def _has_no_loops(graph: Graph) -> bool:
     """Say whether a map runs round in circles once its feedback arrows are set aside."""
     walk: networkx.DiGraph = networkx.DiGraph()
@@ -975,13 +1027,11 @@ def test_intervention_locality(kind: str, data: st.DataObject) -> None:
             continue
         assert claim_id in base.beliefs, "an edit added a claim outside its own reach"
         assert belief == base.beliefs[claim_id], claim_id
-    # A claim added by an `insert` can lengthen the window, and then the two
-    # series are drawn on different days and cannot be compared point by point.
-    # The number on the tile is read on each claim's own resolve-by day and is
-    # comparable either way, which is what the beliefs above already checked.
-    if branched.days == base.days:
-        assert branched.series[pinned] == base.series[pinned]
-        assert branched.states[pinned] == base.states[pinned]
+    # A claim added by an `insert` brings its own resolve-by day, and past the
+    # 180-point cap that day joins the points every series is drawn at — so the two
+    # worlds can be drawn at slightly different days. They are compared on the days
+    # they share, which is every day either of them would show side by side.
+    _same_on_the_days_they_share(base, branched, pinned)
 
 
 def _in_force(fixed: tuple[object, ...]) -> dict[str, tuple[str, bool]]:

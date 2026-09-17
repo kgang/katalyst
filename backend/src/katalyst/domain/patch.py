@@ -27,8 +27,9 @@ What this file must never do
 - Never change the map it was given. Every model here is frozen and every edit
   builds a new map, so the original is still there for the next branch to use.
 - Never raise because an edit does not fit the map. A claim that is not there, an
-  identifier already in use, an arrow that does not exist: each comes back as a
-  `Violation` with a plain sentence, exactly as a rejected proposal does.
+  identifier already in use, an arrow that does not exist, an edit this version
+  cannot carry out: each comes back as a `Violation` with a plain sentence,
+  exactly as a rejected proposal does.
 - Never half-apply a branch. If one edit cannot be applied, the whole fold comes
   back as violations and no map at all.
 - Never repair. Nothing here drops the arrow that would close a loop, renames an
@@ -207,7 +208,7 @@ def flatten(
         if here in walked:
             return [
                 Violation(
-                    code="cycle",
+                    code="edit_not_applicable",
                     subject=here,
                     message=(
                         f"The branch {_quoted(branches[here].label)} continues from itself, "
@@ -440,9 +441,12 @@ def _add_claim(graph: Graph, edit: Insert) -> Applied | list[Violation]:
 
     Four things are checked, and every one of them that fails is reported, so a
     badly attached claim is not fixed one arrow per attempt. The claim's
-    identifier must be free; each arrow's identifier must be free, including of
-    the other arrows arriving with it; each arrow must join the new claim at one
-    end to a claim already on the map at the other; and the map that results must
+    identifier must be free and each arrow's identifier must be free, including of
+    the other arrows arriving with it — anything else is a `duplicate_id`. Each
+    arrow must reach a claim that is on the map — otherwise `unknown_target` — and
+    must name the new claim at one of its two ends, because an arrow between two
+    claims that are already there is not part of adding this one and would move
+    claims nowhere near it. And the map that results must
     still have no loops once the feedback arrows are set aside. A map that was
     already running round in circles refuses the edit too, because a map like that
     has no order to work its claims through and so no world to build.
@@ -503,7 +507,7 @@ def _add_claim(graph: Graph, edit: Insert) -> Applied | list[Violation]:
         if edit.proposition.id not in (arrow.source, arrow.target):
             faults.append(
                 Violation(
-                    code="unknown_target",
+                    code="edit_not_applicable",
                     subject=edit.proposition.id,
                     message=(
                         f"The arrow {ends} does not name the claim this edit adds, so there "
@@ -585,11 +589,11 @@ def _split_claim(graph: Graph, edit: Refine) -> list[Violation]:
         ]
     return [
         Violation(
-            code="unknown_target",
+            code="edit_not_applicable",
             subject=edit.target,
             message=(
                 f"Splitting the claim {_quoted(found.claim)} into finer claims is not built "
-                "yet, so the finer claims it names cannot be put on this map."
+                "yet, so this edit cannot be folded onto this map."
             ),
         )
     ]
@@ -661,7 +665,7 @@ def _no_such_branch(missing: BranchId, walked: list[Branch]) -> Violation:
     """
     if not walked:
         return Violation(
-            code="unknown_target",
+            code="edit_not_applicable",
             subject=missing,
             message=(
                 "There is no branch stored under the name this world was asked for, so "
@@ -669,7 +673,7 @@ def _no_such_branch(missing: BranchId, walked: list[Branch]) -> Violation:
             ),
         )
     return Violation(
-        code="unknown_target",
+        code="edit_not_applicable",
         subject=missing,
         message=(
             f"The branch {_quoted(walked[-1].label)} continues from a branch that is not "
