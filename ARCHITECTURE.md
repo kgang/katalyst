@@ -128,6 +128,8 @@ Deliberately skipped in v1: snapshot tests of rendered graphs, load tests, cover
 
 ## 8. Repository layout `[planned]`
 
+Python tests live inside `backend/`, next to the project they test, so `pytest` and `uv` run from one root (decided 2026-09-16).
+
 ```
 katalyst/
 ├── AGENTS.md  ASSIGNMENT.md  PRODUCT_REQUIREMENTS.md  ARCHITECTURE.md   enduring context
@@ -136,10 +138,10 @@ katalyst/
 ├── spec/                the spec, organized as a book by idea
 ├── backend/
 │   ├── pyproject.toml  uv.lock
-│   └── src/katalyst/   domain/  engine/  grounding/  api/  settings.py
+│   ├── src/katalyst/   domain/  engine/  grounding/  api/  settings.py
+│   └── tests/          unit/ (domain)  boundary/ (recorded)  api/  cassettes/
 ├── frontend/
 │   └── src/            api/ (generated types)  graph/  features/  components/
-├── tests/              unit/ (domain)  boundary/ (recorded)  api/  cassettes/
 ├── evals/              golden inputs and structural assertions; run by hand
 ├── docker/             Dockerfile.backend  Dockerfile.frontend  nginx.conf
 ├── scripts/            gen-types  record-cassettes  eval
