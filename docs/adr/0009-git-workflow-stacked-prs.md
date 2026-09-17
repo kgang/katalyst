@@ -40,7 +40,7 @@ Rules:
 * **Commits.** Conventional Commits 1.0.0. Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `spec`, `adr`. Scope is the stack slug when useful (`feat(engine): …`). Agent-authored commits end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. `git log --oneline --grep '^adr'` is the decision timeline.
 * **Branches.** `<type>/<NN>-<slug>` where `NN` is the stack number from `PRODUCT_REQUIREMENTS.md` §12 (`docs/00-kickoff`, `feat/02-schema`, `feat/03-engine`, `feat/03-canvas`). `git branch --list '*03*'` lists a stack. Parallel stacks (03a/03b) share `NN` and differ by slug.
 * **Stacks.** One stack per roadmap row. The bottom PR is docs-only (spec + ADR) and merges first; then domain types → pure algorithms + property tests → API surface → UI. Never deeper than 4 PRs. Each PR body has three headings: *What*, *Which invariant(s) this satisfies*, *Deliberately not here*. PR descriptions end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)` when agent-authored.
-* **Stacking tool.** Verify native stacks before stack 01: open two PRs where the second targets the first's branch and confirm the PR UI shows the stack and retargets on merge. If it does not, install `git-spice` (`gs branch create`, `gs stack submit`) and record the switch as a one-line amendment here.
+* **Stacking tool.** Division of labour (owner decision, 2026-09-16): agents keep branches *stack-compatible* — each PR's base is its parent branch, never `main` unless it is the bottom of a stack — and Kent assembles the stack in the GitHub web UI. The `gh` CLI (2.101.0) has no stack commands, so PRs are opened with `gh pr create --base <parent-branch>`. `git-spice` remains the fallback if UI-assembled stacks prove too thin at 3+ PRs deep.
 * **CI.** One workflow, four jobs: `backend`, `frontend`, `types-fresh`, `docker`. No API key in CI (ADR-0008).
 * **Pre-commit.** `ruff`, `ruff-format`, `biome`, `gitleaks`, `end-of-file-fixer`, `check-yaml`, `check-added-large-files`. Type checking runs in CI, not in the hook.
 * **Merging.** Squash-merge each PR; the squash message keeps the conventional prefix. `main` is always green.
@@ -86,4 +86,4 @@ Rules:
 
 * Interview D7 (open-ended garden), D10 (GitHub native stacked PRs), D11 (parallel engine + canvas).
 * `docs/research/04-engineering-structure.md` §7 (git hygiene) — GitHub changelog: https://github.blog/changelog/2026-07-30-stacked-pull-requests-are-now-in-public-preview/ · docs: https://docs.github.com/en/pull-requests/get-started/about-stacked-prs · git-spice: https://abhinav.github.io/git-spice/ · Conventional Commits: https://www.conventionalcommits.org/en/v1.0.0/
-* Verification outcome: *pending — to be filled in during stack 01.*
+* Verification outcome (2026-09-16): `gh` 2.101.0 exposes no stack subcommand or flag; native stacks are assembled in the web UI. Agents chain bases; Kent stacks.
