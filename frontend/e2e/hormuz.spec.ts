@@ -158,6 +158,16 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
 
   // The command palette, by name, and the branch opened through it — so the
   // whole of what follows is reachable without a mouse.
+  // What the claim the branch cannot reach reads BEFORE the branch is opened. The
+  // test compares against this rather than against a number typed in here: the
+  // stored example's numbers are curated and have already changed once, and the
+  // claim being made is "the same number as before", not "this particular number".
+  const opecBefore = await page
+    .locator('.react-flow__node[data-id="R"] .belief-chip__reading')
+    .first()
+    .innerText();
+  expect(opecBefore).toMatch(/^\.\d+$/);
+
   await page.keyboard.press("Meta+k");
   await expect(page.getByText(/Every command, by name/)).toBeVisible();
   await page.keyboard.type("Hormuz opens");
@@ -198,7 +208,7 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // written with, unhedged — the same number it read before the branch.
   const opec = page.locator('.react-flow__node[data-id="R"]');
   await expect(opec).toContainText("OPEC+ announces output restraint.");
-  await expect(opec).toContainText(".24");
+  await expect(opec.locator(".belief-chip__reading").first()).toHaveText(opecBefore);
   await expect(opec).not.toContainText("no engine yet");
   await expect(opec.locator(".tile")).toHaveAttribute("data-diff", "untouched");
 
