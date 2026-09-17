@@ -213,7 +213,9 @@ def expanding_question(
     """
     claims = {one.id: one for one in graph.propositions}
     here = claims[frontier]
-    children = sorted(claims[arrow.target].claim for arrow in graph.links if arrow.source == frontier)
+    children = sorted(
+        claims[arrow.target].claim for arrow in graph.links if arrow.source == frontier
+    )
 
     lines = [
         "Here is the map as it stands. The short name in front of each claim is "
@@ -269,8 +271,9 @@ def _map_as_text(graph: Graph) -> str:
     """
     claims = sorted(graph.propositions, key=lambda one: one.id)
     lines = ["Claims:"]
+    started_at = " (this is what the person expects)"
     lines += [
-        f"  {one.id}  {one.claim}" + (" (this is what the person expects)" if one.kind == "hypothesis" else "")
+        f"  {one.id}  {one.claim}" + (started_at if one.kind == "hypothesis" else "")
         for one in claims
     ]
     arrows = sorted(graph.links, key=lambda one: (one.source, one.target, one.id))

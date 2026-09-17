@@ -50,7 +50,12 @@ from collections.abc import Sequence
 from typing import Any, Protocol
 
 import anthropic
-from anthropic.types import MessageParam, ParsedMessage, TextBlockParam
+from anthropic.types import (
+    MessageParam,
+    ParsedMessage,
+    TextBlockParam,
+    WebSearchTool20260209Param,
+)
 
 from katalyst.engine.pricing import MODEL
 from katalyst.engine.prompt import STANDING_TEXT
@@ -86,7 +91,7 @@ it picks up where it left off. This is how many times we will do that before
 treating the answer as one we never got.
 """
 
-SEARCH_TOOL: dict[str, Any] = {
+SEARCH_TOOL: WebSearchTool20260209Param = {
     "type": "web_search_20260209",
     "name": "web_search",
     "max_uses": SEARCHES_INSIDE_ONE_CALL,

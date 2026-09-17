@@ -299,7 +299,9 @@ class LinkProposal(BaseModel):
         description="Says this answer is an arrow between two claims already on the map."
     )
     source: str = Field(description="The cause: one of the short names this call's map listed.")
-    target: str = Field(description="The effect: another of the short names this call's map listed.")
+    target: str = Field(
+        description="The effect: another of the short names this call's map listed."
+    )
     link: LinkDraft = Field(description="The arrow from that cause to that effect.")
 
 

@@ -63,9 +63,7 @@ here: our calls come a few seconds apart, so the short cache never goes cold and
 the longer one would only cost more to write.
 """
 
-DOLLARS_PER_MILLION_CACHE_READ_TOKENS = (
-    DOLLARS_PER_MILLION_INPUT_TOKENS * CACHE_READ_SHARE_OF_INPUT
-)
+DOLLARS_PER_MILLION_CACHE_READ_TOKENS = DOLLARS_PER_MILLION_INPUT_TOKENS * CACHE_READ_SHARE_OF_INPUT
 """What a million tokens served out of the cache cost."""
 
 DOLLARS_PER_MILLION_CACHE_WRITE_TOKENS = (
