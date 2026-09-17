@@ -199,6 +199,8 @@ The fourteen rules above describe a **map**. An **edit** can fail for reasons th
 
 `edit_not_applicable` is the one that covers more than one case, and it is deliberately not a bin for everything: it means *the edit is well-formed and names things that exist, and still cannot be applied*. Keeping it separate is what lets `unknown_target` go on meaning exactly what it says.
 
+**A fifth refusal is not about an edit at all.** `worlds_not_comparable` is what `diff` answers when it is handed two worlds that were not built from the same base map, seed and loop sizes — each world is perfectly good on its own; what cannot be done is setting them side by side, because a difference across two seeds is the user's change plus a wash of sampling noise ([`../multiverse/diff.md`](../multiverse/diff.md) B1). It has its own code for the same reason `edit_not_applicable` does: a code must mean what it says. The three routes cannot produce it — they build both worlds of a comparison themselves — so it guards callers inside our own code. Nineteen codes in all: fourteen faults in a map, four refused edits, one refused comparison.
+
 **`apply` stops at the first edit that does not fit**, and reports every violation *that edit* produced. That is different from `validate`, which walks every rule over the whole map. The reason is ordering: a branch's edits build on each other, so an edit after the failure may name a claim or arrow the failed edit would have added, and reporting its faults would blame the user for an artefact of the stop. One broken edit, all of its reasons.
 
 ### Reject; never repair

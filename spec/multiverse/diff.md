@@ -13,7 +13,9 @@ This chapter owns the four per-claim states, how a change is decided, how the ch
 **A difference is read off two worlds, never off two maps.** `diff` takes two finished worlds — each one a base map with a branch folded onto it and the likelihoods worked through — and compares them claim by claim. Both must carry the same `base_id`, the same `seed`, the same `versions` count and the same `worlds` count. Anything else is refused, because the comparison below is only meaningful when the two worlds were built from the same raw material (see B1).
 
 ```python
-def diff(world_a: World, world_b: World) -> Diff | list[Violation]
+def diff(world_a: World, world_b: World, *, edit_in_words: str) -> Diff | list[Violation]
+# edit_in_words fills the summary's first slot. A world carries its branch's identifier, not
+# its label, and that slot is never written fresh — so the caller hands the words in (B6).
 ```
 
 `World`, `Belief`, `PropositionId`, `LinkId` and `BranchId` are defined in [`propagation.md`](propagation.md), [`../graph/belief.md`](../graph/belief.md) and [`../graph/proposition.md`](../graph/proposition.md). `Violation` — a stable code, the identifier of the thing at fault, and one plain sentence for the reader — is defined in [`../graph/validity.md`](../graph/validity.md). Every model below is frozen: once built it cannot be altered, so a stored difference is a record rather than a working buffer.
@@ -120,7 +122,7 @@ Worked on the Strait of Hormuz map and its strike branch. The claims, quoted fro
 
 `diff` compares the world of branch A with the world of branch B. Both are built by folding a branch onto the *same* untouched base map and working the likelihoods through with the *same* seed. The versions stream — the one that picks which 2 000 versions of the map to try — never depends on the branch, so version 7 of world A and version 7 of world B were built from the same underlying numbers and differ only by the edit. That is what makes the paired comparison in B3 possible.
 
-Two worlds that disagree on `base_id`, `seed`, `versions` or `worlds` are refused with a violation naming the mismatch. There is no repair: a difference computed across two seeds is the user's change plus a wash of sampling noise, and a number nobody can trace to an edit is exactly the state this product refuses to show.
+Two worlds that disagree on `base_id`, `seed`, `versions` or `worlds` are refused with a violation naming the mismatch, under its own code, `worlds_not_comparable` — nothing here is anybody's edit, so it borrows none of the four codes a refused edit carries. There is no repair: a difference computed across two seeds is the user's change plus a wash of sampling noise, and a number nobody can trace to an edit is exactly the state this product refuses to show.
 
 For the Hormuz walkthrough, world A is the base world (the empty branch) and world B is `br_hormuz_then_strike`, three edits in order: suppose H true on the 1st, insert S with its three arrows, suppose S true on the 2nd.
 
@@ -316,7 +318,7 @@ This chapter uses the local numbers `INV-multiverse.18` through `.30`. `.1`–`.
 
 ## Open questions
 
-Raised 2026-09-17. The first four were settled the same day and their answers are recorded in place below. The last two stay open and name who owns them.
+Raised 2026-09-17. The first four were settled the same day and their answers are recorded in place below. The next two stay open and name who owns them, and the seventh was raised by the engine itself.
 
 1. **Which subject the path starts from, when a branch holds several edits.** The ranking was defined from "the edit's subject", and the showcase branch has three edits. The draft proposed the nearest subject.
    **Decided 2026-09-17:** the question disappears, because "shortest" and "which subject" both leave the rule. The rank reads the **best-backed route** — over every path from *any* differing edit's subject to the terminal, the one whose weakest arrow is strongest. See B4.
@@ -333,3 +335,5 @@ Raised 2026-09-17. The first four were settled the same day and their answers ar
 5. **Whether the rail should ever show an unshifted terminal.** Today a terminal that failed either half of the test is absent from `rows`, so a reader cannot tell "it did not move" from "it is not on this map". A greyed row saying *no change* may be better than silence; that is an interface question and `spec/workbench/` owns it.
 
 6. **Diffing more than two worlds.** The interface shows up to four branches at once, and `diff` takes exactly two worlds. Three pairwise diffs against a common base world is the obvious reading and nothing here forbids it, but nothing names it either, and the delta rail's ranking across three lists is undesigned. `spec/workbench/` owns how four branches are compared on screen.
+
+7. **An observation rarely puts a row on the rail at eight worlds per version.** *Raised 2026-09-17, when the engine first ran it; owner: stack 04, where **This happened** first meets real numbers.* Under a `do` the dice cancel out of the paired difference, because both worlds roll the same dice. Under an `observe` they do not: *which* of a version's eight worlds survive the observation is itself a coin flip, so the version-by-version difference carries that noise and the share of versions moving the same way runs lower. Measured on Hormuz: learning that B happened moves M1 by `+.063` and M2 by `+.107`, and both come out at **89%** — a hair under the 90% bar — so both read `unchanged`, the rail is empty, and the summary is the second sentence. That is the settled rule doing what it says, and it is also a button that appears to do nothing. Two candidate repairs, neither taken: run more worlds under each version while an observation is in force (the noise falls as the survivors grow), or read the direction off each version's survival-weighted estimate rather than off its raw worlds. A related fact belongs beside it: a claim with **no causes** moves under an observation only through the version weights — observing B moves H by `−0.0002` — because within one version such a claim's answer is its prior in every world.
