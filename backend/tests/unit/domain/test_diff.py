@@ -32,6 +32,7 @@ budget on the worked example.
 import importlib
 import re
 from datetime import date, timedelta
+from decimal import Decimal
 from itertools import pairwise
 
 import networkx
@@ -74,6 +75,7 @@ from katalyst.domain.diff import (
     _agreement_on,
     _counting_for,
     _read_on,
+    _two_figures,
 )
 from katalyst.domain.propagation import Numbers, Versions
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
@@ -107,9 +109,22 @@ DAY_ZERO = date(2026, 1, 1)
 SEED = 20261001
 """The seed the worked example's demo uses, so a test and a screenshot agree."""
 
+A_LIKELIHOOD = r"[<>]?\.\d+"
+"""How this product writes a likelihood, as a pattern: a point, then digits.
+
+Either of the two guard words, `<.01` and `>.99`, or a plain decimal with the
+nought before the point dropped. Never an exponent, never a digit before the
+point. The sentence pattern below is built out of this one so that the two cannot
+drift, and `test_a_likelihood_is_written_as_a_plain_decimal` checks it on its own
+over every likelihood there is.
+"""
+
+WRITTEN_LIKELIHOOD = re.compile(f"^{A_LIKELIHOOD}$")
+"""The same pattern, anchored, for checking one written likelihood by itself."""
+
 FIRST_SENTENCE = re.compile(
-    r'^".+" moves .+ from [<>]?\.\d+ to [<>]?\.\d+ by \d{4}-\d{2}-\d{2} '
-    r"and leaves \d+ claims? untouched\.$"
+    rf'^".+" moves .+ from {A_LIKELIHOOD} to {A_LIKELIHOOD} by '
+    r"\d{4}-\d{2}-\d{2} and leaves \d+ claims? untouched\.$"
 )
 """The sentence a difference uses when something at an ending moved."""
 
@@ -883,6 +898,88 @@ def test_diff_states_respect_locality(data: st.DataObject) -> None:
             continue
         assert one.state == "unchanged", claim_id
         assert one.delta == 0.0, claim_id
+
+
+# --- How a likelihood is written ------------------------------------------
+
+
+WRITTEN_BY_THE_BROWSER: tuple[tuple[float, str], ...] = (
+    (0.0, "<.01"),
+    (1.0, ">.99"),
+    (0.995, ">.99"),
+    (0.0999, ".10"),
+    (1e-09, ".0000000010"),
+    (0.35, ".35"),
+    (0.06, ".060"),
+    (0.01, ".010"),
+    (0.00012, ".00012"),
+    (0.0035, ".0035"),
+)
+"""What the browser writes for each of these, and therefore what the engine must write.
+
+The right-hand column is not a number anybody decided here: it is the output of
+`toTwoFigures` in `frontend/src/components/BeliefChip.tsx`, run over each input on
+the left. One rule, written twice, and this table is where the two are held
+against each other. The awkward ones are all here on purpose — `.995`, which
+rounds up into the guard; `.0999`, whose rounding carries into the next place; a
+billionth, which is where asking Python for two significant figures used to give
+`1.0e-09` and put an exponent in a sentence; and nothing at all and one, the two
+values the guards exist for.
+"""
+
+
+@given(st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False))
+@settings(max_examples=500, deadline=None)
+def test_a_likelihood_is_written_as_a_plain_decimal(likelihood: float) -> None:
+    """However small it is, a likelihood is written as a decimal a person can read aloud.
+
+    Three things at once, for every likelihood there is. It never carries an
+    exponent — *"moves this claim from `>.99` to `1.0e-09`"* is not a sentence
+    anybody can read aloud, and it is what this function used to produce below a
+    ten thousandth. It always matches the shape the summary sentence's own pattern
+    expects, which is the same pattern this checks against, so the two cannot
+    drift. And, where it is not one of the two guards, it reads back within half a
+    unit of its second figure — which is what *two significant figures* means, and
+    is worked out from the answer rather than typed in.
+
+    The two guards are checked by what they claim. `<.01` is written for nothing at
+    all and for nothing else, because two figures keep two digits however small the
+    number gets. `>.99` is written only for a number past the very figure it
+    prints.
+    """
+    written = _two_figures(likelihood)
+
+    assert "e" not in written.lower(), written
+    assert WRITTEN_LIKELIHOOD.match(written), written
+
+    if written == "<.01":
+        assert likelihood <= 0.0, "nothing at all is the only likelihood written as less than one"
+    elif written == ">.99":
+        assert likelihood > 0.99, "only a number past the figure the guard prints is written as it"
+    else:
+        # Half a unit of the second figure: the most that rounding to two of them
+        # can move a number. Both sides are read as exact decimals so that the
+        # comparison needs no slack of its own.
+        half_the_second_figure = Decimal(1).scaleb(Decimal(written).adjusted() - 1) / 2
+        assert abs(Decimal(repr(likelihood)) - Decimal(written)) <= half_the_second_figure, written
+
+
+def test_the_engine_writes_a_likelihood_exactly_as_the_browser_does() -> None:
+    """One rule written twice, held against itself on the cases that break it.
+
+    The engine writes the summary sentence and the browser writes the chip, and a
+    reader looking at one screen must never see the same number written two ways.
+    So this pins the engine's answer to the browser's on every case where a
+    careless implementation of *two significant figures* parts company from a
+    careful one: rounding that carries into the guard, rounding that carries into
+    the next place, a number small enough to tempt a language into scientific
+    notation, and the two ends of the scale.
+
+    If this fails, one of the two was changed alone. Both move together or neither
+    does — `_two_figures` says which browser function is its twin.
+    """
+    for likelihood, expected in WRITTEN_BY_THE_BROWSER:
+        assert _two_figures(likelihood) == expected, likelihood
 
 
 # --- The one sentence beside the list --------------------------------------

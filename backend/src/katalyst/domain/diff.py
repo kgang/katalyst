@@ -54,6 +54,7 @@ What this file must never do
 import math
 from collections.abc import Mapping, Sequence
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from heapq import heappop, heappush
 from types import MappingProxyType
 from typing import Literal
@@ -1081,22 +1082,63 @@ def _two_figures(likelihood: float) -> str:
     """Write a likelihood the way this product writes every likelihood.
 
     Two significant figures, with the nought before the point dropped, so `.50`
-    and `.42` and `.060`. A number that rounds to nothing or to everything is
-    written as `<.01` or `>.99` instead, because a product that prints `1.0`
-    claims a certainty nobody asserted.
+    and `.42` and `.060` — both figures always printed, because dropping a
+    trailing nought would claim less precision than we have.
+
+    **Never a certainty.** Rounding to two figures turns `.995` into `1.0` and
+    nothing at all into `.0`, and both are claims nobody on this map is entitled
+    to make: one says the thing cannot fail, the other that it cannot happen. So
+    those print as `>.99` and `<.01`. The upper guard catches everything from
+    `.995` up, including 1 itself. The lower one is rarer than it looks: two
+    figures keeps two digits however small the number gets, so `.0035` prints
+    `.0035` and a billionth prints `.0000000010`, and the only value that prints
+    as `<.01` is nothing at all.
+
+    **Never scientific notation.** A sentence that reads *"moves this claim from
+    `>.99` to `1.0e-09`"* is not a sentence anybody can read aloud, and asking
+    Python for two significant figures directly produces exactly that below a ten
+    thousandth. So the rounding is done on the number's own decimal digits: the
+    shortest decimal that reads back as this exact number, its point shifted by
+    counting rather than by multiplying, rounded half-up, and written out with as
+    many noughts after the point as it takes. That is also what stops `.995`
+    printing `.99` — a computer stores it as `0.99499999999999999556`, so asking
+    for two figures directly gives a number under the guard, and the sentence
+    would print the one thing this rule forbids.
+
+    **This rule is written twice and the two must move together.** The browser
+    writes it as `toTwoFigures` in `frontend/src/components/BeliefChip.tsx`, and
+    this function says the same thing for every input it can be given, carry
+    cases included. Change one and change the other in the same pull request, or
+    the same number reads two ways on one screen. Where the lower guard should
+    *begin* — whether a likelihood under `.01` ought to print `<.01` rather than
+    its own two figures — is a question for Kent and is deliberately not settled
+    here; whatever he says lands in both places at once.
 
     Args:
         likelihood: The number, between 0 and 1.
 
     Returns:
-        The number as it is written on screen.
+        The number as it is written on screen: `.35`, or `<.01`, or `>.99`.
     """
-    written = f"{likelihood:#.2g}"
-    if float(written) >= 1.0:
-        return ">.99"
-    if float(written) <= 0.0:
+    if not math.isfinite(likelihood) or likelihood <= 0.0:
         return "<.01"
-    return written.lstrip("0")
+    if likelihood >= 1.0:
+        return ">.99"
+    # The shortest decimal that reads back as this exact number, and where its
+    # point sits: `.995` becomes the digits 995 with its leading digit at the
+    # first place after the point.
+    shortest = Decimal(repr(likelihood))
+    place = shortest.adjusted()
+    # The two figures, as a whole number from 10 to 99. Shifting the point by
+    # counting places rather than by multiplying is what keeps `.995` at exactly
+    # 99.5 rather than a hair under it, so it rounds up the way a reader would.
+    figures = int(shortest.scaleb(1 - place).to_integral_value(rounding=ROUND_HALF_UP))
+    if figures >= 100:
+        # Rounding up carried into the next place: `.0999` is `.10`, not `.100`.
+        figures, place = 10, place + 1
+    if place >= 0:
+        return ">.99"
+    return f".{'0' * (-place - 1)}{figures}"
 
 
 def _without_full_stop(claim: str) -> str:
