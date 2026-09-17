@@ -45,6 +45,7 @@ ViolationCode = Literal[
     "documented_without_source",
     "cycle",
     "reflexive_without_lag",
+    "half_life_without_impulse",
     "belief_out_of_range",
     "no_terminal",
     "no_hypothesis",
@@ -53,7 +54,7 @@ ViolationCode = Literal[
     "market_without_payoff",
     "not_tradeable_without_reason",
 ]
-"""The twelve things that can be wrong with a map.
+"""The thirteen things that can be wrong with a map.
 
 Stable strings: the browser switches on them, tests assert on them, and they are
 never renamed without a migration.
@@ -66,6 +67,9 @@ An arrow whose provenance is one of these has to cite at least one source. The
 other four — `asserted`, `argued`, `user` and `simulated` — claim no outside
 evidence, so they are asked for none.
 """
+
+FADING_SHAPE = "impulse"
+"""The one shape of push that falls away on its own, and so the one that can have a half-life."""
 
 TERMINAL_KINDS: tuple[str, ...] = ("market", "not_tradeable")
 """The two ways a chain is allowed to end: naming an instrument, or naming why there is none."""
@@ -86,7 +90,9 @@ class Violation(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    code: ViolationCode = Field(description="Which rule was broken. One of twelve stable strings.")
+    code: ViolationCode = Field(
+        description="Which rule was broken. One of thirteen stable strings."
+    )
     subject: str = Field(
         description=(
             "The identifier of the thing at fault: a proposition id, a link id, or the graph's own "
@@ -136,6 +142,7 @@ def validate(graph: Graph) -> list[Violation]:
         _arrows_join_claims_on_this_map(graph, claims),
         _no_loops_once_feedback_is_set_aside(graph, claims),
         _feedback_arrows_take_time(graph, claims),
+        _half_lives_belong_to_pushes_that_fade(graph, claims),
         _likelihoods_sit_inside_their_own_range(graph),
     )
 
@@ -627,7 +634,49 @@ def _feedback_arrows_take_time(
     ]
 
 
-# --- Rule 11 — every likelihood sits inside its own range ------------------
+# --- Rule 11 — a half-life belongs only to a push that fades ---------------
+
+
+def _half_lives_belong_to_pushes_that_fade(
+    graph: Graph, claims: dict[PropositionId, Proposition]
+) -> list[Violation]:
+    """Find arrows carrying a half-life whose push never fades.
+
+    A half-life is how many days a spike takes to fall to half its size, so it says
+    something only about an `impulse`. A `step` switches on and holds, and a `ramp`
+    climbs and then holds; neither has anything to fade. A half-life on one of them
+    is either a mistake about the shape or a number that will be ignored forever,
+    and a field quietly ignored is a state the user cannot trace — so it comes back
+    as a fault rather than being dropped.
+
+    Args:
+        graph: The map to read.
+        claims: Every claim on the map, by identifier, for naming the two ends.
+
+    Returns:
+        One violation per arrow whose push does not fade but carries a half-life.
+    """
+    # The case the other way round — an `impulse` with no half-life — is left
+    # legal on purpose. It wants a sensible default rather than a refusal, and
+    # choosing that default belongs to the code that works the numbers through,
+    # not to this rule. It is the remaining half of open question 4 in
+    # spec/graph/link.md.
+    return [
+        Violation(
+            code="half_life_without_impulse",
+            subject=link.id,
+            message=(
+                f"The arrow from {_name_of(claims, link.source)} to "
+                f"{_name_of(claims, link.target)} gives a half-life, but only a spike fades; "
+                "a step or a ramp has nothing to fade."
+            ),
+        )
+        for link in graph.links
+        if link.half_life is not None and link.shape != FADING_SHAPE
+    ]
+
+
+# --- Rule 12 — every likelihood sits inside its own range ------------------
 
 
 def _out_of_range(belief: Belief) -> bool:
