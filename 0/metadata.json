@@ -3,7 +3,7 @@
   "checkpoint_id": "01M2R18258J87M0D17DE39E4AF",
   "session_id": "ef0fe818-4a51-417f-a20d-5479dc442258",
   "strategy": "manual-commit",
-  "created_at": "2026-09-17T15:54:58.607777Z",
+  "created_at": "2026-09-17T15:56:29.156717Z",
   "branch": "feat/04a-growth",
   "checkpoints_count": 5,
   "save_step_count": 1,
@@ -11,15 +11,15 @@
   "agent": "Claude Code",
   "model": "claude-fable-5-1",
   "turn_id": "e2f59e84b660",
-  "checkpoint_transcript_start": 1017,
-  "transcript_lines_at_start": 1017,
-  "compact_transcript_start": 160,
+  "checkpoint_transcript_start": 1197,
+  "transcript_lines_at_start": 1197,
+  "compact_transcript_start": 191,
   "token_usage": {
-    "input_tokens": 58,
-    "cache_creation_tokens": 42246,
-    "cache_read_tokens": 10561668,
-    "output_tokens": 23030,
-    "api_call_count": 24
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
   },
   "skill_events_version": 1,
   "skill_events": [
