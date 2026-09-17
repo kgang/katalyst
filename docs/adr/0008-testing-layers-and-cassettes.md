@@ -1,5 +1,5 @@
 ---
-# ADR-0008: Four test layers; the LLM boundary is tested with committed cassettes and CI needs no API key
+# ADR-0008: Four test layers (five since the 2026-09-17 amendment); the LLM boundary is tested with committed cassettes and CI needs no API key
 status: accepted
 date: 2026-09-16
 decision-makers: Kent Gang
@@ -10,7 +10,7 @@ superseded-by: none
 spec-impact: spec/generation/ (Testing), spec/graph/ and spec/multiverse/ (Invariants → test names)
 ---
 
-# ADR-0008: Four test layers; the LLM boundary is tested with committed cassettes and CI needs no API key
+# ADR-0008: Four test layers (five since the 2026-09-17 amendment); the LLM boundary is tested with committed cassettes and CI needs no API key
 
 ## Context and Problem Statement
 
@@ -51,6 +51,8 @@ Chosen option: "A", because it puts the weight where the claims are (the domain)
 **Layer 2 — model boundary (`backend/tests/boundary/`).** `pytest-recording` (a wrapper over vcrpy) saves each real HTTP exchange to a cassette file and replays it from then on. Tests carry `@pytest.mark.vcr`; the build runs `record_mode=none`, so an unrecorded call fails rather than dialling out; `filter_headers=["x-api-key", "authorization"]` strips credentials before anything is written; cassettes are committed under `backend/tests/cassettes/`. `scripts/record-cassettes.sh` re-records with `--record-mode=rewrite` against a real key. One cassette deliberately holds a proposal that would close a loop, and the test asserts the validator rejects it (`test_expand_rejects_cycle`) — fitting the schema is not the same as being a valid graph (ADR-0003, ADR-0006).
 
 **Layer 3 — evals (`evals/`).** `evals/cases/*.yaml` hold the four `ASSIGNMENT.md` examples. `make eval` runs live against `claude-opus-5` and asserts structure, never wording: no loops; at least one `market` or `not_tradeable` terminal (INV-9); `rationale` and `provenance` on every link; a source on every link marked `documented` (INV-2); resolution criteria on every proposition (INV-1); Verify cases return a graded path or an explicit `no_path` verdict (FR-7); non-zero `cache_read_input_tokens` on a run's second call, proving the prompt cache is hit. Results go to `evals/runs/<date>.tsv`. Not in the build.
+
+**Layer 5 — worked examples (`backend/tests/unit/fixtures/`, added by amendment 2026-09-17).** The stored example maps — today the Strait of Hormuz map and its strike branch — are tested as data: each validates clean, exercises every shape the rules layer defines, and survives the trip to the browser. They are example tests, not property tests, and they are the golden inputs the engine and canvas stacks build on.
 
 **Layer 4 — frontend.** vitest with Testing Library for the layout-pinning logic, the diff-state reducer, and the intervention-panel reducer. One end-to-end browser test (ADR-0007 Confirmation).
 
@@ -96,3 +98,7 @@ Chosen option: "A", because it puts the weight where the claims are (the domain)
 * Interview D5(ii) (traceability), D9 (decision-gated cadence — invariants are named before code).
 * `docs/research/04-engineering-structure.md` §4 (testing layers) and §6 (invariants phrased as claims true for every input, each with a named generation strategy).
 * pytest-recording: https://github.com/kiwicom/pytest-recording · hypothesis: https://hypothesis.readthedocs.io/
+
+## Amendment (2026-09-17)
+
+Stack 02 added a fifth kind of test that the four layers above did not name: the worked-example tests under `backend/tests/unit/fixtures/`, which check the stored example maps as data. Layer 5 above describes it. The four original layers, the cassette rules, and the keyless build are unchanged. Amended in place at Kent's request rather than superseded, because nothing in the decision changed — one layer was missing from the list.

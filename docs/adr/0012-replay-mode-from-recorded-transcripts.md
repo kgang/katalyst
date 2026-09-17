@@ -1,6 +1,6 @@
 ---
 # ADR-0012: Replay mode — a reviewer with no API key walks the hero flow from recorded generation transcripts
-status: proposed
+status: accepted
 date: 2026-09-17
 decision-makers: Kent Gang
 consulted: ADR-0006 (model boundary), ADR-0008 (testing layers and cassettes); the roadmap for stack 04 (generation), where replay would be built
@@ -96,6 +96,7 @@ If accepted, the rules are:
 ## More Information
 
 * Kent's answer, 2026-09-16: yes to replay mode in principle; recorded as `proposed`, and nothing is built against it until he accepts (AGENTS.md; anti-pattern 13).
+* Accepted by Kent on 2026-09-17. Built in stack 04.
 * `plans/roadmap-03-to-06.md`, stack 04 ("Propose replay mode here") and the Definition of done: *"With no API key, replay mode still demonstrates the full flow"*.
 * FR-13 (replay from base graph, branch and seed; transcripts stored) · INV-13 (keyless continuous integration) · NFR-2 (determinism) · NFR-8 (no key in a committed file) · FR-3 and UX-13 (the launchpad's four cards) · FR-5 and UX-8 (streaming is the loading state).
 * ADR-0006 (one proposal per call over server-sent events; the receipt; the transcript) and ADR-0008 (cassettes, and the re-recording rule this decision copies).
