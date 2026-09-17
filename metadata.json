@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2QNJ7ZT9SC7WD1B08XC6HH5",
+  "strategy": "manual-commit",
+  "branch": "spec/04a-streaming-growth",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "spec/workbench/streaming-growth.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 164337,
+    "cache_read_tokens": 3021738,
+    "output_tokens": 35994,
+    "api_call_count": 24
+  }
+}
