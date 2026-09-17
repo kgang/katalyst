@@ -17,8 +17,8 @@ The goal of the project is to create a functional protoype of the concept behind
 | `docs/research/` | Four independent research reports (2026-09-16) that fed the PRD; inputs, not decisions |
 | `plans/` | **Local only, git-ignored.** Agent-to-agent handoffs, working notes, orchestration. Start at `plans/README.md`. Nothing here is a source of truth — anything durable moves into a root document, a decision record, or the spec |
 | `docs/initial-brainstorming.md` | Kent's raw notes; the origin of trigger/sustain links and refinement |
-| `backend/` | The Python server. `domain/` is the pure core — the rules of the map, no network, no model, no clock — and it is property-tested against maps nobody wrote by hand |
-| `frontend/` | The browser app. `src/api/schema.ts` is generated from the server's own description of itself and is never edited by hand |
+| `backend/` | The Python server. `domain/` is the pure core — the rules of the map and the arithmetic that works a change through it, no network, no model, no clock — and it is property-tested against maps nobody wrote by hand. `engine/` builds a world from a map, a branch and a seed; `api/` serves it |
+| `frontend/` | The browser app: the canvas that draws a map, the wires, the Inspector, the two-world overlay and the keyboard. It reads the stored example today and is not joined to the engine yet. `src/api/schema.ts` is generated from the server's own description of itself and is never edited by hand; `e2e/` holds the one end-to-end test |
 
 ## Working agreements (interview, 2026-09-16)
 

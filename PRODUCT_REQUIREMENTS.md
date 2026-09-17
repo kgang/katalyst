@@ -245,18 +245,21 @@ Each stack's bottom PR is docs-only (spec + ADR) and merges first. Branch names 
 | 00 | `docs/00-kickoff` | This document, `ARCHITECTURE.md`, decision records 0001–0011, the `spec/` book skeleton (landing page per idea) and vocabulary, research | — | **merged** — #1 |
 | 01 | `docs/01-*`, `feat/01-*`, `chore/01-*` | Backend + frontend hello-world, Docker (dev + prod), CI, pre-commit, type generation | ADR-0002 accepted | **merged** — #2, #3, #6, #11 |
 | 02 | `spec/02-*`, `feat/02-*` | Pydantic domain models → OpenAPI → TS types; the Hormuz fixture graph (base + "Iran struck" branch) | ADR-0003/0004/0005 accepted | **merged** — #5, #7, #10, #12 |
-| 03a | `spec/03-*`, `feat/03-engine-*` | Propagation, `do/observe/insert/retune`, patch algebra, locality, sensitivity sweep — pure, property-tested | 02 | **next** |
-| 03b | `spec/03-*`, `feat/03-canvas-*` | React Flow canvas: rich tiles, typed ports/wires, ELK layout, streaming from fixture, ghost diff, Inspector | 02, ADR-0007 accepted | **next** |
-| 04 | `*/04-*` | LLM engine: structured outputs, SSE streaming, web-search grounding, cassettes, evals on the four examples | 03a, 03b, ADR-0006/0008 accepted | not started |
-| 05 | `*/05-*` | Tail strip, invalidation derivation, thesis card, Polymarket + FRED adapters, strategy export | 04, ADR-0010 accepted | not started |
+| 03a | `spec/03a-propagation-and-diff`, `feat/03a-apply`, `feat/03a-propagate`, `feat/03a-diff-and-routes` | Propagation, `do/observe/insert/retune`, patch algebra, locality, the diff, the sensitivity sweep, and the three world routes — pure, property-tested | 02 | **merged** — #18, #19, #24, #25 |
+| 03b | `spec/03b-workbench`, `feat/03b-canvas`, `feat/03b-wires`, `feat/03b-diff-and-keys` | React Flow canvas: rich tiles, typed ports and wires, ELK layout, the stored example drawn whole, two worlds in one set of coordinates, the Inspector, the six edits, the keyboard | 02, ADR-0007 accepted | **merged** — #21, #22, #26, #27 |
+| 04a | `*/04a-*` | The browser side: join the canvas to the engine — switch `ApiWorldSource` on, so every number that reads as an absence today fills in — then the map drawing itself claim by claim from a stream | 03a, 03b | **next** |
+| 04b | `*/04b-*` | The server side: the model pipeline (structured outputs, one proposal per call), the event stream, replay mode from recorded transcripts, web-search grounding, recorded model answers, evals on the four examples | 03a, ADR-0006/0008/0012 accepted | **next** |
+| 05 | `*/05-*` | Tail strip, invalidation derivation, thesis card, Polymarket + FRED adapters, strategy export | 04a, 04b, ADR-0010 accepted | not started |
 | 06 | `*/06-*` | `refine`, Monte Carlo distribution, probes, value-of-information ranking | 05 | not started |
 
-Stacks 03a and 03b run in parallel (D11).
+Stacks 03a and 03b ran in parallel on a shared schema, and both are merged (D11). **Stack 04 splits the same way, and for a plain reason: decision record 0009 caps a stack at four pull requests — "never deeper than four"** — and joining the canvas to the engine, streaming the map as it grows, the model pipeline, the event stream, replay and the evals do not fit in four. So 04a is the browser and 04b is the server, they share the event-stream shape the way 03a and 03b shared the schema, and neither waits on the other to start.
 
-Status as of 2026-09-17; the numbers are pull requests on `kgang/katalyst`. A stack's branches carry its number, so one stack is several branches: stack 02 was `spec/02-graph-and-multiverse`, `feat/02-domain-models`, `feat/02-validity` and `feat/02-hormuz-fixture`. Two numbers need a word:
+Status as of 2026-09-17; the numbers are pull requests on `kgang/katalyst`. A stack's branches carry its number, so one stack is several branches: stack 02 was `spec/02-graph-and-multiverse`, `feat/02-domain-models`, `feat/02-validity` and `feat/02-hormuz-fixture`, and each half of stack 03 carries its own letter. Four numbers need a word:
 
 * **#11** — Docker (development and packaged), continuous integration, pre-commit and the Makefile — sat at the top of stack 01 and was merged into its parent branch rather than into `main`, so its work reached `main` inside **#6**'s squashed commit. `git log` on `main` shows no #11, and that is why.
-* **#9** carried decision record 0012 on the branch `adr/02-replay-mode`. Accepted 2026-09-17; built in stack 04 (§13).
+* **#9** carried decision record 0012 on the branch `adr/02-replay-mode`. Accepted 2026-09-17; built in stack 04b (§13).
+* **#17** carried decision record 0014 on the branch `adr/03-engine-rules` — how a supposition ends, and what the range on a computed number means. It is the gate stack 03a was written against rather than a member of either half, which is why it is in neither row above.
+* **#20 and #23 do not exist.** Neither number resolves on GitHub and nothing was merged under either. Pull requests and issues share one counter, so a gap in the numbering is not a missing pull request.
 
 ---
 

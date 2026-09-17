@@ -21,13 +21,15 @@ Workbench · Tile · Port · Wire · Inspector · Delta rail · World-state stri
 
 | Chapter | Covers | Written in |
 |---------|--------|-----------|
-| [`tiles-ports-wires.md`](tiles-ports-wires.md) | Tile anatomy, port types, wire encodings, the chip at a wire's midpoint | stack 03b — written |
-| [`layout-and-zoom.md`](layout-and-zoom.md) | Automatic layered layout, stable incremental re-layout, level of detail by zoom | stack 03b — written |
-| [`diff-view.md`](diff-view.md) | Ghost overlay of two worlds in a shared layout, the delta rail, A ⇄ A′ toggle | stack 03b — written |
-| [`inspector.md`](inspector.md) | The persistent side panel: rationale, sources, base rate, three beliefs, "falsified if" | stack 03b — written |
-| [`color-motion-type.md`](color-motion-type.md) | The color law, the three budgeted animations, typography | stack 03b — written |
-| [`keyboard-and-access.md`](keyboard-and-access.md) | Keyboard map, outline view for screen readers, reduced motion, contrast | stack 03b — written |
-| `streaming-growth.md` | How the map draws itself during generation | stack 04 |
+| [`tiles-ports-wires.md`](tiles-ports-wires.md) | Tile anatomy, port types, wire encodings, the chip at a wire's midpoint | stack 03b — written, canvas built |
+| [`layout-and-zoom.md`](layout-and-zoom.md) | Automatic layered layout, stable incremental re-layout, level of detail by zoom | stack 03b — written, canvas built |
+| [`diff-view.md`](diff-view.md) | Ghost overlay of two worlds in a shared layout, the delta rail, A ⇄ A′ toggle | stack 03b — written, canvas built |
+| [`inspector.md`](inspector.md) | The persistent side panel: rationale, sources, base rate, three beliefs, "falsified if" | stack 03b — written, canvas built |
+| [`color-motion-type.md`](color-motion-type.md) | The color law, the three budgeted animations, typography | stack 03b — written, built bar the number-roll, which has nothing to roll until a number changes |
+| [`keyboard-and-access.md`](keyboard-and-access.md) | Keyboard map, outline view for screen readers, reduced motion, contrast | stack 03b — written, canvas built |
+| `streaming-growth.md` | How the map draws itself during generation | stack 04 — not written |
+
+**"Built" here means drawn, not fed.** The canvas reads the stored example from `GET /api/fixtures/hormuz`; it does not yet ask the engine's world routes. So every chapter's *drawing* rules are built and tested, and every number a chapter says the engine would compute is on screen as an absence with its reason — "no engine yet". Joining the two is the first job of stack 04, and no component changes when it happens.
 
 ## The worked example
 
