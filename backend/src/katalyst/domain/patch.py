@@ -12,11 +12,13 @@ values travel beside the map as `Assignment` records, and the pair — map plus
 assignments — is also what a further fold takes, which is what keeps "apply two
 branches in a row" and "apply the two joined" the same operation.
 
-Three functions live here.
+Four functions live here.
 
 * `apply` folds one branch's edits onto a map, in order.
 * `flatten` puts a chain of branches — a child, its parent, its parent's parent —
   into one ordered list of edits, the parent's first.
+* `introduced_by` says which edit added each arrow, so a claim pushed back down
+  can name the edit responsible.
 * `affected_set` says which claims an edit is allowed to move, read from the
   shape of the map alone.
 
@@ -35,7 +37,7 @@ What this file must never do
   answer every time.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Literal
 
@@ -227,6 +229,35 @@ def flatten(
     return edits
 
 
+def introduced_by(edits: Branch | Sequence[Intervention]) -> Mapping[LinkId, int]:
+    """Say which edit added each arrow, by that edit's position in the run of edits.
+
+    Only an `insert` adds an arrow, so this reads the positions straight off the
+    list. It exists because a claim that was supposed true and has since been
+    pushed back down has to name the edit responsible — the badge reads *Retracted
+    · Oct 2 · by "…"* — and the map the fold leaves behind does not record which
+    edit put which arrow on it.
+
+    It is a fact about a branch, not about a map, so it is computed here and
+    handed to whatever needs it rather than being stored on an arrow. An arrow
+    that was on the base map all along is simply absent from the answer: nothing
+    added it during this branch.
+
+    Args:
+        edits: A branch, or the ordered run of edits `flatten` returns.
+
+    Returns:
+        The position, counting from zero, of the edit that added each arrow.
+    """
+    run = edits.interventions if isinstance(edits, Branch) else tuple(edits)
+    return {
+        arrow.id: position
+        for position, edit in enumerate(run)
+        if isinstance(edit, Insert)
+        for arrow in edit.links
+    }
+
+
 def affected_set(graph: Graph, intervention: Intervention) -> frozenset[PropositionId]:
     """Say which claims an edit is allowed to move, from the shape of the map alone.
 
@@ -245,6 +276,12 @@ def affected_set(graph: Graph, intervention: Intervention) -> frozenset[Proposit
     | `retune` | the claim the arrow points at, and that claim's descendants |
     | `refine` | the finer claims that stand in for the target |
     | `believe` | the target alone — the user's own number is not pushed through the map |
+
+    **Feedback arrows are set aside**, exactly as the map's loop check sets them
+    aside. In this version a feedback arrow is carried as data and never worked
+    through, so nothing an edit does can travel along one, and a claim reachable
+    only through one provably cannot move. The two rules change together: the day
+    the arithmetic unrolls a feedback arrow over time, it belongs back in here.
 
     This is a permission, not a prediction: it says what an edit is allowed to
     move, never what it did move. Asking the engine what it touched and calling
@@ -644,23 +681,29 @@ def _no_such_branch(missing: BranchId, walked: list[Branch]) -> Violation:
 def _walkable(graph: Graph) -> "networkx.DiGraph[PropositionId]":
     """Build the map as a plain directed graph, for asking what leads to what.
 
-    Every arrow is kept, feedback arrows included. An affected set is a permission
-    — these claims may move — so it must never be narrower than the arrows drawn
-    on the map, whatever a later stack does with them. An arrow with an end that
-    is not on the map is left out, because a claim that does not exist cannot move
-    and inventing one here would widen the answer for no reason.
+    Two kinds of arrow are left out, and they are exactly the two the loop check
+    leaves out. A **feedback** arrow — a market changing the world it is measuring
+    — is carried as data in this version and never worked through: nothing an edit
+    does travels along one until a later stack unrolls them over time, so a claim
+    reachable only through one provably cannot move, and saying otherwise would
+    leave the product with nothing it can call untouched. An arrow with an end
+    that is not on the map is left out too, because a claim that does not exist
+    cannot move and inventing one here would widen the answer for no reason.
+
+    This rule and the arithmetic change together: the day a feedback arrow is
+    worked through, it belongs back in here.
 
     Args:
         graph: The map to read.
 
     Returns:
-        A directed graph of the claims and the arrows between them.
+        A directed graph of the claims and the ordinary arrows between them.
     """
     walkable: networkx.DiGraph[PropositionId] = networkx.DiGraph()
     walkable.add_nodes_from(one.id for one in graph.propositions)
     present = {one.id for one in graph.propositions}
     for link in graph.links:
-        if link.source in present and link.target in present:
+        if not link.reflexive and link.source in present and link.target in present:
             walkable.add_edge(link.source, link.target)
     return walkable
 
