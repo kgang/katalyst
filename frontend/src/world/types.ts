@@ -85,6 +85,56 @@ export interface BeliefSlots {
   readonly market: Slot;
 }
 
+/**
+ * What kind of push an arrow carries over time.
+ *
+ * `impulse` is a one-time spike that fades away by its own half-life. `step`
+ * switches on and holds. `ramp` climbs from nothing to full size across the
+ * delay and then holds. The wire's stroke pattern says which, and it is the
+ * only thing the stroke says.
+ */
+export type LinkShape = "impulse" | "step" | "ramp";
+
+/**
+ * Where an arrow and its number came from — a receipt our own pipeline writes,
+ * never something a model says about itself.
+ *
+ * Seven values, drawn on the map as a mark of one, two or three dots at the
+ * arrow's tail, with the exact word beside the same mark in the panel.
+ */
+export type Provenance =
+  | "documented"
+  | "historical"
+  | "market_implied"
+  | "argued"
+  | "user"
+  | "asserted"
+  | "simulated";
+
+/** One published item behind an arrow, and the day we fetched it — or that nobody did. */
+export interface SourceView {
+  /** Where the reader goes to check it. */
+  readonly url: string;
+  /** What the reader will see when they get there, in the publisher's words. */
+  readonly title: string;
+  /** The host name the address points at, with any leading `www.` dropped. */
+  readonly host: string;
+  /** The day our own retrieval step fetched it, or the reason there is no day. */
+  readonly retrieved: { readonly day: string } | { readonly absence: Absence };
+}
+
+/** How often this kind of thing has happened before, when there is an honest set to count. */
+export interface BaseRateView {
+  /** The set of past cases being counted, stated so somebody else could recount them. */
+  readonly referenceClass: string;
+  /** How many cases in that set came out true. */
+  readonly k: number;
+  /** How many cases are in the set altogether. */
+  readonly n: number;
+  /** Web addresses where the count can be checked. Empty means nobody has checked it. */
+  readonly sources: readonly SourceView[];
+}
+
 /** One published item for or against a claim, as the tile shows it. */
 export interface EvidenceClipping {
   /** What the source says, in one sentence, in our words. */
@@ -102,6 +152,8 @@ export interface EvidenceClipping {
   readonly host: string;
   /** `1` when the item supports the claim, `-1` when it cuts against it. */
   readonly direction: 1 | -1;
+  /** Where to read it, so the reader can check us. */
+  readonly url: string;
 }
 
 /**
@@ -132,10 +184,41 @@ export interface ClaimView {
   readonly resolvesBy: string;
   /** Who or what applies the test that settles it. */
   readonly resolutionSource: string;
+  /**
+   * The test itself, written so that two people reading it would agree on the
+   * answer. Too long for a tile; the panel beside the map prints it in full.
+   */
+  readonly resolutionCriteria: string;
+  /**
+   * The model's likelihood for this claim before its causes are taken into
+   * account. Never drawn on a tile — a second number beside the model's would
+   * be a fourth voice — and always drawn in the panel, where the decomposition
+   * starts from it.
+   */
+  readonly prior: Ranged;
+  /** How often this kind of thing has happened before, or the reason there is no such count. */
+  readonly baseRate: { readonly reading: BaseRateView } | { readonly absence: Absence };
   /** The three likelihoods, side by side. */
   readonly beliefs: BeliefSlots;
-  /** At most two published items, for and against. */
+  /** At most two published items, for and against. What the tile has room for. */
   readonly evidence: readonly EvidenceClipping[];
+  /**
+   * Every published item on this claim, in the order the map stores them.
+   *
+   * The tile shows two; the panel shows all of them, because a claim you can
+   * only see half the evidence for is a claim you cannot argue with.
+   */
+  readonly evidenceInFull: readonly EvidenceClipping[];
+  /**
+   * The multiplied-out likelihood of the steps of one route from the
+   * hypothesis to this claim.
+   *
+   * A chain of four plausible steps is not a plausible chain, and this is the
+   * number that says so. It arrives **on the world**, computed by the engine.
+   * Nothing in the browser multiplies anything to fill it in, and the slot holds
+   * its absence until the engine can answer.
+   */
+  readonly pathProduct: Slot;
   /** A word shown instead of a likelihood, when the claim is standing on the reader's say-so. */
   readonly standing?: Standing;
 }
@@ -150,6 +233,41 @@ export interface LinkView {
   readonly target: string;
   /** Whether the push survives its cause going away. */
   readonly mode: LinkMode;
+  /**
+   * How hard this arrow pushes, signed, at full precision.
+   *
+   * It is signed **on the claim, not on the world**. The arrow into *Brent
+   * settles below $68* is `+1.6` — positive, because it makes that claim come
+   * out true more often — and the thing that claim describes is a *falling*
+   * price. So a push's sign is not a direction of financial effect, it never
+   * takes a direction hue, and it is carried by the printed sign and a word.
+   *
+   * Nothing on the canvas adds one of these to anything. Choosing a stroke
+   * width or a word for it is a comparison against fixed thresholds.
+   */
+  readonly strength: number;
+  /** Days from the cause becoming true to the push reaching full size. */
+  readonly lag: number;
+  /** What the push does over time. The wire's stroke pattern, and nothing else. */
+  readonly shape: LinkShape;
+  /** Days for an `impulse` push to fall to half its size. Absent on the other two shapes. */
+  readonly halfLife: number | null;
+  /** The mechanism in one to three plain sentences: why this cause moves this effect. */
+  readonly rationale: string;
+  /** What backs the arrow, each with the day it was fetched or the reason there is none. */
+  readonly sources: readonly SourceView[];
+  /** Where this arrow came from. Drawn as a mark at the tail, spelled out in the panel. */
+  readonly provenance: Provenance;
+  /**
+   * The target's likelihood with this arrow's source supposed true.
+   *
+   * Not computed here and not carried on the world: it costs a whole extra
+   * run of the map per arrow, so the engine works one out only when a wire is
+   * asked about. Until then — and always, in this build, because that route
+   * does not exist yet — the slot holds its absence and the wire's chip reads
+   * the push back in words instead. Never a guessed number.
+   */
+  readonly conditional: Slot;
   /**
    * True when this arrow is a market feeding back on the world. A feedback
    * arrow is the one arrow allowed to close a loop, and it is set aside when

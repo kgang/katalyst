@@ -1,0 +1,55 @@
+/*
+ * The mark that says where an arrow came from: one, two or three dots.
+ *
+ * Drawn rather than typed. A bullet character would be at the mercy of whichever
+ * font happened to load, and it would be text — which would put it under the
+ * eleven-pixel floor the moment the map was zoomed out. A dot drawn as a box is
+ * a graphic: it keeps its shape, it needs three to one rather than four and a
+ * half, and the count is the whole of what it says.
+ */
+
+.origin-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  /* Five pixels rather than four: on a map drawn at three quarters of life size
+   * a four-pixel dot is three pixels on the glass, and three dots and two stop
+   * being tellable apart at a glance — which is the whole of what the mark is
+   * for. */
+  vertical-align: middle;
+  /* Three dots wide however many are lit, so a mark of one and a mark of three
+   * line up in a column in the panel and the count is what differs rather than
+   * the position. */
+  min-width: 19px;
+}
+
+.origin-mark__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentcolor;
+  flex: 0 0 auto;
+}
+
+/* In the panel there is room, so the mark is drawn a size up: it sits beside a
+ * word set at fifteen pixels and a mark half the height of the word beside it
+ * reads as a speck rather than as a count. */
+.origin-mark[data-on-a-wire="no"] {
+  gap: 3px;
+  min-width: 21px;
+}
+
+.origin-mark[data-on-a-wire="no"] .origin-mark__dot {
+  width: 5px;
+  height: 5px;
+}
+
+/* On a wire, the mark sits on the map's own surface with a little of that
+ * surface behind it, so the wire it is attached to does not run through the
+ * middle of the dots. */
+.origin-mark[data-on-a-wire="yes"] {
+  padding: 2px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text-muted);
+}

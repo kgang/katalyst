@@ -26,35 +26,22 @@
   --xy-attribution-background-color: transparent;
 }
 
-/* Where our own drawing marks are defined. No size and no ink of its own; the
- * wires reach into it for the arrowhead. */
-.canvas__marks {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-}
-
-.canvas__marks marker path {
-  fill: none;
-  stroke: var(--text-muted);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* ---- Wires, plainly ----------------------------------------------------- *
- * One weight, one colour, our arrowhead. A wire is about to carry five
- * different things at once — what kind of push it is, how hard, whether it has
- * to keep holding, whether it loops back, and where it came from — and none of
- * that is built yet. Drawing a placeholder that already looked encoded would be
- * worse than drawing a plain line, because a reader would try to read it. */
-
-.canvas .react-flow__edge-path {
-  stroke-linecap: round;
-}
+/* ---- Wires --------------------------------------------------------------- *
+ * How a wire is drawn is `graph/wires/wires.css`, which owns the five things a
+ * stroke, a doubling and a mark at the tail have to say. Nothing about a wire
+ * is set here. */
 
 /* ---- Tiles -------------------------------------------------------------- */
+
+/* A tile the hover lens has put off the path. Everything that is neither a
+ * cause of the claim being pointed at nor something it causes drops to fifteen
+ * per cent, which answers "what does this claim have to do with anything" in
+ * one movement and with no arithmetic — following arrows is walking, not
+ * calculating. */
+.canvas .react-flow__node.is-dimmed {
+  opacity: 0.15;
+  transition: opacity var(--duration-fast) ease-out;
+}
 
 /* A tile the keyboard is on. The ring is ours, drawn the same way as every
  * other focus ring in the app, and it sits outside the tile's own outline so
@@ -147,14 +134,14 @@
   color: var(--text);
 }
 
-/* ---- The one wire that runs backwards ----------------------------------- *
- * A feedback arrow is the only one allowed to point the other way, and it is
- * routed over the top of the map so that it never crosses a tile. The dashes
- * say one thing and one thing only — *this one runs backwards* — and they are a
- * placeholder: the work that gives the stroke its real job, saying what kind of
- * push a wire carries, replaces this with a loop and the delay written on it. */
+/* ---- Selection ----------------------------------------------------------- *
+ * The panel beside the map is open on one thing at a time, and the map says
+ * which. The tile the panel is reading gets a ring in the accent colour — a
+ * different ring from the keyboard's, and drawn outside the tile's own outline
+ * so that it never hides the shape that says what kind of claim it is. */
 
-.canvas .wire--feedback {
-  stroke-dasharray: 2 5;
-  stroke-linecap: round;
+.canvas .react-flow__node.selected {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 2px;
 }

@@ -1,0 +1,248 @@
+/*
+ * How a wire is drawn.
+ *
+ * Every rule below is about pattern, width, doubling or position. **There is not
+ * one hue in this file**, and that is the point rather than an economy: a wire's
+ * colour would have to mean something, and every meaning a wire carries is
+ * already spoken for by a channel the eye can read in a grey print. The one
+ * colour any of these rules names is the colour of the page itself, used to
+ * paint the gap down the middle of a wire that has to keep holding.
+ */
+
+/* ---- The stroke ---------------------------------------------------------- */
+
+.canvas .wire {
+  stroke: var(--text-muted);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: opacity var(--duration-fast) ease-out;
+}
+
+/* The gap down the middle of a wire that has to keep holding. Painted in the
+ * colour of the page over the middle of a stroke drawn at twice the width, which
+ * leaves two parallel lines — the picture of a push that has to keep being
+ * applied, as against one that fires once and is over. */
+.canvas .wire__split {
+  stroke: var(--surface);
+  stroke-width: var(--wire-gap);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A wire the keyboard is on, or one that has been selected. It thickens rather
+ * than changing colour, so the difference survives a grey print — and so that
+ * the four width steps are still the four width steps: a selected wire is drawn
+ * over the top, and the thing that changed is which wire the panel is reading. */
+.canvas .wire.is-selected {
+  stroke: var(--text);
+}
+
+.canvas .react-flow__edge:focus-visible {
+  outline: none;
+}
+
+.canvas .react-flow__edge:focus-visible .wire {
+  stroke: var(--focus);
+}
+
+/* ---- The hover lens ------------------------------------------------------ *
+ * Everything not on the hovered claim's path drops to fifteen per cent. The
+ * value multiplies whatever opacity is already in place rather than replacing
+ * it, so when two worlds are laid over each other a wire that is both off the
+ * path and part of the old world lands near three per cent and disappears —
+ * which is correct: off the path and old is the least interesting thing on the
+ * screen. */
+
+.canvas .wire.is-dimmed,
+.canvas .wire-plate[data-dimmed="yes"],
+.canvas .wire-mark[data-dimmed="yes"] {
+  opacity: 0.15;
+}
+
+/* ---- The mark at the tail ------------------------------------------------ */
+
+.canvas .wire-mark {
+  position: absolute;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) ease-out;
+  /* Above the plate, so that where the two do meet the receipt is the thing you
+   * can still read. */
+  z-index: 1;
+}
+
+/* ---- The plate in the middle --------------------------------------------- *
+ * A small plate on the map's raised surface with a hairline round it, sitting
+ * over the wire so the wire reads as passing behind it. It is transparent to the
+ * pointer: a click on the plate lands on the wire underneath, which is what the
+ * reader meant. */
+
+/* A plate and a mark are drawn over the tiles rather than behind them. A wire
+ * passes behind a tile in one place on this map — the corridor an arrow that
+ * skips a column travels along runs close under the tile above it — and a plate
+ * that disappeared there would be a plate nobody could read. The wire's stroke
+ * still goes behind, which is right: the plate is a label on the map, and the
+ * map is what it labels. */
+.canvas .react-flow__edgelabel-renderer {
+  z-index: 6;
+}
+
+.canvas .wire-plate {
+  position: absolute;
+  pointer-events: none;
+  /* The gutter between one column of the map and the next is 120 pixels, and it
+   * has to hold two things: the mark at the arrow's tail takes the first twenty,
+   * and the plate takes what is left. Hence eighty-eight rather than the whole
+   * gutter — and the plate is nudged along the wire so the two do not sit on top
+   * of one another. */
+  width: 96px;
+  transition: opacity var(--duration-fast) ease-out;
+}
+
+/* A plate on a wire that travels a corridor between two rows of tiles, or over
+ * the top of the map, lies along the wire on one line. Those wires have a wide
+ * short strip of clear space to sit in rather than a tall narrow one, and a
+ * stacked plate would be taller than the corridor is deep — it would sit on the
+ * tiles above and below it. */
+.canvas .wire-plate[data-layout="inline"] {
+  width: auto;
+}
+
+.canvas .wire-chip[data-layout="inline"] {
+  grid-auto-flow: column;
+  align-items: baseline;
+  column-gap: var(--space-1);
+  white-space: nowrap;
+}
+
+/* Zoomed out, the plate is the signed push and nothing else, set in the largest
+ * of the three sizes so it still clears eleven pixels on the glass at the zoom
+ * floor. It is not the full plate made smaller: nothing in this product is drawn
+ * smaller to fit, and a plate that shrank would be a smudge that reads as a
+ * loading state. */
+.canvas .wire-plate[data-detail="summary"] {
+  width: auto;
+}
+
+.canvas .wire-chip {
+  display: grid;
+  row-gap: 2px;
+  padding: var(--space-hair) var(--space-1);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+
+.canvas .wire-chip[data-detail="summary"] {
+  justify-items: center;
+  padding: 2px var(--space-hair);
+}
+
+/* The plate of the wire the panel is reading. A ring appears around it — the
+ * same ring a selected tile gets — as well as the stroke brightening, so that
+ * the difference between "selected" and "not" is a shape and not only a colour.
+ * Nothing in this product is told apart by hue alone, states included. */
+.canvas .wire-plate[data-selected="true"] .wire-chip {
+  border-color: var(--text-muted);
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The push itself: a signed number in the monospace face with fixed-width
+ * digits, so a column of pushes lines up on the point. */
+.canvas .wire-chip__push {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  line-height: 1.2;
+}
+
+/* What the push means, in words, because the width of a stroke is a glance and
+ * this is the reading. */
+.canvas .wire-chip__words {
+  font-size: var(--text-sm);
+  color: var(--text);
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+
+/* How long after its cause the push arrives. Quieter than the rest, because it
+ * is the one line that is about time rather than about force — and kept on one
+ * line, because "after 10 / days" broken over two reads as a plate that ran out
+ * of room rather than as a delay. */
+.canvas .wire-chip__lag {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Zoomed out, the push is set in the largest of the three sizes, so it still
+ * clears eleven pixels on the glass at the zoom floor. So is the delay on the
+ * one arrow that keeps it. */
+.canvas .wire-chip[data-detail="summary"] .wire-chip__push,
+.canvas .wire-chip[data-detail="summary"] .wire-chip__lag {
+  font-size: var(--text-lg);
+}
+
+/* The one backwards arrow keeps its delay when everything else has dropped to
+ * the push alone, so the two sit side by side rather than stacked. */
+.canvas .wire-chip[data-detail="summary"][data-layout="inline"] {
+  grid-auto-flow: column;
+  align-items: baseline;
+  column-gap: var(--space-1);
+  white-space: nowrap;
+}
+
+/* The bounded bar the likelihood rides on, once the engine can supply one. It is
+ * one of the five brightness steps and it never carries text: the number is
+ * printed on the line below it, in the text colour, so it always clears four and
+ * a half to one while the bar only has to clear three.
+ *
+ * Nothing draws this in the current build, because no engine has worked out a
+ * conditional likelihood for any arrow. */
+.canvas .wire-chip__bar {
+  height: var(--space-hair);
+  border-radius: 1px;
+  background: var(--p-0);
+}
+
+.canvas .wire-chip__bar[data-step="1"] {
+  background: var(--p-1);
+}
+
+.canvas .wire-chip__bar[data-step="2"] {
+  background: var(--p-2);
+}
+
+.canvas .wire-chip__bar[data-step="3"] {
+  background: var(--p-3);
+}
+
+.canvas .wire-chip__bar[data-step="4"] {
+  background: var(--p-4);
+}
+
+/* ---- The arrowheads ------------------------------------------------------ *
+ * Ours, not the library's: a thin open chevron that reads as a direction rather
+ * than as a blob. Measured in the map's own units rather than in multiples of
+ * the stroke width, so that a four-step wire and a one-step wire end in the same
+ * arrowhead and the width goes on meaning only one thing. */
+
+.canvas .wire-marks {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.canvas .wire-marks path {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
