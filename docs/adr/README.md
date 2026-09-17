@@ -13,9 +13,9 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0005](0005-link-semantics-and-propagation.md) | Typed links (trigger/sustain, log-odds, lag, shape) propagated by seeded forward Monte Carlo | accepted | 2026-09-16 |
 | [0006](0006-llm-boundary-structured-outputs.md) | LLM boundary: Anthropic SDK, `claude-opus-5`, structured outputs, one proposal per call, SSE | accepted | 2026-09-16 |
 | [0007](0007-canvas-react-flow-elk.md) | Canvas: React Flow v12 + ELK layered layout + Motion; typed ports; ghost diff; no modals | accepted | 2026-09-16 |
-| [0008](0008-testing-layers-and-cassettes.md) | Four testing layers; VCR cassettes so CI runs without an API key; evals out-of-band | accepted | 2026-09-16 |
+| [0008](0008-testing-layers-and-cassettes.md) | Five testing layers (amended 2026-09-17); VCR cassettes so CI runs without an API key; evals out-of-band | accepted | 2026-09-16 |
 | [0009](0009-git-workflow-stacked-prs.md) | Conventional commits, `<type>/<NN>-<slug>` branches, GitHub native stacked PRs (git-spice fallback) | accepted | 2026-09-16 |
 | [0010](0010-grounding-sources.md) | Grounding: Polymarket + FRED behind a `GroundingSource` Protocol; Metaculus/yfinance rejected | accepted | 2026-09-16 |
 | [0011](0011-spec-as-book-and-living-architecture.md) | Spec organized as a book by idea (unnumbered chapters); living `ARCHITECTURE.md` at the root | accepted | 2026-09-16 |
-| [0012](0012-replay-mode-from-recorded-transcripts.md) | Replay mode: a keyless reviewer walks the hero flow from recorded generation transcripts | proposed | 2026-09-17 |
+| [0012](0012-replay-mode-from-recorded-transcripts.md) | Replay mode: a keyless reviewer walks the hero flow from recorded generation transcripts | accepted | 2026-09-17 |
 | [0013](0013-payoff-names-the-trade-quote-names-the-price.md) | `Payoff` splits into a contract shape and a price shape; the domain names the trade, the quote names the price | accepted | 2026-09-17 |

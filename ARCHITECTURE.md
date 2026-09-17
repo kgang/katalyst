@@ -143,7 +143,7 @@ Everything below runs today except stored state, which is marked `[planned]` in 
 
 ## 7. Testing layers `[built]`
 
-Four of the six rows below exist. Decision record 0008 named four layers; the worked-example row is a fifth that grew out of stack 02. The recorded model boundary and the evaluation set are named here so that adding them is filling a slot rather than inventing one.
+Four of the six rows below exist. Decision record 0008 named four layers and was amended on 2026-09-17 to add the fifth, the worked-example row, which grew out of stack 02. The recorded model boundary and the evaluation set are named here so that adding them is filling a slot rather than inventing one.
 
 | Layer | What it covers | Where | State |
 |-------|----------------|-------|-------|
@@ -211,11 +211,11 @@ katalyst/
 | ADR-0005 | Typed links (trigger/sustain, log-odds strength, lag, shape) propagated by seeded simulation | accepted |
 | ADR-0006 | Vendor SDK, `claude-opus-5`, schema-guaranteed output, one proposal per call, streamed | accepted |
 | ADR-0007 | React Flow canvas with automatic layered layout; own the look; no modals | accepted |
-| ADR-0008 | Four testing layers; recorded responses so CI needs no key | accepted |
+| ADR-0008 | Five testing layers (four decided, a worked-example layer added by amendment); recorded responses so CI needs no key | accepted |
 | ADR-0009 | Conventional commits; numbered stacks; PR bases chained by agents, stacks assembled in the GitHub UI | accepted |
 | ADR-0010 | Polymarket and FRED as grounding sources; Metaculus and yfinance rejected | accepted |
 | ADR-0011 | The spec is a book by idea; this file is the living technical counterpart to the PRD | accepted |
-| ADR-0012 | Replay mode: with no model key, the four example hypotheses play from committed generation transcripts through the same event stream | proposed |
+| ADR-0012 | Replay mode: with no model key, the four example hypotheses play from committed generation transcripts through the same event stream | accepted |
 | ADR-0013 | A payoff names what you would trade — contract or price; what it costs is a live quote | accepted |
 
 ---
@@ -235,7 +235,7 @@ Stacks 00, 01 and 02 are merged. What that leaves, each with the stack that will
 Open technical questions, dated:
 
 - **2026-09-16** Ensemble size for generation — how many independent runs to reconcile into one map, and what a graph then costs. Measure in stack 04.
-- **2026-09-17** Replay mode — with no model key, the four example hypotheses play from committed generation transcripts through the live event stream — is proposed in decision record 0012 and awaits Kent's acceptance. Nothing is built against it until then; it would land in stack 04.
+- **2026-09-17** Replay mode — with no model key, the four example hypotheses play from committed generation transcripts through the live event stream — decided in record 0012, accepted the same day; built in stack 04.
 
 Settled since this list was first written, kept here so the change is visible:
 
