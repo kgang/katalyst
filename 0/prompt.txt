@@ -2344,3 +2344,155 @@ Stack 04 needs seven pull requests; a stack is capped at four deep (ADR-0009). S
 - **`EventSource` cannot carry the generation request**, which has a body, and it reconnects by itself — so "server-sent events from `api/` to the canvas" is kept as the wire format but read with `fetch`, not `EventSource`. Marked *decided here*.</result>
 <usage><subagent_tokens>251022</subagent_tokens><tool_uses>46</tool_uses><duration_ms>672595</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a071f070cfaf05a0e</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/a071f070cfaf05a0e.output</output-file>
+<status>completed</status>
+<summary>Agent "K: diff overlay, keys, e2e (03b PR4)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is green and the servers are stopped. Here is the report.
+
+## What I built
+
+**Two worlds in one picture.** `graph/diff/` computes the whole diff from the branch with no arithmetic: `reach.ts` (walking arrows, feedback arrows set aside for *what can move*), `diffState.ts` (the four states, edits applied in order to a map that changes as they go — so a supposition cuts only the arrows that exist when it is applied), `badges.ts` (the six vocabulary badges plus the derived retraction), `branchWorld.ts` (the second world, and `bothPaintings` for A ⇄ A′), `endings.ts` (the rail's rows). On `br_hormuz_then_strike`: **S added · H C B N1 M1 M2 downstream · R untouched**. Every model number a branch could move reads *no engine yet* with its reason; `R` keeps `.24` unhedged.
+
+**The overlay.** The union is laid out **once** (a new `mapKey` clears ELK's pins when the map itself changes, so the union really is laid out together rather than the base map with S bolted on) and painted twice from one position map. A claim or arrow only one world has is a 20 %-opacity dashed ghost in the other. `Space` is a hard switch that moves nothing — proved: identical viewport transform and identical tile positions across the flip. Lens-dimming and ghosting multiply (`--lens × --ghost`) rather than fighting.
+
+**The rail, the branch panel, the six buttons.** Map order, ranked by nothing and saying so; `change / how firm / same direction` as columns; every absent cell a reachable button whose accessible name carries the reason, plus one shared reason line. The branch panel lists the three edits in order with **Supposed · Oct 1 / Added / Supposed · Oct 2**. The six buttons are word for word from the vocabulary; **Split this claim** is dashed and says *not yet built*; nothing is `disabled` — a button with nothing to act on says what it needs.
+
+**UX-14.** H's tile reads, word for word, **Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"**, derived from the branch (a *sustain* arrow pushing against the claim, inserted after the supposition, whose source a later edit makes true). S shows **Supposed · Oct 2** where a likelihood would go.
+
+**Keyboard, overlays, outline.** `⌘K` `j` `k` `h` `l` `E` `B` `Space` `O` `P` `?` `Escape`, bound once on the page and inert while typing. `h`/`l` take the nearest wired neighbour on the cross-axis, the rest become the `j`/`k` set where you land, and the status line names the wire and its delay. Palette and sheet are overlays (no scrim, canvas live, Escape closes, Tab rings). Outline is `role="tree"`; `aria-live` says exactly *"Branch created. One claim added, six claims your edit can reach, one supposition retracted. No numbers yet."*
+
+**Motion.** Two of the three: the propagation wave (per-column reveal by opacity, `--duration-wave` with `--duration-stagger` delays and `animation-fill-mode: backwards` — **not** dash-offset, so the stroke patterns keep their meaning) and branch creation. Under reduced motion the duration is 0 and the stagger survives.
+
+**Hand-me-downs.** (a) dock narrowed 400 → 336 px, collapsible with `P` (listed in the sheet), **plus** a derived first-frame rule in `geometry.ts`: frame to fit but never below `11/13`; measured first-frame zoom is exactly **0.846154** with all tiles `data-detail="full"` (also asserted in the e2e test and in `layout.test.ts`). (b) the bounded brightness bar is on the chip's number line, five steps via `likelihoodStep`, same idiom as the Inspector's. (c) partial — see below. (d) `Selection` is now one type in `world/types.ts`; `Subject` is gone.
+
+## Where I deviated, and why
+
+- **`My own number` does not blank the model number.** The affected-set table puts `believe`'s target in the affected set, so it is `downstream`; but it is not propagated (INV-11), so the model's number has not moved. I split the reading into `affected` (drives the state) and `canMove` (drives the absence). Flagged as an open question.
+- **`Known&lt;T&gt;` rename is partial.** `Known&lt;Reading&gt;` now exists and is generic, `Slot = Known&lt;Ranged&gt;`, and `Absence` gained its `kind` (`no_engine`/`no_market`/`not_said`). I did **not** convert `baseRate` or `SourceView.retrieved`, because those live in the Inspector's body and the wire chip — files I do not own — and the change is cosmetic there. The code keeps `absence.words` as well as `kind`, because the vocabulary settles the words per case.
+- **Focusing a wire no longer selects it; Enter does.** React Flow rebuilds a wire's `&lt;g&gt;` when it becomes selected, which dropped focus to the page — and since the wires come before the tiles in the DOM, **Tab could not reach the map at all**. Enter now fills the panel and focus is put back on the rebuilt wire two frames later.
+- **A layout that never answers now falls back to the page's own thread after 2 s** (lazily imported, so the bundle is unchanged unless it is needed). Found because the map never laid out inside Playwright's own context.
+- **`TILE_MAX_HEIGHT` 272 → 320 and `BELIEF_RAIL` 67 → 69**, both measured in the browser; the old ceiling cut the last line off H's badge, and the rail was two pixels short.
+- **Files outside my list** (all named in the commits): `graph/geometry.ts` (first frame, badge heights, the two measured constants), `graph/layoutRunner.ts` (the map key and the fallback), `world/index.ts`, `test/aMap.ts`, `.gitignore`, `tsconfig.node.json`, and eight existing test files that construct an `Absence` or use the old prop names. `styles/__tests__/colourLaw.test.ts` gained `beliefChip.css` to its allow-list, which hand-me-down (b) requires.
+
+## What I deferred, and why
+
+- **The belief number-roll**, the third budgeted animation: nothing has two numbers to roll between until the engine lands.
+- **A claim the *reader* types is not drawn as a tile.** Its edit, its arrow and its **Added** badge are in the branch panel, the arrow's target and everything downstream go `downstream` on the map, and the panel says in one sentence why there is no tile: a tile needs a prior and a resolution, and inventing either is the veto. Drawing it needs `prior` and `resolution` to become `Known&lt;T&gt;`, which reaches the Inspector.
+- **`test_agrees_with_the_servers_affected_set`** is `it.skip` with its reason written in it, as the chapter requires.
+- **`killed` is drawn but not exercised on Hormuz** (nothing supposes a claim false); a unit test covers it over a hand-built branch.
+
+## Open questions
+
+1. **Two wire plates overlap each other, and one overlaps a tile corner, on the union map** (visible at x ≈ 700–1160 in shot 02). Plate placement is per-wire in `CausalWire`/`route.ts` with no global collision pass; three new wires make the middle crowded. Not my files — your call.
+2. Should `My own number` mark its target `downstream`? (see above)
+3. **The hover lens stays on the claim the keyboard is on**, so after any keyboard walk most of the map sits at 15 %. Correct per the previous agent's comment, but it makes the map read as mostly dimmed.
+4. **The map is one tab stop**, then `j`/`k`/`h`/`l`. React Flow's roving tabindex, and I think it is right (eight tiles and twenty-four chips as tab stops make Tab the slowest way across) — but it is a decision, and the sheet and the status line are what tell the reader.
+5. At 1600 × 1000 **with the panel open the union shows four of its five columns**; `P` (or panning) shows all five at full size. That is the consequence of "the first frame never shows summaries".
+
+## Screenshots — `/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/scratchpad/k-shots/`
+
+| File | What it shows |
+|---|---|
+| `01-first-frame-panel-open.png` | First frame, panel open, **full tiles** at zoom 0.846 154 (= 11/13) |
+| `02-strike-branch-now.png` | The strike branch: S with its ring and badges, H's retraction line, four states |
+| `20-panel-hidden.png` | The same branch with `P` pressed — the whole five-column union at full size |
+| `03-strike-branch-before.png` | A: the map as written, S a dashed ghost, H back at `.35` |
+| `04-strike-branch-now-again.png` | A′ again — nothing moved |
+| `05-h-tile-context.png` / `06-h-tile-ux14.png` | H's tile, and the UX-14 line close up |
+| `07-delta-rail.png` | The rail: summary absence, map order, three columns, three endings |
+| `08-branch-panel.png` | The three edits with their badges |
+| `09-six-buttons.png` / `10-six-buttons-close.png` | The six buttons, word for word |
+| `11-add-a-claim.png` · `12-my-own-number.png` · `13-split-this-claim.png` · `14-change-this-push.png` | Each editing panel |
+| `15-command-palette.png` | The palette: no scrim, the map live behind and beside it |
+| `16-shortcuts-sheet.png` | Every key, and the line about dragging |
+| `17-outline.png` | The map as a list |
+| `18-keyboard-along-a-wire.png` / `19-keyboard-then-j.png` | Walking a wire, then a column, with the status line |
+| `21-reduced-motion-mid-wave.png` / `22-reduced-motion-settled.png` | Reduced motion: per-column ordering survives, no tweening |
+| `23-light-theme-branch.png` / `24-light-theme-base.png` | Light theme |
+| `25-greyscale-first-frame-panel-open.png` / `25-greyscale-strike-branch-now.png` | Greyscale (converted offline — a CSS filter on the page breaks the tiles' stacking and photographs the filter, not the product) |
+
+## Checklist, honestly
+
+1. **Pass.** No rounded filled buttons, no shadows, hairlines, our own focus ring. The only library furniture is React Flow's zoom controls and its attribution, both already restyled.
+2. **Pass.** No spinner, no dialog; the e2e test asserts `getByRole("dialog")` is empty.
+3. **Pass, with one wart.** Everything reads in grey. But `added`'s accent ring and the hypothesis's own accent outline both go light grey; they are told apart by shape, the solid bottom strip and the **Added** badge — not by the ring alone.
+4. **Pass.** Two figures with the range everywhere.
+5. **Pass.** Every absence carries words and a reason; the line under the map names the route every number came from.
+6. **Pass for the base map; fail for the union** — two plate-on-plate overlaps and one plate over a tile corner (open question 1).
+7. **Pass.** Smallest type 13 px at 0.846 zoom = 11.0 px exactly; new components use only `--text`/`--text-muted`, whose measured ratios are in `tokens.css`.
+8. **Pass, measured:** 280.0 px wide; heights 152/176/192/208/216/296, all on the 8-px grid.
+9. **Pass, with the design note in open question 4.** Focus always visible; `h`/`l` follow wires and the status line names the one taken.
+10. **Pass, with a wart:** a wire's plate is drawn in a separate layer and is not part of the reveal, so a plate can appear a beat before its wire.
+11. **Pass.** Asserted in `branchPanel.test.tsx` and scanned for code names there and in `deltaRail.test.tsx` and the e2e test.
+12. **Pass.**
+
+## Files touched
+
+`git diff --stat feat/03b-wires..HEAD` → **63 files, +7164 / −279**. No `schema.ts` diff, no `backend/` diff, no `spec/` diff. Three commits: `feat(canvas)`, `test(canvas)`, `ci(e2e)`.
+
+## Command tails
+
+```
+ Test Files  21 passed (21)
+      Tests  162 passed | 1 skipped (163)
+   Duration  1.47s
+```
+```
+Running 1 test using 1 worker
+  ✓  1 [chromium] › e2e/hormuz.spec.ts:94:1 › the stored example, opened and edited by keyboard alone (1.0s)
+  1 passed (1.6s)
+```
+(cold, with Playwright starting both halves itself: also 1 passed.)
+
+## Dependency diff
+
+```
+ devDependencies: + "@playwright/test": "^1.63.0"
+ scripts:         + "e2e": "playwright test"
+```
+`motion` was **not** added — both budgeted animations are CSS keyframes driven by the existing `--duration-wave` / `--duration-stagger` tokens.
+
+## The new CI job
+
+```yaml
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install uv, the tool that installs Python packages
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install the browser app's packages
+        run: npm ci
+        working-directory: frontend
+      - name: Install the server's packages
+        run: uv sync --frozen
+        working-directory: backend
+      - name: Install the one browser this test runs in
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Open the stored map, branch it, and read it with the keyboard
+        run: npx playwright test
+        working-directory: frontend
+```
+No secrets; `playwright.config.ts` starts uvicorn from `../backend` with `ANTHROPIC_API_KEY` and `FRED_API_KEY` explicitly emptied, and Vite with `KATALYST_API_URL`.
+
+**`ARCHITECTURE.md`** §1 and §7 (and §8's tree, which my new directories made stale) now describe the browser half as built. §7 carries one clearly-marked HTML comment asking the coordinator to restore the combined `make test` sentence with the real number once the engine stack merges — this branch cannot see the server's count.</result>
+<usage><subagent_tokens>711785</subagent_tokens><tool_uses>279</tool_uses><duration_ms>5100714</duration_ms></usage>
+</task-notification>
