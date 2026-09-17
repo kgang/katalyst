@@ -58,11 +58,13 @@ ViolationCode = Literal[
     "unknown_link",
     "duplicate_id",
     "edit_not_applicable",
+    "worlds_not_comparable",
 ]
-"""The eighteen things that can be wrong: fourteen faults in a map, four refused edits.
+"""The nineteen things that can be wrong: fourteen faults in a map, five refusals.
 
-The first fourteen are what `validate` finds in a map. The last four are what
-folding a branch onto a map finds in an *edit*, and no map can have them:
+The first fourteen are what `validate` finds in a map. The last five are what our
+own code refuses to do, and no map can carry any of them. Four are about an
+*edit*, found when a branch is folded onto a map:
 
 * `unknown_target` — the edit names a claim that is not on this map.
 * `unknown_link` — the edit names an arrow that is not on this map.
@@ -71,6 +73,13 @@ folding a branch onto a map finds in an *edit*, and no map can have them:
 * `edit_not_applicable` — this edit cannot be folded onto this map as written.
   Everything it names is there; what it asks for is something this version cannot
   do, or something the shapes allow and the map cannot carry out.
+
+The fifth is about a *comparison*, and it is the one refusal that is not about an
+edit at all:
+
+* `worlds_not_comparable` — these two worlds were not built from the same base
+  map, the same seed and the same two loop sizes, so subtracting one from the
+  other would leave noise rather than the change somebody made.
 
 Stable strings: the browser switches on them, tests assert on them, and they are
 never renamed without a migration.
@@ -106,12 +115,15 @@ class Violation(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    code: ViolationCode = Field(description="Which rule was broken. One of sixteen stable strings.")
+    code: ViolationCode = Field(
+        description="Which rule was broken. One of nineteen stable strings."
+    )
     subject: str = Field(
         description=(
             "The identifier of the thing at fault: a proposition id, a link id, the graph's own "
-            "id for faults about the map as a whole, or a branch id when a chain of branches "
-            "cannot be put in order. Never shown to the user."
+            "id for faults about the map as a whole — including two worlds that cannot be "
+            "compared, which names the map they should both have come from — or a branch id "
+            "when a chain of branches cannot be put in order. Never shown to the user."
         )
     )
     message: str = Field(

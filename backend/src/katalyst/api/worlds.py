@@ -58,10 +58,13 @@ REFUSED: dict[int | str, dict[str, Any]] = {
     422: {
         "model": RefusedEdit,
         "description": (
-            "The branch does not fit the map. The answer lists every reason at once, each "
-            "with a stable code, the identifier of the thing at fault, and one plain "
-            "sentence. A body the server cannot read at all is also a 422, and says so in "
-            "its own words."
+            "The request cannot be carried out as written — on these routes, always a "
+            "branch that does not fit the map, because both worlds of a comparison are "
+            "built here from the one base map, seed and pair of loop sizes. The answer "
+            "lists every reason at once, each with a stable code the interface can switch "
+            "on, the identifier of the thing at fault, and one plain sentence naming the "
+            "claim or the arrow by its words. A body the server cannot read at all is also "
+            "a 422, and says so in its own words."
         ),
     }
 }

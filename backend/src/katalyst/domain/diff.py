@@ -480,12 +480,19 @@ def _worlds_do_not_match(world_a: World, world_b: World) -> list[Violation]:
     There is no repair. Rebuilding one of the worlds to match the other would
     answer a question nobody asked, with a number nobody could trace.
 
+    Every one of these carries the code `worlds_not_comparable`, which is its own
+    code rather than one borrowed from the four that refuse an *edit*. Nothing
+    here is anybody's edit: the two worlds are each perfectly good on their own,
+    and what cannot be done is setting them side by side. A code has to mean what
+    it says, or the interface reading it is reading a guess.
+
     Args:
         world_a: The world to compare from.
         world_b: The world to compare to.
 
     Returns:
-        One violation per mismatch, or an empty list when the two agree.
+        One violation per mismatch, naming the map both worlds should have come
+        from, or an empty list when the two agree.
     """
     disagreements = (
         (
@@ -512,7 +519,7 @@ def _worlds_do_not_match(world_a: World, world_b: World) -> list[Violation]:
         ),
     )
     return [
-        Violation(code="edit_not_applicable", subject=world_b.base_id, message=said)
+        Violation(code="worlds_not_comparable", subject=world_b.base_id, message=said)
         for wrong, said in disagreements
         if wrong
     ]

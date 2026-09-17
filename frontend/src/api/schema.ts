@@ -1343,13 +1343,13 @@ export interface components {
         Violation: {
             /**
              * Code
-             * @description Which rule was broken. One of sixteen stable strings.
+             * @description Which rule was broken. One of nineteen stable strings.
              * @enum {string}
              */
-            code: "missing_resolution" | "missing_rationale" | "documented_without_source" | "cycle" | "reflexive_without_lag" | "half_life_without_impulse" | "impulse_without_half_life" | "belief_out_of_range" | "no_terminal" | "no_hypothesis" | "multiple_hypotheses" | "dangling_link" | "market_without_payoff" | "not_tradeable_without_reason" | "unknown_target" | "unknown_link" | "duplicate_id" | "edit_not_applicable";
+            code: "missing_resolution" | "missing_rationale" | "documented_without_source" | "cycle" | "reflexive_without_lag" | "half_life_without_impulse" | "impulse_without_half_life" | "belief_out_of_range" | "no_terminal" | "no_hypothesis" | "multiple_hypotheses" | "dangling_link" | "market_without_payoff" | "not_tradeable_without_reason" | "unknown_target" | "unknown_link" | "duplicate_id" | "edit_not_applicable" | "worlds_not_comparable";
             /**
              * Subject
-             * @description The identifier of the thing at fault: a proposition id, a link id, the graph's own id for faults about the map as a whole, or a branch id when a chain of branches cannot be put in order. Never shown to the user.
+             * @description The identifier of the thing at fault: a proposition id, a link id, the graph's own id for faults about the map as a whole — including two worlds that cannot be compared, which names the map they should both have come from — or a branch id when a chain of branches cannot be put in order. Never shown to the user.
              */
             subject: string;
             /**
@@ -1655,7 +1655,7 @@ export interface operations {
                     "application/json": components["schemas"]["World"];
                 };
             };
-            /** @description The branch does not fit the map. The answer lists every reason at once, each with a stable code, the identifier of the thing at fault, and one plain sentence. A body the server cannot read at all is also a 422, and says so in its own words. */
+            /** @description The request cannot be carried out as written — on these routes, always a branch that does not fit the map, because both worlds of a comparison are built here from the one base map, seed and pair of loop sizes. The answer lists every reason at once, each with a stable code the interface can switch on, the identifier of the thing at fault, and one plain sentence naming the claim or the arrow by its words. A body the server cannot read at all is also a 422, and says so in its own words. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1688,7 +1688,7 @@ export interface operations {
                     "application/json": components["schemas"]["Diff"];
                 };
             };
-            /** @description The branch does not fit the map. The answer lists every reason at once, each with a stable code, the identifier of the thing at fault, and one plain sentence. A body the server cannot read at all is also a 422, and says so in its own words. */
+            /** @description The request cannot be carried out as written — on these routes, always a branch that does not fit the map, because both worlds of a comparison are built here from the one base map, seed and pair of loop sizes. The answer lists every reason at once, each with a stable code the interface can switch on, the identifier of the thing at fault, and one plain sentence naming the claim or the arrow by its words. A body the server cannot read at all is also a 422, and says so in its own words. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1721,7 +1721,7 @@ export interface operations {
                     "application/json": components["schemas"]["Belief"];
                 };
             };
-            /** @description The branch does not fit the map. The answer lists every reason at once, each with a stable code, the identifier of the thing at fault, and one plain sentence. A body the server cannot read at all is also a 422, and says so in its own words. */
+            /** @description The request cannot be carried out as written — on these routes, always a branch that does not fit the map, because both worlds of a comparison are built here from the one base map, seed and pair of loop sizes. The answer lists every reason at once, each with a stable code the interface can switch on, the identifier of the thing at fault, and one plain sentence naming the claim or the arrow by its words. A body the server cannot read at all is also a 422, and says so in its own words. */
             422: {
                 headers: {
                     [name: string]: unknown;

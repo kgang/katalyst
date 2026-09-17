@@ -310,11 +310,17 @@ def test_diff_refuses_mismatched_worlds(data: st.DataObject) -> None:
         {"versions": first.versions + 1},
         {"worlds": first.worlds + 1},
     ):
-        refused = diff(first, second.model_copy(update=wrong), edit_in_words="a name")
+        doctored = second.model_copy(update=wrong)
+        refused = diff(first, doctored, edit_in_words="a name")
         assert isinstance(refused, list), wrong
         assert len(refused) == 1
+        # Its own code, not one of the four that refuse an edit: nothing here is
+        # anybody's edit, and a code has to mean what it says.
+        assert refused[0].code == "worlds_not_comparable"
+        assert refused[0].subject == doctored.base_id
         assert refused[0].message.endswith(".")
         assert refused[0].subject not in refused[0].message
+        assert len(refused[0].message.split()) >= 8, "a sentence, not a code"
 
 
 @given(st.data())
