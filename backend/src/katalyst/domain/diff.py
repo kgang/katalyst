@@ -29,6 +29,13 @@ What this file must never do
   tight and all one way. The move is read off the **paired** difference: version
   7 of one world against version 7 of the other, which cancels the elicitation
   noise because both versions were built from the same numbers.
+- Never count the versions one way for the number and another way for the
+  direction. **The direction is read with the same weights the number was read
+  with.** When something was observed, a version counts by the share of its
+  worlds that survived, so a version with no surviving world counts for nothing
+  in the number and must not vote on the direction either. Let it vote and a
+  version that contributed nothing to either number argues about which way they
+  moved.
 - Never fold how wide a range is, or how much the versions agreed, into the
   rank. "This moved a lot", "we are unsure how much" and "we are sure which way"
   are three separate facts a trader weighs separately, and one blended score
@@ -154,7 +161,9 @@ class ClaimDiff(BaseModel):
 
     `agreement` is carried on every claim both worlds hold, not only the ones
     that moved, so a reader — or a test — can check the rule that decided the
-    state without recomputing anything.
+    state without recomputing anything. It is read with the same weights the two
+    numbers above were read with, so a version that counted for nothing in them
+    does not vote on which way they moved.
 
     A claim still supposed on its own resolve-by day carries the stored 1 (or 0,
     where it was supposed false) so that the arithmetic stays ordinary. **No
@@ -188,9 +197,18 @@ class ClaimDiff(BaseModel):
     )
     agreement: float | None = Field(
         description=(
-            "The share of versions of the map that moved the same way as the move above. "
-            "Nothing at all when only one of the two worlds holds the claim. On screen "
-            "this column is headed 'same direction'."
+            "The share of versions of the map that moved the same way as the move above, "
+            "each version counted by as much as it counted for the two numbers. Nothing at "
+            "all when only one of the two worlds holds the claim. On screen this column is "
+            "headed 'same direction'."
+        )
+    )
+    moved_only_by_reweighting: bool = Field(
+        description=(
+            "True when the move above came from nothing but the observation changing how "
+            "much each version counts: the claim is in both worlds, it moved by at least "
+            "0.005, and not one version that counts moved at all. Only an observation can "
+            "produce it, and the Inspector says so in one sentence."
         )
     )
 
@@ -235,8 +253,9 @@ class DeltaRow(BaseModel):
     )
     agreement: float = Field(
         description=(
-            "The share of versions of the map that moved the same way on that day. A "
-            "column, never a factor. On screen it is headed 'same direction'."
+            "The share of versions of the map that moved the same way on that day, each "
+            "version counted by as much as it counted for the two numbers. A column, never "
+            "a factor. On screen it is headed 'same direction'."
         )
     )
     rank: float = Field(
@@ -573,30 +592,117 @@ def _read_on(world: World, claim: Proposition) -> int:
     return min(int(numpy.searchsorted(world.series_days, day)), len(world.series_days) - 1)
 
 
-def _agreement_on(before: Numbers, after: Numbers, move: float) -> float:
+def _counting_for(behind_a: Versions, behind_b: Versions, claim_id: PropositionId) -> Numbers:
+    """Say how much each version of the map counts when one claim's move is read.
+
+    **One rule: the direction is read with the same weights the number was read
+    with.** A world reads a claim's number off every version equally — unless an
+    observation is evidence about that claim, in which case each version counts by
+    the share of its worlds that survived what was observed. The two worlds of a
+    difference can each answer that differently, so a version counts for the move
+    by **the smaller of the two weights it carried**: a version can only speak
+    about a difference as far as it counted in both numbers. A version with no
+    surviving world therefore counts for nothing and does not vote.
+
+    Three cases fall out of that one sentence, and none of them is a special case.
+    Only the second world observed something: the version weights that world read
+    the claim with. Both observed something: the smaller of the two. The claim is
+    one the observation is not evidence about — it is joined to what was observed
+    by no chain of arrows and shares no cause with it — so both worlds read it off
+    every world equally, and every version counts the same here too.
+
+    Under every edit that is not an observation neither world weights anything, so
+    every version counts 1 and nothing this file reports can move by a bit.
+
+    Args:
+        behind_a: The version-by-version numbers behind the first world.
+        behind_b: The same behind the second.
+        claim_id: The claim whose move is being read.
+
+    Returns:
+        How much each version counts, one number per version.
+    """
+    in_a = (
+        behind_a.weights if claim_id in behind_a.reweighted else numpy.ones_like(behind_a.weights)
+    )
+    in_b = (
+        behind_b.weights if claim_id in behind_b.reweighted else numpy.ones_like(behind_b.weights)
+    )
+    together: Numbers = numpy.minimum(in_a, in_b)
+    # Nothing at all survived what was observed, anywhere. Then every version
+    # counts the same again — which is exactly what the band does in the same
+    # corner, so the number and its direction stay read the same way. The world
+    # carries a loud warning saying the reader is looking at the map rather than
+    # at an answer.
+    if together.sum() <= 0.0:
+        return numpy.ones_like(together)
+    return together
+
+
+def _agreement_on(before: Numbers, after: Numbers, move: float, counting: Numbers) -> float:
     """Say what share of the versions of the map moved the way the reported move says.
 
     Subtract the first world's version *k* from the second world's version *k*, for
     every version. Because the stream that picks the versions never depends on the
     branch, both versions were built from the same underlying numbers, so the
     elicitation noise cancels and what is left is the edit. This counts how many of
-    those paired differences point the same way as the move being reported.
+    those paired differences point the same way as the move being reported, **each
+    version counted by as much as it counted for the two numbers** — which is what
+    `_counting_for` works out, and is why a version with no surviving world says
+    nothing here.
 
-    A claim that did not move at all in any version comes out at 1: every version
-    agreed, about nothing happening. Its move is nowhere near the floor, so it
-    reads `unchanged` whatever this number says.
+    A claim that did not move at all in any version that counts comes out at 0
+    unless the move is itself nothing: no paired difference points the reported
+    way, because none of them points any way at all. That is the claim an
+    observation moved through the version weights alone, and `_states` names it.
 
     Args:
         before: The first world's answer for one claim on one day, per version.
         after: The second world's answer for the same claim and day, per version.
         move: The move being reported, whose direction the versions are counted
             against.
+        counting: How much each version counts, one number per version.
 
     Returns:
-        The share of versions that moved that way, between 0 and 1.
+        The share of the counted versions that moved that way, between 0 and 1.
     """
     paired = after - before
-    return float(numpy.mean(numpy.sign(paired) == numpy.sign(move)))
+    agreeing = numpy.sign(paired) == numpy.sign(move)
+    return float((counting * agreeing).sum() / counting.sum())
+
+
+def _moved_only_by_reweighting(
+    before: Numbers, after: Numbers, move: float, counting: Numbers
+) -> bool:
+    """Say whether a claim's whole move came from how much each version counts.
+
+    True when the claim moved far enough for the move to count at all and **not one
+    version that counts moved by so much as a bit**: every paired difference among
+    them is exactly zero. Then the two worlds' version-by-version answers are the
+    same numbers, and the only thing left that can have moved the reported number is
+    how much each of those versions counts.
+
+    Only an observation can produce it. Under every other edit both worlds count
+    every version the same, so identical version-by-version answers give identical
+    numbers and the move is exactly nothing, which is below the floor.
+
+    The claim it happens to is a claim with **no causes** — the hypothesis, usually.
+    Inside one version such a claim is its own prior in every world, so throwing
+    worlds away cannot change what that version says about it, and only the version
+    weights are left to move it.
+
+    Args:
+        before: The first world's answer for one claim on one day, per version.
+        after: The second world's answer for the same claim and day, per version.
+        move: The move being reported.
+        counting: How much each version counts, one number per version.
+
+    Returns:
+        True when the move is at least the floor and no counted version moved.
+    """
+    if abs(move) < MOVED_AT_LEAST:
+        return False
+    return not bool(numpy.any((after != before) & (counting > 0.0)))
 
 
 def _forced_false_in(world: World, claim_id: PropositionId) -> bool:
@@ -636,6 +742,13 @@ def _states(
     width while 99.9% of versions move the same way, so overlap would report "no
     change" about the clearest change on the map.
 
+    Each claim's direction is read with the same weights its two numbers were read
+    with, so a version an observation left with no surviving world does not vote.
+    A claim whose whole move came from those weights — every version that counts
+    says exactly the same thing in both worlds — keeps whichever of the four words
+    it had and says so in one field of its own, which the Inspector turns into one
+    sentence.
+
     Args:
         world_a: The world to compare from.
         world_b: The world to compare to.
@@ -658,6 +771,7 @@ def _states(
                 after=world_b.beliefs[claim_id].p,
                 delta=None,
                 agreement=None,
+                moved_only_by_reweighting=False,
             )
             continue
         if claim_id not in in_b:
@@ -674,17 +788,17 @@ def _states(
                 after=None,
                 delta=None,
                 agreement=None,
+                moved_only_by_reweighting=False,
             )
             continue
 
         before = world_a.beliefs[claim_id].p
         after = world_b.beliefs[claim_id].p
         move = after - before
-        agreement = _agreement_on(
-            behind_a.likelihood[claim_id][:, _read_on(world_a, in_a[claim_id])],
-            behind_b.likelihood[claim_id][:, _read_on(world_b, in_b[claim_id])],
-            move,
-        )
+        each_version = behind_a.likelihood[claim_id][:, _read_on(world_a, in_a[claim_id])]
+        each_version_after = behind_b.likelihood[claim_id][:, _read_on(world_b, in_b[claim_id])]
+        counting = _counting_for(behind_a, behind_b, claim_id)
+        agreement = _agreement_on(each_version, each_version_after, move, counting)
         state: ClaimState = "unchanged"
         if _forced_false_in(world_b, claim_id):
             state = "killed"
@@ -697,6 +811,9 @@ def _states(
             after=after,
             delta=move,
             agreement=agreement,
+            moved_only_by_reweighting=_moved_only_by_reweighting(
+                each_version, each_version_after, move, counting
+            ),
         )
     return found
 
@@ -918,6 +1035,7 @@ def _ranked_endings(
                     behind_a.likelihood[claim.id][:, where_a[at]],
                     behind_b.likelihood[claim.id][:, column],
                     peak,
+                    _counting_for(behind_a, behind_b, claim.id),
                 ),
                 rank=abs(peak) * widest.get(claim.id, 0.0),
             )
