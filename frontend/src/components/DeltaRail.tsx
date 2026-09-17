@@ -7,32 +7,38 @@
  * how far its number moved, **how firm** that number is, and whether it went the
  * **same direction** whatever numbers the map started from.
  *
- * **In this build all three are absences, and the order is map order.** Nothing
- * has worked a number through the map, so there is no move to report, nothing to
- * be firm about, and nothing that agreed or disagreed. And with no numbers there
- * is no ranking either — so the rail lists the endings in the order the map
- * stores them, says so on its own face, and invents nothing. A rail that made up
- * an ordering would be making up the single thing the rail exists to tell you.
+ * **The rail ranks nothing.** When the engine has ordered these rows — largest
+ * move along the best-backed route first — the rail draws them in that order and
+ * says so. When nothing has, it lists them in the order the map stores them and
+ * says *that*, because map order is visibly arbitrary while an invented ranking
+ * looks like an answer, and a ranking is the one thing the rail exists to tell
+ * you.
  *
- * The two columns are never folded into any ordering, before the engine or
- * after it. They answer different questions and a trader weighs them separately;
- * folding the width into a rank would sink exactly the claims that most deserve
- * a second look.
+ * **An ending that did not move still gets a row.** The engine lists the ones
+ * that moved; an ending missing from that list could mean either "it held still"
+ * or "it is not on this map", and silence cannot be told from absence. So the
+ * unmoved ones follow the ranked ones, reading *no change*, never mixed in among
+ * them.
+ *
+ * The two columns are never folded into any ordering. They answer different
+ * questions and a trader weighs them separately; folding the width into a rank
+ * would sink exactly the claims that most deserve a second look.
  */
 
 import { useId, useState } from "react";
 import type { DeltaRow, Known } from "../world";
+import { toShare, toTwoFigures } from "./BeliefChip";
 import "./deltaRail.css";
 
 /** What the rail needs to draw itself. */
 export interface DeltaRailProps {
-  /** The endings this edit can reach, in the order the map stores them. */
+  /** The endings this edit can reach, in whatever order they arrived in. */
   readonly rows: readonly DeltaRow[];
   /**
    * Whether something has put these rows in an order that means something.
    *
-   * False in this build, and the rail says so out loud rather than letting map
-   * order be mistaken for a ranking.
+   * True once the engine has ranked them. False before that, and the rail says
+   * so out loud rather than letting map order be mistaken for a ranking.
    */
   readonly ranked: boolean;
   /** The one line saying what this edit did to the trades, or the reason there is none. */
@@ -46,6 +52,12 @@ const KIND_WORDS: Record<string, string> = {
   event: "event",
   hypothesis: "hypothesis",
 };
+
+/** The chevron and the word each direction goes by. Neither is a colour. */
+const WAY = {
+  up: { chevron: "▲", word: "up" },
+  down: { chevron: "▼", word: "down" },
+} as const;
 
 /**
  * One cell: the number, or the words standing where it would have been.
@@ -81,9 +93,37 @@ function Cell({
   );
 }
 
-/** Turn a known number into the words a cell prints. */
-function asWords(value: Known<number>): Known<string> {
-  return value.reading === undefined ? { absence: value.absence } : { reading: `${value.reading}` };
+/**
+ * The change itself, as one cell reads it: `.50 ▼ .42`, and the day the two
+ * worlds were furthest apart.
+ *
+ * A row is read on the **day of largest divergence** rather than on the claim's
+ * own judging day, because a change that shows up for a fortnight and then
+ * unwinds is the thing a trader acts on — so the row names that day.
+ */
+function changeOf(row: DeltaRow): Known<string> {
+  const move = row.move.reading;
+  if (move === undefined) {
+    return { absence: row.move.absence };
+  }
+  const way = WAY[move.way];
+  return {
+    reading: `${toTwoFigures(move.from)} ${way.chevron} ${toTwoFigures(move.to)}`,
+  };
+}
+
+/** How firm the new number is: the width of its own range, printed like a likelihood. */
+function firmnessOf(row: DeltaRow): Known<string> {
+  return row.rangeWidth.reading === undefined
+    ? { absence: row.rangeWidth.absence }
+    : { reading: toTwoFigures(row.rangeWidth.reading) };
+}
+
+/** The share of versions of the map that moved the same way, as a whole percentage. */
+function sameDirectionOf(row: DeltaRow): Known<string> {
+  return row.agreement.reading === undefined
+    ? { absence: row.agreement.absence }
+    : { reading: toShare(row.agreement.reading) };
 }
 
 /** The rail beside the map. */
@@ -97,9 +137,9 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
         Where this edit ends up
       </h2>
 
-      {/* The one line saying what the edit did to the trades. It is written from
-          the numbers the edit moved, and nothing has moved one — so it says that
-          instead, and says what the map *can* tell you underneath. */}
+      {/* The one line saying what the edit did to the trades. The engine writes
+          it from a fixed template with its own numbers in the blanks; before it
+          has, the slot says why there is none. */}
       <p className="delta-rail__summary">
         {summary.reading ?? summary.absence.words}
         {summary.reading === undefined ? (
@@ -116,7 +156,7 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
         <>
           <p className="delta-rail__order">
             {ranked
-              ? "In the order the engine put them in: the size of the move along the best-backed route."
+              ? "In the order the engine put them in: the size of the move times the weakest arrow on the best-backed route behind it. Endings that did not move follow, and are not ranked."
               : "In map order. Nothing has ranked these, because nothing has worked out a number to rank them by."}
           </p>
 
@@ -128,25 +168,25 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
             </div>
             <ul className="delta-rail__rows">
               {rows.map((row) => (
-                <li className="delta-rail__row" key={row.claimId}>
+                <li
+                  className="delta-rail__row"
+                  key={row.claimId}
+                  data-moved={row.noChange === true ? "no" : "yes"}
+                >
                   <p className="delta-rail__label">
                     <span className="delta-rail__id">{row.claimId}</span>
                     {row.label}
                     <span className="delta-rail__kind">{KIND_WORDS[row.kind] ?? row.kind}</span>
+                    {row.move.reading === undefined ? null : (
+                      <span className="delta-rail__day">
+                        {`${WAY[row.move.reading.way].word} · largest on ${row.move.reading.largestOn}`}
+                      </span>
+                    )}
                   </p>
                   <div className="delta-rail__values">
-                    <Cell
-                      value={
-                        row.move.reading === undefined
-                          ? { absence: row.move.absence }
-                          : {
-                              reading: `${row.move.reading.from} → ${row.move.reading.to}`,
-                            }
-                      }
-                      onReason={setReason}
-                    />
-                    <Cell value={asWords(row.rangeWidth)} onReason={setReason} />
-                    <Cell value={asWords(row.agreement)} onReason={setReason} />
+                    <Cell value={changeOf(row)} onReason={setReason} />
+                    <Cell value={firmnessOf(row)} onReason={setReason} />
+                    <Cell value={sameDirectionOf(row)} onReason={setReason} />
                   </div>
                 </li>
               ))}
@@ -155,8 +195,8 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
 
           <p className="delta-rail__reason">
             {reason ??
-              "Every dash above carries the same reason as the words beside it. Reach one with " +
-                "the keyboard, or point at it, and the reason is printed here."}
+              "Every reading above is the engine's own, in the engine's own order. Reach one with " +
+                "the keyboard, or point at it, and whatever it has to say is printed here."}
           </p>
         </>
       )}

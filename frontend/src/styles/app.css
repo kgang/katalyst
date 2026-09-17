@@ -263,11 +263,22 @@ body {
   color: var(--text);
 }
 
-/* Where every number on the map came from, in one sentence, under the map. A
- * map whose numbers cannot say where they came from is the state this product
- * refuses to show, so the sentence is part of the map rather than a footnote
- * somebody might have left off. */
+/* Where every number on the map came from, under the map — and whatever is
+ * still on its way. A map whose numbers cannot say where they came from is the
+ * state this product refuses to show, so the sentence is part of the map rather
+ * than a footnote somebody might have left off.
+ *
+ * One line each, stacked, in a strip of a fixed smallest height, so a line
+ * arriving or going does not move the map above it. There is no spinner in this
+ * strip and there is none anywhere: a line that says what was asked and at which
+ * address says the same thing and says it usefully. */
 .map-origin {
+  /* Never squashed. It is the line that says where every number on this screen
+     came from, and half of it is worth nothing at all. */
+  flex: 0 0 auto;
+  display: grid;
+  row-gap: var(--space-hair);
+  min-height: 2.6em;
   margin: 0;
   padding: var(--space-1) var(--space-3);
   border-top: 1px solid var(--hairline);
@@ -275,6 +286,10 @@ body {
   font-size: var(--text-sm);
   color: var(--text-muted);
   text-wrap: pretty;
+}
+
+.map-origin__line {
+  margin: 0;
 }
 
 /* What the screen says while the map is on its way, or when it could not be

@@ -18,28 +18,34 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { branchAnnouncement } from "./a11y/announcement";
 import { outlineOf } from "./a11y/sentences";
 import type { About, FixtureSummary, Health, Readiness } from "./api/client";
-import { readAbout, readExampleList, readHealth, readReadiness } from "./api/client";
+import { RefusedBranch, readAbout, readExampleList, readHealth, readReadiness } from "./api/client";
 import { BranchPanel, InterventionPanel } from "./components/BranchPanel";
 import { type Command, CommandPalette } from "./components/CommandPalette";
 import { DeltaRail } from "./components/DeltaRail";
 import { Inspector } from "./components/Inspector";
 import { Launchpad } from "./components/Launchpad";
 import { Outline } from "./components/Outline";
+import { Refusal } from "./components/Refusal";
 import { ShortcutsSheet } from "./components/ShortcutsSheet";
 import { MapCanvas } from "./graph/Canvas";
-import { bothPaintings } from "./graph/diff/branchWorld";
+import { bothPaintings, type Computed, railRows } from "./graph/diff/branchWorld";
 import { endings, NO_SUMMARY_YET } from "./graph/diff/endings";
 import { tileHeight } from "./graph/geometry";
 import type { MapKeys } from "./keyboard/useMapKeys";
 import {
+  ApiWorldSource,
   appendEdit,
   type BranchView,
   branchesOf,
+  type ClaimView,
   type Edit,
   FixtureWorldSource,
   forkBranch,
+  type LinkView,
   openBranch,
+  type Reason,
   type Selection,
+  type Slot,
   type WorldSource,
   type WorldView,
   workshopOf,
@@ -228,11 +234,86 @@ function StatusRow({ reading }: { reading: Reading }) {
 type Screen =
   | { at: "launchpad" }
   | { at: "opening"; id: string }
-  | { at: "map"; world: WorldView; branches: readonly BranchView[] }
+  | {
+      at: "map";
+      world: WorldView;
+      branches: readonly BranchView[];
+      /**
+       * Why the map on screen was read from the stored example rather than
+       * worked out by the engine, or nothing when the engine answered.
+       */
+      insteadOfTheEngine: string | null;
+    }
   | { at: "failed"; id: string; reason: string };
 
 /** How long the wires take to arrive, column by column, before the map settles. */
 const WAVE_SETTLES_AFTER = 1200;
+
+/**
+ * What stands where a likelihood would go while the engine is being asked for
+ * one.
+ *
+ * The shared vocabulary has three ways of saying a number is not there, and
+ * this is the third of them — *nothing has been computed* — because that is
+ * exactly what is true while a question is in flight: the engine has been asked
+ * and has not answered, so nothing has worked this number through the map
+ * **yet**. It is not a fourth kind of absence and it is not a spinner: the map
+ * on screen is the last one that was worked out, the slots that would move keep
+ * the words they already had, and the line under the map says what has been
+ * asked for and where.
+ */
+const WHILE_ASKING =
+  "Asking the engine at /api/worlds for the map with this branch folded onto it.";
+
+/**
+ * Everything the engine has said about the branch that is open, and whether it
+ * has said it yet.
+ */
+type Answered =
+  | { at: "asking" }
+  | { at: "answered"; computed: Computed }
+  | { at: "refused"; reasons: readonly Reason[] }
+  | { at: "failed"; reason: string }
+  | { at: "nothing-open" };
+
+/**
+ * How tall a box this claim's tile needs, with room for how far its number
+ * moved.
+ *
+ * A tile is as tall as its own content, and the layout has to know that before
+ * the browser has drawn one — so the height is a plain function of the claim.
+ * This adds one thing to it: **how far the number moved gets a line of its own**
+ * under whatever the edits had to say. On the busiest tile on the map, *Supposed
+ * · Oct 1 → Retracted · Oct 2 · by "…"* already runs to three lines, and
+ * stringing a reading on the end of that run pushes a line out of the box.
+ *
+ * The extra line is measured rather than written down: the words' block and the
+ * reading's block are each measured on their own and the empty tile is counted
+ * once. So if the badge line height ever changes, this changes with it, and
+ * there is no second copy of a number here to fall out of step.
+ *
+ * @param claim The claim the tile is for.
+ */
+function roomFor(claim: ClaimView): number {
+  const badges = claim.badges ?? [];
+  const said = badges.filter((badge) => badge.movement !== true);
+  const moved = badges.filter((badge) => badge.movement === true);
+  if (said.length === 0 || moved.length === 0) {
+    return tileHeight(claim);
+  }
+  const withWords = tileHeight({ ...claim, badges: said });
+  const withReading = tileHeight({ ...claim, badges: moved });
+  const withNeither = tileHeight({ ...claim, badges: [] });
+  return withWords + withReading - withNeither;
+}
+
+/** Turn whatever the engine threw into either a list of reasons or one sentence. */
+function asAnswer(reason: unknown): Answered {
+  if (reason instanceof RefusedBranch) {
+    return { at: "refused", reasons: reason.reasons };
+  }
+  return { at: "failed", reason: inWords(reason) };
+}
 
 /**
  * The map, the panel beside it, and everything you can do to both.
@@ -244,10 +325,16 @@ const WAVE_SETTLES_AFTER = 1200;
 function MapScreen({
   base,
   branches,
+  source,
+  insteadOfTheEngine,
   onLeave,
 }: {
   base: WorldView;
   branches: readonly BranchView[];
+  /** Where a branch's world, its difference and an arrow's number are asked for. */
+  source: WorldSource;
+  /** Why this map is the stored example rather than the engine's, or nothing. */
+  insteadOfTheEngine: string | null;
   onLeave: () => void;
 }) {
   const [shop, setShop] = useState(() => workshopOf(branches));
@@ -270,11 +357,79 @@ function MapScreen({
   const lastBranch = useRef<string | null>(null);
 
   const open = shop.branches.find((branch) => branch.id === shop.openId);
+
+  // What the engine says about the branch that is open. It is asked again
+  // whenever the branch changes — which is what makes the six buttons move
+  // numbers: pressing one appends an edit, and the whole branch goes back.
+  const [answer, setAnswer] = useState<Answered>({ at: "nothing-open" });
+  useEffect(() => {
+    if (open === undefined) {
+      setAnswer({ at: "nothing-open" });
+      return;
+    }
+    let stillWanted = true;
+    setAnswer({ at: "asking" });
+    Promise.all([
+      source.readWorld({ baseId: base.baseId, branch: open }),
+      source.readDiff({ baseId: base.baseId, branch: open }),
+    ]).then(
+      ([now, change]) => {
+        if (stillWanted) {
+          setAnswer({ at: "answered", computed: { now, change } });
+        }
+      },
+      (failure: unknown) => {
+        if (stillWanted) {
+          setAnswer(asAnswer(failure));
+        }
+      },
+    );
+    return () => {
+      // An answer to a question the reader has moved on from is thrown away
+      // rather than drawn: a map that flickers back to an older branch because
+      // a slower request finished last is a map nobody can trust.
+      stillWanted = false;
+    };
+    // The branch itself is what this hangs on, and that is enough: appending an
+    // edit hands back a new branch rather than changing the one that was there
+    // — a branch is an audit trail and nothing rewrites one — so every press of
+    // a button is a new question here, and nothing else is.
+  }, [source, base.baseId, open]);
+
+  const computed = answer.at === "answered" ? answer.computed : undefined;
+
+  // The numbers on the arrows, one at a time, kept once they arrive. Each one
+  // costs a whole extra run of the map, so it is asked for when a reader selects
+  // that arrow and never again for the same branch, seed and arrow.
+  const [wireNumbers, setWireNumbers] = useState<ReadonlyMap<string, Slot>>(new Map());
   const paintings = useMemo(
-    () => (open === undefined ? null : bothPaintings(base, open)),
-    [base, open],
+    () => (open === undefined ? null : bothPaintings(base, open, computed)),
+    [base, open, computed],
   );
-  const world = paintings === null ? base : showing === "now" ? paintings.now : paintings.before;
+
+  const painted = paintings === null ? base : showing === "now" ? paintings.now : paintings.before;
+  const seed = painted.seed;
+
+  /** What names one arrow's number: which branch, which seed, which arrow. */
+  const wireKey = useCallback(
+    (linkId: string) => `${shop.openId ?? "as-written"}:${seed ?? "no-seed"}:${linkId}`,
+    [shop.openId, seed],
+  );
+
+  // The map as it is drawn: the world above, with any arrow number already
+  // fetched put back on its own arrow.
+  const world = useMemo((): WorldView => {
+    if (wireNumbers.size === 0) {
+      return painted;
+    }
+    return {
+      ...painted,
+      links: painted.links.map((link): LinkView => {
+        const asked = wireNumbers.get(wireKey(link.id));
+        return asked === undefined ? link : { ...link, conditional: asked };
+      }),
+    };
+  }, [painted, wireNumbers, wireKey]);
 
   /**
    * One box per claim, tall enough for whichever of the two paintings needs more
@@ -289,14 +444,61 @@ function MapScreen({
     const reserved = new Map<string, number>();
     for (const side of [paintings.now, paintings.before]) {
       for (const claim of side.claims) {
-        reserved.set(claim.id, Math.max(reserved.get(claim.id) ?? 0, tileHeight(claim)));
+        reserved.set(claim.id, Math.max(reserved.get(claim.id) ?? 0, roomFor(claim)));
       }
     }
     return reserved;
   }, [paintings]);
 
-  const rows = useMemo(() => (paintings === null ? [] : endings(paintings.now)), [paintings]);
+  // The endings the edit reaches. With the engine, its own ranked rows, in its
+  // own order; without it, the reachable endings in map order, and the rail
+  // says on its own face which of the two it is showing.
+  const rows = useMemo(
+    () =>
+      computed !== undefined
+        ? railRows(computed)
+        : paintings === null
+          ? []
+          : endings(paintings.now),
+    [computed, paintings],
+  );
   const outline = useMemo(() => outlineOf(world), [world]);
+
+  // One arrow's own number, asked for when the reader selects that arrow and
+  // kept afterwards. It is fetched here rather than by the wire because no
+  // component in this product talks to the network, and because the answer
+  // belongs to the whole screen: the panel and the plate on the wire read the
+  // same one.
+  useEffect(() => {
+    if (selection?.kind !== "wire") {
+      return;
+    }
+    const key = wireKey(selection.id);
+    if (wireNumbers.has(key)) {
+      return;
+    }
+    let stillWanted = true;
+    source
+      .readConditional({ baseId: base.baseId, branch: open, linkId: selection.id })
+      .then(
+        (slot) => slot,
+        (failure: unknown): Slot => ({
+          absence: {
+            kind: "no_engine",
+            words: "no engine yet",
+            reason: inWords(failure),
+          },
+        }),
+      )
+      .then((slot) => {
+        if (stillWanted) {
+          setWireNumbers((was) => new Map(was).set(key, slot));
+        }
+      });
+    return () => {
+      stillWanted = false;
+    };
+  }, [selection, source, base.baseId, open, wireKey, wireNumbers]);
 
   // A branch has just been opened or made. Three things follow, in this order:
   // the map says out loud what the branch did, the wires arrive again in causal
@@ -310,10 +512,9 @@ function MapScreen({
     lastBranch.current = shop.openId;
     setShowing("now");
     setArriving(true);
-    const settles = window.setTimeout(() => setArriving(false), WAVE_SETTLES_AFTER);
     if (paintings === null) {
       setAnnouncement("");
-      return () => window.clearTimeout(settles);
+      return;
     }
     setAnnouncement(branchAnnouncement(paintings.now));
     const arrived = paintings.now.claims.find((claim) => claim.diff === "added");
@@ -322,8 +523,22 @@ function MapScreen({
       setSelection({ kind: "claim", id: arrived.id });
       setStatus(`your edit added this claim · ${arrived.claim}`);
     }
-    return () => window.clearTimeout(settles);
   }, [shop.openId, paintings]);
+
+  // The wave settles on its own clock, and on nothing else.
+  //
+  // **It has to be its own effect.** The one above runs again whenever the
+  // picture changes — and the picture changes when the engine answers, which is
+  // a moment or two after a branch is opened. A timer started up there would be
+  // cleared by that second run and never started again, and the map would stay
+  // mid-arrival for ever, which is to say invisible.
+  useEffect(() => {
+    if (!arriving) {
+      return;
+    }
+    const settles = window.setTimeout(() => setArriving(false), WAVE_SETTLES_AFTER);
+    return () => window.clearTimeout(settles);
+  }, [arriving]);
 
   const edit = useCallback((made: Edit) => {
     setShop((was) =>
@@ -550,8 +765,15 @@ function MapScreen({
                   naming={naming}
                   onNaming={setNaming}
                 />
+                {answer.at === "refused" ? (
+                  <Refusal asking="this map" reasons={answer.reasons} />
+                ) : null}
                 {open === undefined ? null : (
-                  <DeltaRail rows={rows} ranked={false} summary={NO_SUMMARY_YET} />
+                  <DeltaRail
+                    rows={rows}
+                    ranked={computed !== undefined}
+                    summary={computed === undefined ? NO_SUMMARY_YET : computed.change.summary}
+                  />
                 )}
                 <Inspector world={world} selection={selection} />
               </>
@@ -566,51 +788,130 @@ function MapScreen({
       <p className="map-live" aria-live="polite">
         {announcement}
       </p>
-      <p className="map-origin">{world.origin}</p>
+
+      {/* Where every number on this map came from, and anything that is still on
+          its way. There is no spinner here and never will be: a spinner says
+          "wait" without saying what for, so the line says what has been asked
+          and at which address, and the map keeps drawing the last answer while
+          it waits. */}
+      <div className="map-origin">
+        <p className="map-origin__line">{world.origin}</p>
+        {answer.at === "asking" ? <p className="map-origin__line">{WHILE_ASKING}</p> : null}
+        {answer.at === "failed" ? (
+          <p className="map-origin__line">
+            {`The engine did not answer, so this is the map's shape with an absence wherever a ` +
+              `likelihood would have moved. ${answer.reason}`}
+          </p>
+        ) : null}
+        {insteadOfTheEngine === null ? null : (
+          <p className="map-origin__line">{insteadOfTheEngine}</p>
+        )}
+        {(world.warnings ?? []).map((warning) => (
+          <p className="map-origin__line" key={warning}>
+            {warning}
+          </p>
+        ))}
+      </div>
     </main>
   );
 }
 
 /**
- * Where maps come from.
+ * Where maps come from: the engine.
  *
- * Today this reads the stored example the server ships with. When the engine's
- * world route lands, this one line becomes `new ApiWorldSource()` and every
- * number slot that reads as an absence today fills in. Nothing else on this
- * screen changes, which is the whole reason there is a seam here at all.
+ * Every number on the map is worked out by it, from the stored map, the branch
+ * and one seed. Nothing on this screen computes a likelihood, and nothing on
+ * this screen shows one the engine did not produce.
  */
-const DEFAULT_SOURCE: WorldSource = new FixtureWorldSource();
+const DEFAULT_SOURCE: WorldSource = new ApiWorldSource();
 
-/** What the screen needs. Both have defaults; both exist so they can be swapped. */
+/**
+ * Where maps come from when the engine cannot be reached.
+ *
+ * A map you can still read beats a blank screen. The stored example's claims,
+ * arrows, dates and sources are all real and all still worth reading — what is
+ * missing is the working-out, and the screen says so in a line under the map
+ * rather than letting a hand-written likelihood pass for a computed one.
+ */
+const FALLBACK_SOURCE: WorldSource = new FixtureWorldSource();
+
+/**
+ * The line under the map when the stored example is standing in for the engine.
+ *
+ * @param reason What went wrong, in the sentence the failure arrived with.
+ */
+function insteadOfTheEngine(reason: string): string {
+  return (
+    `The engine did not answer, so this map is the stored example exactly as it was written: ` +
+    `its claims, arrows, dates and sources are real, and its likelihoods are the illustrative ` +
+    `ones somebody wrote down rather than anything worked out. ${reason}`
+  );
+}
+
+/** What the screen needs. All three have defaults; all three exist so they can be swapped. */
 export interface AppProps {
   /** Where maps and worlds come from. */
   readonly source?: WorldSource;
+  /** Where they come from when the first one cannot answer. */
+  readonly fallback?: WorldSource;
   /** How the list of stored examples is read. */
   readonly listExamples?: () => Promise<FixtureSummary[]>;
 }
 
 /** The screen. */
-export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }: AppProps = {}) {
+export function App({
+  source = DEFAULT_SOURCE,
+  fallback = FALLBACK_SOURCE,
+  listExamples = readExampleList,
+}: AppProps = {}) {
   const health = useAnswer(readHealth);
   const readiness = useAnswer(readReadiness);
   const about = useAnswer(readAbout);
   const examples = useAnswer(listExamples);
 
   const [screen, setScreen] = useState<Screen>({ at: "launchpad" });
+  const [using, setUsing] = useState<WorldSource>(source);
 
   const open = useCallback(
     (id: string) => {
       setScreen({ at: "opening", id });
-      // The world and the map's own branches, together: the world is what gets
-      // drawn, and the branches are the edits somebody already made to it, which
-      // the panel lists and the diff view folds on. Both come from the same
-      // stored example through the same seam.
-      Promise.all([source.readWorld({ baseId: id }), source.readBundle(id)]).then(
-        ([world, bundle]) => setScreen({ at: "map", world, branches: branchesOf(bundle) }),
-        (reason: unknown) => setScreen({ at: "failed", id, reason: inWords(reason) }),
+      /**
+       * The world and the map's own branches, together: the world is what gets
+       * drawn, and the branches are the edits somebody already made to it, which
+       * the panel lists and the diff view folds on.
+       *
+       * @param from Where to ask.
+       */
+      const ask = (from: WorldSource) =>
+        Promise.all([from.readWorld({ baseId: id }), from.readBundle(id)]);
+
+      ask(source).then(
+        ([world, bundle]) => {
+          setUsing(source);
+          setScreen({ at: "map", world, branches: branchesOf(bundle), insteadOfTheEngine: null });
+        },
+        (failure: unknown) => {
+          // The engine could not answer. Rather than a blank screen, the stored
+          // example — and a line under the map saying, in the failure's own
+          // words, that these are not computed numbers.
+          ask(fallback).then(
+            ([world, bundle]) => {
+              setUsing(fallback);
+              setScreen({
+                at: "map",
+                world,
+                branches: branchesOf(bundle),
+                insteadOfTheEngine: insteadOfTheEngine(inWords(failure)),
+              });
+            },
+            // Neither answered, which means the server itself is not there. That
+            // is one sentence on the page, and a way back to the launchpad.
+            (alsoFailed: unknown) => setScreen({ at: "failed", id, reason: inWords(alsoFailed) }),
+          );
+        },
       );
     },
-    [source],
+    [source, fallback],
   );
 
   const toLaunchpad = useCallback(() => setScreen({ at: "launchpad" }), []);
@@ -621,7 +922,15 @@ export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }:
   );
 
   if (screen.at === "map") {
-    return <MapScreen base={screen.world} branches={screen.branches} onLeave={toLaunchpad} />;
+    return (
+      <MapScreen
+        base={screen.world}
+        branches={screen.branches}
+        source={using}
+        insteadOfTheEngine={screen.insteadOfTheEngine}
+        onLeave={toLaunchpad}
+      />
+    );
   }
 
   if (screen.at !== "launchpad") {
@@ -637,7 +946,8 @@ export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }:
         <div className="map-waiting">
           <p className="map-waiting__line">
             {screen.at === "opening"
-              ? `Reading the stored map from /api/fixtures/${screen.id}.`
+              ? `Reading the map from /api/fixtures/${screen.id} and asking /api/worlds to work ` +
+                `its likelihoods through.`
               : screen.reason}
           </p>
         </div>

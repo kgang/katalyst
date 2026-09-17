@@ -22,9 +22,10 @@
 
 import { describe, expect, it } from "vitest";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
-import type { BranchView, Edit } from "../../world";
+import type { BranchView, DiffView, Edit } from "../../world";
+import { disagreements, type EngineState } from "../diff/agreement";
 import { badgesByClaim, standingByClaim } from "../diff/badges";
-import { bothPaintings, branchWorld } from "../diff/branchWorld";
+import { bothPaintings, branchWorld, railRows } from "../diff/branchWorld";
 import { readDiff } from "../diff/diffState";
 import { endings } from "../diff/endings";
 import type { Arrow } from "../diff/reach";
@@ -76,8 +77,7 @@ function strike() {
 }
 
 describe("what an edit did to the map", () => {
-  // test_computes_the_four_structural_states_for_the_strike_branch
-  it("works out one word per claim from the branch alone", () => {
+  it("test_computes_the_four_structural_states_for_the_strike_branch", () => {
     const { states } = strike();
     expect(Object.fromEntries(states)).toEqual({
       S: "added",
@@ -91,14 +91,12 @@ describe("what an edit did to the map", () => {
     });
   });
 
-  // test_r_comes_out_untouched
-  it("says out loud that the strike cannot reach OPEC's announcement", () => {
+  it("test_r_comes_out_untouched", () => {
     // The whole of the product's central correctness claim, in one assertion.
     expect(strike().states.get("R")).toBe("untouched");
   });
 
-  // test_a_feedback_arrow_never_carries_a_change
-  it("never carries a change along a feedback arrow", () => {
+  it("test_a_feedback_arrow_never_carries_a_change", () => {
     // Set the feedback flag and R becomes reachable; that is the one line to
     // change the day feedback arrows are unrolled in time, and this test is the
     // thing that will fail loudly and point at it.
@@ -111,8 +109,7 @@ describe("what an edit did to the map", () => {
     expect(pretend.states.get("R")).toBe("downstream");
   });
 
-  // test_the_showcase_depends_on_the_order_of_the_edits
-  it("only lets the strike reach the strait because its arrow arrived afterwards", () => {
+  it("test_the_showcase_depends_on_the_order_of_the_edits", () => {
     // Supposing a claim cuts the arrows into it that exist at that moment. Move
     // the supposition to the end and it cuts the strike's arrow too, and the
     // strait is no longer something the strike can move. The order of the edits
@@ -126,8 +123,7 @@ describe("what an edit did to the map", () => {
     expect(cut.cutLinks.has("S->H")).toBe(true);
   });
 
-  // test_a_supposition_that_is_false_kills_its_target
-  it("marks the target of a supposition that it is false, and nothing else", () => {
+  it("test_a_supposition_that_is_false_kills_its_target", () => {
     const { states } = readDiff(CLAIMS as unknown as string[], ARROWS, [
       { op: "do", target: "C", value: false, at: "2026-10-01" },
     ]);
@@ -137,8 +133,7 @@ describe("what an edit did to the map", () => {
     expect(states.get("H")).toBe("untouched");
   });
 
-  // test_your_own_number_moves_nothing_the_map_computes
-  it("does not blank a model number because you put your own beside it", () => {
+  it("test_your_own_number_moves_nothing_the_map_computes", () => {
     const { states, canMove } = readDiff(CLAIMS as unknown as string[], ARROWS, [
       { op: "believe", target: "M1", belief: { p: 0.4, lo: 0.3, hi: 0.5 } },
     ]);
@@ -195,8 +190,7 @@ describe("the second world", () => {
     };
   }
 
-  // test_a_claim_your_edit_can_reach_reads_its_absence
-  it("puts an absence with a reason where a likelihood would have moved", () => {
+  it("test_a_claim_your_edit_can_reach_reads_its_absence", () => {
     const world = branchWorld(base(), branch());
     const b = world.claims.find((claim) => claim.id === "B");
     expect(b?.beliefs.model.reading).toBeUndefined();
@@ -207,21 +201,18 @@ describe("the second world", () => {
     expect(r?.beliefs.model.reading).toBeDefined();
   });
 
-  // test_never_shifts_on_an_absent_number
-  it("never calls a claim shifted, because nothing here has two numbers to compare", () => {
+  it("test_never_shifts_on_an_absent_number", () => {
     const world = branchWorld(base(), branch());
     expect(world.claims.map((claim) => claim.diff)).not.toContain("shifted");
   });
 
-  // test_paints_both_worlds_from_one_position_map
-  it("gives both paintings the same claims and the same arrows, in the same order", () => {
+  it("test_paints_both_worlds_from_one_position_map", () => {
     const { now, before } = bothPaintings(base(), branch());
     expect(before.claims.map((claim) => claim.id)).toEqual(now.claims.map((claim) => claim.id));
     expect(before.links.map((link) => link.id)).toEqual(now.links.map((link) => link.id));
   });
 
-  // test_space_changes_no_position
-  it("draws the claim only one world has as a ghost rather than removing it", () => {
+  it("test_space_changes_no_position", () => {
     const { now, before } = bothPaintings(base(), branch());
     // A tile that disappeared would be a change you could only catch by
     // remembering where it had been.
@@ -229,8 +220,76 @@ describe("the second world", () => {
     expect(now.claims.find((claim) => claim.id === "S")?.ghost).not.toBe(true);
   });
 
-  // test_the_map_as_it_was_written_keeps_its_own_numbers
-  it("leaves every number in the other painting exactly as the map wrote it", () => {
+  it("test_a_supposed_claim_never_reports_a_move_to_the_number_it_is_supposed_to", () => {
+    // The engine stores a flat 1 on a claim whose supposition is holding, so
+    // that a chain multiplied out has a factor for it. No surface prints that
+    // number — and ".41 up to >.99" is that number with the certainty guard in
+    // front of it. The badge pair says *Supposed* instead.
+    const supposed: BranchView = {
+      id: "b",
+      label: "Suppose Brent settles below $68",
+      hue: "violet",
+      edits: [{ op: "do", target: "B", value: true, at: "2026-10-01" }],
+      claims: [],
+      links: [],
+    };
+    const engineSays: DiffView = {
+      claims: new Map([
+        [
+          "B",
+          {
+            state: "shifted" as const,
+            moved: { from: 0.4, to: 1, way: "up" as const, sameDirection: { reading: 1 } },
+          },
+        ],
+      ]),
+      rows: [
+        {
+          claimId: "B",
+          label: "Brent crude settles below $68 for five sessions.",
+          kind: "market" as const,
+          move: { reading: { from: 0.4, to: 1, largestOn: "2026-10-02", way: "up" as const } },
+          rangeWidth: { reading: 0 },
+          agreement: { reading: 1 },
+        },
+      ],
+      summary: { reading: "It moves one ending." },
+      warnings: [],
+    };
+    // The world the engine built. It says, in `states`, that B reads as a
+    // supposition on the day it is judged, so the world source wrote the word
+    // where the likelihood would go — and that word is what the guard reads.
+    const world = base();
+    const asTheEngineBuiltIt = {
+      ...world,
+      claims: world.claims.map((claim) =>
+        claim.id === "B"
+          ? {
+              ...claim,
+              badges: [{ words: "Supposed · Oct 1", reason: "You supposed this is true." }],
+              standing: {
+                words: "Supposed · Oct 1",
+                reason: "While a claim is supposed it is true in every version of the map.",
+              },
+            }
+          : claim,
+      ),
+    };
+
+    const now = branchWorld(base(), supposed, { now: asTheEngineBuiltIt, change: engineSays });
+    const b = now.claims.find((claim) => claim.id === "B");
+    expect(b?.standing?.words).toBe("Supposed · Oct 1");
+    expect(b?.moved).toBeUndefined();
+    expect((b?.badges ?? []).some((badge) => badge.movement === true)).toBe(false);
+
+    // And the rail says the word rather than the number, in the same place the
+    // reading would have gone.
+    const listed = railRows({ now: asTheEngineBuiltIt, change: engineSays });
+    expect(listed[0]?.move.reading).toBeUndefined();
+    expect(listed[0]?.move.absence?.words).toBe("Supposed · Oct 1");
+  });
+
+  it("test_the_map_as_it_was_written_keeps_its_own_numbers", () => {
     const { before } = bothPaintings(base(), branch());
     for (const claim of before.claims) {
       if (claim.id === "S") {
@@ -241,16 +300,62 @@ describe("the second world", () => {
     }
   });
 
-  // test_agrees_with_the_servers_affected_set
-  it.skip(
-    "agrees with the server's own affected set — skipped until the engine's world route exists, " +
-      "because there is nothing to compare against yet. It is skipped rather than deleted: the " +
-      "day the browser and the engine disagree about what an edit reached is the day this " +
-      "product stops being traceable, and this is the test that catches it.",
-    () => {
-      expect(true).toBe(true);
-    },
-  );
+  /**
+   * The browser's structural reading and the engine's own reading of the same
+   * branch, side by side.
+   *
+   * **The engine is the authority and the browser is a hint.** Two rules tie
+   * them together, and a break in either is the traceability veto wearing a
+   * disguise:
+   *
+   * 1. A claim the browser says an edit **cannot reach** must be one the engine
+   *    says did not move. That is the product's central correctness claim — an
+   *    edit changes only what is still joined to its subject — and if the engine
+   *    ever moves a claim the browser called untouched, the browser has told the
+   *    reader the opposite of the truth.
+   * 2. A claim the engine says **moved** must be one the browser said the edit
+   *    could reach. The same rule read the other way round.
+   *
+   * The engine's words below are words, not numbers: which of its four states
+   * each claim came out in. They are what it really answers for the stored
+   * example's strike branch, and the end-to-end test drives the real server and
+   * reads the same states off the screen — so nothing here stands in for a
+   * measurement.
+   */
+  describe("the browser's reading against the engine's", () => {
+    /** What the engine says about the strike branch, claim by claim. */
+    const ENGINE: ReadonlyMap<string, EngineState> = new Map([
+      ["S", "added"],
+      ["H", "shifted"],
+      ["C", "shifted"],
+      ["B", "shifted"],
+      ["N1", "shifted"],
+      ["M1", "shifted"],
+      ["M2", "shifted"],
+      ["R", "unchanged"],
+    ]);
+
+    it("test_the_browser_states_agree_with_the_engine", () => {
+      expect(disagreements(strike().states, ENGINE)).toEqual([]);
+    });
+
+    it("test_a_disagreement_with_the_engine_is_caught", () => {
+      // A check that cannot fail is not a check. Pretend the engine moved the
+      // one claim this branch provably cannot reach, and the comparison has to
+      // say so and name it.
+      const pretend = new Map(ENGINE).set("R", "shifted");
+      expect(disagreements(strike().states, pretend)).toEqual([
+        "R: the browser says an edit cannot reach this claim, and the engine says it moved",
+      ]);
+
+      // And the other way round: a claim the engine added that the browser
+      // never noticed arriving.
+      const missed = new Map(ENGINE).set("B", "added");
+      expect(disagreements(strike().states, missed)).toEqual([
+        "B: the browser says your edit can reach this, and the engine says it arrived with the edit",
+      ]);
+    });
+  });
 });
 
 describe("what a tile says about the edits behind it", () => {
@@ -262,8 +367,7 @@ describe("what a tile says about the edits behind it", () => {
     arrows: new Map([["S->H", { source: "S", mode: "sustain" as const, strength: -1.9 }]]),
   };
 
-  // test_h_reads_supposed_then_retracted_by_the_strike
-  it("reads Supposed then Retracted, in order, word for word", () => {
+  it("test_h_reads_supposed_then_retracted_by_the_strike", () => {
     const badges = badgesByClaim(STRIKE_EDITS, context);
     expect((badges.get("H") ?? []).map((badge) => badge.words)).toEqual([
       "Supposed · Oct 1",
@@ -275,8 +379,7 @@ describe("what a tile says about the edits behind it", () => {
     ]);
   });
 
-  // test_a_supposed_claim_shows_the_word_and_a_retracted_one_does_not
-  it("shows the word where a likelihood would go only while the supposition holds", () => {
+  it("test_a_supposed_claim_shows_the_word_and_a_retracted_one_does_not", () => {
     const badges = badgesByClaim(STRIKE_EDITS, context);
     const standing = standingByClaim(STRIKE_EDITS, badges);
     expect(standing.get("S")?.words).toBe("Supposed · Oct 2");
@@ -285,8 +388,7 @@ describe("what a tile says about the edits behind it", () => {
     expect(standing.has("H")).toBe(false);
   });
 
-  // test_an_arrow_that_fires_once_cannot_take_back_a_supposition
-  it("only lets a holding arrow retract a supposition", () => {
+  it("test_an_arrow_that_fires_once_cannot_take_back_a_supposition", () => {
     // A toppled domino stays toppled: an arrow that fires once and fades cannot
     // take back the reader's word.
     const fires = {
@@ -299,8 +401,7 @@ describe("what a tile says about the edits behind it", () => {
 });
 
 describe("the endings the edit can reach", () => {
-  // test_lists_reachable_terminals_in_map_order
-  it("lists them in the order the map stores them and ranks nothing", () => {
+  it("test_lists_reachable_terminals_in_map_order", () => {
     const world = branchWorld(
       aWorld({
         hypothesisId: "H",

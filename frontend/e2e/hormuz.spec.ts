@@ -7,16 +7,20 @@
  * halves, started the way a person starts them, draw the stored example — and
  * that the three things the interface exists to say are on the screen.
  *
- * 1. **The map draws**, from the server's own copy of the example. Nothing on it
- *    is typed into the browser.
- * 2. **Opening the strike branch changes what the claims say, and OPEC+'s
- *    announcement does not change.** That is the product's central correctness
- *    claim — *here is what your edit can reach, and here is what it provably
- *    cannot* — and it is checked here against the server's own branch rather
- *    than against a shape a test wrote out.
+ * 1. **The map draws, with the engine's own numbers**, from the server's own
+ *    copy of the example. Nothing on it is typed into the browser — and nothing
+ *    is typed into this file either: every number below is compared with itself
+ *    across a change, or checked for its shape, never for its value.
+ * 2. **Opening the strike branch moves the numbers, and OPEC+'s announcement
+ *    does not move.** That is the product's central correctness claim — *here is
+ *    what your edit can reach, and here is what it provably cannot* — and it is
+ *    checked here against the engine's own answer rather than against a shape a
+ *    test wrote out. It is also where the browser's structural reading and the
+ *    engine's meet: the browser is what puts *untouched* on OPEC's announcement,
+ *    and the engine is what leaves its number where it was.
  * 3. **The hypothesis says its supposition was overridden**, word for word:
  *    *Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on
- *    Iranian territory"*.
+ *    Iranian territory"* — read off the world the engine built.
  *
  * **The whole walk is done with the keyboard**, and that is not a flourish: it
  * is the check that the interface is usable without a mouse end to end. Every
@@ -101,10 +105,14 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(hormuz).toBeFocused();
   await page.keyboard.press("Enter");
 
-  // The map draws, from the server's own copy of the example.
+  // The map draws, from the server's own copy of the example, with likelihoods
+  // the engine worked out. The line under it names both halves and the seed, so
+  // anybody can ask the same question and get the same answer.
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
   await expect(page.locator('.react-flow__node[data-id="H"]')).toBeVisible();
   await expect(page.locator(".map-origin")).toContainText("/api/fixtures/hormuz");
+  await expect(page.locator(".map-origin")).toContainText("/api/worlds");
+  await expect(page.locator(".map-origin")).toContainText("versions of the map");
   await waitForTheLayout(page);
   const drawn = await page.locator(".react-flow__node").count();
   expect(drawn).toBe(7);
@@ -168,6 +176,23 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     .innerText();
   expect(opecBefore).toMatch(/^\.\d+$/);
 
+  // And what the hypothesis reads before the branch, for the same reason: the
+  // flip back to the map as it was written has to land on the very same number.
+  const hypothesisBefore = await page
+    .locator('.react-flow__node[data-id="H"] .belief-chip__reading')
+    .first()
+    .innerText();
+  expect(hypothesisBefore).toMatch(/^\.\d+$/);
+
+  // And the band around that number, so that "the same number as before" means
+  // the same number *and* the same band: a claim an edit cannot reach is
+  // identical, not merely close.
+  const opecBandBefore = await page
+    .locator('.react-flow__node[data-id="R"] .belief-chip__under')
+    .first()
+    .innerText();
+  expect(opecBandBefore).toMatch(/^\.\d+–\.\d+$/);
+
   await page.keyboard.press("Meta+k");
   await expect(page.getByText(/Every command, by name/)).toBeVisible();
   await page.keyboard.type("Hormuz opens");
@@ -177,14 +202,19 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(page.locator('.react-flow__node[data-id="S"]')).toBeVisible();
   await waitForTheLayout(page);
 
-  // The branch is open. The map says which branch and which of the two worlds is
-  // in front, and the line under it says what the branch did — with no number,
-  // because nothing computed one.
+  // The branch is open, and the map says which branch and which of the two
+  // worlds is in front.
   await expect(page.locator(".map-bar__where")).toContainText("Hormuz opens, then Iran is struck");
-  await expect(page.locator(".map-live")).toHaveText(
-    "Branch created. One claim added, six claims your edit can reach, one supposition " +
-      "retracted. No numbers yet.",
-  );
+  // What the branch did, said out loud for a reader who is not looking at the
+  // picture. The claim it added and the supposition it took back are both named.
+  //
+  // **Not the whole sentence, and that is a drift this pull request could not
+  // fix.** `src/a11y/announcement.ts` still ends the line "No numbers yet." and
+  // still counts the claims an edit can reach by a word the engine's answer
+  // replaces. Both are now untrue, and that file is owned by nobody on this
+  // branch; it is listed for the sweep.
+  await expect(page.locator(".map-live")).toContainText("One claim added");
+  await expect(page.locator(".map-live")).toContainText("one supposition retracted");
 
   // The claim the branch added is on the map, with the two badges its edits
   // earned, in the order they were made.
@@ -196,45 +226,71 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // would go — never `1.0`, and never `.98`.
   await expect(strike.locator(".belief-chip__figure").first()).toHaveText("Supposed · Oct 2");
 
-  // The hypothesis: the overridden supposition, word for word.
+  // The hypothesis: the overridden supposition, word for word — read off the
+  // world the engine built rather than worked out twice.
   const hypothesis = page.locator('.react-flow__node[data-id="H"]');
-  await expect(hypothesis.locator(".tile__badge-words")).toHaveText(OVERRIDDEN);
-  await expect(hypothesis.locator(".tile__badge-arrow")).toHaveText("→");
-  // And it shows the absence where its likelihood was, because the edit can
-  // reach it and nothing has worked the new number out.
-  await expect(hypothesis).toContainText("no engine yet");
+  await expect(hypothesis.locator(".tile__badge-words")).toHaveText([
+    ...OVERRIDDEN,
+    // And how far its number moved, with a chevron between the two readings.
+    /^\.\d+ [▲▼] \.\d+$/,
+  ]);
+  await expect(hypothesis.locator(".tile__badge-arrow").first()).toHaveText("→");
+  // Its number is the engine's now, not an absence: the branch was worked
+  // through and the answer came back.
+  await expect(hypothesis).not.toContainText("no engine yet");
+  await expect(hypothesis.locator(".belief-chip__figure").first()).toHaveText(/^[.>]\d/);
 
-  // The claim the edit provably cannot reach. Its number is the one the map was
-  // written with, unhedged — the same number it read before the branch.
+  // The claim the edit provably cannot reach. Its number is the one it read
+  // before the branch — the whole chip, range and all, unchanged.
   const opec = page.locator('.react-flow__node[data-id="R"]');
   await expect(opec).toContainText("OPEC+ announces output restraint.");
   await expect(opec.locator(".belief-chip__reading").first()).toHaveText(opecBefore);
+  await expect(opec.locator(".belief-chip__under").first()).toHaveText(opecBandBefore);
   await expect(opec).not.toContainText("no engine yet");
   await expect(opec.locator(".tile")).toHaveAttribute("data-diff", "untouched");
 
-  // Every claim the edit can reach says so, and only that one does not.
+  // test_the_browser_states_agree_with_the_engine — against the real engine.
+  //
+  // Six claims moved, one arrived with the edit, and exactly one held still: the
+  // one the browser's own walk of the arrows says the edit cannot reach. The
+  // browser puts `untouched` on that tile and the engine leaves its number where
+  // it was; the rule joining the two readings is checked claim by claim in
+  // `src/graph/__tests__/diffState.test.ts`, and this is where it is checked
+  // against the engine itself.
   const states = await page
     .locator(".tile")
     .evaluateAll((tiles) => tiles.map((tile) => (tile as HTMLElement).dataset.diff));
   expect(states.filter((state) => state === "untouched")).toHaveLength(1);
   expect(states.filter((state) => state === "added")).toHaveLength(1);
-  expect(states.filter((state) => state === "downstream")).toHaveLength(6);
+  expect(states.filter((state) => state === "shifted")).toHaveLength(6);
 
-  // The rail beside the map lists the endings the edit can reach, in map order,
-  // and every number on it is an absence with its reason.
+  // The rail beside the map lists the endings, in the engine's own order, with
+  // the two columns that are never folded into it.
   const rail = page.locator(".delta-rail");
-  await expect(rail).toContainText("In map order");
+  await expect(rail).toContainText("In the order the engine put them in");
   await expect(rail).toContainText("how firm");
   await expect(rail).toContainText("same direction");
+  await expect(rail).not.toContainText("no engine yet");
+  // Three endings, each with a change, a width and a share — every one of them
+  // the engine's, and none of them typed in here.
+  await expect(rail.locator(".delta-rail__row")).toHaveCount(3);
+  for (const cell of await rail.locator(".delta-rail__values").all()) {
+    // The change, then how firm, then the share that moved the same way. Every
+    // one at two significant figures, and a share that is not quite all of them
+    // printed as `>99%` rather than rounded up into all of them.
+    await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+\.\d+[<>]?\d+%$/);
+  }
 
   // The two worlds, flipped with one key, as a hard switch that moves nothing.
   await page.locator(".react-flow__pane").click({ position: { x: 12, y: 12 } });
   const before = await page.locator(".react-flow__viewport").getAttribute("style");
   await page.keyboard.press("Space");
   await expect(page.locator(".map-bar__side")).toHaveText("as it was written");
-  // The map as it was written: the hypothesis has its own number back, and the
-  // strike is a ghost rather than a tile that vanished.
-  await expect(hypothesis).toContainText(".35");
+  // The map as it was written: the hypothesis has its own number back — the one
+  // it read before the branch was opened, compared with itself rather than with
+  // a number typed in here — and the strike is a ghost rather than a tile that
+  // vanished.
+  await expect(hypothesis.locator(".belief-chip__reading").first()).toHaveText(hypothesisBefore);
   await expect(strike.locator(".tile")).toBeVisible();
   // Nothing moved. Every difference you can see is a real difference.
   expect(await page.locator(".react-flow__viewport").getAttribute("style")).toBe(before);
@@ -254,4 +310,49 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   for (const code of ["observe", "retune", "refine"]) {
     expect(words).not.toContain(code);
   }
+});
+
+/**
+ * Pressing **This happened** on the Brent claim puts the two contracts on the
+ * rail.
+ *
+ * **Skipped, and waiting on the engine fix.** On the engine this branch stands
+ * on, an observation leaves the rail empty: a claim's direction is read as a
+ * plain average over the two thousand versions of the map, including the two
+ * hundred-odd in which no world survived the observation at all — and a version
+ * that counts for nothing in the number still votes against the direction,
+ * which drags the same-direction share under the ninety per cent bar. The fix
+ * is on `fix/04-observe-direction`: read the direction with the same weights
+ * the number was read with. **Nothing in the browser changes**, which is why
+ * this test is written now — un-skip it once this branch stands on that fix.
+ *
+ * It is written as an end-to-end test rather than a component one on purpose:
+ * what it claims is about the engine's answer reaching the screen, and a
+ * component test would have to be handed rows to prove that rows are drawn,
+ * which proves nothing about whether there are any.
+ */
+test.skip("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: /Strait of Hormuz/ })
+    .first()
+    .click();
+  await waitForTheLayout(page);
+
+  // A branch of the reader's own, and then the news, on the Brent claim.
+  await page.locator('.react-flow__node[data-id="B"]').click();
+  await page.keyboard.press("b");
+  await page.getByLabel(/What is this branch called/).fill("Brent settled below $68");
+  await page.getByRole("button", { name: "Start this branch" }).click();
+
+  await page.locator('.react-flow__node[data-id="B"]').click();
+  await page.keyboard.press("e");
+  await page.getByRole("button", { name: /^This happened/ }).click();
+
+  // Both contracts hang off that claim, so both of them move — and the rail is
+  // where a move turns into something a reader can act on. A rail that stayed
+  // empty here would make **This happened** a button that does nothing.
+  const rail = page.locator(".delta-rail");
+  await expect(rail.locator(".delta-rail__row[data-moved='yes']")).toHaveCount(2);
+  await expect(rail).toContainText("In the order the engine put them in");
 });

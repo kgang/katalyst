@@ -54,11 +54,16 @@ const STRIKE: BranchView = {
   ],
   claims: [],
   links: [],
+  wire: {
+    id: "br_hormuz_then_strike",
+    label: "Hormuz opens, then Iran is struck",
+    parent: null,
+    interventions: [{ kind: "do", target: "H", value: true, at: "2026-10-01" }],
+  },
 };
 
 describe("the branch panel", () => {
-  // test_lists_the_edits_in_the_order_they_were_made
-  it("lists the edits in order, each with the badge its button earned", () => {
+  it("test_lists_the_edits_in_the_order_they_were_made", () => {
     render(
       <BranchPanel
         branches={[STRIKE]}
@@ -77,8 +82,7 @@ describe("the branch panel", () => {
     expect(screen.getByText("Supposed · Oct 2")).toBeInTheDocument();
   });
 
-  // test_renders_only_interface_words
-  it("shows no code name anywhere", () => {
+  it("test_renders_only_interface_words", () => {
     const { container } = render(
       <BranchPanel
         branches={[STRIKE]}
@@ -96,8 +100,7 @@ describe("the branch panel", () => {
     }
   });
 
-  // test_a_map_nobody_has_edited_says_so
-  it("says the map is exactly as it was written when nothing has been edited", () => {
+  it("test_a_map_nobody_has_edited_says_so", () => {
     render(
       <BranchPanel
         branches={[]}
@@ -112,8 +115,7 @@ describe("the branch panel", () => {
     expect(screen.getByText(/Nothing has been edited/)).toBeInTheDocument();
   });
 
-  // test_naming_a_branch_happens_in_the_panel
-  it("names a branch in the panel, with nothing opening over the map", () => {
+  it("test_naming_a_branch_happens_in_the_panel", () => {
     const onFork = vi.fn();
     render(
       <BranchPanel
@@ -149,16 +151,14 @@ describe("the six things you can do", () => {
     return made;
   }
 
-  // test_the_six_buttons_are_word_for_word_the_vocabulary
-  it("offers exactly the six buttons, word for word", () => {
+  it("test_the_six_buttons_are_word_for_word_the_vocabulary", () => {
     open();
     for (const words of BUTTONS) {
       expect(screen.getByRole("button", { name: new RegExp(`^${words}`) })).toBeInTheDocument();
     }
   });
 
-  // test_no_code_name_reaches_the_screen
-  it("shows no code name anywhere", () => {
+  it("test_no_code_name_reaches_the_screen", () => {
     const { container } = render(
       <InterventionPanel
         world={WORLD}
@@ -173,16 +173,31 @@ describe("the six things you can do", () => {
     }
   });
 
-  // test_a_button_appends_an_edit_and_moves_no_number
-  it("appends an edit and moves no number", () => {
+  it("test_a_button_appends_an_edit_and_asks_the_engine_for_the_numbers", () => {
     const made = open();
     fireEvent.click(screen.getByRole("button", { name: /^Suppose this is true/ }));
     expect(made).toEqual([{ op: "do", target: "B", value: true, at: WORLD.today }]);
     expect(screen.getByText(/Take this as given/)).toBeInTheDocument();
   });
 
-  // test_split_this_claim_is_visibly_not_yet_live
-  it("says Split this claim is not built rather than doing nothing quietly", () => {
+  it("test_add_a_claim_says_what_it_needs_rather_than_half_doing_it", () => {
+    // A claim is not its wording: it is the wording plus the test that settles
+    // it, who judges it and by when. Nothing in this build drafts those, and a
+    // branch holding a half-written claim could not be folded onto the map at
+    // all — so the button says so and records nothing.
+    const made = open();
+    const add = screen.getByRole("button", { name: /^Add a claim/ });
+    expect(add).toHaveTextContent("needs the part that drafts a claim");
+    expect(add).not.toBeDisabled();
+    fireEvent.click(add);
+    expect(made).toEqual([]);
+    expect(screen.getByText(/no edit was recorded/)).toBeInTheDocument();
+    // And no stack number on screen: a reader does not know what a stack is.
+    expect(screen.queryByText(/stack \d/i)).toBeNull();
+    expect(screen.queryByText(/pull request/i)).toBeNull();
+  });
+
+  it("test_split_this_claim_is_visibly_not_yet_live", () => {
     const made = open();
     const split = screen.getByRole("button", { name: /^Split this claim/ });
     expect(split).toHaveTextContent("not yet built");
@@ -193,16 +208,14 @@ describe("the six things you can do", () => {
     expect(screen.queryByText(/stack \d/i)).toBeNull();
   });
 
-  // test_change_this_push_asks_for_an_arrow_instead_of_going_inert
-  it("asks for an arrow when there is none, rather than being quietly inert", () => {
+  it("test_change_this_push_asks_for_an_arrow_instead_of_going_inert", () => {
     const made = open();
     fireEvent.click(screen.getByRole("button", { name: /^Change this push/ }));
     expect(made).toEqual([]);
     expect(screen.getByText(/Choose an arrow on the map first/)).toBeInTheDocument();
   });
 
-  // test_change_this_push_reads_the_old_number_back_in_words
-  it("reads the arrow's old push back in words before changing it", () => {
+  it("test_change_this_push_reads_the_old_number_back_in_words", () => {
     const made = open("wire");
     fireEvent.click(screen.getByRole("button", { name: /^Change this push/ }));
     fireEvent.change(screen.getByLabelText(/How hard does this arrow push/), {
@@ -213,8 +226,7 @@ describe("the six things you can do", () => {
     expect(screen.getByText(/You moved this arrow from \+1\.6 to \+0\.3/)).toBeInTheDocument();
   });
 
-  // test_your_own_number_is_refused_when_the_range_does_not_hold_it
-  it("refuses a range that does not hold the number, and says why", () => {
+  it("test_your_own_number_is_refused_when_the_range_does_not_hold_it", () => {
     const made = open();
     fireEvent.click(screen.getByRole("button", { name: /^My own number/ }));
     for (const [label, value] of [
@@ -229,8 +241,7 @@ describe("the six things you can do", () => {
     expect(screen.getByText(/the range has to hold the number/)).toBeInTheDocument();
   });
 
-  // test_your_own_number_sits_beside_the_models
-  it("records your own number, and says it is never averaged with the model's", () => {
+  it("test_your_own_number_sits_beside_the_models", () => {
     const made = open();
     fireEvent.click(screen.getByRole("button", { name: /^My own number/ }));
     for (const [label, value] of [
@@ -245,8 +256,7 @@ describe("the six things you can do", () => {
     expect(screen.getByText(/never averaged with either of them/)).toBeInTheDocument();
   });
 
-  // test_nothing_here_is_disabled
-  it("disables nothing, because a greyed-out control cannot even be asked about", () => {
+  it("test_nothing_here_is_disabled", () => {
     render(<InterventionPanel world={WORLD} selection={null} onEdit={vi.fn()} onClose={vi.fn()} />);
     for (const button of screen.getAllByRole("button")) {
       expect(button).not.toBeDisabled();

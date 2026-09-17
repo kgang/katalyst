@@ -18,7 +18,15 @@
  * Nothing in this file, or anywhere under `src/world`, does arithmetic on a
  * likelihood. Numbers arrive from the server and are carried, unchanged and at
  * full precision, to the moment they are printed.
+ *
+ * **One thing here is taken from the generated description after all, and it is
+ * the exception that proves the rule:** a branch, in the shape the server writes
+ * one. That shape is not a view of anything — it is what travels back over the
+ * wire when a world is asked for — so re-stating it by hand would be writing
+ * down the server's own words and waiting for them to drift.
  */
+
+import type { components } from "../api/schema";
 
 /** What a claim is for. Its shape on the canvas carries this, never its colour. */
 export type ClaimKind = "hypothesis" | "event" | "market" | "not_tradeable";
@@ -86,11 +94,18 @@ export interface Absence {
  * a choice between two shapes so that the type itself forbids an empty slot
  * with no reason attached: there is no way to write one down.
  */
-export type Known<Reading> =
-  | { readonly reading: Reading; readonly absence?: undefined }
+export type Known<T> =
+  | { readonly reading: T; readonly absence?: undefined }
   | { readonly reading?: undefined; readonly absence: Absence };
 
-/** One slot where a likelihood belongs. */
+/**
+ * One slot where a likelihood belongs: `Known<Ranged>` under a shorter name.
+ *
+ * `Known<T>` is the shape; `Slot` is what it is called at the one type the
+ * canvas uses most often. One idea, two spellings, and this sentence is the
+ * whole of the difference — so that nobody reading `Slot` has to go looking for
+ * a second rule.
+ */
 export type Slot = Known<Ranged>;
 
 /** The three voices on one claim, each in its own slot, never merged. */
@@ -245,6 +260,14 @@ export interface ClaimView {
    */
   readonly diff?: DiffState;
   /**
+   * How far this claim's likelihood moved, when the engine says it moved.
+   *
+   * Both numbers are the engine's, read on this claim's own resolve-by day, and
+   * the browser subtracts nothing: which way it went is the engine's own word.
+   * Absent on every claim the engine did not call `shifted`.
+   */
+  readonly moved?: Movement;
+  /**
    * What this claim's tile says about the edits behind it, in order.
    *
    * Two badges in a row read as a sequence: *Supposed · Oct 1* then *Retracted
@@ -263,6 +286,42 @@ export interface ClaimView {
 }
 
 /**
+ * How far a claim's likelihood moved between two worlds, as the engine read it.
+ *
+ * Both numbers arrive from the engine at full precision and are printed as they
+ * came. Which way it went is a word the engine's own reading decides, never a
+ * subtraction done here — this half of the product does no arithmetic on the
+ * map's numbers, and "is the second bigger than the first" would be the first
+ * step down that road.
+ */
+export interface Movement {
+  /** The first world's likelihood, on the claim's own resolve-by day. */
+  readonly from: number;
+  /** The second world's likelihood, on the same day. */
+  readonly to: number;
+  /** Which way it went. */
+  readonly way: "up" | "down";
+  /**
+   * The share of versions of the map that moved the same way. On screen this is
+   * headed **same direction**; the word *agreement* is kept off the screen.
+   */
+  readonly sameDirection: Known<number>;
+  /**
+   * True when the engine says this claim moved **only** because an observation
+   * made some versions of the map count for more than others.
+   *
+   * **Nothing sets this yet, and that is deliberate.** It is the one field on
+   * this view model with no source here: the engine's difference carries it on
+   * a claim's own row, as `moved_only_by_reweighting`, from the pull request
+   * that fixes how a direction is read (`fix/04-observe-direction`). The one
+   * line that reads it across is marked in `apiSource.ts`. The browser must
+   * never work this out for itself — whether a claim moved for that reason is a
+   * fact about how the engine read the numbers, and only the engine knows it.
+   */
+  readonly onlyReweighted?: boolean;
+}
+
+/**
  * What an edit did to a claim.
  *
  * Four of the five are worked out from the branch alone, with no arithmetic
@@ -278,8 +337,16 @@ export interface ClaimView {
  * - `untouched` — everything else. Identical to the base world, and the map can
  *   say so without hedging, because that is a proven property of an edit.
  * - `shifted` — the number moved, with a before and an after. It needs two
- *   numbers to compare, so nothing in this build ever produces one; it arrives
- *   with the engine.
+ *   numbers to compare, so only the engine ever produces one, and the browser
+ *   copies the word across rather than deciding it.
+ *
+ * **Which of the two readings wins.** Once the engine has answered, its own word
+ * is the authority wherever it has one — `added`, `killed` and `shifted` are
+ * the engine's. `downstream` and `untouched` stay the browser's, because they
+ * answer a different question: *can* your edit reach this claim, rather than
+ * *did* its number move. A claim the edit can reach whose number did not move is
+ * `downstream`, and saying `untouched` about it would be telling the reader
+ * their change cannot reach something it can.
  */
 export type DiffState = "added" | "killed" | "downstream" | "untouched" | "shifted";
 
@@ -300,6 +367,16 @@ export interface Badge {
    * draw the pair as a sequence with an arrow between them.
    */
   readonly overrides?: boolean;
+  /**
+   * True when this badge is how far the number moved — `.40 → .30 ▼` — rather
+   * than a word about an edit.
+   *
+   * It sits with the badges because it is what the edits did to this claim, and
+   * because the tile already reserves room for whatever they have to say. It is
+   * drawn differently: the two readings in the number face with a chevron
+   * between the old and the new.
+   */
+  readonly movement?: boolean;
 }
 
 /** One arrow, as a wire draws it. */
@@ -424,6 +501,29 @@ export interface WorldView {
    * chip says a different sentence for each. Nothing else reads it.
    */
   readonly versions?: number;
+  /**
+   * How many worlds ran under each version of the map: how the dice fall.
+   *
+   * Absent for the same reason `versions` is. It is printed in the sentence
+   * under the map, beside the seed, so that a reader can rebuild this world.
+   */
+  readonly worldsPerVersion?: number;
+  /**
+   * The one number every random draw behind these likelihoods came from.
+   *
+   * A world is replayable from three things — the map, the branch and this — so
+   * it is carried here and named under the map. Absent on a world nobody
+   * computed.
+   */
+  readonly seed?: number;
+  /**
+   * Plain sentences the engine wanted the reader to see under the map.
+   *
+   * The engine writes these itself — for instance when so few worlds survived an
+   * observation that the range around the answer stops meaning much. They are
+   * printed as they came and never summarised.
+   */
+  readonly warnings?: readonly string[];
 
   /**
    * Where these numbers came from, in one sentence a reader can check.
@@ -434,12 +534,86 @@ export interface WorldView {
   readonly origin: string;
 }
 
-/** Which world to read: a base map, optionally with a branch applied. */
+/**
+ * Which world to read: a base map, optionally with a branch folded onto it.
+ *
+ * The branch is sent **whole**, not by name, because there is nowhere to keep
+ * one yet: the browser holds the branch it built and hands it over with every
+ * question. That is also what makes an answer reproducible from three things —
+ * the map, the branch and the seed.
+ */
 export interface WorldRequest {
   /** The stored example or map to read. */
   readonly baseId: string;
-  /** The branch to apply. Left out, this is the base world. */
-  readonly branchId?: string;
+  /** The branch to fold. Left out, this is the base world — the empty branch. */
+  readonly branch?: BranchView;
+}
+
+/** Which two worlds to compare: one map, one seed, one branch against the base world. */
+export interface DiffRequest {
+  /** The stored example or map both worlds are built from. */
+  readonly baseId: string;
+  /**
+   * The branch the second world has and the first does not.
+   *
+   * The first world is always the base map with nothing done to it, because
+   * that is the comparison the screen offers: the map as it was written against
+   * the map with your edits.
+   */
+  readonly branch: BranchView;
+}
+
+/** Which arrow's number is wanted, and in which world. */
+export interface ConditionalRequest {
+  /** The stored example or map. */
+  readonly baseId: string;
+  /** The branch to fold first. Left out, the map as it was written. */
+  readonly branch?: BranchView;
+  /** The arrow whose number is wanted. */
+  readonly linkId: string;
+}
+
+/** What the engine says happened to one claim between two worlds. */
+export interface ClaimChange {
+  /** The engine's own word for what happened to it. */
+  readonly state: "unchanged" | "shifted" | "added" | "killed";
+  /** How far it moved, when it moved. */
+  readonly moved?: Movement;
+}
+
+/**
+ * What the engine says moved between two worlds.
+ *
+ * Every part of it is the engine's. The browser ranks nothing, re-orders
+ * nothing and adds nothing up: `rows` is drawn in the order it arrived, and the
+ * two columns beside each row are printed as they came.
+ */
+export interface DiffView {
+  /** Every claim either world holds, by identifier, with what happened to it. */
+  readonly claims: ReadonlyMap<string, ClaimChange>;
+  /** The endings, largest rank first, exactly as the engine ordered them. */
+  readonly rows: readonly DeltaRow[];
+  /** The one line saying what this edit did to the trades. */
+  readonly summary: Known<string>;
+  /** Plain sentences either world wanted the reader to see, each said once. */
+  readonly warnings: readonly string[];
+}
+
+/**
+ * One reason a branch could not be folded onto a map.
+ *
+ * `message` is the sentence the reader reads; `subject` is the identifier of the
+ * claim or the arrow at fault, which is what lets the screen point at the right
+ * thing and is never shown. `code` is the stable name of the rule that was
+ * broken, for the same reason.
+ */
+export interface Reason {
+  /** Which rule was broken, when the server named one. */
+  readonly code?: string;
+  /** The identifier of the thing at fault, when the server named one. Never shown. */
+  readonly subject?: string;
+  /** One plain sentence naming the claim or the arrow by its words. */
+  readonly message: string;
 }
 
 /* ---- Editing the map: branches, and the six operations ------------------- */
@@ -539,13 +713,46 @@ export interface BranchView {
   readonly claims: readonly ClaimView[];
   /** Whole arrows an edit added, when the map supplied them. */
   readonly links: readonly LinkView[];
+  /**
+   * This same branch written the way the server writes one, so it can be sent
+   * back to be folded onto the map — when it can be.
+   *
+   * It is carried rather than rebuilt from `edits` for one reason: an **Add a
+   * claim** edit brings a whole claim — how it is judged, by whom, by when, what
+   * it started from — and the drawable form above keeps only what a tile needs.
+   * Rebuilding the server's form from the drawable one would quietly drop the
+   * rest, and the map the engine folded would not be the map on screen.
+   *
+   * **Absent when this branch cannot be written down in full.** Adding a claim
+   * of your own needs the part of this product that drafts one, and that is not
+   * connected — so a branch holding one cannot be folded, and asking for its
+   * world says exactly that rather than sending half of it.
+   *
+   * Where it is present the two forms are built side by side, from the same
+   * source, and hold the same edits in the same order.
+   */
+  readonly wire?: WireBranch;
 }
+
+/**
+ * A branch exactly as the server writes one.
+ *
+ * Taken from the server's own description of itself, because this shape really
+ * is the server's: it is what goes back over the wire when a world is asked
+ * for, and re-stating it here would let the two drift apart.
+ */
+export type WireBranch = components["schemas"]["Branch"];
+
+/** One edit as the server writes one. */
+export type WireEdit = components["schemas"]["Branch"]["interventions"][number];
 
 /**
  * One ending the edit can reach, as the rail beside the map lists it.
  *
- * Every number on a row is optional, and before the engine every one of them is
- * an absence with its reason. The rail ranks nothing and computes nothing.
+ * Every number on a row is optional, and before the engine answers every one of
+ * them is an absence with its reason. **The rail ranks nothing and computes
+ * nothing**: when the engine has ordered these rows the browser draws them in
+ * that order, and when it has not the browser says so on its own face.
  */
 export interface DeltaRow {
   /** The ending's identifier on the map. */
@@ -555,11 +762,26 @@ export interface DeltaRow {
   /** What kind of ending it is, which is what says whether anything trades. */
   readonly kind: ClaimKind;
   /** How far the number moved, and the day it moved furthest. */
-  readonly move: Known<{ readonly from: number; readonly to: number; readonly largestOn: string }>;
+  readonly move: Known<{
+    readonly from: number;
+    readonly to: number;
+    readonly largestOn: string;
+    readonly way: "up" | "down";
+  }>;
   /** How firm: the width of this world's own range on the claim. */
   readonly rangeWidth: Known<number>;
   /** Same direction: the share of versions of the map that moved the same way. */
   readonly agreement: Known<number>;
+  /**
+   * True when this row is here only to say the ending did **not** move.
+   *
+   * The engine lists the endings that moved; an ending missing from that list
+   * could mean either "it did not move" or "it is not on this map", and silence
+   * cannot be told from absence. So the rail adds a quiet row reading *no
+   * change* for every ending the edit can reach that the engine left out, after
+   * the ones it ranked and never mixed in among them.
+   */
+  readonly noChange?: boolean;
 }
 
 /**

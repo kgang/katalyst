@@ -96,6 +96,34 @@ export function toRange(lo: number, hi: number): string {
 }
 
 /**
+ * Print a share of something counted — *how many of the two thousand versions
+ * of the map moved the same way* — as a whole percentage.
+ *
+ * A share is not a likelihood. It is a count of things that happened divided by
+ * how many there were, so a hundred per cent really can mean *every one of
+ * them*, and printing `>.99` over it would hide a fact the machine actually
+ * counted. So the only guard here is the one that stops rounding from inventing
+ * unanimity: a share that is not quite all of them never prints as all of them.
+ *
+ * Two figures, like everything else on screen: `97%`, never `96.63%`.
+ *
+ * @param share A share from 0 to 1, at full precision.
+ */
+export function toShare(share: number): string {
+  if (!Number.isFinite(share)) {
+    return "—";
+  }
+  const whole = Math.round(share * 100);
+  if (whole >= 100 && share < 1) {
+    return ">99%";
+  }
+  if (whole <= 0 && share > 0) {
+    return "<1%";
+  }
+  return `${whole}%`;
+}
+
+/**
  * The whole reading, in the form a sentence would use: `.35 (.22–.50)`.
  *
  * This is what the chip is called when it is read aloud, and what the tile uses

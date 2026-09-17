@@ -1,0 +1,55 @@
+/*
+ * A refused branch, in the panel beside the map.
+ *
+ * It looks like the rest of the panel and not like a warning: no red, no icon,
+ * no fill. A refusal is something the reader can repair, and dressing it as an
+ * alarm would say the tool had broken rather than that the branch does not fit.
+ * What sets it apart is one solid rule down its left edge — the same hairline
+ * every other block uses, drawn in the accent, which survives a grey print
+ * because it is a line and not a colour.
+ */
+
+.refusal {
+  display: grid;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid var(--accent);
+}
+
+.refusal__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.refusal__line {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.refusal__reasons {
+  display: grid;
+  row-gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.refusal__reason {
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.refusal__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}

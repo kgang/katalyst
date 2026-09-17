@@ -214,6 +214,106 @@ describe("the panel, on a claim", () => {
       expect([".35", ".22", ".50", ".55", ".40", ".70", ".28", ".15", ".42"]).toContain(number);
     }
   });
+
+  it("test_the_decomposition_is_laid_out_and_never_added_up", () => {
+    render(
+      <Inspector world={hormuzish({ versions: 2000 })} selection={{ kind: "claim", id: "B" }} />,
+    );
+
+    // What it started at, what pushes on it, and what it comes to — every line
+    // read from somewhere nameable, and no line that is a sum.
+    expect(screen.getByText("it started at")).toBeInTheDocument();
+    expect(screen.getByText("it comes to")).toBeInTheDocument();
+    expect(screen.getAllByText(/pushes/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Nothing on this panel adds them up/)).toBeInTheDocument();
+
+    // The result is the engine's own answer for this claim, printed as it came:
+    // once on the belief row, once at the foot of the decomposition.
+    expect(screen.getAllByText(".46 (.30–.63)").length).toBe(2);
+    expect(screen.getByText(/the engine's own answer for this claim/)).toBeInTheDocument();
+  });
+
+  it("test_a_claim_with_no_causes_says_so_rather_than_showing_an_empty_list", () => {
+    render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />);
+    expect(screen.getByText(/nothing on this map points at this claim/)).toBeInTheDocument();
+  });
+
+  it("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", () => {
+    // **Waiting on the engine fix.** Nothing sets `onlyReweighted` today: the
+    // engine's difference gains the field that says a claim moved purely
+    // because an observation made some versions of the map count for more, in
+    // the pull request that fixes how a direction is read. The browser must
+    // never work it out for itself, so the panel is driven here with the field
+    // set by hand — which checks the one thing this side owns: that the
+    // sentence is printed, word for word, exactly when the engine says so, and
+    // never otherwise.
+    const moved = {
+      from: 0.356,
+      to: 0.365,
+      way: "up" as const,
+      sameDirection: { reading: 0 },
+    };
+    const sentence = "this claim moved only because the observation made some versions count more.";
+
+    const quiet = render(
+      <Inspector
+        world={hormuzish({
+          versions: 2000,
+          claims: [aClaim({ id: "H", kind: "hypothesis", diff: "shifted", moved })],
+        })}
+        selection={{ kind: "claim", id: "H" }}
+      />,
+    );
+    expect(screen.queryByText(sentence)).toBeNull();
+    quiet.unmount();
+
+    render(
+      <Inspector
+        world={hormuzish({
+          versions: 2000,
+          claims: [
+            aClaim({
+              id: "H",
+              kind: "hypothesis",
+              diff: "shifted",
+              moved: { ...moved, onlyReweighted: true },
+            }),
+          ],
+        })}
+        selection={{ kind: "claim", id: "H" }}
+      />,
+    );
+    expect(screen.getByText(sentence)).toBeInTheDocument();
+  });
+
+  it("test_a_moved_claim_shows_the_two_readings_and_the_share_that_agreed", () => {
+    render(
+      <Inspector
+        world={hormuzish({
+          versions: 2000,
+          claims: [
+            aClaim({
+              id: "H",
+              kind: "hypothesis",
+              diff: "shifted",
+              moved: {
+                from: 0.356,
+                to: 0.081,
+                way: "down",
+                sameDirection: { reading: 1 },
+              },
+            }),
+          ],
+        })}
+        selection={{ kind: "claim", id: "H" }}
+      />,
+    );
+    expect(screen.getByText(".36 ▼ .081")).toBeInTheDocument();
+    // The chevron is never the only thing saying which way it went.
+    expect(screen.getByText("down")).toBeInTheDocument();
+    expect(screen.getByText("same direction")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+  });
 });
 
 describe("the panel, on an arrow", () => {
@@ -221,6 +321,34 @@ describe("the panel, on an arrow", () => {
     render(<Inspector world={hormuzish()} selection={{ kind: "wire", id: "H->B" }} />);
     expect(screen.getByText("+1.6")).toBeInTheDocument();
     expect(screen.getByText(/a strong push toward/)).toBeInTheDocument();
+  });
+
+  it("test_the_conditional_is_an_absence_until_the_arrow_is_asked_about", () => {
+    const { unmount } = render(
+      <Inspector world={hormuzish()} selection={{ kind: "wire", id: "H->B" }} />,
+    );
+    // It costs a whole extra run of the map, so it is asked for one arrow at a
+    // time — and until it arrives the panel says that rather than showing a
+    // dash that looks like a number that failed to load.
+    expect(screen.getByText("With its cause supposed true")).toBeInTheDocument();
+    expect(screen.getAllByText("no engine yet").length).toBeGreaterThan(0);
+    unmount();
+
+    const world = hormuzish();
+    render(
+      <Inspector
+        world={{
+          ...world,
+          links: world.links.map((wire) => ({
+            ...wire,
+            conditional: { reading: { p: 0.584, lo: 0.416, hi: 0.734 } },
+          })),
+        }}
+        selection={{ kind: "wire", id: "H->B" }}
+      />,
+    );
+    expect(screen.getByText(".58 (.42–.73)")).toBeInTheDocument();
+    expect(screen.getByText(/supposed, never observed/)).toBeInTheDocument();
   });
 
   it("test_says_what_kind_of_push_and_what_it_does_over_time", () => {

@@ -60,8 +60,14 @@ export interface BadgeContext {
   readonly arrows: ReadonlyMap<string, UnderminingArrow>;
 }
 
-/** The badge a supposition earns. */
-function supposed(at: string, value: boolean): Badge {
+/**
+ * The badge a supposition earns.
+ *
+ * Exported because a computed world earns the same badge from the values its
+ * edits fixed, and one set of words for one badge is the whole point of this
+ * file: the branch and the world must never say it two different ways.
+ */
+export function supposed(at: string, value: boolean): Badge {
   return {
     words: `Supposed · ${toDay(at)}`,
     reason: value
@@ -72,8 +78,8 @@ function supposed(at: string, value: boolean): Badge {
   };
 }
 
-/** The badge the news earns. */
-function happened(at: string): Badge {
+/** The badge the news earns. Exported for the same reason the one above is. */
+export function happened(at: string): Badge {
   return {
     words: `Happened · ${toDay(at)}`,
     reason:
@@ -82,11 +88,41 @@ function happened(at: string): Badge {
   };
 }
 
-/** The badge a claim the reader added earns. */
-const ADDED: Badge = {
+/** The badge a claim the reader added earns. Exported for the same reason. */
+export const ADDED: Badge = {
   words: "Added",
   reason: "This claim, and the arrows that attach it, arrived as one edit on this branch.",
 };
+
+/**
+ * The badge a supposition a later edit took back earns.
+ *
+ * **This one is derived: no button produces it.** A claim the reader supposed
+ * true, and that a later edit in the same branch pushed back down, is never
+ * drawn as plainly true.
+ *
+ * Exported because a computed world carries the retraction itself — which claim,
+ * which day, which arrow, whose doing — and reading it off the world is better
+ * than deriving it twice: two derivations of one line eventually disagree.
+ *
+ * @param at The day the supposition ended: the day the undermining arrow's
+ *   cause was settled, never that day plus the arrow's delay.
+ * @param cause The undermining claim in its own words, ready to be quoted.
+ * @param supposedAt The day the supposition was made, for the sentence behind
+ *   the badge.
+ */
+export function retracted(at: string, cause: string, supposedAt: string): Badge {
+  return {
+    words: `Retracted · ${toDay(at)} · by "${asQuoted(cause)}"`,
+    reason:
+      `You supposed this on ${toDay(supposedAt)}. A later edit added an arrow into it that ` +
+      `only holds while its cause holds, and then made that cause true on ${toDay(at)} — ` +
+      `so from that day we stop taking your word for this claim. The day the number moves ` +
+      `is later still, because that arrow takes time to arrive; the gap is real and is not ` +
+      `smoothed away.`,
+    overrides: true,
+  };
+}
 
 /**
  * Work out every badge on every claim, in the order the edits were made.
@@ -170,17 +206,7 @@ export function badgesByClaim(edits: readonly Edit[], context: BadgeContext): Ma
       if (through === undefined) {
         continue;
       }
-      const quoted = asQuoted(context.words.get(nowTrue) ?? nowTrue);
-      add(claim, {
-        words: `Retracted · ${toDay(at)} · by "${quoted}"`,
-        reason:
-          `You supposed this on ${toDay(live.at)}. A later edit added an arrow into it that ` +
-          `only holds while its cause holds, and then made that cause true on ${toDay(at)} — ` +
-          `so from that day we stop taking your word for this claim. The day the number moves ` +
-          `is later still, because that arrow takes time to arrive; the gap is real and is not ` +
-          `smoothed away.`,
-        overrides: true,
-      });
+      add(claim, retracted(at, context.words.get(nowTrue) ?? nowTrue, live.at));
       supposedNow.delete(claim);
       undermining.delete(claim);
     }

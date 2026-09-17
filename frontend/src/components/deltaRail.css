@@ -118,6 +118,25 @@
   color: var(--text-muted);
 }
 
+/* Which way it went, in a word, and the day the two worlds were furthest apart.
+ * The word is here because the chevron beside the number is a glyph and a glyph
+ * on its own is not a reading; the day is here because a row is read on the day
+ * of largest divergence rather than on the claim's own judging day, and a number
+ * whose day is not said is a number nobody can check. */
+.delta-rail__day {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* An ending that held still. It is quieter than the ones that moved and it is
+ * still fully readable — the whole reason it is on the rail at all is that
+ * silence cannot be told from absence, so a row nobody can read would be no
+ * better than no row. */
+.delta-rail__row[data-moved="no"] .delta-rail__label {
+  color: var(--text-muted);
+}
+
 .delta-rail__value {
   min-width: 0;
   font-family: var(--font-mono);
