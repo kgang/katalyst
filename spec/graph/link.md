@@ -115,8 +115,9 @@ class Link(BaseModel):
     half_life: Days | None = Field(
         default=None,
         description=(
-            "Days for an 'impulse' push to fall to half its size. Meaningful only when `shape` is "
-            "'impulse'; None for 'step' and 'ramp'."
+            "Days for an 'impulse' push to fall to half its size. Only an 'impulse' fades, so "
+            "this must be None for 'step' and 'ramp' — a half-life on either of those is a "
+            "violation, not an ignored field (`half_life_without_impulse`)."
         ),
     )
 
@@ -324,7 +325,7 @@ Local numbers (`INV-graph.<n>`) are unique across the whole of `spec/graph/`. **
 
 Round-trip and immutability are not repeated here. `test_models_round_trip_json` and `test_models_are_frozen` are stated once for every model in this part — `Link` and `Source` alongside `Graph`, `Proposition`, `Belief` and `Violation` — as `INV-graph.7` and `INV-graph.8` in [`validity.md`](validity.md). Local numbers `INV-graph.2` and `INV-graph.3` are retired; they said the same thing about links alone.
 
-Two things that read like invariants but are **not**, because no rule in `validate` enforces them and so no generator can be pointed at them: that `half_life` is set when and only when `shape` is `impulse`, and that `strength` stays inside any sane range. Both are documented on the field and raised under Open questions.
+Half of what used to sit here has become a rule. That `half_life` appears **only** on an `impulse` is now enforced and generated against — it is `INV-graph.15`, stated in [`validity.md`](validity.md) because the rule that checks it lives there, and `links()` never emits a half-life on a `step` or a `ramp`. What is still *not* an invariant: that an `impulse` always **has** a half-life (deliberately legal, see Open questions 4), and that `strength` stays inside any sane range (Open questions 6). Both are documented on the field.
 
 ---
 
@@ -347,6 +348,6 @@ Raised 2026-09-16. Each needs Kent.
    **Decided 2026-09-17:** the second option — `confidence` is dropped for version 1, and the field is gone from the model above. Four reasons, in order of weight. Nothing consumed it: no invariant named it, no code read it, and the canvas gives stroke style to `provenance`, not to this (UX-6 in `PRODUCT_REQUIREMENTS.md` §7). It was a self-report by the one component we have already decided not to trust to declare its own quality — the same argument that keeps the model's hands off `provenance` (decision record 0003, rule 5). It cost a third elicited item on every link, against decision record 0005's deliberate budget of one number and one sentence per arrow. And `PRODUCT_REQUIREMENTS.md` FR-8 already uses the word "confidence" for something else entirely: run-to-run *agreement* across independent generations, which is computed, not claimed. What the field claimed to carry is carried by `provenance`, the rationale sentence and the range on the belief. If stack 04's ensemble wants to show how much the independent runs disagreed about an arrow, it adds a computed `agreement` field — a receipt, not a self-report. No decision record was needed: decision record 0005's table of link fields never listed `confidence`.
 2. **The shapes sheet names `Source` but not its fields.** The three above (`url`, `title`, `retrieved`) are a proposal. Does a source need a publisher, a quoted snippet, or an access date distinct from the retrieval date?
 3. **`sources: list[Source]` versus tuples everywhere.** The shapes sheet's `Link` row writes `list[Source]`, while its immutability row says collections are tuples and its `Graph` row uses tuples. Written here as `tuple[Source, ...]`, which is the rule the rest of the sheet follows. Confirm.
-4. **`half_life` on a non-`impulse` link has no violation code.** The twelve codes in the shapes sheet do not cover it, so today a `step` link carrying a half-life is accepted and the field ignored. Add a thirteenth code, make it a pydantic field validator, or leave it documented and ignored?
+4. **`half_life` on a non-`impulse` link.** *Decided 2026-09-17: rejected as a violation (`half_life_without_impulse`); reject, never repair.* It is the thirteenth code, checked by `validate` rather than by a field validator, because a model proposal gets the shape and the half-life out of step often enough that the user should read a sentence rather than a stack trace. **Still open, the other direction:** an `impulse` that names no half-life is legal today and the push then has no stated decay. Does it take a default, and if so whose — a number on the link, a constant in propagation, or a re-prompt? Settle before propagation is written in stack 03a.
 5. **Does `ramp` need its own duration?** This chapter defines all three shapes as reaching full size at the end of `lag`, with `ramp` climbing across that window. That makes `lag` do two jobs for `ramp` — dead time for the others, build-up time for it. The alternative is a separate `rise_time` field. Settle before propagation is written in stack 03a.
 6. **Should `strength` have a sanity ceiling?** It is an unbounded float. A model that writes ±12 has effectively asserted certainty while looking like it gave a number. A soft cap of about ±5 (roughly 1% to 99% on a coin flip) would catch that, at the cost of a rule with no principle behind it.

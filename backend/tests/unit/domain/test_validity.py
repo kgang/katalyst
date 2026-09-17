@@ -52,6 +52,7 @@ RULE_ORDER: tuple[tuple[str, ...], ...] = (
     ("dangling_link",),
     ("cycle",),
     ("reflexive_without_lag",),
+    ("half_life_without_impulse",),
     ("belief_out_of_range",),
 )
 """The rules in the order the chapter lists them, which is the order faults come back in.
@@ -204,6 +205,39 @@ def test_reflexive_links_have_positive_lag(graph: Graph) -> None:
 
     assert [fault.code for fault in faults] == ["reflexive_without_lag"]
     assert "has no delay" in faults[0].message
+
+
+@given(broken_graphs("half_life_without_impulse"))
+@many
+def test_validate_rejects_half_life_without_impulse(graph: Graph) -> None:
+    """A half-life on a push that holds is refused, not quietly ignored.
+
+    Only a spike fades, so only a spike can say how fast. A field we accept and
+    then ignore forever is a number the user cannot account for, which is the one
+    thing this product is not allowed to show.
+    """
+    faults = validate(graph)
+
+    assert [fault.code for fault in faults] == ["half_life_without_impulse"]
+    assert faults[0].subject in {one.id for one in graph.links}
+    assert "only a spike fades" in faults[0].message
+
+
+@given(graphs())
+@many
+def test_an_impulse_without_a_half_life_is_still_legal(graph: Graph) -> None:
+    """The case the other way round is left alone on purpose.
+
+    An arrow whose push is a spike but names no half-life wants a sensible default
+    rather than a refusal, and choosing that default belongs to the code that works
+    the numbers through. It is the remaining half of open question 4 in
+    `spec/graph/link.md`.
+    """
+    spikes_without_a_half_life = tuple(
+        one.model_copy(update={"shape": "impulse", "half_life": None}) for one in graph.links
+    )
+
+    assert validate(graph.model_copy(update={"links": spikes_without_a_half_life})) == []
 
 
 @given(broken_graphs("belief_out_of_range"))

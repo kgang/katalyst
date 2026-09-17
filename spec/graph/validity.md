@@ -55,6 +55,7 @@ ViolationCode = Literal[
     "documented_without_source",
     "cycle",
     "reflexive_without_lag",
+    "half_life_without_impulse",
     "belief_out_of_range",
     "no_terminal",
     "no_hypothesis",
@@ -63,7 +64,7 @@ ViolationCode = Literal[
     "market_without_payoff",
     "not_tradeable_without_reason",
 ]
-"""The twelve things that can be wrong with a map. Stable strings: the browser
+"""The thirteen things that can be wrong with a map. Stable strings: the browser
 switches on them, tests assert on them, and they are never renamed without a
 migration."""
 
@@ -81,7 +82,7 @@ class Violation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     code: ViolationCode = Field(
-        description="Which rule was broken. One of twelve stable strings."
+        description="Which rule was broken. One of thirteen stable strings."
     )
     subject: str = Field(
         description=(
@@ -124,7 +125,7 @@ Rules for messages: name the claim by its words, never by its identifier; say wh
 
 ### The rules
 
-Eleven rules, twelve codes — "exactly one hypothesis" fails in two different directions. The table is split in two so it fits on a screen; the `code` column joins them.
+Twelve rules, thirteen codes — "exactly one hypothesis" fails in two different directions. The table is split in two so it fits on a screen; the `code` column joins them.
 
 | # | Rule, in plain words | Serves | Code | Test |
 |---|---|---|---|---|
@@ -138,7 +139,8 @@ Eleven rules, twelve codes — "exactly one hypothesis" fails in two different d
 | 8 | Both ends of every arrow name a claim that is on this map | INV-graph.1 | `dangling_link` | `test_validate_rejects_dangling_link` | 02 |
 | 9 | Once the reflexive arrows are set aside, there are no loops | INV-6 | `cycle` | `test_validate_rejects_cycles`, `test_apply_preserves_dag` |
 | 10 | Every reflexive arrow takes time: `lag > 0` | INV-6 | `reflexive_without_lag` | `test_reflexive_links_have_positive_lag` |
-| 11 | Every likelihood sits between 0 and 1 with low ≤ p ≤ high | INV-7 | `belief_out_of_range` | `test_validate_rejects_belief_out_of_range` | 02 |
+| 11 | A half-life appears only on an arrow whose push fades: `shape` is `impulse` | INV-graph.15 | `half_life_without_impulse` | `test_validate_rejects_half_life_without_impulse` | 02 |
+| 12 | Every likelihood sits between 0 and 1 with low ≤ p ≤ high | INV-7 | `belief_out_of_range` | `test_validate_rejects_belief_out_of_range` | 02 |
 
 | Code | Message pattern |
 |---|---|
@@ -153,6 +155,7 @@ Eleven rules, twelve codes — "exactly one hypothesis" fails in two different d
 | `dangling_link` | The arrow out of "…" points at a claim that is not on this map. (Or: the arrow into "…" comes from a claim that is not on this map.) |
 | `cycle` | These claims form a loop with no delay in it: "…" → "…" → "…". Mark the arrow where a market feeds back on the world as reflexive and give it a delay, or remove one arrow. |
 | `reflexive_without_lag` | The feedback arrow from "…" to "…" has no delay. A market cannot change the world it is measuring in zero time. |
+| `half_life_without_impulse` | The arrow from "…" to "…" gives a half-life, but only a spike fades; a step or a ramp has nothing to fade. |
 | `belief_out_of_range` | The `<owner>` likelihood on "…" is `<p>`, with a range of `<lo>` to `<hi>`, which is not a range around that number between 0 and 1. |
 
 **`dangling_link` is the one case where a message cannot name both ends**, because one of them does not exist. It names the end that does.
@@ -161,7 +164,9 @@ Eleven rules, twelve codes — "exactly one hypothesis" fails in two different d
 
 **Rule 9, loops.** The check builds a directed graph with `networkx` — a standard Python library for graph algorithms — from every link whose `reflexive` flag is false, and asks it for the cycles. A self-link (an arrow from a claim to itself) is a cycle of length one and is caught by the same pass, which is why there is no separate code for it. A map that passes this rule is what the literature calls a *directed acyclic graph* — a graph whose arrows all point one way and never come back round. The abbreviation *DAG* survives in this repo only inside the test name `test_apply_preserves_dag`. Reflexive arrows are excluded because a market feeding back on the world is a real loop in reality, made honest by taking time; how it unrolls over that time is stack 06's work. See [`link.md`](link.md), section *`reflexive` — a market feeding back on the world*.
 
-**Rule 11, likelihoods, is checked twice on purpose.** `Belief` already refuses to be built with `lo > p` or `hi > 1` — that is a field check on the model itself, so a `Graph` assembled through our own models can never contain a bad one, and `belief_out_of_range` will never fire from that direction. The rule exists here anyway as the net under maps that arrive some other way: a hand-edited fixture file, a stored map read back after the shapes have changed, a future path that builds beliefs from raw numbers. Belief construction is [`belief.md`](belief.md); the after-any-intervention version of the same guarantee is `test_belief_bounds_after_any_sequence`, owned by [`belief.md`](belief.md). Whether a code that is currently unreachable from inside the models should exist at all is under Open questions.
+**Rule 12, likelihoods, is checked twice on purpose.** `Belief` already refuses to be built with `lo > p` or `hi > 1` — that is a field check on the model itself, so a `Graph` assembled through our own models can never contain a bad one, and `belief_out_of_range` will never fire from that direction. The rule exists here anyway as the net under maps that arrive some other way: a hand-edited fixture file, a stored map read back after the shapes have changed, a future path that builds beliefs from raw numbers. Belief construction is [`belief.md`](belief.md); the after-any-intervention version of the same guarantee is `test_belief_bounds_after_any_sequence`, owned by [`belief.md`](belief.md). Whether a code that is currently unreachable from inside the models should exist at all is under Open questions.
+
+**Rule 11 rejects rather than ignores.** A half-life is how many days a spike takes to fall to half its size, so it says something only about an `impulse`; a `step` switches on and holds and a `ramp` climbs and then holds, and neither has anything to fade. The field could have been quietly ignored on those two shapes, and for a while it was. It is refused instead, because a number we accept and then ignore forever is a number the user cannot account for — the same argument as *Reject; never repair* below. The case the other way round, an `impulse` with no half-life, stays legal: it wants a sensible default rather than a refusal, and choosing that default belongs to propagation. Decided 2026-09-17; see [`link.md`](link.md), Open questions 4.
 
 **Rules 4 and 5 are validity rules, not field rules.** `Proposition.payoff` and `Proposition.not_tradeable_reason` are optional fields on one class, so a `market` claim with no payoff can be *built*. It just cannot be *valid*. That is deliberate: a model proposal with the wrong combination comes back as a `Violation` carrying a sentence the user can read, not as a pydantic exception carrying a stack trace.
 
@@ -249,7 +254,7 @@ The generators live in `backend/tests/strategies.py`, built on `hypothesis`, a P
 
 Every invariant below is therefore two-sided: valid maps must pass clean, and a specific damage must produce a specific code. The **Stack** column says when the invariant starts running: everything about `validate` is stack 02; anything about applying a branch waits for stack 03a.
 
-Local numbers (`INV-graph.<n>`) are unique across the whole of `spec/graph/`. **This chapter holds `INV-graph.4` through `INV-graph.8`**, and restates `INV-graph.1` from [`link.md`](link.md) because the rule that enforces it lives here.
+Local numbers (`INV-graph.<n>`) are unique across the whole of `spec/graph/`. **This chapter holds `INV-graph.4` through `INV-graph.8`, and `INV-graph.15`**, and restates `INV-graph.1` from [`link.md`](link.md) because the rule that enforces it lives here.
 
 | ID | Statement | Test | Stack |
 |---|---|---|---|
@@ -259,6 +264,7 @@ Local numbers (`INV-graph.<n>`) are unique across the whole of `spec/graph/`. **
 | **INV-7** | For all graphs from `graphs()`, `[]`. For all from `broken_graphs("belief_out_of_range")` — built by bypassing the model constructors — exactly one `belief_out_of_range` | `test_validate_rejects_belief_out_of_range` | 02 |
 | **INV-9** | For all graphs from `graphs()`, `[]`. For all from `broken_graphs("no_terminal")`, exactly one `no_terminal`; likewise `market_without_payoff` and `not_tradeable_without_reason` | `test_validate_requires_terminal`, `test_validate_requires_payoff_on_market`, `test_validate_requires_reason_on_not_tradeable` | 02 |
 | **INV-graph.1** | Stated in [`link.md`](link.md): both ends of every arrow name a claim on the same map. For all graphs from `broken_graphs("dangling_link")`, exactly one `dangling_link` | `test_validate_rejects_dangling_link` | 02 |
+| **INV-graph.15** | For all links drawn from `links()`: `half_life` is `None` unless `shape` is `impulse`. For all graphs from `broken_graphs("half_life_without_impulse")`, `validate` returns exactly one `half_life_without_impulse` violation. The converse — an `impulse` with no half-life — is deliberately not asserted; such a map is valid | `test_validate_rejects_half_life_without_impulse`, `test_an_impulse_without_a_half_life_is_still_legal` | 02 |
 | **INV-graph.4** | For all graphs from `graphs()`, exactly one proposition has `kind == "hypothesis"` and it is the one named by `hypothesis_id`. For all from `broken_graphs("no_hypothesis")`, exactly one `no_hypothesis`; for all from `broken_graphs("multiple_hypotheses")`, exactly one `multiple_hypotheses` | `test_validate_requires_exactly_one_hypothesis` | 02 |
 | **INV-graph.5** | For all graphs drawn from `broken_graphs(r1, r2, r3)` with three distinct rule names, `validate` returns exactly three violations and their codes are exactly `{r1, r2, r3}` — it never stops at the first | `test_validate_reports_every_violation` | 02 |
 | **INV-graph.6** | For all graphs from `broken_graphs(*rules)`, calling `validate` twice returns two equal lists, and the codes appear in the order of the rule table above, ties broken by `subject` | `test_violations_are_ordered_stably` | 02 |

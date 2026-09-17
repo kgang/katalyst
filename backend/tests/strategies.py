@@ -132,6 +132,7 @@ BREAKABLE_RULES: tuple[str, ...] = (
     "no_terminal",
     "missing_rationale",
     "documented_without_source",
+    "half_life_without_impulse",
     "cycle",
     "reflexive_without_lag",
     "dangling_link",
@@ -151,6 +152,7 @@ INDEPENDENTLY_BREAKABLE: tuple[str, ...] = (
     "belief_out_of_range",
     "missing_rationale",
     "documented_without_source",
+    "half_life_without_impulse",
     "cycle",
     "reflexive_without_lag",
     "dangling_link",
@@ -399,7 +401,8 @@ def links(
     sentence is the argument and the provenance is our receipt for it.
     Guarantees: the mechanism is never blank; an arrow whose provenance claims a
     document or a price cites at least one source; a feedback arrow always has a
-    delay greater than zero. Valid by construction.
+    delay greater than zero; a half-life appears only on a push that fades, which
+    is the spike. Valid by construction.
 
     Args:
         draw: Supplied by the generator library.
@@ -626,6 +629,25 @@ def _break_documented_without_source(draw: Any, graph: Graph) -> Graph:
     )
 
 
+def _break_half_life_without_impulse(draw: Any, graph: Graph) -> Graph:
+    """Put a half-life on one arrow whose push holds instead of fading.
+
+    Both fields are set together, so the arrow is unambiguously wrong in one way:
+    a shape that never falls away, carrying a number that says how fast it falls
+    away.
+    """
+    victim = draw(st.sampled_from(graph.links))
+    return _with_arrow(
+        graph,
+        victim.model_copy(
+            update={
+                "shape": draw(st.sampled_from(("step", "ramp"))),
+                "half_life": draw(st.floats(min_value=0.5, max_value=90.0, allow_nan=False)),
+            }
+        ),
+    )
+
+
 def _break_cycle(draw: Any, graph: Graph) -> Graph:
     """Add an ordinary arrow running back the way an existing one came.
 
@@ -716,6 +738,7 @@ BREAKERS = {
     "no_terminal": _break_no_terminal,
     "missing_rationale": _break_missing_rationale,
     "documented_without_source": _break_documented_without_source,
+    "half_life_without_impulse": _break_half_life_without_impulse,
     "cycle": _break_cycle,
     "reflexive_without_lag": _break_reflexive_without_lag,
     "dangling_link": _break_dangling_link,
@@ -743,7 +766,7 @@ def broken_graphs(draw: Any, *rules: str) -> Graph:
         *rules: The codes of the rules to break. Naming none gives an undamaged map.
 
     Raises:
-        KeyError: If a name is not one of the twelve.
+        KeyError: If a name is not one of the thirteen.
     """
     graph = draw(graphs())
     for rule in BREAKABLE_RULES:
