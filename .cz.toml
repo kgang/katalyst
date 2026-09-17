@@ -1,0 +1,48 @@
+# How a commit message must be written in this repository.
+#
+# The tool that checks it is `commitizen`, run as a git hook every time a commit
+# message is written (see `.pre-commit-config.yaml`). It reads this file.
+#
+# The convention is Conventional Commits: a message starts with a type, an
+# optional scope in brackets, a colon and a space, then a one-line summary.
+#
+#   feat(engine): propagate a change to every claim downstream of it
+#   adr: record why the map is stored as a graph rather than a tree
+#
+# Reading `git log --oneline --grep '^adr'` then prints the decision timeline,
+# which is the whole point of the convention.
+#
+# This file sits at the top of the repository rather than inside `backend/`
+# because it governs the whole repository, not the Python project.
+
+[tool.commitizen]
+# "Customize" means the allowed types are the ones written below rather than the
+# tool's built-in list. Two of ours — `spec` and `adr` — are not in that list.
+name = "cz_customize"
+
+[tool.commitizen.customize]
+# What a message must look like, as a pattern:
+#
+#   type          one of the words listed, and nothing else
+#   (scope)       optional, in brackets, lower case
+#   !             optional, meaning the change breaks something that used to work
+#   : summary     a colon, a space, and at least one character
+#
+# The types, in plain words:
+#   feat      new behaviour a user can see
+#   fix       behaviour that was wrong and now is not
+#   refactor  the same behaviour, written differently
+#   perf      the same behaviour, faster
+#   test      tests only
+#   docs      writing only
+#   spec      a chapter of the spec under `spec/`
+#   adr       a decision record under `docs/adr/`
+#   chore     housekeeping: dependencies, ignore files, project settings
+#   ci        the checks that run on a pull request
+#   build     how the app is built or packaged
+#   style     formatting with no change in behaviour
+#   revert    undoing an earlier commit
+schema_pattern = "^(feat|fix|refactor|perf|test|docs|spec|adr|chore|ci|build|style|revert)(\\([a-z0-9._/-]+\\))?!?: .+"
+
+# What the tool prints when a message does not match.
+schema = "<type>(<optional scope>): <summary>"

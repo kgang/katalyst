@@ -75,7 +75,8 @@ def readyz(settings: Annotated[Settings, Depends(get_settings)]) -> Readiness:
     Returns:
         Whether the program is ready, and whether a model key is configured.
     """
-    model_key_present = settings.ANTHROPIC_API_KEY is not None
+    # An empty string counts as no key: copying .env.example unfilled must not read as ready.
+    model_key_present = bool(settings.ANTHROPIC_API_KEY)
     return Readiness(
         status="ready" if model_key_present else "not_ready",
         model_key_present=model_key_present,
