@@ -1,0 +1,32 @@
+{
+  // Biome is the one tool that both checks and formats the code in this
+  // directory. There is deliberately no second linter and no second formatter:
+  // two of either means two opinions and a fight in every pull request.
+  //
+  //   npm run lint    checks everything and changes nothing
+  //   npm run format  rewrites the files
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "files": {
+    // `src/api/schema.ts` is generated from the server's description of itself
+    // and is never edited by hand. It is left exactly as the generator wrote
+    // it, because a build job regenerates it and compares the result character
+    // for character; reformatting it here would make that comparison fail.
+    "includes": ["**", "!src/api/schema.ts", "!dist"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": { "preset": "recommended" }
+  },
+  "assist": {
+    "actions": { "source": { "organizeImports": "on" } }
+  },
+  "javascript": {
+    "formatter": { "quoteStyle": "double" }
+  }
+}

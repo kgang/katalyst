@@ -12,13 +12,13 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 - `prior`: the model's marginal belief before parents are considered.
 - `base_rate` (optional): `{reference_class, k, n, sources}`.
 - `evidence[]`: `{claim, url, direction ∈ {+1, −1}, weight}`.
-- `payoff` (market only): instrument, direction, magnitude.
+- `payoff` (market only): one of two shapes, told apart by a `kind` field. A **contract payoff** — `kind: contract` — names a venue, the venue's own identifier for the contract, its title, and the side you would take (`yes` or `no`). A **price payoff** — `kind: price` — names an instrument, a direction (`long` or `short`), and `move`, how far the price is expected to move if the claim comes out true, as a fraction (0.03 is three per cent). The rule behind both: the domain names *what you would trade*; what it costs — price, spread, and when we looked — is a market belief, fetched live.
 
 **Link.** An edge. A causal claim from one proposition to another.
 - `mode`: `trigger` — horizontal/sequential causality (dominoes): fires once when the parent becomes true, effect persists and decays; removing the parent later does not undo it. `sustain` — vertical causality (the desk holds the apple): the effect exists only while the parent holds; removing the parent retracts the effect.
 - `strength`: how much the link shifts the child's odds while active, on a log-odds scale (so several links add up instead of multiplying).
 - `lag`: time from parent-true to link-active. `shape`: `impulse` (a one-time spike that fades with `half_life`) · `step` (switches on and holds) · `ramp` (builds up over `lag`).
-- `rationale`: the mechanism in one to three sentences. `sources[]`. `confidence`: `speculative` · `argued` · `documented`.
+- `rationale`: the mechanism in one to three sentences. `sources[]`. There is no field for how sure the model is about its own mechanism; `provenance` and the rationale carry that.
 - `provenance`: see below. `reflexive`: market → world feedback; requires `lag > 0` (INV-6).
 
 **Provenance.** Where a number or link came from. `asserted` (model, no evidence) · `argued` (model, mechanism stated) · `documented` (cited sources) · `market_implied` (a live price) · `historical` (event study) · `user` · `simulated` (a probe). Encoded on every chip and wire (INV-2, INV-12).
@@ -30,7 +30,7 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 ## The multiverse
 
 **Intervention.** One operation on a graph:
-- `do(n, value, at?)` — assert. Cuts `n`'s incoming links; ancestors unchanged (INV-3). This is what a hypothesis is.
+- `do(n, value, at?)` — assert. Cuts the incoming links `n` has **at the moment the edit is applied**; a link inserted later is live. A timed assertion — `do(H, at=Oct 1)` says H holds from the 1st, not that H is sealed for ever. Ancestors unchanged (INV-3). This is what a hypothesis is.
 - `observe(n, value)` — learn. Updates ancestors as well as descendants. Distinct verb in the UI.
 - `insert(node, links[])` — "…but X happens." Adds a proposition and its links.
 - `retune(link, strength)` — the user disagrees with a number.
@@ -43,7 +43,7 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 
 **Diff.** Between two worlds: per proposition, `unchanged` · `shifted` (with before → after) · `added` · `killed`; plus a ranked list of terminal deltas and a one-line natural-language summary.
 
-**Locality.** An intervention on `n` changes only `descendants(n) ∪ {n}` (INV-4). The product's central correctness claim.
+**Locality.** An intervention changes only what is still connected to its subject in the graph the edit leaves behind (INV-4). Which claims those are depends on the operation, because the operations leave behind different graphs: `do` cuts the target's incoming arrows, so only the target and its descendants remain connected to it; `observe` cuts nothing, so its ancestors — and what those ancestors cause — are connected too. The per-operation **affected set** table in `multiverse/interventions.md` is the operational form, and the property test computes the set from the shape of the graph. The product's central correctness claim.
 
 ## Sensitivity and drill-down
 
@@ -68,6 +68,21 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 **Workbench.** The main screen: canvas + world-state strip + Inspector + tail strip + thesis dock.
 **Tile.** A proposition's on-canvas card. **Port.** A typed input/output on a tile. **Wire.** A link's on-canvas rendering. **Inspector.** The persistent side panel; never a modal. **Delta rail.** The ranked terminal-delta list beside a diff. **Launchpad.** The empty state with the four seeded examples.
 
+## Interface words
+
+The six operations keep their code names in code, in the wire format and in this document — `do`, `observe`, `insert`, `retune`, `refine`, `believe` — and none of those words appears on screen. These are the words the user reads. Change a button here first, then everywhere else.
+
+| Code name | The button | The badge afterwards | What the interface says it means |
+|---|---|---|---|
+| `do` | **Suppose this is true** (and **Suppose this is false**) | **Supposed · date** | "Take this as given, and do not tell me what caused it" |
+| `observe` | **This happened** | **Happened · date** | "This is news — update what came before it too" |
+| `insert` | **Add a claim**, hinted as "…but this also happens" | **Added** | A claim and its arrows arrive together |
+| `retune` | **Change this push** | **Retuned** | "You moved this arrow from +0.7 to +0.3" |
+| `refine` | **Split this claim** | **Split** | The finer claims add back up to the one they replace |
+| `believe` | **My own number** | none — the three-up belief chip is the badge | Your number sits beside the model's and the market's |
+
+One more badge is **derived**: no button produces it. **Retracted · date · by "…"** appears on a claim that was supposed true and has since been pushed back down by a later edit — what was holding this up was removed. It names the edit responsible and the day it landed (UX-14; the mechanism is in `multiverse/interventions.md`).
+
 ## Words we do not use
 
-*Prediction* (we model arguments, not oracles) · *scenario* (ambiguous between branch and world) · *edge* when we mean a link (reserve *edge* for model-vs-market spread) · *node* in UI copy (say tile or proposition) · *confidence* when we mean probability (confidence is the model's certainty about its own number).
+*Prediction* (we model arguments, not oracles) · *scenario* (ambiguous between branch and world) · *edge* when we mean a link (reserve *edge* for model-vs-market spread) · *node* in UI copy (say tile or proposition) · *confidence*, at all — there is no confidence field on anything. A link's standing is its `provenance` (a receipt we write), its rationale, and the range on the belief; a number for how much independent runs of the model disagreed is called *agreement* and is computed, never self-reported.

@@ -66,7 +66,7 @@ Every doc, identifier, and UI label uses these words exactly. Full definitions i
 | **Provenance** | Where a number or link came from: `asserted` (model, no evidence) · `argued` (model + mechanism) · `documented` (cited sources) · `market_implied` (live price) · `historical` (event study) · `user` · `simulated` (probe) |
 | **Belief** | A probability with an honest interval `{p, lo, hi}` and an owner: `model` \| `user` \| `market`. The three are never merged |
 | **Graph** | Propositions and links with no loops (a directed acyclic graph). Loops are legal only through `reflexive` links — a market feeding back on the world — which must have a delay and unroll over time |
-| **Intervention** | One of `do` (assert; cut parents), `observe` (learn; update parents too), `insert` (add a proposition + links), `retune` (change a link), `refine` (expand a proposition into sub-propositions that must marginalize back), `believe` (record the user's own belief on a proposition; shown beside the model's, not propagated in v1) |
+| **Intervention** | One of `do` (assert; cut parents; the button reads **Suppose this is true**), `observe` (learn; update parents too; the button reads **This happened**), `insert` (add a proposition + links), `retune` (change a link), `refine` (expand a proposition into sub-propositions that must marginalize back), `believe` (record the user's own belief on a proposition; shown beside the model's, not propagated in v1) |
 | **Branch** | A named, ordered list of interventions over a base graph. A branch *is* a patch; branches compose by concatenation |
 | **World** | A base graph with a branch applied and beliefs propagated. The base world is a branch with zero interventions |
 | **Diff** | The structural and belief delta between two worlds: `unchanged` / `shifted` / `added` / `killed` per node, plus ranked terminal deltas |
@@ -112,7 +112,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 - **FR-5 (P0)** Generation streams. Propositions and links arrive one at a time over server-sent events (a one-way stream from server to browser) and render as they arrive; layout reserves space so the graph grows without reflowing violently.
 - **FR-6 (P0)** Every graph terminates in ≥1 `market` proposition, or in an explicit "not tradeable — because…" terminal (INV-9).
 - **FR-7 (P0)** Verify door returns a graded path A→B or an explicit `no_path` verdict with the nearest reachable proposition. Never a fabricated bridge.
-- **FR-8 (P1)** Ensemble: N independent generations reconciled into one graph; run-to-run disagreement surfaces as link confidence.
+- **FR-8 (P1)** Ensemble: N independent generations reconciled into one graph; run-to-run disagreement surfaces as link *agreement* — a number computed from how far the independent runs differed, never a self-report by the model.
 - **FR-9 (P1)** Adversarial critique pass before beliefs are final. **(P2)** Persona red-teams ("Lloyd's underwriter", "OPEC desk") that propose *missing* propositions and links — hypothesis diversity, not outcome simulation.
 
 ### 6.3 Audit
@@ -124,7 +124,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 ### 6.4 Multiverse
 - **FR-14 (P0)** Interventions `do`, `observe`, `insert`, `retune`, `believe` on any proposition; committing one forks a branch implicitly; the base world is immutable (INV-5).
 - **FR-15 (P0)** Re-propagation is local: only the intervened proposition and its descendants change; `sustain` links retract, `trigger` links do not (INV-4).
-- **FR-16 (P0)** Diff: ghost overlay of A under A′ in a shared union layout; delta rail of terminal changes ranked by |Δ| × confidence; one-line natural-language diff.
+- **FR-16 (P0)** Diff: ghost overlay of A under A′ in a shared union layout; delta rail of terminal changes ranked by the size of the change and how well-founded it is — the provenance of the arrows behind it and the width of its range, never a self-reported number; one-line natural-language diff.
 - **FR-17 (P1)** Compare ≥3 branches as small multiples; at most 4 branches visible, rest collapsed to a list; branches must be named.
 - **FR-18 (P1)** `refine`: expand a proposition into sub-propositions; the children's combined likelihood must equal the parent's — they marginalize back (INV-10). This is the brainstorm's "search deeper lines".
 
@@ -170,6 +170,7 @@ The direction is D3. The research's "Instrument" craft rules (typography, color,
 - **UX-11 Typography.** One UI face and one tabular-figures mono for every number; three sizes, three weights; hierarchy by color and spacing. Not the component library's defaults.
 - **UX-12 Themes and access.** Dark-first, light verified, semantic tokens. All text and glyphs ≥4.5:1. The graph also exists as an outline (`role="tree"`) with a screen-reader announcement (`aria-live`) when a branch re-propagates.
 - **UX-13 Empty and edge states.** Launchpad (FR-3); `no_path` verdict as a first-class card; "not tradeable — because…" terminal as a first-class card.
+- **UX-14 An overridden assertion says so.** A claim the user supposed true, and that a later edit in the same branch has pushed back down, never renders as plainly true. Its tile carries both states in order — *Supposed · Oct 1 → Retracted · Oct 2 by "confirmed strike on Iranian territory"* — naming the edit responsible, and the branch panel lists that branch's edits in the order they were made. This is what makes the rule that a later `insert` outranks an earlier assertion readable on screen rather than surprising.
 
 ---
 
@@ -195,7 +196,7 @@ Phrased as checkable statements. Each names the spec that owns it; specs name th
 | INV-1 | **Checkable.** Every proposition has resolution criteria, a named adjudicating source, and a resolve-by date | `spec/graph/` |
 | INV-2 | **Says why.** Every link has a rationale and a provenance; a link that claims evidence (documented, historical, or market-implied) carries at least one source. Every belief has an owner | `spec/graph/` |
 | INV-3 | **Assert is not observe.** Asserting a proposition (`do`) changes nothing upstream of it; observing it (`observe`) may. Two operations, two verbs in the interface | `spec/multiverse/` |
-| INV-4 | **Locality.** After an intervention on a proposition, everything that is not that proposition or downstream of it is byte-identical between the base and the branch | `spec/multiverse/` |
+| INV-4 | **Locality.** An intervention changes only what is still connected to its subject in the graph the edit leaves behind; every other proposition is byte-identical between the base and the branch. Operational form: the affected-set table in `spec/multiverse/interventions.md`, which names the set for each of the six operations | `spec/multiverse/` |
 | INV-5 | **Branches are patches.** The base graph is never modified. A branch is an ordered list of interventions. Applying an empty branch changes nothing; applying two branches in sequence equals applying their concatenation. Every world replays exactly from (base, branch, seed) | `spec/multiverse/` |
 | INV-6 | **No loops.** Ignoring *reflexive* links (a market feeding back on the world), the graph has no cycles; every reflexive link carries a delay greater than zero | `spec/graph/` |
 | INV-7 | **Honest numbers.** Every belief satisfies 0 ≤ low ≤ p ≤ high ≤ 1 after any sequence of interventions, and is rendered at two significant figures with its range | `spec/graph/`, `spec/workbench/` |

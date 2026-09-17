@@ -18,3 +18,4 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0010](0010-grounding-sources.md) | Grounding: Polymarket + FRED behind a `GroundingSource` Protocol; Metaculus/yfinance rejected | accepted | 2026-09-16 |
 | [0011](0011-spec-as-book-and-living-architecture.md) | Spec organized as a book by idea (unnumbered chapters); living `ARCHITECTURE.md` at the root | accepted | 2026-09-16 |
 | [0012](0012-replay-mode-from-recorded-transcripts.md) | Replay mode: a keyless reviewer walks the hero flow from recorded generation transcripts | proposed | 2026-09-17 |
+| [0013](0013-payoff-names-the-trade-quote-names-the-price.md) | `Payoff` splits into a contract shape and a price shape; the domain names the trade, the quote names the price | accepted | 2026-09-17 |

@@ -60,7 +60,7 @@ Concretely:
 
 ### Confirmation
 
-* `tests/boundary/test_expand_cassettes.py` — `expand()` against recorded responses, including a recorded proposal that would close a loop and must be rejected (`test_expand_rejects_cycle`).
+* `backend/tests/boundary/test_expand_cassettes.py` — `expand()` against recorded responses, including a recorded proposal that would close a loop and must be rejected (`test_expand_rejects_cycle`).
 * `evals/cases/*.yaml` on the four assignment examples, asserting structure and never wording: no loops; at least one terminal of kind `market`, which names a tradeable instrument; a rationale on every link; a source on every `documented` link. Run by `make eval`.
 * `test_generation_receipt_records_cache_reads` — the receipt shows non-zero `cache_read_input_tokens` after the second call in a run.
 * Review checklist: no `output_config={"format": ...}` dicts alongside `output_format=Model`; no `budget_tokens`; no `temperature`.

@@ -27,9 +27,9 @@ Proposition · Link · Provenance · Belief · Graph · Hypothesis · Terminal (
 
 | Chapter | Covers | Written in |
 |---------|--------|-----------|
-| `proposition.md` | Fields, kinds, resolution, base rates, evidence, payoff | stack 02 |
-| `link.md` | Mode (trigger/sustain), strength, lag, shape, half-life, provenance, reflexive links | stack 02 |
-| `belief.md` | Owner, range, rendering rules, why never merged | stack 02 |
-| `validity.md` | What makes a graph valid; rejection over repair; server-minted identifiers | stack 02 |
+| [`proposition.md`](proposition.md) | Fields, kinds, resolution, base rates, evidence, payoff | stack 02 — written |
+| [`link.md`](link.md) | Mode (trigger/sustain), strength, lag, shape, half-life, provenance, reflexive links | stack 02 — written |
+| [`belief.md`](belief.md) | Owner, range, rendering rules, why never merged | stack 02 — written |
+| [`validity.md`](validity.md) | What makes a graph valid; rejection over repair; server-minted identifiers | stack 02 — written |
 
 Decision records behind this part: ADR-0003 (the domain layer owns validity; the model only proposes), ADR-0005 (link semantics).

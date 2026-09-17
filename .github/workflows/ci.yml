@@ -1,0 +1,167 @@
+# The checks that run on every pull request and on every push to `main`.
+#
+# Four jobs, named exactly `backend`, `frontend`, `types-fresh` and `docker`.
+# The names are not decoration: decision record 0009 makes them the checks that
+# must pass before anything reaches `main`, so renaming one here would quietly
+# stop it being required.
+#
+#   backend      the Python half: style, types, tests
+#   frontend     the browser half: style, types, tests
+#   types-fresh  the browser's types still match the server's data shapes
+#   docker       both packaged images still build
+#
+# No job below is given an API key or any other secret, and no job needs one.
+# That is the rule INV-13 in `PRODUCT_REQUIREMENTS.md`: the whole suite passes
+# with nothing configured, because tests replay answers recorded earlier instead
+# of calling anything. A test that tries to reach the network fails loudly
+# rather than quietly costing money.
+#
+# Every action used below is pinned to a major version, so a fix arrives without
+# a rewrite arriving with it.
+
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# If a second commit is pushed to the same branch while the first is still being
+# checked, stop the first. Nobody reads the result of a run that has already been
+# replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The Python half: install exactly what the lock file names, then lint, check
+  # types, and run the tests.
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv, the tool that installs Python packages
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install the exact packages the lock file names
+        # `--frozen` means: use the lock file as it is. If it disagrees with
+        # `pyproject.toml`, stop, rather than quietly resolving something else.
+        # uv reads `backend/.python-version` and fetches Python 3.12 itself.
+        run: uv sync --frozen
+
+      - name: Find mistakes
+        run: uv run ruff check .
+
+      - name: Check the code is laid out the agreed way
+        run: uv run ruff format --check .
+
+      - name: Check types
+        run: uv run mypy src
+
+      - name: Run the tests
+        # `--record-mode=none` means a test may only replay an exchange that is
+        # already recorded. An unrecorded call fails the test instead of dialling
+        # out, which is what lets this job run with no key.
+        run: uv run pytest --record-mode=none
+
+  # The browser half. `npm run check` is three things in a row: style, types,
+  # tests.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install the exact packages the lock file names
+        run: npm ci
+
+      - name: Check style, types and tests
+        run: npm run check
+
+  # The browser app's types are generated from the server's own description of
+  # itself and committed. This job generates them again and fails if the result
+  # differs, which is what stops the two halves drifting apart: change a data
+  # shape on the server without regenerating, and this goes red instead of the
+  # browser breaking later.
+  types-fresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install uv, the tool that installs Python packages
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install the browser app's packages
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install the server's packages
+        run: uv sync --frozen
+        working-directory: backend
+
+      - name: Generate the types again from the server
+        run: ./scripts/gen-types.sh
+
+      - name: frontend/src/api/schema.ts is stale — run `make types` and commit the result
+        run: git diff --exit-code -- frontend/src/api/schema.ts
+
+  # Both packaged images still build. Nothing is published anywhere: this proves
+  # the instructions in `docker/` are still correct, and that is all.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up the image builder
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the packaged server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.backend
+          target: prod
+          push: false
+          # Reuse the layers built by the previous run of this job, so a change
+          # to one line of Python does not reinstall every package again. The
+          # two images keep separate caches, named below.
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build the packaged browser image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.frontend
+          target: prod
+          push: false
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
