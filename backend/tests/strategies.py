@@ -33,6 +33,8 @@ rules layer never checks the format, which is what makes this possible.
 from datetime import date
 from typing import Any
 
+import networkx
+from hypothesis import assume
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy, composite
 
@@ -448,11 +450,12 @@ def links(
 
 
 @composite
-def graphs(draw: Any) -> Graph:
+def graphs(draw: Any, separated: bool = False) -> Graph:
     """A whole cause-and-effect map that already satisfies every rule.
 
-    Generates: between two and eight claims, the arrows between them, and the claim
-    the map started from. Claims are numbered, and an arrow only ever runs from a
+    Generates: between two and eight claims — four and eight when a map in two
+    pieces is asked for — the arrows between them, and the claim the map started
+    from. Claims are numbered, and an arrow only ever runs from a
     lower-numbered claim to a higher-numbered one, which is what keeps the map free
     of loops without having to check for them afterwards. Sometimes one extra arrow
     runs backwards, and that one is always marked as a market feeding back on the
@@ -463,17 +466,35 @@ def graphs(draw: Any) -> Graph:
     two ends present on the map; every arrow carrying a mechanism, and a source
     wherever it claims one; every feedback arrow carrying a delay; every likelihood
     inside its own range. `validate` returns an empty list for anything drawn here.
+
+    Args:
+        draw: Supplied by the generator library.
+        separated: Ask for a map in **two pieces** with no arrow running between
+            them. Nothing about validity requires a map to be all of a piece, and
+            the locality tests need two claims with nothing joining them: on a map
+            that is all of a piece the first claim is an ancestor of every other,
+            so every pair of claims shares a cause and the test would have nothing
+            to pin. Each piece gets at least two claims, so each has at least one
+            arrow in it. The default is a single piece, which is what every test
+            written before this option expects.
     """
-    size = draw(st.integers(min_value=2, max_value=8))
+    size = draw(st.integers(min_value=4 if separated else 2, max_value=8))
     identifiers = [f"claim-{index}" for index in range(size)]
 
-    # The first claim is what the user started from. The last is an ending you
-    # can act on, so the map always ends somewhere. The ones in between are
-    # steps, or endings of their own.
+    # Where the second piece begins, when one was asked for. Past the end of the
+    # map when it was not, which is what makes every claim below fall in the
+    # first piece and the map come out all of one piece.
+    second_piece = draw(st.integers(min_value=2, max_value=size - 2)) if separated else size
+
+    # The first claim is what the user started from. The last claim of each piece
+    # is an ending you can act on, so the map always ends somewhere. The ones in
+    # between are steps, or endings of their own.
     kinds = ["hypothesis"]
-    for _ in identifiers[1:-1]:
-        kinds.append(draw(st.sampled_from(("event", "event", "market", "not_tradeable"))))
-    kinds.append(draw(st.sampled_from(TERMINAL_KINDS)))
+    for index in range(1, size):
+        if index in (second_piece - 1, size - 1):
+            kinds.append(draw(st.sampled_from(TERMINAL_KINDS)))
+        else:
+            kinds.append(draw(st.sampled_from(("event", "event", "market", "not_tradeable"))))
 
     claims = [
         draw(propositions(identifier=identifiers[index], kind=kinds[index]))
@@ -482,11 +503,17 @@ def graphs(draw: Any) -> Graph:
 
     arrows: list[Link] = []
     for index in range(1, size):
+        # A cause always comes from the same piece of the map, so no arrow ever
+        # joins the two. The first claim of the second piece has no earlier claim
+        # in its own piece, so it has no causes at all.
+        earlier = identifiers[second_piece:index] if index >= second_piece else identifiers[:index]
+        if not earlier:
+            continue
         causes = draw(
             st.lists(
-                st.sampled_from(identifiers[:index]),
+                st.sampled_from(earlier),
                 min_size=1,
-                max_size=min(index, 3),
+                max_size=min(len(earlier), 3),
                 unique=True,
             )
         )
@@ -524,6 +551,67 @@ def graphs(draw: Any) -> Graph:
         links=tuple(arrows),
         hypothesis_id=identifiers[0],
     )
+
+
+def fully_separated_pairs(graph: Graph) -> list[tuple[str, str]]:
+    """Every pair of claims on a map with nothing at all joining them.
+
+    "Nothing joining them" means three things at once: no chain of arrows runs
+    from the first to the second, none runs from the second to the first, and no
+    claim anywhere is a cause of both. Those three are exactly what it takes for
+    the second claim to sit outside the *widest* of the six affected sets — the
+    one `observe` has, which reaches the target, everything it causes, its own
+    causes, and everything those causes lead to.
+
+    Args:
+        graph: The map to read.
+
+    Returns:
+        Each such pair, both ways round, in a settled order so that a failing
+        example reads the same twice.
+    """
+    present = {one.id for one in graph.propositions}
+    walk: networkx.DiGraph = networkx.DiGraph()
+    walk.add_nodes_from(sorted(present))
+    walk.add_edges_from(
+        (one.source, one.target)
+        for one in graph.links
+        if one.source in present and one.target in present
+    )
+    leads_to = {claim: networkx.descendants(walk, claim) for claim in walk}
+    caused_by = {claim: networkx.ancestors(walk, claim) for claim in walk}
+    return [
+        (subject, other)
+        for subject in sorted(walk)
+        for other in sorted(walk)
+        if other != subject
+        and other not in leads_to[subject]
+        and subject not in leads_to[other]
+        and not (caused_by[subject] & caused_by[other])
+    ]
+
+
+@composite
+def separated_pair(draw: Any, graph: Graph) -> tuple[str, str]:
+    """Two claims on one map with nothing joining them: a subject, and a claim to pin.
+
+    Generates: a pair of claim identifiers drawn from `fully_separated_pairs`.
+    Guarantees: the second claim is outside the affected set of any edit made on
+    the first, whichever of the six operations it is. That is what makes it worth
+    pinning — an assertion over an empty set is always true, and without a claim
+    that is certainly outside, the locality test for `observe` would pass while
+    checking nothing.
+
+    A map that offers no such pair is discarded rather than quietly passed. Ask
+    `graphs(separated=True)` for a map in two pieces and there are always plenty.
+
+    Args:
+        draw: Supplied by the generator library.
+        graph: The map the two claims are on.
+    """
+    pairs = fully_separated_pairs(graph)
+    assume(pairs)
+    return draw(st.sampled_from(pairs))
 
 
 # --- The same maps, damaged on purpose -------------------------------------
@@ -782,23 +870,26 @@ def broken_graphs(draw: Any, *rules: str) -> Graph:
 
 
 @composite
-def interventions(draw: Any, graph: Graph) -> Intervention:
+def interventions(draw: Any, graph: Graph, kind: str | None = None) -> Intervention:
     """One typed edit whose subject is actually on the given map.
 
     Generates: one of the six edits, at random. Anything it names — a claim, an
     arrow — is drawn from the map it was given, and anything it introduces carries
     an identifier the map does not already use.
     Guarantees: the edit can be built without raising, and every identifier it
-    names exists. It does *not* guarantee the edit would apply cleanly, because
-    applying one is not this stack's work.
+    names exists. It does *not* guarantee the edit applies cleanly: `refine` never
+    does, because splitting a claim is not built yet.
 
     Args:
         draw: Supplied by the generator library.
         graph: The map the edit is about.
+        kind: Pin which of the six operations to make, when a test is about one of
+            them; otherwise one of the six is chosen at random.
     """
     claim_ids = [one.id for one in graph.propositions]
     link_ids = [one.id for one in graph.links]
-    kind = draw(st.sampled_from(("do", "observe", "insert", "retune", "refine", "believe")))
+    if kind is None:
+        kind = draw(st.sampled_from(("do", "observe", "insert", "retune", "refine", "believe")))
 
     if kind == "do":
         return Do(
