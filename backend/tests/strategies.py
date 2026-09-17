@@ -1,0 +1,824 @@
+"""Random maps, edits and likelihoods for the property tests.
+
+A property test states something that should be true of *every* map — "a map we
+built correctly has nothing wrong with it", "breaking exactly this rule produces
+exactly this complaint" — and then checks it against hundreds of maps nobody
+wrote by hand. The library underneath is `hypothesis`, which generates the inputs
+and, when one fails, shrinks it to the smallest example that still fails. It
+shares its name with the user's *hypothesis* — the claim a map starts from — and
+has nothing to do with it.
+
+Everything here lives in the tests, never in the shipped code, so the rules layer
+gains no dependency on it.
+
+Two families of generator, and the difference between them is the whole design.
+
+**Valid by construction.** `graphs()`, `propositions()`, `links()` and `beliefs()`
+build things that already satisfy every rule: a map from `graphs()` has exactly
+one starting claim, at least one ending you can act on, arrows whose two ends are
+both present, no loops among the ordinary arrows, a source behind every arrow
+that claims one, and a delay on every feedback arrow. If `validate` ever
+complains about one of these, either `validate` or this file is wrong, and the
+failing example says which.
+
+**Broken on purpose.** `broken_graphs(*rules)` takes a map built that way and
+damages exactly the rules it is named, one damage per name. That is what lets a
+test say "break this one thing and you get this one complaint, and no others".
+
+Identifiers are readable on purpose — `claim-0`, `arrow-3`, `map-7` — because a
+twenty-six character identifier in a failing example teaches nobody anything. The
+rules layer never checks the format, which is what makes this possible.
+"""
+
+from datetime import date
+from typing import Any
+
+from hypothesis import strategies as st
+from hypothesis.strategies import SearchStrategy, composite
+
+from katalyst.domain import (
+    BaseRate,
+    Belief,
+    Beliefs,
+    Believe,
+    Branch,
+    Do,
+    Evidence,
+    Graph,
+    Insert,
+    Intervention,
+    Link,
+    Observe,
+    Payoff,
+    Proposition,
+    Refine,
+    Resolution,
+    Retune,
+    Source,
+)
+
+# --- Words, so a failing example reads like a map and not like noise -------
+
+CLAIM_SENTENCES: tuple[str, ...] = (
+    "The Strait of Hormuz reopens to unrestricted commercial transit.",
+    "Brent crude settles below sixty-eight dollars for five sessions.",
+    "The Lloyd's war-risk premium for Gulf transits falls under half a per cent.",
+    "OPEC+ announces an output restraint.",
+    "A confirmed military strike on Iranian territory is reported.",
+    "Datacentre photonic transceiver share crosses a tenth of shipments.",
+    "The Federal Reserve cuts its policy rate at its next meeting.",
+    "A ceasefire holds for a full calendar month.",
+)
+
+CRITERIA_SENTENCES: tuple[str, ...] = (
+    "At least fourteen consecutive days of unrestricted commercial transit.",
+    "Five consecutive settlement prices under the stated level.",
+    "The published rate is under the stated level on the last business day.",
+    "A formal announcement carried by the organisation's own newsroom.",
+)
+
+ADJUDICATORS: tuple[str, ...] = (
+    "Lloyd's List transit counts",
+    "ICE Futures settlement prices",
+    "the Federal Reserve's own release",
+    "at least two of AP, Reuters and AFP",
+)
+
+RATIONALE_SENTENCES: tuple[str, ...] = (
+    "The war-risk premium in the price unwinds once transit data confirms the lane is open.",
+    "Underwriters reprice Gulf hulls only while the lane actually stays open.",
+    "Cheaper insurance cuts the delivered cost of a cargo, and the saving shows up in the price.",
+    "A sustained run of low settlements pressures revenue targets and brings forward a decision.",
+)
+
+INSTRUMENTS: tuple[str, ...] = (
+    "a prediction-market contract on the stated outcome",
+    "the front-month futures contract",
+    "the energy-sector fund against the broad-market fund",
+)
+
+NO_INSTRUMENT_REASONS: tuple[str, ...] = (
+    "No venue quotes this, and the listed pure-plays are too thin to trade honestly.",
+    "Every instrument that would express this settles long after the claim resolves.",
+)
+
+REFERENCE_CLASSES: tuple[str, ...] = (
+    "Disruption episodes since nineteen eighty that ended within ninety days.",
+    "Months since the start of the decade in which the price settled under the level.",
+)
+
+PROVENANCE_WITHOUT_EVIDENCE: tuple[str, ...] = ("asserted", "argued", "user", "simulated")
+"""The four ways of recording a number that claims no document and no price behind it."""
+
+PROVENANCE_CLAIMING_EVIDENCE: tuple[str, ...] = ("documented", "historical", "market_implied")
+"""The three ways of recording a number that does claim one, and so must cite a source."""
+
+TERMINAL_KINDS: tuple[str, ...] = ("market", "not_tradeable")
+"""The two ways a chain is allowed to end."""
+
+BREAKABLE_RULES: tuple[str, ...] = (
+    "missing_resolution",
+    "belief_out_of_range",
+    "no_hypothesis",
+    "no_terminal",
+    "missing_rationale",
+    "documented_without_source",
+    "cycle",
+    "reflexive_without_lag",
+    "dangling_link",
+    "multiple_hypotheses",
+    "market_without_payoff",
+    "not_tradeable_without_reason",
+)
+"""Every rule `broken_graphs` knows how to break, in the order it applies them.
+
+The order matters only because some damages change a claim or an arrow and others
+add one: the changes are made first, so a later damage never lands on something an
+earlier damage invented.
+"""
+
+INDEPENDENTLY_BREAKABLE: tuple[str, ...] = (
+    "missing_resolution",
+    "belief_out_of_range",
+    "missing_rationale",
+    "documented_without_source",
+    "cycle",
+    "reflexive_without_lag",
+    "dangling_link",
+    "multiple_hypotheses",
+    "market_without_payoff",
+    "not_tradeable_without_reason",
+)
+"""The rules that can be broken together, any of them alongside any other.
+
+Two pairs are left out because breaking both is not possible at once, not because
+the code cannot do it. A map with **no ending you can act on** cannot also hold a
+tradeable ending that names no instrument, or an untradeable ending that gives no
+reason — those two damages work by adding an ending, which is the thing
+`no_terminal` has just taken away. And a map with **no starting claim** cannot
+also have several. Each of those four rules has its own single-rule test.
+"""
+
+MISSING_CLAIM_ID = "claim-not-on-this-map"
+"""An identifier deliberately belonging to nothing, for making an arrow dangle."""
+
+
+# --- The small pieces ------------------------------------------------------
+
+
+def seeds() -> SearchStrategy[int]:
+    """Whole numbers used to drive a random simulation.
+
+    Generates: a number between zero and four billion.
+    Guarantees: nothing but the range. A seed carries no meaning of its own; what
+    matters is that the same one always produces the same world, which is what the
+    replay tests check once there is something to replay.
+    """
+    return st.integers(min_value=0, max_value=2**32 - 1)
+
+
+def raw_belief_fields() -> SearchStrategy[tuple[float, float, float, str]]:
+    """Four raw values to try building a likelihood out of, most of which will not work.
+
+    Generates: three arbitrary floating-point numbers — including the ones that are
+    not numbers at all, such as "not a number" and the infinities — paired with one
+    of the three owners.
+    Guarantees: nothing whatever about the values. That is the point: feeding these
+    to `Belief` must either produce a likelihood that sits inside its own range, or
+    raise. There is no third outcome and no silent clamping to fit.
+    """
+    return st.tuples(
+        st.floats(),
+        st.floats(),
+        st.floats(),
+        st.sampled_from(("model", "user", "market")),
+    )
+
+
+@composite
+def beliefs(draw: Any, owner: str | None = None) -> Belief:
+    """One likelihood with an honest range and a name on it.
+
+    Generates: a likelihood, a bottom and a top, and an owner.
+    Guarantees: zero is at most the bottom, the bottom at most the likelihood, the
+    likelihood at most the top, and the top at most one. Valid by construction, so
+    anything drawn here can be built without raising.
+
+    Args:
+        draw: Supplied by the generator library.
+        owner: Pin the owner when the caller needs a particular voice; otherwise
+            one of the three is chosen at random.
+    """
+    edges = sorted(
+        draw(
+            st.lists(
+                st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
+                min_size=3,
+                max_size=3,
+            )
+        )
+    )
+    chosen = owner if owner is not None else draw(st.sampled_from(("model", "user", "market")))
+    return Belief(lo=edges[0], p=edges[1], hi=edges[2], owner=chosen)
+
+
+@composite
+def belief_sets(draw: Any) -> Beliefs:
+    """The three slots on one claim, each holding a number owned by the right voice.
+
+    Generates: the model's number always, the user's and the market's sometimes.
+    Guarantees: every slot holds a likelihood owned by the voice the slot is named
+    for, so the set can be built without raising.
+    """
+    return Beliefs(
+        model=draw(beliefs(owner="model")),
+        user=draw(st.one_of(st.none(), beliefs(owner="user"))),
+        market=draw(st.one_of(st.none(), beliefs(owner="market"))),
+    )
+
+
+@composite
+def resolutions(draw: Any) -> Resolution:
+    """How one claim gets settled: the test, the judge, and the date.
+
+    Generates: a test and a judge drawn from short lists of realistic wordings, and
+    a date.
+    Guarantees: neither the test nor the judge is blank, which is what rule one asks
+    for.
+    """
+    return Resolution(
+        criteria=draw(st.sampled_from(CRITERIA_SENTENCES)),
+        source=draw(st.sampled_from(ADJUDICATORS)),
+        by=draw(st.dates(min_value=date(2026, 1, 1), max_value=date(2030, 12, 31))),
+    )
+
+
+@composite
+def payoffs(draw: Any) -> Payoff:
+    """What one tradeable ending is worth.
+
+    Generates: an instrument, a side, and how far it is expected to move.
+    Guarantees: the size of the move is never negative; the side carries the
+    direction.
+    """
+    return Payoff(
+        instrument=draw(st.sampled_from(INSTRUMENTS)),
+        direction=draw(st.sampled_from(("long", "short"))),
+        magnitude=draw(st.floats(min_value=0.0, max_value=3.0, allow_nan=False)),
+    )
+
+
+@composite
+def base_rates(draw: Any) -> BaseRate:
+    """How often this kind of thing has happened before: so many cases out of so many.
+
+    Generates: a reference class, two counts, and sometimes a web address.
+    Guarantees: the count of true cases never exceeds the size of the set, and the
+    set is never empty.
+    """
+    total = draw(st.integers(min_value=1, max_value=200))
+    return BaseRate(
+        reference_class=draw(st.sampled_from(REFERENCE_CLASSES)),
+        k=draw(st.integers(min_value=0, max_value=total)),
+        n=total,
+        sources=tuple(draw(st.lists(st.just("https://example.test/count"), max_size=2))),
+    )
+
+
+@composite
+def evidence_items(draw: Any) -> Evidence:
+    """One published item for or against a claim.
+
+    Generates: what it says, where to read it, which way it points, and how much it
+    counts.
+    Guarantees: it points one way or the other and never neither, and it counts
+    somewhere between nothing and everything.
+    """
+    return Evidence(
+        claim=draw(st.sampled_from(CLAIM_SENTENCES)),
+        url="https://example.test/item",
+        direction=draw(st.sampled_from((1, -1))),
+        weight=draw(st.floats(min_value=0.0, max_value=1.0, allow_nan=False)),
+    )
+
+
+@composite
+def sources(draw: Any) -> Source:
+    """One thing a reader can open to check what we are claiming.
+
+    Generates: an address, a title, and sometimes the day it was fetched.
+    Guarantees: both the address and the title are present, since a citation a
+    reader cannot open is not a citation.
+    """
+    return Source(
+        url="https://example.test/document",
+        title=draw(st.sampled_from(("Voyage economics in the Gulf", "Transit counts, monthly"))),
+        retrieved=draw(
+            st.one_of(st.none(), st.dates(min_value=date(2020, 1, 1), max_value=date(2026, 9, 17)))
+        ),
+    )
+
+
+@composite
+def propositions(draw: Any, identifier: str | None = None, kind: str | None = None) -> Proposition:
+    """One claim that will be true or false by a date, judged by a named source.
+
+    Generates: an identifier, the claim in a sentence, one of the four kinds, how it
+    will be settled, the model's number before and after its causes, and sometimes a
+    reference class and some published items.
+    Guarantees: the test and the judge are not blank; the prior is owned by the
+    model and every slot's number is owned by the voice the slot is named for; a
+    tradeable ending always names an instrument and an untradeable one always says
+    why. Valid by construction.
+
+    Args:
+        draw: Supplied by the generator library.
+        identifier: Pin the identifier when the caller is assembling a whole map.
+        kind: Pin the kind for the same reason; otherwise one of the four is chosen.
+    """
+    chosen_id = (
+        identifier
+        if identifier is not None
+        else draw(st.sampled_from(tuple(f"claim-{index}" for index in range(8))))
+    )
+    chosen_kind = (
+        kind
+        if kind is not None
+        else draw(st.sampled_from(("hypothesis", "event", "market", "not_tradeable")))
+    )
+    return Proposition(
+        id=chosen_id,
+        claim=draw(st.sampled_from(CLAIM_SENTENCES)),
+        kind=chosen_kind,
+        resolution=draw(resolutions()),
+        prior=draw(beliefs(owner="model")),
+        beliefs=draw(belief_sets()),
+        base_rate=draw(st.one_of(st.none(), base_rates())),
+        evidence=tuple(draw(st.lists(evidence_items(), max_size=2))),
+        payoff=draw(payoffs()) if chosen_kind == "market" else None,
+        not_tradeable_reason=(
+            draw(st.sampled_from(NO_INSTRUMENT_REASONS)) if chosen_kind == "not_tradeable" else None
+        ),
+    )
+
+
+@composite
+def links(
+    draw: Any,
+    identifier: str | None = None,
+    source: str | None = None,
+    target: str | None = None,
+    reflexive: bool | None = None,
+) -> Link:
+    """One arrow: a causal claim from one proposition to another.
+
+    Generates: an identifier, the two ends, whether the push is a one-time shove or
+    a continuous hold, how hard it pushes, how long it takes, its shape over time,
+    the mechanism in a sentence, sometimes citations, and where the number came
+    from.
+    Guarantees: the mechanism is never blank; an arrow whose provenance claims a
+    document or a price cites at least one source; a feedback arrow always has a
+    delay greater than zero. Valid by construction.
+
+    Args:
+        draw: Supplied by the generator library.
+        identifier: Pin the arrow's identifier when assembling a whole map.
+        source: Pin the cause — the claim the arrow starts at.
+        target: Pin the effect — the claim the arrow ends at.
+        reflexive: Pin whether this is a market feeding back on the world.
+    """
+    is_feedback = reflexive if reflexive is not None else draw(st.booleans())
+    claims_evidence = draw(st.booleans())
+    shape = draw(st.sampled_from(("impulse", "step", "ramp")))
+    return Link(
+        id=identifier if identifier is not None else "arrow-0",
+        source=source if source is not None else "claim-0",
+        target=target if target is not None else "claim-1",
+        mode=draw(st.sampled_from(("trigger", "sustain"))),
+        strength=draw(st.floats(min_value=-4.0, max_value=4.0, allow_nan=False)),
+        lag=(
+            draw(st.floats(min_value=0.5, max_value=30.0, allow_nan=False))
+            if is_feedback
+            else draw(st.floats(min_value=0.0, max_value=30.0, allow_nan=False))
+        ),
+        shape=shape,
+        half_life=(
+            draw(st.floats(min_value=0.5, max_value=90.0, allow_nan=False))
+            if shape == "impulse"
+            else None
+        ),
+        rationale=draw(st.sampled_from(RATIONALE_SENTENCES)),
+        sources=(
+            (draw(sources()),) if claims_evidence else tuple(draw(st.lists(sources(), max_size=1)))
+        ),
+        confidence=draw(st.sampled_from(("speculative", "argued", "documented"))),
+        provenance=draw(
+            st.sampled_from(
+                PROVENANCE_CLAIMING_EVIDENCE if claims_evidence else PROVENANCE_WITHOUT_EVIDENCE
+            )
+        ),
+        reflexive=is_feedback,
+    )
+
+
+# --- A whole map, valid by construction ------------------------------------
+
+
+@composite
+def graphs(draw: Any) -> Graph:
+    """A whole cause-and-effect map that already satisfies every rule.
+
+    Generates: between two and eight claims, the arrows between them, and the claim
+    the map started from. Claims are numbered, and an arrow only ever runs from a
+    lower-numbered claim to a higher-numbered one, which is what keeps the map free
+    of loops without having to check for them afterwards. Sometimes one extra arrow
+    runs backwards, and that one is always marked as a market feeding back on the
+    world and always carries a delay — the one legal way to close a loop.
+
+    Guarantees: exactly one claim of kind hypothesis, and it is the one the map
+    names as its starting claim; at least one ending you can act on; every arrow's
+    two ends present on the map; every arrow carrying a mechanism, and a source
+    wherever it claims one; every feedback arrow carrying a delay; every likelihood
+    inside its own range. `validate` returns an empty list for anything drawn here.
+    """
+    size = draw(st.integers(min_value=2, max_value=8))
+    identifiers = [f"claim-{index}" for index in range(size)]
+
+    # The first claim is what the user started from. The last is an ending you
+    # can act on, so the map always ends somewhere. The ones in between are
+    # steps, or endings of their own.
+    kinds = ["hypothesis"]
+    for _ in identifiers[1:-1]:
+        kinds.append(draw(st.sampled_from(("event", "event", "market", "not_tradeable"))))
+    kinds.append(draw(st.sampled_from(TERMINAL_KINDS)))
+
+    claims = [
+        draw(propositions(identifier=identifiers[index], kind=kinds[index]))
+        for index in range(size)
+    ]
+
+    arrows: list[Link] = []
+    for index in range(1, size):
+        causes = draw(
+            st.lists(
+                st.sampled_from(identifiers[:index]),
+                min_size=1,
+                max_size=min(index, 3),
+                unique=True,
+            )
+        )
+        for cause in causes:
+            arrows.append(
+                draw(
+                    links(
+                        identifier=f"arrow-{len(arrows)}",
+                        source=cause,
+                        target=identifiers[index],
+                        reflexive=False,
+                    )
+                )
+            )
+
+    # One arrow may run backwards. It is legal only because it is marked as a
+    # market feeding back on the world, which takes it out of the loop check, and
+    # only because it takes time.
+    if draw(st.booleans()):
+        turned = draw(st.sampled_from(arrows))
+        arrows.append(
+            draw(
+                links(
+                    identifier=f"arrow-{len(arrows)}",
+                    source=turned.target,
+                    target=turned.source,
+                    reflexive=True,
+                )
+            )
+        )
+
+    return Graph(
+        id=f"map-{draw(st.integers(min_value=0, max_value=999))}",
+        propositions=tuple(claims),
+        links=tuple(arrows),
+        hypothesis_id=identifiers[0],
+    )
+
+
+# --- The same maps, damaged on purpose -------------------------------------
+
+
+def _with_claim(graph: Graph, changed: Proposition) -> Graph:
+    """Put a changed claim back on the map in place of the one it replaces.
+
+    The replacement is made without re-checking the map, because the whole point of
+    these helpers is to produce a map that would not pass.
+    """
+    return graph.model_copy(
+        update={
+            "propositions": tuple(
+                changed if one.id == changed.id else one for one in graph.propositions
+            )
+        }
+    )
+
+
+def _with_arrow(graph: Graph, changed: Link) -> Graph:
+    """Put a changed arrow back on the map in place of the one it replaces."""
+    return graph.model_copy(
+        update={"links": tuple(changed if one.id == changed.id else one for one in graph.links)}
+    )
+
+
+def _added_arrow_id(graph: Graph) -> str:
+    """Name an arrow that is certainly not already on the map."""
+    return f"arrow-added-{len(graph.links)}"
+
+
+def _break_missing_resolution(draw: Any, graph: Graph) -> Graph:
+    """Blank one claim's test, its judge, or both."""
+    victim = draw(st.sampled_from(graph.propositions))
+    blank_test, blank_judge = draw(st.sampled_from(((True, False), (False, True), (True, True))))
+    resolution = victim.resolution.model_copy(
+        update={
+            "criteria": "   " if blank_test else victim.resolution.criteria,
+            "source": "" if blank_judge else victim.resolution.source,
+        }
+    )
+    return _with_claim(graph, victim.model_copy(update={"resolution": resolution}))
+
+
+def _break_belief_out_of_range(draw: Any, graph: Graph) -> Graph:
+    """Put a likelihood on one claim that its own class would have refused.
+
+    Built with `model_construct`, the one way of making a model without running its
+    checks, because there is no other way to produce the thing this rule exists to
+    catch.
+    """
+    victim = draw(st.sampled_from(graph.propositions))
+    impossible = draw(
+        st.sampled_from(
+            (
+                Belief.model_construct(p=1.4, lo=0.2, hi=0.5, owner="model"),
+                Belief.model_construct(p=0.1, lo=0.6, hi=0.9, owner="model"),
+                Belief.model_construct(p=-0.3, lo=-0.5, hi=0.5, owner="model"),
+            )
+        )
+    )
+    spoiled = victim.beliefs.model_copy(update={"model": impossible})
+    return _with_claim(graph, victim.model_copy(update={"beliefs": spoiled}))
+
+
+def _break_no_hypothesis(draw: Any, graph: Graph) -> Graph:
+    """Turn the claim the map started from into an ordinary step."""
+    starter = next(one for one in graph.propositions if one.kind == "hypothesis")
+    return _with_claim(graph, starter.model_copy(update={"kind": "event"}))
+
+
+def _break_no_terminal(draw: Any, graph: Graph) -> Graph:
+    """Turn every ending into an ordinary step, so the map stops nowhere in particular."""
+    demoted = tuple(
+        one.model_copy(update={"kind": "event", "payoff": None, "not_tradeable_reason": None})
+        if one.kind in TERMINAL_KINDS
+        else one
+        for one in graph.propositions
+    )
+    return graph.model_copy(update={"propositions": demoted})
+
+
+def _break_missing_rationale(draw: Any, graph: Graph) -> Graph:
+    """Blank one arrow's mechanism, leaving a number with no reason behind it."""
+    victim = draw(st.sampled_from(graph.links))
+    return _with_arrow(
+        graph, victim.model_copy(update={"rationale": draw(st.sampled_from(("", "  ")))})
+    )
+
+
+def _break_documented_without_source(draw: Any, graph: Graph) -> Graph:
+    """Make one arrow claim a document or a price is behind it, and cite nothing."""
+    victim = draw(st.sampled_from(graph.links))
+    return _with_arrow(
+        graph,
+        victim.model_copy(
+            update={
+                "provenance": draw(st.sampled_from(PROVENANCE_CLAIMING_EVIDENCE)),
+                "sources": (),
+            }
+        ),
+    )
+
+
+def _break_cycle(draw: Any, graph: Graph) -> Graph:
+    """Add an ordinary arrow running back the way an existing one came.
+
+    Ordinary, not feedback: a feedback arrow is set aside before the loop check, so
+    it would close nothing. One added arrow makes exactly one tangle of claims, and
+    so exactly one complaint.
+    """
+    turned = draw(st.sampled_from([one for one in graph.links if not one.reflexive]))
+    closing = draw(
+        links(
+            identifier=_added_arrow_id(graph),
+            source=turned.target,
+            target=turned.source,
+            reflexive=False,
+        )
+    )
+    return graph.model_copy(update={"links": (*graph.links, closing)})
+
+
+def _break_reflexive_without_lag(draw: Any, graph: Graph) -> Graph:
+    """Add a feedback arrow that takes no time, which is a contradiction rather than a loop.
+
+    Added rather than changed, so that this damage never interferes with the loop
+    check: a feedback arrow is set aside there whatever its delay.
+    """
+    turned = draw(st.sampled_from(graph.links))
+    instant = draw(
+        links(
+            identifier=_added_arrow_id(graph),
+            source=turned.target,
+            target=turned.source,
+            reflexive=True,
+        )
+    )
+    return graph.model_copy(
+        update={"links": (*graph.links, instant.model_copy(update={"lag": 0.0}))}
+    )
+
+
+def _break_dangling_link(draw: Any, graph: Graph) -> Graph:
+    """Add an arrow with one end on a claim that is not on the map."""
+    anchor = draw(st.sampled_from(graph.propositions))
+    points_outward = draw(st.booleans())
+    dangling = draw(
+        links(
+            identifier=_added_arrow_id(graph),
+            source=anchor.id if points_outward else MISSING_CLAIM_ID,
+            target=MISSING_CLAIM_ID if points_outward else anchor.id,
+            reflexive=False,
+        )
+    )
+    return graph.model_copy(update={"links": (*graph.links, dangling)})
+
+
+def _break_multiple_hypotheses(draw: Any, graph: Graph) -> Graph:
+    """Add a second claim marked as the one the map started from."""
+    intruder = draw(propositions(identifier="claim-second-starter", kind="hypothesis"))
+    return graph.model_copy(update={"propositions": (*graph.propositions, intruder)})
+
+
+def _break_market_without_payoff(draw: Any, graph: Graph) -> Graph:
+    """Add a tradeable ending that names nothing to trade."""
+    empty = draw(propositions(identifier="claim-unpriced-ending", kind="market"))
+    return graph.model_copy(
+        update={"propositions": (*graph.propositions, empty.model_copy(update={"payoff": None}))}
+    )
+
+
+def _break_not_tradeable_without_reason(draw: Any, graph: Graph) -> Graph:
+    """Add an untradeable ending that never says why there is nothing to trade."""
+    silent = draw(propositions(identifier="claim-silent-ending", kind="not_tradeable"))
+    return graph.model_copy(
+        update={
+            "propositions": (
+                *graph.propositions,
+                silent.model_copy(
+                    update={"not_tradeable_reason": draw(st.sampled_from((None, " ")))}
+                ),
+            )
+        }
+    )
+
+
+BREAKERS = {
+    "missing_resolution": _break_missing_resolution,
+    "belief_out_of_range": _break_belief_out_of_range,
+    "no_hypothesis": _break_no_hypothesis,
+    "no_terminal": _break_no_terminal,
+    "missing_rationale": _break_missing_rationale,
+    "documented_without_source": _break_documented_without_source,
+    "cycle": _break_cycle,
+    "reflexive_without_lag": _break_reflexive_without_lag,
+    "dangling_link": _break_dangling_link,
+    "multiple_hypotheses": _break_multiple_hypotheses,
+    "market_without_payoff": _break_market_without_payoff,
+    "not_tradeable_without_reason": _break_not_tradeable_without_reason,
+}
+"""One way of breaking each rule, looked up by the code that rule produces."""
+
+
+@composite
+def broken_graphs(draw: Any, *rules: str) -> Graph:
+    """A map that was valid, damaged in exactly the ways named and no others.
+
+    Generates: a map from `graphs()`, then one deliberate act of damage per rule
+    named. Each name is the code that rule produces, so `broken_graphs("cycle")`
+    yields maps whose only complaint is `cycle`.
+
+    Guarantees: `validate` returns exactly one complaint per name, with exactly
+    those codes and no others. Rules that cannot be broken together are listed and
+    explained in `INDEPENDENTLY_BREAKABLE` above.
+
+    Args:
+        draw: Supplied by the generator library.
+        *rules: The codes of the rules to break. Naming none gives an undamaged map.
+
+    Raises:
+        KeyError: If a name is not one of the twelve.
+    """
+    graph = draw(graphs())
+    for rule in BREAKABLE_RULES:
+        if rule in rules:
+            graph = BREAKERS[rule](draw, graph)
+    unknown = set(rules) - set(BREAKABLE_RULES)
+    if unknown:
+        raise KeyError(f"no way of breaking these rules is written down: {sorted(unknown)}")
+    return graph
+
+
+# --- Edits, and the branches that hold them --------------------------------
+
+
+@composite
+def interventions(draw: Any, graph: Graph) -> Intervention:
+    """One typed edit whose subject is actually on the given map.
+
+    Generates: one of the six edits, at random. Anything it names — a claim, an
+    arrow — is drawn from the map it was given, and anything it introduces carries
+    an identifier the map does not already use.
+    Guarantees: the edit can be built without raising, and every identifier it
+    names exists. It does *not* guarantee the edit would apply cleanly, because
+    applying one is not this stack's work.
+
+    Args:
+        draw: Supplied by the generator library.
+        graph: The map the edit is about.
+    """
+    claim_ids = [one.id for one in graph.propositions]
+    link_ids = [one.id for one in graph.links]
+    kind = draw(st.sampled_from(("do", "observe", "insert", "retune", "refine", "believe")))
+
+    if kind == "do":
+        return Do(
+            target=draw(st.sampled_from(claim_ids)),
+            value=draw(st.booleans()),
+            at=draw(
+                st.one_of(
+                    st.none(), st.dates(min_value=date(2026, 1, 1), max_value=date(2030, 12, 31))
+                )
+            ),
+        )
+    if kind == "observe":
+        return Observe(target=draw(st.sampled_from(claim_ids)), value=draw(st.booleans()))
+    if kind == "insert":
+        newcomer = draw(propositions(identifier="claim-newcomer", kind="event"))
+        anchor = draw(st.sampled_from(claim_ids))
+        attachment = draw(
+            links(
+                identifier="arrow-newcomer",
+                source=anchor,
+                target=newcomer.id,
+                reflexive=False,
+            )
+        )
+        return Insert(proposition=newcomer, links=(attachment,))
+    if kind == "retune":
+        return Retune(
+            link=draw(st.sampled_from(link_ids)),
+            strength=draw(st.floats(min_value=-4.0, max_value=4.0, allow_nan=False)),
+        )
+    if kind == "refine":
+        finer = tuple(
+            draw(propositions(identifier=f"claim-finer-{index}", kind="event"))
+            for index in range(draw(st.integers(min_value=2, max_value=3)))
+        )
+        return Refine(target=draw(st.sampled_from(claim_ids)), into=finer)
+    return Believe(target=draw(st.sampled_from(claim_ids)), belief=draw(beliefs(owner="user")))
+
+
+@composite
+def branches(draw: Any, graph: Graph) -> Branch:
+    """A named, ordered list of edits over the given map.
+
+    Generates: an identifier, a name a person would read, sometimes a parent branch
+    it continues from, and up to three edits about the given map.
+    Guarantees: the name is never blank, and every edit names something on the map.
+    An empty list of edits is allowed on purpose — that is the base world.
+
+    Args:
+        draw: Supplied by the generator library.
+        graph: The map the branch's edits are about.
+    """
+    return Branch(
+        id=f"branch-{draw(st.integers(min_value=0, max_value=999))}",
+        label=draw(
+            st.sampled_from(
+                (
+                    "Hormuz opens, then Iran is struck",
+                    "Strike, but underwriters shrug",
+                    "My own numbers",
+                )
+            )
+        ),
+        parent=draw(st.one_of(st.none(), st.just("branch-parent"))),
+        interventions=tuple(draw(st.lists(interventions(graph), max_size=3))),
+    )
