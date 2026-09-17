@@ -54,9 +54,16 @@ async function read<Reading>(
     throw new Error(`Could not reach the server at ${address}. It may not be running.`);
   }
   if (answer.data === undefined) {
-    throw new Error(
-      `The server answered ${address} with status ${answer.response.status} and no reading.`,
-    );
+    const numbered = answer.response.status;
+    // A web server that forwards requests on to another program replies with
+    // 502, 503 or 504 when that program did not answer at all. In practice that
+    // means the server is not running, so say so rather than repeating a number
+    // the reader would have to look up.
+    const reason =
+      numbered === 502 || numbered === 503 || numbered === 504
+        ? `Nothing answered at ${address} — the server may not be running.`
+        : `The request to ${address} came back with no reading.`;
+    throw new Error(`${reason} The reply was numbered ${numbered}.`);
   }
   return answer.data;
 }

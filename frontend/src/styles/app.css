@@ -107,7 +107,7 @@ body {
 
 .status-row {
   display: grid;
-  grid-template-columns: 7rem 7rem minmax(0, 1fr);
+  grid-template-columns: 6.5rem 6rem minmax(0, 1fr);
   gap: var(--space-2);
   align-items: baseline;
   padding: var(--space-1) 0;
