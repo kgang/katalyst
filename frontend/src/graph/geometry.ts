@@ -63,8 +63,14 @@ const HEADER = 21;
  */
 const CLAIM_LINE = 20.25;
 
-/** The three belief chips: owner, number and range, with the rule above them. */
-const BELIEF_RAIL = 67;
+/**
+ * The three belief chips: owner, number and range, with the rule above them.
+ *
+ * Measured at 69 in the browser, which is two pixels more than the 67 written
+ * here before the chips grew their brightness bars. A row that is two pixels
+ * short takes them off the bottom of the tile.
+ */
+const BELIEF_RAIL = 69;
 
 /**
  * The line a dead end prints saying why nothing here can be traded. Clamped to
@@ -76,8 +82,18 @@ const FINDING = 35;
 const CLIPPING = 21;
 const CLIPPING_GAP = 4;
 
-/** One line of a claim's badges, at thirteen pixels over a line height of 1.35. */
-const BADGE_LINE = 18;
+/**
+ * One line of a claim's badges, and the hairline and padding the badges
+ * themselves add to the block once.
+ *
+ * Thirteen pixels over a line height of 1.35 is 17.5, and each badge is drawn
+ * with a hairline round it and a pixel of padding, which lifts a line box to
+ * about 19. Both measured in the browser against the stored example's strike
+ * branch, where the tallest badge line in the product — *Supposed · Oct 1 →
+ * Retracted · Oct 2 · by "…"* — runs to three lines.
+ */
+const BADGE_LINE = 19;
+const BADGE_PADDING = 4;
 
 /**
  * Roughly how many characters of a badge fit on one line.
@@ -166,7 +182,7 @@ export function tileHeight(claim: ClaimView): number {
   }
   const badges = badgeLines(claim);
   if (badges > 0) {
-    foot.push(BADGE_LINE * badges);
+    foot.push(BADGE_LINE * badges + BADGE_PADDING);
   }
   if (foot.length > 0) {
     blocks.push(foot.reduce((a, b) => a + b, 0) + GAP * (foot.length - 1));

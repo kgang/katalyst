@@ -1,10 +1,14 @@
 /**
  * The whole keyboard map, bound once on the map itself.
  *
- * Bound on the map rather than on each tile, so that the same key does the same
- * thing wherever you are standing — and so that typing a claim into a field in
- * the panel beside the map never moves the view, because the keystroke never
- * reaches here.
+ * Bound once on the page rather than on each tile, so that the same key does the
+ * same thing wherever you are standing: on a tile, on a chip inside a tile, on a
+ * row of the panel beside the map, or on nothing at all. A key bound to the tile
+ * you happen to be on is a key that stops working the moment you press Tab.
+ *
+ * **Typing is never a shortcut.** While the keyboard is in a field — naming a
+ * branch, writing a claim, giving your own number — every key below is left
+ * alone, because in a field a `j` is a `j`.
  *
  * | Key | What it does |
  * |---|---|
@@ -95,7 +99,7 @@ export function useMapKeys(needs: MapKeysNeeds) {
   const { wires, positions, focused, onFocused, onStatus, keys, words } = needs;
 
   return useCallback(
-    (event: React.KeyboardEvent<HTMLElement>): void => {
+    (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement;
       const typing =
         target.tagName === "INPUT" ||

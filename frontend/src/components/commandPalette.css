@@ -18,7 +18,7 @@
   display: grid;
   row-gap: var(--space-1);
   width: min(440px, calc(100% - var(--space-6)));
-  max-height: 60%;
+  max-height: calc(100% - var(--space-6));
   padding: var(--space-2);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);

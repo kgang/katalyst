@@ -155,7 +155,15 @@ body {
   min-height: 1.8em;
 }
 
+/* The label on the line under the map. A word rather than a glyph: a picture of
+ * a keyboard is one more thing that has to survive every typeface, and it says
+ * less than the word does. */
 .map-status__mark {
+  flex: none;
+  padding: 1px var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-family: var(--font-mono);
   color: var(--text-muted);
 }
 
@@ -165,7 +173,9 @@ body {
  * than any number nobody computed. */
 .map-live {
   margin: 0;
-  padding: 0 var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-raised);
   font-size: var(--text-sm);
   color: var(--text);
   text-wrap: pretty;

@@ -100,6 +100,14 @@ interface SurfaceProps {
    * Left out, each tile is as tall as its own content.
    */
   readonly heights?: ReadonlyMap<string, number>;
+  /**
+   * Which map this is: the base map, or the base map with one branch folded on.
+   *
+   * Both paintings of one diff share it, so flipping between them moves nothing.
+   * Opening a different branch changes it, and the union of the two worlds is
+   * then laid out again from scratch — one layout, two paintings.
+   */
+  readonly mapKey: string;
   /** Everything the keys that are not about moving are wired to. */
   readonly keys: MapKeys;
   /** Say what the last keystroke did, under the map. */
@@ -129,6 +137,7 @@ function MapSurface({
   focused,
   onFocused,
   heights,
+  mapKey,
   keys,
   onStatus,
   onOverflow,
@@ -139,7 +148,7 @@ function MapSurface({
   const [pointingAt, setPointingAt] = useState<string | null>(null);
 
   const drawing = useMemo(() => toFlow(world, heights), [world, heights]);
-  const layout = useLayout(drawing.tiles, drawing.layoutEdges);
+  const layout = useLayout(drawing.tiles, drawing.layoutEdges, mapKey);
 
   // How far the map is zoomed out. Below the threshold a wire's plate would
   // have its words drawn under eleven pixels on the glass, which is the one
@@ -267,41 +276,59 @@ function MapSurface({
     return { x: left, y: top - overhead, width: right - left, height: bottom - top + overhead };
   }, [drawing, layout, heightOf]);
 
-  // Frame the whole map once, when it is first laid out, and never again.
-  // Afterwards the view follows whatever the reader is looking at, because
-  // losing your place because the map was rearranged is the single most
+  const framed = useRef<string | null>(null);
+  const justFramed = useRef(false);
+  const centredOn = useRef<string | null>(null);
+
+  // Frame the map when it is a different map — the first time it is drawn, and
+  // again when a branch adds a claim to it. Panning, zooming and walking around
+  // never re-frame: losing your place because the map was rearranged is the most
   // disorienting thing a canvas can do.
   useEffect(() => {
-    if (layout.runs === 0) {
+    // Only once the positions really are this map's. Framing from the positions
+    // worked out for the map before the branch would frame the wrong thing, and
+    // the right thing would then arrive underneath it.
+    if (layout.runs === 0 || layout.laidOutFor !== mapKey || framed.current === mapKey) {
       return;
     }
-    if (layout.runs === 1) {
-      const frame = mapBounds();
-      const room = surface.current?.getBoundingClientRect();
-      if (frame !== null && room !== undefined) {
-        // Framed to fit — but never zoomed out past the point where a full tile
-        // would have to become a summary. The reader's first sight of the map is
-        // tiles they can read; if the whole map does not fit at that size, it is
-        // framed from its beginning, on the left, and they pan to the rest.
-        flow.setViewport(firstFrame(frame, { width: room.width, height: room.height }), {
-          duration: 0,
-        });
-      }
+    const frame = mapBounds();
+    const room = surface.current?.getBoundingClientRect();
+    if (frame === null || room === undefined) {
       return;
     }
-  }, [layout.runs, flow, mapBounds]);
+    // Framed to fit — but never zoomed out past the point where a full tile would
+    // have to become a summary. The reader's first sight of the map is tiles they
+    // can read; if the whole map does not fit at that size, it is framed from its
+    // beginning, on the left, where the map starts, and they pan to the rest.
+    flow.setViewport(firstFrame(frame, { width: room.width, height: room.height }), {
+      duration: 0,
+    });
+    framed.current = mapKey;
+    justFramed.current = true;
+  }, [layout.runs, layout.laidOutFor, flow, mapBounds, mapKey]);
 
-  // The view follows whatever the keyboard is on, so a tile that arrives — the
-  // claim an edit just added — is framed rather than hunted for, and a step
-  // along a wire never walks off the edge of the glass.
+  // The view follows whatever the keyboard is on, so a step along a wire never
+  // walks off the edge of the glass. It does not fight the framing above: when a
+  // branch has just arrived and moved focus to the claim it added, the whole map
+  // has already been framed and that claim is in it.
   useEffect(() => {
-    if (focused === null || layout.runs === 0) {
+    if (focused === null || layout.runs === 0 || centredOn.current === focused) {
+      // Only when the keyboard has actually moved. Flipping between the two
+      // worlds redraws every tile and moves none of them, and a view that slid
+      // sideways on the flip would make the reader hunt for what changed — which
+      // is the one thing the flip exists to show.
+      return;
+    }
+    if (justFramed.current) {
+      justFramed.current = false;
+      centredOn.current = focused;
       return;
     }
     const node = flow.getNode(focused);
     if (node === undefined) {
       return;
     }
+    centredOn.current = focused;
     flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + heightOf(focused) / 2, {
       zoom: flow.getZoom(),
       duration: 0,
@@ -365,6 +392,11 @@ function MapSurface({
       onSelect(under);
       if (under?.kind === "claim") {
         onFocused(under.id);
+        // Pointing at a tile and reaching it with the keyboard land in the same
+        // place, so the ring says where you are whichever way you got there.
+        (event.target as HTMLElement)
+          .closest<HTMLElement>(".react-flow__node")
+          ?.focus({ preventScroll: true });
       }
     },
     [onSelect, whatIsUnder, onFocused, openColumn],
@@ -430,25 +462,33 @@ function MapSurface({
     words: claimWords,
   });
 
+  // The keyboard map, bound once on the page. On the page rather than on the map
+  // itself, because a key bound to the element you happen to be standing on is a
+  // key that stops working the moment you press Tab — and every key below is left
+  // alone while the keyboard is in a field.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      // A collapsed tile is reached with the keyboard like any other, and Enter
+      // opens what is behind it — the same thing a press does.
+      const at = (event.target as HTMLElement | null)?.closest<HTMLElement>(".react-flow__node");
+      if (event.key === "Enter" && at?.dataset.id?.startsWith(OVERFLOW_PREFIX) === true) {
+        event.preventDefault();
+        openColumn(Number(at.dataset.id.slice(OVERFLOW_PREFIX.length)));
+        return;
+      }
+      onKeyDown(event);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onKeyDown, openColumn]);
+
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: the map is the surface the whole keyboard map is bound to, and every tile on it is itself a thing the keyboard can land on. Binding the keys to each tile instead would make the same key mean different things depending on where you were standing.
     <div
       className="canvas"
       ref={surface}
       data-arriving={arriving ? "yes" : "no"}
       onFocusCapture={onFocus}
       onPointerDownCapture={onPointAt}
-      onKeyDown={(event) => {
-        // A collapsed tile is reached with the keyboard like any other, and
-        // Enter opens what is behind it — the same thing a press does.
-        const at = (event.target as HTMLElement).closest<HTMLElement>(".react-flow__node");
-        if (event.key === "Enter" && at?.dataset.id?.startsWith(OVERFLOW_PREFIX) === true) {
-          event.preventDefault();
-          openColumn(Number(at.dataset.id.slice(OVERFLOW_PREFIX.length)));
-          return;
-        }
-        onKeyDown(event);
-      }}
     >
       <WireMarks />
 

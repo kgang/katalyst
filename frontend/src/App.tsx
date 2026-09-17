@@ -494,6 +494,7 @@ function MapScreen({
             focused={focused}
             onFocused={setFocused}
             heights={heights}
+            mapKey={`${base.baseId}:${shop.openId ?? "as-written"}`}
             keys={keys}
             onStatus={setStatus}
             onOverflow={(column) => {
@@ -509,9 +510,7 @@ function MapScreen({
             <ShortcutsSheet open={true} onClose={() => setOverlay(null)} />
           ) : null}
           <p className="map-status">
-            <span className="map-status__mark" aria-hidden="true">
-              ⌨
-            </span>
+            <span className="map-status__mark">last key</span>
             {status}
           </p>
         </div>

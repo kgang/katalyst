@@ -23,6 +23,7 @@
  * looks nothing like a button: no fill, no border, no radius. */
 .belief-chip__face {
   display: grid;
+  width: 100%;
   grid-template-rows: auto auto auto;
   align-content: start;
   justify-items: start;
@@ -59,6 +60,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-hair);
+  width: 100%;
   min-width: 0;
   font-size: var(--text-md);
   font-weight: var(--weight-medium);
@@ -71,6 +73,30 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A reading that is words rather than a number wraps to a second line instead of
+ * being cut off. *no engine yet* does not fit in a third of a tile on one line,
+ * and half of it — *no engi…* — is not an absence with a reason, it is a
+ * mistake. The second line costs nothing: a chip showing words has no range
+ * under it, so the line it would have taken is free. Two lines is the ceiling,
+ * because the tile's height was worked out from exactly this. */
+.belief-chip[data-reading="words"] .belief-chip__figure {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+/* The line under the number holds its height so that three chips side by side
+ * keep the same baselines — but only when it has something to hold. An empty one
+ * under a two-line absence would push the tile taller than the box the map
+ * reserved for it. */
+.belief-chip__under:empty {
+  display: none;
 }
 
 .belief-chip[data-reading="number"] .belief-chip__reading {

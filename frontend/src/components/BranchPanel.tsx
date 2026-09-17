@@ -473,8 +473,10 @@ export function InterventionPanel({ world, selection, onEdit, onClose }: Interve
             value={push}
             onChange={(event) => setPush(event.target.value)}
           />
+          {/* Not the button's own words again: two things called *Change this
+              push* on one panel is two things a reader has to tell apart. */}
           <button className="intervene__go" type="submit">
-            Change this push
+            Change it to that
           </button>
         </form>
       ) : null}

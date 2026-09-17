@@ -21,7 +21,7 @@
  */
 
 import { toTwoFigures } from "../components/BeliefChip";
-import { asQuoted } from "../graph/diff/days";
+import { asQuoted, toDay } from "../graph/diff/days";
 import type { ClaimView, LinkView, Slot, WorldView } from "../world";
 
 /** One claim in the outline, with the claims it causes under it. */
@@ -69,13 +69,37 @@ function daysInWords(lag: number): string {
   return `${inWords(Math.round(lag))} days later`;
 }
 
+/**
+ * The short form of each absence, for a sentence.
+ *
+ * The panel beside the map has room for the whole reason and prints it; a spoken
+ * sentence does not, and a paragraph read aloud in the middle of a claim buries
+ * the claim. So each kind of absence has one clause here, and it is the
+ * vocabulary's own.
+ */
+const ABSENCE_CLAUSE: Record<string, string> = {
+  no_engine: "nothing has worked this number through the map yet",
+  not_said: "nobody has given a number",
+};
+
 /** One belief, read out: `Model .46, range .30 to .63`, or the reason there is none. */
 function beliefInWords(owner: string, slot: Slot): string {
   if (slot.reading === undefined) {
-    return `${owner} ${slot.absence.words} — ${slot.absence.reason}`;
+    const { kind, words, reason } = slot.absence;
+    // "no market" carries its own reason and is short enough to read whole; it
+    // is also the one absence that is sometimes a finding rather than a gap.
+    if (kind === "no_market") {
+      return `${asSentence(words)} — ${reason.replace(/\.$/, "")}`;
+    }
+    return `${owner} — ${ABSENCE_CLAUSE[kind] ?? reason}`;
   }
   const { p, lo, hi } = slot.reading;
   return `${owner} ${toTwoFigures(p)}, range ${toTwoFigures(lo)} to ${toTwoFigures(hi)}`;
+}
+
+/** Make the first letter of a clause a capital, and leave every other letter alone. */
+function asSentence(line: string): string {
+  return line.charAt(0).toUpperCase() + line.slice(1);
 }
 
 /** How one arrow into this claim reads. */
@@ -83,15 +107,15 @@ function incomingInWords(wire: LinkView, from: ClaimView | undefined): string {
   const source = asQuoted(from?.claim ?? wire.source);
   const when = daysInWords(wire.lag);
   if (wire.reflexive) {
-    return `Fed back into by ${source}, ${when}`;
+    return `Fed back into by: ${source}, ${when}`;
   }
   if (wire.strength < 0) {
-    return `Pushed the other way by ${source}`;
+    return `Pushed the other way by: ${source}`;
   }
   if (wire.mode === "sustain") {
-    return `Held up by ${source}`;
+    return `Held up by: ${source}`;
   }
-  return `Caused by ${source}, ${when}`;
+  return `Caused by: ${source}, ${when}`;
 }
 
 /** What each kind of claim is, said plainly. */
@@ -102,7 +126,7 @@ function kindInWords(claim: ClaimView): string | null {
     case "market":
       return "A tradeable ending";
     case "not_tradeable":
-      return `Not tradeable — ${claim.beliefs.market.absence?.reason ?? "no venue quotes this claim"}`;
+      return `Not tradeable — ${(claim.beliefs.market.absence?.reason ?? "no venue quotes this claim").replace(/\.$/, "")}`;
     case "event":
       return null;
   }
@@ -146,7 +170,12 @@ export function claimSentence(
   if (claim.beliefs.user.reading !== undefined) {
     parts.push(`${beliefInWords("Your own number", claim.beliefs.user)}.`);
   }
-  parts.push(`${beliefInWords("Market", claim.beliefs.market)}.`);
+  // A dead end's own stored reason is a finding, and the line below prints it
+  // whole. Printing it twice — once as the market slot's absence and again as
+  // what kind of claim this is — says nothing the second time.
+  if (claim.kind !== "not_tradeable") {
+    parts.push(`${beliefInWords("Market", claim.beliefs.market)}.`);
+  }
 
   const kind = kindInWords(claim);
   if (kind !== null) {
@@ -161,7 +190,9 @@ export function claimSentence(
   const repeats = under === undefined ? [] : outgoing.filter((one) => !under.has(one.target));
   const follows = outgoing.length - repeats.length;
   if (follows > 0) {
-    parts.push(`${inWords(follows)} ${follows === 1 ? "claim follows" : "claims follow"}.`);
+    parts.push(
+      `${asSentence(inWords(follows))} ${follows === 1 ? "claim follows" : "claims follow"}.`,
+    );
   }
   for (const wire of repeats) {
     parts.push(
@@ -169,7 +200,7 @@ export function claimSentence(
     );
   }
 
-  parts.push(`Settled by ${claim.resolvesBy}.`);
+  parts.push(`Settled by ${toDay(claim.resolvesBy)}.`);
   return parts.join(" ");
 }
 

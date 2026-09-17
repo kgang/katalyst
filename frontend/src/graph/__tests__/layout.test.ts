@@ -26,6 +26,7 @@ import {
 } from "../elkGraph";
 import {
   claimLines,
+  firstFrame,
   LARGEST_ZOOM,
   SMALLEST_ZOOM,
   SUMMARY_BELOW_ZOOM,
@@ -316,5 +317,88 @@ describe("sorting a map into columns", () => {
     const { shown, overflows } = capLayers(assignLayers(["a", "b", "c"], []));
     expect(shown.map((one) => one.id)).toEqual(["a", "b", "c"]);
     expect(overflows).toHaveLength(0);
+  });
+});
+
+describe("the union of two worlds", () => {
+  /** The stored example's shape, as a list of tiles and the arrows between them. */
+  const BASE: [string, number][] = [
+    ["H", 280],
+    ["C", 192],
+    ["B", 176],
+    ["R", 152],
+    ["M1", 192],
+    ["M2", 192],
+    ["N1", 216],
+  ];
+  const BASE_ARROWS: LayoutEdge[] = [
+    { id: "H->B", source: "H", target: "B" },
+    { id: "H->C", source: "H", target: "C" },
+    { id: "H->N1", source: "H", target: "N1" },
+    { id: "C->B", source: "C", target: "B" },
+    { id: "B->M1", source: "B", target: "M1" },
+    { id: "B->M2", source: "B", target: "M2" },
+    { id: "R->B", source: "R", target: "B" },
+  ];
+
+  // test_union_layout_is_stable
+  it("lays out the union once, and gives every claim in both worlds one coordinate", async () => {
+    // The strike adds S with three arrows, one of them into the hypothesis
+    // itself — so every base claim moves one column right. That has to happen: a
+    // cause cannot be drawn to the right of what it causes. What must **not**
+    // happen is the two worlds being laid out separately, because then every
+    // tile would appear to have moved and the diff would say nothing.
+    const union: [string, number][] = [...BASE, ["S", 208]];
+    const unionArrows: LayoutEdge[] = [
+      ...BASE_ARROWS,
+      { id: "S->B", source: "S", target: "B" },
+      { id: "S->C", source: "S", target: "C" },
+      { id: "S->H", source: "S", target: "H" },
+    ];
+
+    const once = await layout(union, unionArrows, new Map());
+    const again = await layout(union, unionArrows, new Map());
+
+    // One coordinate per claim, and the same one every time: the layout is a
+    // pure function of the map.
+    expect([...once.keys()].sort()).toEqual([...union.map(([id]) => id)].sort());
+    expect(Object.fromEntries(again)).toEqual(Object.fromEntries(once));
+
+    // And the union really is a map with a direction: the strike sits before the
+    // claim it pushes against, which is what a diff over it can then be read on.
+    expect(once.get("S")?.x ?? 0).toBeLessThan(once.get("H")?.x ?? 0);
+    expect(once.get("H")?.x ?? 0).toBeLessThan(once.get("B")?.x ?? 0);
+  });
+
+  // test_the_first_frame_never_shows_a_summary_tile
+  it("frames the first view at a zoom that keeps full tiles, at 1600 by 1000", () => {
+    // The map is four columns wide and about eight hundred tall; the panel
+    // beside it takes 336 pixels, the bar at the top and the two lines at the
+    // foot take about 150, and what is left is what the map gets. Fitting the
+    // whole thing into that lands just under the zoom at which a full tile has
+    // to become a summary — so the frame is held at that zoom instead, and the
+    // reader's first sight of the product is tiles they can read.
+    const map = { x: 0, y: 0, width: 1480, height: 800 };
+    const room = { width: 1600 - 336, height: 1000 - 150 };
+    const frame = firstFrame(map, room);
+    expect(frame.zoom).toBeGreaterThanOrEqual(SUMMARY_BELOW_ZOOM);
+    expect(smallestTextAt(frame.zoom) * frame.zoom).toBeGreaterThanOrEqual(TEXT_FLOOR);
+    // Never blown up past life size, however small the map.
+    expect(firstFrame({ x: 0, y: 0, width: 300, height: 200 }, room).zoom).toBe(1);
+  });
+
+  // test_a_map_too_big_to_fit_is_framed_from_its_beginning
+  it("frames a map too big to fit from its left edge rather than shrinking it", () => {
+    // The union is five columns wide, which does not fit beside the panel at a
+    // readable zoom. The answer is the same one a tile gives when it runs out of
+    // room: change what is shown, never shrink it below eleven pixels. So the
+    // frame starts where the map starts and the reader pans to the rest.
+    const frame = firstFrame(
+      { x: 0, y: 0, width: 1880, height: 800 },
+      { width: 1264, height: 850 },
+    );
+    expect(frame.zoom).toBe(SUMMARY_BELOW_ZOOM);
+    expect(frame.x).toBeGreaterThan(0);
+    expect(frame.x).toBeLessThan(40);
   });
 });
