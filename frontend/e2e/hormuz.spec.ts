@@ -243,11 +243,13 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // The claim the edit provably cannot reach. Its number is the one it read
   // before the branch — the whole chip, range and all, unchanged.
   const opec = page.locator('.react-flow__node[data-id="R"]');
-  await expect(opec).toContainText("OPEC+ announces output restraint.");
-  await expect(opec.locator(".belief-chip__reading").first()).toHaveText(opecBefore);
-  await expect(opec.locator(".belief-chip__under").first()).toHaveText(opecBandBefore);
-  await expect(opec).not.toContainText("no engine yet");
-  await expect(opec.locator(".tile")).toHaveAttribute("data-diff", "untouched");
+  await test.step("test_the_fully_separated_claim_does_not_change", async () => {
+    await expect(opec).toContainText("OPEC+ announces output restraint.");
+    await expect(opec.locator(".belief-chip__reading").first()).toHaveText(opecBefore);
+    await expect(opec.locator(".belief-chip__under").first()).toHaveText(opecBandBefore);
+    await expect(opec).not.toContainText("no engine yet");
+    await expect(opec.locator(".tile")).toHaveAttribute("data-diff", "untouched");
+  });
 
   // test_the_browser_states_agree_with_the_engine — against the real engine.
   //

@@ -177,7 +177,7 @@ describe("the rail beside the map", () => {
     expect(screen.getByText(">99%")).toBeInTheDocument();
   });
 
-  it("test_an_ending_that_held_still_says_so_rather_than_vanishing", () => {
+  it("test_an_unmoved_terminal_is_a_greyed_row_not_a_missing_one", () => {
     // Silence cannot be told from absence: an ending missing from the engine's
     // list could mean "it did not move" or "it is not on this map". So it gets
     // a quiet row of its own, after the ranked ones and never among them.

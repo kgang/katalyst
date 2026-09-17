@@ -91,6 +91,42 @@ describe("a tile whose number moved", () => {
     expect(badge).not.toBeNull();
   });
 
+  it("test_the_retraction_badge_comes_from_the_world", () => {
+    // The world carries the retraction itself — which claim, which day, which
+    // arrow and whose doing — and the badge is read off that record rather than
+    // derived a second time from the branch. Two derivations of one line
+    // eventually disagree, so there is one. What this checks is the other half:
+    // that the tile draws what it was handed, in order, with the arrow between
+    // the two that says the second took back the first.
+    const overridden = aClaim({
+      id: "H",
+      kind: "hypothesis",
+      claim: "The Strait of Hormuz reopens to unrestricted commercial transit.",
+      diff: "shifted",
+      badges: [
+        { words: "Supposed · Oct 1", reason: "You supposed this is true, from Oct 1." },
+        {
+          words: 'Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"',
+          reason: "A later edit added an arrow into it and then made that cause true.",
+          overrides: true,
+        },
+      ],
+    });
+    const { container } = draw(overridden);
+
+    expect(
+      [...container.querySelectorAll(".tile__badge-words")].map((one) => one.textContent),
+    ).toEqual([
+      "Supposed · Oct 1",
+      'Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"',
+    ]);
+    expect(container.querySelector(".tile__badge-arrow")?.textContent?.trim()).toBe("→");
+
+    // And a claim the world reports no retraction for carries no such badge.
+    const plain = draw(aClaim({ id: "C", badges: [] }));
+    expect(plain.container.textContent).not.toContain("Retracted");
+  });
+
   it("test_a_tile_with_no_move_draws_no_movement_badge", () => {
     const { container } = draw(aClaim({ id: "R", diff: "untouched", badges: [] }));
     expect(container.querySelector('.tile__badge[data-badge="movement"]')).toBeNull();

@@ -75,7 +75,7 @@ describe("a belief chip", () => {
     expect(toReading(0.35, 0.22, 0.5)).toBe(".35 (.22–.50)");
   });
 
-  it("test_the_range_is_never_omitted", () => {
+  it("test_chip_never_omits_the_range", () => {
     const { container } = render(<BeliefChip owner="model" slot={known(0.61, 0.45, 0.74)} />);
     expect(readingOf(container)).toBe(".61");
     expect(underOf(container)).toBe(".45–.74");

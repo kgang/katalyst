@@ -51,14 +51,18 @@ computed is exactly the state a reader cannot trace.
 three different sentences, so an absence carries both its kind and its sentence:
 
 ```ts
-/** A value we may not have. Never a blank, never a zero, never a placeholder. */
+/** A value we may not have. Never a blank, never a zero, never a placeholder.
+    The two halves are written as a choice between two shapes, so the type itself
+    forbids an empty slot with no reason attached: there is no way to write one. */
 export type Known<T> =
-  | { known: true; value: T }
-  | { known: false; absence: Absence };
+  | { reading: T; absence?: undefined }
+  | { reading?: undefined; absence: Absence };
 
 export interface Absence {
   /** Which absence this is; it picks the words. */
   kind: "no_engine" | "no_market" | "not_said";
+  /** What is printed where the number would be. Never blank, never a zero. */
+  words: string;
   /** The sentence shown beside the words. Always present, never empty. */
   reason: string;
 }
@@ -266,7 +270,19 @@ The rail sits beside the canvas and lists what changed at the **endings** — th
 instrument, or name why there is none. **With the engine** it is the terminal changes, ranked, one
 line each, in the order the engine gave them:
 
-> the terminal's own words · `before → after` ▼ · largest on *day*
+```
+M1  A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.
+    tradeable
+    down · largest on 2026-10-04
+    .50 ▼ .42        .27        97%
+```
+
+The ending's own words and what kind of ending it is; then which way it went and
+the day the two worlds are furthest apart; then the three columns — the change,
+**how firm**, **same direction**. The chevron sits between the two readings
+rather than after them, so the row reads as one number becoming another, and the
+direction is a word as well as a glyph because a glyph read aloud is nothing at
+all.
 
 The engine writes every part of that row. On the Hormuz strike branch (seed 20261001) the three rows
 it gives are: the Polymarket Brent contract · `.50 → .42` ▼ · largest on Oct 4; the energy-shares

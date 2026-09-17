@@ -210,8 +210,7 @@ describe("asking the engine", () => {
     expect(strike?.standing?.reason).toContain("true in every version of the map");
   });
 
-  // test_the_retraction_badge_comes_from_the_world
-  it("test_the_retraction_badge_comes_from_the_world", async () => {
+  it("test_the_world_supplies_the_badges_and_the_standing", async () => {
     const world = await new ApiWorldSource().readWorld({ baseId: "example", branch: BRANCH });
     const h = world.claims.find((claim) => claim.id === "H");
 
