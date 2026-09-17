@@ -73,8 +73,9 @@ ViolationCode = Literal[
     # One refused comparison — what `diff` finds. See *Refusing an edit* below.
     "worlds_not_comparable",
 ]
-"""Eighteen stable strings: fourteen things that can be wrong with a **map**, and
-four reasons an **edit** cannot be folded onto one. The browser switches on them,
+"""Nineteen stable strings: fourteen things that can be wrong with a **map**,
+four reasons an **edit** cannot be folded onto one, and one reason two **worlds**
+cannot be compared. The browser switches on them,
 tests assert on them, and they are never renamed without a migration."""
 
 
