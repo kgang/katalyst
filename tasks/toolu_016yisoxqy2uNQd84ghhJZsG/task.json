@@ -1,0 +1,11 @@
+{
+  "tool_use_id": "toolu_016yisoxqy2uNQd84ghhJZsG",
+  "agent_id": "ac561d12b88b7801c",
+  "subagent_type": "fork",
+  "task_description": "Draft ADRs 0001–0005",
+  "files": [
+    "PRODUCT_REQUIREMENTS.md"
+  ],
+  "started_at": "2026-09-16T21:42:52.480394-04:00",
+  "completed_at": "2026-09-16T21:42:52.480755-04:00"
+}

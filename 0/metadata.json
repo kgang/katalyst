@@ -1,0 +1,116 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2PGR2AFWWY0VB9MQ42KDSBX",
+  "session_id": "6426bff2-c00c-4e7a-9489-062009a5ee3f",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-17T01:47:23.668721Z",
+  "branch": "docs/00-kickoff",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "docs/research/01-landscape-and-competitors.md",
+    "docs/research/02-causal-modeling-formalisms.md",
+    "docs/research/03-ui-ux-directions.md",
+    "docs/research/04-engineering-structure.md",
+    "docs/research/README.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8",
+  "turn_id": "b18d00b44f13",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 396,
+    "cache_creation_tokens": 188352,
+    "cache_read_tokens": 2169489,
+    "output_tokens": 58069,
+    "api_call_count": 17,
+    "subagent_tokens": {
+      "input_tokens": 274,
+      "cache_creation_tokens": 375898,
+      "cache_read_tokens": 3793311,
+      "output_tokens": 57923,
+      "api_call_count": 60
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01DEUN2Ej5DQ7AXbpu7r2Bni",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "claude-api"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "b18d00b44f13",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 149,
+        "end": 150,
+        "entry_ids": [
+          "37c3c2fe-4193-40a6-ad42-2a0d37192160"
+        ],
+        "tool_use_id": "toolu_01DEUN2Ej5DQ7AXbpu7r2Bni"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01DEUN2Ej5DQ7AXbpu7r2Bni"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: claude-api",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-17T01:47:23.540025Z",
+    "agent_lines": 686,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 686,
+    "total_lines_changed": 686,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 783,
+      "user_lines_removed": 2,
+      "agent_lines_added": 1323,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "PRODUCT_REQUIREMENTS.md": 2,
+        "docs/adr/0003-domain-owns-the-graph.md": 92,
+        "docs/adr/0004-branches-are-patches.md": 95,
+        "docs/adr/0005-link-semantics-and-propagation.md": 119,
+        "docs/adr/0006-llm-boundary-structured-outputs.md": 96,
+        "docs/adr/0007-canvas-react-flow-elk.md": 100,
+        "docs/adr/0008-testing-layers-and-cassettes.md": 98,
+        "docs/adr/0009-git-workflow-stacked-prs.md": 89,
+        "docs/adr/0010-grounding-sources.md": 86,
+        "docs/adr/README.md": 5,
+        "spec/00-vocabulary.md": 1
+      },
+      "user_removed_per_file": {
+        "PRODUCT_REQUIREMENTS.md": 2
+      }
+    }
+  ]
+}
