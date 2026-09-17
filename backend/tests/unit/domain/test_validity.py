@@ -123,11 +123,15 @@ def test_validate_requires_terminal(graph: Graph) -> None:
 @given(broken_graphs("market_without_payoff"))
 @many
 def test_validate_requires_payoff_on_market(graph: Graph) -> None:
-    """A tradeable ending that names nothing to trade is the commonest thing a model gets wrong."""
+    """An ending that says it is tradeable has to say what you would trade.
+
+    Either a contract somebody already sells, or an instrument and which way you
+    would take it. This is the commonest thing a model gets wrong.
+    """
     faults = validate(graph)
 
     assert [fault.code for fault in faults] == ["market_without_payoff"]
-    assert "an instrument, a direction and a size" in faults[0].message
+    assert "does not say what you would trade" in faults[0].message
 
 
 @given(broken_graphs("not_tradeable_without_reason"))

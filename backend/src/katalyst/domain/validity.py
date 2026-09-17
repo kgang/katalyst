@@ -313,8 +313,8 @@ def _tradeable_claims_name_an_instrument(graph: Graph) -> list[Violation]:
             code="market_without_payoff",
             subject=proposition.id,
             message=(
-                f"The tradeable claim {_quoted(proposition.claim)} does not name an instrument, "
-                "a direction and a size."
+                f"The tradeable claim {_quoted(proposition.claim)} does not say what you "
+                "would trade."
             ),
         )
         for proposition in graph.propositions
