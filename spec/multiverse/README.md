@@ -29,7 +29,7 @@ Intervention (`do`, `observe`, `insert`, `retune`, `refine`, `believe`) · Branc
 |---------|--------|-----------|
 | [`interventions.md`](interventions.md) | The six operations, their preconditions, and what each may touch | stack 02 — written, models built |
 | [`branches-and-worlds.md`](branches-and-worlds.md) | Patch algebra, replay, seeds, naming, parent branches | stack 02 — written, models built |
-| `propagation.md` | How likelihoods flow: adding link strengths on a log-odds scale, trigger vs sustain over time, lags and signal shapes, the seeded random-simulation engine | stack 03a |
-| `diff.md` | Per-proposition states (unchanged / shifted / added / killed), ranked terminal deltas, the one-line summary | stack 03a |
+| [`propagation.md`](propagation.md) | How likelihoods flow: adding link strengths on a log-odds scale, trigger vs sustain over time, lags and signal shapes, how a supposition ends, and the two-loop seeded simulation that gives every computed number its range | stack 03a — written |
+| [`diff.md`](diff.md) | Per-proposition states (unchanged / shifted / added / killed), agreement, ranked terminal deltas, the one-line summary, the sensitivity sweep | stack 03a — written |
 
-Decision records behind this part: ADR-0004 (branches are patches), ADR-0005 (propagation).
+Decision records behind this part: ADR-0004 (branches are patches), ADR-0005 (propagation), ADR-0014 (how a supposition ends; what the range on a computed number means; how a change is ranked and dated).
