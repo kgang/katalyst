@@ -34,7 +34,7 @@
  * absence that says exactly that rather than being worked out here.
  */
 
-import type { Diff, World } from "../api/client";
+import type { ClaimDiff, Diff, World } from "../api/client";
 import { readConditional, readDiff, readExample, readWorld } from "../api/client";
 import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
@@ -251,18 +251,15 @@ function toWorldView(world: World, bundle: FixtureBundle, branch?: BranchView): 
 /**
  * How far one claim moved, as the engine read it.
  *
- * @param before The first world's likelihood, or nothing when only one world
- *   holds the claim.
- * @param after The second world's likelihood, or nothing for the same reason.
- * @param delta The move, signed, exactly as the engine reported it.
- * @param agreement The share of versions that moved the same way.
+ * Every part of it is the engine's own: the two readings, the sign that says
+ * which way it went, the share of versions that agreed, and whether the move
+ * came from nothing but the observation changing how much each version counts.
+ * Nothing here subtracts, compares two numbers, or works anything out.
+ *
+ * @param row The claim's own row of the engine's difference.
  */
-function movement(
-  before: number | null,
-  after: number | null,
-  delta: number | null,
-  agreement: number | null,
-): Movement | undefined {
+function movement(row: ClaimDiff): Movement | undefined {
+  const { before, after, delta, agreement } = row;
   if (before === null || after === null || delta === null) {
     return undefined;
   }
@@ -285,30 +282,13 @@ function movement(
             },
           }
         : { reading: agreement },
-
-    // ---- The seam for "this claim moved only because the observation made
-    // some versions count more" ------------------------------------------
-    //
-    // A claim with no causes of its own can move under **This happened**
-    // without anything pushing on it: the observation makes the versions of
-    // the map in which it was likely count for more, and the average shifts.
-    // The engine's difference says when that is the whole story, in one field
-    // on a claim's row — `moved_only_by_reweighting` — and the Inspector
-    // prints one sentence when it is set.
-    //
-    // **It is deliberately not read here yet.** That field arrives with the
-    // engine fix on `fix/04-observe-direction`, which this branch does not yet
-    // stand on: reading it before the generated types carry it would mean
-    // asserting a shape nobody has described, which is the one habit this seam
-    // exists to avoid. When this branch is rebased onto that fix the line is
-    //
-    //     onlyReweighted: row.moved_only_by_reweighting,
-    //
-    // with `row` the claim's own `ClaimDiff`, and nothing else changes: the
-    // panel already knows what to do with it.
-    //
-    // The browser must never work this out for itself either way — it is a
-    // fact about how the engine read the numbers, and only the engine knows it.
+    // A claim with no causes of its own can move under **This happened** without
+    // anything pushing on it: the observation makes the versions of the map in
+    // which it was likely count for more, and the average shifts. The engine
+    // says when that is the whole story, and the panel prints one sentence when
+    // it does. **The browser never works this out for itself** — it is a fact
+    // about how the engine read the numbers, and only the engine knows it.
+    onlyReweighted: row.moved_only_by_reweighting,
   };
 }
 
@@ -320,7 +300,7 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
   for (const [id, one] of Object.entries(difference.claims)) {
     changed.set(id, {
       state: one.state,
-      moved: movement(one.before, one.after, one.delta, one.agreement),
+      moved: movement(one),
     });
   }
 

@@ -53,9 +53,19 @@ export function Refusal({ asking, reasons }: RefusalProps) {
           </li>
         ))}
       </ol>
+      {/* Why two tiles beside each other read differently, said once here rather
+          than on every tile. A claim the edit can reach has no number, because
+          the branch it would have come from was refused. A claim the edit
+          provably cannot reach keeps the number the engine worked out for the
+          map as it was written, and that number is still true — an edit changes
+          only what is still joined to its subject. Both are right, and a reader
+          seeing one blank tile beside one with a number deserves to be told
+          which is which. */}
       <p className="refusal__note">
-        Nothing was changed on the map. The branch is still yours to edit, and the map above is the
-        last one the engine did work out.
+        Nothing was changed on the map. Every claim your edit can reach reads <b>not worked out</b>,
+        because the branch those numbers would have come from is the one that was refused. A claim
+        your edit cannot reach keeps the number the engine worked out for the map as it was written,
+        which is still the number for that claim.
       </p>
     </section>
   );

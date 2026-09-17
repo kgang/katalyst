@@ -450,8 +450,13 @@ export function branchWorld(base: WorldView, branch: BranchView, engine?: Engine
       // that number wearing the certainty guard's clothes. The badge pair says
       // *Supposed · Oct 1* instead, which is what actually happened.
       const supposed = standing.get(claim.id) !== undefined;
-      const moved =
-        state === "shifted" && !supposed ? computed?.change.claims.get(claim.id)?.moved : undefined;
+      // What the engine read on this claim: the two numbers, which way they
+      // went, and whether the move came from nothing but the observation
+      // changing how much each version counts. It is carried for **every** claim
+      // the engine read, not only the ones it calls `shifted` — a claim can move
+      // a hair and still come out unchanged, and when it did so purely by
+      // reweighting the panel has a sentence for exactly that.
+      const moved = supposed ? undefined : computed?.change.claims.get(claim.id)?.moved;
       // Which tiles reserve a line for how far their number moved: the ones the
       // edit can reach, and only those. A claim it added, one it forced false
       // and one it cannot reach have nothing to say there, and a claim standing
@@ -464,8 +469,17 @@ export function branchWorld(base: WorldView, branch: BranchView, engine?: Engine
         moved,
         badges: [
           ...(badges.get(claim.id) ?? []),
+          // The tile's line reads the move only when the engine calls the claim
+          // shifted. A claim that moved a hair and came out unchanged reads *no
+          // change*, which is the engine's own verdict; the two numbers behind
+          // it are one click away in the panel.
           ...(reserves && engine !== undefined
-            ? [movedBadge(moved, engine.at === "waiting" ? engine.absence : undefined)]
+            ? [
+                movedBadge(
+                  state === "shifted" ? moved : undefined,
+                  engine.at === "waiting" ? engine.absence : undefined,
+                ),
+              ]
             : []),
         ],
         standing: standing.get(claim.id),

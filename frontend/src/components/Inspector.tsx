@@ -321,6 +321,10 @@ function WhatYourEditDid({ claim }: { claim: ClaimView }) {
   }
   const way = moved.way === "up" ? { chevron: "▲", word: "up" } : { chevron: "▼", word: "down" };
   const agreed = moved.sameDirection.reading;
+  // The engine's verdict on the claim, which is not the same thing as the two
+  // numbers: a claim can move a hair and still come out unchanged, because a
+  // move counts only when the versions of the map agree on which way it went.
+  const counted = claim.diff === "shifted";
 
   return (
     <Section title="What your edit did">
@@ -328,8 +332,16 @@ function WhatYourEditDid({ claim }: { claim: ClaimView }) {
         <span className="inspector__mono">
           {`${toTwoFigures(moved.from)} ${way.chevron} ${toTwoFigures(moved.to)}`}
         </span>
-        <span className="inspector__moved-word">{way.word}</span>
+        <span className="inspector__moved-word">
+          {counted ? way.word : `${way.word} · no change`}
+        </span>
       </p>
+      {counted ? null : (
+        <p className="inspector__reason">
+          The engine compared the two worlds and reports no change on this claim: a move counts only
+          when the versions of the map agree on which way it went, and these did not.
+        </p>
+      )}
       <dl className="inspector__pairs">
         <dt>same direction</dt>
         <dd>
@@ -348,15 +360,11 @@ function WhatYourEditDid({ claim }: { claim: ClaimView }) {
             "the move and never multiplied into it."}
       </p>
 
-      {/* ---- Where the reweighting sentence goes ---------------------------
-          A claim with no causes of its own can move under **This happened**
+      {/* A claim with no causes of its own can move under **This happened**
           without anything pushing on it: the observation makes the versions of
           the map in which it was likely count for more, and the average shifts.
-          The engine's difference gains one field saying when that is the whole
-          story, in the pull request that fixes how a direction is read; until
-          that field exists `moved.onlyReweighted` is never set, so this prints
-          nothing at all rather than guessing. The sentence itself is settled,
-          word for word, and is written here so that it cannot drift. */}
+          The engine says when that is the whole story; this prints the sentence
+          when it does, word for word, and nothing at all when it does not. */}
       {moved.onlyReweighted === true ? (
         <p className="inspector__reason">
           this claim moved only because the observation made some versions count more.

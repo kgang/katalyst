@@ -100,6 +100,38 @@ describe("the branch panel", () => {
     }
   });
 
+  it("test_an_unedited_map_says_where_its_numbers_came_from", () => {
+    // Two different claims about the same screen, and the map must make the one
+    // that is true: the engine worked these numbers out, or nobody did.
+    const computed = render(
+      <BranchPanel
+        branches={[STRIKE]}
+        openId={null}
+        world={{ ...WORLD, versions: 2000 }}
+        onOpen={vi.fn()}
+        onFork={vi.fn()}
+        naming={false}
+        onNaming={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/worked out by the engine/)).toBeInTheDocument();
+    expect(computed.container.textContent).not.toContain("the stored example carries");
+    computed.unmount();
+
+    render(
+      <BranchPanel
+        branches={[STRIKE]}
+        openId={null}
+        world={WORLD}
+        onOpen={vi.fn()}
+        onFork={vi.fn()}
+        naming={false}
+        onNaming={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/the stored example carries/)).toBeInTheDocument();
+  });
+
   it("test_a_map_nobody_has_edited_says_so", () => {
     render(
       <BranchPanel

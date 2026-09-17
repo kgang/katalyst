@@ -206,9 +206,18 @@ export function BranchPanel({
       )}
 
       {open === undefined ? (
+        // Where the numbers on the unedited map came from — and there are two
+        // answers, told apart by the one thing that says whether anything was
+        // worked out: whether the world reports how many versions of the map
+        // were run. The engine's answer and the stored example's own numbers are
+        // different claims about the world, and a screen that said the same
+        // sentence over both would be making the weaker one silently.
         <p className="branch-panel__none">
-          Nothing has been edited. The map above is exactly as it was written, and every number on
-          it is the one the stored example carries.
+          {world.versions === undefined
+            ? "Nothing has been edited. The map above is exactly as it was written, and every " +
+              "number on it is the one the stored example carries — nothing has worked one out."
+            : "Nothing has been edited. The map above is exactly as it was written, and every " +
+              "number on it was worked out by the engine from that map with nothing done to it."}
         </p>
       ) : (
         <ol className="branch-panel__edits">

@@ -314,24 +314,23 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
 
 /**
  * Pressing **This happened** on the Brent claim puts the two contracts on the
- * rail.
+ * rail — and the panel says when a claim moved only because the observation
+ * changed how much each version counts.
  *
- * **Skipped, and waiting on the engine fix.** On the engine this branch stands
- * on, an observation leaves the rail empty: a claim's direction is read as a
- * plain average over the two thousand versions of the map, including the two
- * hundred-odd in which no world survived the observation at all — and a version
- * that counts for nothing in the number still votes against the direction,
- * which drags the same-direction share under the ninety per cent bar. The fix
- * is on `fix/04-observe-direction`: read the direction with the same weights
- * the number was read with. **Nothing in the browser changes**, which is why
- * this test is written now — un-skip it once this branch stands on that fix.
+ * This is the one thing the engine fix on `fix/04-observe-direction` bought, and
+ * it is checked here rather than in a component test on purpose: what it claims
+ * is that the engine's answer reaches the screen, and a component test would
+ * have to be handed rows to prove that rows are drawn, which proves nothing
+ * about whether there are any.
  *
- * It is written as an end-to-end test rather than a component one on purpose:
- * what it claims is about the engine's answer reaching the screen, and a
- * component test would have to be handed rows to prove that rows are drawn,
- * which proves nothing about whether there are any.
+ * **Where the observation lands matters, and both cases are here.** Reporting
+ * Brent as news moves both contracts hanging off it, and they appear on the
+ * rail. Reporting the insurance premium as news moves the strait's own
+ * likelihood — but nothing pushes on the strait, so what moved it is the
+ * observation making the versions in which it was likely count for more. The
+ * engine says so in one field and the panel prints one sentence.
  */
-test.skip("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
+test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   await page.goto("/");
   await page
     .getByRole("button", { name: /Strait of Hormuz/ })
@@ -353,6 +352,38 @@ test.skip("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   // where a move turns into something a reader can act on. A rail that stayed
   // empty here would make **This happened** a button that does nothing.
   const rail = page.locator(".delta-rail");
-  await expect(rail.locator(".delta-rail__row[data-moved='yes']")).toHaveCount(2);
+  await expect(rail.locator('.delta-rail__row[data-moved="yes"]')).toHaveCount(2);
   await expect(rail).toContainText("In the order the engine put them in");
+  // Every reading on those rows is the engine's, and none is typed in here.
+  for (const cell of await rail
+    .locator('.delta-rail__row[data-moved="yes"] .delta-rail__values')
+    .all()) {
+    await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+\.\d+[<>]?\d+%$/);
+  }
+});
+
+test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({ page }) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: /Strait of Hormuz/ })
+    .first()
+    .click();
+  await waitForTheLayout(page);
+
+  // The news is the insurance premium falling. Nothing on this map pushes on
+  // the strait's own likelihood — it is the claim the map starts from — so the
+  // only way it can move is the observation making some versions count for more.
+  await page.locator('.react-flow__node[data-id="C"]').click();
+  await page.keyboard.press("b");
+  await page.getByLabel(/What is this branch called/).fill("The premium fell");
+  await page.getByRole("button", { name: "Start this branch" }).click();
+  await page.locator('.react-flow__node[data-id="C"]').click();
+  await page.keyboard.press("e");
+  await page.getByRole("button", { name: /^This happened/ }).click();
+
+  // The panel, on the strait itself, word for word.
+  await page.locator('.react-flow__node[data-id="H"]').click();
+  await expect(
+    page.getByText("this claim moved only because the observation made some versions count more."),
+  ).toBeVisible();
 });

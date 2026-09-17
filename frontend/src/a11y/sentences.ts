@@ -82,6 +82,26 @@ const ABSENCE_CLAUSE: Record<string, string> = {
   not_said: "nobody has given a number",
 };
 
+/**
+ * How far this claim's number moved, read out.
+ *
+ * The chevron the tile draws is a glyph, and a glyph read aloud is nothing at
+ * all — so the direction is the word here, and the two readings are the
+ * engine's own, printed the way every number on this screen is printed.
+ *
+ * @param claim A claim the engine says moved.
+ */
+function movedInWords(claim: ClaimView): string {
+  const moved = claim.moved;
+  if (moved === undefined) {
+    return "Your edit moved this claim.";
+  }
+  return (
+    `Your edit moved this claim ${moved.way}, from ${toTwoFigures(moved.from)} to ` +
+    `${toTwoFigures(moved.to)}.`
+  );
+}
+
 /** One belief, read out: `Model .46, range .30 to .63`, or the reason there is none. */
 function beliefInWords(owner: string, slot: Slot): string {
   if (slot.reading === undefined) {
@@ -156,7 +176,12 @@ export function claimSentence(
         ? "Your edit added this claim."
         : claim.diff === "killed"
           ? "You supposed this is false."
-          : "Your edit can reach this claim.",
+          : claim.diff === "shifted"
+            ? // How far it moved, in the same two readings and the same word the
+              // tile shows — a reader who never sees the picture gets the move,
+              // not only the fact that there was one.
+              movedInWords(claim)
+            : "Your edit can reach this claim.",
     );
   } else if (claim.diff === "untouched") {
     parts.push("Your edit cannot reach this claim.");

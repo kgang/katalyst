@@ -310,13 +310,10 @@ export interface Movement {
    * True when the engine says this claim moved **only** because an observation
    * made some versions of the map count for more than others.
    *
-   * **Nothing sets this yet, and that is deliberate.** It is the one field on
-   * this view model with no source here: the engine's difference carries it on
-   * a claim's own row, as `moved_only_by_reweighting`, from the pull request
-   * that fixes how a direction is read (`fix/04-observe-direction`). The one
-   * line that reads it across is marked in `apiSource.ts`. The browser must
-   * never work this out for itself — whether a claim moved for that reason is a
-   * fact about how the engine read the numbers, and only the engine knows it.
+   * It comes from the engine's difference, on the claim's own row, and the
+   * browser must never work it out for itself — whether a claim moved for that
+   * reason is a fact about how the engine read the numbers, and only the engine
+   * knows it. The panel prints one sentence when it is set.
    */
   readonly onlyReweighted?: boolean;
 }

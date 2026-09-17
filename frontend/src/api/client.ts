@@ -41,6 +41,9 @@ export type World = components["schemas"]["World"];
 /** What moved between two worlds: every claim, the endings that moved, one sentence. */
 export type Diff = components["schemas"]["Diff"];
 
+/** What happened to one claim between two worlds, with the numbers behind it. */
+export type ClaimDiff = components["schemas"]["ClaimDiff"];
+
 /** One likelihood with the range around it, and whose number it is. */
 export type Belief = components["schemas"]["Belief"];
 

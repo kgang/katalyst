@@ -78,6 +78,16 @@ describe("a branch the engine would not fold", () => {
     expect(screen.getByText(/Nothing was changed on the map/)).toBeInTheDocument();
   });
 
+  it("test_a_refusal_says_why_one_claim_still_has_a_number", () => {
+    render(<Refusal asking="this map" reasons={THREE} />);
+    // Two tiles beside each other read differently and both are right: a claim
+    // the edit can reach has no number because the branch was refused, and one
+    // it cannot reach keeps the number the engine worked out for the map as it
+    // was written. A reader seeing the pair deserves to be told which is which.
+    expect(screen.getByText(/not worked out/)).toBeInTheDocument();
+    expect(screen.getByText(/cannot reach keeps the number/)).toBeInTheDocument();
+  });
+
   it("test_one_reason_reads_as_one_reason", () => {
     render(<Refusal asking="this map" reasons={[THREE[0] as Reason]} />);
     expect(screen.getByText(/gave one reason/)).toBeInTheDocument();

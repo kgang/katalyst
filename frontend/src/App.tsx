@@ -409,7 +409,6 @@ function MapScreen({
   const [status, setStatus] = useState(
     "Press ? for every key. j and k walk a column; h and l follow the wires.",
   );
-  const [announcement, setAnnouncement] = useState("");
   const [arriving, setArriving] = useState(true);
   const lastBranch = useRef<string | null>(null);
 
@@ -522,6 +521,16 @@ function MapScreen({
   );
   const outline = useMemo(() => outlineOf(world), [world]);
 
+  // What the branch did, said out loud for a reader who is not looking at the
+  // picture. It is said twice, because the two halves arrive at different
+  // moments: the shape the instant the branch opens, and the counts when the
+  // engine answers. The live region is polite, so the second line waits for a
+  // pause rather than cutting across the first.
+  const announcement = useMemo(
+    () => (paintings === null ? "" : branchAnnouncement(paintings.now, computed?.change)),
+    [paintings, computed],
+  );
+
   // One arrow's own number, asked for when the reader selects that arrow and
   // kept afterwards. It is fetched here rather than by the wire because no
   // component in this product talks to the network, and because the answer
@@ -571,10 +580,8 @@ function MapScreen({
     setShowing("now");
     setArriving(true);
     if (paintings === null) {
-      setAnnouncement("");
       return;
     }
-    setAnnouncement(branchAnnouncement(paintings.now));
     const arrived = paintings.now.claims.find((claim) => claim.diff === "added");
     if (arrived !== undefined) {
       setFocused(arrived.id);
