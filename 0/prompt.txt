@@ -1,0 +1,253 @@
+Please read 
+
+For the next agent, in plans/
+
+- HANDOFF.md, rewritten. It covers what is built, how you work, the merge method as it actually behaves (GitHub restacks only linear children by itself), and fourteen lessons.
+- stack-04-generation.md. It plans stack 04 as 04a (browser) ∥ 04b (server): seven PRs, an eight-event shapes sheet, pre-decisions, waves with owned files, agent briefs and a review checklist. I read it end to end and corrected it.
+- roadmap-03-to-06.md, refreshed, with stack 03 marked merged.
+- The plans README.md, scripts/land.sh, and a closing STATUS.md entry.
+
+Can you dispatch an opus sub-agent to analyze the open questions for me and critically analyze what the best choices would be to balance functionality, and a principled, simple as possible code design and architecture to understand and maintain? Afterwards, present the open questions to me using the question tool explaining the question in simple terms with an explanation of the impact of the decision. Then, incorporate my decisions and proceed with implementing stack 4
+
+---
+
+<task-notification>
+<task-id>a70ce831169348f32</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/ef0fe818-4a51-417f-a20d-5479dc442258/tasks/a70ce831169348f32.output</output-file>
+<status>completed</status>
+<summary>Agent "Analyze stack 04 open questions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I read the plan, the records, the chapters, and then ran the shipped engine read-only to check the two numbers the plan builds on. Everything below that says "measured" was measured today on this machine, on the Hormuz fixture at seed `20261001`.
+
+---
+
+# 1. Needs Kent
+
+## Q1 — Where a claim's starting number and its range come from (decision record 0015)
+
+**In one sentence:** when we ask the model how likely a claim is, do we take the number and range it states, or ask it several times and use the spread of its answers as the range?
+
+| | Option | On screen | In code | Cost |
+|---|---|---|---|---|
+| **A** | **Take the stated range, labelled as stated (recommended).** Record 0015 says "not yet", names the measurement that would justify the change, and defers it to stack 07 | Nothing changes. Record 0014 already ships the sentence *"model interval, uncalibrated"* (`docs/adr/0014-…md:163`) and K3 already picks between two chip sentences (`plans/notes/2026-09-17-kent-decisions-stack-03-round-2.md:11`) | Nothing new. No `engine/ensemble.py`, no new belief field, no extra answers in a recording, no new test | Zero extra calls |
+| **B** | The ensemble exists but is off by default: `N` is an argument, 1 live, 8 when `make record-demo` or `make eval` runs | A "runs agree" figure on recorded and evaluated maps only | `engine/ensemble.py`, one field, one screen element; a recording carries 8 answers per claim | About +240 calls per recording (30 claims × 8) |
+| **C** | The plan as written: N = 3 live, N = 8 when recording | "runs agree" everywhere | As B, plus the live path | +90 calls per live generation, and the belief chips cannot resolve until all 90 return. At record 0006's own 2–6 seconds a call (`docs/adr/0006-…md:58`) that is tens of seconds of a finished map with no numbers on it |
+| **D** | FR-8 as literally written — N whole generations reconciled into one map | — | — | Not recommended. The plan's reason is right, and `spec/multiverse/diff.md:309` already refuses the same move one level down: *do not infer a difference by matching two maps* |
+
+**Recommendation: A.** The single strongest reason is that the field would end up carrying two different meanings. Record 0014 defines `lo` and `hi` precisely: *the 10th and 90th percentiles of the likelihood itself* (`docs/adr/0014-…md:81`). A spread measured across N answers means something else — how much one model wobbles when asked the same question several times. Putting the second quantity in the field that holds the first is the thing lesson 9 forbids.
+
+Three supporting facts, all checkable:
+
+- **The runs are not independent.** The plan builds the map once and re-asks with "the same cached prefix" (`plans/stack-04-generation.md:209`). Same system prompt, same map, same claim wording, and record 0006 rules out `temperature` and `top_p` (`docs/adr/0006-…md:44`). So the only thing varying is the model's own sampling. "Runs agree" over-claims; `spec/vocabulary.md:48` reserves the word for *how far several independent generation runs agreed*.
+- **"Trimmed mean" is not honest at N = 3.** Trim one from each end of three and one number is left — the middle one. Trim none and it is the plain mean. The word promises robustness it cannot deliver. At N = 8 it is fine. If any version of this is built, say **median** and use it at both sizes: one word, one rule.
+- **It is a 4–5× multiplier on the whole stack's model spend** (section 4), which is the same conversation as the ceiling in Q4.
+
+**Strongest argument against A:** record 0014's own research note says stated model ranges are reliably too narrow — a nominal 90% range covered the truth 28% of the time (`docs/adr/0014-…md:239`). Shipping a range we have read evidence against is a known understatement. Option B answers that for the four recordings, which is what a reviewer actually sees, at no live cost.
+
+Either way, **FR-8's wording has to be amended in the same pull request** (`PRODUCT_REQUIREMENTS.md:115` still says "N independent generations reconciled into one graph"), and §13's 2026-09-16 question (`PRODUCT_REQUIREMENTS.md:271`) moves with a sentence saying the question changed rather than that it was answered.
+
+---
+
+## Q2 — Why "This happened" puts nothing on the change list (`diff.md` open question 7)
+
+**In one sentence:** when you say an event actually happened and the map moves, the tool currently says nothing moved — is that because we ran too few worlds, or because we are counting something wrong?
+
+**It is a counting mistake, and I measured it.** Observing that Brent settled below \$68 on the Hormuz map, at the shipped 8 worlds per version:
+
+- **209 of the 2,000 versions have no surviving world at all.** Those versions report a likelihood of `0.0` (`backend/src/katalyst/domain/propagation.py:1327-1330`) and count for exactly nothing in the number and the band, because their weight is zero (`propagation.py:1177-1178`).
+- **Then they are counted as votes against the direction.** `_agreement_on` takes a plain unweighted mean of the signs (`backend/src/katalyst/domain/diff.py:598-599`) and never looks at those weights.
+- 209 ÷ 2,000 = **10.45%**. The measured shortfall below the 90% bar is **10.95%** (M1 and M2 both read 0.8905). **Among the versions that actually survived, agreement is 99.44%.**
+
+So the whole of open question 7 is dead versions voting. The reported *move* is survival-weighted; the reported *direction* is not. Two populations, one comparison.
+
+| | Option | On screen | In code | Cost |
+|---|---|---|---|---|
+| **A** | **Count only the versions that survived, each by how much it survived (recommended).** One rule: *read the direction with the same weights the number was read with* | "This happened" puts rows on the rail | `diff.py:576-599` takes the weights it can already reach — `_states` (`diff.py:683`) and `_ranked_endings` (`diff.py:917`) both already hold `behind_a` and `behind_b`, which carry `weights`. About ten lines | **Nothing.** Measured: M1 and M2 go 89.05% → 98.66% at the shipped 8 worlds. Under the five non-observe edits every weight is 1, so not one bit changes anywhere else |
+| **B** | More worlds while an observation is in force (the plan's choice) | Same | A conditional default in `backend/src/katalyst/engine/worlds.py`, which already passes one world count to both sides of a comparison (`worlds.py:156-162`) | Measured: **16 worlds is enough** (→ 97.5%), and a difference goes 229 ms → 380 ms. The plan's "eight times the worlds … about half a second" (`plans/stack-04-generation.md:219`) is wrong twice: 64 is not needed, and at 64 a difference takes **1,361 ms**, not half a second |
+| **C** | Raise worlds to 16 for everything, no condition anywhere | Same | Two constants (`engine/worlds.py:62-74`, `propagation.py:104-106`) | Measured: a world 67 → 87 ms, a difference 218 → 329 ms. Exactly four quoted numbers go stale: the three same-direction percentages in `spec/multiverse/diff.md:184-186` (96.5→99.5, 95.5→99.3, 99.9→100) and B's base-world band `.25–.55` → `.25–.54`. Every other quoted number on the rail is unchanged to the printed precision |
+| **D** | Survival-weighted direction (the plan's second candidate) | — | — | Not a change. The per-version answer is **already** the mean over surviving worlds (`propagation.py:1305-1334`). The leak is at the diff, not in propagation |
+
+**Recommendation: A, and take C as well if you want margin.** The strongest reason: A is not a repair to a rule, it is the removal of a contradiction inside one sentence, and it costs nothing. B fixes the symptom by making the mistake rarer — 209 dead versions at 8 worlds, 49 at 16, 2 at 32 — while paying 1.7× the latency and leaving the inconsistency in place. And B genuinely is two rules: a comparison refuses two worlds built at different world counts (`diff.py:516-519`), so the conditional has to be "if **either** side has an observation, both sides run higher", which is a sentence with an *either* in it.
+
+**Strongest argument against A:** the 90% bar in record 0014 (`docs/adr/0014-…md:132`) was set before any observation was ever run, so nobody knows whether it is the right bar against a correctly counted number. A fixes the count without revisiting the bar. If he wants both, the measurement is an afternoon.
+
+---
+
+## Q3 — The hypothesis can never be marked as moved by an observation
+
+**In one sentence:** when you say "the war-risk premium fell" and that makes the strait-opening claim more likely, should the tool be allowed to say that claim moved?
+
+**Measured today.** `Observe(C, True)` on Hormuz moves H from `.356` to `.365` — **+.009, nearly twice the 0.005 floor** — and its same-direction share is exactly **0**, at every world count I tried. It is zero by construction: H has no causes, so inside a version its answer is its own prior in both worlds, the paired difference is exactly zero in all 2,000 versions, and a sign of zero never equals a sign of plus one (`diff.py:598-599`). The entire move comes from the version weights.
+
+This is the sentence the product sells. `spec/multiverse/propagation.md:331`: *"cheap insurance is evidence the lane really is open."* Today the tile shows H rising and the state beside it reads `unchanged`. Neither of the plan's two repairs touches this, and no number of worlds will.
+
+| | Option | On screen | In code | Cost |
+|---|---|---|---|---|
+| **A** | **Keep the four states, and say it where facts about the reading are said (recommended)** — the Inspector: *"this claim moved only because the observation made some versions count more."* Exactly the precedent K4 set for "no path reaches this claim any more" | One sentence in the Inspector, and the tile's number moves as it already does | One branch in `_states`, one sentence, one paragraph in `diff.md` | Small |
+| **B** | Split the move into the part inside versions and the part from the weights, and let either half make a claim `shifted` | Rows appear for causeless claims | Real new arithmetic in `diff.py`, and a second definition of *agreement* to explain | More correct, twice as much to explain |
+| **C** | Leave it; write it into the chapter as a known blind spot | A reviewer sees a number move and `unchanged` beside it | Nothing | Free, and it is the one thing Kent vetoes on sight |
+
+**Recommendation: A.** Strongest reason: it is the same shape as a decision he already took — losing the last path from the hypothesis is a fact about the path, reported in the path bar, not a fifth state (K4, `notes/…-round-2.md:12`). **Strongest argument against:** it is another sentence on a panel that is already dense, and the underlying rule stays incomplete rather than being fixed.
+
+---
+
+## Q4 — A spending ceiling for `make record-demo` and `make eval`
+
+**In one sentence:** how much money may the two commands that call the model for real spend, and should the code stop itself when it hits that number?
+
+No price appears anywhere in this repository — I checked `docs/adr/`, `docs/research/`, the PRD and ARCHITECTURE. The plan forbids writing one from memory (`plans/stack-04-generation.md:14`). So the tiers below are in **calls**; the money is calls × the price read from the `claude-api` skill on the day, put in `engine/pricing.py` with the date beside it. Full arithmetic in section 4.
+
+| | Option | What it buys | Calls |
+|---|---|---|---|
+| **A** | **Tier 2 (recommended): all four recordings, two or three re-record rounds, the cassettes, no ensemble** | The definition of done — all four cards open with no key — and a demo that survives a prompt change | **~1,500–2,500** |
+| **B** | Tier 1: Hormuz only, plus the cassettes | The boundary tests, one recording, the end-to-end test, the one screen he looks at | ~300–500 |
+| **C** | Tier 3: Tier 2 plus about five eval rounds and the ensemble at N = 8 on every recording | A scorecard to compare prompts against, and the measured "runs agree" number | ~6,500–9,000 |
+
+**On enforcement: a hard stop per run, in code.** `engine/receipt.py` already folds every call's usage (`plans/stack-04-generation.md:279`). Give `make record-demo` and `make eval` a ceiling argument, check the running receipt after every call, and stop with a plain sentence naming what was spent and what was got. Ten lines, and the ceiling is then an input the receipt can point at rather than a number in someone's head. A ceiling **across** runs would need something kept between runs, and stack 04 has forbidden storage until stack 05 (`plans/stack-04-generation.md:9`, FR-31) — so the running total stays a working agreement in `STATUS.md`.
+
+**Strongest argument against A:** without eval rounds there is no scorecard, so "did that prompt change help?" is answered by looking at four pictures. Tier 3's extra spend is mostly the ensemble, not the evals; five eval rounds without the ensemble is about 1,000 calls, and that may be the better middle.
+
+**One thing that is not in the plan and should be:** record 0006 declares the server-side web-search tool on calls that need evidence (`docs/adr/0006-…md:47`). Each search is billed as a search *and* returns its results as input tokens. With up to 30 claims and no cap named anywhere, this is the largest unknown in the bill. **A searches-per-generation cap belongs beside the other caps** (`plans/stack-04-generation.md:273`).
+
+---
+
+## Q5 — Do the three non-Hormuz examples get recordings now?
+
+**In one sentence:** do we record all four example hypotheses as soon as the pipeline runs, or only once the prompt has stopped changing?
+
+The constraint that decides it: a recording is remade whenever a prompt changes (`docs/adr/0012-…md:47`), and the new `recordings` build job **fails** when a recording's prompt hash does not match the current prompt (`docs/adr/0012-…md:69`). A stale recording is not merely old — it turns the build red.
+
+| | Option | What it costs |
+|---|---|---|
+| **A** | **Hormuz as soon as the pipeline runs; all four at the end of 04b's third pull request, once the prompt is frozen (recommended)** | One Hormuz re-record, maybe two. Hormuz is what the end-to-end test and every chapter use, so it has to exist early anyway |
+| **B** | All four as soon as the pipeline runs | Four recordings × every prompt round. At Tier 2 that is most of the budget spent twice |
+| **C** | Defer the other three to stack 07 | Breaks the definition of done — *all four example events* (`plans/HANDOFF.md:15`) — and 04a's launchpad would show three cards reading *not yet live* |
+
+**Recommendation: A.** Strongest reason: the prompt is the thing being designed in 04b, and every recording made before it settles is money spent on a file that must be deleted. **Against:** recording all four early is the only way to find out early that the prompt works on the other three hypotheses — if the export-restrictions example turns out to produce loops, you find that out in the last pull request of the stack. Mitigate by running all four **once** through `make eval` (structure only, no recording written) as soon as the pipeline is green.
+
+---
+
+## Q6 — When the validator refuses a proposal, is the model told why?
+
+**In one sentence:** after our own rules reject something the model proposed, do we ask again and tell it what was wrong, ask again and say nothing, or move on?
+
+Record 0003 already answers this: *"`engine/` may then issue one targeted re-prompt naming those violations (bounded and logged); a second failure surfaces to the user as a proper error state"* (`docs/adr/0003-…md:43`). The plan says *"never repair"* (`plans/stack-04-generation.md:271`) and then caps *"3 refusals in a row on one frontier claim closes that claim"* (`:273`) — so the engine does ask again, up to three times, and the plan never says whether the next call knows what went wrong.
+
+| | Option | On screen | In code | Cost |
+|---|---|---|---|---|
+| **A** | **Ask again once, naming the validator's own sentences, exactly as record 0003 says (recommended)** | Unchanged — every refusal still shows in the strip | The cap becomes 2 calls on a claim, not 3 | Fewest calls |
+| **B** | The plan as written: up to three more calls, none of them told why | Same | As planned | Up to three chances to make the same loop-closing proposal, and money each time |
+| **C** | One refusal closes that frontier claim | Same, fewer refusals to watch | Simplest of all | One unlucky proposal loses a branch of the map |
+
+**Recommendation: A.** Strongest reason: it is already an accepted record and it costs the fewest calls; telling the model the validator's sentence is not repairing the proposal — the proposal is still rejected, still shown, and a new one is still validated from scratch. **Against:** it puts violation text into a prompt, which is the one place a prompt can start steering the model toward *passing the validator* rather than toward being right. Worth one line in `proposals.md` saying so.
+
+---
+
+# 2. Falls out of something already decided
+
+| Item | What it follows from | Correction the plan needs |
+|---|---|---|
+| Provenance decided by us | `docs/adr/0003-…md:46`, `0006:47` — the model never declares it | **"Cited sources → documented" is not honest as written.** Record 0006 says citations come *from the search tool's own results*. A URL the model typed that the tool never returned is not a source. Say `documented` only when the arrow's sources match what the tool returned in that call, and make `test_provenance_is_written_from_what_was_found` compare against the tool's result set |
+| POST read as a stream, not `EventSource` | The request has a body; automatic reconnection would re-run and re-spend | None. Both reasons are hard |
+| `sse-starlette` as the transport | A tooling choice, and the plan already names a fallback | **Turn the heartbeat off.** Record 0012:46 says a recording is one event of the live stream per line; a `: ping` comment line would land in a recording and in the `recordings` build job. Plain `StreamingResponse` is the simpler default and needs no such caveat |
+| Eight events | Follows from the pipeline's own shape | Two collisions — see section 3, items 5 and 6 |
+| The caps | `docs/adr/0006-…md:57` already caps depth and width; all are arguments | Add a **searches-per-generation** cap (Q4). Add upper bounds on `versions` and `worlds` (section 3, item 8) |
+| One last ending-seeking call, then an honest `no_terminal` | INV-9, plus record 0003's "the engine never writes a claim the model did not propose" | None |
+| Transcripts in memory | FR-31 and the plan's own no-storage rule; a second on-disk store would be migrated away in stack 05 | None |
+| Graph reconciliation not built | `spec/multiverse/diff.md:309` — *do not infer a difference by matching two maps* — is the same argument one level down | Cite that anti-pattern in record 0015. It is a stronger warrant than "unauditable judgement" and it is already accepted |
+| `POST /api/generate/insert` as the one model-calling edit | `PRODUCT_REQUIREMENTS.md:217`, anti-pattern 2, names `insert` as the single exception | Ownership is wrong — section 3, item 3 |
+| Three frontier claims at once | `docs/adr/0006-…md:46` already says "runs frontier nodes concurrently" | It does **not** fight replay — record 0006:44 says plainly that NFR-2 asks determinism of propagation, not generation. It **does** fight cassettes: every call goes to the same URL, and vcrpy's default matching is method and URL, so two calls in flight can be handed each other's recorded response. Add the request body to `match_on`, or run the boundary tests one call at a time |
+| `Receipt` as an event and rebuilt on replay | `docs/adr/0012-…md:49` requires mode, date, hash and zero dollars on the receipt | Clean, but **two** events are rebuilt, not one — section 3, item 4 |
+| FR-9 out of stack 04 | It is P1; record 0006:59 calls it "an extra stage over the same call shape"; and its value cannot be read without a scorecard | Right call. Two things Kent should know: it roughly doubles the calls, so it is the same conversation as Q4; and `evaluation.md` should name the scorecard fields **now**, or stack 07 has nothing to compare a critique pass against |
+
+---
+
+# 3. Corrections the plan needs regardless of Kent's answers
+
+1. **The count disagrees.** `plans/stack-04-generation.md:3` says five things, three blocking. `plans/HANDOFF.md:41` and `:177` both say four. HANDOFF is stale.
+
+2. **04a's third pull request cannot merge before 04b's third.** It ships `frontend/e2e/generate.spec.ts`, which "runs the Hormuz recording **with no key**" (`:191`). The route, the replay reader and the recordings are all 04b's third pull request (`:53`, `:302`). The plan says 04a merges first (`:31`), and the `e2e` build job runs every spec in the folder (`.github/workflows/ci.yml:183,217`). **Merging 04a's third pull request turns `main` red.** Choose one: hold that pull request until 04b lands, or move the spec into 04b's third pull request, or skip it behind a check for the recording file.
+
+3. **`POST /api/generate/insert` is owned twice.** `:166` calls it "04a pull request 3's"; `:293` and the wave table `:425` give it to 04b's third pull request. Same hazard as item 2 — 04a's "Add a claim" button would 404 on `main` until 04b lands.
+
+4. **Replay rebuilds two events, not one.** `:118` says every event is re-emitted unchanged **except `receipt`**. `:302` says beliefs are not replayed as numbers — the recording carries the seed and `domain/` re-propagates. Both cannot be true. The streaming and replay chapters must say: `receipt` is rebuilt, `beliefs_propagated` is recomputed. This is also good news for file size — a recording then need not carry a `World` at all (record 0012:59 warns about the megabyte).
+
+5. **`no_path` is written in two events.** `Verdict.kind` (`:87`) and `Done.reason` (`:107`). Two derivations of one line eventually disagree — the plan applies that principle itself to the retraction badge (`:138`). Keep it on `Verdict`, which carries the path, the product and the nearest claim; `Done.reason` should say why the *generation* stopped.
+
+6. **Three fields are written twice in one stream.** `mode`, the recording date and `prompt_hash` appear on both `GenerationStarted` (`:66-70`) and `Receipt` (`:99-103`). Record 0012:49 requires them on the receipt, so drop them from `GenerationStarted`.
+
+7. **The `recordings` build job must pass on an empty folder**, or it is red from the commit that adds it until the first recording exists.
+
+8. **Nothing caps `versions` or `worlds` on a request.** `backend/src/katalyst/api/worlds.py:99-110,140-142,162-167` bound them below (`gt=0`, `gt=1`) and not above. `POST /api/generate` takes the same two fields (`:292`) and also spends money. Add an upper bound in the same place.
+
+9. **The plan's cost sentence for open question 7 is wrong in both directions** (`:219`). Measured: 16 worlds clears the bar, not 64; and at 64 a *difference* takes 1,361 ms, not "about half a second". The half-second figure is a single world's cost, and the user waits for a difference.
+
+10. **Record 0003 and the plan disagree about re-prompting** — `docs/adr/0003-…md:43` versus `plans/stack-04-generation.md:271`. Whichever way Q6 goes, record 0003 gets a dated amendment in 04b's bottom pull request, as record 0008 was amended rather than superseded.
+
+11. **"Record 0006 *measures* a 30-claim map at about 40 calls"** (`:273`) — record 0006:57 *estimates* it. Say estimate, and put the first real measurement in `STATUS.md`.
+
+12. **Two documents disagree about engine speed.** `ARCHITECTURE.md` §10 says a world is about 70 ms and a 60-claim map over 61 days about 470 ms; `spec/multiverse/propagation.md:112` says 67 ms and 544 ms. I measured a Hormuz world at 67–76 ms today. Pick one document as the source and sweep the other.
+
+13. **The boundary test list tests the weak half of provenance.** `test_expand_rejects_a_documented_arrow_that_cites_nothing` (`:282`) catches an empty list. Add the strong half: a `documented` arrow citing a URL the search tool never returned.
+
+14. **Keep the 28% figure with its citation.** `:207` quotes it bare; it is FermiEval, recorded at `docs/adr/0014-…md:239`. A floating benchmark number is a number nobody computed.
+
+---
+
+# 4. Cost estimate workings
+
+Everything below is either measured today or cited. **Dollars are deliberately absent** — no price exists anywhere in this repository, and `plans/stack-04-generation.md:14` requires the price table to be read from the `claude-api` skill on the day and recorded with its date in `engine/pricing.py`.
+
+**Calls for one 30-claim map, no ensemble**
+
+| Line | Number | Where from |
+|---|---|---|
+| Expansion calls | ~40 | `docs/adr/0006-…md:57` (an estimate, not a measurement) |
+| Refusal retries | +6 to +30 | Up to 3 in a row per frontier claim, `plans/stack-04-generation.md:273` |
+| Ending-seeking calls | up to +3 | One per open frontier claim, `:275` |
+| **Per generation** | **~50 (45–75)** | |
+
+**Tokens per expansion call** — the bytes are measured, the bytes-to-tokens step is a rule of thumb and must be checked with the API's own token counter before anyone trusts it.
+
+- The Hormuz map serialises to **7,366 bytes for 7 claims and 8 arrows** → about **1,050 bytes per claim with its arrow** (measured today).
+- A 30-claim map is therefore about **31,500 bytes**; the average call sees roughly half of it, ~15,750 bytes.
+- The cached system block holds the vocabulary, the schema guidance and the house rules (`docs/adr/0006-…md:48`). `spec/vocabulary.md` alone is **12,641 bytes** (measured).
+- At the usual four-bytes-to-a-token rule of thumb: roughly **4,000 cache-read** + **4,000 fresh input** + **~400 visible output** tokens per call.
+- **Thinking tokens are not measured anywhere.** Record 0006:44 turns adaptive thinking on. This could be the largest term. Measure it on the first real call and put it in `STATUS.md` before anyone runs a full set.
+- **Web search is not measured either.** Record 0006:47 declares the server-side search tool; each search is billed as a search and returns results as input tokens. Up to 30 per map, uncapped.
+
+**Ensemble, if built** — 30 claims × N small calls, each seeing the finished map (~31,500 bytes ≈ ~7,900 tokens, cacheable across all of them) and returning ~30 tokens.
+
+- N = 3 live: **+90 calls** per generation → ~140 total.
+- N = 8 when recording: **+240 calls** → ~290 total.
+
+**The stack's total**
+
+| | Without ensemble | With the plan's ensemble |
+|---|---|---|
+| Four recordings, one round (`docs/adr/0012-…md:46`) | 4 × 50 = 200 | 4 × 290 = 1,160 |
+| Re-record rounds — a recording is remade on every prompt change (`0012:47`, `0008:65`); realistically 3–5 in 04b | 600–1,000 | 3,500–5,800 |
+| Cassettes — 13 boundary tests (`:282`), 1–3 calls each, re-recorded on the same rounds | 45–200 | 45–200 |
+| Evals — 4 cases (`:313`), ~5 rounds to be worth having | 5 × 4 × 50 = 1,000 | 5 × 4 × 140 = 2,800 |
+| **Total** | **~1,700–2,200 calls** | **~6,500–8,800 calls** |
+
+**The ensemble is a 4–5× multiplier on the whole stack's model spend.** That is the single strongest number in Q1 and Q4, and it is the same conversation.
+
+**Tiers**
+
+- **Tier 1 — Hormuz plus the cassettes: ~300–500 calls.** Buys the boundary tests, one recording, the end-to-end test, and the screen Kent looks at.
+- **Tier 2 (recommended) — all four recordings, two or three re-record rounds, the cassettes, no ensemble: ~1,500–2,500 calls.** Buys the definition of done.
+- **Tier 3 — Tier 2 plus five eval rounds and the ensemble at N = 8: ~6,500–9,000 calls.** Buys a scorecard and the measured "runs agree" number.
+
+---
+
+### Critical files for implementation
+
+- `/Users/kentgang/git3/katalyst/backend/src/katalyst/domain/diff.py` — `_agreement_on` at lines 576–599 is where open question 7 actually lives; `_states` (620–701) and `_ranked_endings` (866–927) are its two callers and already hold the weights it needs.
+- `/Users/kentgang/git3/katalyst/backend/src/katalyst/domain/propagation.py` — `_per_version` (1305–1334) produces the spurious zero for a dead version; `_draw` (1160–1185) produces the weights; `_band` (1374–1411) shows how weights are meant to be used.
+- `/Users/kentgang/git3/katalyst/plans/stack-04-generation.md` — the plan itself: line 3 (the five questions), 62–118 (the event vocabulary), 166 and 191 and 293 (the ordering hazards), 207–222 (records 0015 and the open-question-7 repair), 273 (the caps).
+- `/Users/kentgang/git3/katalyst/docs/adr/0014-a-supposition-ends-when-something-pushes-back.md` — section B defines what a range means, section F defines `observe` under two loops, section G is what record 0015 inherits.
+- `/Users/kentgang/git3/katalyst/backend/src/katalyst/engine/worlds.py` — lines 62–74 hold the two budget constants and 156–162 show that a comparison already passes one world count to both sides.</result>
+<usage><subagent_tokens>209683</subagent_tokens><tool_uses>41</tool_uses><duration_ms>797115</duration_ms></usage>
+</task-notification>
