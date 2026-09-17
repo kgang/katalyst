@@ -28,17 +28,32 @@ What this layer must never do
 
 What is here now
 ----------------
-The data shapes, and nothing that computes with them. `belief.py`, `proposition.py`
-and `link.py` hold the three things a map is made of; `graph.py` holds a whole
-map; `intervention.py` holds the six typed edits and `branch.py` the ordered list
-of them; `ids.py` holds the identifier names. `validity.py` decides whether a
-proposed map is well-formed, and returns every fault at once rather than the
-first. Folding a branch onto a map and working the likelihoods through arrive in
-a later stack.
+The data shapes. `belief.py`, `proposition.py` and `link.py` hold the three
+things a map is made of; `graph.py` holds a whole map; `intervention.py` holds
+the six typed edits and `branch.py` the ordered list of them; `ids.py` holds the
+identifier names. `validity.py` decides whether a proposed map is well-formed,
+and returns every fault at once rather than the first. `patch.py` folds a
+branch's edits onto a map, puts a chain of branches in order, and says which
+claims an edit is allowed to move. `propagation.py` works the likelihoods
+through: it turns a map and the values its edits fixed into a world — a number
+and a range for every claim on the day it is judged, a number for every day in
+between, and a named state for each of those days. `diff.py` compares two such
+worlds: what happened to every claim, which endings moved and in what order, and
+one fixed sentence saying so; it also sweeps a world one claim at a time, to see
+what each flip would move.
 """
 
 from katalyst.domain.belief import Belief, Beliefs
 from katalyst.domain.branch import Branch
+from katalyst.domain.diff import (
+    ClaimDiff,
+    ClaimState,
+    DeltaRow,
+    Diff,
+    SensitivityRow,
+    diff,
+    sensitivity,
+)
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import BranchId, LinkId, PropositionId
 from katalyst.domain.intervention import (
@@ -51,6 +66,21 @@ from katalyst.domain.intervention import (
     Retune,
 )
 from katalyst.domain.link import Days, Link, Provenance, Source
+from katalyst.domain.patch import (
+    Assignment,
+    affected_set,
+    apply,
+    flatten,
+    introduced_by,
+)
+from katalyst.domain.propagation import (
+    Retraction,
+    SeriesState,
+    Versions,
+    World,
+    propagate,
+    versions_of,
+)
 from katalyst.domain.proposition import (
     BaseRate,
     ContractPayoff,
@@ -63,14 +93,19 @@ from katalyst.domain.proposition import (
 from katalyst.domain.validity import Violation, ViolationCode, validate
 
 __all__ = [
+    "Assignment",
     "BaseRate",
     "Belief",
     "Beliefs",
     "Believe",
     "Branch",
     "BranchId",
+    "ClaimDiff",
+    "ClaimState",
     "ContractPayoff",
     "Days",
+    "DeltaRow",
+    "Diff",
     "Do",
     "Evidence",
     "Graph",
@@ -86,9 +121,22 @@ __all__ = [
     "Provenance",
     "Refine",
     "Resolution",
+    "Retraction",
     "Retune",
+    "SensitivityRow",
+    "SeriesState",
     "Source",
+    "Versions",
     "Violation",
     "ViolationCode",
+    "World",
+    "affected_set",
+    "apply",
+    "diff",
+    "flatten",
+    "introduced_by",
+    "propagate",
+    "sensitivity",
     "validate",
+    "versions_of",
 ]

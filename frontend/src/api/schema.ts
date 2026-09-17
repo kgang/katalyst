@@ -145,6 +145,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/worlds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build World
+         * @description Fold a branch onto a stored example and work every likelihood through time.
+         *
+         *     Ask with no branch for the base world — the map as it stands, with nothing
+         *     done to it. That is what the browser asks for first, and it is why the route
+         *     that hands out the stored examples still hands out a map and its branches and
+         *     nothing computed: a map is written by hand and a world never is.
+         *
+         *     Args:
+         *         request: Which example, which branch, which seed, and how big a run.
+         *
+         *     Returns:
+         *         One world, naming the branch it came from.
+         *
+         *     Raises:
+         *         HTTPException: With status 404 and a sentence naming the examples that do
+         *             exist, when nothing is stored under that name. With status 422 and the
+         *             list of reasons, when the branch does not fit the map.
+         */
+        post: operations["build_world_api_worlds_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worlds/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compare Worlds
+         * @description Build two worlds from one map and one seed, and say what moved between them.
+         *
+         *     The answer is exactly what asking for the two worlds separately and comparing
+         *     them gives, to the byte. This route exists because the comparison needs both
+         *     worlds at once and sending two whole worlds to the browser so that it can
+         *     subtract them would be sending it work it has no way to check.
+         *
+         *     Args:
+         *         request: Which example, which two branches, which seed, and how big a run.
+         *
+         *     Returns:
+         *         One difference: every claim with what happened to it, the endings that
+         *         moved in ranked order, one fixed sentence, and every warning either world
+         *         carried.
+         *
+         *     Raises:
+         *         HTTPException: With status 404 when nothing is stored under that name, or
+         *             422 with the list of reasons when one of the branches does not fit.
+         */
+        post: operations["compare_worlds_api_worlds_diff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worlds/conditional": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read Conditional
+         * @description Give the number on one arrow: its target, with its source **supposed** true.
+         *
+         *     Supposed, never observed. "How often do these two show up together" is a
+         *     correlation, and an arrow claims a mechanism; the two disagree whenever a
+         *     third thing caused both, and nothing on the wire would tell the reader which
+         *     they were looking at.
+         *
+         *     Args:
+         *         request: Which example, which branch, which seed, and which arrow.
+         *
+         *     Returns:
+         *         One likelihood with its range, owned by the model.
+         *
+         *     Raises:
+         *         HTTPException: With status 404 when nothing is stored under that name, or
+         *             422 when the branch does not fit the map or the arrow is not on it.
+         */
+        post: operations["read_conditional_api_worlds_conditional_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -164,6 +272,48 @@ export interface components {
              * @description The version of the running build, such as 0.1.0.
              */
             version: string;
+        };
+        /**
+         * Assignment
+         * @description One value an edit fixed: which claim, to what, from which day, and which edit did it.
+         *
+         *     A `do` and an `observe` both fix a claim's value, and this is where that fact
+         *     lives. It is never written onto the claim itself, because the same claim has
+         *     to mean the same thing in every branch — a fixed value belongs to the world
+         *     the branch builds, not to the map the branch was built from.
+         *
+         *     Frozen, like everything in this layer. A later assignment on the same claim is
+         *     appended rather than replacing the earlier one, so the record still reads
+         *     "supposed on the 1st, then reported on the 3rd" instead of silently showing
+         *     only the last word on the subject.
+         */
+        Assignment: {
+            /**
+             * Target
+             * @description The claim whose value this edit fixed.
+             */
+            target: string;
+            /**
+             * Value
+             * @description What it was fixed to: true if the claim holds, false if it does not.
+             */
+            value: boolean;
+            /**
+             * At
+             * @description The day the value holds from. Arrows out of the claim measure their delay from this day. None means the first day of the window the map is worked through on — an `observe` always says None, because it carries no date.
+             */
+            at?: string | null;
+            /**
+             * By
+             * @description Which edit fixed it, as its position in the branch, counting from 0. This is what lets a claim say which edit moved it.
+             */
+            by: number;
+            /**
+             * Kind
+             * @description Which verb the user chose. 'do' is supposing a claim true and cutting it loose from its causes; 'observe' is reporting that it happened and leaving its causes connected. The two are never merged.
+             * @enum {string}
+             */
+            kind: "do" | "observe";
         };
         /**
          * BaseRate
@@ -309,6 +459,97 @@ export interface components {
             interventions: (components["schemas"]["Do"] | components["schemas"]["Observe"] | components["schemas"]["Insert"] | components["schemas"]["Retune"] | components["schemas"]["Refine"] | components["schemas"]["Believe"])[];
         };
         /**
+         * ClaimDiff
+         * @description What happened to one claim between two worlds, with the numbers behind it.
+         *
+         *     `before` and `after` are read on **the claim's own resolve-by day** — the day
+         *     the claim is judged, which every claim has, and the day its tile's number
+         *     already refers to. So a claim's state is about the number the reader is
+         *     looking at, and not about some other day.
+         *
+         *     `agreement` is carried on every claim both worlds hold, not only the ones
+         *     that moved, so a reader — or a test — can check the rule that decided the
+         *     state without recomputing anything.
+         *
+         *     A claim still supposed on its own resolve-by day carries the stored 1 (or 0,
+         *     where it was supposed false) so that the arithmetic stays ordinary. **No
+         *     surface prints that number**: every reader looks at the world's `states`
+         *     first and writes the word *Supposed* where the number would go.
+         */
+        ClaimDiff: {
+            /**
+             * Target
+             * @description The claim this is about.
+             */
+            target: string;
+            /**
+             * State
+             * @description What happened to it, in one word.
+             * @enum {string}
+             */
+            state: "unchanged" | "shifted" | "added" | "killed";
+            /**
+             * Before
+             * @description The first world's likelihood for it, on the claim's own resolve-by day. Nothing at all when the second world added the claim, because there is no first-world number to read.
+             */
+            before: number | null;
+            /**
+             * After
+             * @description The second world's likelihood for it, on the same day. Nothing at all in the one case the product cannot produce: a claim the first world holds and the second does not.
+             */
+            after: number | null;
+            /**
+             * Delta
+             * @description The move, signed: the second world's number minus the first world's. Nothing at all when one of the two worlds has no number to read.
+             */
+            delta: number | null;
+            /**
+             * Agreement
+             * @description The share of versions of the map that moved the same way as the move above. Nothing at all when only one of the two worlds holds the claim. On screen this column is headed 'same direction'.
+             */
+            agreement: number | null;
+        };
+        /**
+         * ConditionalRequest
+         * @description What it takes to work out the number on one arrow.
+         *
+         *     One arrow at a time, because each one costs a whole extra run of the engine
+         *     for a number most readers never open. Nothing is lost by waiting: the answer
+         *     is a pure function of these four things, so a number fetched when somebody
+         *     asks is identical to one worked out in advance.
+         */
+        ConditionalRequest: {
+            /**
+             * Base Id
+             * @description The short name of the stored example.
+             */
+            base_id: string;
+            /** @description The branch to fold first. Leave it out for the untouched map. */
+            branch?: components["schemas"]["Branch"] | null;
+            /**
+             * Seed
+             * @description The one number every random draw comes from.
+             */
+            seed: number;
+            /**
+             * Link Id
+             * @description The arrow whose number is wanted.
+             */
+            link_id: string;
+            /**
+             * Versions
+             * @description The outer loop. Match the world this number is shown beside.
+             * @default 2000
+             */
+            versions: number;
+            /**
+             * Worlds
+             * @description The inner loop, for the same reason.
+             * @default 8
+             */
+            worlds: number;
+        };
+        /**
          * ContractPayoff
          * @description A named contract at a named venue, and which side of it you would take.
          *
@@ -344,6 +585,166 @@ export interface components {
              * @enum {string}
              */
             side: "yes" | "no";
+        };
+        /**
+         * DeltaRow
+         * @description One ending that moved, with everything a reader needs to weigh the move.
+         *
+         *     A row is read on the **day of largest divergence**, not on the claim's own
+         *     resolve-by day, because a change that shows up for a fortnight and then
+         *     unwinds is the thing a trader acts on — and on this product's own worked
+         *     example reading a row on its distant resolve-by day shows about two thirds of
+         *     the move and calls it the answer.
+         *
+         *     `range_width` and `agreement` are **columns, never factors**. They answer two
+         *     different questions — how unsure are we of this number, and how sure are we of
+         *     its direction — and a trader weighs them separately from how big the move is.
+         *     Multiplying either into the rank would bury exactly the wide claims that are
+         *     worth researching, and would hide which of the three facts is talking.
+         */
+        DeltaRow: {
+            /**
+             * Target
+             * @description The ending that moved.
+             */
+            target: string;
+            /**
+             * Before
+             * @description The first world's likelihood on the day below.
+             */
+            before: number;
+            /**
+             * After
+             * @description The second world's likelihood on the day below.
+             */
+            after: number;
+            /**
+             * Peak Delta
+             * @description The move on that day, signed: the largest the two worlds ever differ.
+             */
+            peak_delta: number;
+            /**
+             * At Day
+             * Format: date
+             * @description The day the two worlds are furthest apart. Always one of the days the series actually carries, which matters once a window longer than 180 days has been drawn at fewer points.
+             */
+            at_day: string;
+            /**
+             * Range Width
+             * @description How wide the second world's own range on this claim is on that day — the same width its tile shows, so the list and the tile can never disagree about how firm a number is. On screen this column is headed 'how firm'.
+             */
+            range_width: number;
+            /**
+             * Agreement
+             * @description The share of versions of the map that moved the same way on that day. A column, never a factor. On screen it is headed 'same direction'.
+             */
+            agreement: number;
+            /**
+             * Rank
+             * @description How big the move is times how well-backed the route behind it is: the size of the move, times the weakest arrow on the best-backed route from a differing edit's subject to this ending. Two factors, and only two.
+             */
+            rank: number;
+        };
+        /**
+         * Diff
+         * @description The whole difference between two worlds: every claim, the endings that moved, one sentence.
+         *
+         *     Frozen, like everything in this layer, so a stored difference is a record
+         *     rather than a working buffer. It can always be thrown away and rebuilt from
+         *     the base map, the two branches and the seed, and if a stored one ever
+         *     disagrees with what those produce, the stored one is the one that is wrong.
+         */
+        Diff: {
+            /**
+             * Base Id
+             * @description The one map both worlds were built from.
+             */
+            base_id: string;
+            /**
+             * Branch A
+             * @description The first world's branch. Nothing at all means the base world.
+             */
+            branch_a: string | null;
+            /**
+             * Branch B
+             * @description The second world's branch. Nothing at all means the base world.
+             */
+            branch_b: string | null;
+            /**
+             * Seed
+             * @description The one seed both worlds were built from.
+             */
+            seed: number;
+            /**
+             * Versions
+             * @description The outer loop both worlds ran: versions of the map.
+             */
+            versions: number;
+            /**
+             * Worlds
+             * @description The inner loop both worlds ran: worlds per version.
+             */
+            worlds: number;
+            /**
+             * Claims
+             * @description Every claim either world holds, exactly once.
+             */
+            claims: {
+                [key: string]: components["schemas"]["ClaimDiff"];
+            };
+            /**
+             * Rows
+             * @description The endings that moved, largest rank first. An ending is a claim that names an instrument or one that says why there is nothing to trade.
+             */
+            rows: components["schemas"]["DeltaRow"][];
+            /**
+             * Summary
+             * @description One of two fixed sentences with its blanks filled in from the numbers above. Never written by a language model, and never free prose.
+             */
+            summary: string;
+            /**
+             * Warnings
+             * @description Plain sentences either world wanted the reader to see, each said once.
+             */
+            warnings: string[];
+        };
+        /**
+         * DiffRequest
+         * @description What it takes to compare two branches: one map, two branches, and one seed.
+         *
+         *     One seed for the pair, and that is not an optimisation. The stream that picks
+         *     which versions of the map to try never depends on the branch, so version 7 of
+         *     one world and version 7 of the other were built from the same underlying
+         *     numbers and differ only by the edit. Build them from two seeds and every
+         *     difference is the edit plus a wash of sampling noise.
+         */
+        DiffRequest: {
+            /**
+             * Base Id
+             * @description The short name of the stored example both worlds use.
+             */
+            base_id: string;
+            /** @description The branch to compare from. Leave it out for the base world. */
+            branch_a?: components["schemas"]["Branch"] | null;
+            /** @description The branch to compare to. Required, because the name the user gave it is what the summary sentence calls the change. */
+            branch_b: components["schemas"]["Branch"];
+            /**
+             * Seed
+             * @description The one seed both worlds are built from.
+             */
+            seed: number;
+            /**
+             * Versions
+             * @description The outer loop both worlds run.
+             * @default 2000
+             */
+            versions: number;
+            /**
+             * Worlds
+             * @description The inner loop both worlds run.
+             * @default 8
+             */
+            worlds: number;
         };
         /**
          * Do
@@ -783,6 +1184,23 @@ export interface components {
             reconcile: "marginalize";
         };
         /**
+         * RefusedEdit
+         * @description Why a branch could not be folded onto a map: every reason at once, never just the first.
+         *
+         *     A person fixing a branch one fault per attempt learns only that the tool is
+         *     hostile, so the whole list comes back together. Each entry is addressed to two
+         *     readers at once: the code and the subject are for the interface, which uses
+         *     them to highlight the right tile or wire, and the message is the sentence the
+         *     person reads.
+         */
+        RefusedEdit: {
+            /**
+             * Detail
+             * @description Every reason the branch was refused, in a settled order.
+             */
+            detail: components["schemas"]["Violation"][];
+        };
+        /**
          * Resolution
          * @description How a claim gets settled: the test, who applies it, and by when.
          *
@@ -806,6 +1224,47 @@ export interface components {
              * @description The date by which the test has been applied. After this date the claim is true or false — never still open.
              */
             by: string;
+        };
+        /**
+         * Retraction
+         * @description The end of a supposition: which claim, which day, and what undermined it.
+         *
+         *     A claim the user supposed true, and which a later edit has pushed back down,
+         *     is never drawn as plainly true. This is what the tile's *Retracted · date · by
+         *     "…"* badge is written from.
+         *
+         *     It records the day the **cause** became true, never that day plus the arrow's
+         *     delay. Tying the end of a supposition to the arrival of the push would tie
+         *     "do I still take your word for this" to a delay parameter — change a lag from
+         *     three days to thirty and the supposition would silently outlive the news.
+         */
+        Retraction: {
+            /**
+             * Target
+             * @description The claim whose supposition ended.
+             */
+            target: string;
+            /**
+             * At
+             * Format: date
+             * @description The day it ended: the day the opposing arrow's source was settled, never that day plus the arrow's delay.
+             */
+            at: string;
+            /**
+             * By Link
+             * @description The arrow that undermined the supposition.
+             */
+            by_link: string;
+            /**
+             * By Claim
+             * @description That arrow's source — the claim the tile names in its badge.
+             */
+            by_claim: string;
+            /**
+             * By
+             * @description Which edit introduced the arrow, as its position in the branch, counting from 0. Always known, and that is a theorem rather than a convention: supposing a claim cuts every arrow pointing at it at that moment, so any arrow that later pushes against it was added afterwards, by an edit.
+             */
+            by: number;
         };
         /**
          * Retune
@@ -870,6 +1329,189 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * Violation
+         * @description One thing wrong with a map, addressed to two different readers at once.
+         *
+         *     `code` and `subject` are for the machine: the interface uses them to highlight
+         *     the tile or wire at fault. `message` is for the person: a plain sentence naming
+         *     the claim by its text. A violation must never be the only record of a
+         *     rejection — the list is stored with the generation transcript so a rejected
+         *     proposal stays auditable.
+         */
+        Violation: {
+            /**
+             * Code
+             * @description Which rule was broken. One of nineteen stable strings.
+             * @enum {string}
+             */
+            code: "missing_resolution" | "missing_rationale" | "documented_without_source" | "cycle" | "reflexive_without_lag" | "half_life_without_impulse" | "impulse_without_half_life" | "belief_out_of_range" | "no_terminal" | "no_hypothesis" | "multiple_hypotheses" | "dangling_link" | "market_without_payoff" | "not_tradeable_without_reason" | "unknown_target" | "unknown_link" | "duplicate_id" | "edit_not_applicable" | "worlds_not_comparable";
+            /**
+             * Subject
+             * @description The identifier of the thing at fault: a proposition id, a link id, the graph's own id for faults about the map as a whole — including two worlds that cannot be compared, which names the map they should both have come from — or a branch id when a chain of branches cannot be put in order. Never shown to the user.
+             */
+            subject: string;
+            /**
+             * Message
+             * @description Interface text. One plain sentence that names the claim or the arrow by its words and says what is missing. Never contains an identifier.
+             */
+            message: string;
+        };
+        /**
+         * World
+         * @description One finished answer: a map, the values its edits fixed, and every number worked through.
+         *
+         *     A world is a **computed result, never a source of truth**. It can always be
+         *     thrown away and rebuilt from three things — the base map, the branch and the
+         *     seed — and if a stored world ever disagrees with what those three produce, the
+         *     stored world is the one that is wrong.
+         *
+         *     Every likelihood in `beliefs` is owned by the model and is read on that claim's
+         *     own resolve-by day, which is the day the claim is judged and the date its tile
+         *     already shows. `series` carries one likelihood per day so the spike and the
+         *     fade are visible rather than hidden, and `states` says, for each of those days,
+         *     whether the number is the ordinary sampled one, a supposition holding, a
+         *     supposition withdrawn with no push yet, or a push that has landed.
+         *
+         *     **A claim whose supposition is holding reads 1 — exactly 1, range and all, or
+         *     0 when it was supposed false.** That number is there so that a chain of claims
+         *     multiplied together has a factor for it, and for nothing else: **no surface may
+         *     print it.** Every reader looks at `states` first and prints the word *Supposed*
+         *     where the number would go, because "suppose this is true" answered with a
+         *     likelihood is a tool arguing with the person using it.
+         */
+        World: {
+            /**
+             * Base Id
+             * @description The map this world was built from.
+             */
+            base_id: string;
+            /**
+             * Branch Id
+             * @description The branch that was folded on. None means the base world, the empty branch. Working the numbers through takes a map and the values its edits fixed, and never the branch itself, so whatever asked for the world writes this in.
+             */
+            branch_id?: string | null;
+            /**
+             * Seed
+             * @description The one number every random draw in here came from.
+             */
+            seed: number;
+            /**
+             * Versions
+             * @description The outer loop: how many versions of the map were tried — how sure we are of the numbers we put in.
+             */
+            versions: number;
+            /**
+             * Worlds
+             * @description The inner loop: how many worlds were run under each version — how the dice fall.
+             */
+            worlds: number;
+            /**
+             * Day Zero
+             * Format: date
+             * @description The day the window starts on.
+             */
+            day_zero: string;
+            /**
+             * Days
+             * @description How long the window is, in whole days. Not the number of points in a series: a window longer than 180 days is drawn at 180 evenly spaced points.
+             */
+            days: number;
+            /** @description The map the branch's edits left behind. */
+            graph: components["schemas"]["Graph"];
+            /**
+             * Assignments
+             * @description Every value an edit fixed, in the order the edits were made.
+             */
+            assignments: components["schemas"]["Assignment"][];
+            /**
+             * Retractions
+             * @description Every supposition that a later edit undermined, and what undermined it.
+             */
+            retractions: components["schemas"]["Retraction"][];
+            /**
+             * Beliefs
+             * @description The model's likelihood for each claim, read on that claim's own resolve-by day, with the range that says how sure we are of it.
+             */
+            beliefs: {
+                [key: string]: components["schemas"]["Belief"];
+            };
+            /**
+             * Series Days
+             * @description Which day of the window each point of every series stands for, counting from zero. Ordinarily every day. Past 180 days the series is drawn at fewer, unevenly spaced days — every claim's own resolve-by day is always among them, so a tile's headline number is always a point of the line drawn beneath it — and then this is the only thing that says where those points sit.
+             */
+            series_days: number[];
+            /**
+             * Series
+             * @description One likelihood for each of the days above, for the scrubbable time axis.
+             */
+            series: {
+                [key: string]: number[];
+            };
+            /**
+             * States
+             * @description One named state per day, the same length as the series.
+             */
+            states: {
+                [key: string]: ("sampled" | "supposed" | "withdrawn" | "pushed")[];
+            };
+            /**
+             * Conditionals
+             * @description The likelihood of an arrow's target with that arrow's source **supposed** true — never how often the two show up together. Empty on a freshly built world: it costs a whole extra run per arrow, so it is fetched one arrow at a time when something asks.
+             */
+            conditionals?: {
+                [key: string]: components["schemas"]["Belief"];
+            };
+            /**
+             * Range Shares
+             * @description How much of each claim's band comes from not being sure of each claim's prior: range_shares[target][source]. Nothing on screen reads it yet; it is carried because the sample it comes from is thrown away otherwise.
+             */
+            range_shares?: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /**
+             * Warnings
+             * @description Plain sentences the reader should see under the map.
+             * @default []
+             */
+            warnings: string[];
+        };
+        /**
+         * WorldRequest
+         * @description What it takes to build one world: a map, a branch, and a seed.
+         *
+         *     Those three are the whole of a world. The same three give a byte-identical
+         *     answer on any machine and at any time, which is what makes a screenshot from
+         *     three days ago reproducible.
+         */
+        WorldRequest: {
+            /**
+             * Base Id
+             * @description The short name of the stored example, such as "hormuz".
+             */
+            base_id: string;
+            /** @description The branch to fold, sent whole because there is nowhere to keep one yet. Leave it out for the base world — the map with nothing done to it. */
+            branch?: components["schemas"]["Branch"] | null;
+            /**
+             * Seed
+             * @description The one number every random draw in the answer comes from. The same seed always gives the same world.
+             */
+            seed: number;
+            /**
+             * Versions
+             * @description How many versions of the map to try: how sure we are of the numbers put in. Each version is one coherent set of numbers this model would have stood behind, and the range on every answer is the spread across them.
+             * @default 2000
+             */
+            versions: number;
+            /**
+             * Worlds
+             * @description How many worlds to run under each version: how the dice fall. At least two, or there is no spread inside a version to subtract from the range.
+             * @default 8
+             */
+            worlds: number;
         };
     };
     responses: never;
@@ -987,6 +1629,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    build_world_api_worlds_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorldRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["World"];
+                };
+            };
+            /** @description The request cannot be carried out as written — on these routes, always a branch that does not fit the map, because both worlds of a comparison are built here from the one base map, seed and pair of loop sizes. The answer lists every reason at once, each with a stable code the interface can switch on, the identifier of the thing at fault, and one plain sentence naming the claim or the arrow by its words. A body the server cannot read at all is also a 422, and says so in its own words. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusedEdit"];
+                };
+            };
+        };
+    };
+    compare_worlds_api_worlds_diff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiffRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Diff"];
+                };
+            };
+            /** @description The request cannot be carried out as written — on these routes, always a branch that does not fit the map, because both worlds of a comparison are built here from the one base map, seed and pair of loop sizes. The answer lists every reason at once, each with a stable code the interface can switch on, the identifier of the thing at fault, and one plain sentence naming the claim or the arrow by its words. A body the server cannot read at all is also a 422, and says so in its own words. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusedEdit"];
+                };
+            };
+        };
+    };
+    read_conditional_api_worlds_conditional_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConditionalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Belief"];
+                };
+            };
+            /** @description The request cannot be carried out as written — on these routes, always a branch that does not fit the map, because both worlds of a comparison are built here from the one base map, seed and pair of loop sizes. The answer lists every reason at once, each with a stable code the interface can switch on, the identifier of the thing at fault, and one plain sentence naming the claim or the arrow by its words. A body the server cannot read at all is also a 422, and says so in its own words. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusedEdit"];
                 };
             };
         };

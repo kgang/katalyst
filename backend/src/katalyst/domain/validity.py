@@ -46,6 +46,7 @@ ViolationCode = Literal[
     "cycle",
     "reflexive_without_lag",
     "half_life_without_impulse",
+    "impulse_without_half_life",
     "belief_out_of_range",
     "no_terminal",
     "no_hypothesis",
@@ -53,8 +54,32 @@ ViolationCode = Literal[
     "dangling_link",
     "market_without_payoff",
     "not_tradeable_without_reason",
+    "unknown_target",
+    "unknown_link",
+    "duplicate_id",
+    "edit_not_applicable",
+    "worlds_not_comparable",
 ]
-"""The thirteen things that can be wrong with a map.
+"""The nineteen things that can be wrong: fourteen faults in a map, five refusals.
+
+The first fourteen are what `validate` finds in a map. The last five are what our
+own code refuses to do, and no map can carry any of them. Four are about an
+*edit*, found when a branch is folded onto a map:
+
+* `unknown_target` — the edit names a claim that is not on this map.
+* `unknown_link` — the edit names an arrow that is not on this map.
+* `duplicate_id` — an edit adds a claim or an arrow under an identifier that is
+  already in use.
+* `edit_not_applicable` — this edit cannot be folded onto this map as written.
+  Everything it names is there; what it asks for is something this version cannot
+  do, or something the shapes allow and the map cannot carry out.
+
+The fifth is about a *comparison*, and it is the one refusal that is not about an
+edit at all:
+
+* `worlds_not_comparable` — these two worlds were not built from the same base
+  map, the same seed and the same two loop sizes, so subtracting one from the
+  other would leave noise rather than the change somebody made.
 
 Stable strings: the browser switches on them, tests assert on them, and they are
 never renamed without a migration.
@@ -91,12 +116,14 @@ class Violation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     code: ViolationCode = Field(
-        description="Which rule was broken. One of thirteen stable strings."
+        description="Which rule was broken. One of nineteen stable strings."
     )
     subject: str = Field(
         description=(
-            "The identifier of the thing at fault: a proposition id, a link id, or the graph's own "
-            "id for faults about the map as a whole. Never shown to the user."
+            "The identifier of the thing at fault: a proposition id, a link id, the graph's own "
+            "id for faults about the map as a whole — including two worlds that cannot be "
+            "compared, which names the map they should both have come from — or a branch id "
+            "when a chain of branches cannot be put in order. Never shown to the user."
         )
     )
     message: str = Field(
@@ -143,6 +170,7 @@ def validate(graph: Graph) -> list[Violation]:
         _no_loops_once_feedback_is_set_aside(graph, claims),
         _feedback_arrows_take_time(graph, claims),
         _half_lives_belong_to_pushes_that_fade(graph, claims),
+        _pushes_that_fade_say_how_fast(graph, claims),
         _likelihoods_sit_inside_their_own_range(graph),
     )
 
@@ -634,7 +662,7 @@ def _feedback_arrows_take_time(
     ]
 
 
-# --- Rule 11 — a half-life belongs only to a push that fades ---------------
+# --- Rules 11 and 12 — a shape and its numbers agree, checked both ways ----
 
 
 def _half_lives_belong_to_pushes_that_fade(
@@ -656,11 +684,6 @@ def _half_lives_belong_to_pushes_that_fade(
     Returns:
         One violation per arrow whose push does not fade but carries a half-life.
     """
-    # The case the other way round — an `impulse` with no half-life — is left
-    # legal on purpose. It wants a sensible default rather than a refusal, and
-    # choosing that default belongs to the code that works the numbers through,
-    # not to this rule. It is the remaining half of open question 4 in
-    # spec/graph/link.md.
     return [
         Violation(
             code="half_life_without_impulse",
@@ -676,7 +699,44 @@ def _half_lives_belong_to_pushes_that_fade(
     ]
 
 
-# --- Rule 12 — every likelihood sits inside its own range ------------------
+def _pushes_that_fade_say_how_fast(
+    graph: Graph, claims: dict[PropositionId, Proposition]
+) -> list[Violation]:
+    """Find arrows whose push is a spike and which never say how fast it fades.
+
+    The mirror of the rule above, and the other half of one idea: a shape and the
+    numbers that describe it have to agree, checked both ways. A `step` switches on
+    and holds and a `ramp` climbs and then holds, so neither may carry a half-life.
+    A spike does nothing but fade, so it must say how fast — without a half-life
+    there is no decay to work out at all, and whatever the code that works the
+    numbers through did with such an arrow would be a number the author never
+    wrote down.
+
+    Reject, never repair: no default half-life is invented here or anywhere else.
+
+    Args:
+        graph: The map to read.
+        claims: Every claim on the map, by identifier, for naming the two ends.
+
+    Returns:
+        One violation per arrow that fades without saying how fast.
+    """
+    return [
+        Violation(
+            code="impulse_without_half_life",
+            subject=link.id,
+            message=(
+                f"The arrow from {_name_of(claims, link.source)} to "
+                f"{_name_of(claims, link.target)} is a spike that fades, but does not say "
+                "how fast; without a half-life there is nothing to fade by."
+            ),
+        )
+        for link in graph.links
+        if link.shape == FADING_SHAPE and link.half_life is None
+    ]
+
+
+# --- Rule 13 — every likelihood sits inside its own range ------------------
 
 
 def _out_of_range(belief: Belief) -> bool:

@@ -14,8 +14,19 @@ half-life was measured. They come from the sketch in
 `docs/research/02-causal-modeling-formalisms.md` §3 and from the worked chapters
 in `spec/graph/` and `spec/multiverse/`, and they are written down so the
 machinery has something honest-shaped to run on — not because anyone has
-established them. That is why no arrow claims a provenance of `documented`: no
-retrieval step ran for this file. Arrows say `argued` (a mechanism was stated
+established them.
+
+**And this map is a curated example**, so its inputs may be tuned to make the
+worked example rich and interesting rather than flat. Every tuned value carries
+a comment saying what it was, what it is now and why, and the word **Tuned**, so
+that searching this file for it finds every one of them. What is never tuned is
+a **computed** number: `beliefs.model` equals `prior` on every claim here, which
+is the truthful statement "nothing has been computed yet", and the engine's own
+world is served beside this map. A number typed in by hand cannot say where it
+came from, and that is the one state this product refuses to show.
+
+That is also why no arrow claims a provenance of `documented`: no retrieval step
+ran for this file. Arrows say `argued` (a mechanism was stated
 and nothing was fetched to back it) or, in the one weak case, `asserted` (the
 sentence is a story rather than a mechanism). Every belief is a range, never a
 point, for the same reason.
@@ -50,7 +61,7 @@ The arrows, with their sign, mode, signal shape and delay::
     H --( +1.1  sustain  step      same day             )--> C
     H --( +0.7  trigger  ramp     10 days               )--> N1
     C --( +0.7  sustain  step      7 days               )--> B
-    B --( +0.9  trigger  impulse   1 day,  half-life 14 )--> M1
+    B --( +0.9  trigger  impulse   1 day,  half-life 30 )--> M1
     B --( +0.8  trigger  ramp      3 days               )--> M2
     B --( +0.6  trigger  ramp     14 days, REFLEXIVE    )--> R
     R --( -1.2  trigger  step      5 days               )--> B   closes the loop
@@ -117,10 +128,11 @@ def _resolve_by(days: int) -> date:
 # Each one is a claim that will be true or false by a date, judged by a named
 # source. `prior` is what the model thinks about the claim on its own, before
 # anything causes it. `beliefs.model` is what it thinks once its causes have
-# pushed on it — which is arithmetic this stack does not do, so the numbers in
-# that slot are illustrative stand-ins, and stack 03a will compute them for
-# real. The two are the same number on the hypothesis, because the hypothesis
-# has no causes and so there is nothing to add.
+# pushed on it — and in this file it is **equal to the prior on every claim**,
+# which is the truthful statement "nothing has been computed yet". The engine
+# computes the real number and the world it produces is served beside this map.
+# No computed number is ever typed in by hand here: a number that cannot say
+# where it came from is exactly the state this product refuses to show.
 
 
 # H — the hypothesis. The user typed "the Strait of Hormuz is going to open
@@ -144,6 +156,11 @@ HORMUZ_OPEN = Proposition(
         by=_resolve_by(31),
     ),
     prior=Belief(p=0.35, lo=0.22, hi=0.50, owner="model"),
+    # `beliefs.model` equals `prior`, here and on every claim below, and that is
+    # the truthful statement "nothing has been computed yet". The engine writes
+    # the computed number, and the world it produces is served beside this map;
+    # a number typed in by hand could not say where it came from, which is the
+    # one thing this product must never show.
     beliefs=Beliefs(
         model=Belief(p=0.35, lo=0.22, hi=0.50, owner="model"),
         user=Belief(p=0.55, lo=0.40, hi=0.70, owner="user"),
@@ -204,9 +221,9 @@ WAR_RISK_PREMIUM_FALLS = Proposition(
         by=_resolve_by(30),
     ),
     prior=Belief(p=0.30, lo=0.18, hi=0.45, owner="model"),
-    # Illustrative: two arrows push on C (H directly, and S once the branch is
-    # applied), and adding those pushes up is stack 03a's job.
-    beliefs=Beliefs(model=Belief(p=0.44, lo=0.30, hi=0.60, owner="model")),
+    # Nothing computed yet: the same numbers as the prior, until the engine runs.
+    # Was .44 (.30 to .60), a hand-written guess at what H's push would do to C.
+    beliefs=Beliefs(model=Belief(p=0.30, lo=0.18, hi=0.45, owner="model")),
 )
 
 
@@ -222,11 +239,19 @@ BRENT_BELOW_68 = Proposition(
             "consecutive or not, within the window."
         ),
         source="ICE Brent front-month settlement prices.",
-        by=_resolve_by(45),
+        # **Tuned.** Was `_resolve_by(45)`, 2026-11-15; now 2026-10-15, a
+        # fortnight. Five settlements below $68 is about a fortnight of sessions,
+        # so a fortnight is the honest window for this claim — and at forty-five
+        # days both pushes on B had faded to nothing much (H → B to 0.37 of full
+        # size, S → B to 0.04), so the tile read almost exactly B's own prior and
+        # the example taught nobody anything. A tile is read on the claim's own
+        # resolve-by day; this is the claim's date moving to where the claim
+        # actually is, not the reading rule bending to flatter the demo.
+        by=_resolve_by(14),
     ),
     prior=Belief(p=0.28, lo=0.15, hi=0.42, owner="model"),
-    # Illustrative, as above: B has three incoming arrows and no arithmetic here.
-    beliefs=Beliefs(model=Belief(p=0.46, lo=0.30, hi=0.63, owner="model")),
+    # Nothing computed yet. Was .46 (.30 to .63), a hand-written guess.
+    beliefs=Beliefs(model=Belief(p=0.28, lo=0.15, hi=0.42, owner="model")),
 )
 
 
@@ -248,9 +273,10 @@ OPEC_RESTRAINT = Proposition(
         by=_resolve_by(60),
     ),
     prior=Belief(p=0.18, lo=0.08, hi=0.32, owner="model"),
-    # Illustrative: R's one incoming arrow is the feedback arrow out of B, and
-    # nothing unrolls a feedback arrow over time until stack 06.
-    beliefs=Beliefs(model=Belief(p=0.24, lo=0.12, hi=0.40, owner="model")),
+    # Nothing computed yet. Was .24 (.12 to .40), a hand-written guess. R's one
+    # incoming arrow is the feedback arrow out of B, and nothing unrolls a
+    # feedback arrow over time yet, so the engine leaves R at its prior too.
+    beliefs=Beliefs(model=Belief(p=0.18, lo=0.08, hi=0.32, owner="model")),
 )
 
 
@@ -269,9 +295,12 @@ BRENT_CONTRACT = Proposition(
     ),
     prior=Belief(p=0.40, lo=0.28, hi=0.55, owner="model"),
     beliefs=Beliefs(
-        # Illustrative, and the number research report 02 §3 gives for the base
-        # world before any branch is applied.
-        model=Belief(p=0.61, lo=0.45, hi=0.74, owner="model"),
+        # Nothing computed yet: the same numbers as the prior. Was .61 (.45 to .74),
+        # the number research report 02 §3 gives for the base world — a figure
+        # from a sketch rather than from this engine. The gap worth looking at is
+        # between whatever the engine computes and the market's .48 below, and
+        # that gap is only honest once the engine has written the first number.
+        model=Belief(p=0.40, lo=0.28, hi=0.55, owner="model"),
         # **Illustrative, not a live quote.** A real market belief is read off a
         # venue: the mid-price between the best bid and the best offer becomes
         # the likelihood, and the quoted spread becomes the range. Nothing in
@@ -314,9 +343,9 @@ ENERGY_SHARES_LAG = Proposition(
         by=_resolve_by(45),
     ),
     prior=Belief(p=0.35, lo=0.22, hi=0.50, owner="model"),
-    # Illustrative, and again the number research report 02 §3 gives for the
-    # base world.
-    beliefs=Beliefs(model=Belief(p=0.54, lo=0.38, hi=0.68, owner="model")),
+    # Nothing computed yet. Was .54 (.38 to .68), the number research report 02 §3
+    # gives for the base world — a figure from a sketch, not from this engine.
+    beliefs=Beliefs(model=Belief(p=0.35, lo=0.22, hi=0.50, owner="model")),
     # A price payoff, because no venue asks this question, but two funds anybody
     # can trade move when the answer changes. The other half of the pair the map
     # shows: a contract at one ending, an instrument at the other.
@@ -356,8 +385,8 @@ TALKS_RESUME = Proposition(
         by=_resolve_by(60),
     ),
     prior=Belief(p=0.22, lo=0.12, hi=0.36, owner="model"),
-    # Illustrative, as with every other propagated number here.
-    beliefs=Beliefs(model=Belief(p=0.29, lo=0.15, hi=0.45, owner="model")),
+    # Nothing computed yet. Was .29 (.15 to .45), a hand-written guess.
+    beliefs=Beliefs(model=Belief(p=0.22, lo=0.12, hi=0.36, owner="model")),
     not_tradeable_reason=(
         "No venue quotes a contract on a diplomatic round, and the nearest traded "
         "proxies are sanctioned Iranian assets that cannot be bought at all, so there "
@@ -478,9 +507,15 @@ PREMIUM_TO_BRENT = Link(
 # reprices within a day of settlements printing below $68.
 #
 # The half-life is not in the plan's table. An `impulse` with no half-life has
-# no decay to evaluate, and stack 03a has to evaluate this arrow, so a number is
-# supplied here: a fortnight, illustrative like the rest, and short because the
-# contract itself settles a month out.
+# no decay to evaluate, and the engine has to evaluate this arrow, so a number is
+# supplied here, illustrative like the rest.
+#
+# **Tuned.** Was 14 days, chosen because the contract settles a month out. Now 30.
+# The contract is written on very nearly the event B measures, so the repricing
+# lasts about as long as the move does rather than unwinding inside a fortnight —
+# and at fourteen days the push had faded to a quarter of full size by the day
+# the contract is judged, so M1's tile read its own prior and the clearest chain
+# on the map showed nothing.
 BRENT_TO_CONTRACT = Link(
     id="B->M1",
     source="B",
@@ -489,7 +524,7 @@ BRENT_TO_CONTRACT = Link(
     strength=0.9,
     lag=1.0,
     shape="impulse",
-    half_life=14.0,
+    half_life=30.0,
     rationale=(
         "The contract is written on almost the same thing the claim measures, so a run "
         "of settlements below $68 reprices it within a day."
@@ -629,7 +664,7 @@ STRIKE_ON_IRAN = Proposition(
         by=_resolve_by(1),
     ),
     # Illustrative, from research report 02 §3. S has no causes on this map, so
-    # the two numbers are the same, exactly as on the hypothesis.
+    # its computed number would be its prior anyway.
     prior=Belief(p=0.06, lo=0.02, hi=0.14, owner="model"),
     beliefs=Beliefs(model=Belief(p=0.06, lo=0.02, hi=0.14, owner="model")),
 )
@@ -677,9 +712,17 @@ STRIKE_TO_PREMIUM = Link(
 #
 # It is a `sustain` arrow, and it points at the claim the user asserted. A
 # reopening is held up by the *absence* of hostilities the way an apple is held
-# up by a desk, not caused once by the opening event. So from the day the strike
-# lands, the strait's openness **retracts** — even though the user supposed it
-# true the day before.
+# up by a desk, not caused once by the opening event. So the strait's openness
+# **retracts** — even though the user supposed it true the day before.
+#
+# **Two different days, and the difference is the point.** The user's word is
+# withdrawn on **2026-10-02**, the day the strike itself becomes true: that is
+# the day the world changed, and it is the date the tile's badge names. The push
+# does not arrive until **2026-10-05**, because this arrow carries a three-day
+# lag. In between, H is neither supposed nor pushed: it reads its own prior of
+# .35 again, labelled *withdrawn — no live push yet*. From the 5th the -1.9 lands
+# and H reads about .07. The three-day gap is not a bug to hide; it is the honest
+# shape of the answer, which is why every day of a claim's series carries a name.
 #
 # That is allowed because supposing a claim is a **timed assertion, not a seal**.
 # "Suppose the strait is open, from 2026-10-01" cuts the arrows into H that exist

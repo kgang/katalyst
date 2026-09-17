@@ -19,7 +19,7 @@ Intervention (`do`, `observe`, `insert`, `retune`, `refine`, `believe`) · Branc
 | ID | Statement |
 |----|-----------|
 | INV-3 | `do` changes no ancestor of the target; `observe` may. They are distinct operations with distinct verbs in the interface |
-| INV-4 | Locality: an intervention changes only what is still connected to its subject in the graph the edit leaves behind; every other proposition is byte-identical between base and branch. The per-operation affected set in [`interventions.md`](interventions.md) is the operational form |
+| INV-4 | Locality: an intervention changes only what is still connected to its subject in the graph the edit leaves behind; every other proposition is byte-identical between base and branch. The per-operation affected set in [`interventions.md`](interventions.md) is the operational form, and the same chapter holds the one rule about feedback arrows: *what can move* is read off the map with feedback arrows set aside, because this engine never works one through |
 | INV-5 | The base graph is immutable; a branch is an ordered patch list; applying an empty branch is the identity; applying two branches in sequence equals applying their concatenation; every world replays from (base, branch, seed) |
 | INV-10 | After splitting a proposition into finer sub-propositions, their combined likelihood equals the original's within a small tolerance |
 
@@ -29,7 +29,7 @@ Intervention (`do`, `observe`, `insert`, `retune`, `refine`, `believe`) · Branc
 |---------|--------|-----------|
 | [`interventions.md`](interventions.md) | The six operations, their preconditions, and what each may touch | stack 02 — written, models built |
 | [`branches-and-worlds.md`](branches-and-worlds.md) | Patch algebra, replay, seeds, naming, parent branches | stack 02 — written, models built |
-| `propagation.md` | How likelihoods flow: adding link strengths on a log-odds scale, trigger vs sustain over time, lags and signal shapes, the seeded random-simulation engine | stack 03a |
-| `diff.md` | Per-proposition states (unchanged / shifted / added / killed), ranked terminal deltas, the one-line summary | stack 03a |
+| [`propagation.md`](propagation.md) | How likelihoods flow: adding link strengths on a log-odds scale, trigger vs sustain over time, lags and signal shapes, how a supposition ends, and the two-loop seeded simulation that gives every computed number its range | stack 03a — written |
+| [`diff.md`](diff.md) | Per-proposition states (unchanged / shifted / added / killed), agreement, ranked terminal deltas, the one-line summary, the sensitivity sweep | stack 03a — written |
 
-Decision records behind this part: ADR-0004 (branches are patches), ADR-0005 (propagation).
+Decision records behind this part: ADR-0004 (branches are patches), ADR-0005 (propagation), ADR-0014 (how a supposition ends; what the range on a computed number means; how a change is ranked and dated).
