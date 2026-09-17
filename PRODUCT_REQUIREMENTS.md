@@ -272,7 +272,7 @@ Dated so this section visibly ages. An answered question moves to the list below
 - **Asked 2026-09-16, answered 2026-09-17.** Product name in the interface: **Katalyst**, the repository's own name. `/api/about` returns it and the status screen prints it.
 - **Asked 2026-09-16, answered 2026-09-17.** Does the GitHub native stacked-PR preview work on `kgang/katalyst`? **Yes**, and stacks 01 and 02 were merged that way; `git-spice` was not needed. The command-line tool `gh` refuses to merge a stacked pull request and points at an asynchronous merge route instead; that route, and the one trap in it, are written down under *More Information* in decision record 0009.
 - **Asked 2026-09-16, answered 2026-09-17.** Reflexive links (`market → world`, lag > 0): **schema in stack 02, propagation deferred to stack 06.** The schema is built, and the stored Hormuz example carries such a link with a delay on it.
-- **Asked 2026-09-17, answered 2026-09-17.** Replay mode (FR-13) — a reviewer with no model key walks the hero flow on the four example hypotheses, played from committed generation transcripts through the live event stream. The shape is now written down as decision record 0012, which is `decision record 0012, accepted 2026-09-17; built in stack 04.
+- **Asked 2026-09-17, answered 2026-09-17.** Replay mode (FR-13) — a reviewer with no model key walks the hero flow on the four example hypotheses, played from committed generation transcripts through the live event stream. Written down as decision record 0012 and accepted the same day; built in stack 04.
 
 ---
 
