@@ -48,12 +48,12 @@ describe("the status strip", () => {
     // leaving the reader to work it out.
     expect(screen.getByText("absent")).toBeInTheDocument();
     expect(
-      screen.getByText("no key configured — generation arrives in stack 04"),
+      screen.getByText("no key configured — generating a map is not built yet"),
     ).toBeInTheDocument();
 
-    // The running build named itself.
+    // The version row is derived from the server's own answer.
     expect(screen.getByText("0.1.0")).toBeInTheDocument();
-    expect(screen.getByText("named Katalyst")).toBeInTheDocument();
+    expect(screen.getByText("reported by Katalyst")).toBeInTheDocument();
 
     // Three rows, each one a term in the description list.
     expect(screen.getAllByRole("term")).toHaveLength(3);

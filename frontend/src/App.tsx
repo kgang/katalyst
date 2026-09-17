@@ -138,7 +138,7 @@ function modelKeyReading(answer: Answer<Readiness>): Reading {
             label: "model key",
             value: "absent",
             glyph: "○",
-            state: "no key configured — generation arrives in stack 04",
+            state: "no key configured — generating a map is not built yet",
             tone: "quiet",
           };
     case "failed":
@@ -162,7 +162,7 @@ function versionReading(answer: Answer<About>): Reading {
         label: "version",
         value: answer.value.version,
         glyph: "●",
-        state: `named ${answer.value.name}`,
+        state: `reported by ${answer.value.name}`,
         tone: "good",
       };
     case "failed":
