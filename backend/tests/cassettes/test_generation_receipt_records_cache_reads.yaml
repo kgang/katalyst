@@ -1,0 +1,778 @@
+interactions:
+- request:
+    body: "{\"max_tokens\":16000,\"messages\":[{\"role\":\"user\",\"content\":\"Today is 2026-09-17.\\\
+      n\\nHere is the map as it stands. The short name in front of each claim is ours; use\
+      \ one when you name a cause.\\n\\nClaims:\\n  B  Brent crude settles below $68 for five\
+      \ sessions.\\n  C  Lloyd's war-risk insurance premium for Gulf transits falls below\
+      \ 0.4%.\\n  H  The Strait of Hormuz reopens to unrestricted commercial transit. (this\
+      \ is what the person expects)\\n  M1  A Polymarket contract \\\"Brent below $70 on 2026-10-31\\\
+      \" resolves YES.\\n  M2  The energy fund XLE underperforms the S&P 500 fund SPY by more\
+      \ than 3% over 20 trading days.\\n  N1  Omani-mediated United States-Iran talks resume\
+      \ publicly.\\n  R  OPEC+ announces output restraint.\\n\\nArrows:\\n  B -> M1\\n  B\
+      \ -> M2\\n  B -> R\\n  C -> B\\n  H -> B\\n  H -> C\\n  H -> N1\\n  R -> B\\n\\nWe are\
+      \ asking about this claim: Lloyd's war-risk insurance premium for Gulf transits falls\
+      \ below 0.4%.\\n\\nIt already leads to:\\n  - Brent crude settles below $68 for five\
+      \ sessions.\\n\\nAnswer with the one next piece, or with a note that this part of the\
+      \ story is finished.\"}],\"model\":\"claude-opus-5\",\"output_config\":{\"format\":{\"\
+      schema\":{\"$defs\":{\"BaseRate\":{\"type\":\"object\",\"description\":\"How often this\
+      \ kind of thing has happened before: k times out of n.\\n\\nThe outside view \u2014\
+      \ the anchor a likelihood starts from before anything\\nspecific to this case is considered.\
+      \ Optional, because some claims have no\\nhonest reference class, and absent is better\
+      \ than invented.\",\"title\":\"BaseRate\",\"properties\":{\"reference_class\":{\"type\"\
+      :\"string\",\"description\":\"The set of past cases being counted, stated precisely\
+      \ enough that someone else could recount them: 'Hormuz closure or disruption episodes\
+      \ since 1980 that ended within 90 days'.\",\"title\":\"Reference Class\"},\"k\":{\"\
+      type\":\"integer\",\"description\":\"How many cases in that set came out true.\\n\\\
+      n{minimum: 0}\",\"title\":\"K\"},\"n\":{\"type\":\"integer\",\"description\":\"How many\
+      \ cases are in that set altogether.\\n\\n{exclusiveMinimum: 0}\",\"title\":\"N\"},\"\
+      sources\":{\"type\":\"array\",\"description\":\"Web addresses where the count can be\
+      \ checked. Empty means the count is the model's own recollection, and nothing downstream\
+      \ of it may claim to be documented.\\n\\n{default: []}\",\"title\":\"Sources\",\"items\"\
+      :{\"type\":\"string\"}}},\"additionalProperties\":false,\"required\":[\"reference_class\"\
+      ,\"k\",\"n\"]},\"ClaimProposal\":{\"type\":\"object\",\"description\":\"One new claim,\
+      \ and the one arrow that reaches it from a claim already there.\\n\\nThe ordinary answer\
+      \ while a map is growing. The pair travels together because\\na claim with nothing causing\
+      \ it is not a step in a story, and an arrow with\\nnothing at its far end is not an\
+      \ argument. That is still one thing: one\\nquestion, one answer.\\n\\nA claim is something\
+      \ that will be plainly true or false by a date, settled by\\na named source. Never a\
+      \ mood (\\\"tensions ease\\\"); always a check (\\\"at least 14\\nconsecutive days of\
+      \ unrestricted commercial transit through the Strait of\\nHormuz per Lloyd's List, by\
+      \ 2026-11-01\\\").\",\"title\":\"ClaimProposal\",\"properties\":{\"kind\":{\"type\"\
+      :\"string\",\"description\":\"Says this answer is a new claim with the arrow that reaches\
+      \ it.\\n\\n{const: claim}\",\"title\":\"Kind\"},\"claim\":{\"type\":\"string\",\"description\"\
+      :\"The claim in one sentence, as a person would say it out loud. The precise, settleable\
+      \ version goes in the test below.\",\"title\":\"Claim\"},\"claim_kind\":{\"type\":\"\
+      string\",\"enum\":[\"event\",\"market\",\"not_tradeable\"],\"description\":\"What this\
+      \ claim is for. 'event': a step in the middle of the story. 'market': an ending that\
+      \ names something you could trade. 'not_tradeable': an ending that names why there is\
+      \ nothing to trade.\",\"title\":\"Claim Kind\"},\"resolution\":{\"$ref\":\"#/$defs/Resolution\"\
+      },\"prior\":{\"$ref\":\"#/$defs/Ranged\"},\"base_rate\":{\"anyOf\":[{\"$ref\":\"#/$defs/BaseRate\"\
+      },{\"type\":\"null\"}],\"description\":\"How often this kind of thing has happened before:\
+      \ how many cases out of how many, and what set was counted. Leave it out when there\
+      \ is no honest set to count \u2014 absent is better than invented.\\n\\n{default: None}\"\
+      },\"payoff\":{\"anyOf\":[{\"anyOf\":[{\"$ref\":\"#/$defs/ContractPayoff\"},{\"$ref\"\
+      :\"#/$defs/PricePayoff\"}],\"description\":\"{discriminator: {'mapping': {'contract':\
+      \ '#/$defs/ContractPayoff', 'price': '#/$defs/PricePayoff'}, 'propertyName': 'kind'}}\"\
+      },{\"type\":\"null\"}],\"description\":\"What you would trade. Belongs to a 'market'\
+      \ ending, and is one of two things told apart by its own `kind` field, which always\
+      \ say which: `kind` 'contract' for a named contract at a named venue with the side you\
+      \ would take, or `kind` 'price' for an instrument, a direction, and how far its price\
+      \ would move.\\n\\n{default: None}\",\"title\":\"Payoff\"},\"not_tradeable_reason\"\
+      :{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Why this chain\
+      \ ends with nothing to trade, in one plain sentence. Belongs to a 'not_tradeable' ending.\\\
+      n\\n{default: None}\",\"title\":\"Not Tradeable Reason\"},\"cause\":{\"type\":\"string\"\
+      ,\"description\":\"The claim this arrow starts at, named by one of the short names this\
+      \ call's map listed. It is a claim already on the map; nothing new is named here, and\
+      \ nothing new is named anywhere else either.\",\"title\":\"Cause\"},\"link\":{\"$ref\"\
+      :\"#/$defs/LinkDraft\"}},\"additionalProperties\":false,\"required\":[\"kind\",\"claim\"\
+      ,\"claim_kind\",\"resolution\",\"prior\",\"cause\",\"link\"]},\"ContractPayoff\":{\"\
+      type\":\"object\",\"description\":\"A named contract at a named venue, and which side\
+      \ of it you would take.\\n\\nThe kind of ending where somebody already sells exactly\
+      \ this claim: a\\nprediction-market contract that settles on the same question the claim\
+      \ asks.\\nNothing here says what the contract costs, because that is a live price rather\\\
+      nthan a fact about the map.\",\"title\":\"ContractPayoff\",\"properties\":{\"kind\"\
+      :{\"type\":\"string\",\"title\":\"Kind\",\"description\":\"{const: contract, default:\
+      \ contract}\"},\"venue\":{\"type\":\"string\",\"description\":\"Where the contract trades,\
+      \ by the venue's own name: 'Polymarket', 'Kalshi'.\",\"title\":\"Venue\"},\"contract_id\"\
+      :{\"type\":\"string\",\"description\":\"How that venue identifies this exact contract,\
+      \ so a reader can look it up and a later step can fetch its price.\",\"title\":\"Contract\
+      \ Id\"},\"title\":{\"type\":\"string\",\"description\":\"The contract's question in\
+      \ the venue's own words, so a person reading the map can see it is really the same question\
+      \ the claim asks.\",\"title\":\"Title\"},\"side\":{\"type\":\"string\",\"enum\":[\"\
+      yes\",\"no\"],\"description\":\"'yes' if you make money when the claim comes true, 'no'\
+      \ if you make money when it fails.\",\"title\":\"Side\"}},\"additionalProperties\":false,\"\
+      required\":[\"venue\",\"contract_id\",\"title\",\"side\"]},\"LinkDraft\":{\"type\":\"\
+      object\",\"description\":\"The arrow itself: how hard it pushes, how long it takes,\
+      \ and why it is real.\\n\\nAn arrow is an argument, never a correlation, so a mechanism\
+      \ in plain words\\nis required of every one. What is absent is as deliberate as what\
+      \ is here:\\nno identifier, and nothing saying how well-backed the arrow is. The second\
+      \ is\\na fact about what our pipeline found, not a claim a model may make about\\nitself.\\\
+      n\\nThe two spans of time here are whole days. A model is asked for two days, not\\\
+      nfor two and a half; the arrow it becomes allows the half day, because\\narithmetic\
+      \ on a timeline needs it, and the widening happens on the way in.\",\"title\":\"LinkDraft\"\
+      ,\"properties\":{\"mode\":{\"type\":\"string\",\"enum\":[\"trigger\",\"sustain\"],\"\
+      description\":\"How the push behaves when the cause goes away. 'trigger': a one-time\
+      \ shove \u2014 once the cause becomes true the effect is pushed and stays pushed, fading\
+      \ on its own; undoing the cause later does not undo it. 'sustain': a continuous hold\
+      \ \u2014 the push exists only while the cause holds, and vanishes the moment it stops.\"\
+      ,\"title\":\"Mode\"},\"strength\":{\"type\":\"number\",\"description\":\"How far this\
+      \ arrow shifts the effect's odds while the push is at full size, on the scale where\
+      \ separate pushes add up instead of multiplying. Signed: positive makes the effect more\
+      \ likely to be true, negative less likely. Roughly: +1 triples the odds, -1 cuts them\
+      \ to a third. This is not a probability.\",\"title\":\"Strength\"},\"lag\":{\"type\"\
+      :\"integer\",\"description\":\"Whole days from the cause becoming true to the push reaching\
+      \ full size. 0 means the same day.\",\"title\":\"Lag\"},\"shape\":{\"type\":\"string\"\
+      ,\"enum\":[\"impulse\",\"step\",\"ramp\"],\"description\":\"What the push does over\
+      \ time. 'impulse': nothing during the delay, then a spike that fades. 'step': nothing\
+      \ during the delay, then full size, held. 'ramp': climbs from nothing to full size across\
+      \ the delay, then held.\",\"title\":\"Shape\"},\"half_life\":{\"anyOf\":[{\"type\":\"\
+      integer\"},{\"type\":\"null\"}],\"description\":\"Whole days for a spike to fall to\
+      \ half its size. Belongs to a spike and to nothing else: a step and a ramp switch on\
+      \ and hold, so they have nothing to fade.\\n\\n{default: None}\",\"title\":\"Half Life\"\
+      },\"rationale\":{\"type\":\"string\",\"description\":\"The mechanism in one to three\
+      \ plain sentences: why this cause moves this effect. An arrow with a number and no reason\
+      \ is worth nothing to the person reading it.\",\"title\":\"Rationale\"},\"sources\"\
+      :{\"type\":\"array\",\"description\":\"Addresses this call's search tool returned that\
+      \ back the mechanism above. Leave it empty when you did not search or found nothing\
+      \ \u2014 an empty list is an honest answer we can show, and an address you are recalling\
+      \ rather than reading is not.\\n\\n{default: []}\",\"title\":\"Sources\",\"items\":{\"\
+      $ref\":\"#/$defs/SourceDraft\"}}},\"additionalProperties\":false,\"required\":[\"mode\"\
+      ,\"strength\",\"lag\",\"shape\",\"rationale\"]},\"LinkProposal\":{\"type\":\"object\"\
+      ,\"description\":\"One arrow between two claims that are both already on the map.\\\
+      n\\nThe answer when the missing piece is not a new step but a connection between\\ntwo\
+      \ steps that are already there.\",\"title\":\"LinkProposal\",\"properties\":{\"kind\"\
+      :{\"type\":\"string\",\"description\":\"Says this answer is an arrow between two claims\
+      \ already on the map.\\n\\n{const: link}\",\"title\":\"Kind\"},\"source\":{\"type\"\
+      :\"string\",\"description\":\"The cause: one of the short names this call's map listed.\"\
+      ,\"title\":\"Source\"},\"target\":{\"type\":\"string\",\"description\":\"The effect:\
+      \ another of the short names this call's map listed.\",\"title\":\"Target\"},\"link\"\
+      :{\"$ref\":\"#/$defs/LinkDraft\"}},\"additionalProperties\":false,\"required\":[\"kind\"\
+      ,\"source\",\"target\",\"link\"]},\"PricePayoff\":{\"type\":\"object\",\"description\"\
+      :\"An instrument you would buy or sell, which way, and how far you expect it to move.\\\
+      n\\nThe kind of ending where no contract asks this question, but something traded\\\
+      nmoves when the answer changes: a futures contract, a ticker, one fund against\\nanother.\"\
+      ,\"title\":\"PricePayoff\",\"properties\":{\"kind\":{\"type\":\"string\",\"title\":\"\
+      Kind\",\"description\":\"{const: price, default: price}\"},\"instrument\":{\"type\"\
+      :\"string\",\"description\":\"The thing you would buy or sell, named the way its venue\
+      \ names it: a ticker, a futures contract, one fund against another.\",\"title\":\"Instrument\"\
+      },\"direction\":{\"type\":\"string\",\"enum\":[\"long\",\"short\"],\"description\":\"\
+      'long' if the position makes money when the claim comes true, 'short' if it makes money\
+      \ when the claim fails.\",\"title\":\"Direction\"},\"move\":{\"type\":\"number\",\"\
+      description\":\"How far the instrument's price is expected to move if the claim comes\
+      \ out true, as a fraction of that price: 0.03 means three per cent. The side is carried\
+      \ by `direction`, so this number is never negative.\\n\\n{minimum: 0.0}\",\"title\"\
+      :\"Move\"}},\"additionalProperties\":false,\"required\":[\"instrument\",\"direction\"\
+      ,\"move\"]},\"Ranged\":{\"type\":\"object\",\"description\":\"A likelihood and the range\
+      \ around it, with nobody's name on it.\\n\\nThe model gives three numbers and no owner,\
+      \ because whose number this is is a\\nfact about our pipeline: every likelihood a proposal\
+      \ carries is stamped as\\nthe model's own by us on the way in.\\n\\nThe two ends are\
+      \ the tenth and ninetieth of a hundred: if this claim were\\nsettled a hundred times\
+      \ over, nine in ten of the answers would sit between\\nthem. They say how sure the number\
+      \ is, not how much the world can move.\\n\\nThis shape must never grow a field for whose\
+      \ number it is. The moment it has\\none, a model can hand us a number wearing the person's\
+      \ name on it.\",\"title\":\"Ranged\",\"properties\":{\"p\":{\"type\":\"number\",\"description\"\
+      :\"How likely this claim is to come out true, from 0 (certainly not) to 1 (certainly\
+      \ yes), before anything on the map pushes it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"\
+      title\":\"P\"},\"lo\":{\"type\":\"number\",\"description\":\"The bottom of the honest\
+      \ range around that number. Never above it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"title\"\
+      :\"Lo\"},\"hi\":{\"type\":\"number\",\"description\":\"The top of the honest range around\
+      \ that number. Never below it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"title\":\"Hi\"\
+      }},\"additionalProperties\":false,\"required\":[\"p\",\"lo\",\"hi\"]},\"Resolution\"\
+      :{\"type\":\"object\",\"description\":\"How a claim gets settled: the test, who applies\
+      \ it, and by when.\\n\\nEvery proposition has one. A claim with no resolution is a vibe,\
+      \ and a\\nlikelihood attached to a vibe can never be scored, right or wrong.\",\"title\"\
+      :\"Resolution\",\"properties\":{\"criteria\":{\"type\":\"string\",\"description\":\"\
+      The test, written so that two people reading it would agree on the answer. 'At least\
+      \ 14 consecutive days of unrestricted commercial transit', not 'shipping returns to\
+      \ normal'.\",\"title\":\"Criteria\"},\"source\":{\"type\":\"string\",\"description\"\
+      :\"Who or what applies the test: a named publication, exchange, agency or venue. 'Lloyd's\
+      \ List transit counts', not 'the news'.\",\"title\":\"Source\"},\"by\":{\"type\":\"\
+      string\",\"description\":\"The date by which the test has been applied. After this date\
+      \ the claim is true or false \u2014 never still open.\",\"title\":\"By\",\"format\"\
+      :\"date\"}},\"additionalProperties\":false,\"required\":[\"criteria\",\"source\",\"\
+      by\"]},\"SourceDraft\":{\"type\":\"object\",\"description\":\"An address the model says\
+      \ backs an arrow, before we have checked it.\\n\\nIt is a *claim about a document*,\
+      \ not a document. Our code decides whether it\\nbecomes something a reader can open,\
+      \ and it does so only if the search tool\\nitself returned that address in the same\
+      \ call.\\n\\nOne field, and deliberately no more. The day it was fetched is the day\
+      \ *our*\\nretrieval step fetched something, and the title is what the search tool itself\\\
+      nreported \u2014 both are facts about us rather than about the model, so both are\\\
+      nwritten where a source is built and a model has no way to reach either.\",\"title\"\
+      :\"SourceDraft\",\"properties\":{\"url\":{\"type\":\"string\",\"description\":\"One\
+      \ address that opens, not a search query, and one the search tool returned to you in\
+      \ this call rather than one you are recalling.\",\"title\":\"Url\"}},\"additionalProperties\"\
+      :false,\"required\":[\"url\"]},\"Stop\":{\"type\":\"object\",\"description\":\"The answer\
+      \ that says this part of the story is finished.\\n\\nNot a failure and not an error.\
+      \ A chain that has reached somewhere you could\\nact on, or a step with nothing honest\
+      \ to hang off it, is done \u2014 and saying so\\nis more useful than inventing one more\
+      \ box.\",\"title\":\"Stop\",\"properties\":{\"kind\":{\"type\":\"string\",\"description\"\
+      :\"Says there is nothing more to add here.\\n\\n{const: stop}\",\"title\":\"Kind\"},\"\
+      why\":{\"type\":\"string\",\"description\":\"One plain sentence saying why this part\
+      \ of the story is finished. It is kept and shown, so write it for a person.\",\"title\"\
+      :\"Why\"}},\"additionalProperties\":false,\"required\":[\"kind\",\"why\"]}},\"type\"\
+      :\"object\",\"description\":\"The envelope a proposal travels in, and the one thing\
+      \ in this layer the wire forced.\\n\\nA proposal is one of three shapes told apart by\
+      \ a `kind` field. Written out as\\na description of what an answer must look like, that\
+      \ is a choice at the very\\ntop \u2014 and **the service refuses a top-level choice\
+      \ that also names shapes by\\nreference**: *\\\"output_config.format.schema: For 'anyOf',\
+      \ '$defs' is not\\nsupported\\\"* (2026-09-17, the first live call). Put the same choice\
+      \ one field\\ndown and the top is an ordinary object, which it accepts.\\n\\nSo this\
+      \ exists for the wire and for nothing else. It is put on at the moment\\nthe question\
+      \ goes out and taken off at the moment the answer comes back, both\\ninside this file.\
+      \ **No field of any proposal is renamed, and nothing outside\\nthis file knows the envelope\
+      \ exists** \u2014 `expand.py` is handed a plain\\nproposal, exactly as before.\\n\\\
+      nA single shape such as a starting claim is already an object at the top, so it\\nneeds\
+      \ no envelope and does not get one.\",\"title\":\"OneProposal\",\"properties\":{\"proposal\"\
+      :{\"anyOf\":[{\"$ref\":\"#/$defs/ClaimProposal\"},{\"$ref\":\"#/$defs/LinkProposal\"\
+      },{\"$ref\":\"#/$defs/Stop\"}],\"description\":\"The one thing this answer is.\\n\\\
+      n{discriminator: {'mapping': {'claim': '#/$defs/ClaimProposal', 'link': '#/$defs/LinkProposal',\
+      \ 'stop': '#/$defs/Stop'}, 'propertyName': 'kind'}}\",\"title\":\"Proposal\"}},\"additionalProperties\"\
+      :false,\"required\":[\"proposal\"]},\"type\":\"json_schema\"}},\"system\":[{\"type\"\
+      :\"text\",\"text\":\"You are helping somebody think through what an event they expect\
+      \ would set off,\\nstep by step, until the story reaches something they could actually\
+      \ trade.\\n\\nYou do this one step at a time. Each time we ask, we show you the map\
+      \ as it\\nstands and point at one claim on it, and you answer with a single next piece.\\\
+      nSomebody watches the map grow as your answers arrive, so a small, well-argued\\npiece\
+      \ beats a large, vague one.\\n\\nWhat a claim is.\\nA claim is something that will be\
+      \ plainly true or false by a date, settled by a\\nnamed source. \\\"The drug pipeline\
+      \ looks healthy\\\" is not a claim, because two\\nhonest people will never agree on\
+      \ whether it happened. \\\"The United States Food\\nand Drug Administration grants full\
+      \ approval to at least one new obesity\\ntreatment, listed in its own approvals database,\
+      \ by the thirty-first of March\\\" is\\na claim, because they will. Every claim you\
+      \ write carries the test, the name of\\nwhoever applies it, and the day by which the\
+      \ answer is known.\\n\\nStart from the outside, then come inside. Before you say how\
+      \ likely this claim\\nis, ask what set of past cases it belongs to, how many of them\
+      \ came out true, and\\nout of how many. Say what that set was, precisely enough that\
+      \ somebody else could\\ncount it again. Then say how likely this particular claim is,\
+      \ with the honest\\nrange around it \u2014 wide when you are reaching, narrow when you\
+      \ are on familiar\\nground. The range is how sure you are of your own number. Where\
+      \ there is no\\nhonest set of past cases, leave it out; absent is better than invented.\\\
+      n\\nWhat an arrow is.\\nAn arrow is a claim about a mechanism: this happening moves\
+      \ the odds of that.\\nIt says which way and how hard it pushes, how many whole days\
+      \ it takes to arrive,\\nand what it does over time \u2014 a spike that fades, a switch\
+      \ that stays on, or a\\nclimb that builds and then holds. It says whether the push survives\
+      \ its cause\\ngoing away: a toppled domino stays down, while an apple only stays up\
+      \ while the\\ndesk is under it. And it says, in one to three sentences, why the mechanism\
+      \ is\\nreal. An arrow with a number and no reason is worth nothing to the person reading\\\
+      nit.\\n\\nWhere the backing comes from.\\nUse the search tool when the ground is checkable\
+      \ and you are not certain of it,\\nand cite only addresses the search returned to you\
+      \ in this same call. If you did\\nnot search, or nothing useful came back, cite nothing\
+      \ and say what you know in\\nthe reason instead. An empty list of citations is an honest\
+      \ answer we can show.\\nAn address you are recalling rather than reading is not backing,\
+      \ and we will not\\ntreat it as backing.\\n\\nHow a story ends.\\nA chain ends either\
+      \ at something somebody could put money on \u2014 a contract at a\\nnamed venue with\
+      \ the side you would take, or an instrument with a direction and\\nhow far you expect\
+      \ its price to move \u2014 or at a plain statement that there is\\nnothing to trade\
+      \ here, and why. Both are good endings. An ending that trails off\\ninto prose is not.\\\
+      n\\nWhat an answer is.\\nExactly one of three things:\\n  a new claim, together with\
+      \ the one arrow that reaches it from a claim already\\n  on the map;\\n  an arrow between\
+      \ two claims that are both already on the map;\\n  or a note that this part of the story\
+      \ is finished, with one sentence saying\\n  why.\\n\\nYou never name a new claim with\
+      \ anything but its words. The short names in the\\nmap we show you are ours; point at\
+      \ one when you name a cause, and never invent\\nanother.\\n\",\"cache_control\":{\"\
+      type\":\"ephemeral\"}}],\"thinking\":{\"type\":\"adaptive\"},\"tool_choice\":{\"type\"\
+      :\"auto\"},\"tools\":[{\"type\":\"web_search_20260209\",\"name\":\"web_search\",\"max_uses\"\
+      :1}]}"
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '20271'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 1.6.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-helper:
+      - messages.parse
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.6.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.4
+      x-stainless-timeout:
+      - '600'
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: "{\"model\":\"claude-opus-5\",\"id\":\"msg_011Cf98rZaA3gJTLQtVaveRr\",\"type\"\
+        :\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\"\
+        :\"\",\"signature\":\"CAISmQoKjgEIERgCKkCghPZr4oC1414hyLg9ui5qxDR62wxlC6cEZ65QFE8JQhm3mXAOooNPGNS11vLH98vltCOJZvyLMQiHiM8dfEIdMg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzaoAaXmr9UGEgzFDiT73SROA+RIgWIaDB4TQG/NiRW1kVCIPSIw7Wwb2drShKLCOPUGuB2R0ML+lWR54los6FHyWEPPbj0pFf56qmBEm2bFGM5Lw5ZJKrcIQ/P2JCsV6bxeXx2OYOidXTscnbKJ9ZVtwBw1plIKzY+RiL69dNO412SPbaEaq3udxeewqwZtotEFbFSwfnQV8fLk9vh8cA6K1r/bcJDzpq9REkFPNLoFTvWgTbIRRZ5cRpU4r8BVCs1NrjyiRr3NTEOaoYx670AKAMVs7XiCYrvArSZUR4Uq811JjPM7K+WBko9VASRbrerLE5X8PMU9oAJPGHez4HSmmpRH3xjIlDloR2npxrQnOmwRCV/mP/0ON9JLeFb/lD504QS0d00N2EeimkZ6v4+Et+H+382tnMrxdttkQHciSFB3Qad1S/xX5H0UDbMAlMur1UPrgim3yPutOxNp1Gyj2ESArQBSd3rVQxK1ChUOHzGM2l+hEKfmdRYXXKZVSSY7CRqew2nWMlv7g4VFiylDuqlCyMKGynkpxvX540gtiWQDdZ2DJ8/AotxIW7CqIzPV5RKAdecTRo69WcYTSHg5ZtUu/ARfaA+IJGTWVWU6CmluSGiZssHPFiYw68VFEsOCnKcqjzkTgIsp9KLvBvdwzsmnw2zpuXdtKm2nwaET8yxS9XE5Wn8azfolIeYBjaP1nHUHnHpCksGYkDv5uFGjLc/u1pTv991URmZuLMHNJePTqzxCYEbgPwLNNYHcOM4y2b8nCa7gUsMla0ow6FeBKpBM8QVkI04B6dlmOooV118c/eC+S+KM07PiQFGN/7D6HNMWh1vBxNoIE34uxlk9ZPmAxXlysfeQziO163z5ZKVR1L+HUHvinQ23jM127O1ntLY74qKhVkNkgNEhddFNaVRwL1bmedOzmk84IXh4DOhoH/sTNpvQQxVl4aGQk+gnALFTPILvIn+yHWQHuBnkgaVgc59X/lF4NZll10kB/VlyrSop94t+MIH684gMeVpj1IKRqBSHxSF9q6sGiSHfUkkoOW83S5AkpAGPGbRrBQs4IvgyV+MxGZLSNtfkuq8eYKdkeJAwpPw3dc2yIMR4WRIlhSQmJgj4m9+yR/OQ4DylbZNQagvLJwXUTJvw9/PNDS6AVPX0aO9N1s+oC+lldBIQgBW6gzxbfvEAueQJIujOjbfetHmBSBgjtwSiTJ08uopAzX+2JAiRZD+0A4WWhEvu20ddX3kXuRVf78OyHrPaPe/2C06fTEvQWej+TTulElrYeUTRQtOEsJhn6lVCjoxSnXXlDCx1ZEiInSwUOme5hbsPCA2OjhWO9oPg9Mm+KPk1POUFrBJKvpUyXqDF4WadLrCexh8TM/ydtTCzkEvCnywpBG1qOyaKqWTQ2wVtA5EqvB6AGvE7RCVSUVBV/D0/9bdr67JUPjG9x5fuygilGCneNWPtR3NfUCrKsri8Om1jIZtWMAC6gy0I+FGy+40ktOnqgBrBqTzIsp7kU3V+k/BqXTBqYvyEGLxMTzDi7hm5e6PC1PjwGBkDy5sYAQ==\"\
+        },{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_01SX5rykKQrN6Tns75s4KwA8\",\"name\"\
+        :\"code_execution\",\"input\":{\"code\":\"import json\\nr = await web_search({\\\"\
+        query\\\": \\\"war risk premium Gulf tankers 2026 VLCC TD3C rates Hormuz insurance\\\
+        \"})\\np = json.loads(r) if isinstance(r, str) else r\\nfor x in (p if isinstance(p,list)\
+        \ else [p])[:6]:\\n    print(x.get(\\\"title\\\"), \\\"|\\\", x.get(\\\"url\\\"))\\\
+        n    print((x.get(\\\"content\\\") or \\\"\\\")[:400].replace(\\\"\\\\n\\\",\\\" \\\
+        \"))\\n    print(\\\"---\\\")\\n\"}},{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_01MNpedrgC5z2vfzKZwhkzCv\"\
+        ,\"name\":\"web_search\",\"input\":{\"query\":\"war risk premium Gulf tankers 2026\
+        \ VLCC TD3C rates Hormuz insurance\"},\"caller\":{\"type\":\"code_execution_20260120\"\
+        ,\"tool_id\":\"srvtoolu_01SX5rykKQrN6Tns75s4KwA8\"}},{\"type\":\"web_search_tool_result\"\
+        ,\"tool_use_id\":\"srvtoolu_01MNpedrgC5z2vfzKZwhkzCv\",\"content\":[{\"type\":\"web_search_result\"\
+        ,\"title\":\"Howden Re Compiled by Business Intelligence 26th March 2026 Strait of\
+        \ Hormuz:\",\"url\":\"https://www.howdenre.com/sites/howdenre.howdenprod.com/files/2026-03/HowdenRe_Strait_of_Hormuz_report_March272026.pdf\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"Strait of Hormuz -\
+        \ Insurance Market - Strauss Center\",\"url\":\"https://www.strausscenter.org/strait-of-hormuz-insurance-market/\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"How shipping insurance\
+        \ rates are rising, as Hormuz, Bab al-Mandeb shut down | US-Israel war on Iran News\
+        \ | Al Jazeera\",\"url\":\"https://www.aljazeera.com/economy/2026/7/23/how-shipping-insurance-rates-are-rising-as-hormuz-bab-al-mandeb-shut-down\"\
+        ,\"encrypted_content\":\"EvEICioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDGH9oi9v+nmo1MtgFhoM9vJfFUoEDgjUq3LuIjDY5ec5GUW6G4mNv2EJPVw2IHQh2dGQg/h7AFflSNMdvCktHDL8PMVk/NlRITiDatEq9AdjhiCX/w2BLLN8hwaYlNY8LT80JZhV9SfDS69+hbcPXqsiwLrQwb0O0JUxMaOPOsTfb+e2ij8iSi5Xv5mNehean+ftemfjxKukRDq8KX0CzojNzylTCMXH0L9ksLwDP0bkFISeGV/e4lLPc91+J7SZvGPVdyEfQnnX+dL2/pNOvgpMgmXYXsOdgLJjL3KEkXqc2CtzzNdYQhSeOGYSiHO5yAwhQJRCB3LN9Yyp00SEJMhW/pClAyX5wShawL1FM9RsHRurQcRAY1ZXqFcnbjlWv1jxuC5oPwm9Xu6hW6iJsjWAn8OkCjt8+Jd6g7wFrQfdInqyw2GTpwhI1Z4v/L0icVKFZ5tstdYN1el9Hn6YacQqmmLN51F/PLAgofCwwlrE9J/x1jnrn30161Aag+K226SGMYlwVCYd0+N8hcOHJty67cw3oxkNk7x74bch3KnHf9oN49aik34cJtVnW9xrErp9z5y9pKh6jAaPuZLvJyYDtaw2qAyDPASZ8zoqdfe5/IY/Ob7IzJr7EgfMtrwF7dMW/VXPkXCBx9KSX38iYmiTwsXlPVFn75HlL6Kom3CevxzEY6s8WBIsM484VXbpclFuMQ23II/uy+XnjRl8vALjCowaexAHKMze1/e6lHgsmsmXrv5u0MrzNbaskA2hV9+vaZMz2XB+D+IP2KCsaEROA1hEmYbD4lYszvp/iDMN+5jQJI+LgQovCkfxogNZmJun1iy+ZtGANAYlIN3tJhw/kxbXT440CrVwEKFUtU4Rb+ul91jjDWiSZBQmF8UTanaxG0v+TteO61XhNGA1K76Kwvy9wtA2XBh4dHULrTdEybudvsbrskgtbo8mCMKSqyeHgR7O+ND+t2yR/rJ5ltNMkks8oZbxNyjLatvY3DWxuot0GcVv4e8XLh4ArPItPYLf1s+GfH/X4aY748KsH+VggYGxU8Kd7ha3CtlwfZztL7rGYSt/ZTiEZphPsu1bFOsmiW5RYLQwqizugCl5ARd6YeUkJBk9R2Pc8FIAIjZ4nIafeLBHJu6sRAEheSxY+QO62IYZCvMJdHX8KkqfPxF9nQpM93eHzw2fMEH5CAkuO8/G2oZyKzfZB2oa62ysPXIIygnKV2aSnfI0ByI7267/9kyMPkcqO0TTN84RVbgzkDAAwOnkxHo/mX+VL2++D3eYu9Jt3DNR46ZRCONrKzsRaWQOzl3RjiDCMnSgMogeprFdy6RbBpaIR5KzosA/hiAJk2ZpITPJCgpCMNfB9b4uFQ4rmdth3PAssTCHzL3R1Li+4IqxQB6JdcgvsUd2n+wBXZoe7WX3D0A7ieM9AB2p6j3BfXJ7nMeGUtr9JqrZB0A7GAM=\"\
+        ,\"page_age\":\"July 24, 2026\"},{\"type\":\"web_search_result\",\"title\":\"War Risk\
+        \ Insurance in 2026: What Ship Owners Need to Know\",\"url\":\"https://www.nautilusshipping.com/news-and-insights/war-risk-insurance-in-2026-what-ship-owners-need-to-know\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":\"August 6, 2026\"},{\"type\":\"web_search_result\",\"title\":\"War\
+        \ Risk Insurance 2026: Why Hormuz Transits Now Cost $1.5M-$4.5M More Per Voyage\"\
+        ,\"url\":\"https://www.fairwayeta.com/insights/war-risk-insurance-2026-hidden-cost-shipping\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":\"May 6, 2026\"},{\"type\":\"web_search_result\",\"title\":\"The Insurance\
+        \ Market Closed The Strait Of Hormuz Before Iran Did. Here Is What VLCC Rates Reveal.\"\
+        ,\"url\":\"https://www.gosships.com/p/the-insurance-market-closed-the-strait\",\"\
+        encrypted_content\":\"Es4ICioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDNCQyxyskoA6RmROYBoM3XtAGsZljPgN1e2eIjB29aHapdygxohYvwWYMdM8+Qx0MPA1zHiIyKhE3nGT09flxkHJYIxudm2PEY+aY/kq0QdWRa5grWztTCZLuo/+dys5LivYzpAhO4GN5x1w6g1+0uCJGnpCP0ztOnfEODcwJes4fcEYYop6zLHArKLGCSRiYmHqSzd74bXBxO9DEzSfCQpKUyzX61A0oZeGwPwJQLs6N4izUc1KBd8iP6JU1Q56IOLKi09RMahfpskRGKljyx9raaGMLH8d7JKYd9M0JFxdynmpFTSgpfVqennp1uu/8JmrKWpp429rKVo2f/5kEApw7evvWUrpQWdpzeA/YFfaQq9Z5PkAyNojRnkfA8VEHciWS9+r2NelTs9HQY2W43dYTUudzTn3jBtl/pQalvBjLgcU6GQWHCzbvPyNLs4wxfhpypBQnJgyPT9+/SgeAKi2DWBIutmWQTFLxd9QMqmxLTTiMDNqpoEAaF/pCV8QdVt7HgqmI/5vA4Mo4Rj9N0rmn5a1WAfE0znQGRnAUEU+UN2wBUWBb7WJdxe62n+tlOCESYPPXIctM27PGiTgNn5B29r1Arm07BE2QKWPP9jvuwjtcAjLxU5NpjJDQPEr94u69uOi/VtuZeDfWdyOZIpLUNHqr8gYpkz2LyRMrVA48VjFUaN4KHT69U3yvfFdOYigmskpVQ46oPbYo6xUTyEviLMUa/0Avxw+QTHfu33+ki2JU6BtSyXRX1gE5Yrx/EikHwnic+i/mHaq+Wy4O0jly5WchF4Ln/YZhCj0VUhKrzFenihTZcXMZQZgts+Ka5+ict+6kQagXnJ4znHrhDkYS+lDx+1sHOUlFrcWWe+KudmGTvHkdZvqiSKNzEAFVkuec9bw8n9HQ54Ga5ydzc4wH36Vczu93r2dylqtRDyONAOi7Z2rR+1Lu2c4ySfqCMr3UshOgQUnyU4wnwVZxxXaHGAvwrrhGHYoCuz+4GIPJY0aoTfwo5BOry6GAFqXEGBGmauWMeRD6DNHFen8e05/64D7EheTdnWe8MHb5YTA/NRFh81CeQqCmxPlHBVRlCV/F7T0D5IsdzL6DVwl2UfCQfbtEOyMZK/uVveDFGsNzF6ENAdEa0P8uOQHQ7TNte5dJVMm9X/sD43WAfEz/AqCXkRliH8KnqwhkTOZ2j21/PLIOfUTlmOjtyBUHvHrdR9vErp37nG1m+q9HmwLyLeoUVqd1nXiW+ZDe8/ssAD6t/y04JPLbrWhsqh5al/yLddLG0nGgHmpzOS3eAozVXZlqx4gSbv4nes+ADU2M1rmI3owj08RmE/9oxSsUhMWhD30ZgeCtDcCd/T5lj82pu10gpBV6HAVhob8B993L+NvoArZPEZ/TLxAs5uzmKUJfRgD\"\
+        ,\"page_age\":\"April 24, 2026\"},{\"type\":\"web_search_result\",\"title\":\"War\
+        \ Risk Insurance & Tanker Rates Explained | Hormuz Strait Monitor\",\"url\":\"https://hormuzstraitmonitor.com/insurance-explained/\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"Featured Topics\"\
+        ,\"url\":\"https://spglobal.com/energy/en/news-research/latest-news/shipping/033026-war-risk-insurance-cost-off-highs-but-still-elevated-in-persian-gulf\"\
+        ,\"encrypted_content\":\"EuIICioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDLy15dI83ueucF8t1hoMGI7X12Elc7rlDt3bIjDi5xNbb4Eb4uvEyLUwxqWkjCtkfon4pk8ovjP9Vtqe+wNiuvy5r2wtyLgqWQOV1W0q5QfMguBp4NO2riiegZe1GTML1gPr2LcO8tAC2W6mNHwAJ9DiavlS6DAJZ92kzGMmjWFILsUKZMgvWZ7yv7u0FuZJs9vyT+MBkWCpRriXP93tRzycexqj7ZcxF0/2tnIOI7sR5//sYoIM7HVD1XDCol8Mpz4gne+ovnFuF7pTvoZ5Tpme3SCEV1THa0V/0sXrP6mwA+5k9foRC7UthvTlWLQQdl2TZZtxO/enoApyabN854kEme0lxqF141JBS7mappFQXlrAcpqGFiCQD/2Gq1FdnbZWMbq7AzzqpG4gNwPXj2qpDaErcxaV/4mgiNen6n4EdcfirfGtsBBFFn2EpJMlKZ9h/Ie1WdADWQPoy35CEZqZ2UYi2qGZ/9q/l1vnHSA6uYVVMbh4OOBlpCRNwNPdxVB3vF+BWjMq7iF59ojWZAx9UgLoO9wB/BVlu531R6WlB8FhYsz+rXOkW3ZWg0fBH0UFk6nngHZsZnb2TfG39fsRao8czy2uB0NToHsrekbElDO572cV+z6cJdrN6Njgap4/MKndayvubQUUOxm7d5HcuRCtimFq3YIHVRrrYTFOaRXaF7mEqHIGY8yU/gMevuCOq4MLSZJ/l7+xe8OBoZmL924vLaeTMAdQELDX82navgg8Jy3UHS4oWpHv73b6+iWpDSqWXV7xv2W9n3Rp/F4jiAqHldd3EsqNP3mZMsCtP2MrrPhHSnEdL8ojlhwZpY9IsmFF1kD+k4fS1fxFlGGx5PtDLXvD29ztt4lzHsiOqYit50CP8qK6of5f5L3IvFwLnT6uARqRmPUKgIJN/ydOzOLkY7iv+dsT++2kAHICT1mNhl4yFFGDZkwAqN1RLZPawqkBDYKqrlwteqSGO3ZVHTvKoihCBeI47eIMDoUkC9c+L0lzTqMtFrKV3S776/65REnbzGVYm/+eXdaOCUy3dmSznn7MZpQw80yegvTEsBT33Uzu+K320rg13M//pZrQ5tWCIVLnxs1NpAAPtDHovep5TV7vH3oVxSzPxLhuRzQGczzYG0C3xeC3TT6WXfaSr59y0jwmBpkBjK9ld94jnVYk6r1lYC4emmlJxx1Ug7/4RcKkK6iOXfXaoU+lCCg0/Ki1CPWR90i7zWc7zr2XeSYg7xN8dtxszQySgA6qcTr7r1HAHoE5/FDigrOjasBRQ9PhO9LpnbfMayYbgERwGxE5lWalaMIPVaqj2iMG+xdkqlgIU5zsAkZzl40Dp41vKlWvRIA2lj87DLGHkqPyeVCvxCq/2XuTqsUk26AcTooRp9/s5vaGj8ZSzrRou8OswkbmXd2DJ8NqcDc2YkMSOKGyGAM=\"\
+        ,\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"Shipping Costs Surge\
+        \ as Insurers Drop War Risk Protection in Gulf\",\"url\":\"https://finance.yahoo.com/news/shipping-costs-surge-insurers-drop-143000136.html\"\
+        ,\"encrypted_content\":\"EtEHCioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDIb9g3DoPXiiHR9i/BoMwTgHQX+T6gi/7t+tIjBPQ4pl+2OH2YQ5XNfKBF7YPpDd+Kenhfc0dQ5O5zHsQewoLymLB8VOu/hmzLSAWcIq1AZ2+ygDkaau9g6W+9frelcpqaPFBAY3uOUcOtvaWyH/surWo5ZeLgcHTxYtRxLvkeA5GzD7XgQcWGsc9w9mY/RyUh4xBuytr6D6Bhi+h7RFfFT8gS2+9wKc9bmlRIAfuMbPsP5Y+e5IqM4hS87oZMKv1dfqPqE3AwI0jmWde1nx7ixcXk0IifSLWZbX9ONcjV6qFQXnTs6GFS+ueTPKQkEbMLXyajZIjZ0TqphbA9FyR/OwCCo0a/knVZd3fveasVbOJMhJOEM9HTowdnG2eOzFgKsJ5qC+LQyfzDCmNwomrUEkh3bcCN/Bi8onh7T5yvHiT6EAMuW21Lb6LWj4BVeQ/sXJ45XtFCcOxngb9DQtVZ+INw6KM1w/d3mziUUAYgtw0JnJEuzJaziguQNmMV3MLzr5i4FfltnAmFWIMCb70heS6HSC8izRr3+1SdtokBkGM2zcQFuC1VRZEfnHsJB2np9lNOyiz2LhwRiM0PSYdNKckEGKiE1Ur4ZUld6RC2FAMgaUcHSF1YkKUqoXuXc8ysKztQ2C3QeRKzbWMSrkSUYk4fNBgQ6kEGCdDoYP6vEGRG4JJHujq0Xf2B9iSZtbJxJUO7Sslu64ZysdzOcbfL1hepvG3M5l/8DrR7Vx5VaxAd/Wb020++3bNEQEsJyEQbkbodWZdxuf3ltLTKZsUutJvpYNGe0rQS/OVNLm+0ybFORqSZ4I7EgWUEt2eZVuVu5keP9/70ZGDAJeMkoS8/lrx5z0aL+QgFhnnH6SMvRnK1Q4bMjzIhVfl3vRjur2Pr11YxVq9/s8vQ0dMcezzHjgy7IjKcpiQTkhn0mCBbtVu3q/9qYgvOnGSSC2xkq4V4cf4dBOoXvtbimjxbx8Wl7cVquNp4zqdGE+0ffz3iJDivJX7bjB0+qpXdir2eO0oRiK8DJdj8J7ERbmAplk0l3+3zwlCd6mqlS6jPWL4Hu8tDbv2ZTIy9bMWi+1Qk7X7i07SpEm3qvsYTgLlHk9s/cXkRQVO0rAkwUUWTgzfV7zu79P4aCKPbN1/0Zz6b7A/5lYkIIOiEkuYiCvcDs9YmOgM/9jMD/fOBTTWrmnI/II9Vctzartqw0k7vAnr5s94FTDXYcUTLknvsghJJTruWIcq08YAw==\"\
+        ,\"page_age\":null}],\"caller\":{\"type\":\"code_execution_20260120\",\"tool_id\"\
+        :\"srvtoolu_01SX5rykKQrN6Tns75s4KwA8\"}},{\"type\":\"code_execution_tool_result\"\
+        ,\"tool_use_id\":\"srvtoolu_01SX5rykKQrN6Tns75s4KwA8\",\"content\":{\"type\":\"encrypted_code_execution_result\"\
+        ,\"encrypted_stdout\":\"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\"\
+        ,\"stderr\":\"\",\"return_code\":0,\"content\":[]}},{\"type\":\"thinking\",\"thinking\"\
+        :\"\",\"signature\":\"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\"\
+        },{\"type\":\"text\",\"text\":\"{\\\"proposal\\\":{\\\"kind\\\":\\\"claim\\\",\\\"\
+        claim\\\":\\\"Middle East Gulf\u2013China VLCC freight rates collapse back toward\
+        \ pre-crisis levels once the war-risk surcharge is gone.\\\",\\\"claim_kind\\\":\\\
+        \"market\\\",\\\"resolution\\\":{\\\"criteria\\\":\\\"The Baltic Exchange TD3C (Middle\
+        \ East Gulf to China, 270k mt) time-charter-equivalent earnings assessment prints\
+        \ below $150,000/day on at least 10 consecutive publication days.\\\",\\\"source\\\
+        \":\\\"Baltic Exchange daily tanker route assessments (TD3C), as published in the\
+        \ Baltic Exchange tanker report\\\",\\\"by\\\":\\\"2026-12-31\\\"},\\\"prior\\\":{\\\
+        \"p\\\":0.3,\\\"lo\\\":0.14,\\\"hi\\\":0.5},\\\"base_rate\\\":{\\\"reference_class\\\
+        \":\\\"Episodes since 1980 in which a benchmark crude tanker route (Baltic/Worldscale\
+        \ VLCC assessments) spiked to more than three times its prior six-month average because\
+        \ of a conflict or chokepoint disruption, and then printed below 1.5x that prior average\
+        \ within 90 days of the disruption's insurance-market normalisation\\\",\\\"k\\\"\
+        :6,\\\"n\\\":8,\\\"sources\\\":[]},\\\"payoff\\\":{\\\"kind\\\":\\\"price\\\",\\\"\
+        instrument\\\":\\\"FRO (Frontline plc, NYSE)\\\",\\\"direction\\\":\\\"short\\\",\\\
+        \"move\\\":0.28},\\\"cause\\\":\\\"C\\\",\\\"link\\\":{\\\"mode\\\":\\\"sustain\\\"\
+        ,\\\"strength\\\":1.7,\\\"lag\\\":14,\\\"shape\\\":\\\"ramp\\\",\\\"rationale\\\"\
+        :\\\"War-risk premium on a Hormuz VLCC transit ran from roughly 0.1\u20130.25% of\
+        \ hull value pre-crisis to multiple per cent, worth $1.5m\u2013$4.5m of added cost\
+        \ per voyage, and that cost is passed straight into the quoted freight rate \u2014\
+        \ which is why TD3C went from about $117k/day in mid-February to roughly $474k/day\
+        \ by mid-April. Once underwriters quote Gulf transits below 0.4% of hull value, the\
+        \ surcharge component of the rate disappears and the idle tonnage that was avoiding\
+        \ the Gulf re-enters the trade, so assessments fall over a charter-fixing cycle of\
+        \ one to three weeks. The push is a hold rather than a shove: if premiums spiked again,\
+        \ rates would spike with them.\\\",\\\"sources\\\":[{\\\"url\\\":\\\"https://www.gosships.com/p/the-insurance-market-closed-the-strait\\\
+        \"},{\\\"url\\\":\\\"https://www.fairwayeta.com/insights/war-risk-insurance-2026-hidden-cost-shipping\\\
+        \"},{\\\"url\\\":\\\"https://www.howdenre.com/sites/howdenre.howdenprod.com/files/2026-03/HowdenRe_Strait_of_Hormuz_report_March272026.pdf\\\
+        \"}]}}}\"}],\"container\":{\"id\":\"container_0195LYR8APZm7Z63tXQa8b3i\",\"expires_at\"\
+        :\"2026-09-17T15:03:23.365717Z\"},\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"\
+        stop_details\":null,\"usage\":{\"input_tokens\":490,\"cache_creation_input_tokens\"\
+        :2574,\"cache_read_input_tokens\":25722,\"cache_creation\":{\"ephemeral_5m_input_tokens\"\
+        :2574,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":2161,\"output_tokens_details\"\
+        :{\"thinking_tokens\":1087},\"service_tier\":\"standard\",\"inference_geo\":\"global\"\
+        ,\"server_tool_use\":{\"web_search_requests\":1,\"web_fetch_requests\":0}}}"
+    headers:
+      cf-cache-status:
+      - DYNAMIC
+      connection:
+      - keep-alive
+      content-length:
+      - '35794'
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - application/json
+      date:
+      - Thu, 17 Sep 2026 14:03:44 GMT
+      server:
+      - cloudflare
+      server-timing:
+      - x-originResponse;dur=33995
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      x-robots-tag:
+      - none
+    status:
+      code: 200
+      message: OK
+- request:
+    body: "{\"max_tokens\":16000,\"messages\":[{\"role\":\"user\",\"content\":\"Today is 2026-09-17.\\\
+      n\\nHere is the map as it stands. The short name in front of each claim is ours; use\
+      \ one when you name a cause.\\n\\nClaims:\\n  B  Brent crude settles below $68 for five\
+      \ sessions.\\n  C  Lloyd's war-risk insurance premium for Gulf transits falls below\
+      \ 0.4%.\\n  H  The Strait of Hormuz reopens to unrestricted commercial transit. (this\
+      \ is what the person expects)\\n  M1  A Polymarket contract \\\"Brent below $70 on 2026-10-31\\\
+      \" resolves YES.\\n  M2  The energy fund XLE underperforms the S&P 500 fund SPY by more\
+      \ than 3% over 20 trading days.\\n  N1  Omani-mediated United States-Iran talks resume\
+      \ publicly.\\n  R  OPEC+ announces output restraint.\\n\\nArrows:\\n  B -> M1\\n  B\
+      \ -> M2\\n  B -> R\\n  C -> B\\n  H -> B\\n  H -> C\\n  H -> N1\\n  R -> B\\n\\nWe are\
+      \ asking about this claim: Brent crude settles below $68 for five sessions.\\n\\nIt\
+      \ already leads to:\\n  - A Polymarket contract \\\"Brent below $70 on 2026-10-31\\\"\
+      \ resolves YES.\\n  - OPEC+ announces output restraint.\\n  - The energy fund XLE underperforms\
+      \ the S&P 500 fund SPY by more than 3% over 20 trading days.\\n\\nAnswer with the one\
+      \ next piece, or with a note that this part of the story is finished.\"}],\"model\"\
+      :\"claude-opus-5\",\"output_config\":{\"format\":{\"schema\":{\"$defs\":{\"BaseRate\"\
+      :{\"type\":\"object\",\"description\":\"How often this kind of thing has happened before:\
+      \ k times out of n.\\n\\nThe outside view \u2014 the anchor a likelihood starts from\
+      \ before anything\\nspecific to this case is considered. Optional, because some claims\
+      \ have no\\nhonest reference class, and absent is better than invented.\",\"title\"\
+      :\"BaseRate\",\"properties\":{\"reference_class\":{\"type\":\"string\",\"description\"\
+      :\"The set of past cases being counted, stated precisely enough that someone else could\
+      \ recount them: 'Hormuz closure or disruption episodes since 1980 that ended within\
+      \ 90 days'.\",\"title\":\"Reference Class\"},\"k\":{\"type\":\"integer\",\"description\"\
+      :\"How many cases in that set came out true.\\n\\n{minimum: 0}\",\"title\":\"K\"},\"\
+      n\":{\"type\":\"integer\",\"description\":\"How many cases are in that set altogether.\\\
+      n\\n{exclusiveMinimum: 0}\",\"title\":\"N\"},\"sources\":{\"type\":\"array\",\"description\"\
+      :\"Web addresses where the count can be checked. Empty means the count is the model's\
+      \ own recollection, and nothing downstream of it may claim to be documented.\\n\\n{default:\
+      \ []}\",\"title\":\"Sources\",\"items\":{\"type\":\"string\"}}},\"additionalProperties\"\
+      :false,\"required\":[\"reference_class\",\"k\",\"n\"]},\"ClaimProposal\":{\"type\":\"\
+      object\",\"description\":\"One new claim, and the one arrow that reaches it from a claim\
+      \ already there.\\n\\nThe ordinary answer while a map is growing. The pair travels together\
+      \ because\\na claim with nothing causing it is not a step in a story, and an arrow with\\\
+      nnothing at its far end is not an argument. That is still one thing: one\\nquestion,\
+      \ one answer.\\n\\nA claim is something that will be plainly true or false by a date,\
+      \ settled by\\na named source. Never a mood (\\\"tensions ease\\\"); always a check\
+      \ (\\\"at least 14\\nconsecutive days of unrestricted commercial transit through the\
+      \ Strait of\\nHormuz per Lloyd's List, by 2026-11-01\\\").\",\"title\":\"ClaimProposal\"\
+      ,\"properties\":{\"kind\":{\"type\":\"string\",\"description\":\"Says this answer is\
+      \ a new claim with the arrow that reaches it.\\n\\n{const: claim}\",\"title\":\"Kind\"\
+      },\"claim\":{\"type\":\"string\",\"description\":\"The claim in one sentence, as a person\
+      \ would say it out loud. The precise, settleable version goes in the test below.\",\"\
+      title\":\"Claim\"},\"claim_kind\":{\"type\":\"string\",\"enum\":[\"event\",\"market\"\
+      ,\"not_tradeable\"],\"description\":\"What this claim is for. 'event': a step in the\
+      \ middle of the story. 'market': an ending that names something you could trade. 'not_tradeable':\
+      \ an ending that names why there is nothing to trade.\",\"title\":\"Claim Kind\"},\"\
+      resolution\":{\"$ref\":\"#/$defs/Resolution\"},\"prior\":{\"$ref\":\"#/$defs/Ranged\"\
+      },\"base_rate\":{\"anyOf\":[{\"$ref\":\"#/$defs/BaseRate\"},{\"type\":\"null\"}],\"\
+      description\":\"How often this kind of thing has happened before: how many cases out\
+      \ of how many, and what set was counted. Leave it out when there is no honest set to\
+      \ count \u2014 absent is better than invented.\\n\\n{default: None}\"},\"payoff\":{\"\
+      anyOf\":[{\"anyOf\":[{\"$ref\":\"#/$defs/ContractPayoff\"},{\"$ref\":\"#/$defs/PricePayoff\"\
+      }],\"description\":\"{discriminator: {'mapping': {'contract': '#/$defs/ContractPayoff',\
+      \ 'price': '#/$defs/PricePayoff'}, 'propertyName': 'kind'}}\"},{\"type\":\"null\"}],\"\
+      description\":\"What you would trade. Belongs to a 'market' ending, and is one of two\
+      \ things told apart by its own `kind` field, which always say which: `kind` 'contract'\
+      \ for a named contract at a named venue with the side you would take, or `kind` 'price'\
+      \ for an instrument, a direction, and how far its price would move.\\n\\n{default: None}\"\
+      ,\"title\":\"Payoff\"},\"not_tradeable_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"\
+      type\":\"null\"}],\"description\":\"Why this chain ends with nothing to trade, in one\
+      \ plain sentence. Belongs to a 'not_tradeable' ending.\\n\\n{default: None}\",\"title\"\
+      :\"Not Tradeable Reason\"},\"cause\":{\"type\":\"string\",\"description\":\"The claim\
+      \ this arrow starts at, named by one of the short names this call's map listed. It is\
+      \ a claim already on the map; nothing new is named here, and nothing new is named anywhere\
+      \ else either.\",\"title\":\"Cause\"},\"link\":{\"$ref\":\"#/$defs/LinkDraft\"}},\"\
+      additionalProperties\":false,\"required\":[\"kind\",\"claim\",\"claim_kind\",\"resolution\"\
+      ,\"prior\",\"cause\",\"link\"]},\"ContractPayoff\":{\"type\":\"object\",\"description\"\
+      :\"A named contract at a named venue, and which side of it you would take.\\n\\nThe\
+      \ kind of ending where somebody already sells exactly this claim: a\\nprediction-market\
+      \ contract that settles on the same question the claim asks.\\nNothing here says what\
+      \ the contract costs, because that is a live price rather\\nthan a fact about the map.\"\
+      ,\"title\":\"ContractPayoff\",\"properties\":{\"kind\":{\"type\":\"string\",\"title\"\
+      :\"Kind\",\"description\":\"{const: contract, default: contract}\"},\"venue\":{\"type\"\
+      :\"string\",\"description\":\"Where the contract trades, by the venue's own name: 'Polymarket',\
+      \ 'Kalshi'.\",\"title\":\"Venue\"},\"contract_id\":{\"type\":\"string\",\"description\"\
+      :\"How that venue identifies this exact contract, so a reader can look it up and a later\
+      \ step can fetch its price.\",\"title\":\"Contract Id\"},\"title\":{\"type\":\"string\"\
+      ,\"description\":\"The contract's question in the venue's own words, so a person reading\
+      \ the map can see it is really the same question the claim asks.\",\"title\":\"Title\"\
+      },\"side\":{\"type\":\"string\",\"enum\":[\"yes\",\"no\"],\"description\":\"'yes' if\
+      \ you make money when the claim comes true, 'no' if you make money when it fails.\"\
+      ,\"title\":\"Side\"}},\"additionalProperties\":false,\"required\":[\"venue\",\"contract_id\"\
+      ,\"title\",\"side\"]},\"LinkDraft\":{\"type\":\"object\",\"description\":\"The arrow\
+      \ itself: how hard it pushes, how long it takes, and why it is real.\\n\\nAn arrow is\
+      \ an argument, never a correlation, so a mechanism in plain words\\nis required of every\
+      \ one. What is absent is as deliberate as what is here:\\nno identifier, and nothing\
+      \ saying how well-backed the arrow is. The second is\\na fact about what our pipeline\
+      \ found, not a claim a model may make about\\nitself.\\n\\nThe two spans of time here\
+      \ are whole days. A model is asked for two days, not\\nfor two and a half; the arrow\
+      \ it becomes allows the half day, because\\narithmetic on a timeline needs it, and the\
+      \ widening happens on the way in.\",\"title\":\"LinkDraft\",\"properties\":{\"mode\"\
+      :{\"type\":\"string\",\"enum\":[\"trigger\",\"sustain\"],\"description\":\"How the push\
+      \ behaves when the cause goes away. 'trigger': a one-time shove \u2014 once the cause\
+      \ becomes true the effect is pushed and stays pushed, fading on its own; undoing the\
+      \ cause later does not undo it. 'sustain': a continuous hold \u2014 the push exists\
+      \ only while the cause holds, and vanishes the moment it stops.\",\"title\":\"Mode\"\
+      },\"strength\":{\"type\":\"number\",\"description\":\"How far this arrow shifts the\
+      \ effect's odds while the push is at full size, on the scale where separate pushes add\
+      \ up instead of multiplying. Signed: positive makes the effect more likely to be true,\
+      \ negative less likely. Roughly: +1 triples the odds, -1 cuts them to a third. This\
+      \ is not a probability.\",\"title\":\"Strength\"},\"lag\":{\"type\":\"integer\",\"description\"\
+      :\"Whole days from the cause becoming true to the push reaching full size. 0 means the\
+      \ same day.\",\"title\":\"Lag\"},\"shape\":{\"type\":\"string\",\"enum\":[\"impulse\"\
+      ,\"step\",\"ramp\"],\"description\":\"What the push does over time. 'impulse': nothing\
+      \ during the delay, then a spike that fades. 'step': nothing during the delay, then\
+      \ full size, held. 'ramp': climbs from nothing to full size across the delay, then held.\"\
+      ,\"title\":\"Shape\"},\"half_life\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"\
+      null\"}],\"description\":\"Whole days for a spike to fall to half its size. Belongs\
+      \ to a spike and to nothing else: a step and a ramp switch on and hold, so they have\
+      \ nothing to fade.\\n\\n{default: None}\",\"title\":\"Half Life\"},\"rationale\":{\"\
+      type\":\"string\",\"description\":\"The mechanism in one to three plain sentences: why\
+      \ this cause moves this effect. An arrow with a number and no reason is worth nothing\
+      \ to the person reading it.\",\"title\":\"Rationale\"},\"sources\":{\"type\":\"array\"\
+      ,\"description\":\"Addresses this call's search tool returned that back the mechanism\
+      \ above. Leave it empty when you did not search or found nothing \u2014 an empty list\
+      \ is an honest answer we can show, and an address you are recalling rather than reading\
+      \ is not.\\n\\n{default: []}\",\"title\":\"Sources\",\"items\":{\"$ref\":\"#/$defs/SourceDraft\"\
+      }}},\"additionalProperties\":false,\"required\":[\"mode\",\"strength\",\"lag\",\"shape\"\
+      ,\"rationale\"]},\"LinkProposal\":{\"type\":\"object\",\"description\":\"One arrow between\
+      \ two claims that are both already on the map.\\n\\nThe answer when the missing piece\
+      \ is not a new step but a connection between\\ntwo steps that are already there.\",\"\
+      title\":\"LinkProposal\",\"properties\":{\"kind\":{\"type\":\"string\",\"description\"\
+      :\"Says this answer is an arrow between two claims already on the map.\\n\\n{const:\
+      \ link}\",\"title\":\"Kind\"},\"source\":{\"type\":\"string\",\"description\":\"The\
+      \ cause: one of the short names this call's map listed.\",\"title\":\"Source\"},\"target\"\
+      :{\"type\":\"string\",\"description\":\"The effect: another of the short names this\
+      \ call's map listed.\",\"title\":\"Target\"},\"link\":{\"$ref\":\"#/$defs/LinkDraft\"\
+      }},\"additionalProperties\":false,\"required\":[\"kind\",\"source\",\"target\",\"link\"\
+      ]},\"PricePayoff\":{\"type\":\"object\",\"description\":\"An instrument you would buy\
+      \ or sell, which way, and how far you expect it to move.\\n\\nThe kind of ending where\
+      \ no contract asks this question, but something traded\\nmoves when the answer changes:\
+      \ a futures contract, a ticker, one fund against\\nanother.\",\"title\":\"PricePayoff\"\
+      ,\"properties\":{\"kind\":{\"type\":\"string\",\"title\":\"Kind\",\"description\":\"\
+      {const: price, default: price}\"},\"instrument\":{\"type\":\"string\",\"description\"\
+      :\"The thing you would buy or sell, named the way its venue names it: a ticker, a futures\
+      \ contract, one fund against another.\",\"title\":\"Instrument\"},\"direction\":{\"\
+      type\":\"string\",\"enum\":[\"long\",\"short\"],\"description\":\"'long' if the position\
+      \ makes money when the claim comes true, 'short' if it makes money when the claim fails.\"\
+      ,\"title\":\"Direction\"},\"move\":{\"type\":\"number\",\"description\":\"How far the\
+      \ instrument's price is expected to move if the claim comes out true, as a fraction\
+      \ of that price: 0.03 means three per cent. The side is carried by `direction`, so this\
+      \ number is never negative.\\n\\n{minimum: 0.0}\",\"title\":\"Move\"}},\"additionalProperties\"\
+      :false,\"required\":[\"instrument\",\"direction\",\"move\"]},\"Ranged\":{\"type\":\"\
+      object\",\"description\":\"A likelihood and the range around it, with nobody's name\
+      \ on it.\\n\\nThe model gives three numbers and no owner, because whose number this\
+      \ is is a\\nfact about our pipeline: every likelihood a proposal carries is stamped\
+      \ as\\nthe model's own by us on the way in.\\n\\nThe two ends are the tenth and ninetieth\
+      \ of a hundred: if this claim were\\nsettled a hundred times over, nine in ten of the\
+      \ answers would sit between\\nthem. They say how sure the number is, not how much the\
+      \ world can move.\\n\\nThis shape must never grow a field for whose number it is. The\
+      \ moment it has\\none, a model can hand us a number wearing the person's name on it.\"\
+      ,\"title\":\"Ranged\",\"properties\":{\"p\":{\"type\":\"number\",\"description\":\"\
+      How likely this claim is to come out true, from 0 (certainly not) to 1 (certainly yes),\
+      \ before anything on the map pushes it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"title\"\
+      :\"P\"},\"lo\":{\"type\":\"number\",\"description\":\"The bottom of the honest range\
+      \ around that number. Never above it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"title\"\
+      :\"Lo\"},\"hi\":{\"type\":\"number\",\"description\":\"The top of the honest range around\
+      \ that number. Never below it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"title\":\"Hi\"\
+      }},\"additionalProperties\":false,\"required\":[\"p\",\"lo\",\"hi\"]},\"Resolution\"\
+      :{\"type\":\"object\",\"description\":\"How a claim gets settled: the test, who applies\
+      \ it, and by when.\\n\\nEvery proposition has one. A claim with no resolution is a vibe,\
+      \ and a\\nlikelihood attached to a vibe can never be scored, right or wrong.\",\"title\"\
+      :\"Resolution\",\"properties\":{\"criteria\":{\"type\":\"string\",\"description\":\"\
+      The test, written so that two people reading it would agree on the answer. 'At least\
+      \ 14 consecutive days of unrestricted commercial transit', not 'shipping returns to\
+      \ normal'.\",\"title\":\"Criteria\"},\"source\":{\"type\":\"string\",\"description\"\
+      :\"Who or what applies the test: a named publication, exchange, agency or venue. 'Lloyd's\
+      \ List transit counts', not 'the news'.\",\"title\":\"Source\"},\"by\":{\"type\":\"\
+      string\",\"description\":\"The date by which the test has been applied. After this date\
+      \ the claim is true or false \u2014 never still open.\",\"title\":\"By\",\"format\"\
+      :\"date\"}},\"additionalProperties\":false,\"required\":[\"criteria\",\"source\",\"\
+      by\"]},\"SourceDraft\":{\"type\":\"object\",\"description\":\"An address the model says\
+      \ backs an arrow, before we have checked it.\\n\\nIt is a *claim about a document*,\
+      \ not a document. Our code decides whether it\\nbecomes something a reader can open,\
+      \ and it does so only if the search tool\\nitself returned that address in the same\
+      \ call.\\n\\nOne field, and deliberately no more. The day it was fetched is the day\
+      \ *our*\\nretrieval step fetched something, and the title is what the search tool itself\\\
+      nreported \u2014 both are facts about us rather than about the model, so both are\\\
+      nwritten where a source is built and a model has no way to reach either.\",\"title\"\
+      :\"SourceDraft\",\"properties\":{\"url\":{\"type\":\"string\",\"description\":\"One\
+      \ address that opens, not a search query, and one the search tool returned to you in\
+      \ this call rather than one you are recalling.\",\"title\":\"Url\"}},\"additionalProperties\"\
+      :false,\"required\":[\"url\"]},\"Stop\":{\"type\":\"object\",\"description\":\"The answer\
+      \ that says this part of the story is finished.\\n\\nNot a failure and not an error.\
+      \ A chain that has reached somewhere you could\\nact on, or a step with nothing honest\
+      \ to hang off it, is done \u2014 and saying so\\nis more useful than inventing one more\
+      \ box.\",\"title\":\"Stop\",\"properties\":{\"kind\":{\"type\":\"string\",\"description\"\
+      :\"Says there is nothing more to add here.\\n\\n{const: stop}\",\"title\":\"Kind\"},\"\
+      why\":{\"type\":\"string\",\"description\":\"One plain sentence saying why this part\
+      \ of the story is finished. It is kept and shown, so write it for a person.\",\"title\"\
+      :\"Why\"}},\"additionalProperties\":false,\"required\":[\"kind\",\"why\"]}},\"type\"\
+      :\"object\",\"description\":\"The envelope a proposal travels in, and the one thing\
+      \ in this layer the wire forced.\\n\\nA proposal is one of three shapes told apart by\
+      \ a `kind` field. Written out as\\na description of what an answer must look like, that\
+      \ is a choice at the very\\ntop \u2014 and **the service refuses a top-level choice\
+      \ that also names shapes by\\nreference**: *\\\"output_config.format.schema: For 'anyOf',\
+      \ '$defs' is not\\nsupported\\\"* (2026-09-17, the first live call). Put the same choice\
+      \ one field\\ndown and the top is an ordinary object, which it accepts.\\n\\nSo this\
+      \ exists for the wire and for nothing else. It is put on at the moment\\nthe question\
+      \ goes out and taken off at the moment the answer comes back, both\\ninside this file.\
+      \ **No field of any proposal is renamed, and nothing outside\\nthis file knows the envelope\
+      \ exists** \u2014 `expand.py` is handed a plain\\nproposal, exactly as before.\\n\\\
+      nA single shape such as a starting claim is already an object at the top, so it\\nneeds\
+      \ no envelope and does not get one.\",\"title\":\"OneProposal\",\"properties\":{\"proposal\"\
+      :{\"anyOf\":[{\"$ref\":\"#/$defs/ClaimProposal\"},{\"$ref\":\"#/$defs/LinkProposal\"\
+      },{\"$ref\":\"#/$defs/Stop\"}],\"description\":\"The one thing this answer is.\\n\\\
+      n{discriminator: {'mapping': {'claim': '#/$defs/ClaimProposal', 'link': '#/$defs/LinkProposal',\
+      \ 'stop': '#/$defs/Stop'}, 'propertyName': 'kind'}}\",\"title\":\"Proposal\"}},\"additionalProperties\"\
+      :false,\"required\":[\"proposal\"]},\"type\":\"json_schema\"}},\"system\":[{\"type\"\
+      :\"text\",\"text\":\"You are helping somebody think through what an event they expect\
+      \ would set off,\\nstep by step, until the story reaches something they could actually\
+      \ trade.\\n\\nYou do this one step at a time. Each time we ask, we show you the map\
+      \ as it\\nstands and point at one claim on it, and you answer with a single next piece.\\\
+      nSomebody watches the map grow as your answers arrive, so a small, well-argued\\npiece\
+      \ beats a large, vague one.\\n\\nWhat a claim is.\\nA claim is something that will be\
+      \ plainly true or false by a date, settled by a\\nnamed source. \\\"The drug pipeline\
+      \ looks healthy\\\" is not a claim, because two\\nhonest people will never agree on\
+      \ whether it happened. \\\"The United States Food\\nand Drug Administration grants full\
+      \ approval to at least one new obesity\\ntreatment, listed in its own approvals database,\
+      \ by the thirty-first of March\\\" is\\na claim, because they will. Every claim you\
+      \ write carries the test, the name of\\nwhoever applies it, and the day by which the\
+      \ answer is known.\\n\\nStart from the outside, then come inside. Before you say how\
+      \ likely this claim\\nis, ask what set of past cases it belongs to, how many of them\
+      \ came out true, and\\nout of how many. Say what that set was, precisely enough that\
+      \ somebody else could\\ncount it again. Then say how likely this particular claim is,\
+      \ with the honest\\nrange around it \u2014 wide when you are reaching, narrow when you\
+      \ are on familiar\\nground. The range is how sure you are of your own number. Where\
+      \ there is no\\nhonest set of past cases, leave it out; absent is better than invented.\\\
+      n\\nWhat an arrow is.\\nAn arrow is a claim about a mechanism: this happening moves\
+      \ the odds of that.\\nIt says which way and how hard it pushes, how many whole days\
+      \ it takes to arrive,\\nand what it does over time \u2014 a spike that fades, a switch\
+      \ that stays on, or a\\nclimb that builds and then holds. It says whether the push survives\
+      \ its cause\\ngoing away: a toppled domino stays down, while an apple only stays up\
+      \ while the\\ndesk is under it. And it says, in one to three sentences, why the mechanism\
+      \ is\\nreal. An arrow with a number and no reason is worth nothing to the person reading\\\
+      nit.\\n\\nWhere the backing comes from.\\nUse the search tool when the ground is checkable\
+      \ and you are not certain of it,\\nand cite only addresses the search returned to you\
+      \ in this same call. If you did\\nnot search, or nothing useful came back, cite nothing\
+      \ and say what you know in\\nthe reason instead. An empty list of citations is an honest\
+      \ answer we can show.\\nAn address you are recalling rather than reading is not backing,\
+      \ and we will not\\ntreat it as backing.\\n\\nHow a story ends.\\nA chain ends either\
+      \ at something somebody could put money on \u2014 a contract at a\\nnamed venue with\
+      \ the side you would take, or an instrument with a direction and\\nhow far you expect\
+      \ its price to move \u2014 or at a plain statement that there is\\nnothing to trade\
+      \ here, and why. Both are good endings. An ending that trails off\\ninto prose is not.\\\
+      n\\nWhat an answer is.\\nExactly one of three things:\\n  a new claim, together with\
+      \ the one arrow that reaches it from a claim already\\n  on the map;\\n  an arrow between\
+      \ two claims that are both already on the map;\\n  or a note that this part of the story\
+      \ is finished, with one sentence saying\\n  why.\\n\\nYou never name a new claim with\
+      \ anything but its words. The short names in the\\nmap we show you are ours; point at\
+      \ one when you name a cause, and never invent\\nanother.\\n\",\"cache_control\":{\"\
+      type\":\"ephemeral\"}}],\"thinking\":{\"type\":\"adaptive\"},\"tool_choice\":{\"type\"\
+      :\"auto\"},\"tools\":[{\"type\":\"web_search_20260209\",\"name\":\"web_search\",\"max_uses\"\
+      :1}]}"
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '20407'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 1.6.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-helper:
+      - messages.parse
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.6.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.4
+      x-stainless-timeout:
+      - '600'
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: '{"model":"claude-opus-5","id":"msg_011Cf98u5dUZXyMyouoTxDB9","type":"message","role":"assistant","content":[{"type":"thinking","thinking":"","signature":"CAIS2RYKjgEIERgCKkCEeq2YlsWmrwk5AjyDMskirsXhMANHHamJlwyf1txkdfQ0a0XjazLd1yVd4/XnHdI9hRF7Eczbulyj3mL3I2dBMg1jbGF1ZGUtb3B1cy01OAFCCHRoaW5raW5nWiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzaoAdDmr9UGEgxlyeZvtyRd9pCKS8MaDK1I9uOeMKaEl2cbMCIwnxAGKITTZlXfdFKMvHAAsobX96DzWk/2beCH2NWouKPyaSDhzgHtRYLsAiNjGarzKvcUrfQjWJkCqgfOVMjTSjoYumnUBeLZ+6wUer5aOiHRyHBRVHyqHbnu+KZdUiiqMaFhCnxXvoEDPEn6ypGTzchAFxDkJx/hWHaGghL0CcEPXc7EpVJMejgpj3pzrQ6Nv+pTi5kU27Mfbe6s4ZYBhGb80dmNNAckpgzwfOmpDWs/2+oqEsyv3M6BarRhhY18kuOOz0eVbKQwhr/QmYxrnd9ssghC3xC7zRIG+/JLfjUbe4hYbEWQwkhOMwUVyMU5+iXv44UNdKcS35Uzyo9XURB/lxZm1U22UqCpObY//zksbqDM6ltHf8DuN6afQvB94HkWR45EGicmB1l18ksa3k8CRd8Jp/Y2JFzqCn7gZumRl21Zwh8lwEs2Rz+HpVHyF1pQOihTxmbWQQ167lI3/qqNLwjtvm73HXeak8LySI8cTjtit/OoOdB8MYDWX6I/YYn9xb7YJ8JoFkVObl2yJnN0zjuNjQytpQKf1sQSXZzJWDOckYpRylnigWiIY17nhgL+lYLxyv1Yi4f3UNwrzIn6nP6TuDniTiIoQYF+nmfqDCpqntGzUtrdHPcv0gsQnNg8Mv2f+jtiiLWdzwM9PLkkcDzhytIiE3HvUh1gX6u6ZukxlwqWqa5ZF1dKPaLauewP9ELzk5tR6np29mvXoH3B7pw6HcmPWjBRRKyOVDxlok2ucD5GHwgTSc9YVFIA8OZEoF0iT3MQTuKil4O8fUg1lkyIcfVc4zuPoMNhkUtW9ypnsIpHqmn31PmTQZVAeiSQaxxCAcSRMsfIYtrIYK5cuguBMcDUt6AcnQUxaVGjtqgYUCibN4EAGnLooEJuO/Q7Vgx8T7nwt5CVFqzspTKeZHHPwHvY7p1yAkQKLR6HP6SYSPrFp0hGDPNc5ZN2SLR+zZWIIsi+XUQNKdQV//yIJEmV5hj0Jeempd3JSIA2aE7w33DO2enkFb9602vCtKbXjpBZnnppyVcp45gOR6UY7gtAACMVhwyMTUIC+hFSJu4XXzDxDLP7TiE966EuVT7x7moTbD01Nf62zV61h7q8DSzUDm3GPbLhDqQMOZ07fRbDTWEBcEboF69ocHRx7ErrJmEyNt75rRrCdJtsJdssHH7XfnZk8+zkLfvZXfsCsks41m8pKzh2NnZEIJuuz9OrIFR8fmsBg6e7AET6p29ISCEwshCMMqKlBhVxsI/eZMIwgQieSQS5oKpBAKE0G0YGldv0k51tLoaSv8qkQqiR9DN4VvdNUbOhiLQh8Nte3yhxSMV3zmWtNmRK4RyZIyNzPLqH7F5eFZ9AU8SEZ21IkVK8XI2G6QZgaOaMSQS6bTB6Nwbw1NdLY9Dqn4pBVnDctw6/TWZyEs/alycpdIgqR3tgXVRjfZ36Fuhz0eYfEikZBaHod3PMYLHD8ZjllWi+xvV5zY7Wro9J1xQBm+Zftd/lUaxCja4u8RlhckAufbA6NBUOThdlCL0+WCTnsEuJQKBXLdkpcG1EfR26FIaCdzYKkofJ7lZbxffEvgyO3jN0BcST8X4R4rbXiIL5t/1sVw8wsKAwek59/oy8v7TUnnZiggDMN9bpnrMyhpJ21txPRbXdQtOdgnFsHr7SDlLAgcGZHMUTwOHUp+kREDwN2Xy7qAyWoQqtqfteYtTUgDit6DyHVdpIRZWpHtsNZ+m6kpnqnhCnM7cNnPU5WR2BcEULpKY5tyL4fq+Z7H2lcjoPiRKo11qa3Yt5Yfo3DdoXdeRb7pU5m8tPkxUTUQutqVBiTrlovpdTYl1yafqqDFdDCyoTaMfCFoSxsnttJg6+kGwhm/9vboi+wg7uicZx0+9GM5K6tgkElga0IUpn7HIm8Lh+k1MjlNk92akGk4I9s9+a8sonXHzym88lqQEbAdDbwbHe7QieDh09QaUQzmrYikfjiCel3buFkprhQsPGmErnHVgXtnqduAwn38zAFaPbMjntOYZW9HrhjsBbUMdceWHzqZaAzM9yOG0SpLq786KBPaaSH5SKsjZrjGG7iZlmQzf1FOs5O2P+1MdCyY5RSk5Hjaenu9vslkqFcqkC7xhYQFa+M+gp8F9APOsGEBxPwkgaVErL3Gv2BRX/StDMO2ZMBcZvO+gNLiqzW3KFGASmrHgaV2ZEF8TmBiAOAFTNpDqTzZtwMobcs6Ja02fStKlUvENrL8/XDGuPlSEkw2v7ZoNxExqHQY++5fi5057SJZ2/6WDpJUVqb3lQ+5RmsaQgaIDxGSGFT5kik6xXwk+2whIy1Rs08ZnHDvQ63kr0wHlmf6vtHCeliMEPNcQAtKy5SgQ36RVhvsCqgzJ4cP9WvsOThahll8frjRh49hZ0XVZs/O38Cw3FW+8sEVykJnY4h2hLQUuQ13mp2e+6XZJEj8E//RYGYjW/xoAgup1OMg4yDLSGJ0UVo5cquZdwMYR8yJ1IbFjb+ApH1vFUB85Jd9XNYhErOkDTEyuB8kI07IBWIYbe4CNp49QSzVcFa6R0jmAHBA+ci7aNbuOyoByrWOy0us0qcwngXzp2SVKT0dUssWxte8LDG1YBO1WONB4DRhDDQeSSEmUx8SZVLRbCNq21jaa64inlExqWlGrSfADZyag2Wvtx5Z3NDKpMGOiVcKC4ARbDyFiDHPJ5sVpgq9WXe843SPA2ci8G5cf0JM0LFrUYTRSggxY1GzNK1gbH+95uOZfN+K+DArqgEF74ALzZ7U37A2yrBHeEnXksODDJpsUfKtVUiMa+3Kn2crNDBfo4swcyATJi739xvZHRghZm4aYI5OKLp8m93VNUyi2RypB2zeQi4OngXjHKn214gksqHxjbn4q08Y+8pPMbbW5CTmaZmxZCW5SA7R5MvhTcgjR4MxKn6adGI7tXSKajUIlROrwsIU93N8KlG2tqJbCap+bTza57Ck9AIq0VgrcN2A163uVv48zuk68i4WTHIYjAIMPdRoA/ONBlRi7xdsfAbMXx2eCnA5PN7+lA2jaRvgWMZhyIB12zDKOOb6JutZ+dq1jACg42jo8bhyjZ5CwdWnVA1S+pUDnqRfv2VgiHOv3be9q0C6UUjCW9SJZ+U/EI81iECWgprGch8Mo0k+ih2NI5fPlIULcUKe8Q4TCPA43uYQBp8j2WMXaVft1ZHR7Y3AK6z/KnCbeY6bfbtUDMk5iQtzGn0IjFpTkRhPxMiY2D8O/ZlKnYZVsmZfS/cCFKQh2ABdTWJi7E5jLZh1zqwp2DQfopLfflTjQwLupEVeOq1QOnt+1VqKBDNjKEmndLZeXPdfWOLF4oP/TamUMAXY3jWiLf3o5YHgme6vzki/ICUurGlghj5TG2yP+VrVIALtfbbSOlKe4aFWVSiMtM8OYlu7tplu9oVV9Gtv2B7eXQfhLpBNLtj7AMLjXDKFNRcMmYol565eRYWEQPzKaBbA7Uac/KQOLOEEYa6FCqyH8Vav86mehxA+F+8CSRA6zhqg/5s7cqTIC6tQdb5z+wdLbq9HxhqPmgNmlpw/Z/RvZ1wnw1+22GGw3Suit5rNDE2g2B2WQf0itcZDiR0qSuDZYdJvNprJWjYQhgVm+KEcqtry6Z80czhcC2SPxItpFSGAE="},{"type":"server_tool_use","id":"srvtoolu_01Tb9FfmyezATmjBpTUjarAM","name":"code_execution","input":{"code":"import
+        json\nr = await web_search({\"query\": \"EIA weekly US regular gasoline retail price
+        average 2026 Brent crude pass-through lag weeks\"})\np = json.loads(r) if isinstance(r,str)
+        else r\nfor x in p[:5]:\n    print(x.get(\"title\"), \"|\", x.get(\"url\"), \"|\",
+        (x.get(\"content\") or \"\")[:300].replace(\"\\n\",\" \"))\n"}},{"type":"server_tool_use","id":"srvtoolu_01M43td6PE4KGV59JWnfVhyi","name":"web_search","input":{"query":"EIA
+        weekly US regular gasoline retail price average 2026 Brent crude pass-through lag
+        weeks"},"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_01Tb9FfmyezATmjBpTUjarAM"}},{"type":"web_search_tool_result","tool_use_id":"srvtoolu_01M43td6PE4KGV59JWnfVhyi","content":[{"type":"web_search_result","title":"EIA
+        expects lower gasoline prices in 2026 and 2027 as crude oil prices fall - U.S. Energy
+        Information Administration (EIA)","url":"https://www.eia.gov/todayinenergy/detail.php?id=67024","encrypted_content":"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","page_age":null},{"type":"web_search_result","title":"Retail
+        Gasoline Price (US Average): Chart, Current Level & History | thetrading.tools","url":"https://www.thetrading.tools/gasoline-price","encrypted_content":"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","page_age":"1
+        week ago"},{"type":"web_search_result","title":"Why Are Gas Prices Going Up? $4.32/Gallon,
+        Explained (September 14, 2026) | Energy Factbook","url":"https://energyfactbook.com/why-are-gas-prices-high/","encrypted_content":"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","page_age":"3
+        days ago"},{"type":"web_search_result","title":"US Gasoline and Diesel Price Tracker
+        | Sourced Wire","url":"https://sourcedwire.com/energy/gasoline-prices","encrypted_content":"EowKCioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDLXFuU7RSQSl6BQP/RoMwmeTPom0KeMlS68IIjDO6qoPN4CDUFn7ln1XV8BTin7d/gxOyyMtJ5oFwqLlwiqBHiXysDmEtHh1rWafXxAqjwk4TBdg9yaz25eiMj5SWAyDClnH6DAX24/NvtVvwwEP5R/oDevWGyghlMrF0FqWiRBPcK7uUAX4Rpp62ZqEWoHLMClsmKHLwNNFD4mGaA9nxHf7t0OT2fFeSmd61l2+fxvXoBn1yH6N2au+TC+fCr/Z4yslcfPCCOjL1Bn56sDjkbB6+gpiH9AZ9TW9/DwRsED0vpHJLjpb4A2E7Dyzan3WEmrB5+FViTLLrNZWtY2fxAT0L/GD+CmSBbwQJ2uF+N8sxir83YN7/R6nZFHERj5KnGyq6ujYaZ0FxAI70/WiQs5aEvKM/DgnVYVt+q0aehuZcHK+wiZ+ygz7WUWpBbDOmJM4kIEMFbGYsp3tQ/H6JLbn7x2ponvcsz3Hcey2EMjkrlH4hxbcabP3I3gFNSHY8Q53T6PQAmobaiMSd/cXnsfdTdlqhWIkAYWH/ahKdhOmSjIoG3gtkBcFq6mH2cxCVWqROwzmqJkBi4IBP7qxT//P9NXaV+KU0Ima7lJNltonP0sFLyniz5rltJPOFzg4QKDoQECKCxp2lVEg0h9uO5+Hp/M9ZkN5ZQeEUEVtwUNtIsGIet6NNE5L27jh5iSFUZxCOYzBQkOEATDpxSMuKm7D3T2rw/GMV8n5y0SC5iPM8jdTI5CLU0+enIR7DOvCInNcemWOsrTdNFJoYHcAfDiE7GSEM84RHXx/DwcFzqENOUWXL2/s6EaST/NjH+y9SjJ30aQsuJROPNjauvjCFhivoy0/amVV9PZtaVbBqUItJAwiXCdOVkiIL7JCKxMCroQarpPWa7PlbB5cylv2nDV+37gGkaYeCiP77F0l50EHg804rPyd3uEAXfE/wHXxJ3bCkQmGzu0goU01PRrDohND7D5JRJITSsLU4sa3XQly0cXD3qnxH/igrXEemttqjRsZoB4cs3AW50DbFPHB3puKACZOkP+LEKx/41ZZ7Des/lU/eA6FdEirH0Fom+HiAun3eFb8TtK36gA9XeeKw/POXA2Y6Oy2sU+EOiELmNI8L6S4IjX4jgAeh7Lr1IWLs3rq81x9SVynoRVy8XYlg7KDt6/tIlTEXVZSH4FVMH6nXuy62qLr5C7/yTDnJNeEDhwQ8HwNZEbzPfrTpssgMeTQlUz2tfF5lzYhw72W5GHjuDfzdavRibVZBeldrxa+ZxDJFHn+7KcCOFJ/X4cZNu+veRK3GcOiS3j4po3O2SpJWILTRFRwIIQJBNUdi1g4o/uv1vnQ2hNYahx67+n8usVgSCwrv9tdmm2qvA1NbGH4hBoOUOJIoo+ePNslTMZQh9fF/JuRtZMqFrh3VLER3y6i6oYLjwlt/wIk4+tBeBjo3dL7OozpOG/jq2xxk21iizf3mBYbfO6P9cj+V25iBVo6QntrNUZ3Z/TgYTUh8MR/p+IuPgKJt/tHEOXzaPoF535rTK9zXq+bE8ZvXh9mbDmGk0iBOcn7+u+yXUZEzkFvz2erqiLz9tLsknTOK3KfW3nrVpALUyz2CMZKaMwkopKvTIntc0r+xgEUvPh+t3k9/9gNNikV8xuGUhwbldMYAw==","page_age":"3
+        weeks ago"},{"type":"web_search_result","title":"US Retail Fuel Prices - Thinking
+        On Energy","url":"https://thinkingonenergy.com/retail-fuel-prices/","encrypted_content":"Et4QCioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDJXZLgJmqzbneUJz4xoM39GxtkuKie6AiZGAIjC8Nh1Uz4hSv8bwkATHWOpJb90RogqduzZzfSDOnGiWbILPpM+7L1KXdTEn7bVV7Egq4Q+oRrGKHt+LROM9D3iRi5n1kbt7+kkM/J95e70TdZYRImfXtVhzRnlnvL9kh7HfNYdxF9ItzN5pGgpN3NpcdIcvPR8GTrAAIxJeiR2Nm/rfG7baZU5JkfIU2/YpFp28/tC7g1P4F8c5qAC3NO/lKw3F0Fs473h5tR3xivpUL9JxfdgIZOu55LlRnv8CfwNXwMyMN6VwHxBu38un9vCr0vXIf0s3Ri/mmxnASkI+qupN5TVtYeVkPkOJU2ik3adpk+hajng12boYi7BHocKVw6B89AoW/WvzQGLebN2JiVkRsPgyiBORLh+qRiQ6c8p3ZcafR5VEdj9d3Rc2HaP2vUvAGmAbjBoejOwLq/i5nwdlu5ziC3Gj+ZFVlWJgI7q3vVaE7ZxfP2yDfe6+uqnddGEr+rsUdEC6D1dR1sqoMOUKMDAYphBlR736r1F0B1sW7G+WQEwxU0uY5oFrbfJtZwiEdaP+6JaApz+smdKg9NkgNe5tmfbOm+8OV+nkPvNJwt5ai3OnPsfCByjYaBwDwBiehUwb/fOt48rjjQzbSw2lOSnB6T/38AAnjWripVe0t3Mv6weOJu/q2J9JrQMXfOQDxUQiTBDPyRrNKcQX+PtBQKaze78/ZocQDnA9UELmuk8f84avkWlQYlagIjAPIc/+ymH7ZttfkcKXu9wLYco7TmVNfGGdX+QlF1kZLcpubfq+cUKOMwi+pWjMYKsNZnAvjH/nSJwGX/8dyn36OuuTN9Q8FdK+cVEo6y4rbdri1Godr4n34SdEwHsr3ogGaqQWAjFCokDvUQYEWHJzsOXC+jXO+msk0kFnDcAIABOgCphryOHqjmjpC3e4DntoeXNcxhsEWhuGBjn4+F4xyD31UVL4PYIVv5t/GqCWuYGVzczQCQZuZIliojUQCzFRCZ8mNm9tGTupOsq1VYAgwlFWA5I6yike+Ku0KtnMDb2squpM+cgxfNBXaMc2DiwaOWwOtHboTrP3Hh4TFzPA/RTNuDQqMgMJJLCsjjFngpEpWg7q9jbXn+yEQZ9MrPaKdBIfSYJrcVEz6Mpk6KzcuFL97SC7yv0BZEL3LRmX/XBtWdKMUeeM6N0pXAgo6MNFChLqldEW/bt66XNnF0Mq/YkcxziVHyme58c9ZVuVieSrHXF/A6ovr2QoG+1eUL5GVeMOJRSg2u3OtowsDos9EN8RHasJ12RpJjj37/6osyww96rmhMPS17H1iPgYyU9sJ4Do5rMXegIWU+FeGYq7pZNHrNvgUHH8TlZ6hM36FGRTPY3k+Vf1ucb5CvcI+Gno3brYNfoyJcE+HOLk4uCx4u5OC0PvB+RPC7wVaBF5ezoaUhbyAOaHi9VEmwNz4f8FI+sxI6V0cKNhHnrqjts/fVqOEnEJbPyOoSqt9fGD8R//6m0d25RB6+jomXxmqnc0jiVeHMcGRgNiwL3Snz+SEBDq4CdWyxhN++9kxDwZnr4BC4ZGq3ThpmpFm8SFKPU3eRpLoY0hoT5Ckll6NKg30ywrbDbNJONnty5zLhjuJILa+IgaRQewm0sslY4nacpFCxWfWeW0DcGgFmqR+TYSU629PgBST+fbwlaUDr4bgUSfVMK8rL1OkyT9RlSmB4YQiav1w+JhLNu+TvKEd1V/GW8mKDeNoMPbCB0sK7TNfsC/Mj5P8nQu8yXL1ztsOffvooWfKVirrtraKZb6YbVATJAvmFBzrF/9DA6LfdpVIP47OamrEpQYYE8H5LwTuzwQBlBdGPa3+t7M/sshAqsFAajm1XBx4RAlu5hPcs2fpRJvDJgzI4SOMfHgZIh80k3KAXN5UQgvwhMzgIWfqcNPbpHPak6hMNm8cjLmBd5WOLL+D4BKJnZQsJilfX6B7crZvh4LoR/p6tAkUzK6tRysSVPrIpnzRTCBw+fJkkLVJ2E2FhOdIx39Mv9d3biHL/pHBPBemkCJc5CKaaKpHAC6SilyW/l/QILKTHxfw57nRA2+X/RFqcI5HlXUwBY8jXJF5+0SVgmEd2vYFeWX72aTPxcYrhPqXWIdWD1xOrpdzMqphL6MjEzfZZW5aDrudt5SCZKPf5kRkfJYudHrB60qlPTif1liMRrWzOWjCN3mrZTywMhs4imkSu9zf24KH0zRYnfzte7bBTtg8DI969h8lX1idLkQWSKMRdH93DVD9gjK5luxhUHno9PfMNDst3kjRQAR/sAnnMeZa4OtJoXEWZ0qgZvXl9Wf3ve3+dpFFK1xu55DYmqnZ/i/pUB8JxFGPh7spRfx/q1knbEL8ih9C9GsCGW/VaEoxvC3g4REwHzYV2Q48JxukN25Iohs+UEj/uKaSXTK1HS7kEvIowzxKIbJ1zUtqQF6vmBscM3paiQ/C/gtyG4pIEtMAzD1C9QF2RAag6p2fKDwLPV//QodSQu5d6bkFW7724nQYFAPqQJZjvZM3RT1ZTJ00WdpHtVdSZvQ5lhuUYPR7Qx96wqTsiAsLK0C1Rb/wiNem9rzqNqu6eBUF9abmBk6KTguUNgz3mzVVD7xKYDuKW/e/gb5uscDkZpvhM1II4aWWjr2S3HDX8Y9ocHwqWQKVOhGm7cRwQLfSTJv8YXYfZ7yiwlLS+PYwn9UlpHA2kODRKxw0pPgRDOhbinU2CJU6dAukQhQ6B7dby8WPFDTdFRL10yV9R4IYQjOHrI5J/KFdulzw8OcyTOoGAM=","page_age":"June
+        19, 2026"},{"type":"web_search_result","title":"Gasoline and Diesel Fuel Update -
+        U.S. Energy Information Administration (EIA)","url":"https://www.eia.gov/petroleum/gasdiesel/","encrypted_content":"ErMICioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDMsu5g5uzciGYpU5WhoMcOotrOsXptzdmaghIjAWUZcnsQvxfUkt0WDMczGOiMb9UubHulhOXoWH3sye6y8cfM7epyhcJ9+A9GslQr4qtgdlPlXCJwrduIv3rvixhqfJdZLlqTT54Uuj65E+OrNV4j/EzngI3REapU8fbtc0t9q+hERmFTGjCAnvT+fhEX/3xnx+IsyCudv0D8FBW68xyScrJVULC/vlFcJS1A1Det+nkgupmDAtoJOogm9B0C5J0BWXC3B07dllhICFqEIzOTghXaCnLjnjbWyo8Z61yUmZJvyF4cD9aeB0eMqNDIuZ8TOMcyKBrLS/BvuWAHg9zLjYY1APb2em40SHR3UddVFF76vmYV5pdmvR04RDuV62dYAzn4Izn2KLAfRfSqolxHhktysJgudmUUDOmwKHHDZLMBIhnpUz/Z7TNlxZ7G5OqaHbZJTLv94mYlgBHI3Wv8HR8q0ViL+YXKz6uRh3ldUTERc5tNGS2HsFhDk+ee9wLNhzksZ6dU1R+ncHpnY7T54vDKLeZFabPNvU1X/VLB7FveBRBEcwgWkABz1sL8NqlxEFDbpmh5S4CGK06ahRypA6mmBmjJ6Bv87DpYBRJstwaLpOnS3gNzmKJewlxBvEWnyRvsJaHkiAl4d+HOKZvxfbLQblaW41l36FLkJSc9a0GDc8IZo+z7gb3y2SqpkRiPVina5jfsVzsKqCXwy0ei5onwqK2dN34elnaGgqGOUD6of9kA+r2WLOTDWSiyYAF0OMmdfqpUWs8pvMrhBzqN+hlVGvZOj8+vLHv6XMx2FW20ZPhrlwVIhVgreLP+i8jXwMB8ntOq7FaImRdyhYgj3vj8K5kb1DT5wM0kBtK8iv3K4FUlAAQui+u14LMHDefwzt+nULSDHfOMQDTsL7UReiTRnYze4rKswNeLUiN44rvYkMkx3jx7lxS4CEKPoj4OTbwUnN5t9JMjXn5iTdr4r8J1yA8DhPaHQiwfGW7hIk/OjGRcUhrffKN/ZfxPYysjU8fEnqzk9NtLD0c2UjxyE794nHqlYvP6UjF0/JW/l7nzInQZY9qnk9eLWwRr4w1P15bcLT1G1zkpEC84mDmO12d3FaygFR2IENN8DGJiD7rvm0+i1v+GIHJmdWLL28LRfBIqMO8Br+2xL2/hSSbvC5oTD44h81K3yffdZ/axulUP+he3qn3JNafdYj3rEuuCNsqTQ6twVnsvQfCpx1I563MX4Szx3wor4UKdH8Cw4jxEFwMEVlCt8HCVkBXMDd/g9ERYkJhwRXfiaAS6dKRMl2Ipyf5/KE5HK8igjTwO68kj56JozlEAUfW3XzEjpHnloXqjrtC9nnqtKEvGF9ayPVvp1TQRgD","page_age":"2
+        days ago"},{"type":"web_search_result","title":"Weekly U.S. Regular All Formulations
+        Retail Gasoline Prices (Dollars per Gallon)","url":"https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EMM_EPMR_PTE_NUS_DPG&f=W","encrypted_content":"EusBCioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDJRpT8BLpzBsOhO0lxoMRVhKHwVTWwDUeljPIjA/in7OvpFQZN7hkPXp0Z2xSsTXF2NyYHdcMaCzT7ddCwQUBOF338HsKWdbxUP+/eoqb9b1mHyJwPMcDW8/qWoxXV+09iKwEFYiEM8OGCVEtI2POa79kQR4Jxe5jo+rxNnQ8vHeRrcQEaNjCUJ6vUs5leb/AnbH6Lm1w75dn1P1kLT68XaqzG9Jkz2mELl9TqoW00Q6m3DT4cQbQCuiwsaCtRgD","page_age":"June
+        22, 2026"},{"type":"web_search_result","title":"US Regular All Formulations Gas Price
+        (GASREGW) | FRED | St. Louis Fed","url":"https://fred.stlouisfed.org/series/GASREGW","encrypted_content":"EsoICioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDO7IUdUENc04vmKmPBoMTdmpaqHGl+RsQC6YIjD4//NcvVYSiKmVlH8bmGeIpnRtlhKeyPPFvrSp2ajlir63ExnWGEk58Im6mui60CMqzQc3vf4L7Z14KM6GthRkWBm1zyGMwLfSBxhoWFdvETKV0hT7OBAN3ZDU4465WkqGyJTw75MbS4rlCxrnDHSc4vHo1l0f1wBoSKWjSZhbKH3thBTDslDMfNu1fxuMrZI6Ufw5ievYWF5JOrLQBigzabegwFVqHR8VRFHVw7GR5QAQT6mUoUXYvcIy4xzDtX27ndD4r63lb0Cec53m5b+v1JxOA2n9mIz1B/FfMQEk8HqD7T271om8V84/o9VucLMX8XZg+hNGuNcdsYYrWpUiYq/NWPBdS96VTfPWre9t6gnu5AcDFzFmXzHO+T+9It8NojhSQfOy83YgXj/K7G3f9iQIOYxDpaw/0cr6I9fRbYnoxxG0IWg/CbLhevKL5i00vhow/h32ehC2SSV13DbXgsAbUd1p09dNo0lWDgehbWMdCy/MJCyA9wSuuilqCdP0nBN2S6/3LT08GVIFZevOkP9dZ+C18D8WhefD7fgETqyqXnPSkzkdUIgVVbTv6tykafgfl5jmBQ1HZsChpOk8h1NdymN/8c0w6gWXr+YnbqTzVLtAxrCF5TFQrv2yBcNeXfNX3qLnfOBIQE43HtYGM+ewWXR4nEU7yskkjN+ii+BgaiuUbMtJLKt75r0jV78G4N2iN86Ausi+6Z/mxnJagOt16VD4WjW7b4p9D+ODJJy3f8luBAJg4iHsjCQzRSfzz6lyA3YvA6cMI8K36SFokRFEMxL9kvVsvuxeiVE7+HPro8j9W7kelzkzjfVmEUwXBXLjGwNacDgIA0cGvhjz7axMGLMpIvNJc4I/E9FDYhR2S8jaRuP4lxVD5YCUR8gwQaXEx+/q+NWlhN5damUsbZU9oBCsOvSlj6WFiA12m8Tt1jk2+x3pw84qrB1eV+DmLCRpq8HK9hAcXppQuo2N6ieBHSBegrVYFJEbM1Cff8kXBnws+q9G/GeyMIgY5zOlRNS8a/dUIlh73MUD7TRrqbRH9ypN60J7jyLB1bIlQQn0AdedgiDRbsuu4nweoCa0uUCeNbTu97VFMzVZXsI/2QoR0GDbCKTA7T/bODRKSyZIkyeO/JO3N6uTh8GtPbpbIrNcES1a5FhPchw6w23JRGBlf22vjH+3yPBK1/Mf87pzDUcPieAd+Hmp3Cg+N6JnnU9+o3U92hqnawioo2AyBoth8M3wUIUwj0HBKZRrqtc3yOB5Vnmzpipa2vKIico1BhzLc0D1WS5KJJtztURCXmqt3mGsA13wFVb2uxvjNqQpgB9XjHmoCvL4j8zTfqOT0LpBGxOQBMEPs19jpEMFGAM=","page_age":"2
+        days ago"},{"type":"web_search_result","title":"Retail Prices for Regular Gasoline","url":"https://www.eia.gov/dnav/pet/pet_pri_gnd_a_epmr_pte_dpgal_w.htm","encrypted_content":"EusBCioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDN5it82MPKLEDwF73BoMg63AzH/op9ZwUkM8IjAjOD6UhTjy5Qvg7eB68nXvpkRTf/DYRU9V0Z9Yhc7GPNUBrmoSHW1CCoEWZvJgKFwqb4NmFfPw5g0X2NZ5nDp87ENv/+YpvKhbQp5dS+x/slCItmiHkvdGxqD7ehg2YWuxiedX3I8sZhmEyveyH8M1cM2RmiWz17H1A/v2xrjJOMkU2YHnLtwK8PLEMH4AbYgsa0UFqx7kg1dyAIRjHJnNpxgD","page_age":null}],"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_01Tb9FfmyezATmjBpTUjarAM"}},{"type":"code_execution_tool_result","tool_use_id":"srvtoolu_01Tb9FfmyezATmjBpTUjarAM","content":{"type":"encrypted_code_execution_result","encrypted_stdout":"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","stderr":"","return_code":0,"content":[]}},{"type":"thinking","thinking":"","signature":"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"},{"type":"text","text":"{\"proposal\":{\"kind\":\"claim\",\"claim\":\"US
+        pump prices fall sharply once crude settles in the high $60s, with the national average
+        regular gasoline price dropping to $3.50 a gallon or less.\",\"claim_kind\":\"event\",\"resolution\":{\"criteria\":\"In
+        at least one weekly release, the U.S. average retail price of regular all-formulations
+        gasoline is at or below $3.500 per gallon, as published in the EIA Gasoline and Diesel
+        Fuel Update (weekly retail series), for any survey week from 2026-09-21 through 2026-12-21.\",\"source\":\"U.S.
+        Energy Information Administration, Gasoline and Diesel Fuel Update (weekly U.S. regular
+        all-formulations retail price)\",\"by\":\"2026-12-28\"},\"prior\":{\"p\":0.3,\"lo\":0.12,\"hi\":0.55},\"base_rate\":{\"reference_class\":\"Episodes
+        since 2000 in which front-month Brent fell at least 25% from a local peak and stayed
+        down for at least three weeks; counted as true if the EIA weekly U.S. regular retail
+        gasoline average fell at least 15% within 13 weeks of the Brent peak\",\"k\":6,\"n\":7,\"sources\":[]},\"cause\":\"B\",\"link\":{\"mode\":\"trigger\",\"strength\":2.2,\"lag\":28,\"shape\":\"ramp\",\"rationale\":\"Crude
+        is roughly 45-46% of the retail pump price, and wholesale prices reflect crude moves
+        with a one-to-three week delay while retail reflects wholesale with a further lag,
+        so a sustained Brent settle in the high $60s mechanically pulls the national average
+        down over about four to six weeks. The push is a trigger rather than a hold because
+        once cheaper barrels move through refiners and into station inventories the lower
+        street price is locked in for weeks even if crude ticks back up. The national average
+        was $4.32/gal in mid-September 2026 with crude the stated driver, so the crude channel
+        is currently the dominant term.\",\"sources\":[{\"url\":\"https://www.eia.gov/todayinenergy/detail.php?id=67024\"},{\"url\":\"https://energyfactbook.com/why-are-gas-prices-high/\"},{\"url\":\"https://sourcedwire.com/energy/gasoline-prices\"}]}}}"}],"container":{"id":"container_01AryUyv9oqLvLL7wXm81poz","expires_at":"2026-09-17T15:04:06.250139Z"},"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"usage":{"input_tokens":547,"cache_creation_input_tokens":2582,"cache_read_input_tokens":25722,"cache_creation":{"ephemeral_5m_input_tokens":2582,"ephemeral_1h_input_tokens":0},"output_tokens":2823,"output_tokens_details":{"thinking_tokens":1902},"service_tier":"standard","inference_geo":"global","server_tool_use":{"web_search_requests":1,"web_fetch_requests":0}}}'
+    headers:
+      cf-cache-status:
+      - DYNAMIC
+      connection:
+      - keep-alive
+      content-length:
+      - '32445'
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - application/json
+      date:
+      - Thu, 17 Sep 2026 14:04:29 GMT
+      server:
+      - cloudflare
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      x-robots-tag:
+      - none
+    status:
+      code: 200
+      message: OK
+version: 1

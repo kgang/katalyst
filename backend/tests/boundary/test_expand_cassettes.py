@@ -52,6 +52,25 @@ NOTHING_IN_A_RECORDING_MAY_LOOK_LIKE_A_KEY = (
 )
 """What a leaked credential looks like in a file somebody might publish."""
 
+NOTHING_IN_A_RECORDING_SAYS_WHOSE_ACCOUNT_IT_WAS = (
+    "anthropic-organization-id",
+    "anthropic-workspace-id",
+    "anthropic-ratelimit-",
+    "request-id",
+    "cf-ray",
+    "traceresponse",
+    "set-cookie",
+)
+"""What the service says about the account a call was billed to.
+
+None of it is a secret and none of it is read back on replay, and all of it is
+somebody's business but the reader's: which organisation and workspace paid for
+the call, what that account has bought and how much of it is left, and a handful
+of identifiers tying the exchange to one account's traffic. The recorder takes
+them out as it writes (`tests/boundary/conftest.py`); this is the net under that,
+and it checks every recording wherever it was made.
+"""
+
 
 @pytest.fixture
 def answerer(request: pytest.FixtureRequest) -> Model:
@@ -235,10 +254,17 @@ def test_expand_rejects_a_documented_arrow_that_cites_nothing(answerer: Model) -
 def test_no_cassette_contains_a_key() -> None:
     """Nothing in a committed recording would embarrass us in a public repository.
 
-    Passes on an empty folder, so it is green from the commit that adds it and
-    bites the moment the first recording lands.
+    A key first, and then everything the service's own reply says about the
+    account that paid for the call. Passes on an empty folder, so it was green
+    from the commit that added it and bit the moment the first recording landed —
+    which is exactly what happened: the first four came back naming an
+    organisation, a workspace and that account's rate limits.
     """
     for recording in sorted(CASSETTES.rglob("*.yaml")):
         said = recording.read_text(encoding="utf-8")
         for looks_like_a_key in NOTHING_IN_A_RECORDING_MAY_LOOK_LIKE_A_KEY:
             assert looks_like_a_key not in said, f"{recording.name} holds something like a key"
+        for whose_account in NOTHING_IN_A_RECORDING_SAYS_WHOSE_ACCOUNT_IT_WAS:
+            assert whose_account not in said, (
+                f"{recording.name} says whose account this was, at {whose_account!r}"
+            )
