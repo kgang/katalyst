@@ -1,0 +1,11 @@
+{
+  "tool_use_id": "toolu_01488CdwJgrKgxZefeVhYkjE",
+  "agent_id": "abb1ea6ff6682217a",
+  "subagent_type": "general-purpose",
+  "task_description": "Draft decision record 0012: replay mode",
+  "files": [
+    "plans/orchestration-stacks-01-02.md"
+  ],
+  "started_at": "2026-09-17T00:33:48.023128-04:00",
+  "completed_at": "2026-09-17T00:33:48.023493-04:00"
+}
