@@ -8,7 +8,9 @@ It borrows three things from simulation games: a visible world state, discrete t
 
 ## Terms this part owns
 
-Workbench · Tile · Port · Wire · Inspector · Delta rail · World-state strip · Launchpad · Level of detail.
+Workbench · Tile · Port · Wire · Inspector · Delta rail · World-state strip · Launchpad · Level of detail · Skeleton tile · Refusal strip · Receipt strip · Replay badge.
+
+The last four belong to a map that is being generated and are defined, with the button that starts one, in [`../vocabulary.md`](../vocabulary.md).
 
 ## Invariants this part owns
 

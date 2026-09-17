@@ -384,7 +384,7 @@ Two statements, one subject: a chip never leaves a reader guessing what it is lo
 - For every chip whose number is **absent**: the chip renders that absence's words, or its dash-with-invitation, **and** a non-empty reason, and renders no digit at all. The reason counts whether it is printed on the tile or carried as the element's own accessible name — and for every absence but a `not_tradeable` ending's, the accessible name is where it lives. There is no input for which the chip renders blank, `0`, or a stand-in value.
 - For every **model chip that has a number**: it renders the computed label and hover sentence exactly when the world carries `versions`, and the stated label and hover sentence exactly when it does not. There is no input for which it claims a computation over a number nothing computed.
 
-- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_every_absence_renders_words_and_a_reason` and `test_model_chip_says_computed_only_when_a_world_computed_it`.
+- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_every_absence_renders_words_and_a_reason` and `test_a_computed_chip_says_it_is_uncalibrated`.
 - **Also:** visual review checklist line 5 — is there a number nobody computed, an empty slot filled in rather than left as an absence with a reason, or a number whose origin cannot be named in one click?
 
 ### INV-workbench.6 — Three voices, never merged *(refines INV-11)*

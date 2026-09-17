@@ -328,9 +328,10 @@ error. None of these opens a window: the panel is always there, and selecting ch
 
 *(Decided 2026-09-17, stack 04a; this closes open question 2 below.)*
 
-NFR-6 says every generation records the model, the tokens, the cache reads and the dollars, and shows
-them in the Inspector's transcript view. Nothing generated in the stack that wrote this chapter, so
-nothing was specified and nothing was drawn. A generation now exists, and this is where it is read.
+NFR-6 says every generation records the model, the tokens, the cache reads, the searches and the
+dollars, and shows them in the Inspector's transcript view. Nothing generated in the stack that wrote
+this chapter, so nothing was specified and nothing was drawn. A generation now exists, and this is
+where it is read.
 
 **The generation is the panel's third subject.** Until now the panel opened on a claim or an arrow.
 It also opens on the run that produced them — `{ kind: "generation", id }`, where `id` is the
@@ -344,29 +345,47 @@ THIS GENERATION
   tokens in        <Receipt.input_tokens>
   tokens out       <Receipt.output_tokens>
   read from cache  <Receipt.cache_read_tokens>
+  web searches     <Receipt.searches>
   cost             <Receipt.dollars>
   took             <Receipt.seconds>
   mode             replay · recorded <Receipt.recording_date> · prompt <Receipt.prompt_hash>
 
 TRANSCRIPT
-  0   accepted   The Strait of Hormuz reopens to unrestricted commercial transit.       → H
+  0   accepted   The Strait of Hormuz is open to unrestricted commercial transit for
+                 14 consecutive days                                                  → H
   …
-  9   refused    "cheaper crude reduces the incentive to close the strait"
+  6   refused    "cheaper crude reduces the incentive to close the strait"
                  These claims form a loop with no delay in it: … Mark the arrow where a
                  market feeds back on the world as reflexive and give it a delay, or
                  remove one arrow.
-  …
+  7   accepted   The energy fund XLE underperforms the S&P 500 fund SPY by more than
+                 3% over 20 trading days                                             → M2
+  —   stopped    Nothing further to add on "Lloyd's war-risk insurance premium for Gulf
+                 transits falls below 0.4%"
+  —   stopped    Nothing further to add on "Brent crude settles below $68 for five
+                 sessions"
 ```
+
+**Three kinds of line, not two.** A proposal was accepted, a proposal was refused, or the model
+answered *Stop* on a line and it closed with nothing added. The third is the one a reader would
+otherwise never see: it makes no event on the stream, because nothing about the map changed, and the
+transcript is the only place it is recorded. **A stopped line carries no `at`** — `at` counts what was
+proposed, and a stop proposed nothing — so the positions in this list have gaps in them, and the gaps
+are the stops. Printing them as a dash rather than renumbering is what keeps `at` meaning the same
+thing here as it does on the stream and in the refusal strip.
 
 Five rules, and four of them are rules this panel already obeys.
 
 * **Every number is a field, and the panel adds nothing up.** It does not total the two token counts,
-  does not work a cost out of a token count and a price, and does not time anything. INV-workbench.54
-  already forbids it for likelihoods; the same rule covers a cost.
+  does not work a cost out of a token count and a price, and does not time anything. Searches have
+  their own row because they are billed apart from tokens, so a reader checking `cost` against the
+  token counts alone would find it wrong. INV-workbench.54 already forbids the arithmetic for
+  likelihoods; the same rule covers a cost.
 * **Every line of the transcript is in the engine's own words.** An accepted line names the claim it
   became; a refused line quotes what the model wrote and then carries the validator's own sentence,
-  one per rule broken, with nothing added. The panel composes no sentence about a refusal, and a
-  refused claim is quoted rather than given an identifier or a tile.
+  one per rule broken, with nothing added; a stopped line carries the model's own one-sentence reason.
+  The panel composes no sentence about any of the three, and a refused claim is quoted rather than
+  given an identifier or a tile.
 * **The mode is read first.** In a replay the row says `replay`, names the day the recording was made
   and the prompt it was made against, and the cost reads what the rebuilt receipt carries — zero,
   because the recording was played and nothing was called. That zero is a computed zero, printed
@@ -389,7 +408,7 @@ section a reader would read as a transcript with nothing in it.
 **How you get here.** Selecting a row on the refusal strip opens the panel at that transcript line.
 Selecting the receipt strip opens it at the top. Both strips, and the shape of the stream behind
 them, are [`streaming-growth.md`](streaming-growth.md)'s; this chapter owns only what the panel does
-with them, and INV-workbench.71 there pins the receipt's own fields.
+with them, and INV-workbench.72 there pins the receipt's own fields.
 
 ---
 
@@ -434,8 +453,10 @@ versions count more."* is rendered exactly when the engine's diff row for that c
 field saying so, and by no other route: no comparison of a same-direction share against zero, no
 check for whether a claim has incoming arrows, no inference from an empty decomposition. *Tests:*
 inspector › `test_never_derives_a_displayed_number`,
-`test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector`,
-`test_the_receipt_is_printed_field_by_field`.
+`test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector`;
+`frontend/src/stream/__tests__/strips.test.tsx` ›
+`test_the_receipt_strip_prints_every_field_and_adds_nothing_up`, which covers this rendering and the
+strip's, because there is one rule and it should not be checked twice under two names.
 
 **INV-workbench.55 — which sentence, and the band slot.** For every claim, the sentence under the
 model row is the stated one when `WorldView.versions` is absent and record 0014's when it is
@@ -521,7 +542,7 @@ comes from (B1).*
    opens on a generation as well as on a claim and an arrow; the section prints the `receipt`
    event's fields one by one and the transcript beneath them, and is read from
    `GET /api/generate/{generation_id}/transcript`, which lives in memory for the life of the process
-   until stack 05's file. In B7, and pinned by INV-workbench.54 here and INV-workbench.71 in
+   until stack 05's file. In B7, and pinned by INV-workbench.54 here and INV-workbench.72 in
    [`streaming-growth.md`](streaming-growth.md).
 
 3. **May the panel show an arrow's pushes before the engine, without the result line?**

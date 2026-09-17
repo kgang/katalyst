@@ -116,6 +116,21 @@ export interface LinkView {
   conditional: Known<BeliefView>;        // the midpoint chip; fetched one arrow at a time
 }
 
+/** One claim's row in a difference, as the browser reads the engine's `ClaimDiff`. */
+export interface ClaimDiffView {
+  claimId: string;
+  state: "unchanged" | "shifted" | "added" | "killed";
+  before: Known<number>;
+  after: Known<number>;
+  /** "Same direction": the share of versions that moved the same way. */
+  agreement: Known<number>;
+  /** True when the whole of the move is the observation changing how much each version
+      counts — the claim's own arithmetic did not move it at all. Written by the engine
+      (`spec/multiverse/diff.md`); the Inspector turns it into one sentence and nothing
+      in the browser ever works it out. */
+  movedOnlyByReweighting: boolean;
+}
+
 export interface DeltaRow {
   claimId: string;
   label: string;                                     // the terminal's own words
@@ -140,7 +155,14 @@ takes one. `TileProps` and `WireProps` there, and `ClaimDetail` and `LinkDetail`
 **One field, two spellings, said once here.** The server's wire name is `range_width`; the view
 model's is `rangeWidth`. Same number, and neither is ever shown — the rail's column is headed **how
 firm**. Likewise the field `agreement`, whose column reads **same direction**: the bare word
-*agreement* is left free on screen for stack 04's run-to-run number.
+*agreement* is left free on screen for a run-to-run number, if one is ever earned. Decision record
+0015 says not in stack 04 — the range a claim ships with is the one the model stated, labelled as
+stated, and no number anywhere says how far two generations agreed.
+
+**And one field with one spelling in all three places.** The engine's `ClaimDiff` carries
+`moved_only_by_reweighting`; the view model spells it `movedOnlyByReweighting`; the Inspector turns it
+into one fixed sentence. Nothing shortens it, nothing abbreviates it, and nothing in the browser
+decides it — [`inspector.md`](inspector.md) B2 has the sentence and the rule.
 
 ### Component props
 
@@ -261,7 +283,7 @@ columns that are never folded into the rank**:
 | Column on screen | The question it answers | Field |
 |---|---|---|
 | **how firm** | *How firm is this number?* The width of the new world's own range on that claim — the same quantity the tile shows, so the rail and the tile cannot disagree | `rangeWidth` |
-| **same direction** | *Did it point the same way whatever numbers we started from?* The share of the 2 000 versions of the map that moved in the same direction | `agreement` |
+| **same direction** | *Did it point the same way whatever numbers we started from?* The share of the 2 000 versions of the map that moved in the same direction — **each version counted by as much as it counted for the two numbers**, so a version that contributed nothing to either number votes on neither | `agreement` |
 
 Different questions, weighed separately by a trader, which is why they are columns and not one
 score. Folding width into the rank would sink exactly the claims that most deserve attention.
@@ -427,7 +449,7 @@ the browser computed equals the state derived from the server's `affected_set`. 
 with feedback arrows set aside, which is why they can agree at all; the day stack 06 unrolls them,
 `test_a_feedback_arrow_never_carries_a_change` in the domain fails loudly and points at the one
 sentence to change. Until stack 03a lands this test is skipped with its reason written in it, never
-deleted. *Test:* diffState › `test_agrees_with_the_servers_affected_set`.
+deleted. *Test:* diffState › `test_the_browser_states_agree_with_the_engine`.
 
 **INV-workbench.44 — `shifted` is never produced without two numbers.** For every pair of worlds in
 which either side's likelihood is absent, no claim is `shifted`. *Test:* diffState ›
@@ -451,7 +473,7 @@ numbers in the browser. *Tests:* deltaRail › `test_lists_reachable_terminals_i
 
 **INV-workbench.47 — how firm and same direction are never folded into the rank.** For every rail
 row the two are rendered as their own columns, and no ordering function reads either. *Test:*
-deltaRail › `test_never_sorts_by_width_or_agreement`.
+deltaRail › `test_how_firm_and_same_direction_are_columns_not_factors`.
 
 **INV-workbench.48 — a supposed claim shows the word, and the retraction comes from the world.** For
 every claim under a live supposition, the tile renders **Supposed · date** where a likelihood would

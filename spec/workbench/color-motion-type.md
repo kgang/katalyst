@@ -154,7 +154,7 @@ Force the light theme. Every token flips to its light value, every measured rati
 
 ## INVARIANTS
 
-Each is *for all inputs of this kind, this statement holds*, and each names what checks it. Two kinds of check appear: a **component test** under `frontend/src/**/__tests__/`, and a numbered line of the **visual review checklist** — the twelve things the coordinator looks for on every screenshot before any of this is shown to anyone. A checklist line is a checkable thing; it is checked by a person.
+Each is *for all inputs of this kind, this statement holds*, and each names what checks it. Two kinds of check appear: a **component test** under `frontend/src/**/__tests__/`, and a numbered line of the **visual review checklist** in [`README.md`](README.md) — the things the coordinator looks for on every screenshot before any of this is shown to anyone. A checklist line is a checkable thing; it is checked by a person.
 
 Local numbers in this part are `INV-workbench.<n>`. This chapter holds **13 – 19**; [`tiles-ports-wires.md`](tiles-ports-wires.md) holds 1 – 12.
 
