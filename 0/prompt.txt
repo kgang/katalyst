@@ -1662,3 +1662,301 @@ I looked at all four.
 No diff in `schema.ts`, `backend/`, `spec/`, `.github/` or `tokens.css` (checked: 0 lines). Nothing pushed, no PR opened, `main` untouched.</result>
 <usage><subagent_tokens>562969</subagent_tokens><tool_uses>224</tool_uses><duration_ms>487333</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>aced43e63c11c0d42</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/aced43e63c11c0d42.output</output-file>
+<status>completed</status>
+<summary>Agent "D: build apply (03a PR2)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything green and committed. Here is the report.
+
+## What I built
+
+**`backend/src/katalyst/domain/propagation.py`** (new, ~1530 lines) — `World`, `Retraction`, `SeriesState`, `Versions`, `propagate`, `versions_of`.
+
+- **Two loops.** 2 000 versions of the map (numpy-only Latin hypercube, per-claim stratified columns) × 8 worlds each, the likelihood kept rather than the coin flip, inner noise subtracted by the law of total variance. No `scipy` — the inverse normal quantile is Acklam's rational approximation, written out with its source.
+- **Two seed streams**, both derived per claim from `blake2b(claim id)` rather than from a shared hypercube, so adding a claim cannot shift any other claim's draws. That is what makes `test_versions_do_not_depend_on_the_branch` hold exactly rather than approximately, and it also makes the *worlds* stream branch-independent, so the dice cancel out of a paired comparison too.
+- **The time axis, suppositions, spells, retractions, states, `range_shares`, warnings** as the chapter specifies.
+- **`patch.py`** gained `introduced_by`, and `affected_set` now sets feedback arrows aside.
+
+**Measured against the chapter's own arithmetic:** B reads `.037` on day 1 and `.176` on day 2 (chapter: `.03`, `.17`); H reads `1.0` supposed on day 0, `.356` withdrawn on days 1–3 (chapter: "about `.35`, reported `.36`"), `.081` pushed from day 4 (chapter: "about `.07`"). One retraction, `at` = 2026-10-02, `by_link` = `S-&gt;H`, `by_claim` = `S`, `by` = 1.
+
+Two findings the property tests produced, both real:
+
+1. **The survival weighting was global.** An `observe` reweighted every claim's versions, so a claim the observation was not evidence about moved by sampling noise — INV-4 failing quietly. Fixed: the weighting reaches only the claims an observation is evidence about (target, descendants, ancestors, their descendants); a claim d-separated from it is read off every world, which is both exact and lower-variance.
+2. **The inner variance used `ddof=0`**, biasing it low by `(m−1)/m` so the noise correction under-subtracted. With `ddof=1`, frozen-prior bands went from 0.000–0.061 wide to **0.000–0.009**. `test_band_is_not_sampling_noise` would have passed at a lax tolerance and hidden it.
+
+## Where I deviated, and why
+
+- **`World` gained `series_days`.** Once the 180-point cap keeps every resolve-by day (item 8), the points are no longer evenly spaced, and nothing else could say where they sit. **The chapter's `World` shape needs this line.**
+- **`introduced_by` is `Mapping[LinkId, int] = NOTHING_ADDED`** (an immutable empty mapping), not `| None`. I could not find a way to make the breach structurally impossible without changing `propagate`'s pinned arguments; a `ValueError` on a real breach is the honest second best.
+- **Arrows keep the map's order** rather than being sorted by identifier — that order *is* the introduction order, so it serves as both the summation order and the same-day tie-break. Consequence: `test_propagation_order_independent` now shuffles only the claims, and says why the arrows are not shuffled.
+- **`propagate` raises in one place** (the `introduced_by` breach) and assumes a map the validity rules accept (no loops). Documented on the function.
+- **Single precision inside the loops**, double for every average and percentile. Three times quicker, nothing visible changes.
+- **`tests/unit/domain/test_validity.py`** was not on my list but had to change: `test_an_impulse_without_a_half_life_is_still_legal` now asserts the opposite of item 3, and `RULE_ORDER` needed the new code. Replaced with `test_validate_rejects_impulse_without_half_life`.
+- **`GraphEditMachine` widens its reach** when an edit changes what an observation is evidence about — putting a lever on a claim somebody reported takes evidence off the map, and evidence is not local. The affected-set table covers one edit on a map, not that interaction. Documented in `_evidence_moved`.
+
+## Kent's decisions, item by item
+
+| # | Status |
+|---|---|
+| **1 — feedback arrows** | **Done.** `affected_set` and `_affected_from_the_shape` both set them aside. `test_a_feedback_arrow_never_carries_a_change` (generated maps, two-piece, feedback arrow added across) plus `test_the_strike_branch_cannot_reach_opec_on_the_worked_example` and the golden R test. Its docstring says the day stack 06 unrolls them this fails, and names `interventions.md` as the sentence to change. |
+| **2 — `edit_not_applicable`** | **Done.** `refine`, the stray `insert` arrow, and both `flatten` failures moved onto it. `unknown_target` means only what it says. |
+| **3 — `impulse_without_half_life`** | **Done.** Rule 12 in `validate`, `broken_graphs` damage rule, `test_validate_rejects_impulse_without_half_life`. `links()` already never generates one; the Hormuz fixture has none. Counts now read "fourteen map faults, four refused edits". |
+| **4 — `Retraction.by` required** | **Done.** `by: int` with `ge=0`; `ValueError` with a plain sentence on a breach, documented as the one place this file raises and why. |
+| **5 — tie-break and re-supposing** | **Done, with a finding.** The tie-break needed no new data: the arrows' order on the map *is* the introduction order. Re-supposing works — but **the four-word series `supposed · withdrawn · pushed · supposed` is not reachable**, because a second `do` cuts the arrow that undermined the first, exactly as the first `do` cut whatever pointed at the claim then. Two tests pin what does happen: `test_a_claim_can_be_supposed_again_after_it_was_undermined` (second supposition undermined by a *new* arrow — supposed, withdrawn, pushed, one retraction) and `test_supposing_a_claim_again_cuts_what_undermined_it`. **Your call whether the ruling's example sentence needs correcting.** |
+| **6 — ramp with `lag = 0`** | **Done.** The "at or past the delay" days are settled first, so the climb has no days left. No special case, no division by nothing, one test. |
+| **7 — supposed `Belief` is `1.0`** | **Done.** Already the behaviour; the "no surface but a path product may read it" sentence is now on `World`. |
+| **8 — the cap keeps resolve-by days** | **Done**, plus `series_days` on `World` (see deviations) and a generated test over windows past 180 days. |
+| **9 — what `diff` needs** | **`Versions` now also carries `inner_spread`**, so `diff` can rebuild any day's band exactly as the world reports it, for either world, at any `at_day`. Nothing per-day goes on the wire. |
+
+## How `diff` gets the paired per-version difference
+
+`versions_of(world) -&gt; Versions` — a plain frozen record holding the day of each column, the per-version prior draws, the per-version likelihood per day, the per-version inner spread, the survival weights and which claims they apply to. It **recomputes** from the world's own three inputs rather than being carried on it: 2 000 × days × claims floats is millions of numbers and no browser should be sent them. Recomputation is exact, so a recomputed version *is* the version the world was built from. The cost is one extra engine run per world in a diff.
+
+## Fixture tuning
+
+| What | Was | Now | Why |
+|---|---|---|---|
+| B's resolve-by | `_resolve_by(45)` = 2026-11-15 | `_resolve_by(14)` = 2026-10-15 | Five sub-$68 settlements is about a fortnight of sessions. At 45 days `H→B` was at 0.37 of full size and `S→B` at 0.04, so the tile read B's own prior. |
+| `B-&gt;M1` `half_life` | 14.0 | 30.0 | The contract is written on nearly the event B measures. At 14 days the push was at 0.26 by the day the contract is judged. |
+| `beliefs.model` on C | `.44 (.30–.60)` | `.30 (.18–.45)` = prior | No computed number typed by hand |
+| … on B | `.46 (.30–.63)` | `.28 (.15–.42)` | ” |
+| … on R | `.24 (.12–.40)` | `.18 (.08–.32)` | ” |
+| … on M1 | `.61 (.45–.74)` | `.40 (.28–.55)` | ” |
+| … on M2 | `.54 (.38–.68)` | `.35 (.22–.50)` | ” |
+| … on N1 | `.29 (.15–.45)` | `.22 (.12–.36)` | ” |
+
+**No strength, mode, shape, provenance, prior, lag, claim text or `reflexive` flag changed.** `B-&gt;R` stays reflexive; `H-&gt;N1` stays `asserted`.
+
+**Computed headline numbers, seed 20261001, full budget:**
+
+| claim | judged on | base world | strike world |
+|---|---|---|---|
+| H | day 31 | `.36 (.22–.50)` | `.08 (.04–.13)` |
+| C | day 30 | `.40 (.25–.55)` | `.07 (.03–.11)` |
+| B | day 14 | `.40 (.25–.55)` | `.30 (.17–.44)` |
+| R | day 60 | `.19 (.08–.32)` | `.19 (.08–.32)` — byte-identical |
+| M1 | day 30 | `.46 (.32–.60)` | `.41 (.28–.55)` |
+| M2 | day 45 | `.43 (.28–.58)` | `.36 (.23–.51)` |
+| N1 | day 60 | `.28 (.15–.42)` | `.37 (.22–.53)` |
+| S | day 1 | — | `1.00` |
+
+## Chapter numbers that went stale
+
+**`spec/multiverse/diff.md`** — B "by 2026-11-15" (§B, line 115) → 2026-10-15. §B5 (line 179) and anti-pattern 6 (line 279): "`H → B` has decayed to 0.37 of full size by day 45, which is B's resolve-by day, and `B → M1` to 0.26 by day 30" — B's resolve-by day is now 14 (`H→B` at 0.76) and `B→M1` is at 0.54 by day 30. §B3 (line 153): B's width `.292 → .323` and H's share `2.6% → 0%` were measured at day 45.
+
+**`spec/multiverse/propagation.md`** — §B5 (line 267): "Measured, on Hormuz claim B at day 45" reads as if day 45 were B's reading day. §B5 (line 278): "92% of B's band is B's own prior" — now **88%** in the strike world, **65%** in the base world at day 14. §B5 (line 282): the same `.292 → .323` / `2.6% → 0%` pair; H's share of B's base-world band is now **6.1%**.
+
+**`docs/adr/0014`** lines 111, 124, 162 carry the same three measurements.
+
+**Soft:** `spec/graph/belief.md` lines 5/117/163–167/209 use `.61 (.45–.75)` for M1's model belief. It reads as an illustration, but `.61` was the hand-written number that is now gone; the engine computes `.46 (.32–.60)`.
+
+## Timing at sixty claims
+
+| | |
+|---|---|
+| Hormuz strike branch (8 claims, 61-day window) | **67 ms** |
+| sixty claims, one day | **41 ms** |
+| sixty claims, 61-day window | **544 ms** |
+| sixty claims, a year (179 points) | **1 437 ms** |
+
+**The plan's "about ten milliseconds at sixty claims" is a single day**, which is what the research note measured (B at day 45). A scrubbable series over a sixty-day window is sixty-one of those. My single-day figure is 41 ms rather than 10 ms; the gap is the per-version prior draw and the `range_shares` breakdown, which are fixed costs the research prototype paid once outside its timed loop. I did not contort the design: single precision and sorting once per band (rather than twice) took 60-claim/61-day from 850 ms to 544 ms, and the rest is the honest cost of `claims × days × 16 000` sigmoid evaluations.
+
+## Open questions
+
+- **The `supposed · withdrawn · pushed · supposed` series** (item 5) — unreachable while a `do` cuts every arrow into its target. Either the ruling's example sentence is corrected, or a `do`'s cut becomes timed like its assertion, which is a change to `apply`'s settled rule.
+- **`World.series_days`** needs a line in `propagation.md`'s `World`.
+- **`_evidence_moved`** — should the affected-set table say what an edit does when an observation is already in force?
+
+## `schema.ts`
+
+**Not stale.** Neither `World`, `Retraction` nor `Violation` reaches the server's published description (checked directly) — there is no route yet. I did not touch `frontend/`.
+
+## Files touched (`git diff --stat feat/03a-apply..HEAD`)
+
+```
+ backend/src/katalyst/domain/__init__.py           |   31 +-
+ backend/src/katalyst/domain/patch.py              |   87 +-
+ backend/src/katalyst/domain/propagation.py        | 1530 +++++++++++++++++++++
+ backend/src/katalyst/domain/validity.py           |   60 +-
+ backend/src/katalyst/fixtures/hormuz.py           |  107 +-
+ backend/tests/strategies.py                       |   32 +-
+ backend/tests/unit/domain/test_patches.py         |  301 +++-
+ backend/tests/unit/domain/test_propagation.py     | 1110 +++++++++++++++
+ backend/tests/unit/domain/test_validity.py        |   25 +-
+ backend/tests/unit/fixtures/test_hormuz_golden.py |  159 +++
+ 10 files changed, 3343 insertions(+), 99 deletions(-)
+```
+
+Four commits: `cf23d39`, `edc039e`, `d4cb623`, `f473001`. Nothing pushed. `pre-commit run --files …` passes on all ten.
+
+## Verification
+
+```
+=== pytest ===
+src/katalyst/domain/patch.py            156      0     68      0   100%
+src/katalyst/domain/propagation.py      422      0     90      0   100%
+src/katalyst/domain/validity.py         141      0     52      0   100%
+---------------------------------------------------------------------------------
+TOTAL                                   917      0    224      0   100%
+======================= 226 passed, 2 warnings in 57.21s =======================
+
+=== ruff check . ===              All checks passed!
+=== ruff format --check . ===     45 files already formatted
+=== mypy src ===                  Success: no issues found in 24 source files
+=== mypy --strict src/katalyst/domain === Success: no issues found in 11 source files
+```
+
+`grep -rn "scipy\|strength_lo\|strength_hi" backend/` and `grep -rn "np.random\.\(seed\|rand\|choice\)" backend/src` both find nothing. Suite is 57 s, under the two-minute budget.</result>
+<usage><subagent_tokens>712539</subagent_tokens><tool_uses>223</tool_uses><duration_ms>3624662</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aced43e63c11c0d42</task-id>
+<tool-use-id>toolu_011TQFzLJmXYvDLxFWvKXgJn</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/aced43e63c11c0d42.output</output-file>
+<status>completed</status>
+<summary>Agent "D: build apply (03a PR2)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Measurements taken on the shipped fixture at seed `20261001`, full budget (2 000 × 8). Script lives at `/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/scratchpad/measure_fixture.py` — not committed, working tree clean.
+
+**1 · B on its resolve-by day (day 14)**
+
+| world | p | band | width |
+|---|---|---|---|
+| base | `.40` | `.25–.55` | `.30` |
+| `do(H)` | `.58` | `.42–.73` | `.32` |
+| strike | `.30` | `.17–.44` | `.27` |
+
+`do(H)` still **widens** B's band — `.296 → .318`, the chapter's `.292 → .323` with the same sign and nearly the same size.
+
+**2 · `range_shares[B]`, read on day 14**
+
+| world | B's own prior | H | next largest |
+|---|---|---|---|
+| base | **64.9%** | 6.1% | C 4.2% |
+| `do(H)` | 81.5% | **0.4%** | C 4.4% |
+| strike | 88.1% | 0.4% | R 3.5% |
+
+H's share falling to near nothing under `do(H)` holds (`6.1% → 0.4%`, chapter: `2.6% → 0%`).
+
+**3 · "Pin it down"** — base world, B's own prior frozen at `.28`, everything else as shipped: band `.34–.46`, width `.117`. So **from 30 points to 12** (chapter: 29 → 8).
+
+**4 · The paired base-versus-`do(H)` difference on B at day 14**
+
+| | |
+|---|---|
+| mean move | **+.19** |
+| 10-to-90 of the move | **+.10 to +.27** (width `.17`) |
+| same direction | **99.9%** of versions |
+| band overlap | `.129` of a narrower band of `.296` = **43.6%** |
+
+The anti-pattern's point gets *stronger*: the bands now overlap by nearly a half while essentially every version moves the same way.
+
+**5 · Decay factors and B's clock** — `H-&gt;B` on day 14: **0.758** (confirms 0.76). `B-&gt;M1` on day 30: **0.536** (confirms 0.54). **B is settled on day 2** in the base world; H on day 0. For reference, `H-&gt;B` on day 45 is still **0.370**.
+
+**6 · Delta-method cross-check**, B at day 14, base world — sampler `.2495–.5451`, analytic `.2459–.5455`. Agreement to **.0036** on the low edge and **.0004** on the high.
+
+**7 · Strike versus base, terminal by terminal**
+
+| terminal | day of largest divergence | before | after | peak | same direction |
+|---|---|---|---|---|---|
+| M1 | day 3 | `.50` | `.42` | **−.079** | 96.5% |
+| M2 | day 5 | `.43` | `.36` | **−.069** | 95.5% |
+| N1 | day 10 | `.28` | `.37` | **+.088** | 99.9% |
+
+All three peak in the first fortnight, days after the strike — which is exactly the "do not read a delta row on a distant resolve-by day" point, now with dates close to the edit rather than a month out.
+
+**Extra, for like-for-like** — the same quantities read on **day 45**, where the chapters measured them, on the tuned fixture: base B `.35 (.20–.49)`, width `.288`, own share **76.7%**, H's share **2.1%**; `do(H)` B `.45 (.29–.61)`, width `.322`, own share 82.7%, H's share 0.3%; paired move `+.102 (+.051 to +.155)`, 99.9% same direction.
+
+So the chapter's `.35 (.20–.49)`, `.292 → .323` and `+.10 (+.07 to +.13)` are **still right at day 45** — the tuning barely moved them. What changed is only *which day B is read on*: the `92% → 76.7%` and `29 points → 30 points` differences come from day 45 versus day 14 and from the spread estimate, not from the two inputs I tuned. That may make the rewrite smaller than you expected: several sentences can keep their numbers if they say "at day 45" rather than "on its resolve-by day".</result>
+<usage><subagent_tokens>725651</subagent_tokens><tool_uses>4</tool_uses><duration_ms>108944</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ab5c0e5cee8af0d2e</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/ab5c0e5cee8af0d2e.output</output-file>
+<status>completed</status>
+<summary>Agent "Q: write diff.md chapter" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Swept. No git commands were run.
+
+## Per file
+
+**`spec/multiverse/diff.md` — 335 lines**
+
+- **Purpose** — the illustrative "`.44` to `.21`" swapped for the engine's real top row, `.50` → `.42` on the Brent contract, so no made-up number survives anywhere on the page.
+- **Behaviour preamble** — the "every likelihood is illustrative" caveat replaced: every number is the engine's own at seed `20261001`, full budget, none typed by hand; the example's inputs may be tuned (B's resolve-by day and one half-life were, in this stack), which is why the golden test asserts directions and orderings only.
+- **Claim list** — B's resolve-by day 2026-11-15 → **2026-10-15**. M2's 2026-11-15 is unchanged and correct (still `_resolve_by(45)`, checked in the fixture).
+- **B2** — the state walk-through is now the engine's six shifted claims at their own resolve-by days: H `.36`→`.08`, C `.40`→`.07`, B `.40`→`.30`, M1 `.46`→`.41`, M2 `.43`→`.36`, N1 `.28`→`.37`. Per your instruction it says every move clears the 90% bar, *which is what the golden test pins*, rather than quoting a resolve-by-day share I do not have. Added why N1 goes up (`H → N1` is a trigger; H was true on day 0 in every world, so the push fired everywhere and stays fired). R now quotes `.19 (.08–.32)` in both worlds, byte for byte.
+- **B3** — the overlap evidence is now day 14: base `.40 (.25–.55)` against supposed `.58 (.42–.73)`, **overlap 44% of the narrower band (`.129` of `.296`)**, **99.9%** same direction, move `+.19 (+.10 to +.27)`. Widths `.296 → .318`; H's share of B's band `6.1% → 0.4%`.
+- **B4** — the worked example keeps the route reasoning and gains **the rail the engine actually produces**, as a table: M1 day 3 / 2026-10-04 / `.50`→`.42` / `−.079` / 96.5% / 0.6 / `.047`; M2 day 5 / 2026-10-06 / `.43`→`.36` / `−.069` / 95.5% / 0.6 / `.041`; N1 day 10 / 2026-10-11 / `.28`→`.37` / `+.088` / 99.9% / 0.3 / `.026`. Followed by a paragraph on N1 having the biggest move and ranking last — the second factor earning its place, with the arrow's own rationale quoted as the reason.
+- **B5** — the fade sentence is rebuilt around M1, which is now the clean case: peak `−.079` on day 3 against `−.05` on its resolve-by day, about two thirds of the move; all three endings peak within ten days of the strike. The decay factors are restated truthfully (`H → B` at **0.76** on day 14, `B → M1` at **0.54** on day 30) with a line saying what tuning B's window from forty-five days to fourteen did and did not change.
+- **B6** — the summary instance is now real and quotes the claim verbatim: *"Hormuz opens, then Iran is struck" moves A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES from .50 to .42 by 2026-10-04 and leaves 1 claim untouched.* Added a line saying the slot takes the claim's stored words minus its trailing full stop, and a short note that `.50`/`.42` are the rail's day and not M1's resolve-by day, where the move is the smaller `−.05`.
+- **Anti-patterns 1 and 6** — 44% / 99.9%, and the M1 peak-versus-resolve-by-day contrast.
+
+**`PRODUCT_REQUIREMENTS.md` — 279 lines.** FR-21 now reads **65% … from 30 points wide to 12**, with the dated correction extended to record both repairs (the "base rate" wording and the old 92% / 29-to-8 figures) and to say the new figures are the shipped engine's, read on B's resolve-by day after the window was tuned. FR-16 untouched.
+
+**`docs/adr/0014-…md` — 241 lines.** One dated note appended to the existing inline correction in §C, in the same italic-parenthetical form, carrying your sentence verbatim plus "and the measurements above stand as taken". **No measurement in the record was rewritten** — the day-45 figures throughout remain exactly as taken.
+
+## Left alone, and why
+
+- **M2's 2026-11-15** — still correct; only B's date moved.
+- **Record 0014's tables and §B/§D/§E figures** — a dated journal entry, per your instruction; the new note points at the re-measurement without touching them.
+- **The `.06` / paired-difference reading** — already removed last round, nothing to sweep.
+- **The tie-break paragraph at B4** (added between rounds, marked *proposed here*) — I left it as found, including its mark; it is about equally-backed routes, not a number.
+- **`propagation.md`'s "overlap by a third"** — P's file this round.
+- **Length** — `diff.md` is now 335 lines, fifteen over the original 200–320 guidance. The real rail table and the N1 paragraph are what pushed it; say the word and I will cut the B5 fade paragraph back to a single sentence to bring it under.</result>
+<usage><subagent_tokens>246157</subagent_tokens><tool_uses>15</tool_uses><duration_ms>153872</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aeabd344ac41d665b</task-id>
+<tool-use-id>toolu_01Hfk9XoGmZvBbZDmMNL4r1u</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/3bcc9024-06ad-4692-9a6a-e303e34756e0/tasks/aeabd344ac41d665b.output</output-file>
+<status>completed</status>
+<summary>Agent "P: write propagation.md chapter" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Sweep complete. Worked in `/Users/kentgang/git3/katalyst-wt/feat-03a-apply`; no git commands; only my two files touched.
+
+## `spec/multiverse/propagation.md` — 462 lines (was 425)
+
+- **`World` gains `series_days`**, placed between `beliefs` and `series` to match the shipped shape, marked as the second addition to the plan's shape. Described in B1 (why it exists: past 180 points the days are uneven and a sparkline drawn as though they were evenly spaced misplaces every date) and referenced in B8's reader table.
+- **`propagate` signature** reordered to match the code — `introduced_by` is last, defaulting to `NOTHING_ADDED` — and the surrounding prose says it is one of two additions. New paragraph: a missing undermining arrow raises `ValueError`, the one place the function raises, because it is our own caller's contract breach and not user input.
+- **Timing**: the plan's "about ten milliseconds at sixty claims" replaced by the measured figures (Hormuz 67 ms; sixty claims 41 ms one day, 544 ms over 61 days, 1.4 s over a year), with the reason — cost is claims × days × 16 000, so the window is the term that grows — and one clause saying what the old figure actually measured.
+- **Behaviour preamble** gained a "Judged on" column (H 31, C 30, **B 14**, R 60, M1 30, M2 45, N1 60, S 1) and a sentence on why B's moved. The window note now reads day 0 to day 60, sixty-one points.
+- **B3** gained the N1 illustration: `H → N1` fired in every world on day 0, so N1 comes out *higher* on the strike branch (`.37` against `.28`) while C, held by a sustain from the same claim, collapses `.40 → .07`. One cause, two claims moving opposite ways, one field of difference. Also `.07` → `.08` for H's post-push draws.
+- **B4**: the H table now reads `.36` withdrawn and about `.08` pushed, with the prior `.35` named in the "why" cell; the note beneath gives the engine's `.356` / `.081` and marks the hand arithmetic (`.35`, `sigmoid(−2.52) = .074`) as still right *as hand arithmetic*, with one clause on which is which.
+- **Re-supposing rewritten** (item 4): a second `do` cuts every arrow pointing at the claim *including the one that undermined the first supposition*, and a cut is not timed — so `supposed · withdrawn · pushed · supposed` **cannot occur**; H reads `supposed` throughout. What can happen is a second supposition undermined by a *new* arrow added after it. "One `Retraction` per ending" kept; both tests named; stated as a consequence of the settled cut rule.
+- **B5**: the four-design table captioned as a dated measurement of designs, with "B's resolve-by day has since moved to day 14, and the shipped engine still reports `.35 (.20–.49)` for B at day 45"; the "10 ms" cell dropped from that row (it is now in the Data model). Living numbers restated: **65%** own share (plus H 6.1%, C 4.2%), **30 points to 12** with the actual bands, **`.296 → .318`**, **6.1% → 0.4%**. Delta-method cross-check now quotes `.2495–.5451` against `.2459–.5455`, in both B5 and `INV-multiverse.13`.
+- **B6** gained item 6: the weighting reaches only what the observation is evidence about; an unconnected claim is read off every world unweighted, which is exact and keeps INV-4 true.
+- **B7** gained item 7: both streams derived per claim from a hash of its identifier, so adding a claim cannot shift another's draws — why `test_versions_do_not_depend_on_the_branch` holds exactly and why the dice cancel in a paired comparison. The noise-correction paragraph now says the inner variance is the unbiased estimate, in plain words (eight numbers give seven independent comparisons; dividing by eight would leave the band a shade too wide).
+- **B8** gained a base-versus-strike headline table for all seven claims, engine's own numbers, with R byte-identical and N1 going up called out.
+- Golden assertion 3 now reads "about `.36` — H's own prior, `.35`, read back"; the research-report paragraph now contrasts report 02's `.61 → .18` / `.54 → .09` against the engine's `.46 → .41` / `.43 → .36` and says that is what "illustrative" meant.
+
+## `spec/multiverse/interventions.md` — 431 lines (was 429)
+
+- **Item 8**: a paragraph beside the affected-set table — the table covers one edit on a map; when an `observe` is in force and a later edit changes what it is evidence about, evidence is not local and the reach is the union; `GraphEditMachine` accounts for it in `_evidence_moved`. Framed as the principle applied twice, not an exception.
+- **B2's walk-through**: the three-state table now reads `.36` withdrawn and about `.08` pushed, with H's prior `.35` named; the UX-14 paragraph matches, with one parenthetical saying these are the engine's numbers at the fixture's seed.
+- No hand-written model numbers were quoted in this chapter, so nothing else needed removing.
+
+## Left alone, and why
+
+- **The `+.10`, `+.07 to +.13` paired-difference figures and "100% of versions agree"** — I was not given the re-measured values on the tuned fixture, and they are `diff.md`'s quantities. Rather than quote stale ones I replaced them with what I could verify from the numbers you sent: B's two bands are `.25–.55` against `.42–.73`, overlapping from `.42` to `.55`, about two fifths of each. The agreement figure is deferred to `diff.md` by name, in both B7 and anti-pattern 5. **If Q has the re-measured agreement number, one sentence in each place would close it.**
+- **"Overlap by a third"** became "about two fifths" — the tuned bands genuinely overlap more than they used to.
+- **The four-design comparison table's numbers** are unchanged by design: it compares designs, not the current fixture, and now says so.
+- **`docs/adr/0014`'s and `vocabulary.md`'s `.35` / `.07`** are Q's files; note that 0014's Hormuz table has the same `.35` / `about .07` pair I have just moved to `.36` / `.08`, and its `92%` / `29 points to 8` / `2.6% → 0%` figures are the ones I restated. Worth confirming Q is taking all four.</result>
+<usage><subagent_tokens>284228</subagent_tokens><tool_uses>39</tool_uses><duration_ms>243874</duration_ms></usage>
+</task-notification>
