@@ -1,0 +1,65 @@
+One critique/adjustment I'd like to make on the ADRs/plans and the structure of the repo overall is that while the ADR docs should be numbered, the docs in spec should be structured more like an ontology or book. That is, use an intentional directory and file structure to organize it by idea. It could be numbered if deliberately to order them in an intended reading order. ADRs makes sense to order by number because they are produced sequentially.
+
+Another general critique or improvement would be to plan for or add a living ARCHITECTURE.md that acts as a technically focused counterpart to the PRODUCT_REQUIREMENTS.md doc.
+
+---
+
+Please include a corresponding revision to the ADRs as appropriate. Use opus sub-agents to help.
+
+---
+
+<task-notification>
+<task-id>aadba0e03d4a6e5ab</task-id>
+<tool-use-id>toolu_015eXNpjaT63pbN9d6UygTo3</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/6426bff2-c00c-4e7a-9489-062009a5ee3f/tasks/aadba0e03d4a6e5ab.output</output-file>
+<status>completed</status>
+<summary>Agent "Write ADR-0011 spec-as-book" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Wrote `/Users/kentgang/git3/katalyst/docs/adr/0011-spec-as-book-and-living-architecture.md` (105 lines) and appended one row to `/Users/kentgang/git3/katalyst/docs/adr/README.md`. No other files touched.
+
+What the record says:
+
+- **Front matter** uses every template field: status `accepted`, date 2026-09-16, decision-makers Kent Gang, consulted (the 2026-09-16 critique, AGENTS.md, ADR-0001), informed (every agent writing specs/architecture/PRs), supersedes `none (this refines ADR-0001; it does not replace it)`, superseded-by `none`, spec-impact `spec/README.md (structure of the whole spec)`.
+- **Context** frames the problem as a question: the flat `spec/01-…` … `spec/06-probes.md` layout borrowed the decision records' numbering, implying a sequence nobody intends, and nothing in the repo describes the system as built.
+- **Drivers**: the owner's critique (readers look things up by idea), the AGENTS.md rules (ALL-CAPS root docs hold enduring context; docs stand alone), the kgents constitution's Generative principle (spec is compression — regenerate the implementation from spec plus architecture doc), the D5(ii) disgust veto ("an architecture doc that drifts is worse than none"), and the solo-developer-plus-agents maintenance constraint.
+- **Decision** states the two rules explicitly: one directory per idea with a README landing page carrying the three sections (idea / what it owns / chapters), unnumbered chapter files with numbering reserved for a stated reading order, decision records staying numbered as a journal; and a living root `ARCHITECTURE.md` with per-section built/planned markers, a "last verified" date, and the same-PR update obligation.
+- **Confirmation** is the four concrete checks you specified, including the new PR-checklist item "Does this change invalidate `ARCHITECTURE.md`?".
+- **Pros and cons** cover all six options A–F with honest trade-offs on each, including the chosen one (discipline cost: an un-updated landing page is a quiet lie).
+- **More Information** names the 2026-09-16 critique, ADR-0001 (with "MADR" spelled out as Markdown Any Decision Records, and a note that ADR-0001 remains in force), the Generative principle, and the PRD §3/§12 pairing of spec parts to stacks.
+
+Self-containment pass: MADR, pydantic, "ontology", and "invariants" are each explained at the point of use.</result>
+<usage><subagent_tokens>44935</subagent_tokens><tool_uses>13</tool_uses><duration_ms>89560</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7c295a9f068e1a83</task-id>
+<tool-use-id>toolu_01Xp96B6gukoLEQBi3Hvnkph</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/6426bff2-c00c-4e7a-9489-062009a5ee3f/tasks/a7c295a9f068e1a83.output</output-file>
+<status>completed</status>
+<summary>Agent "Plain-language pass ADRs 0001–0005" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. All five files rewritten in place; front matter, status, dates, chosen options, considered options, and every argument preserved. The remapped `spec/` directory paths were left as found.
+
+| File | Before | After |
+|---|---|---|
+| `docs/adr/0001-record-architecture-decisions.md` | 94 | 95 |
+| `docs/adr/0002-python-backend-react-frontend.md` | 88 | 88 |
+| `docs/adr/0003-domain-owns-the-graph.md` | 92 | 92 |
+| `docs/adr/0004-branches-are-patches.md` | 95 | 95 |
+| `docs/adr/0005-link-semantics-and-propagation.md` | 119 | 123 (+3.4%) |
+
+Key clarifications, per file:
+
+**0001** — MADR, Nygard, `adr-tools` and `log4brains` are now described where they are first named (template shape, Node.js dependency, etc.); "front-matter" is explained as the `---` block at the top of the file; the bare kernel reference `(L1.13)` was dropped as unexplained jargon, and D5-ii / D9 / NFR-5 / D7 now carry short meanings. Added the required ADR-0011 bullet under More Information.
+
+**0002** — every tool in the toolchain list now says what it does in three to six words (FastAPI, pydantic, uv, networkx, Vite, biome, gitleaks, cassettes); `hypothesis` is glossed once as property-based testing with shrinking; "OpenAPI codegen" became "the backend publishes a machine-readable description of its own endpoints, and the TypeScript types are generated from it, with a build job failing on drift"; `D5-i` is named as the template-UI veto.
+
+**0003** — "structured outputs" is now "schema-constrained output — the model must fill a fixed shape — which guarantees well-formed JSON, not a sound graph"; every invariant cited in the drivers carries its meaning (INV-1 resolvable, INV-2 rationale plus sources, INV-6 no loops / directed acyclic graph, INV-9 lands somewhere tradeable); ULIDs and cassette are glossed at first use.
+
+**0004** — the `do`/`observe` distinction is carried in plain words throughout ("assert" versus "learn", with Pearl's `do` named once); INV-5's patch algebra is stated in prose ("applying no edits is a no-op; applying two lists in a row equals applying them joined") instead of symbol equations; the ghost overlay and delta rail are described as "the faded before-and-after overlay" and "the ranked list of terminal changes". One factual tidy: the text said "one of five ops" while listing six; it now says six.
+
+**0005** — log-odds is defined once ("the scale on which independent influences add instead of multiply"), Monte Carlo once ("thousands of random simulations whose spread is the answer"); the aggregation formula keeps its code block but the `Σ` was replaced with "sum over active links" and followed by a one-sentence reading of the formula; the full-CPT option now explains "a number for every combination of parent truth values — doubling with each parent", `CVaR₅`/`P(ruin)` became "the average loss in the worst 5% of runs" and "the chance of being wiped out", non-ergodic became "these events are one-shot: they never repeat enough to settle into a long-run average", and Pearl's hierarchy link now says which rung we work at and why.</result>
+<usage><subagent_tokens>84105</subagent_tokens><tool_uses>17</tool_uses><duration_ms>272021</duration_ms></usage>
+</task-notification>
