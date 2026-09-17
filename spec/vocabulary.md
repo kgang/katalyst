@@ -70,7 +70,7 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 ## Surfaces
 
 **Workbench.** The main screen: canvas + world-state strip + Inspector + tail strip + thesis dock.
-**Tile.** A proposition's on-canvas card. **Port.** A typed input/output on a tile. **Wire.** A link's on-canvas rendering. **Inspector.** The persistent side panel; never a modal. **Delta rail.** The ranked terminal-delta list beside a diff. **Launchpad.** The empty state with the four seeded examples.
+**Tile.** A proposition's on-canvas card. **Port.** A typed input/output on a tile. **Wire.** A link's on-canvas rendering. **Inspector.** The persistent side panel; never a modal. **Delta rail.** The ranked terminal-delta list beside a diff; its two side columns are headed **how firm** (the width of the new number's range) and **same direction** (the share of versions of the map that moved the same way — the field called `agreement`; on screen the word *agreement* is kept free for stack 04's run-to-run number). **Launchpad.** The empty state with the four seeded examples.
 
 ## Interface words
 
@@ -86,6 +86,18 @@ The six operations keep their code names in code, in the wire format and in this
 | `believe` | **My own number** | none — the three-up belief chip is the badge | Your number sits beside the model's and the market's |
 
 One more badge is **derived**: no button produces it. **Retracted · date · by "…"** appears on a claim that was supposed true and has since been pushed back down by a later edit — what was holding this up was removed. It names the edit responsible and the day it landed (UX-14; the mechanism is in `multiverse/interventions.md`).
+
+## Words for a number that is not there
+
+An empty slot never shows a blank, a zero or a placeholder: it shows words and, one hover or one click away, a reason. These are the words; change them here first.
+
+| Where | On the tile | The reason, read in the Inspector and on the chip's hover |
+|---|---|---|
+| No market price, on a `market` claim | **no market** | "No venue quotes this claim; what you would trade is on the payoff." |
+| No market price, on an `event` or the `hypothesis` | **no market** | "No venue quotes this claim." |
+| No market price, on a `not_tradeable` ending | **no market**, with the claim's own stored reason **on the tile** — that reason is a finding, not boilerplate | the same stored reason |
+| No number of your own yet | **—** and *add yours* | "You have not given a number for this claim." |
+| Nothing has been computed | **no engine yet** | "Nothing has worked this number through the map yet." |
 
 ## Words we do not use
 

@@ -95,6 +95,7 @@ Concretely:
 
 ## More Information
 
+* **Amended 2026-09-17, when stack 03b's chapters were written.** Three details above have moved on, and the chapters in `spec/workbench/` are where they now live. (1) The animation library is published as `motion` — the same library and author as Framer Motion, under its current name. (2) Provenance is carried by a three-step origin mark at the wire's tail, not by a dashed stroke: the stroke already says what kind of push an arrow carries, and one channel cannot carry two meanings (`spec/workbench/color-motion-type.md`). (3) Until the engine's world route is switched on, the diff reducer reads a base map plus a branch — not a pair of worlds — and gives four structural states, `added | killed | downstream | untouched`; `shifted` joins them when the numbers arrive, and the engine's own difference keeps the four states named above (`spec/workbench/diff-view.md`, `spec/multiverse/diff.md`). The visual review checklist now maps to UX-1 through UX-14.
 * Interview D3 (Workbench aesthetic) and D5(i) (template veto).
 * `docs/research/03-ui-ux-directions.md` §1 (technology comparison and ELK settings), §2 (ghost overlay, delta rail), §5 (anti-patterns), §6 (accessibility).
 * React Flow layouting: https://reactflow.dev/learn/layouting/layouting · ELK example: https://reactflow.dev/examples/layout/elkjs
