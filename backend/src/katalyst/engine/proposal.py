@@ -262,9 +262,11 @@ class ClaimProposal(BaseModel):
     payoff: Payoff | None = Field(
         default=None,
         description=(
-            "What you would trade. Belongs to a 'market' ending: either a named "
-            "contract at a named venue and which side you would take, or an "
-            "instrument, a direction, and how far its price would move."
+            "What you would trade. Belongs to a 'market' ending, and is one of "
+            "two things told apart by its own `kind` field, which always say "
+            "which: `kind` 'contract' for a named contract at a named venue with "
+            "the side you would take, or `kind` 'price' for an instrument, a "
+            "direction, and how far its price would move."
         ),
     )
     not_tradeable_reason: str | None = Field(

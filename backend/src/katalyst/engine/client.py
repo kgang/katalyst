@@ -51,6 +51,12 @@ from collections.abc import Sequence
 from typing import Any, Protocol
 
 import anthropic
+
+# A private path into the client library, used in exactly one place and never to
+# build a request: `wire_schema` below looks at what the library *would* send, so
+# a test can check it before a call is made. If the library ever moves it, the
+# import fails loudly at start-up rather than the product failing quietly.
+from anthropic.lib._parse._transform import transform_schema
 from anthropic.types import (
     MessageParam,
     ParsedMessage,
@@ -58,7 +64,7 @@ from anthropic.types import (
     ToolChoiceParam,
     WebSearchTool20260209Param,
 )
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from katalyst.engine.outcome import FoundPage, Said
 from katalyst.engine.pricing import MODEL
@@ -139,6 +145,50 @@ STANDING_BLOCK: list[TextBlockParam] = [
     }
 ]
 """The standing half of every request, marked as the part worth remembering."""
+
+
+class OneProposal(BaseModel):
+    """The envelope a proposal travels in, and the one thing in this layer the wire forced.
+
+    A proposal is one of three shapes told apart by a `kind` field. Written out as
+    a description of what an answer must look like, that is a choice at the very
+    top — and **the service refuses a top-level choice that also names shapes by
+    reference**: *"output_config.format.schema: For 'anyOf', '$defs' is not
+    supported"* (2026-09-17, the first live call). Put the same choice one field
+    down and the top is an ordinary object, which it accepts.
+
+    So this exists for the wire and for nothing else. It is put on at the moment
+    the question goes out and taken off at the moment the answer comes back, both
+    inside this file. **No field of any proposal is renamed, and nothing outside
+    this file knows the envelope exists** — `expand.py` is handed a plain
+    proposal, exactly as before.
+
+    A single shape such as a starting claim is already an object at the top, so it
+    needs no envelope and does not get one.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    proposal: Proposal = Field(description="The one thing this answer is.")
+
+
+def wire_schema(shape: Any) -> dict[str, Any]:
+    """Return the exact description of an answer that the library will send.
+
+    The library builds this from the shape and then tidies it — dropping what the
+    service does not support and validating those parts on this side instead — so
+    reading the shape's own description would not tell you what actually goes out.
+    This is the thing to make assertions about.
+
+    Args:
+        shape: A shape an answer must fit.
+
+    Returns:
+        The description as the service will receive it.
+    """
+    schema: dict[str, Any] = TypeAdapter(shape).json_schema()
+    tidied: dict[str, Any] = transform_schema(schema)
+    return tidied
 
 
 class AnswerWeCouldNotRead(Exception):
@@ -230,7 +280,7 @@ class Model:
         Returns:
             The answer, in our own words.
         """
-        return self._ask(question, Proposal, may_search=may_search)
+        return self._ask(question, OneProposal, may_search=may_search)
 
     def _ask(self, question: str, shape: Any, *, may_search: bool) -> Said:
         """Put one question, sending a part-finished answer back until it finishes.
@@ -296,6 +346,9 @@ def what_it_said(rounds: Sequence[ParsedMessage[Any]]) -> Said:
     What the model wrote and what the search returned come out in **two different
     fields**, because the whole grounding rule rests on never confusing them.
 
+    A proposal arrives inside the envelope the wire forced on it, and leaves
+    without one.
+
     Args:
         rounds: Every round trip the question took, oldest first. The last one
             holds the answer.
@@ -305,8 +358,12 @@ def what_it_said(rounds: Sequence[ParsedMessage[Any]]) -> Said:
         what every trip cost.
     """
     last = rounds[-1]
+    answered = last.parsed_output
+    if isinstance(answered, OneProposal):
+        # The envelope comes off here, so nothing past this file ever sees it.
+        answered = answered.proposal
     return Said(
-        answered=last.parsed_output,
+        answered=answered,
         found=_pages_the_search_returned(rounds),
         declined=_declined(last),
         calls=len(rounds),

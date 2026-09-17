@@ -89,7 +89,9 @@ def test_only_two_shapes_are_ever_asked_for() -> None:
             # The first thing handed over is the question; the second is the
             # shape an answer has to fit.
             asked_for.update(one.id for one in node.args[1:] if isinstance(one, ast.Name))
-    assert asked_for == {"Proposal", "StartingClaim"}, asked_for
+    # A proposal travels inside the envelope the wire forced on it; a starting
+    # claim is already an object at the top and goes as it is.
+    assert asked_for == {"OneProposal", "StartingClaim"}, asked_for
 
 
 def test_an_arrow_is_only_ever_built_where_a_proposal_is_accepted() -> None:

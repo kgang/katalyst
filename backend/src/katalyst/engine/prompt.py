@@ -122,24 +122,28 @@ def prompt_hash() -> str:
     must fit. Change a sentence or add a field, and every recording made before
     the change can be told apart from one made after.
 
+    The shapes it covers are the ones **as they go out over the wire**, not as
+    they are written here. The client library tidies a shape before sending it,
+    and what the model was actually asked for is the tidied one — so if that
+    tidying ever changes, every recording made before it can be told from every
+    recording made after, which is exactly what this is for.
+
     It deliberately does **not** cover the varying half. That differs on every
     call by design, and folding it in would make the fingerprint useless.
 
     Returns:
         The fingerprint as plain hexadecimal, the same on every machine.
     """
-    # Imported inside the function rather than at the top of the file: the shapes
-    # module reads the map's own types and this one reads the shapes, and a plain
-    # import both ways round is a circle waiting to happen the first time either
-    # grows.
-    from pydantic import TypeAdapter
-
-    from katalyst.engine.proposal import Proposal, StartingClaim
+    # Imported inside the function rather than at the top of the file, because the
+    # seam reads this module and this line reads the seam. Both are fully loaded
+    # by the time anybody asks for a fingerprint.
+    from katalyst.engine.client import OneProposal, wire_schema
+    from katalyst.engine.proposal import StartingClaim
 
     shapes = json.dumps(
         {
-            "proposal": TypeAdapter(Proposal).json_schema(),
-            "starting_claim": TypeAdapter(StartingClaim).json_schema(),
+            "proposal": wire_schema(OneProposal),
+            "starting_claim": wire_schema(StartingClaim),
         },
         sort_keys=True,
         separators=(",", ":"),
