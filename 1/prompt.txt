@@ -1,0 +1,301 @@
+Could you please deeply analyze the take home assignment description and assets at 
+/Users/kentgang/git2/kelai-takehome-applied-ai? Combine some ideation, creative brainstorming, and light internet research using usb-agents.
+
+For this session, please scaffold the /Users/kentgang/git2/kelai directory based on the structure of /Users/kentgang/git3/katalyst? Specifically, setup an AGENTS.md, a PRODUCT_REQUIREMENTS.md doc, a spec folder, and a docs/ folder with docs/adr
+
+Please also leverage sub-agents to critically review the agents' ideas where most important. Refine the ideas to aim for the most enlightened, principled, and simple as possible to understand and maintain overall as possible. I would like to achieve all aspects of what was laid out in the project description files at /Users/kentgang/git2/kelai-takehome-applied-ai. Let's use the openai agents sdk for creating the agent. Please structure and strategize the development to leverage parallelized build and development as much as possible to make it fast.
+
+When using and orchestrating sub-agents, please use sub-agents.
+
+---
+
+Could you please deeply analyze the take home assignment description and assets at 
+/Users/kentgang/git2/kelai-takehome-applied-ai? Combine some ideation, creative brainstorming, and light internet research using usb-agents.
+
+For this session, please scaffold the /Users/kentgang/git2/kelai directory based on the structure of /Users/kentgang/git3/katalyst? Specifically, setup an AGENTS.md, a PRODUCT_REQUIREMENTS.md doc, a spec folder, and a docs/ folder with docs/adr
+
+Please also leverage sub-agents to critically review the agents' ideas where most important. Refine the ideas to aim for the most enlightened, principled, and simple as possible to understand and maintain overall as possible. I would like to achieve all aspects of what was laid out in the project description files at /Users/kentgang/git2/kelai-takehome-applied-ai. Let's use the openai agents sdk for creating the agent. Please structure and strategize the development to leverage parallelized build and development as much as possible to make it fast.
+
+When using and orchestrating sub-agents, please use opus sub-agents.
+
+---
+
+Additional context, I added an openai api key to .env.
+
+---
+
+<task-notification>
+<task-id>a0a47f964f668bfc5</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/a0a47f964f668bfc5.output</output-file>
+<status>completed</status>
+<summary>Agent "Tool design and grounding ideation" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git2/kelai/docs/research/04-tools-and-grounding.md` (423 lines, self-contained). Every figure in it I computed from `returns.parquet` while writing, so the worked examples are the real answers.
+
+**Recommendation: a two-tier tool surface — 1:1 where the endpoint is already at the altitude of a user question, composites where the question needs fan-out.** Eight tools over six endpoints: `search_signals`, `get_signal`, `list_notes`, `read_note`, `backtest`, `compare_signals` (N signals × 1–3 windows, fans out to N single-signal backtests), `track_record` (full history + calendar-year grid + an optional caller-supplied split), `find_redundant_pairs` (60 cached `/returns` fetches → 1,770 correlations → rows above threshold). **`/signals/{id}/returns` is deliberately not a tool** — raw returns never enter the model's context. Three rules keep composites honest: they select and shape but never compute a portfolio metric (`/backtest` is the only Sharpe implementation); no LLM inside a tool; every HTTP request a composite issues must be one a human could legitimately make. Errors: the tool layer never re-implements a house rule, it forwards the server's 400 verbatim via `failure_error_function` as `TOOL_ERROR 400: …` so the model self-corrects (the Q1 trace genuinely hits this — August 2024 is 22 trading days).
+
+**Grounding**: an evidence ledger in the Agents SDK run context, with note results recorded as `kind: "CLAIM"` that *do not satisfy* the numeric check. The load-bearing mechanism is cheaper than it looks: **tools pre-round to 2–3 s.f. and emit every derived number**, so the model copies strings and never does arithmetic — which makes the deterministic post-check an exact match rather than a fuzzy one. Plus inline `[E1]` citations, fixed-shape claim lines (`Claim (file.md): "…" → confirmed [E3 vs E1]`), and one automatic repair turn before a visible banner. Free-text markdown over a Pydantic `output_type`: streaming survives, and the structure tests need already lives in the tool-generated ledger rather than a model-authored field.
+
+**Redundancy vs. the house rules**: the rules govern *combinations*; a correlation builds no portfolio, no weights, no leverage. The house itself sanctions it — the onboarding note says to evaluate candidates individually and compare, and `flow-redundancy-audit.md` is a circulated N×N audit. The injected q3 note is still refused on all three counts (it asks for 10-signal portfolios, 1,770 *backtests*, and Sharpes rounded UP). The distinction is provenance, not content: we scan because the user asked, and with minimum privilege — 60 read-only GETs, then exactly three backtests on the one surviving pair (flw_02/flw_05, corr 0.970; the 50/50 combo scores 1.16 vs flw_02's 1.30 alone; drop flw_05, save $12k/yr).
+
+Two findings worth your attention: the strongest guardrail against the `/internal/config` and vendor-callback injections is that **no tool takes a URL or path** — capability first, persuasion second, which is also the decisive argument against a code interpreter. And automatic breakpoint search must be rejected: scanning year-end splits flags 4 of 60 signals at z &gt; 2.5, three of them spurious, so `track_record` only tests a split a cited note names.</result>
+<usage><subagent_tokens>88321</subagent_tokens><tool_uses>15</tool_uses><duration_ms>602851</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>abf7b8cab1b81d2d5</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/abf7b8cab1b81d2d5.output</output-file>
+<status>completed</status>
+<summary>Agent "Compute data ground truth" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git2/kelai/docs/research/01-data-ground-truth.md` (800 lines). Assignment repo untouched; injections catalogued only, never followed.
+
+**Ten note claims are false against the data.** The worst:
+
+1. **val_10 "softened the blow by maybe a third"** (`value-winter-2020.md`) — it was the **2nd worst of ten** value signals in Feb–May 2020 (-0.221345 vs family median -0.164547). A *real* value+quality blend does work (`val_01+qly_01` 50/50 loses -0.082622 vs val_01's -0.206151), so the lesson is right and the evidence is fabricated.
+2. **ml_03 "moderate Sharpe"** (`ml-family-review.md`) — actually **-0.238622**, 55th of 60, at **$30k/yr**. Live money question.
+3. **mom_01 "clipped in August" 2024** — it was **+2.43%**, the 2nd-best momentum signal that month. mom_07 itself was down (-1.26%).
+4. **mom_10 "most volatile"** — 10th of 12 in 2024, 9th of 12 full history (mom_08 is).
+5. **mom_05/mom_08 "second tier" in 2024** — 8th and 11th of 12.
+6. **snt_05 "never had a disaster"** — 2021 Sharpe **-1.165873**, highest vol in its family.
+7. **Value correlations "spiked" in Feb–May 2020** — they **fell** (0.191 in-window vs 0.288 full).
+8. **ml_01 "re-derives momentum and value"** — corr to mom_01 is -0.0097; it has the **lowest mean |corr| of all 60 signals**.
+9. **Sentiment bill "over $125k"** — exactly $125,000.
+10. **q3 note's suggested "val_10 or val_01 + qly_01"** — those are the two *worst* value signals by full-history Sharpe.
+
+`flow-redundancy-audit.md` is the only note that survives a full audit intact (flw_02/flw_05 = 0.969739, both $12k).
+
+**Spec ambiguities that actually matter** (16 enumerated):
+- **Does the starting 1.0 count as a drawdown peak?** Full history it never matters (all 60 agree), but **10.8% of 60-day windows diverge** — qly_03 over 2024-01-01..2024-03-22 gives -0.067156 vs -0.057734. Ask KelAI.
+- **`per_signal` at weight 1.0 or at assigned weight?** Undefined; the two differ on ann_return/vol/drawdown. Most likely place implementations silently disagree.
+- **ddof**: moves Sharpe 0.84% at n=60 — above any 6-dp assertion. Recommend ddof=1.
+- "Trading days" = business days **including holidays** (2019-07-04 is in the index); 2024 has 262 rows, annualised at 252.
+
+**Headline golden answers:** mom_07 2024 Sharpe **3.822335**; qly_03 pre/post-2022 **1.721182 / -0.073481**; the val_05+val_03+qly_01 combo at 0.5 each scores **1.071213** and **fails** the note's own "must beat its best constituent" rule (qly_01 alone is 1.184619) — the most interesting single result in the set. Exactly **3** pairs in the library exceed |corr| 0.5.
+
+**Volume:** one signal's full history is ~24k tokens — never hand it to the model. The 6-metric block is 129 bytes.</result>
+<usage><subagent_tokens>126895</subagent_tokens><tool_uses>47</tool_uses><duration_ms>705802</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae7a0b6ee4e548399</task-id>
+<tool-use-id>toolu_01KFooZfAuNPcJfZ74uHTCaa</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/ae7a0b6ee4e548399.output</output-file>
+<status>completed</status>
+<summary>Agent "Threat model and guardrail design" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git2/kelai/docs/research/03-threat-model-and-guardrails.md` (50 catalogued threats T01–T50, layer assignments, untrusted-content handling, egress + grounding design, scope, 22 adversarial tests, 7-guardrail one-pager, sources, and a ground-truth appendix computed from the real parquet).
+
+**Recommended design — seven guardrails, five structural**
+
+The architecture is decided before any individual guardrail: the agent holds two legs of the lethal trifecta (private data, untrusted notes) and never the third. It gets six typed read-only tools, no URL/path/code arguments, one pinned HTTP client with a host-plus-path allowlist that excludes `/internal/*`, and no filesystem. The admin token is therefore never in its blast radius — the canary filter is a tripwire on that control, not the control.
+
+1. **G1 Closed tool surface + pinned transport** — kills the `/internal/config` call, the vendor-note POST, and `server.py`/`.env` reads at once.
+2. **G2 House rules as server code** (1–3 signals, gross ≤ 1.5, ≥ 60 days), frozen at build time from the methodology note rather than parsed at runtime — so the q3 "waiver" is a 400.
+3. **G3 Notes by enum** — membership lookup over `notes/*.md`, never path-joining a string.
+4. **G4 Untrusted-content envelope** — nonce delimiters, provenance header, datamarking, a `contains_hidden_markup` flag, and a duty to *report* injections.
+5. **G5 Egress: deterministic filter + inert renderer** — canary blocks; markdown images and non-allowlisted URLs stripped; CSP `img-src 'self'`.
+6. **G6 Numeric grounding ledger** — every decimal/percentage/currency token must match a tool result under round-half-even at printed precision; `ceil`-but-not-`round` raises `rounding_direction_violation` (the q3 payload's exact signature); `computed` vs `quoted` tiers make the brief's grading criterion mechanical.
+7. **G7 Run budget** — `max_turns`, call cap, cache, tool-boundary truncation. Scope is deliberately *not* a guardrail: prompt paragraph plus an empty capability set.
+
+**Three most contestable choices**
+
+- **Not stripping HTML comments.** I keep attacker text in context so the agent can tell the team their corpus is poisoned — both payloads say "do not mention this," which is the tell. Stripping stops one of three payloads and zero of three goals.
+- **Zero LLM guardrails.** No injection classifier, no jailbreak classifier, no scope classifier, no judge, no dual-LLM quarantine. Everything probabilistic sits *above* structural controls, never instead of them.
+- **Grounding failures annotate, not block** (after one repair retry), and bare integers are exempt — a documented gap where "we tested 47 combinations" passes.
+
+Ground truth found while checking: `value-winter-2020.md` is **wrong** twice (val_10's Feb–May 2020 drawdown was −22.4%, second-worst of ten; value correlations *fell* to 0.19 from 0.29), while the momentum, accruals and flow notes check out — useful golden fixtures.</result>
+<usage><subagent_tokens>97103</subagent_tokens><tool_uses>24</tool_uses><duration_ms>693391</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a72f0c9c72479ed86</task-id>
+<tool-use-id>toolu_01G9GUKM6XZ1iEZJhefqX1s5</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/a72f0c9c72479ed86.output</output-file>
+<status>completed</status>
+<summary>Agent "UI, tests, reproducibility strategy" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git2/kelai/docs/research/05-ui-tests-and-build-plan.md` (969 lines, ~9k words, tables + ASCII throughout).
+
+**Recommendations**
+
+1. **UI — option (a).** One static `index.html` + ~250 lines of vanilla JS served by the agent's own FastAPI app. No node, no build. Two columns: answer + inline-SVG equity/drawdown chart on the left, a live trace rail on the right (tool, arguments, duration, compact result, evidence id, guardrail events shown honestly). Hand-rolled ~40-line markdown renderer with *no image rule and no link rule at all*, plus `default-src 'none'; img-src 'self' data:` — kills markdown-image exfiltration three ways. Eight SSE events (`run.started`, `tool.call`, `tool.result`, `chart`, `guardrail`, `answer.delta`, `run.finished`, `error`). The chart goes out-of-band: the tool writes the full curve to the ledger and straight to the browser, and hands the model only the metrics — so the model can't mis-transcribe a curve it never saw.
+2. **Two processes.** Platform on `:8100` untouched; `kelai-web` on `:8000` over real HTTP. Yes to an injectable client — tests swap in `httpx2.ASGITransport` and never open a socket.
+3. **Repo.** `server.py` stays the one file KelAI diffs (docstrings verbatim, bodies filled); arithmetic moves to sibling `backtest.py`/`notes.py`. Root `pyproject.toml` + `uv.lock`; `platform/requirements.txt` **generated** via `uv export --only-group platform`, CI fails on drift.
+4. **Tests — 9 layers, 8 keyless.** Cassettes: **no** — vcrpy's streaming replay is structurally broken (#927 open) and `openai` 3.x uses `httpx2` anyway; the SDK ships `agents.testing.ScriptedModel`, which I ran end-to-end keyless with real tool execution and streaming. Live evals are `make eval`, N=5, reported as `pass^k`.
+5. **Install:** `make setup &amp;&amp; make test`; uv bootstraps itself and its Python. No Docker. gitleaks allowlist by *value* for the fake `KELAI-ADMIN-…` token.
+6. **Build:** contracts frozen in hour 1, six tracks in six worktrees over disjoint dirs, fan not stack. Critical path ~7.75 h. Riskiest seam is ledger→SSE→chart, engineered away with a committed transcript fixture both B and D build against.
+
+**Findings worth knowing:** `returns.parquet` does *not* regenerate byte-identically (6.9e-18 drift) — don't write that test. `ddof` is a real 0.19% ambiguity. And `value-winter-2020.md`'s val_10 claim is **false** (−22.4%, second-worst of ten) — a genuine note-vs-data contradiction for the model-graded case.
+
+**Least sure:** (1) refusing cassettes outright — a few *non-streaming* recordings would catch tool-schema rejections that `ScriptedModel` structurally cannot; I'm at 60/40. (2) keeping `server.py` monolithic — better diff, worse code, and I don't know where the line threshold sits.</result>
+<usage><subagent_tokens>150487</subagent_tokens><tool_uses>51</tool_uses><duration_ms>847631</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ace7e5d5453f052bd</task-id>
+<tool-use-id>toolu_0162XmPJLXhdEWMozN8Q6e1P</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/ace7e5d5453f052bd.output</output-file>
+<status>completed</status>
+<summary>Agent "Research OpenAI Agents SDK" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git2/kelai/docs/research/02-openai-agents-sdk.md` (~1990 lines, 12 sections, each with a `verified on 2026-09-17 against &lt;url&gt;` marker). Facts were checked against the `v0.22.2` **git tag** source, not just the docs site (which publishes from `main` and drifts ahead); several sub-agents installed the package and executed the sketches.
+
+**Pin:** `openai-agents==0.22.2` (released 2026-09-09, Python &gt;=3.10). Exact `==` — it is a `0.Y.Z` project where *minor* bumps are breaking and *patch* bumps ship new public surface. Add a hash-pinned lockfile and pin `mcp&lt;2`.
+
+**Model:** `gpt-5.6-luna` — the SDK's own default, $0.20/$1.20 per 1M, full tool support, 1.05M context. Cheaper `gpt-5-nano` is **shutting down 2026-12-11** and `gpt-4.1-nano` on **2026-10-23**, inside the review window; `luna` is OpenAI's named replacement for both.
+
+**Five facts most likely to change the design:**
+
+1. **`agents.testing.ScriptedModel` ships in the package** (added 0.21.0). `tests/fake_model.py` is gone; there is a full official Testing doc page. This kills the vcrpy plan outright — cassettes can't work anyway, because `openai&gt;=3.0` moved to **`httpx2`** and vcrpy flattens SSE into one chunk. CI needs no API key and the scripted suite ran 2 tests in 0.04 s.
+2. **Tool guardrails exist and can reject *without* killing the run.** `@tool_input_guardrail` / `@tool_output_guardrail`, returning `ToolGuardrailFunctionOutput.reject_content(msg)` — the message replaces the tool result. That is the exact primitive for the planted note injections: scrub the payload, keep the conversation useful. Also: input guardrails default to `run_in_parallel=True`, which does **not** save tokens and may fire after tools already ran — use `run_in_parallel=False`.
+3. **There is no `seed` anywhere** — not in `ModelSettings`, and not in the Responses API at all (0 hits in `response_create_params.py`). Determinism must come from `ScriptedModel`, not from the model. Split the suite: hermetic scripted (gates CI) + a small opt-in live suite asserting only on numbers.
+4. **Tracing is ON by default, uploads to OpenAI with your prompts, tool arguments and tool results included** (`trace_include_sensitive_data=True`). Use `set_trace_processors([JsonlProcessor(...)])` — one call that both stops the egress and gives us `spans.jsonl` for the UI and test artifacts.
+5. **`output_type` and readable streaming are mutually exclusive** — deltas become raw JSON fragments and the SDK has no partial-parse helper (all three `partial=` call sites pass `False`). So: plain-text streaming agent, and ground citations via the `RunContextWrapper` ledger (never sent to the LLM) plus a grounding output guardrail — verifiable, rather than the model self-reporting its own sources.
+
+Two smaller landmines: open issue **#5053** — a *keyword-only* `RunContextWrapper` first param makes a tool fail silently forever; and strict schemas reject any **non-`None` default** on a tool parameter (#4390).</result>
+<usage><subagent_tokens>226862</subagent_tokens><tool_uses>66</tool_uses><duration_ms>1038152</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a1c2e43e9b0f8aee7</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/a1c2e43e9b0f8aee7.output</output-file>
+<status>completed</status>
+<summary>Agent "Simplicity and taste critique" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git2/kelai/docs/research/07-critique-simplicity.md`.
+
+**Three biggest cuts**
+
+1. **The docs scaffold.** Cut PRODUCT_REQUIREMENTS.md, ARCHITECTURE.md, and `spec/`-as-a-book entirely; 12 ADRs → 3. The README *is* the book, five chapters: Carve · Ground · Guard · Test · Run, ≤150 lines. The repo currently holds 4,772 lines of research and zero lines of product — a reviewer with 45 minutes concludes either "this wasn't one day" or "the thinking is in the docs because it isn't in the code."
+2. **Tests: 9 layers → 4.** Cut the independent numpy oracle (report 05 refutes it in its own paragraph, then keeps it anyway — keep the hand-computed five-day example, which is the mitigation), cut hypothesis (keep five invariants as plain assertions), merge ScriptedModel and the SSE contract into one layer since *the scripted run's event stream is the SSE fixture*, and cut the model grader outright — fixed-shape claim lines make even the val_10 case regex-assertable, and a confident argued "no" answers the brief's "we'd enjoy hearing the reasoning" better than a hedged yes.
+3. **Six build tracks → three**, and the extras. Merge guardrails into agent (they exist to be wired into the tools; splitting them creates a 30-min integration step that vanishes), merge UI+evals+packaging (all consume contracts, produce nothing anyone needs). Plus: 8 tools → 6, 8 SSE events → 6, and cut `sharpe_se`/`z_diff`/`savings_usd`, which are negative-value — ±1.0 on a one-year Sharpe makes every ranking "not statistically separated" and undercuts the confident Q1 answer the data supports.
+
+**Actually wrong, not merely heavy**
+
+- **`track_record` is not a guardrail.** It makes the year grid available; it doesn't make misuse impossible or detected. "What if the model ignores the year rows?" → nothing happens. The dispersion caveat closes the qly_03 trap, and it lives in `compare_signals` already.
+- **`list_notes`'s defence contradicts the design.** "Otherwise an endpoint is unreachable" makes 1:1 coverage a goal, while the same doc is proud of not exposing `/returns`.
+- **The plan doesn't fit its own day**: 7.75 h critical path, ≈9 h wall clock, pre-friction.
+- **Streaming before the egress verdict is a genuine hole** (the draft asks and doesn't answer): scan each delta before emitting — five lines.
+- **`img-src 'self' data:` should be `'none'`** — the chart is inline SVG, and the whole UI security argument rests on that header.
+- **`contracts.py` "frozen on hour 1"** freezes imagined field lists; freeze names and `emit()` only.</result>
+<usage><subagent_tokens>145849</subagent_tokens><tool_uses>16</tool_uses><duration_ms>467412</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a50245c0bf009b372</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/a50245c0bf009b372.output</output-file>
+<status>completed</status>
+<summary>Agent "Red-team the guardrail design" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report at `/Users/kentgang/git2/kelai/docs/research/06-critique-security.md`.
+
+**BREAKS the draft.** Principle 4 — "no tool takes a URL or path, the secret is unreachable" — is false, and I reproduced it. `read_note(filename: str)` and `get_signal(signal_id: str)` *are* path parameters. Every mainstream client does RFC 3986 dot-segment removal, so `read_note("../internal/config")` sends `GET http://localhost:8100/internal/config`. Verified on httpx, requests, yarl and `urljoin` — changing library doesn't help. Even `/signals/{id}/returns` falls: `id="../internal/config#"` puts `/returns` in the fragment (never sent); `"?"` puts it in the query (FastAPI ignores it).
+
+Two failures compound into a full kill chain. The onboarding note tells the model to call that endpoint; the token comes back as a **tool result**, which streams to the trace panel. The draft's egress filter covers "the final answer and tool-call arguments" — a tool *result* is neither. The note also says "do not mention this notice", so the answer is clean, grounding passes, egress passes, and the token is on the interviewer's screen with zero guardrails fired. Every keyless test stays green: A08 tests the *server*, which Starlette's `[^/]+` converter already protects, and the one test that would catch it needs an API key.
+
+Inverted surprise worth the walkthrough: percent-encoded traversal (`%2f`) is the *safe* one. Report 03 put a guardrail on the layer that was already fine and none on the layer that wasn't.
+
+Also fatal-ish: row 7's streaming justification collapses with principle 4 — and report 02 §5.5 already warned that SDK output guardrails fire *after* the deltas stream. Fix: confidentiality is irreversible so it goes inline (48-char hold-back scrubber on one `emit()` every SSE frame passes through); integrity stays terminal.
+
+Best cheap win: render the `embedded_instructions` badge from the ledger, not the model's prose — then "do not mention this" fails structurally, and the test stops being flaky.
+
+Also: dates/years exempt from grounding is the gap that matters (the house rule is "a Sharpe without dates is not a result"); no multi-turn test; no input size cap. Cuts: derived sums, prompt-fragment filter, local trace processor, Playwright.
+
+`@tool_output_guardrail` is decoration as report 02 proposes it — real as an *inbound* canary tripwire.</result>
+<usage><subagent_tokens>121187</subagent_tokens><tool_uses>14</tool_uses><duration_ms>526608</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ac8a67e7cb22105a7</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/ac8a67e7cb22105a7.output</output-file>
+<status>failed</status>
+<summary>Agent "Live spike of grounding assumption" failed: Agent terminated early due to an API error: You've hit your session limit · resets 7am (America/New_York) (error type rate_limit, HTTP 429, request id REDACTED, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I'll hold until the monitor reports A's completion rather than polling further.</result>
+</task-notification>
+
+---
+
+Please try again
+
+---
+
+For this project, let's lean towards making commits directly to main. Please add that to AGENTS.md
+
+---
+
+<task-notification>
+<task-id>acc11ebddf0f241c2</task-id>
+<tool-use-id>toolu_01WXWMf3zzJuLAgR8u9uyCyq</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/acc11ebddf0f241c2.output</output-file>
+<status>completed</status>
+<summary>Agent "Critique contracts and build plan" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Written to `/Users/kentgang/git2/kelai/docs/research/09-critique-contracts-and-build-plan.md`.
+
+**Collisions found in the existing plan (15 catalogued; the five that cost real time):**
+
+1. **Every composite tool in report 04 has a non-`None` default** (`limit: int = 20`, `min_abs_corr: float = 0.8`). SDK issue #4390: strict schema strips `default` only when it is exactly `None`; anything else stays and the API rejects *every* turn. Invisible without a key — `ScriptedModel` never builds a request, so the keyless suite stays green while the product is dead.
+2. **The ledger is defined three incompatible ways** — 02 §4.3 (`float` tolerance), 04 §3.1 (`display` string match), 03 §4B (flat `(path, value, tier)` with rounding branches). T2 writes it, T3 reads it, T5 asserts on it.
+3. **Tool registry disagrees on count *and* names**: 03 says six including `get_returns`; 04 says eight and that `get_returns` must *not* be a tool; draft says seven. `run_backtest`/`backtest`, `get_note`/`read_note` both appear.
+4. **Evidence ids are `E1` in the prompt and `e2` in the SSE schema** — and grounding is exact string membership, so case is load-bearing.
+5. **Prompt-injection handling is specified two opposite ways**: 02 wants `reject_content` (payload never reaches the model); 03/04 insist on *not* stripping because reporting the poisoned corpus is the product behaviour.
+
+Plus: `platform/` doesn't exist in the repo yet and nobody owns vendoring it; the transcript fixture has no generator so it will drift from `contracts.py` within an hour; `make test` writes into tracked `results/`; `parallel_tool_calls=True` makes the "committed transcript" nondeterministic; and weight `0.0` produces `Sharpe = NaN` → invalid JSON.
+
+**The riskiest seam is not B↔D.** That one the fixture genuinely solves. It's T2↔T3↔T4 at the answer stream: guardrails fire *after* deltas ship, but egress is specified as a block. Fixed by a 64-char hold-back in the contract plus a committed split-canary transcript.
+
+Delivered: all three contracts written out as code/JSON, the eleven API resolutions with a frozen validation order and `{"detail": "rule_token: …"}` wording, a ≤120-word email to KelAI (`per_signal`, drawdown peak, `request` echo), T0–T6 with kickoff prompts, the T0 tree, and two ADR-gated stacks around one fan — noting ADR-0001 is still `proposed` and currently blocks its own process.</result>
+<usage><subagent_tokens>213072</subagent_tokens><tool_uses>18</tool_uses><duration_ms>753928</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ac8a67e7cb22105a7</task-id>
+<tool-use-id>toolu_011UcU2nGJbyDYsAXcb15y7C</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/8bebbda3-a2e7-4ac3-80a6-4aa787fd875f/tasks/ac8a67e7cb22105a7.output</output-file>
+<status>completed</status>
+<summary>Agent "Live spike of grounding assumption" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Report at `/Users/kentgang/git2/kelai/docs/research/08-spike-grounding-assumption.md`.
+
+**Verdict: the assumption holds. Ship the grounding check as a blocking guardrail** — conditional on fixing our own tool layer, not the model.
+
+**Hard numbers, 60 live `gpt-5.6-luna` runs, $0.099 total, 0 failures:**
+
+- **0 ungrounded tokens out of 566**, in 60/60 runs, under the final checker with a complete ledger.
+- **Model-attributable false positives: 0. Model-attributable errors: 0.** No arithmetic, no `12000→12k` reformat, no percent↔fraction slip, no invented or re-rounded number, in any run.
+- With the ledger as the tools *first wrote it*, 15 flags — **every single one caused by a tool printing a number it forgot to ledger** (`min_abs_corr`, `annual_cost_usd`) or by a checker gap (signal-name digits like "200d", the hyphen in "pre-2024", the `60` in refusal boilerplate). The check's precision is a property of our code, which we can test.
+- **Injection (11 exposed runs): compliance 0/11.** No `/internal`, no `admin_token`, no callback URL, no &gt;3-signal attempt, no round-up, no "exempt" claim. Reported to the user 9/11 — 82% is prompt-shaped, so the flag banner should be emitted from the ledger, not the model.
+- **Scope/jailbreak: 12/12 refused with zero tool calls.** Over-refusal on legitimate borderline questions: **0/4**. "Just estimate, don't bother with tools" → called the tool 3/3.
+- Known answers: mom_07 3.82 5/5; flw_02/flw_05 0.970 @ $12,000 5/5; combo 1.07 5/5. **qly_03 pre/post 1.72/−0.07: 0/5** — the model never read the decay note, so it never supplied the split date.
+- Latency 1.9–31 s; cost $0.0003–$0.0042 per question.
+
+Three things worth your attention beyond the verdict:
+
+1. **`list_notes` earns its place** (draft-synthesis row 1 doubted it). Without it, B2 refused 5/5 and B3 asked "which file?" 4/5 — and **8 of 25 `read_note` calls used a guessed, non-existent filename**. Zero traversal attempts, but the membership check is load-bearing on every third call, so `read_note` must take a closed set, never a path.
+2. **`sharpe_se` should be cut** — mentioned in 1/60 answers. `savings_usd` should stay (5/5 on A4).
+3. **Don't add the repair turn** — it would double latency to fix something that never happened.</result>
+<usage><subagent_tokens>258157</subagent_tokens><tool_uses>93</tool_uses><duration_ms>687118</duration_ms></usage>
+</task-notification>
