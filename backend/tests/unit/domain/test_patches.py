@@ -23,6 +23,7 @@ import networkx
 import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
+from hypothesis.stateful import RuleBasedStateMachine, initialize, rule
 
 from katalyst.domain import (
     Belief,
@@ -41,9 +42,12 @@ from katalyst.domain import (
     Resolution,
     Retune,
     Violation,
+    World,
     affected_set,
     apply,
     flatten,
+    introduced_by,
+    propagate,
 )
 from katalyst.fixtures.hormuz import (
     FIXTURE_DATE,
@@ -63,6 +67,24 @@ a_few = settings(max_examples=20, deadline=None)
 
 SIX_OPERATIONS: tuple[str, ...] = ("do", "observe", "insert", "retune", "refine", "believe")
 """Every way of changing a map. The locality rule is checked against each of them."""
+
+DAY_ZERO = date(2026, 1, 1)
+"""The day the windows below start on. The generated maps carry dates from 2026 onwards."""
+
+SEED = 20261001
+"""One seed, so that two worlds in a test differ by the edit between them and nothing else."""
+
+TINY_BUDGET = {"versions": 8, "worlds": 2}
+"""How many versions of the map and worlds under each these tests run at, and why so few.
+
+The shipped engine runs two thousand versions times eight worlds, which is about
+seventy milliseconds a world — far too slow to run twice per edit over hundreds of
+generated maps. Locality is not a statement about how steady a number is: a claim
+outside an edit's reach comes out **byte-identical** at any budget, because every
+claim's random numbers come from its own identifier and an edit it cannot reach
+cannot change them. Two worlds run at eight versions prove that as squarely as two
+run at two thousand, and in a thousandth of the time.
+"""
 
 
 # --- Small things the tests below build by hand ----------------------------
@@ -162,7 +184,10 @@ def _affected_from_the_shape(graph: Graph, edit: Intervention) -> set[str]:
     """
     walk: networkx.DiGraph = networkx.DiGraph()
     walk.add_nodes_from(one.id for one in graph.propositions)
-    walk.add_edges_from((one.source, one.target) for one in graph.links)
+    # Feedback arrows are left out, the same way the map's own loop check leaves
+    # them out: nothing is worked through one in this version, so nothing an edit
+    # does can travel along it.
+    walk.add_edges_from((one.source, one.target) for one in graph.links if not one.reflexive)
 
     if isinstance(edit, Refine):
         return {one.id for one in edit.into}
@@ -550,12 +575,18 @@ def test_an_arrow_with_an_end_off_the_map_moves_nothing() -> None:
     )
 
 
-def test_a_feedback_arrow_still_counts_as_an_arrow() -> None:
-    """The affected set keeps the feedback arrows, because an affected set is a permission.
+def test_a_feedback_arrow_is_set_aside_like_the_loop_check_sets_it_aside() -> None:
+    """Nothing an edit does travels along a feedback arrow, so nothing on its far side moves.
 
-    It says what an edit is *allowed* to move. A permission that left an arrow out
-    would be narrower than the map, and narrower is how a locality rule comes to
-    be broken without anything noticing.
+    A market feeding back on the world is carried as data in this version and
+    never worked through — a later stack unrolls it over time — so a claim
+    reachable only through one provably cannot move. That is what lets the product
+    point at a claim and say *your change could not reach this*, which is the
+    whole promise; counting the arrow would leave nothing on the worked example
+    outside the branch's reach and nothing to point at.
+
+    The two rules change together: the day the arithmetic works a feedback arrow
+    through, it belongs back in the affected set.
     """
     graph = _two_piece_map().model_copy(
         update={
@@ -566,9 +597,7 @@ def test_a_feedback_arrow_still_counts_as_an_arrow() -> None:
         }
     )
 
-    assert affected_set(graph, Do(target="third", value=True)) == frozenset(
-        {"third", "ending", "apart", "apart-ending"}
-    )
+    assert affected_set(graph, Do(target="third", value=True)) == frozenset({"third", "ending"})
 
 
 # --- The refusals, one per way an edit can fail to fit ---------------------
@@ -874,3 +903,187 @@ def test_an_arrow_inserted_after_a_supposition_is_live() -> None:
     assert "S->H" not in {one.id for one in cut.links}
     assert "S->B" in {one.id for one in cut.links}
     assert "S->C" in {one.id for one in cut.links}
+
+
+# --- Locality, in full: over two worlds rather than two maps -----------------
+
+
+def _world_of(graph: Graph, *edits: Intervention) -> World:
+    """Fold a branch onto a map and work the numbers through, at the small budget above."""
+    branch = _branch(*edits)
+    folded = apply(graph, branch)
+    assert not isinstance(folded, list), folded
+    left_behind, fixed = folded
+    return propagate(
+        left_behind,
+        fixed,
+        as_of=DAY_ZERO,
+        seed=SEED,
+        introduced_by=introduced_by(branch),
+        **TINY_BUDGET,
+    )
+
+
+def _has_no_loops(graph: Graph) -> bool:
+    """Say whether a map runs round in circles once its feedback arrows are set aside."""
+    walk: networkx.DiGraph = networkx.DiGraph()
+    walk.add_nodes_from(one.id for one in graph.propositions)
+    walk.add_edges_from((one.source, one.target) for one in graph.links if not one.reflexive)
+    return bool(networkx.is_directed_acyclic_graph(walk))
+
+
+@pytest.mark.parametrize("kind", SIX_OPERATIONS)
+@given(st.data())
+@a_few
+def test_intervention_locality(kind: str, data: st.DataObject) -> None:
+    """Every claim outside an edit's reach is byte-identical in the two **worlds**.
+
+    This is the product's central correctness claim, and the full form of it: not
+    only that the two maps agree about a claim the edit cannot reach, but that the
+    two *answers* do — the likelihood, its range, and every day of its series.
+
+    For each of the six operations the test pins a claim **fully separated** from
+    the subject: no chain of arrows runs between them in either direction and no
+    claim is a cause of both. Without that, the `observe` case would pass while
+    checking nothing, because its reach can swallow every claim on a small map and
+    an assertion over an empty set is always true. Maps offering no such claim are
+    discarded rather than quietly passed.
+
+    The reach is worked out here, from the shape of the map, and never asked of the
+    engine.
+    """
+    graph = data.draw(graphs(separated=True))
+    subject, pinned = data.draw(separated_pair(graph))
+    edit = _edit_of_kind(data, graph, kind, subject)
+    base = _world_of(graph)
+
+    folded = apply(graph, _branch(edit))
+    if isinstance(folded, list):
+        # Splitting a claim is not built yet, so it moves nothing whatever.
+        assert kind == "refine"
+        assert _world_of(graph).beliefs[pinned] == base.beliefs[pinned]
+        return
+
+    after, _ = folded
+    branched = _world_of(graph, edit)
+    may_move = _affected_from_the_shape(after, edit)
+
+    assert pinned not in may_move
+    assert branched.beliefs[pinned] == base.beliefs[pinned]
+    for claim_id, belief in branched.beliefs.items():
+        if claim_id in may_move:
+            continue
+        assert claim_id in base.beliefs, "an edit added a claim outside its own reach"
+        assert belief == base.beliefs[claim_id], claim_id
+    # A claim added by an `insert` can lengthen the window, and then the two
+    # series are drawn on different days and cannot be compared point by point.
+    # The number on the tile is read on each claim's own resolve-by day and is
+    # comparable either way, which is what the beliefs above already checked.
+    if branched.days == base.days:
+        assert branched.series[pinned] == base.series[pinned]
+        assert branched.states[pinned] == base.states[pinned]
+
+
+def _in_force(fixed: tuple[object, ...]) -> dict[str, tuple[str, bool]]:
+    """Which value is in force on each claim, and which verb fixed it.
+
+    A later assignment overrides an earlier one on the same claim, so the last is
+    the one that counts and the earlier ones stay for the record.
+    """
+    return {one.target: (one.kind, one.value) for one in fixed}  # type: ignore[attr-defined]
+
+
+def _observation_reach(graph: Graph, fixed: tuple[object, ...]) -> set[str]:
+    """Which claims the observations in force are evidence about, on this map.
+
+    An observation reaches the claim it names, everything that claim leads to,
+    everything that leads to it, and everything those causes lead to — the widest
+    of the six reaches, and the same one `observe` has in the affected-set table.
+    """
+    reached: set[str] = set()
+    for target, (kind, value) in _in_force(fixed).items():
+        if kind == "observe":
+            reached |= _affected_from_the_shape(graph, Observe(target=target, value=value))
+    return reached
+
+
+def _evidence_moved(
+    before: Graph, before_fixed: tuple[object, ...], after: Graph, after_fixed: tuple[object, ...]
+) -> set[str]:
+    """Which claims an edit may move by changing what the evidence on the map is about.
+
+    The affected-set table says what one edit does to a map on its own. It does
+    not cover one thing a *run* of edits can do: change what an earlier
+    observation is evidence about.
+
+    Two ways that happens, and both are honest rather than a hole in the rule.
+    Putting a lever on a claim somebody had reported — a `do` over an earlier
+    `observe` — **takes the evidence off the map**, and the claims that evidence
+    reached go back to what they said before it arrived. And attaching a new claim
+    to one that was reported widens what the evidence is about, because the new
+    arrows carry it further. Evidence is the one thing on a map that is not local,
+    which is exactly why observing and supposing are two different verbs.
+
+    So when the evidence in force changes, or the claims it reaches change, those
+    claims are allowed to move as well — and when neither changes, they are not.
+    """
+    was, now = _in_force(before_fixed), _in_force(after_fixed)
+    was_evidence = {one: was[one] for one in was if was[one][0] == "observe"}
+    now_evidence = {one: now[one] for one in now if now[one][0] == "observe"}
+    reached_before = _observation_reach(before, before_fixed)
+    reached_after = _observation_reach(after, after_fixed)
+    if was_evidence == now_evidence and reached_before == reached_after:
+        return set()
+    return reached_before | reached_after
+
+
+class GraphEditMachine(RuleBasedStateMachine):
+    """A run of edits made one after another, the way a user actually works.
+
+    Rather than one random edit on one random map, this makes a *sequence* of them
+    — suppose this, add that, change this number — and re-checks three things after
+    **every** step: the map still has no loops once feedback arrows are set aside,
+    every likelihood is still a likelihood inside its own range, and the step just
+    taken moved nothing outside its own reach.
+
+    A failing sequence is shrunk to the shortest one that still breaks, so a
+    failure reads as "these two edits, in this order" rather than as a wall of
+    generated data. That is the whole reason this is a state machine and not
+    another property test.
+    """
+
+    @initialize(graph=graphs(separated=True))
+    def start_from(self, graph: Graph) -> None:
+        """Begin with a map in two pieces and the base world it produces."""
+        self.graph = graph
+        self.fixed: tuple[object, ...] = ()
+        self.world = propagate(graph, (), as_of=DAY_ZERO, seed=SEED, **TINY_BUDGET)
+
+    @rule(data=st.data())
+    def make_one_more_edit(self, data: st.DataObject) -> None:
+        """Apply one more edit, and re-check the three rules against the step just taken."""
+        offered = [one for one in SIX_OPERATIONS if one != "retune" or self.graph.links]
+        edit = data.draw(interventions(self.graph, kind=data.draw(st.sampled_from(offered))))
+        outcome = apply(self.graph, _branch(edit), self.fixed)  # type: ignore[arg-type]
+        if isinstance(outcome, list):
+            # A refused edit changes nothing at all; what it says is tested above.
+            return
+        after, fixed = outcome
+        world = propagate(after, fixed, as_of=DAY_ZERO, seed=SEED, **TINY_BUDGET)
+
+        assert _has_no_loops(after)
+        for belief in world.beliefs.values():
+            assert 0.0 <= belief.lo <= belief.p <= belief.hi <= 1.0
+        may_move = _affected_from_the_shape(after, edit) | _evidence_moved(
+            self.graph, self.fixed, after, fixed
+        )
+        for claim_id, belief in world.beliefs.items():
+            if claim_id in may_move:
+                continue
+            assert belief == self.world.beliefs[claim_id], claim_id
+
+        self.graph, self.fixed, self.world = after, fixed, world
+
+
+GraphEditMachine.TestCase.settings = settings(max_examples=15, stateful_step_count=4, deadline=None)
+TestGraphEditMachine = GraphEditMachine.TestCase
