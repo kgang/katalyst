@@ -39,6 +39,7 @@ What this file must never do
 
 import hashlib
 import json
+from datetime import date
 
 from katalyst.domain import Graph, PropositionId
 
@@ -146,7 +147,7 @@ def prompt_hash() -> str:
     return hashlib.sha256((STANDING_TEXT + shapes).encode("utf-8")).hexdigest()
 
 
-def starting_question(sentence: str, *, is_the_hypothesis: bool) -> str:
+def starting_question(sentence: str, *, is_the_hypothesis: bool, today: date) -> str:
     """Ask for one sentence a person typed, written as a claim anybody could settle.
 
     Asked once for the sentence the map starts from, and once more for the place
@@ -158,6 +159,11 @@ def starting_question(sentence: str, *, is_the_hypothesis: bool) -> str:
         is_the_hypothesis: True for the sentence the map starts from, False for
             the place they asked whether it gets to. It changes one sentence of
             framing and nothing else.
+        today: The day this run is happening. A person writing "next week" means
+            a week from a particular day, and nothing else in the request says
+            which. It sits here, in the varying half, and never in the standing
+            half, where it would change the bytes the service recognises on every
+            single run.
 
     Returns:
         The varying half of the request, as plain text.
@@ -177,7 +183,7 @@ def starting_question(sentence: str, *, is_the_hypothesis: bool) -> str:
             " Write only this claim. Whether anything leads to it is the question "
             "they asked, not something to answer here."
         )
-    return "\n".join([opening, "", f"    {sentence.strip()}", "", closing])
+    return "\n".join([_today(today), "", opening, "", f"    {sentence.strip()}", "", closing])
 
 
 def expanding_question(
@@ -186,6 +192,7 @@ def expanding_question(
     *,
     target: str | None,
     ending_only: bool,
+    today: date,
 ) -> str:
     """Show the map as it stands, point at one claim, and ask for the next piece.
 
@@ -207,6 +214,9 @@ def expanding_question(
         ending_only: True on the one last call a run makes when it has run out of
             room and the map still ends nowhere anybody could act on. It narrows
             the question to an ending and nothing else.
+        today: The day this run is happening, so a claim can be given a date the
+            answer is known by. It sits in the varying half, never in the
+            standing half.
 
     Returns:
         The varying half of the request, as plain text.
@@ -218,6 +228,8 @@ def expanding_question(
     )
 
     lines = [
+        _today(today),
+        "",
         "Here is the map as it stands. The short name in front of each claim is "
         "ours; use one when you name a cause.",
         "",
@@ -230,10 +242,13 @@ def expanding_question(
     if target is not None:
         lines += [
             "",
-            "The person wants to know whether the story reaches this: "
-            f"{target.strip()}. Work towards it where the mechanism honestly goes "
-            "that way, and do not bend a step to get there — if it does not "
-            "reach, we would rather say so.",
+            "The person wants to know whether the story reaches this:",
+            "",
+            f"    {target.strip()}",
+            "",
+            "Work towards it where the mechanism honestly goes that way, and do "
+            "not bend a step to get there — if it does not reach, we would rather "
+            "say so.",
         ]
     if ending_only:
         lines += [
@@ -280,3 +295,21 @@ def _map_as_text(graph: Graph) -> str:
     if arrows:
         lines += ["", "Arrows:", *(f"  {one.source} -> {one.target}" for one in arrows)]
     return "\n".join(lines)
+
+
+def _today(today: date) -> str:
+    """Say what day it is, once, at the top of the varying half.
+
+    A person who types "next week" means a week from a particular day, and a
+    claim's date has to be settleable against something. This is the only moving
+    part in a request that is not the map itself, and it is deliberately below
+    the block the service remembers: put it above and every run would pay full
+    price for every call.
+
+    Args:
+        today: The day this run is happening.
+
+    Returns:
+        One line.
+    """
+    return f"Today is {today.isoformat()}."

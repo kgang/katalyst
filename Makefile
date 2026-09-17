@@ -11,13 +11,13 @@
 
 # These are names of tasks, not names of files to build. Saying so means `make
 # test` still works if a file called `test` ever appears.
-.PHONY: help dev up down prod test lint types eval
+.PHONY: help dev up down prod test lint types eval record-cassettes
 
 help: ## Show this list
 	@echo "Katalyst — make <task>"
 	@echo
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) \
-		| awk 'BEGIN { FS = ":.*## " }; { printf "  %-6s  %s\n", $$1, $$2 }'
+		| awk 'BEGIN { FS = ":.*## " }; { printf "  %-17s  %s\n", $$1, $$2 }'
 
 # --- running the app --------------------------------------------------------
 
@@ -50,6 +50,28 @@ types: frontend/node_modules ## Rewrite the browser app's types from the server'
 
 eval: ## Score what the language model proposes against saved examples
 	@echo "make eval arrives in stack 04, the stack that first asks a language model for anything."
+
+# --- the one task that spends money -----------------------------------------
+#
+# Everything else in this file runs with no key. This one calls the model for
+# real and writes what it says into backend/tests/cassettes, so that every later
+# run — and every run of the build — replays those answers instead of paying for
+# them again.
+#
+# It records only the tests that can be recorded. The ones marked `handmade`
+# hold a case a live model will not produce on request — a proposal that closes
+# a loop, a claim with a blank test, a citation the search never returned — and
+# their recordings are one of the honest ones edited by hand. Re-recording them
+# would throw the deliberate case away, so this leaves them alone. Each of those
+# tests says in its own docstring exactly which edit it needs.
+#
+# Re-run this whenever a prompt changes. A recording made against different
+# words is a recording of a question we no longer ask.
+
+record-cassettes: ## Record the model's real answers for the tests to replay. Spends money; needs a key
+	cd backend && uv run pytest tests/boundary -m "not handmade" --record-mode=rewrite
+	cd backend && env -u ANTHROPIC_API_KEY uv run pytest \
+		tests/boundary/test_expand_cassettes.py::test_no_cassette_contains_a_key
 
 # --- the one rule here that builds a real thing -----------------------------
 

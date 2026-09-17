@@ -447,7 +447,7 @@ def expand(
         What happened, and what the call cost. Never raises for anything the model
         did or failed to do.
     """
-    question = expanding_question(graph, frontier, target=target, ending_only=ending_only)
+    question = expanding_question(graph, frontier, target=target, ending_only=ending_only, today=on)
     try:
         rounds = answerer.proposal(question, may_search=may_search)
     except ValidationError as did_not_fit:
@@ -485,6 +485,7 @@ def start_the_map(
     *,
     is_the_hypothesis: bool,
     answerer: Answerer,
+    on: date,
 ) -> Outcome:
     """Turn one sentence a person typed into a claim anybody could settle.
 
@@ -506,11 +507,12 @@ def start_the_map(
         sentence: What the person typed, unchanged.
         is_the_hypothesis: True for the sentence the map starts from.
         answerer: Whatever this run asks its questions of.
+        on: The day this run is happening, so a claim can be given a date.
 
     Returns:
         The minted claim, or the reason there is not one, and what the call cost.
     """
-    question = starting_question(sentence, is_the_hypothesis=is_the_hypothesis)
+    question = starting_question(sentence, is_the_hypothesis=is_the_hypothesis, today=on)
     try:
         rounds = answerer.starting_claim(question)
     except ValidationError as did_not_fit:
@@ -906,7 +908,7 @@ def grow(
 
     # The claim the map starts from, and the destination when there is one.
     first, receipt, refused, spent = yield from _keep_asking(
-        lambda: start_the_map(hypothesis, is_the_hypothesis=True, answerer=answerer),
+        lambda: start_the_map(hypothesis, is_the_hypothesis=True, answerer=answerer, on=on),
         receipt,
         refused,
         caps,
@@ -927,7 +929,7 @@ def grow(
     destination: PropositionId | None = None
     if target is not None and not spent:
         wanted, receipt, refused, spent = yield from _keep_asking(
-            lambda: start_the_map(target, is_the_hypothesis=False, answerer=answerer),
+            lambda: start_the_map(target, is_the_hypothesis=False, answerer=answerer, on=on),
             receipt,
             refused,
             caps,
