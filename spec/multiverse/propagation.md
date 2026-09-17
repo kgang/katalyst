@@ -56,6 +56,10 @@ class Retraction(BaseModel):
     by: int                  # the edit that introduced the arrow, by position in the branch
 ```
 
+**`by` is a required `int`, never `None`** (decided 2026-09-17), and that is a small theorem rather than a convention. A `do` cuts every arrow into its target that is present **when it is applied**. So any arrow that later undermines that supposition cannot have been on the map at the time — it was added afterwards, by an edit, and every edit has a position in the branch. There is no case left over, so there is no `None` to represent it, and the badge can always name the edit responsible.
+
+`propagate` is told those positions through a keyword-only argument, `introduced_by: Mapping[LinkId, int]`, computed from the branch by a pure helper in `domain/patch.py`. **This is the one addition to the signature the plan wrote**, and it is here because a `Graph` records what a map contains, not which edit put it there — that history lives in the branch, and `propagate` is handed it rather than guessing.
+
 ### What a world is
 
 ```python
@@ -71,7 +75,9 @@ class World(BaseModel):                                   # frozen
     assignments: tuple[Assignment, ...]
     retractions: tuple[Retraction, ...]
     beliefs: Mapping[PropositionId, Belief]               # owner "model", read on each claim's resolve-by day
-    series: Mapping[PropositionId, tuple[float, ...]]     # one likelihood per day, for the time axis
+    series: Mapping[PropositionId, tuple[float, ...]]     # one likelihood per day, for the time axis;
+                                                          # sampled to 180 points on a longer window, always
+                                                          # keeping every claim's resolve-by day
     states: Mapping[PropositionId, tuple[SeriesState, ...]]  # one named state per day, same length as the series
     conditionals: Mapping[LinkId, Belief]                 # empty by default — see below
     range_shares: Mapping[PropositionId, Mapping[PropositionId, float]]
@@ -92,6 +98,7 @@ def propagate(
     *,
     as_of: date,
     seed: int,
+    introduced_by: Mapping[LinkId, int] = {},  # which edit added each arrow; see Retraction above
     versions: int = 2_000,   # the outer loop: versions of the map (how sure we are of the inputs)
     worlds: int = 8,         # the inner loop: worlds per version (how the dice fall)
 ) -> World
@@ -134,13 +141,13 @@ Every number below is **illustrative**, exactly as the fixture's are, and pull r
 
 **Being settled is not being true.** A claim with no assignment is sampled from its own `prior`, every draw, exactly as always; nothing is ever forced true because its clock started. The two ideas are separate and conflating them is the mistake this paragraph exists to prevent. It follows that the settled day — call it `t_source` — is **one schedule, computed once from the shape of the map**, the same in every draw, while **truth is per draw**: an arrow's term is non-zero only in those draws where its source came out true. One schedule, sixteen thousand different worlds running along it.
 
-**The window is capped at 180 points.** If the window is longer than 180 days the series is sampled down to 180 evenly spaced points and a sentence in `warnings` says so. `states` is always the same length as `series`.
+**The window is capped at 180 points.** If the window is longer than 180 days the series is sampled down to 180 points and a sentence in `warnings` says so. The sampling is not blindly even: **every claim's resolve-by day is kept among the points**, and the rest are spread evenly around them. A tile's headline is read on the claim's own resolve-by day, so without that guarantee the headline could be a number that appears nowhere on the sparkline underneath it — the same guarantee [`diff.md`](diff.md) gives a delta row's `at_day`. `states` is always the same length as `series`.
 
-> **On the Hormuz map.** The longest resolve-by date is R's and N1's, sixty days out, so the window is sixty days and the cap never bites. On the strike branch, H is settled on day 0 by `Do(target="H", at=2026-10-01)` and S on day 1 by `Do(target="S", at=2026-10-02)`. C is settled on day 0, because `H → C` carries `lag=0.0`. B is settled on **day 1**: `S → B` carries `lag=0.0` and S was settled on day 1, so that arrow reaches B the same day — earlier than `H → B`'s two-day lag (day 2), `R → B`'s five (day 5) or `C → B`'s seven (day 7). In the base world, where there is no S, B is settled on day 2 via `H → B`. B's own clock is what the arrows *leaving* B measure from, so on the branch M1 is settled on day 2 (`B → M1`, one-day lag) and M2 on day 4 (`B → M2`, three-day lag), each a day earlier than in the base world. R is settled on **day zero**: its only incoming arrow is `B → R`, the feedback arrow, and this stack sets reflexive arrows aside rather than unrolling them (stack 06 does that), so R has no live incoming arrow and rule 3 applies.
+> **On the Hormuz map.** The longest resolve-by date is R's and N1's, sixty days out, so the window is sixty days and the cap never bites. On the strike branch, H is settled on day 0 by `Do(target="H", at=2026-10-01)` and S on day 1 by `Do(target="S", at=2026-10-02)`. C is settled on day 0, because `H → C` carries `lag=0.0`. B is settled on **day 1**: `S → B` carries `lag=0.0` and S was settled on day 1, so that arrow reaches B the same day — earlier than `H → B`'s two-day lag (day 2), `R → B`'s five (day 5) or `C → B`'s seven (day 7). In the base world, where there is no S, B is settled on day 2 via `H → B`. B's own clock is what the arrows *leaving* B measure from, so on the branch M1 is settled on day 2 (`B → M1`, one-day lag) and M2 on day 4 (`B → M2`, three-day lag), each a day earlier than in the base world. R is settled on **day zero**: its only incoming arrow is `B → R`, a feedback arrow, which the engine sets aside ([`interventions.md`](interventions.md), *the map the engine works through is the map with feedback arrows set aside*), so R has no live incoming arrow and rule 3 applies. It is also why R is `unchanged` on the strike branch.
 
 ### B2 — One claim's log-odds on one day
 
-At day *t*, for each claim, in an order that always puts causes before effects — a topological order, with reflexive arrows set aside exactly as `validate` already sets them aside for its loop check (INV-6: a map has no loops once feedback arrows are removed):
+At day *t*, for each claim, in an order that always puts causes before effects — a topological order over **the map the engine works through**, which is the map with feedback arrows set aside; that rule is stated once in [`interventions.md`](interventions.md) and cited here. There is always such an order, because INV-6 (a map has no loops once feedback arrows are removed) guarantees it.
 
 ```
 log-odds(claim, t) = baseline(claim) + Σ over live incoming arrows: strength × shape(t − t_source)
@@ -157,11 +164,13 @@ impulse(u) = 0                          for u < L        zero through the lag, t
 step(u)    = 0                          for u < L        zero through the lag, then
              1                          for u ≥ L        full size, held
 
-ramp(u)    = u / L                      for 0 ≤ u < L    climbing from 0 to 1 across the lag,
-             1                          for u ≥ L        then full size, held
+ramp(u)    = 1                          for u ≥ L        full size, held — this branch is tested first
+             u / L                      for 0 ≤ u < L    climbing from 0 to 1 across the lag
 ```
 
-**`lag` is the ramp's rise time**, and there is no `rise_time` field in version 1. That settles [`../graph/link.md`](../graph/link.md)'s open question 5. A `half_life` on a `step` or a `ramp` is a **violation**, not an ignored field — the thirteenth code, `half_life_without_impulse`, already on `main`; this stack cites it and does not add it again. Reject, never repair.
+**Two edge cases that need no special case.** A `ramp` whose `lag` is `0.0` has no rise time, and because the `u ≥ L` branch is tested first, the climbing branch is never reached and the arrow behaves as a `step` — full size on the same day. That is a *consequence* of the order the branches are written in, not a rule anyone has to remember, and there is no division by zero. And an `impulse` with no `half_life` never arrives: a spike that fades must say how fast, so a map carrying one is refused by `validate` before `propagate` ever sees it (`impulse_without_half_life`, [`../graph/validity.md`](../graph/validity.md) rule 13, decided 2026-09-17). Reject, never repair — the alternatives were to read it as no decay, which silently turns the arrow into a `step` and overrides the author's choice of shape, or to invent a number and attribute it to the model.
+
+**`lag` is the ramp's rise time**, and there is no `rise_time` field in version 1. That settles [`../graph/link.md`](../graph/link.md)'s open question 5. A `half_life` on a `step` or a `ramp` is a **violation**, not an ignored field — `half_life_without_impulse`, already on `main`; this stack cites it and does not add it again.
 
 **A warning above ±5.** `validate` is untouched and puts no ceiling on `strength`; an unbounded number is the honest type. But ±5 is roughly 1% to 99% on a coin flip, so `propagate` adds a plain sentence to `warnings` naming any arrow beyond it. A warning, not a rejection: the map is still legal, and the user should be told.
 
@@ -213,6 +222,12 @@ ramp     push  ────┴▁▁▁▂▂▂▃▃▃▄▄▄▅▅▅▆�
 **It stops holding on the day the *cause* of the first live opposing arrow becomes true.** Not the day that arrow's push reaches full size — the day the world changed. An arrow into the target is *opposing* when its push runs against the value that was supposed: negative strength against a claim supposed true, positive against one supposed false. In code: `Retraction.at = t_source` of that arrow's source, and the arrow's own `lag` then does its ordinary work afterwards. From that day the claim is computed like any other claim: its own prior, plus every live arrow, each arriving on its own schedule.
 
 Tying the end of a supposition to the *arrival* instead would tie "do I still take your word for this" to a delay parameter — change a lag from three days to thirty and the supposition silently outlives the news.
+
+**When two opposing arrows land on the same day, the badge names one, and which one is fixed** (decided 2026-09-17). Take the arrow whose introducing edit came **first in the branch**; within one edit, its position in `Insert.links`; for an arrow that was on the base map all along, its position in `graph.links`. All three orderings already exist and are already load-bearing, so nothing new has to be remembered and replay still holds: the same map, branch and seed name the same arrow on the badge every time.
+
+**A retracted claim can be supposed again** (decided 2026-09-17). Assignments are ordered and a later one overrides an earlier one, so a second `do` on the same claim simply holds from its own date until something undermines it in turn. Each ending produces **one** `Retraction`, so a claim can carry more than one; the series then reads `supposed · withdrawn · pushed · supposed`, and the tile shows the **last** pair — the supposition in force and the retraction that ended the one before it. Nothing special was added for this: it falls out of the ordering rule.
+
+**What a supposed claim's `Belief` holds.** While a supposition holds the claim is true in every draw, so its `Belief` is `p = lo = hi = 1.0` — or `0.0` where it was supposed false. That exists for exactly one reader: the path product (INV-8, the rule that a chain's multiplied-out likelihood is reported honestly), which needs a factor to multiply. **No other surface may read it.** Every other reader checks `states` first and prints the word *Supposed*, because a tile showing `1.00` claims a certainty about the world that the user never asserted — they asserted a supposition.
 
 > **On the Hormuz strike branch, with day zero at 2026-10-01:**
 >
@@ -336,7 +351,7 @@ Two of them, `.13` and `.17`, are pinned to the shipped Hormuz fixture at the fi
 
 **INV-3 — assert is not observe (product invariant: `do` moves nothing upstream of its target; `observe` may).** For all maps `g` from `graphs()` and all `Do` edits from `interventions(g)`: every ancestor of the target is byte-identical in the base world and the branch world. For all maps containing a claim with at least one parent strictly between 0 and 1, an `Observe` on that claim changes at least one ancestor. Tests: `test_do_leaves_ancestors_unchanged`, `test_observe_may_update_ancestors`.
 
-**INV-4 — locality (product invariant: an edit changes only what is still connected to its subject in the map the edit leaves behind).** For all maps `g` from `graphs()` and all edits from `interventions(g)`: every claim outside the edit's affected set is byte-identical in the **base world** and the **branch world** — the full statement, over propagated worlds, for all six operations, each pinning at least one fully separated claim from `separated_pair(graph)`. The test computes the affected set itself from the shape of the map with `networkx`, and never calls `domain.patch.affected_set`; a test that agrees with the code it is testing is not a test. Test: `test_intervention_locality`, in `backend/tests/unit/domain/test_patches.py`. Re-checked after every step of `GraphEditMachine`, in the same file, which also re-checks the no-loops rule (INV-6) and the 0-to-1 bounds (INV-7) and shrinks any failing sequence to the shortest one that still breaks.
+**INV-4 — locality (product invariant: an edit changes only what is still connected to its subject in the map the edit leaves behind).** For all maps `g` from `graphs()` and all edits from `interventions(g)`: every claim outside the edit's affected set is byte-identical in the **base world** and the **branch world** — the full statement, over propagated worlds, for all six operations, each pinning at least one fully separated claim from `separated_pair(graph)`. The test computes the affected set itself from the shape of the map with `networkx` — over the map with feedback arrows set aside, by [`interventions.md`](interventions.md)'s rule — and never calls `domain.patch.affected_set`; a test that agrees with the code it is testing is not a test. The companion `test_a_feedback_arrow_never_carries_a_change`, in the same file, holds the other half: a claim reachable only through a feedback arrow is byte-identical in the two worlds, which is why R is untouched on the Hormuz strike branch. Test: `test_intervention_locality`, in `backend/tests/unit/domain/test_patches.py`. Re-checked after every step of `GraphEditMachine`, in the same file, which also re-checks the no-loops rule (INV-6) and the 0-to-1 bounds (INV-7) and shrinks any failing sequence to the shortest one that still breaks.
 
 **INV-5 with NFR-2 — every world replays from base, branch and seed.** For all maps `g` from `graphs()`, all branches `b` from `branches(g)` and all seeds `s` from `seeds()`: two independently computed worlds from `(g, b, s)` serialize to identical bytes. Tests: `test_world_replays_from_base_branch_seed`, and `test_same_seed_same_world`, which must cover **both** streams — the same 2 000 versions and the same coin flips inside them.
 
@@ -393,12 +408,18 @@ Directions and orderings, never values: research report 02 §3 reports `P(M1)` g
 
 ## Open questions
 
-Raised 2026-09-17. Each needs Kent.
+Raised 2026-09-17, and all four **decided the same day**. Each answer now lives in Behaviour, where a reader meets it in the arithmetic rather than in a footnote; the questions are kept here, closed, so the chapter shows its working.
 
-1. **An `impulse` that names no `half_life`.** [`../graph/link.md`](../graph/link.md)'s open question 4 settled one direction — a half-life on a `step` or a `ramp` is a violation — and left this one open: an `impulse` with `half_life=None` is legal today, and the shape above has no decay to evaluate. Three candidates, none picked here: read it as no decay at all (which makes the arrow a `step` and quietly ignores the author's choice of shape), take a default from somewhere, or make it a fourteenth violation code. It does not bite in stack 03a because every `impulse` in the fixture names a half-life — `B → M1` carries a comment saying it was added for exactly this reason — but `propagate` has to do *something* the first time a generated map omits one.
+1. **An `impulse` that names no `half_life`.** [`../graph/link.md`](../graph/link.md)'s open question 4 settled one direction — a half-life on a `step` or a `ramp` is a violation — and left this one open: what should `propagate` do with a spike that has no decay to evaluate?
+   **Decided 2026-09-17: nothing, because it never sees one.** It is a map fault, `impulse_without_half_life`, checked by `validate` ([`../graph/validity.md`](../graph/validity.md) rule 13). The shape and its parameters must agree, checked both ways. Reject, never repair: reading it as no decay would silently turn the arrow into a `step`, and any other default would be a number we invented and attributed to the model. See B2.
 
-2. **Which arrow the badge names when two undermine a supposition on the same day.** The rule is "the first live opposing arrow", and the fixture has exactly one. If two opposing arrows' sources are settled on the same day, `Retraction.by_link` needs a stated tie-break — the larger push, the earlier edit, or the smaller identifier — or the badge is not deterministic, which would break replay.
+2. **Which arrow the badge names when two undermine a supposition on the same day.**
+   **Decided 2026-09-17:** the arrow whose introducing edit came first in the branch; within one edit, its position in `Insert.links`; for a base-map arrow, its position in `graph.links`. Three orderings that already exist and are already load-bearing, so replay holds. See B4.
 
-3. **A `ramp` with `lag = 0.0`.** The shape divides by the lag, so a zero-lag ramp has no rise time. Reading it as "full size on the same day" makes it a `step`, which is probably right and is certainly better than a division by zero — but it means two shapes describe one behaviour, and nothing today says so out loud.
+3. **A `ramp` with `lag = 0.0`.**
+   **Decided 2026-09-17: nothing to decide.** The `u ≥ L` branch is tested first, so the climbing branch is never reached and a zero-lag ramp behaves as a `step`. A consequence of how the shape is written, not a special case, and no division by zero. See B2.
 
-4. **A second `do` on a claim whose supposition has already been withdrawn.** Assignments are ordered and a later one overrides an earlier one, so the user can re-suppose a retracted claim. Does the second supposition hold from its own date until undermined again — giving a series that reads *supposed · withdrawn · pushed · supposed* — and does the world then carry two retractions for one claim? The shapes allow it; nothing has decided what it means.
+4. **A second `do` on a claim whose supposition has already been withdrawn.**
+   **Decided 2026-09-17: allowed.** The second supposition holds from its own date until undermined again; the world carries one `Retraction` per ending, so a claim may have several; the series reads `supposed · withdrawn · pushed · supposed` and the tile shows the last pair. It falls out of "a later assignment overrides an earlier one" and needed nothing new. See B4.
+
+Nothing is open in this chapter today.

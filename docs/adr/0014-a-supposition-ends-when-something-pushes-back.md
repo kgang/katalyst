@@ -121,7 +121,7 @@ R4 is **kept as a test**, not as the engine: the simulation must agree with the 
 
 ### C. Where the width comes from — for free
 
-From the same two thousand versions, compute **each stated range's share of each claim's band** — a first-order variance share, obtained by binning the versions by the drawn value and comparing group averages; six lines of `numpy`, nothing run twice. Hormuz: **92 per cent of B's band is B's own base rate**; pin that down and B's band goes from 29 points wide to 8. Everything else contributes under half a point.
+From the same two thousand versions, compute **each stated range's share of each claim's band** — a first-order variance share, obtained by binning the versions by the drawn value and comparing group averages; six lines of `numpy`, nothing run twice. Hormuz: **92 per cent of B's band is B's own prior**; pin that down and B's band goes from 29 points wide to 8. Everything else contributes under half a point. *(Corrected 2026-09-17: read "base rate"; the Brent claim has none — the number that varies is its `prior`. `PRODUCT_REQUIREMENTS.md` FR-21 carries the same repair.)*
 
 This **replaces FR-21's "sensitivity × width of interval"** as the ranking for where to spend modelling effort. Carried on the world in stack 03a; first read by the interface in stack 06.
 
