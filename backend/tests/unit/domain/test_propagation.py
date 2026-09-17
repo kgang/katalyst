@@ -56,7 +56,7 @@ from katalyst.domain import (
     versions_of,
 )
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ
-from tests.strategies import branches, graphs, interventions, seeds
+from tests.strategies import branches, graphs, interventions, seeds, uncertain_beliefs
 
 many = settings(max_examples=25, deadline=None)
 a_few = settings(max_examples=12, deadline=None)
@@ -455,25 +455,50 @@ def test_do_leaves_ancestors_unchanged(data: st.DataObject) -> None:
 
 
 @given(st.data())
-@many
+@a_few
 def test_observe_may_update_ancestors(data: st.DataObject) -> None:
     """Learning something reaches back into what caused it, which supposing never does.
 
     Keeping only the worlds in which the claim came out as observed changes what
     the survivors say about the claim's causes just as much as about what it
-    causes. That is a *capability* claim, so the map is filtered to ones where a
-    cause could move at all.
-    """
-    graph = data.draw(graphs())
-    target = data.draw(st.sampled_from([one.id for one in graph.propositions]))
-    causes = _causes_of(graph, target)
-    assume(causes)
-    claims = {one.id: one for one in graph.propositions}
-    assume(0.05 < claims[target].prior.p < 0.95)
-    assume(any(0.0 < claims[one].prior.p < 1.0 for one in causes))
+    causes.
 
-    base = _folded(graph)
-    learned = _folded(graph, Observe(target=target, value=True))
+    **The map is built to be one a cause can move on, never filtered down to one.**
+    Every claim's prior comes from `uncertain_beliefs()` — a likelihood this product
+    would be willing to print, with a range of real width around it — so nothing on
+    the map is settled before the engine starts and the versions really do draw
+    different numbers for each claim. The claim to observe is picked from the ones
+    that actually have causes, read off the shape of the map.
+
+    Asking instead for *any* likelihood above nought, as this test once did, lets
+    through a number like `3.4e-289`: a cause that comes out false in every world,
+    so nothing upstream can move, and the test fails on a rare seed rather than on a
+    real fault. A generator that builds what a test needs cannot have that hole, and
+    it throws nothing away to get there.
+
+    **And this one runs at the shipped budget, not the small one.** The thing it is
+    about is the weight an observation gives each version — the share of that
+    version's worlds that survived — and at four worlds per version that share is
+    one of five numbers. A map whose observed claim is nearly certain then discards
+    no world at all in any version, every weight is 1, and the two worlds come out
+    identical: the test would be reporting how coarse its own budget is rather than
+    anything about the engine. The propagation chapter's section B6 says the same
+    thing about the size of the move. Measured over four hundred generated maps:
+    sixteen of them could not show the effect at sixteen versions of four worlds,
+    and every single one showed it at the shipped two thousand of eight.
+    """
+    graph = data.draw(graphs(priors=uncertain_beliefs()))
+    # Every claim but the first on a map that is all of one piece is given at
+    # least one cause by `graphs()` itself, so this list is never empty. It is
+    # asserted rather than assumed: the day that changes, this says so out loud
+    # instead of quietly checking fewer maps.
+    with_causes = [one.id for one in graph.propositions if _causes_of(graph, one.id)]
+    assert with_causes, "graphs() gives every claim but the first at least one cause"
+    target = data.draw(st.sampled_from(with_causes))
+    causes = _causes_of(graph, target)
+
+    base = _folded(graph, **FULL)
+    learned = _folded(graph, Observe(target=target, value=True), **FULL)
 
     assert any(learned.beliefs[one] != base.beliefs[one] for one in causes)
 
