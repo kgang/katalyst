@@ -15,7 +15,7 @@
 
 import ELK from "elkjs/lib/elk.bundled.js";
 import { describe, expect, it } from "vitest";
-import type { LinkView } from "../../world";
+import type { ClaimView, LinkView } from "../../world";
 import {
   LAYOUT_OPTIONS,
   type LayoutEdge,
@@ -23,18 +23,40 @@ import {
   readPositions,
   toElkGraph,
 } from "../elkGraph";
-import { TILES_PER_LAYER } from "../geometry";
+import {
+  claimLines,
+  LARGEST_ZOOM,
+  SMALLEST_ZOOM,
+  SUMMARY_BELOW_ZOOM,
+  smallestTextAt,
+  TEXT_FLOOR,
+  TILE_MAX_HEIGHT,
+  TILE_MIN_HEIGHT,
+  TILES_PER_LAYER,
+  tileHeight,
+} from "../geometry";
 import { assignLayers, capLayers } from "../layers";
 
 const engine = new ELK();
 
-/** Lay a map out and read the answer back, exactly as the page does. */
+/**
+ * Lay a map out and read the answer back, exactly as the page does.
+ *
+ * Tiles are given a height here the way the page gives them one: worked out
+ * from the claim, not measured from a drawn tile.
+ */
 async function layout(
-  ids: readonly string[],
+  tiles: readonly (readonly [string, number])[],
   edges: readonly LayoutEdge[],
   placed: ReadonlyMap<string, Position>,
 ): Promise<Map<string, Position>> {
-  const laidOut = await engine.layout(toElkGraph(ids, edges, placed));
+  const laidOut = await engine.layout(
+    toElkGraph(
+      tiles.map(([id, height]) => ({ id, height })),
+      edges,
+      placed,
+    ),
+  );
   return readPositions(laidOut, placed);
 }
 
@@ -65,7 +87,11 @@ describe("the map's layout", () => {
 
   it("keeps tiles that are already placed exactly where they are", async () => {
     const first = await layout(
-      ["H", "C", "B"],
+      [
+        ["H", 272],
+        ["C", 216],
+        ["B", 192],
+      ],
       [
         { id: "H->C", source: "H", target: "C" },
         { id: "C->B", source: "C", target: "B" },
@@ -77,7 +103,12 @@ describe("the map's layout", () => {
     // A claim arrives, with two arrows, one of which lands on a tile that is
     // already on screen.
     const second = await layout(
-      ["H", "C", "B", "S"],
+      [
+        ["H", 272],
+        ["C", 216],
+        ["B", 192],
+        ["S", 232],
+      ],
       [
         { id: "H->C", source: "H", target: "C" },
         { id: "C->B", source: "C", target: "B" },
@@ -98,7 +129,11 @@ describe("the map's layout", () => {
 
   it("runs left to right, so a cause is always left of what it causes", async () => {
     const placed = await layout(
-      ["H", "C", "B"],
+      [
+        ["H", 272],
+        ["C", 216],
+        ["B", 192],
+      ],
       [
         { id: "H->C", source: "H", target: "C" },
         { id: "C->B", source: "C", target: "B" },
@@ -114,6 +149,111 @@ describe("the map's layout", () => {
     expect(b).toBeDefined();
     expect((h as Position).x).toBeLessThan((c as Position).x);
     expect((c as Position).x).toBeLessThan((b as Position).x);
+  });
+
+  it("gives each tile the height it will actually be drawn at", async () => {
+    const placed = await layout(
+      [
+        ["short", TILE_MIN_HEIGHT],
+        ["tall", TILE_MAX_HEIGHT],
+      ],
+      [{ id: "short->tall", source: "short", target: "tall" }],
+      new Map(),
+    );
+    const short = placed.get("short");
+    const tall = placed.get("tall");
+    expect(short).toBeDefined();
+    expect(tall).toBeDefined();
+    // The two are in different columns, so a tile of one height never decides
+    // where a tile of another height goes.
+    expect((short as Position).x).toBeLessThan((tall as Position).x);
+  });
+});
+
+describe("how tall a tile is", () => {
+  /** A claim with nothing on it, which each test then gives what it needs. */
+  function claimOf(text: string, extra: Partial<ClaimView> = {}): ClaimView {
+    return {
+      id: "X",
+      claim: text,
+      kind: "event",
+      resolvesBy: "2026-11-01",
+      resolutionSource: "A named source.",
+      beliefs: {
+        model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
+        user: { absence: { words: "—", reason: "You have not said." } },
+        market: { reading: { p: 0.48, lo: 0.45, hi: 0.52 } },
+      },
+      evidence: [],
+      ...extra,
+    };
+  }
+
+  it("is decided by the content, not fixed for every tile", () => {
+    const bare = tileHeight(claimOf("A short claim."));
+    const withReason = tileHeight(
+      claimOf("A short claim.", {
+        beliefs: {
+          model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
+          user: { absence: { words: "—", reason: "You have not said." } },
+          market: { absence: { words: "no market", reason: "No venue quotes this claim." } },
+        },
+      }),
+    );
+    const withClippings = tileHeight(
+      claimOf("A claim long enough to take three whole lines of the tile it is written on.", {
+        evidence: [
+          { line: "One.", monogram: "A", host: "a.com", direction: 1 },
+          { line: "Two.", monogram: "B", host: "b.com", direction: -1 },
+        ],
+      }),
+    );
+
+    expect(bare).toBeLessThan(withReason);
+    expect(withReason).toBeLessThan(withClippings);
+  });
+
+  it("stays on the eight-pixel grid and inside the floor and the ceiling", () => {
+    const claims = [
+      "A.",
+      "A claim of about the length that takes two lines.",
+      "A claim long enough to run past three lines of a tile and be stopped there, with more.",
+    ];
+    for (const text of claims) {
+      const height = tileHeight(claimOf(text));
+      expect(height % 8).toBe(0);
+      expect(height).toBeGreaterThanOrEqual(TILE_MIN_HEIGHT);
+      expect(height).toBeLessThanOrEqual(TILE_MAX_HEIGHT);
+    }
+  });
+
+  it("shows between one and three lines of the claim, and never more", () => {
+    expect(claimLines("Short.")).toBe(1);
+    expect(claimLines("A".repeat(400))).toBe(3);
+    // The number of lines the tile is built for is the number the claim is
+    // allowed to draw, so the two can never disagree.
+    expect(claimLines("")).toBe(1);
+  });
+});
+
+describe("the eleven-pixel floor", () => {
+  it("holds at every zoom the reader can reach", () => {
+    // Swept rather than spot-checked, because the whole point of the floor is
+    // that there is no zoom at which it fails.
+    for (let zoom = SMALLEST_ZOOM; zoom <= LARGEST_ZOOM + 0.0001; zoom += 0.005) {
+      const onGlass = smallestTextAt(zoom) * zoom;
+      expect(onGlass).toBeGreaterThanOrEqual(TEXT_FLOOR - 0.0001);
+    }
+  });
+
+  it("switches to the summary exactly where the full tile would fall below it", () => {
+    // A hair under the threshold the summary is drawing; a hair over, the full
+    // tile is — and both clear eleven pixels.
+    expect(
+      smallestTextAt(SUMMARY_BELOW_ZOOM - 0.001) * (SUMMARY_BELOW_ZOOM - 0.001),
+    ).toBeGreaterThan(TEXT_FLOOR);
+    expect(smallestTextAt(SUMMARY_BELOW_ZOOM) * SUMMARY_BELOW_ZOOM).toBeCloseTo(TEXT_FLOOR, 6);
+    expect(smallestTextAt(SMALLEST_ZOOM) * SMALLEST_ZOOM).toBeCloseTo(TEXT_FLOOR, 6);
   });
 });
 

@@ -7,12 +7,13 @@
  * wall; saying the number out loud is what keeps it honest, because a map that
  * quietly dropped claims would be lying about its own shape.
  *
- * It is drawn the same size as a claim's tile and with the same one-pixel
- * outline, so the column keeps its rhythm — but with a dashed line rather than
- * a solid one, because it is not a claim.
+ * It is drawn the same width as a claim's tile and with the same one-pixel
+ * outline, so the column keeps its rhythm — but at the shortest a tile is
+ * allowed to be, and with a dashed line rather than a solid one, because it is
+ * not a claim.
  */
 
-import { TILE_HEIGHT, TILE_WIDTH } from "../graph/geometry";
+import { TILE_MIN_HEIGHT, TILE_WIDTH } from "../graph/geometry";
 import "./tile.css";
 
 /** What the collapsed tile needs to draw itself. */
@@ -27,14 +28,14 @@ export function TileOverflow({ count }: TileOverflowProps) {
   return (
     <article
       className="tile tile--overflow"
-      style={{ width: `${TILE_WIDTH}px`, height: `${TILE_HEIGHT}px` }}
+      style={{ width: `${TILE_WIDTH}px`, height: `${TILE_MIN_HEIGHT}px` }}
       aria-label={`${count} more ${claims} in this column, not drawn`}
     >
       <svg
         className="tile__outline"
         width={TILE_WIDTH}
-        height={TILE_HEIGHT}
-        viewBox={`0 0 ${TILE_WIDTH} ${TILE_HEIGHT}`}
+        height={TILE_MIN_HEIGHT}
+        viewBox={`0 0 ${TILE_WIDTH} ${TILE_MIN_HEIGHT}`}
         aria-hidden="true"
         focusable="false"
       >
@@ -42,7 +43,7 @@ export function TileOverflow({ count }: TileOverflowProps) {
           x="0.5"
           y="0.5"
           width={TILE_WIDTH - 1}
-          height={TILE_HEIGHT - 1}
+          height={TILE_MIN_HEIGHT - 1}
           rx="6"
           strokeDasharray="4 4"
         />

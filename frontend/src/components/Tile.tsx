@@ -27,7 +27,7 @@
  */
 
 import { Handle, Position, useStore } from "@xyflow/react";
-import { SUMMARY_BELOW_ZOOM, TILE_HEIGHT, TILE_WIDTH } from "../graph/geometry";
+import { claimLines, SUMMARY_BELOW_ZOOM, TILE_WIDTH, tileHeight } from "../graph/geometry";
 import type { ClaimKind, ClaimView } from "../world";
 import { BeliefChip } from "./BeliefChip";
 import "./tile.css";
@@ -35,8 +35,10 @@ import "./tile.css";
 /**
  * The four outlines, as line drawings the width and height of a tile.
  *
- * Every path is offset by half a pixel so that a one-pixel stroke lands on a
- * pixel boundary instead of straddling two and going soft.
+ * Each one is drawn to the height its own tile turned out to be, because a tile
+ * is as tall as its content. Every path is offset by half a pixel so that a
+ * one-pixel stroke lands on a pixel boundary instead of straddling two and
+ * going soft.
  *
  * - **hypothesis** — the left edge comes to a point. This is where the map
  *   starts: the claim the reader typed, with nothing before it.
@@ -50,23 +52,16 @@ import "./tile.css";
  * given a wider margin on that side — see `tile.css`. A shape that crosses its
  * own words is not a shape, it is a mistake.
  */
-const OUTLINES: Record<ClaimKind, string> = {
-  hypothesis: `M 16.5 0.5 H ${TILE_WIDTH - 0.5} V ${TILE_HEIGHT - 0.5} H 16.5 L 0.5 ${
-    TILE_HEIGHT / 2
-  } Z`,
-  event: `M 6.5 0.5 H ${TILE_WIDTH - 6.5} A 6 6 0 0 1 ${TILE_WIDTH - 0.5} 6.5 V ${
-    TILE_HEIGHT - 6.5
-  } A 6 6 0 0 1 ${TILE_WIDTH - 6.5} ${TILE_HEIGHT - 0.5} H 6.5 A 6 6 0 0 1 0.5 ${
-    TILE_HEIGHT - 6.5
-  } V 6.5 A 6 6 0 0 1 6.5 0.5 Z`,
-  market: `M 0.5 0.5 H ${TILE_WIDTH - 18.5} L ${TILE_WIDTH - 0.5} 18.5 V ${
-    TILE_HEIGHT - 0.5
-  } H 0.5 Z`,
-  not_tradeable: `M 0.5 0.5 H ${TILE_WIDTH - 0.5} V ${TILE_HEIGHT / 2 - 14} L ${
-    TILE_WIDTH - 14.5
-  } ${TILE_HEIGHT / 2} L ${TILE_WIDTH - 0.5} ${TILE_HEIGHT / 2 + 14} V ${
-    TILE_HEIGHT - 0.5
-  } H 0.5 Z`,
+const OUTLINES: Record<ClaimKind, (height: number) => string> = {
+  hypothesis: (h) => `M 16.5 0.5 H ${TILE_WIDTH - 0.5} V ${h - 0.5} H 16.5 L 0.5 ${h / 2} Z`,
+  event: (h) =>
+    `M 6.5 0.5 H ${TILE_WIDTH - 6.5} A 6 6 0 0 1 ${TILE_WIDTH - 0.5} 6.5 V ${h - 6.5} ` +
+    `A 6 6 0 0 1 ${TILE_WIDTH - 6.5} ${h - 0.5} H 6.5 A 6 6 0 0 1 0.5 ${h - 6.5} ` +
+    `V 6.5 A 6 6 0 0 1 6.5 0.5 Z`,
+  market: (h) => `M 0.5 0.5 H ${TILE_WIDTH - 18.5} L ${TILE_WIDTH - 0.5} 18.5 V ${h - 0.5} H 0.5 Z`,
+  not_tradeable: (h) =>
+    `M 0.5 0.5 H ${TILE_WIDTH - 0.5} V ${h / 2 - 14} L ${TILE_WIDTH - 14.5} ${h / 2} ` +
+    `L ${TILE_WIDTH - 0.5} ${h / 2 + 14} V ${h - 0.5} H 0.5 Z`,
 };
 
 /** What each kind is called on screen. No underscores and no code names. */
@@ -146,6 +141,16 @@ export function Tile({ claim, isHypothesis }: TileProps) {
   const detail = zoom < SUMMARY_BELOW_ZOOM ? "summary" : "full";
 
   const marketAbsence = claim.beliefs.market.absence;
+  // As tall as this claim's own content, worked out the same way the layout
+  // worked it out, so the box the map reserved and the box the browser draws
+  // are the same box.
+  const height = tileHeight(claim);
+  const lines = claimLines(claim.claim);
+  // The foot only exists when it has something in it. An empty one would still
+  // take a gap above it, and the tile would have a step of dead space at the
+  // bottom — which is the whole thing a clamped height is meant to avoid. When
+  // the badges arrive, having one of those puts the foot there too.
+  const hasFoot = marketAbsence !== undefined || claim.evidence.length > 0;
 
   return (
     <article
@@ -153,18 +158,24 @@ export function Tile({ claim, isHypothesis }: TileProps) {
       data-kind={claim.kind}
       data-detail={detail}
       data-hypothesis={isHypothesis ? "yes" : "no"}
-      style={{ width: `${TILE_WIDTH}px`, height: `${TILE_HEIGHT}px` }}
+      style={{
+        width: `${TILE_WIDTH}px`,
+        height: `${height}px`,
+        // How many lines of the claim to show. The same number the height was
+        // worked out from, so the claim stops exactly where the box ends.
+        ["--tile-claim-lines" as string]: `${lines}`,
+      }}
       aria-label={`${KIND_WORDS[claim.kind]}: ${claim.claim}`}
     >
       <svg
         className="tile__outline"
         width={TILE_WIDTH}
-        height={TILE_HEIGHT}
-        viewBox={`0 0 ${TILE_WIDTH} ${TILE_HEIGHT}`}
+        height={height}
+        viewBox={`0 0 ${TILE_WIDTH} ${height}`}
         aria-hidden="true"
         focusable="false"
       >
-        <path d={OUTLINES[claim.kind]} />
+        <path d={OUTLINES[claim.kind](height)} />
       </svg>
 
       {/* The sockets. An arrow that fires once and an arrow that has to keep
@@ -215,7 +226,7 @@ export function Tile({ claim, isHypothesis }: TileProps) {
         <BeliefChip owner="market" slot={claim.beliefs.market} />
       </div>
 
-      {detail === "full" ? (
+      {detail === "full" && hasFoot ? (
         // The foot of the tile. It is pushed to the bottom edge as one block, so
         // that on every tile alike the claim is at the top, the beliefs are in
         // the middle and whatever is left sits on the floor — and the eye can

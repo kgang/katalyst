@@ -13,12 +13,26 @@
  */
 
 import type { ElkExtendedEdge, ElkNode, LayoutOptions } from "elkjs/lib/elk-api";
-import { TILE_HEIGHT, TILE_WIDTH } from "./geometry";
+import { TILE_WIDTH } from "./geometry";
 
 /** Where a tile sits, in the map's own coordinates. */
 export interface Position {
   readonly x: number;
   readonly y: number;
+}
+
+/**
+ * One tile, reduced to the two things the layout engine needs: what it is
+ * called and how tall it is.
+ *
+ * The height comes from the claim's own content — see `geometry.ts` — rather
+ * than from measuring a tile the browser has drawn. That is what keeps the
+ * layout a plain function of the map, testable without a browser, and it is why
+ * a tile's box and the box the layout reserved for it are always the same box.
+ */
+export interface LayoutTile {
+  readonly id: string;
+  readonly height: number;
 }
 
 /** One arrow, reduced to the two things the layout engine needs. */
@@ -66,19 +80,19 @@ export const LAYOUT_OPTIONS: LayoutOptions = {
  * semi-interactive setting above, is what keeps a tile arriving late from
  * shuffling the tiles that arrived before it.
  *
- * @param ids Every tile to place, in reading order.
+ * @param tiles Every tile to place, with its height, in reading order.
  * @param edges Every arrow between them. Feedback arrows are left out by the
  *   caller: an arrow that points backwards has no say in a left-to-right order.
  * @param placed Where tiles already sit, for the ones that have been placed.
  */
 export function toElkGraph(
-  ids: readonly string[],
+  tiles: readonly LayoutTile[],
   edges: readonly LayoutEdge[],
   placed: ReadonlyMap<string, Position>,
 ): ElkNode {
-  const children: ElkNode[] = ids.map((id) => {
+  const children: ElkNode[] = tiles.map(({ id, height }) => {
     const already = placed.get(id);
-    const child: ElkNode = { id, width: TILE_WIDTH, height: TILE_HEIGHT };
+    const child: ElkNode = { id, width: TILE_WIDTH, height };
     if (already !== undefined) {
       return {
         ...child,

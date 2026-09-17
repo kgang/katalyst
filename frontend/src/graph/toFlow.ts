@@ -8,7 +8,8 @@
 
 import type { Edge, Node } from "@xyflow/react";
 import type { ClaimView, LinkMode, WorldView } from "../world";
-import type { LayoutEdge } from "./elkGraph";
+import type { LayoutEdge, LayoutTile } from "./elkGraph";
+import { TILE_MIN_HEIGHT, tileHeight } from "./geometry";
 import { assignLayers, capLayers } from "./layers";
 
 /** A tile standing for one claim. */
@@ -20,8 +21,14 @@ export type OverflowNode = Node<{ count: number }, "overflow">;
 /** Everything the canvas draws as a box. */
 export type MapNode = ClaimNode | OverflowNode;
 
-/** A wire, carrying which kind of push it is so the wires work can read it. */
-export type MapEdge = Edge<{ mode: LinkMode; reflexive: boolean }>;
+/**
+ * A wire, carrying which kind of push it is so the wires work can read it.
+ *
+ * `skyY` is filled in by the canvas rather than here: it is the line the one
+ * backwards wire travels along, above every tile, and only the canvas knows
+ * where the tiles ended up.
+ */
+export type MapEdge = Edge<{ mode: LinkMode; reflexive: boolean; skyY?: number }>;
 
 /** What the canvas needs in order to draw a world. */
 export interface MapDrawing {
@@ -29,6 +36,11 @@ export interface MapDrawing {
   readonly nodes: readonly MapNode[];
   /** The wires, as they will be drawn. */
   readonly edges: readonly MapEdge[];
+  /**
+   * Every tile with the height it will be drawn at, which is the height the
+   * layout reserves for it. One number, worked out once, used by both.
+   */
+  readonly tiles: readonly LayoutTile[];
   /**
    * The arrows the layout gets a look at.
    *
@@ -100,7 +112,10 @@ export function toFlow(world: WorldView): MapDrawing {
         target: link.target,
         sourceHandle: source,
         targetHandle: target,
-        type: "smoothstep",
+        // A feedback arrow is routed over the top of the map rather than
+        // straight back through whatever tile is in the way. Every other wire
+        // takes the ordinary orthogonal route.
+        type: link.reflexive ? "feedback" : "smoothstep",
         data: { mode: link.mode, reflexive: link.reflexive },
       };
     });
@@ -130,5 +145,11 @@ export function toFlow(world: WorldView): MapDrawing {
     }
   }
 
-  return { nodes, edges, layoutEdges };
+  const tiles: LayoutTile[] = nodes.map((node) =>
+    node.type === "claim"
+      ? { id: node.id, height: tileHeight(node.data.claim) }
+      : { id: node.id, height: TILE_MIN_HEIGHT },
+  );
+
+  return { nodes, edges, layoutEdges, tiles };
 }

@@ -24,7 +24,13 @@
 import ELK, { type ELK as LayoutEngine } from "elkjs/lib/elk-api.js";
 import elkWorkerAddress from "elkjs/lib/elk-worker.min.js?url";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type LayoutEdge, type Position, readPositions, toElkGraph } from "./elkGraph";
+import {
+  type LayoutEdge,
+  type LayoutTile,
+  type Position,
+  readPositions,
+  toElkGraph,
+} from "./elkGraph";
 
 /** Where every tile sits, and which run of the layout put it there. */
 export interface Layout {
@@ -66,17 +72,21 @@ function inWords(reason: unknown): string {
  * Work out where every tile goes, on a background thread, and keep tiles that
  * have already been placed exactly where they are.
  *
- * @param ids Every tile to place, in reading order.
+ * @param tiles Every tile to place, with its height, in reading order.
  * @param edges Every arrow that gets a say in the left-to-right order. Feedback
  *   arrows are left out by the caller.
  */
-export function useLayout(ids: readonly string[], edges: readonly LayoutEdge[]): Layout {
+export function useLayout(tiles: readonly LayoutTile[], edges: readonly LayoutEdge[]): Layout {
   // The map only changes when the claims or the arrows do, and comparing two
   // lists of strings is cheaper and steadier than comparing two arrays by
   // identity — a fresh array with the same contents must not start a re-layout.
   const shape = useMemo(
-    () => JSON.stringify([ids, edges.map((edge) => [edge.id, edge.source, edge.target])]),
-    [ids, edges],
+    () =>
+      JSON.stringify([
+        tiles.map((tile) => [tile.id, tile.height]),
+        edges.map((edge) => [edge.id, edge.source, edge.target]),
+      ]),
+    [tiles, edges],
   );
 
   // Where tiles already sit. Held across runs, because that is what pinning
@@ -90,9 +100,9 @@ export function useLayout(ids: readonly string[], edges: readonly LayoutEdge[]):
 
   useEffect(() => {
     let stillWanted = true;
-    const [tiles, wires] = JSON.parse(shape) as [string[], [string, string, string][]];
+    const [boxes, wires] = JSON.parse(shape) as [[string, number][], [string, string, string][]];
     const graph = toElkGraph(
-      tiles,
+      boxes.map(([id, height]) => ({ id, height })),
       wires.map(([id, source, target]) => ({ id, source, target })),
       placed.current,
     );

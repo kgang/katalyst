@@ -30,9 +30,10 @@ import "@xyflow/react/dist/base.css";
 import { Tile } from "../components/Tile";
 import { TileOverflow } from "../components/TileOverflow";
 import type { WorldView } from "../world";
-import { LARGEST_ZOOM, SMALLEST_ZOOM, TILE_HEIGHT, TILE_WIDTH } from "./geometry";
+import { FeedbackWire } from "./FeedbackWire";
+import { LARGEST_ZOOM, SMALLEST_ZOOM, TILE_WIDTH } from "./geometry";
 import { useLayout } from "./layoutRunner";
-import { type ClaimNode, type MapNode, type OverflowNode, toFlow } from "./toFlow";
+import { type ClaimNode, type MapEdge, type MapNode, type OverflowNode, toFlow } from "./toFlow";
 import "./canvas.css";
 
 /** The two kinds of box the map draws. Defined once, outside render, so the
@@ -44,11 +45,30 @@ const TILE_TYPES = {
   overflow: ({ data }: { data: OverflowNode["data"] }) => <TileOverflow count={data.count} />,
 };
 
+/** The one wire that is not drawn by the library's own router. */
+const WIRE_TYPES = { feedback: FeedbackWire };
+
+/** How far above the highest tile the one backwards wire travels. */
+const SKY_GAP = 56;
+
 /** The name of the arrowhead every wire ends in, defined once below. */
 const ARROWHEAD = "katalyst-arrowhead";
 
-/** How much room to leave around the map when it is first framed. */
-const FIRST_FRAME = { padding: 0.14, maxZoom: 1, duration: 0 } as const;
+/**
+ * How the map is framed the first time it is drawn: the whole of it, with a
+ * margin of a twelfth of the window around it, and never blown up past life
+ * size.
+ *
+ * The margin is as tight as it is on purpose. Whether the first frame shows the
+ * full tiles or their summaries is decided by whether the whole map happens to
+ * fit above the summary threshold, and a fat margin pushes a map that would
+ * have fitted below it. On a window 1600 by 1000 this frames the stored example
+ * at 0.88 — full tiles, with the smallest words landing at 11.4 pixels. On a
+ * smaller window it lands below the threshold and the first frame is summaries,
+ * which is the right answer there: the words stay legible and zooming in fills
+ * the tiles.
+ */
+const FIRST_FRAME = { padding: 0.08, maxZoom: 1, duration: 0 } as const;
 
 /** The surface itself. Lives inside the provider so it can move the view. */
 function MapSurface({ world }: { world: WorldView }) {
@@ -57,8 +77,7 @@ function MapSurface({ world }: { world: WorldView }) {
   const [focused, setFocused] = useState<string | null>(null);
 
   const drawing = useMemo(() => toFlow(world), [world]);
-  const ids = useMemo(() => drawing.nodes.map((node) => node.id), [drawing]);
-  const layout = useLayout(ids, drawing.layoutEdges);
+  const layout = useLayout(drawing.tiles, drawing.layoutEdges);
 
   const nodes: MapNode[] = useMemo(
     () =>
@@ -67,6 +86,25 @@ function MapSurface({ world }: { world: WorldView }) {
         position: layout.positions.get(node.id) ?? { x: 0, y: 0 },
       })),
     [drawing, layout],
+  );
+
+  // The one backwards wire travels above every tile, so it needs to be told
+  // where the top of the map is. An edge cannot see the other tiles.
+  const edges: MapEdge[] = useMemo(() => {
+    const tops = [...layout.positions.values()].map((at) => at.y);
+    const skyY = (tops.length > 0 ? Math.min(...tops) : 0) - SKY_GAP;
+    return drawing.edges.map((edge) => {
+      if (edge.type !== "feedback" || edge.data === undefined) {
+        return edge;
+      }
+      return { ...edge, data: { ...edge.data, skyY } };
+    });
+  }, [drawing, layout]);
+
+  /** How tall a tile turned out to be, so the view can be centred on its middle. */
+  const heightOf = useCallback(
+    (id: string) => drawing.tiles.find((tile) => tile.id === id)?.height ?? 0,
+    [drawing],
   );
 
   // Frame the whole map once, when it is first laid out, and never again.
@@ -84,13 +122,13 @@ function MapSurface({ world }: { world: WorldView }) {
     if (focused !== null) {
       const node = flow.getNode(focused);
       if (node) {
-        flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + TILE_HEIGHT / 2, {
+        flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + heightOf(focused) / 2, {
           zoom: flow.getZoom(),
           duration: 0,
         });
       }
     }
-  }, [layout.runs, flow, focused]);
+  }, [layout.runs, flow, focused, heightOf]);
 
   /**
    * Remember which tile the reader is on, and bring it into view if it is not.
@@ -122,13 +160,13 @@ function MapSurface({ world }: { world: WorldView }) {
       }
       const node = flow.getNode(id);
       if (node) {
-        flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + TILE_HEIGHT / 2, {
+        flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + heightOf(id) / 2, {
           zoom: flow.getZoom(),
           duration: 0,
         });
       }
     },
-    [flow],
+    [flow, heightOf],
   );
 
   return (
@@ -154,8 +192,9 @@ function MapSurface({ world }: { world: WorldView }) {
 
       <ReactFlow
         nodes={nodes}
-        edges={[...drawing.edges]}
+        edges={edges}
         nodeTypes={TILE_TYPES}
+        edgeTypes={WIRE_TYPES}
         // Tiles do not move. Automatic layout decides where a claim sits, and a
         // tile you can drag half of the time — snapping back whenever the map is
         // laid out again — reads as broken. Pinning, grouping and annotating

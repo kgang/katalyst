@@ -146,3 +146,15 @@
   font-size: var(--text-sm);
   color: var(--text);
 }
+
+/* ---- The one wire that runs backwards ----------------------------------- *
+ * A feedback arrow is the only one allowed to point the other way, and it is
+ * routed over the top of the map so that it never crosses a tile. The dashes
+ * say one thing and one thing only — *this one runs backwards* — and they are a
+ * placeholder: the work that gives the stroke its real job, saying what kind of
+ * push a wire carries, replaces this with a loop and the delay written on it. */
+
+.canvas .wire--feedback {
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+}

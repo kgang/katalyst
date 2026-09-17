@@ -34,6 +34,18 @@
   isolation: isolate;
 }
 
+/* Nothing inside a tile is ever squeezed. The tile's height was worked out from
+ * exactly these blocks, so if the arithmetic is a fraction of a pixel out the
+ * right answer is for the tile to be a fraction of a pixel taller — not for the
+ * claim to lose the bottom of its last line, which is what a flexible box does
+ * by default and which reads as text cut in half. */
+.tile__header,
+.tile__claim,
+.tile__beliefs,
+.tile__foot {
+  flex: none;
+}
+
 /* The drawn outline: the fill and the one-pixel line, in the shape that says
  * what kind of claim this is. Sits behind everything in the tile, and takes no
  * clicks. */
@@ -95,9 +107,11 @@
 }
 
 /* ---- The claim ---------------------------------------------------------- *
- * Three lines, then it stops. The stop is by line rather than by character, so
- * a word is never cut in half to save a few pixels; the rest of the sentence
- * lives in the panel beside the map. */
+ * As many lines as the tile was built to hold — at most three — and then it
+ * stops. The number comes from the same place the tile's height came from, so
+ * the claim stops exactly where the box ends and never a line later. The stop
+ * is by line rather than by character, so a word is never cut in half to save a
+ * few pixels; the rest of the sentence lives in the panel beside the map. */
 
 .tile__claim {
   margin: 0;
@@ -107,8 +121,8 @@
   text-wrap: pretty;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: var(--tile-claim-lines, 3);
+  line-clamp: var(--tile-claim-lines, 3);
   overflow: hidden;
 }
 
@@ -219,13 +233,20 @@
   white-space: nowrap;
 }
 
-/* Where a claim's badges go. Empty until the buttons that earn one exist; the
- * space is kept so a tile does not change height the day they do. */
+/* Where a claim's badges go — *Supposed · Oct 1*, *Retracted · Oct 2 · by "…"*,
+ * *Added*, *Retuned*. Nothing on this screen can edit the map yet, so it is
+ * always empty for now, and while it is empty it takes no room at all: an
+ * element of no height still earns the gap above it, and a gap with nothing in
+ * it is the dead space a clamped height exists to avoid. The moment a badge
+ * arrives the slot reappears, and the height the tile is given grows with it. */
 .tile__badges {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-hair);
-  min-height: 0;
+}
+
+.tile__badges:empty {
+  display: none;
 }
 
 /* ---- The collapsed tile ------------------------------------------------- *
@@ -287,6 +308,8 @@
   font-size: var(--text-lg);
   line-height: 1.25;
   font-weight: var(--weight-medium);
+  /* Two lines out here whatever the full tile shows: the summary is a glance,
+   * not a read. */
   -webkit-line-clamp: 2;
   line-clamp: 2;
 }
