@@ -770,12 +770,30 @@ def test_a_refusal_never_names_an_identifier(data: st.DataObject) -> None:
     `subject`, where the interface uses it to highlight the right tile or wire.
     """
     graph = data.draw(graphs())
-    somewhere_else = data.draw(graphs())
-    edit = data.draw(interventions(somewhere_else))
+    on_the_map = data.draw(st.sampled_from(graph.propositions))
+    # Every edit here is built to be refused, one way each. Drawing edits from a
+    # second generated map and throwing away the ones that happened to fit was
+    # tried first: generated maps share identifiers, so most edits fitted, most
+    # draws were thrown away, and the run failed its own health check on a bad day.
+    edit: Intervention = data.draw(
+        st.sampled_from(
+            [
+                Do(target="claim-not-on-this-map", value=True, at=None),
+                Observe(target="claim-not-on-this-map", value=False),
+                Believe(target="claim-not-on-this-map", belief=data.draw(beliefs(owner="user"))),
+                Retune(link="arrow-not-on-this-map", strength=0.5),
+                Insert(proposition=on_the_map, links=()),
+                Refine(
+                    target=on_the_map.id,
+                    into=(_example_claim("claim-finer-0"), _example_claim("claim-finer-1")),
+                ),
+            ]
+        )
+    )
 
     folded = apply(graph, _branch(edit))
-    assume(isinstance(folded, list))
-    assert isinstance(folded, list)
+    assert isinstance(folded, list), "every edit above is built to be refused"
+    assert folded, "a refusal with no reasons in it tells the user nothing"
 
     identifiers = (
         {one.id for one in graph.propositions} | {one.id for one in graph.links} | {graph.id}
