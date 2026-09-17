@@ -12,7 +12,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Slot } from "../../world";
+import type { Known, Ranged } from "../../world";
 import { BeliefChip, toReading, toShare, toTwoFigures } from "../BeliefChip";
 
 /**
@@ -37,7 +37,7 @@ function underOf(container: HTMLElement): string {
 }
 
 /** A slot with a number in it. */
-function known(p: number, lo: number, hi: number): Slot {
+function known(p: number, lo: number, hi: number): Known<Ranged> {
   return { reading: { p, lo, hi } };
 }
 

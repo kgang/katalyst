@@ -10,11 +10,11 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Slot } from "../../../world";
+import type { Known, Ranged } from "../../../world";
 import { WireChip } from "../WireChip";
 
 /** The absence every arrow carries in this build, and the reason beside it. */
-const NO_ENGINE: Slot = {
+const NO_ENGINE: Known<Ranged> = {
   absence: {
     kind: "no_engine",
     words: "no engine yet",

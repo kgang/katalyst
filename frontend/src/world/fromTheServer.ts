@@ -23,8 +23,9 @@ import type {
   BaseRateView,
   ClaimView,
   EvidenceClipping,
+  Known,
   LinkView,
-  Slot,
+  Ranged,
   SourceView,
 } from "./types";
 
@@ -61,12 +62,12 @@ export function seedFor(bundle: FixtureBundle): number {
  * The three numbers are copied across at full precision. Rounding is a display
  * decision and is made once, in the chip that prints them.
  */
-export function filled(belief: Belief): Slot {
+export function filled(belief: Belief): Known<Ranged> {
   return { reading: { p: belief.p, lo: belief.lo, hi: belief.hi } };
 }
 
 /** Turn "there is no number here" into the words and the reason for them. */
-export function missing(kind: AbsenceKind, words: string, reason: string): Slot {
+export function missing(kind: AbsenceKind, words: string, reason: string): Known<Ranged> {
   const absence: Absence = { kind, words, reason };
   return { absence };
 }
@@ -186,7 +187,7 @@ const NO_MARKET_REASON: Record<"market" | "event" | "hypothesis", string> = {
 };
 
 /** Why this claim has no market number. */
-function marketAbsence(proposition: Proposition): Slot {
+function marketAbsence(proposition: Proposition): Known<Ranged> {
   if (proposition.kind === "not_tradeable") {
     // A dead end says why it is a dead end, in the map's own words. This is the
     // one reason a tile prints for itself, because it is an answer rather than
@@ -203,21 +204,17 @@ function marketAbsence(proposition: Proposition): Slot {
 /**
  * What stands where a chain's multiplied-out likelihood would go.
  *
- * **The engine does not carry one.** A world holds a likelihood for every claim
- * and a series for every day, and nothing anywhere multiplies a route's steps
- * together — so there is no number to fetch, and the browser is forbidden from
- * working one out, because a canvas that multiplies its own is a second engine
- * and two engines disagree with nobody able to say which is right. The panel
- * names the route it would have been for and says this instead.
+ * **A world does not carry one yet.** It holds a likelihood for every claim and
+ * a series for every day, and nothing anywhere multiplies a route's steps
+ * together. The engine will carry it; until it does the slot says so, because
+ * working it out here would put a second answer on the map beside the engine's.
  */
 export const NO_PATH_PRODUCT: Absence = {
   kind: "no_engine",
   words: "no engine yet",
   reason:
     "Nothing has multiplied this chain out. The likelihood of a whole route is worked out " +
-    "where the map's numbers are worked out, and the engine does not carry one yet — so it " +
-    "is missing rather than guessed, because multiplying it here would make this screen a " +
-    "second engine.",
+    "where the map's numbers are, and the engine does not carry one yet.",
 };
 
 /**

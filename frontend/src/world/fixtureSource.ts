@@ -35,8 +35,9 @@ import type {
   DiffRequest,
   DiffView,
   Edit,
+  Known,
   LinkView,
-  Slot,
+  Ranged,
   WorldRequest,
   WorldView,
 } from "./types";
@@ -195,7 +196,7 @@ export class FixtureWorldSource implements WorldSource {
    * The likelihood of an arrow's target with its cause supposed true costs a
    * whole extra run of the map.
    */
-  async readConditional(_request: ConditionalRequest): Promise<Slot> {
+  async readConditional(_request: ConditionalRequest): Promise<Known<Ranged>> {
     throw noEngineHere("Working out the number on one arrow");
   }
 }

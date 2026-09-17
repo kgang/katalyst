@@ -43,9 +43,10 @@ import type {
   BeliefOwner,
   ClaimKind,
   ClaimView,
+  Known,
   LinkView,
+  Ranged,
   Selection,
-  Slot,
   WorldView,
 } from "../world";
 import { toReading, toShare, toTwoFigures } from "./BeliefChip";
@@ -105,7 +106,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * The panel writes a belief on one line; the tile stacks it over three. Same
  * number, same rounding, same guard against printing a certainty; two shapes.
  */
-function BeliefRow({ owner, slot }: { owner: BeliefOwner; slot: Slot }) {
+function BeliefRow({ owner, slot }: { owner: BeliefOwner; slot: Known<Ranged> }) {
   const reading = slot.reading;
   if (reading === undefined) {
     return (

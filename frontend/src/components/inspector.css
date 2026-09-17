@@ -15,17 +15,16 @@
  * where the edit ends up, then this. It takes whatever height is left and
  * scrolls on its own, so that reading a long rationale never scrolls the branch
  * list out of sight. */
-/* The panel takes whatever room is left beside the map, and never less than
- * this. **Never less** is the load-bearing half: the branch panel and the rail
- * above it both grow with what the engine has to say, and on a branch with
- * three endings they can fill the whole column between them — which, with a
- * panel that shrinks to nothing, means selecting a claim shows the reader an
- * empty strip. So it keeps a readable height of its own and the column scrolls
- * to reach it, which is a thing a reader can do something about. */
+/* Why this number is what it is. It takes whatever room the other two leave, and
+ * never less than a screenful of reading — *never less* being the load-bearing
+ * half: the branch panel and the rail above both grow with what the engine has
+ * to say, and on a branch with three endings they would fill the column between
+ * them. A panel squeezed to nothing means selecting a claim shows the reader an
+ * empty strip, which is this product's central answer gone missing. */
 .inspector {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 320px;
+  min-height: 18rem;
   overflow-y: auto;
   background: var(--surface-raised);
 }

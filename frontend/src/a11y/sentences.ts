@@ -22,7 +22,7 @@
 
 import { toTwoFigures } from "../components/BeliefChip";
 import { asQuoted, toDay } from "../graph/diff/days";
-import type { ClaimView, LinkView, Slot, WorldView } from "../world";
+import type { ClaimView, Known, LinkView, Ranged, WorldView } from "../world";
 
 /** One claim in the outline, with the claims it causes under it. */
 export interface OutlineItem {
@@ -103,7 +103,7 @@ function movedInWords(claim: ClaimView): string {
 }
 
 /** One belief, read out: `Model .46, range .30 to .63`, or the reason there is none. */
-function beliefInWords(owner: string, slot: Slot): string {
+function beliefInWords(owner: string, slot: Known<Ranged>): string {
   if (slot.reading === undefined) {
     const { kind, words, reason } = slot.absence;
     // "no market" carries its own reason and is short enough to read whole; it

@@ -270,7 +270,7 @@ describe("asking the engine", () => {
       // product is forbidden from multiplying one — so the slot says exactly
       // that rather than being filled in.
       expect(claim.pathProduct.reading).toBeUndefined();
-      expect(claim.pathProduct.absence?.reason).toContain("second engine");
+      expect(claim.pathProduct.absence?.reason).toContain("the engine does not carry one yet");
     }
   });
 });

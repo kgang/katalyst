@@ -8,8 +8,15 @@
  * separation for a list this short.
  */
 
+/* Where the edit ends up. It grows a row per ending the edit can reach, so it
+ * is the section most likely to want more room than the column has — and it
+ * takes what it can, keeps enough to read two rows, and scrolls the rest. */
 .delta-rail {
+  flex: 0 1 auto;
+  min-height: 12rem;
+  overflow-y: auto;
   display: grid;
+  align-content: start;
   row-gap: var(--space-1);
   padding: var(--space-2);
   border-bottom: 1px solid var(--hairline);

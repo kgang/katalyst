@@ -43,11 +43,12 @@ import {
   type Edit,
   FixtureWorldSource,
   forkBranch,
+  type Known,
   type LinkView,
   openBranch,
+  type Ranged,
   type Reason,
   type Selection,
-  type Slot,
   type WorldSource,
   type WorldView,
   workshopOf,
@@ -458,7 +459,7 @@ function MapScreen({
   // The numbers on the arrows, one at a time, kept once they arrive. Each one
   // costs a whole extra run of the map, so it is asked for when a reader selects
   // that arrow and never again for the same branch, seed and arrow.
-  const [wireNumbers, setWireNumbers] = useState<ReadonlyMap<string, Slot>>(new Map());
+  const [wireNumbers, setWireNumbers] = useState<ReadonlyMap<string, Known<Ranged>>>(new Map());
   const paintings = useMemo(
     () => (open === undefined ? null : bothPaintings(base, open, engine)),
     [base, open, engine],
@@ -549,7 +550,7 @@ function MapScreen({
       .readConditional({ baseId: base.baseId, branch: open, linkId: selection.id })
       .then(
         (slot) => slot,
-        (failure: unknown): Slot => ({
+        (failure: unknown): Known<Ranged> => ({
           absence: {
             kind: "no_engine",
             words: "no engine yet",

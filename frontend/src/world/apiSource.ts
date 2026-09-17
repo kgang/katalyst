@@ -51,7 +51,7 @@ import type {
   DiffView,
   Known,
   Movement,
-  Slot,
+  Ranged,
   Standing,
   WireBranch,
   WorldRequest,
@@ -469,7 +469,7 @@ export class ApiWorldSource implements WorldSource {
    *
    * @param request Which map, which branch, and which arrow.
    */
-  async readConditional(request: ConditionalRequest): Promise<Slot> {
+  async readConditional(request: ConditionalRequest): Promise<Known<Ranged>> {
     const bundle = await this.readBundle(request.baseId);
     const answer = await readConditional(
       request.baseId,

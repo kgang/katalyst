@@ -40,7 +40,6 @@ export type {
   Ranged,
   Reason,
   Selection,
-  Slot,
   SourceView,
   Standing,
   WireBranch,

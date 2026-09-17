@@ -191,13 +191,24 @@ body {
  * as one. It is 336 pixels wide rather than 400, which is what leaves the map
  * enough room at a 1600-pixel window to draw full tiles on its first frame
  * instead of summaries. Press P and it goes, and the map has the whole width. */
+/* The column beside the map: your branches, where the edit ends up, and why this
+ * number is what it is. All three at once, and that is the rule.
+ *
+ * **Each one scrolls itself; the column never scrolls as a whole.** Two of the
+ * three grow with what the engine has to say — a branch gains edits, a rail
+ * gains a row per ending — and in one column of fixed height something has to
+ * give. What must not give is a section disappearing off the bottom: a panel you
+ * cannot see is a panel that is not there, and this product's answer to "why is
+ * this number what it is" is in the third of them. So each keeps a readable
+ * height of its own, shrinks no further than that, and scrolls inside itself.
+ * Nothing is ever hidden behind anything else. */
 .dock {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   width: 336px;
   min-width: 0;
-  overflow-y: auto;
+  overflow: hidden;
   border-left: 1px solid var(--hairline);
   background: var(--surface-raised);
 }

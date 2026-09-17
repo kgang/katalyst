@@ -28,7 +28,7 @@
 
 import { useId, useState } from "react";
 import { type LikelihoodStep, likelihoodStep } from "../graph/wires/encodings";
-import type { BeliefOwner, Slot, Standing } from "../world";
+import type { BeliefOwner, Known, Ranged, Standing } from "../world";
 import "./beliefChip.css";
 
 /**
@@ -223,7 +223,7 @@ function marketNote(lo: number, hi: number): Note {
 /** Work out the three lines a chip shows, and the note behind it. */
 function readChip(
   owner: BeliefOwner,
-  slot: Slot,
+  slot: Known<Ranged>,
   standing: Standing | undefined,
   versions: number | undefined,
 ): {
@@ -285,7 +285,7 @@ export interface BeliefChipProps {
   /** Whose number this is. There are three, and they are never averaged. */
   readonly owner: BeliefOwner;
   /** The number, or the absence that stands where it would have been. */
-  readonly slot: Slot;
+  readonly slot: Known<Ranged>;
   /** A word shown instead of a likelihood, when the claim stands on the reader's say-so. */
   readonly standing?: Standing;
   /**

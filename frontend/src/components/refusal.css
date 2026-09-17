@@ -10,7 +10,11 @@
  */
 
 .refusal {
+  flex: 0 1 auto;
+  min-height: 9rem;
+  overflow-y: auto;
   display: grid;
+  align-content: start;
   row-gap: var(--space-1);
   padding: var(--space-2);
   border-bottom: 1px solid var(--hairline);

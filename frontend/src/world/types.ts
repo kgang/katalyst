@@ -98,24 +98,14 @@ export type Known<T> =
   | { readonly reading: T; readonly absence?: undefined }
   | { readonly reading?: undefined; readonly absence: Absence };
 
-/**
- * One slot where a likelihood belongs: `Known<Ranged>` under a shorter name.
- *
- * `Known<T>` is the shape; `Slot` is what it is called at the one type the
- * canvas uses most often. One idea, two spellings, and this sentence is the
- * whole of the difference — so that nobody reading `Slot` has to go looking for
- * a second rule.
- */
-export type Slot = Known<Ranged>;
-
 /** The three voices on one claim, each in its own slot, never merged. */
 export interface BeliefSlots {
   /** What the model thinks. */
-  readonly model: Slot;
+  readonly model: Known<Ranged>;
   /** What the reader thinks. Absent until they say. */
-  readonly user: Slot;
+  readonly user: Known<Ranged>;
   /** What a venue is pricing. Absent when no venue quotes this claim. */
-  readonly market: Slot;
+  readonly market: Known<Ranged>;
 }
 
 /**
@@ -251,7 +241,7 @@ export interface ClaimView {
    * Nothing in the browser multiplies anything to fill it in, and the slot holds
    * its absence until the engine can answer.
    */
-  readonly pathProduct: Slot;
+  readonly pathProduct: Known<Ranged>;
   /** A word shown instead of a likelihood, when the claim is standing on the reader's say-so. */
   readonly standing?: Standing;
   /**
@@ -420,7 +410,7 @@ export interface LinkView {
    * does not exist yet — the slot holds its absence and the wire's chip reads
    * the push back in words instead. Never a guessed number.
    */
-  readonly conditional: Slot;
+  readonly conditional: Known<Ranged>;
   /**
    * True when this arrow is a market feeding back on the world. A feedback
    * arrow is the one arrow allowed to close a loop, and it is set aside when
