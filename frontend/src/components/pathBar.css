@@ -1,0 +1,97 @@
+/*
+ * The path bar, at the foot of the panel.
+ *
+ * It is a block rather than a strip on purpose: the route is the answer to
+ * "where does this claim come from", and a route squeezed into one line is a
+ * route nobody reads.
+ */
+
+.path-bar {
+  display: grid;
+  row-gap: var(--space-hair);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--hairline);
+  background: var(--surface);
+}
+
+.path-bar__heading {
+  margin: 0 0 var(--space-hair);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The route as its identifiers, which is how it gets named out loud. */
+.path-bar__route {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.path-bar__steps {
+  margin: var(--space-hair) 0 var(--space-1);
+  padding: 0;
+  list-style: none;
+  display: grid;
+  row-gap: var(--space-hair);
+}
+
+.path-bar__step {
+  display: grid;
+  grid-template-columns: 3ch 1fr;
+  column-gap: var(--space-1);
+  align-items: baseline;
+}
+
+.path-bar__step-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.path-bar__step-claim {
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.path-bar__label {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* The reading itself: a number, or the words that stand where it would have
+ * been. The three things this bar can say are three different readings and they
+ * are never allowed to look like one another — which is why each carries which
+ * one it is on the element itself, and why the sentence underneath is always
+ * there. */
+.path-bar__reading {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.path-bar__reading[data-reading="number"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.path-bar__why,
+.path-bar__wart {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.path-bar__wart {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--hairline);
+}

@@ -15,6 +15,7 @@
 
 import ELK from "elkjs/lib/elk.bundled.js";
 import { describe, expect, it } from "vitest";
+import { aClaim, aWire } from "../../test/aMap";
 import type { ClaimView, LinkView } from "../../world";
 import {
   LAYOUT_OPTIONS,
@@ -62,14 +63,7 @@ async function layout(
 
 /** An arrow, with the fields the layering cares about. */
 function arrow(source: string, target: string, extra: Partial<LinkView> = {}): LinkView {
-  return {
-    id: `${source}->${target}`,
-    source,
-    target,
-    mode: "trigger",
-    reflexive: false,
-    ...extra,
-  };
+  return aWire({ source, target, ...extra });
 }
 
 describe("the map's layout", () => {
@@ -173,20 +167,15 @@ describe("the map's layout", () => {
 describe("how tall a tile is", () => {
   /** A claim with nothing on it, which each test then gives what it needs. */
   function claimOf(text: string, extra: Partial<ClaimView> = {}): ClaimView {
-    return {
-      id: "X",
+    return aClaim({
       claim: text,
-      kind: "event",
-      resolvesBy: "2026-11-01",
-      resolutionSource: "A named source.",
       beliefs: {
         model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
         user: { absence: { words: "—", reason: "You have not said." } },
         market: { reading: { p: 0.48, lo: 0.45, hi: 0.52 } },
       },
-      evidence: [],
       ...extra,
-    };
+    });
   }
 
   /** The three slots, with no market number in the market slot. */
@@ -204,8 +193,8 @@ describe("how tall a tile is", () => {
     const withClippings = tileHeight(
       claimOf("A claim long enough to take three whole lines of the tile it is written on.", {
         evidence: [
-          { line: "One.", monogram: "A", host: "a.com", direction: 1 },
-          { line: "Two.", monogram: "B", host: "b.com", direction: -1 },
+          { line: "One.", monogram: "A", host: "a.com", direction: 1, url: "https://a.com/" },
+          { line: "Two.", monogram: "B", host: "b.com", direction: -1, url: "https://b.com/" },
         ],
       }),
     );

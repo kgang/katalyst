@@ -22,10 +22,12 @@ import type { components } from "../api/schema";
 import type { FixtureBundle, WorldSource } from "./source";
 import type {
   Absence,
+  BaseRateView,
   ClaimView,
   EvidenceClipping,
   LinkView,
   Slot,
+  SourceView,
   WorldRequest,
   WorldView,
 } from "./types";
@@ -33,6 +35,7 @@ import type {
 type Proposition = components["schemas"]["Proposition"];
 type Belief = components["schemas"]["Belief"];
 type Evidence = components["schemas"]["Evidence"];
+type Source = components["schemas"]["Source"];
 
 /**
  * Turn a likelihood from the server into a filled slot, unchanged.
@@ -78,7 +81,70 @@ export function monogramFor(url: string): { monogram: string; host: string } {
 /** Turn one published item into the clipping a tile shows. */
 function clipping(evidence: Evidence): EvidenceClipping {
   const { monogram, host } = monogramFor(evidence.url);
-  return { line: evidence.claim, monogram, host, direction: evidence.direction };
+  return {
+    line: evidence.claim,
+    monogram,
+    host,
+    direction: evidence.direction,
+    url: evidence.url,
+  };
+}
+
+/**
+ * Turn one item behind an arrow into the source the panel prints.
+ *
+ * `retrieved` is the day *our own retrieval step* pulled the page down. It is
+ * absent whenever a person typed the address in by hand, which is the case for
+ * every source in the stored example — and the panel says that in words rather
+ * than printing a day nobody fetched anything on.
+ */
+function source(item: Source): SourceView {
+  const { host } = monogramFor(item.url);
+  return {
+    url: item.url,
+    title: item.title,
+    host,
+    retrieved:
+      item.retrieved === null || item.retrieved === undefined
+        ? {
+            absence: {
+              words: "—",
+              reason: "nobody fetched this; a person put the address in by hand",
+            },
+          }
+        : { day: item.retrieved },
+  };
+}
+
+/**
+ * How often this kind of thing has happened before — or, when the map records
+ * no such count, the sentence saying so.
+ *
+ * The count is printed as `7 of 9` and never as a rate. Dividing one by the
+ * other would be this half of the product doing arithmetic on the map's
+ * numbers, and it would also quietly claim that seven-in-nine is the answer,
+ * which is exactly what a prior is for and exactly what it is not.
+ */
+function baseRate(
+  proposition: Proposition,
+): { readonly reading: BaseRateView } | { readonly absence: Absence } {
+  const stored = proposition.base_rate;
+  if (stored === null || stored === undefined) {
+    return {
+      absence: {
+        words: "—",
+        reason: "no reference class recorded for this claim",
+      },
+    };
+  }
+  return {
+    reading: {
+      referenceClass: stored.reference_class,
+      k: stored.k,
+      n: stored.n,
+      sources: stored.sources.map((url) => source({ url, title: url, retrieved: null })),
+    },
+  };
 }
 
 /**
@@ -119,6 +185,9 @@ function toClaim(proposition: Proposition): ClaimView {
     kind: proposition.kind,
     resolvesBy: proposition.resolution.by,
     resolutionSource: proposition.resolution.source,
+    resolutionCriteria: proposition.resolution.criteria,
+    prior: { p: proposition.prior.p, lo: proposition.prior.lo, hi: proposition.prior.hi },
+    baseRate: baseRate(proposition),
     beliefs: {
       model: filled(beliefs.model),
       user: beliefs.user
@@ -126,9 +195,19 @@ function toClaim(proposition: Proposition): ClaimView {
         : missing("—", "You have not put your own number on this claim yet."),
       market: beliefs.market ? filled(beliefs.market) : marketAbsence(proposition),
     },
-    // At most two clippings on a tile. The rest live in the panel beside the
-    // map, which is built in the pull request after this one.
+    // At most two clippings on a tile; every one of them in the panel beside
+    // the map, where there is room to read them.
     evidence: proposition.evidence.slice(0, 2).map(clipping),
+    evidenceInFull: proposition.evidence.map(clipping),
+    // The multiplied-out likelihood of a route from the hypothesis to this
+    // claim. It is computed on the world and this half of the product renders
+    // it; there is no world yet, so there is no number, and the bar says which
+    // route it would have been for and that nothing has worked it out.
+    pathProduct: missing(
+      "no engine yet",
+      "Nothing has worked this number through the map yet. The likelihood of a whole " +
+        "chain is multiplied out where the map's numbers are computed, and never here.",
+    ),
   };
 }
 
@@ -139,6 +218,26 @@ function toLink(link: components["schemas"]["Link"]): LinkView {
     source: link.source,
     target: link.target,
     mode: link.mode,
+    // Carried across at full precision and never touched. The wire compares it
+    // against four fixed widths and five fixed bands of words; nothing adds it
+    // to anything.
+    strength: link.strength,
+    lag: link.lag,
+    shape: link.shape,
+    halfLife: link.half_life ?? null,
+    rationale: link.rationale,
+    sources: link.sources.map(source),
+    provenance: link.provenance,
+    // The likelihood of this arrow's target with its source supposed true. The
+    // engine works one out on request, one arrow at a time, and that route does
+    // not exist yet — so every arrow in this build carries the absence and the
+    // wire reads its push back in words instead.
+    conditional: missing(
+      "no engine yet",
+      "Nothing has worked this number through the map yet. The likelihood with this " +
+        "arrow's cause supposed true costs a whole extra run of the map, so it is " +
+        "worked out one arrow at a time, and there is nothing to ask yet.",
+    ),
     reflexive: link.reflexive,
   };
 }

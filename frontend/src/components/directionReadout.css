@@ -1,0 +1,42 @@
+/*
+ * Which way the money moves.
+ *
+ * This is the only stylesheet in the product that names `--dir-up` or
+ * `--dir-down`, and a test checks that no other file does. The glyph and the
+ * amount take the hue; the word beside them does not, because the word is what
+ * a reader who sees no colour at all is reading.
+ */
+
+.direction-readout {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-hair);
+  font-size: var(--text-sm);
+}
+
+.direction-readout__amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
+}
+
+.direction-readout__word {
+  color: var(--text);
+}
+
+.direction-readout__what {
+  color: var(--text-muted);
+}
+
+/* The hue, and only on the glyph and the amount. The word beside them stays in
+ * the text colour, because the word is what a reader who sees no colour at all
+ * is reading. */
+.direction-readout[data-direction="up"] .direction-readout__glyph,
+.direction-readout[data-direction="up"] .direction-readout__amount {
+  color: var(--dir-up);
+}
+
+.direction-readout[data-direction="down"] .direction-readout__glyph,
+.direction-readout[data-direction="down"] .direction-readout__amount {
+  color: var(--dir-down);
+}

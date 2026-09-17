@@ -1,0 +1,328 @@
+/*
+ * The panel beside the map.
+ *
+ * A column with a hairline down its left edge and nothing else holding it in:
+ * no shadow, no floating card, no close button, because there is nothing to
+ * close. It is part of the screen rather than something that appeared over it.
+ *
+ * Its headings are small, spaced-out capitals in the muted colour — the label on
+ * a piece of equipment rather than a title — so that the reading beside them is
+ * always the loudest thing in its own block.
+ */
+
+.inspector {
+  flex: 0 0 auto;
+  width: 400px;
+  min-width: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--hairline);
+  background: var(--surface-raised);
+}
+
+/* ---- Nothing selected ---------------------------------------------------- *
+ * A real state with its own words, never a blank panel. */
+
+.inspector__empty {
+  display: grid;
+  row-gap: var(--space-1);
+  padding: var(--space-3);
+}
+
+.inspector__empty-heading {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+/* ---- The head ------------------------------------------------------------ */
+
+.inspector__head {
+  display: grid;
+  row-gap: var(--space-hair);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* The claim in full, never ellipsized here. The tile already stops at three
+ * lines; a claim you cannot read in full is a claim you cannot argue with. */
+.inspector__claim {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.inspector__kind {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.inspector__arrow {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text-muted);
+}
+
+/* ---- Sections ------------------------------------------------------------ */
+
+.inspector__section {
+  display: grid;
+  row-gap: var(--space-hair);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.inspector__heading {
+  margin: 0 0 var(--space-hair);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.inspector__body {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+/* The words that stand where a number would have been. Never a blank, never a
+ * zero, never a stand-in. */
+.inspector__words {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+/* Why there is no number, or what a number means. Always present beside an
+ * absence: an absence with no reason is a hole. */
+.inspector__reason {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.inspector__label {
+  margin: var(--space-hair) 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+/* The empty slot kept for "why is this band wide?", which arrives in a later
+ * piece of work. It is drawn only where the range above it was computed, and
+ * nothing computes one yet — so this rule reserves no height today and will
+ * hold the sentence when there is one to hold. */
+.inspector__band-slot {
+  min-height: 0;
+}
+
+.inspector__mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector__prior {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+
+.inspector__count {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+/* ---- Pairs: a label on the left, the value on the right ------------------ */
+
+.inspector__pairs {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 9ch 1fr;
+  column-gap: var(--space-2);
+  row-gap: var(--space-hair);
+  font-size: var(--text-sm);
+}
+
+.inspector__pairs--wide {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.inspector__pairs dt {
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.inspector__pairs dd {
+  margin: 0;
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+/* ---- Beliefs: three owners, one line each, never merged ------------------ */
+
+.inspector__belief {
+  display: grid;
+  grid-template-columns: 7ch 1fr;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+
+/* Why a belief has no number sits under the words rather than beside them: a
+ * sentence squeezed into the last third of a row wraps one word to a line and
+ * reads as a column of rubble. */
+.inspector__belief-reason {
+  grid-column: 2;
+}
+
+.inspector__owner {
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.inspector__number {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-1);
+  align-items: center;
+}
+
+/* The bounded bar the likelihood rides on: one of five brightnesses, the same
+ * size whatever the number is. Brightness is the whole of what it says, and the
+ * number printed beside it is the reading — so the bar only has to clear three
+ * to one, and the number always clears four and a half. */
+.inspector__bar {
+  width: var(--space-4);
+  height: var(--space-hair);
+  border-radius: 1px;
+  background: var(--p-0);
+}
+
+.inspector__bar[data-step="1"] {
+  background: var(--p-1);
+}
+
+.inspector__bar[data-step="2"] {
+  background: var(--p-2);
+}
+
+.inspector__bar[data-step="3"] {
+  background: var(--p-3);
+}
+
+.inspector__bar[data-step="4"] {
+  background: var(--p-4);
+}
+
+.inspector__reading {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* ---- Clippings and sources ---------------------------------------------- */
+
+.inspector__clippings,
+.inspector__sources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  row-gap: var(--space-1);
+}
+
+.inspector__clipping {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  column-gap: var(--space-1);
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+
+/* A letter standing for the publication, taken from the host name in its own
+ * address. A letter rather than the publication's icon, on purpose: an icon is
+ * a request to somebody else's server, and this app draws its first frame
+ * without making one. */
+.inspector__monogram {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0 var(--space-hair);
+}
+
+/* A sign, not a colour: whether the item supports the claim or cuts against it.
+ * A reader who cannot tell two hues apart loses nothing. */
+.inspector__sign {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.inspector__clipping-body {
+  display: grid;
+  row-gap: 2px;
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.inspector__source {
+  display: grid;
+  row-gap: 2px;
+  font-size: var(--text-sm);
+}
+
+.inspector__source-title {
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.inspector__source-host,
+.inspector__source-fetched {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-wrap: pretty;
+}
+
+/* ---- Where it came from -------------------------------------------------- */
+
+.inspector__origin {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+}
+
+.inspector__origin-word {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+/* Read out loud, never drawn. Used where a mark or a sign carries a meaning
+ * that a reader listening rather than looking would otherwise miss. */
+.inspector__hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

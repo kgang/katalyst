@@ -6,11 +6,12 @@
  * only judgement made here is which tiles there is room to draw.
  */
 
-import type { Edge, Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 import type { ClaimView, LinkMode, WorldView } from "../world";
 import type { LayoutEdge, LayoutTile } from "./elkGraph";
 import { TILE_MIN_HEIGHT, tileHeight } from "./geometry";
 import { assignLayers, capLayers } from "./layers";
+import type { CausalEdge } from "./wires/CausalWire";
 
 /** A tile standing for one claim. */
 export type ClaimNode = Node<
@@ -25,13 +26,13 @@ export type OverflowNode = Node<{ count: number }, "overflow">;
 export type MapNode = ClaimNode | OverflowNode;
 
 /**
- * A wire, carrying which kind of push it is so the wires work can read it.
+ * A wire, carrying everything it needs to say its five things at once.
  *
- * `skyY` is filled in by the canvas rather than here: it is the line the one
- * backwards wire travels along, above every tile, and only the canvas knows
- * where the tiles ended up.
+ * How it is routed is filled in by the canvas rather than here: a wire that has
+ * to skip a column needs to know where the other tiles ended up, and only the
+ * canvas knows that.
  */
-export type MapEdge = Edge<{ mode: LinkMode; reflexive: boolean; skyY?: number }>;
+export type MapEdge = CausalEdge;
 
 /** What the canvas needs in order to draw a world. */
 export interface MapDrawing {
@@ -105,6 +106,7 @@ export function toFlow(world: WorldView): MapDrawing {
   // Only arrows between two tiles that are actually drawn become wires. An
   // arrow into a collapsed claim has nowhere to land, and the collapsed tile
   // says in words that those claims are still on the map.
+  const claimWords = new Map(world.claims.map((claim) => [claim.id, claim.claim]));
   const edges: MapEdge[] = world.links
     .filter((link) => drawn.has(link.source) && drawn.has(link.target))
     .map((link) => {
@@ -115,11 +117,24 @@ export function toFlow(world: WorldView): MapDrawing {
         target: link.target,
         sourceHandle: source,
         targetHandle: target,
-        // A feedback arrow is routed over the top of the map rather than
-        // straight back through whatever tile is in the way. Every other wire
-        // takes the ordinary orthogonal route.
-        type: link.reflexive ? "feedback" : "smoothstep",
-        data: { mode: link.mode, reflexive: link.reflexive },
+        // One kind of wire, drawn by us. How it gets from one end to the other
+        // is worked out by the canvas, which is the only thing that knows where
+        // the other tiles ended up.
+        type: "causal" as const,
+        // What a reader who never sees the picture hears instead. Everything
+        // the stroke says, said in words.
+        ariaLabel:
+          `arrow from ${claimWords.get(link.source) ?? link.source} ` +
+          `to ${claimWords.get(link.target) ?? link.target}`,
+        data: {
+          shape: link.shape,
+          strength: link.strength,
+          mode: link.mode,
+          lag: link.lag,
+          reflexive: link.reflexive,
+          provenance: link.provenance,
+          conditional: link.conditional,
+        },
       };
     });
 
