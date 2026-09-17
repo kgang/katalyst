@@ -95,6 +95,8 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 
 **Six things and no more, in this stack.** Anything else a reader wants is one click away in the Inspector. Two things are missing on purpose. There is **no density sparkline** yet: a sparkline draws a day-by-day series, and nothing here computes one — a curve shaped by hand would be a picture of numbers nobody worked out. UX-1 keeps the sparkline, and it arrives with the engine's world, which carries a `series` of one likelihood per day. And an evidence item's `weight` is not drawn, because a weight that moves nothing is a number pretending to be an input; it is listed in the Inspector, where it can be labelled for what it is.
 
+**A skeleton is not a seventh thing, because it is not a tile.** While a map is being generated a reserved rectangle stands where the next claim will go: the tile's own box — 280 px wide, at the clamp's floor — carrying one line of words and nothing else. It is a box, not a claim. It has no identifier on the map, no chips, no kind silhouette, no badge, and no number that could be a number nobody computed. It is drawn by its own component, and every invariant in this chapter is about tiles and excludes it by name. [`streaming-growth.md`](streaming-growth.md) owns it.
+
 **The monogram is a letter, never a fetched favicon.** The packaged demo must draw its first frame with no request to anything outside it, and a favicon is such a request. The monogram is the first letter of the publisher's host name, with any leading `www.` dropped: `lloydslist.com` gives **L**, `bbc.com` gives **B**, `eia.gov` gives **E**.
 
 ### The four kind silhouettes *(proposed here — decision record 0007 settles that there are four, not what they look like)*
@@ -345,7 +347,7 @@ H has three arrows leaving it. Two of them — to B and to N1 — leave from `ou
 
 ## INVARIANTS
 
-Each is *for all inputs of this kind, this statement holds*, and each names what checks it: a **component test** under `frontend/src/**/__tests__/`, or a numbered line of the **visual review checklist** — the twelve things the coordinator looks for on every screenshot. A checklist line is a checkable thing; it is checked by a person.
+Each is *for all inputs of this kind, this statement holds*, and each names what checks it: a **component test** under `frontend/src/**/__tests__/`, or a numbered line of the **visual review checklist** in [`README.md`](README.md) — the things the coordinator looks for on every screenshot. A checklist line is a checkable thing; it is checked by a person.
 
 Local numbers in this part are `INV-workbench.<n>`. This chapter holds **1 – 12**; [`color-motion-type.md`](color-motion-type.md) holds 13 – 19.
 
@@ -364,7 +366,7 @@ For every claim string, of any length: the tile renders at most three lines, and
 
 ### INV-workbench.3 — Six things, and no seventh
 
-For every tile: the rendered regions are exactly those in the six-things table, and no other content region is present.
+For every tile: the rendered regions are exactly those in the six-things table, and no other content region is present. A skeleton is not a tile and is excluded by name; what it may and may not carry is [`streaming-growth.md`](streaming-growth.md)'s INV-workbench.62.
 
 - **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_draws_the_six_regions_and_no_seventh`.
 
