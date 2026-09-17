@@ -7,21 +7,32 @@
  */
 
 export { ApiWorldSource } from "./apiSource";
-export { FixtureWorldSource, monogramFor } from "./fixtureSource";
+export { appendEdit, forkBranch, openBranch, type Workshop, workshopOf } from "./branchReducer";
+export { branchesOf, FixtureWorldSource, monogramFor } from "./fixtureSource";
 export type { FixtureBundle, WorldSource } from "./source";
 export type {
   Absence,
+  AbsenceKind,
+  AddedArrow,
+  Badge,
   BaseRateView,
   BeliefOwner,
   BeliefSlots,
+  BranchHue,
+  BranchView,
   ClaimKind,
   ClaimView,
+  DeltaRow,
+  DiffState,
+  Edit,
   EvidenceClipping,
+  Known,
   LinkMode,
   LinkShape,
   LinkView,
   Provenance,
   Ranged,
+  Selection,
   Slot,
   SourceView,
   Standing,

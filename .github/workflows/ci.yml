@@ -1,14 +1,15 @@
 # The checks that run on every pull request and on every push to `main`.
 #
-# Four jobs, named exactly `backend`, `frontend`, `types-fresh` and `docker`.
-# The names are not decoration: decision record 0009 makes them the checks that
-# must pass before anything reaches `main`, so renaming one here would quietly
-# stop it being required.
+# Five jobs, named exactly `backend`, `frontend`, `types-fresh`, `docker` and
+# `e2e`. The names are not decoration: decision record 0009 makes them the checks
+# that must pass before anything reaches `main`, so renaming one here would
+# quietly stop it being required.
 #
 #   backend      the Python half: style, types, tests
 #   frontend     the browser half: style, types, tests
 #   types-fresh  the browser's types still match the server's data shapes
 #   docker       both packaged images still build
+#   e2e          the one test that drives both halves in a real browser
 #
 # No job below is given an API key or any other secret, and no job needs one.
 # That is the rule INV-13 in `PRODUCT_REQUIREMENTS.md`: the whole suite passes
@@ -165,3 +166,53 @@ jobs:
           push: false
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+
+  # The one end-to-end test. It starts both halves the way a person starts them
+  # and drives the real app in a real browser: the stored example draws, the
+  # strike branch changes what the claims say, the claim it provably cannot reach
+  # does not change, and the whole walk is done with the keyboard.
+  #
+  # It is deliberately one test. Everything else about this product is checked by
+  # tests that need neither a browser nor a server, and a suite of browser tests
+  # is a suite of slow tests that fail for reasons that are not faults.
+  #
+  # **No key of any kind is given to this job, and it needs none.** The screen it
+  # drives is fed by the stored-example route, which reads a file and calls
+  # nothing. That is INV-13 in `PRODUCT_REQUIREMENTS.md`: the whole build passes
+  # with nothing configured.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install uv, the tool that installs Python packages
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install the browser app's packages
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install the server's packages
+        run: uv sync --frozen
+        working-directory: backend
+
+      - name: Install the one browser this test runs in
+        # Chromium alone. The other two engines would triple the time this job
+        # takes to tell us the same thing.
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Open the stored map, branch it, and read it with the keyboard
+        run: npx playwright test
+        working-directory: frontend

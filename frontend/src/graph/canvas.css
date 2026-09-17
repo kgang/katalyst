@@ -33,14 +33,94 @@
 
 /* ---- Tiles -------------------------------------------------------------- */
 
-/* A tile the hover lens has put off the path. Everything that is neither a
- * cause of the claim being pointed at nor something it causes drops to fifteen
- * per cent, which answers "what does this claim have to do with anything" in
- * one movement and with no arithmetic — following arrows is walking, not
- * calculating. */
-.canvas .react-flow__node.is-dimmed {
-  opacity: 0.15;
+/* ---- Two meanings on one channel, multiplied rather than fought over ------ *
+ * Opacity carries two things on this map, and they have to compose:
+ *
+ *   the hover lens  — everything off the path of the claim you are pointing at
+ *                     drops to fifteen per cent, which answers "what does this
+ *                     have to do with anything" in one movement and with no
+ *                     arithmetic, because following arrows is walking;
+ *   the other world — a claim or an arrow that is not in the world you are
+ *                     looking at is drawn at twenty per cent, in the place it
+ *                     takes in the other one, so that flipping between the two
+ *                     moves nothing.
+ *
+ * A tile that is both — off the path *and* in the other world — lands at the two
+ * multiplied together, near three per cent, and disappears. That is correct: you
+ * asked to see one path, in one world. Writing them as two custom properties and
+ * multiplying is what makes that happen; two rules setting `opacity` would leave
+ * whichever came last, which is not a meaning at all. */
+.canvas .react-flow__node,
+.canvas .react-flow__edge {
+  opacity: calc(var(--lens, 1) * var(--ghost, 1));
   transition: opacity var(--duration-fast) ease-out;
+}
+
+.canvas .react-flow__node.is-dimmed,
+.canvas .react-flow__edge.is-dimmed {
+  --lens: 0.15;
+}
+
+.canvas .react-flow__node.is-ghost,
+.canvas .react-flow__edge.is-ghost {
+  --ghost: 0.2;
+}
+
+/* A tile in the other world is dashed as well as faint. Its outline is a plain
+ * hairline with no job of its own, so dashing it costs nothing — unlike a wire,
+ * whose stroke is already fully spent saying what kind of push it is, and which
+ * therefore says "other world" by being faint and by nothing else. */
+.canvas .react-flow__node.is-ghost .tile__outline path {
+  stroke-dasharray: 4 3;
+}
+
+/* ---- The wires arriving, in the order the argument runs ------------------ *
+ * One of the three animations this product spends, and the only one on the map.
+ * Each column's wires appear sixty milliseconds after the column before, so the
+ * eye follows the chain the way the argument runs rather than seeing the whole
+ * picture land at once.
+ *
+ * It is a reveal and not a stroke being drawn along its own length, deliberately.
+ * Drawing a stroke means animating its dash pattern — and the dash pattern is
+ * already spoken for: it is what says whether this push is a spike that fades, a
+ * switch that holds, or one that builds. Animating it would make every wire lie
+ * about its own kind for two hundred milliseconds.
+ *
+ * Under reduced motion `--duration-wave` is zero and `--duration-stagger` is
+ * not, so each column still arrives after the one before it and nothing tweens.
+ * The ordering is the causality; the tweening is decoration. */
+.canvas[data-arriving="yes"] .react-flow__edge {
+  animation: wire-arrives var(--duration-wave) ease-out var(--wave-delay, 0ms) backwards;
+}
+
+.canvas .react-flow__edge.wave-0 {
+  --wave-delay: 0ms;
+}
+
+.canvas .react-flow__edge.wave-1 {
+  --wave-delay: var(--duration-stagger);
+}
+
+.canvas .react-flow__edge.wave-2 {
+  --wave-delay: calc(2 * var(--duration-stagger));
+}
+
+.canvas .react-flow__edge.wave-3 {
+  --wave-delay: calc(3 * var(--duration-stagger));
+}
+
+.canvas .react-flow__edge.wave-4 {
+  --wave-delay: calc(4 * var(--duration-stagger));
+}
+
+.canvas .react-flow__edge.wave-5 {
+  --wave-delay: calc(5 * var(--duration-stagger));
+}
+
+@keyframes wire-arrives {
+  from {
+    opacity: 0;
+  }
 }
 
 /* A tile the keyboard is on. The ring is ours, drawn the same way as every

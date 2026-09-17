@@ -14,13 +14,36 @@
  * it is waiting for and where it asked.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { branchAnnouncement } from "./a11y/announcement";
+import { outlineOf } from "./a11y/sentences";
 import type { About, FixtureSummary, Health, Readiness } from "./api/client";
 import { readAbout, readExampleList, readHealth, readReadiness } from "./api/client";
+import { BranchPanel, InterventionPanel } from "./components/BranchPanel";
+import { type Command, CommandPalette } from "./components/CommandPalette";
+import { DeltaRail } from "./components/DeltaRail";
 import { Inspector } from "./components/Inspector";
 import { Launchpad } from "./components/Launchpad";
-import { MapCanvas, type Selection } from "./graph/Canvas";
-import { FixtureWorldSource, type WorldSource, type WorldView } from "./world";
+import { Outline } from "./components/Outline";
+import { ShortcutsSheet } from "./components/ShortcutsSheet";
+import { MapCanvas } from "./graph/Canvas";
+import { bothPaintings } from "./graph/diff/branchWorld";
+import { endings, NO_SUMMARY_YET } from "./graph/diff/endings";
+import { tileHeight } from "./graph/geometry";
+import type { MapKeys } from "./keyboard/useMapKeys";
+import {
+  appendEdit,
+  type BranchView,
+  branchesOf,
+  type Edit,
+  FixtureWorldSource,
+  forkBranch,
+  openBranch,
+  type Selection,
+  type WorldSource,
+  type WorldView,
+  workshopOf,
+} from "./world";
 
 /**
  * Everything the screen can know about one thing it asked for. Three states and
@@ -205,8 +228,348 @@ function StatusRow({ reading }: { reading: Reading }) {
 type Screen =
   | { at: "launchpad" }
   | { at: "opening"; id: string }
-  | { at: "map"; world: WorldView }
+  | { at: "map"; world: WorldView; branches: readonly BranchView[] }
   | { at: "failed"; id: string; reason: string };
+
+/** How long the wires take to arrive, column by column, before the map settles. */
+const WAVE_SETTLES_AFTER = 1200;
+
+/**
+ * The map, the panel beside it, and everything you can do to both.
+ *
+ * Three things live here rather than inside the map, because all three are about
+ * the whole screen rather than about the picture: which branch is open, which of
+ * the two worlds is painted, and what the keyboard is on.
+ */
+function MapScreen({
+  base,
+  branches,
+  onLeave,
+}: {
+  base: WorldView;
+  branches: readonly BranchView[];
+  onLeave: () => void;
+}) {
+  const [shop, setShop] = useState(() => workshopOf(branches));
+  const [showing, setShowing] = useState<"now" | "before">("now");
+  const [selection, setSelection] = useState<Selection>(null);
+  const [focused, setFocused] = useState<string | null>(null);
+  const [dock, setDock] = useState<"panel" | "outline" | "away">("panel");
+  const [onlyColumn, setOnlyColumn] = useState<{
+    layer: number;
+    claims: readonly string[];
+  } | null>(null);
+  const [overlay, setOverlay] = useState<"palette" | "sheet" | null>(null);
+  const [intervening, setIntervening] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [status, setStatus] = useState(
+    "Press ? for every key. j and k walk a column; h and l follow the wires.",
+  );
+  const [announcement, setAnnouncement] = useState("");
+  const [arriving, setArriving] = useState(true);
+  const lastBranch = useRef<string | null>(null);
+
+  const open = shop.branches.find((branch) => branch.id === shop.openId);
+  const paintings = useMemo(
+    () => (open === undefined ? null : bothPaintings(base, open)),
+    [base, open],
+  );
+  const world = paintings === null ? base : showing === "now" ? paintings.now : paintings.before;
+
+  /**
+   * One box per claim, tall enough for whichever of the two paintings needs more
+   * room — a claim grows badges when an edit touched it. Reserving the taller box
+   * is what lets the union be laid out once and painted twice with nothing
+   * moving.
+   */
+  const heights = useMemo(() => {
+    if (paintings === null) {
+      return undefined;
+    }
+    const reserved = new Map<string, number>();
+    for (const side of [paintings.now, paintings.before]) {
+      for (const claim of side.claims) {
+        reserved.set(claim.id, Math.max(reserved.get(claim.id) ?? 0, tileHeight(claim)));
+      }
+    }
+    return reserved;
+  }, [paintings]);
+
+  const rows = useMemo(() => (paintings === null ? [] : endings(paintings.now)), [paintings]);
+  const outline = useMemo(() => outlineOf(world), [world]);
+
+  // A branch has just been opened or made. Three things follow, in this order:
+  // the map says out loud what the branch did, the wires arrive again in causal
+  // order, and — because creating a claim moves focus to it — the keyboard lands
+  // on the claim the branch added, so the view frames the thing you just made
+  // rather than leaving you to hunt for it.
+  useEffect(() => {
+    if (shop.openId === lastBranch.current) {
+      return;
+    }
+    lastBranch.current = shop.openId;
+    setShowing("now");
+    setArriving(true);
+    const settles = window.setTimeout(() => setArriving(false), WAVE_SETTLES_AFTER);
+    if (paintings === null) {
+      setAnnouncement("");
+      return () => window.clearTimeout(settles);
+    }
+    setAnnouncement(branchAnnouncement(paintings.now));
+    const arrived = paintings.now.claims.find((claim) => claim.diff === "added");
+    if (arrived !== undefined) {
+      setFocused(arrived.id);
+      setSelection({ kind: "claim", id: arrived.id });
+      setStatus(`your edit added this claim · ${arrived.claim}`);
+    }
+    return () => window.clearTimeout(settles);
+  }, [shop.openId, paintings]);
+
+  const edit = useCallback((made: Edit) => {
+    setShop((was) =>
+      appendEdit(was.openId === null ? forkBranch(was, "Your own branch") : was, made),
+    );
+  }, []);
+
+  const keys: MapKeys = useMemo(
+    () => ({
+      intervene: () => {
+        setDock("panel");
+        setIntervening(true);
+      },
+      branch: () => {
+        setDock("panel");
+        setNaming(true);
+      },
+      flipWorlds: () => {
+        if (paintings === null) {
+          setStatus("there is nothing to flip to — no branch is open");
+          return;
+        }
+        setShowing((was) => {
+          const next = was === "now" ? "before" : "now";
+          setStatus(
+            next === "now"
+              ? "the map with your edits"
+              : "the map as it was written, with what your branch adds drawn faint",
+          );
+          return next;
+        });
+      },
+      outline: () =>
+        setDock((was) => {
+          setOnlyColumn(null);
+          return was === "outline" ? "panel" : "outline";
+        }),
+      panel: () => setDock((was) => (was === "away" ? "panel" : "away")),
+      palette: () => setOverlay("palette"),
+    }),
+    [paintings],
+  );
+
+  // ⌘K, ? and Escape work wherever you are on the screen, not only on the map,
+  // because two of them are how you find out what the others do.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable === true;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setOverlay((was) => (was === "palette" ? null : "palette"));
+        return;
+      }
+      if (event.key === "Escape") {
+        setOverlay(null);
+        setIntervening(false);
+        setNaming(false);
+        return;
+      }
+      if (event.key === "?" && !typing) {
+        event.preventDefault();
+        setOverlay((was) => (was === "sheet" ? null : "sheet"));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const commands: Command[] = useMemo(() => {
+    const made: Command[] = [
+      {
+        name: "The map as it was written",
+        does: "Close the branch. Also the first row of the branch panel.",
+        run: () => setShop((was) => openBranch(was, null)),
+      },
+      ...shop.branches.map((branch) => ({
+        name: `Open the branch: ${branch.label}`,
+        does: `${branch.edits.length} edits. Also a row in the branch panel.`,
+        run: () => setShop((was) => openBranch(was, branch.id)),
+      })),
+      {
+        name: "Flip between the two maps",
+        does: "The same as pressing Space on the map. A hard switch, never a fade.",
+        run: keys.flipWorlds,
+      },
+      {
+        name: "Change this claim",
+        does: "The six things you can do to it. The same as pressing E on the map.",
+        run: keys.intervene,
+      },
+      {
+        name: "Start a branch",
+        does: "The same as pressing B on the map, and as the button in the branch panel.",
+        run: keys.branch,
+      },
+      {
+        name: "Read the map as a list",
+        does: "The same as pressing O. Every claim, one sentence each.",
+        run: () => {
+          setOnlyColumn(null);
+          setDock("outline");
+        },
+      },
+      {
+        name: "Show or hide the panel beside the map",
+        does: "The same as pressing P, when you want the whole width for the map.",
+        run: keys.panel,
+      },
+      {
+        name: "Every key, on one sheet",
+        does: "The same as pressing the question mark.",
+        run: () => setOverlay("sheet"),
+      },
+      {
+        name: "Back to the launchpad",
+        does: "The same as the link at the top left.",
+        run: onLeave,
+      },
+    ];
+    return made;
+  }, [shop.branches, keys, onLeave]);
+
+  const pick = useCallback((id: string) => {
+    setFocused(id);
+    setSelection({ kind: "claim", id });
+  }, []);
+
+  return (
+    <main className="page page--map">
+      <header className="map-bar">
+        <button className="map-bar__back" type="button" onClick={onLeave}>
+          <span aria-hidden="true">←</span> Back to the launchpad
+        </button>
+        <h1 className="map-bar__title">{base.title}</h1>
+        {open === undefined ? (
+          <p className="map-bar__where">The map as it was written</p>
+        ) : (
+          <p className="map-bar__where">
+            {/* A branch's hue rides on its name chip and its lane and nowhere
+                else, and the chip always carries the branch's name — so which
+                branch you are in is readable with no colour at all. */}
+            <span className="map-bar__chip" data-hue={open.hue} aria-hidden="true" />
+            {open.label}
+            <span className="map-bar__side">
+              {showing === "now" ? "with your edits" : "as it was written"}
+            </span>
+          </p>
+        )}
+        <button className="map-bar__sheet" type="button" onClick={() => setOverlay("sheet")}>
+          Every key (?)
+        </button>
+      </header>
+
+      {/* The map and the panel, side by side. The panel is part of the screen
+          rather than something that appears over it: there are no pop-ups
+          anywhere in this product, and a dialog you have to dismiss would steal
+          the map that makes the detail mean anything. */}
+      <div className="map-body">
+        <div className="map-stage">
+          <MapCanvas
+            world={world}
+            selection={selection}
+            onSelect={setSelection}
+            focused={focused}
+            onFocused={setFocused}
+            heights={heights}
+            mapKey={`${base.baseId}:${shop.openId ?? "as-written"}`}
+            keys={keys}
+            onStatus={setStatus}
+            onOverflow={(column) => {
+              setOnlyColumn(column);
+              setDock("outline");
+            }}
+            arriving={arriving}
+          />
+          {overlay === "palette" ? (
+            <CommandPalette open={true} onClose={() => setOverlay(null)} commands={commands} />
+          ) : null}
+          {overlay === "sheet" ? (
+            <ShortcutsSheet open={true} onClose={() => setOverlay(null)} />
+          ) : null}
+          <p className="map-status">
+            <span className="map-status__mark">last key</span>
+            {status}
+          </p>
+        </div>
+
+        {dock === "away" ? null : (
+          <aside className="dock" aria-label="The panel beside the map">
+            {dock === "outline" ? (
+              <Outline
+                items={outline}
+                onPick={pick}
+                focused={focused}
+                {...(onlyColumn === null
+                  ? {}
+                  : {
+                      only: new Set(onlyColumn.claims),
+                      filter:
+                        `Only the claims in column ${onlyColumn.layer}, which is what the ` +
+                        `collapsed tile on the map stands for. Press O for all of them.`,
+                    })}
+              />
+            ) : (
+              <>
+                {intervening ? (
+                  <InterventionPanel
+                    world={world}
+                    selection={selection}
+                    onEdit={edit}
+                    onClose={() => setIntervening(false)}
+                  />
+                ) : null}
+                <BranchPanel
+                  branches={shop.branches}
+                  openId={shop.openId}
+                  world={world}
+                  onOpen={(id) => setShop((was) => openBranch(was, id))}
+                  onFork={(label) => setShop((was) => forkBranch(was, label))}
+                  naming={naming}
+                  onNaming={setNaming}
+                />
+                {open === undefined ? null : (
+                  <DeltaRail rows={rows} ranked={false} summary={NO_SUMMARY_YET} />
+                )}
+                <Inspector world={world} selection={selection} />
+              </>
+            )}
+          </aside>
+        )}
+      </div>
+
+      {/* What a branch did, said out loud for a reader who is not looking at the
+          picture. Polite: it waits for a pause rather than cutting across
+          whatever is being read. */}
+      <p className="map-live" aria-live="polite">
+        {announcement}
+      </p>
+      <p className="map-origin">{world.origin}</p>
+    </main>
+  );
+}
 
 /**
  * Where maps come from.
@@ -235,17 +598,15 @@ export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }:
 
   const [screen, setScreen] = useState<Screen>({ at: "launchpad" });
 
-  // What the panel beside the map is open on. It lives here rather than inside
-  // the map because the panel is beside the map, not on it: selecting a claim
-  // changes what the panel says and nothing opens over the canvas.
-  const [selection, setSelection] = useState<Selection>(null);
-
   const open = useCallback(
     (id: string) => {
       setScreen({ at: "opening", id });
-      setSelection(null);
-      source.readWorld({ baseId: id }).then(
-        (world) => setScreen({ at: "map", world }),
+      // The world and the map's own branches, together: the world is what gets
+      // drawn, and the branches are the edits somebody already made to it, which
+      // the panel lists and the diff view folds on. Both come from the same
+      // stored example through the same seam.
+      Promise.all([source.readWorld({ baseId: id }), source.readBundle(id)]).then(
+        ([world, bundle]) => setScreen({ at: "map", world, branches: branchesOf(bundle) }),
         (reason: unknown) => setScreen({ at: "failed", id, reason: inWords(reason) }),
       );
     },
@@ -259,6 +620,10 @@ export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }:
     [health, readiness, about],
   );
 
+  if (screen.at === "map") {
+    return <MapScreen base={screen.world} branches={screen.branches} onLeave={toLaunchpad} />;
+  }
+
   if (screen.at !== "launchpad") {
     return (
       <main className="page page--map">
@@ -266,33 +631,16 @@ export function App({ source = DEFAULT_SOURCE, listExamples = readExampleList }:
           <button className="map-bar__back" type="button" onClick={toLaunchpad}>
             <span aria-hidden="true">←</span> Back to the launchpad
           </button>
-          <h1 className="map-bar__title">
-            {screen.at === "map" ? screen.world.title : "Strait of Hormuz"}
-          </h1>
+          <h1 className="map-bar__title">Strait of Hormuz</h1>
         </header>
 
-        {screen.at === "map" ? (
-          <>
-            {/* The map and the panel, side by side. The panel is part of the
-                screen rather than something that appears over it: there are no
-                pop-ups anywhere in this product, and a dialog you have to
-                dismiss would steal the map that makes the detail mean
-                anything. */}
-            <div className="map-body">
-              <MapCanvas world={screen.world} selection={selection} onSelect={setSelection} />
-              <Inspector world={screen.world} subject={selection} />
-            </div>
-            <p className="map-origin">{screen.world.origin}</p>
-          </>
-        ) : (
-          <div className="map-waiting">
-            <p className="map-waiting__line">
-              {screen.at === "opening"
-                ? `Reading the stored map from /api/fixtures/${screen.id}.`
-                : screen.reason}
-            </p>
-          </div>
-        )}
+        <div className="map-waiting">
+          <p className="map-waiting__line">
+            {screen.at === "opening"
+              ? `Reading the stored map from /api/fixtures/${screen.id}.`
+              : screen.reason}
+          </p>
+        </div>
       </main>
     );
   }

@@ -229,3 +229,10 @@ frontend/.vite/
 .vite/
 *.tsbuildinfo
 npm-debug.log*
+
+# What the one browser test leaves behind when it runs: its report, the traces it
+# keeps from a failure, and the browsers it downloads. None of it is source.
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/.playwright/

@@ -4,7 +4,10 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "es2023",
-    "lib": ["ES2023"],
+    /* `DOM` is here for the end-to-end test: the little functions it hands to
+       `page.evaluate` are shipped to the browser and run there, so they need the
+       browser's own types even though the file around them runs in Node. */
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "skipLibCheck": true,
 
@@ -23,5 +26,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  /* The build tool's configuration, and the one end-to-end test with the
+     settings that start both halves for it. All three run in Node. */
+  "include": ["vite.config.ts", "playwright.config.ts", "e2e"]
 }

@@ -27,6 +27,7 @@
  */
 
 import { useId, useState } from "react";
+import { type LikelihoodStep, likelihoodStep } from "../graph/wires/encodings";
 import type { BeliefOwner, Slot, Standing } from "../world";
 import "./beliefChip.css";
 
@@ -197,7 +198,14 @@ function readChip(
   slot: Slot,
   standing: Standing | undefined,
   versions: number | undefined,
-): { reading: string; under: string | null; spoken: string; note: Note; numeric: boolean } {
+): {
+  reading: string;
+  under: string | null;
+  spoken: string;
+  note: Note;
+  numeric: boolean;
+  step: LikelihoodStep | null;
+} {
   // A claim the reader has supposed true is true in every simulated world, so
   // the chip shows the word rather than a number. Inventing one — .98, or 1.0 —
   // would invite the reader to wonder about the other two per cent of a thing
@@ -209,6 +217,7 @@ function readChip(
       spoken: `${OWNER_WORDS[owner]}: ${standing.words}`,
       note: { label: standing.words, sentence: standing.reason },
       numeric: false,
+      step: null,
     };
   }
 
@@ -222,6 +231,7 @@ function readChip(
       spoken: `${OWNER_WORDS[owner]}: ${absence.words}. ${absence.reason}`,
       note: { label: absence.words, sentence: absence.reason },
       numeric: false,
+      step: null,
     };
   }
 
@@ -238,6 +248,7 @@ function readChip(
     spoken: `${OWNER_WORDS[owner]}: ${toReading(p, lo, hi)}`,
     note,
     numeric: true,
+    step: likelihoodStep(p),
   };
 }
 
@@ -262,7 +273,7 @@ export interface BeliefChipProps {
 export function BeliefChip({ owner, slot, standing, versions }: BeliefChipProps) {
   const noteId = useId();
   const [pinned, setPinned] = useState(false);
-  const { reading, under, spoken, note, numeric } = readChip(owner, slot, standing, versions);
+  const { reading, under, spoken, note, numeric, step } = readChip(owner, slot, standing, versions);
 
   return (
     <span className="belief-chip" data-owner={owner} data-reading={numeric ? "number" : "words"}>
@@ -282,7 +293,20 @@ export function BeliefChip({ owner, slot, standing, versions }: BeliefChipProps)
         onClick={() => setPinned((was) => !was)}
       >
         <span className="belief-chip__owner">{OWNER_WORDS[owner]}</span>
-        <span className="belief-chip__reading">{reading}</span>
+        <span className="belief-chip__reading">
+          {/* The bounded bar the likelihood rides on: one of five brightnesses,
+              the same size whatever the number is. Brightness is the whole of
+              what it says and the number printed beside it is the reading, so
+              the bar only has to clear three to one while the number clears four
+              and a half. It is drawn on the chip, never over a whole tile:
+              tile-wide brightness is already spent on the other world in a diff
+              and on the hover lens, and three meanings on one channel means none
+              of them reads. */}
+          {step === null ? null : (
+            <span className="belief-chip__bar" data-step={step} aria-hidden="true" />
+          )}
+          <span className="belief-chip__figure">{reading}</span>
+        </span>
         <span className="belief-chip__under">{under ?? ""}</span>
       </button>
       <span className="belief-chip__note" id={noteId} data-pinned={pinned ? "yes" : "no"}>

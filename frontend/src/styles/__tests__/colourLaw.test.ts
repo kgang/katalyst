@@ -36,10 +36,12 @@ function everyStylesheet(from: string): Record<string, string> {
 const STYLESHEETS = everyStylesheet("src");
 const TOKENS = STYLESHEETS["/src/styles/tokens.css"] ?? "";
 
-/** The five steps of the ramp, and the two chips allowed to paint with them. */
+/** The five steps of the ramp, and the chips allowed to paint with them. */
 const RAMP = ["--p-0", "--p-1", "--p-2", "--p-3", "--p-4"];
 const MAY_PAINT_WITH_THE_RAMP = new Set([
   "/src/styles/tokens.css",
+  // The bounded bar beside the number on a tile's belief chip.
+  "/src/components/beliefChip.css",
   // The bounded bar behind the number in the panel's belief rows.
   "/src/components/inspector.css",
   // The bounded bar on a wire's plate, once the engine can supply a likelihood.

@@ -1,0 +1,96 @@
+/*
+ * The shortcuts sheet.
+ *
+ * Sits over the map at its bottom right, over nothing else: no scrim, nothing
+ * dimmed, nothing to dismiss but Escape. The keys are set in the fixed-width
+ * face and lined up in a column, so the sheet reads as a reference card rather
+ * than as a dialog.
+ */
+
+.sheet {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 40;
+  display: grid;
+  row-gap: var(--space-1);
+  width: min(480px, calc(100% - var(--space-6)));
+  max-height: calc(100% - var(--space-6));
+  padding: var(--space-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  overflow-y: auto;
+}
+
+.sheet__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.sheet__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sheet__close {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.sheet__keys {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: 0;
+}
+
+.sheet__row {
+  display: grid;
+  grid-template-columns: 4.5em 1fr;
+  column-gap: var(--space-1);
+  align-items: baseline;
+}
+
+.sheet__key {
+  margin: 0;
+  padding: 1px var(--space-hair);
+  justify-self: start;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.sheet__does {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* The line about dragging. It is not a shortcut, so it is set apart by a
+ * hairline above it rather than dropped into the list where it would read as
+ * one. */
+.sheet__dragging {
+  margin: 0;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--hairline);
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-wrap: pretty;
+}

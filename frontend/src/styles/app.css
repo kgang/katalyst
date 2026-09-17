@@ -125,6 +125,144 @@ body {
   min-height: 0;
 }
 
+/* The map and the line under it that says what the last keystroke did. Both are
+ * the stage; the panel is beside them. The stage is the thing the two overlays —
+ * the command palette and the shortcuts sheet — are positioned against, so that
+ * neither can ever cover the panel and neither needs a scrim to sit above. */
+.map-stage {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* One line under the map naming what the last keystroke did: which wire it took
+ * and how long that wire's delay is, or that there was no wire that way. A
+ * movement you cannot account for is the same failure as a number you cannot
+ * account for, in a smaller place. */
+.map-status {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-hair) var(--space-2);
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-raised);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  min-height: 1.8em;
+}
+
+/* The label on the line under the map. A word rather than a glyph: a picture of
+ * a keyboard is one more thing that has to survive every typeface, and it says
+ * less than the word does. */
+.map-status__mark {
+  flex: none;
+  padding: 1px var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* What a branch did, said out loud. It is a visible line as well as a spoken
+ * one: a reader looking at the picture should be told the same thing a reader
+ * hearing it is told, and the counts are the ones the diff worked out rather
+ * than any number nobody computed. */
+.map-live {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-raised);
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.map-live:empty {
+  display: none;
+}
+
+/* The panel beside the map: the six things you can do, your branches, where the
+ * edit ends up, and why a number is what it is — one column, stacked, scrolling
+ * as one. It is 336 pixels wide rather than 400, which is what leaves the map
+ * enough room at a 1600-pixel window to draw full tiles on its first frame
+ * instead of summaries. Press P and it goes, and the map has the whole width. */
+.dock {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: 336px;
+  min-width: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--hairline);
+  background: var(--surface-raised);
+}
+
+/* Which branch you are in, in the bar at the top. The hue is on the chip; the
+ * name is beside it, so the branch is readable with no colour at all. */
+.map-bar__where {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.map-bar__chip {
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: 2px;
+  background: var(--text-muted);
+}
+
+.map-bar__chip[data-hue="violet"] {
+  background: var(--branch-violet);
+}
+
+.map-bar__chip[data-hue="teal"] {
+  background: var(--branch-teal);
+}
+
+.map-bar__chip[data-hue="rose"] {
+  background: var(--branch-rose);
+}
+
+.map-bar__chip[data-hue="slate"] {
+  background: var(--branch-slate);
+}
+
+/* Which of the two paintings is in front. A word, never a colour: the two
+ * worlds differ in what they say, and the bar says which one is speaking. */
+.map-bar__side {
+  padding: 1px var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  color: var(--text);
+}
+
+.map-bar__sheet {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.map-bar__sheet:hover {
+  color: var(--text);
+}
+
 /* Where every number on the map came from, in one sentence, under the map. A
  * map whose numbers cannot say where they came from is the state this product
  * refuses to show, so the sentence is part of the map rather than a footnote

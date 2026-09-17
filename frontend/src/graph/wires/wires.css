@@ -250,3 +250,17 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* ---- Arriving with their own wire ---------------------------------------- *
+ * The wires are revealed a column at a time, so the eye follows the chain the
+ * way the argument runs. A plate and a mark are drawn in a different layer from
+ * the wire they belong to, so the rule that reveals the wire cannot reach them —
+ * and without this they arrived a beat early, a reading with nothing yet to
+ * read. Each takes its own wire's delay, handed in as a value on the element.
+ *
+ * `wire-arrives` is defined once, in `canvas.css`, with the rule that reveals
+ * the wire itself. */
+.canvas[data-arriving="yes"] .wire-plate,
+.canvas[data-arriving="yes"] .wire-mark {
+  animation: wire-arrives var(--duration-wave) ease-out var(--wave-delay, 0ms) backwards;
+}

@@ -27,15 +27,25 @@ export function aClaim(over: Partial<ClaimView> = {}): ClaimView {
     resolutionSource: "A named source.",
     resolutionCriteria: "The test, written so that two people reading it would agree.",
     prior: { p: 0.28, lo: 0.15, hi: 0.42 },
-    baseRate: { absence: { words: "—", reason: "no reference class recorded for this claim" } },
+    baseRate: {
+      absence: {
+        kind: "not_said",
+        words: "—",
+        reason: "no reference class recorded for this claim",
+      },
+    },
     beliefs: {
       model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-      user: { absence: { words: "—", reason: "You have not said." } },
-      market: { absence: { words: "no market", reason: "no venue quotes this claim" } },
+      user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+      market: {
+        absence: { kind: "no_market", words: "no market", reason: "no venue quotes this claim" },
+      },
     },
     evidence: [],
     evidenceInFull: [],
-    pathProduct: { absence: { words: "no engine yet", reason: "Nothing has worked it out." } },
+    pathProduct: {
+      absence: { kind: "no_engine", words: "no engine yet", reason: "Nothing has worked it out." },
+    },
     ...over,
   };
 }
@@ -56,7 +66,9 @@ export function aWire(over: Partial<LinkView> = {}): LinkView {
     rationale: "Why this cause moves this effect.",
     sources: [],
     provenance: "argued",
-    conditional: { absence: { words: "no engine yet", reason: "Nothing has worked it out." } },
+    conditional: {
+      absence: { kind: "no_engine", words: "no engine yet", reason: "Nothing has worked it out." },
+    },
     reflexive: false,
     ...over,
   };
@@ -67,6 +79,7 @@ export function aWorld(over: Partial<WorldView> = {}): WorldView {
   return {
     baseId: "example",
     title: "An example map",
+    today: "2026-10-01",
     hypothesisId: "H",
     claims: [aClaim({ id: "H", kind: "hypothesis" }), aClaim({ id: "B" })],
     links: [aWire()],

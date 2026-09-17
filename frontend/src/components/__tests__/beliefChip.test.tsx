@@ -90,6 +90,7 @@ describe("a belief chip", () => {
         owner="market"
         slot={{
           absence: {
+            kind: "no_market",
             words: "no market",
             reason: "No venue quotes this claim, so there is no price to read.",
           },
@@ -110,7 +111,13 @@ describe("a belief chip", () => {
     const { container } = render(
       <BeliefChip
         owner="user"
-        slot={{ absence: { words: "—", reason: "You have not put your own number on this yet." } }}
+        slot={{
+          absence: {
+            kind: "not_said",
+            words: "—",
+            reason: "You have not put your own number on this yet.",
+          },
+        }}
       />,
     );
     expect(readingOf(container)).toBe("—");

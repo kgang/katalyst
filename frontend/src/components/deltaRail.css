@@ -1,0 +1,149 @@
+/*
+ * The rail beside the map.
+ *
+ * A column of readings, laid out like the face of an instrument: small
+ * spaced-out labels once at the top, values lined up under them in the
+ * fixed-width face so that the eye can run straight down a column. No fills, no
+ * shadows, no rounded cards — a hairline between one row and the next is enough
+ * separation for a list this short.
+ */
+
+.delta-rail {
+  display: grid;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.delta-rail__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The one line saying what the edit did to the trades — or, here, the reason
+ * there is no such line. The words come first and the sentence behind them sits
+ * under it, because a reader who stops at the first line should still have been
+ * told the truth. */
+.delta-rail__summary {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+
+.delta-rail__summary-reason {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.delta-rail__order,
+.delta-rail__empty,
+.delta-rail__reason {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.delta-rail__reason {
+  min-height: 3.6em;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--hairline);
+}
+
+.delta-rail__table {
+  display: grid;
+  row-gap: var(--space-1);
+}
+
+/* The three column labels, written once. `same direction` is the share of the
+ * versions of the map that moved the same way; `how firm` is the width of this
+ * world's own range on the claim. Neither is ever folded into an ordering. */
+.delta-rail__labels,
+.delta-rail__values {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1.3fr;
+  column-gap: var(--space-1);
+  align-items: baseline;
+}
+
+.delta-rail__labels {
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.delta-rail__rows {
+  display: grid;
+  row-gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delta-rail__row {
+  display: grid;
+  row-gap: var(--space-hair);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--hairline);
+}
+
+.delta-rail__label {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+/* The claim's letter on the map, so the rail and the picture can be read
+ * together without hunting. */
+.delta-rail__id {
+  display: inline-block;
+  min-width: 2.2em;
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+}
+
+.delta-rail__kind {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.delta-rail__value {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A value that is not there is a button, because the reason it is not there is a
+ * sentence and the column is too narrow for one. It looks nothing like a button:
+ * no fill, no border, a dotted underline saying there is more behind it. */
+.delta-rail__value--absent {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+.delta-rail__value--absent:hover {
+  color: var(--text);
+}

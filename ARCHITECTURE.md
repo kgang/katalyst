@@ -15,7 +15,9 @@ Both halves of the drawing below run today; the event stream, the model pipeline
 ```
  ┌──────────────────────────── browser ─────────────────────────────┐
  │  React + TypeScript (Vite)                                       │
- │  workbench canvas · inspector · world-state strip · thesis dock  │
+ │  workbench canvas · inspector · diff overlay · delta rail ·      │
+ │  branch panel · keyboard and outline                             │
+ │  [planned] world-state strip · time axis · thesis dock           │
  └───────────────▲───────────────────────────────▲──────────────────┘
         HTTP JSON │                               │ server-sent events
                   │                               │ (one-way stream: proposals,
@@ -38,7 +40,13 @@ Both halves of the drawing below run today; the event stream, the model pipeline
     web search tool)      prices, no key)             free key)
 ```
 
-**What runs, and what is drawn ahead.** The browser app and the Python server both start, and `api/` answers three things for real: whether the server is up, what it calls itself, and the stored worked example. `domain/` holds the rules and nothing else. `[planned]` Four parts of the drawing have no code behind them. There is no event stream — every route today is an ordinary request and its answer. `engine/` holds identifier minting alone; nothing has ever called Anthropic's API. `grounding/` is an empty package; nothing has ever called Polymarket or FRED. There is no storage: no database file, no volume declared in either compose file, nothing kept between requests. Inside the browser box only a status screen exists; the canvas, the inspector, the world-state strip and the thesis dock are drawn because they are decided, not because they are written.
+**What runs, and what is drawn ahead.** The browser app and the Python server both start, and `api/` answers four things for real: whether the server is up, what it calls itself, the stored worked example, and — new with stack 03a — what a branch does to a map: `POST /api/worlds`, `POST /api/worlds/diff` and `POST /api/worlds/conditional`. `domain/` holds the rules and the arithmetic and nothing else: it folds a branch onto a map, works the likelihoods through, and says what moved. **The canvas does not ask those three routes yet** — it reads the stored example and shows every computed number as an absence with a reason; joining the two is the first job of stack 04.
+
+**The browser half is built as far as the map goes.** It draws the stored example from `GET /api/fixtures/hormuz` — tiles with typed sockets, wires carrying the shape, strength and provenance of each push, automatic left-to-right layout on a background thread — and beside the map a panel that answers "why is this number what it is". Two worlds lie over each other: the union of the base map and a branch is laid out once and painted twice in the same coordinates, with one word per claim saying what the edit did to it, a rail listing the endings the edit can reach, and a panel listing the branch's edits in the order they were made. The whole of it works from the keyboard — along the wires rather than across the glass — and the same world exists as a nested list for a reader who never sees the picture. **No number on any of those screens was computed in the browser.** Where a likelihood would have moved there is an absence with the reason it is absent, because the part of this system that works one out is the server's and is not connected yet.
+
+`[planned]` **Inside the browser box, three things are drawn because they are decided rather than because they are written**: the world-state strip of tradeable instruments, time as a real axis on which lags are real distances, and the thesis dock. All three need numbers that move, which arrive when the canvas is joined to the engine.
+
+`[planned]` Four parts of the drawing outside the browser have no code behind them. There is no event stream — every route today is an ordinary request and its answer. `engine/` mints identifiers and builds worlds from the stored example, and nothing else; nothing has ever called Anthropic's API. `grounding/` is an empty package; nothing has ever called Polymarket or FRED. There is no storage: no database file, no volume declared in either compose file, nothing kept between requests.
 
 Two halves, one contract: the backend publishes an OpenAPI description (a machine-readable list of every route and data shape); the frontend's TypeScript types are generated from it and committed, and continuous integration fails if regeneration would change them. The two halves cannot drift silently.
 
@@ -158,20 +166,22 @@ Four of the six rows below exist. Decision record 0008 named four layers and was
 
 | Layer | What it covers | Where | State |
 |-------|----------------|-------|-------|
-| Pure rules, property-based | Map validity over maps nobody wrote by hand. `backend/tests/strategies.py` builds maps that are correct by construction and maps damaged on exactly one rule; the `hypothesis` library runs each test against hundreds of them and shrinks any failure to the smallest example that still breaks | `backend/tests/unit/domain/` | `[built]` — twenty-one property tests over `validate`. Propagation, interventions and patch algebra arrive with stack 03a |
+| Pure rules, property-based | Map validity over maps nobody wrote by hand. `backend/tests/strategies.py` builds maps that are correct by construction and maps damaged on exactly one rule; the `hypothesis` library runs each test against hundreds of them and shrinks any failure to the smallest example that still breaks | `backend/tests/unit/domain/` | `[built]` — property tests over `validate`, `apply`, `propagate` and `diff`, with a state machine that re-checks locality after every edit of a generated sequence |
 | Model boundary, recorded | Real vendor answers recorded once, scrubbed of keys, replayed; including malformed and refused answers | `backend/tests/boundary/`, recordings in `backend/tests/cassettes/` | `[planned]` — the directory, the settings that strip keys from a recording (`backend/tests/conftest.py`), and the rule that an unrecorded call fails rather than dials out are all in place; the first recording arrives with stack 04 |
-| Routes | Each route answers, and answers the shape it says it does | `backend/tests/api/` | `[built]` — health, about, and the two stored-example routes |
+| Routes | Each route answers, and answers the shape it says it does | `backend/tests/api/` | `[built]` — health, about, the two stored-example routes, and the three world routes (a world, a difference, one conditional), including the 422 that carries every reason an edit was refused |
 | Worked example | The Strait of Hormuz map and its branch: every rule it must obey, and every shape it is there to exercise | `backend/tests/unit/fixtures/` | `[built]` |
-| Browser app | Component tests for the status screen; later the canvas, the reducers and the inspector; one end-to-end smoke test | `frontend/src/**/*.test.tsx` | `[built]` for components; the end-to-end test is `[planned]` |
+| Browser app | Component tests for the status screen, the canvas, the reducers, the inspector and the diff; one end-to-end test | `frontend/src/**/*.test.{ts,tsx}`, `frontend/e2e/` | `[built]` — 177 browser tests, and the one end-to-end test |
 | Evaluation set | The four assignment examples run live; structural checks (no loops, ends in a trade, every link has a rationale, verify mode never fabricates a bridge) | `evals/` | `[planned]` — arrives with stack 04. `make eval` says so out loud rather than pretending |
 
-`make test` today runs 137 server tests and 3 browser tests, all without a key and without the network. Coverage is measured on the rules layer alone — `backend/src/katalyst/domain/` — and stands at 100% of lines and branches; no other layer has a coverage threshold, on purpose (decision record 0008).
+`make test` runs **259 server tests and 177 browser tests**, and `npx playwright test` runs the **one** end-to-end test. None of them needs a key and none of them reaches the network: the end-to-end test starts both halves itself and drives the stored example, which reads a file. Coverage is measured on the rules layer alone — `backend/src/katalyst/domain/` — and stands at 100% of lines and branches; no other layer has a coverage threshold, on purpose (decision record 0008).
 
-The one test that matters most is still `backend/tests/unit/test_import_boundary.py`. `test_domain_imports_nothing_impure` reads every file under `domain/` — nine of them now — and fails if any imports the engine, the routes, the grounding layer, or a model client. It is the rule "the model proposes; our code decides" made mechanical.
+The one test that matters most is still `backend/tests/unit/test_import_boundary.py`. `test_domain_imports_nothing_impure` reads every file under `domain/` — twelve of them now — and fails if any imports the engine, the routes, the grounding layer, or a model client. It is the rule "the model proposes; our code decides" made mechanical.
 
-**Runs on every pull request**, in four checks named `backend`, `frontend`, `types-fresh` and `docker` (`.github/workflows/ci.yml`). None of them is given an API key, and none needs one. `types-fresh` regenerates `frontend/src/api/schema.ts` from the server's own description of itself and fails if the result differs from what is committed, which is what stops the two halves drifting apart.
+**Runs on every pull request**, in five checks named `backend`, `frontend`, `types-fresh`, `docker` and `e2e` (`.github/workflows/ci.yml`). None of them is given an API key, and none needs one. `types-fresh` regenerates `frontend/src/api/schema.ts` from the server's own description of itself and fails if the result differs from what is committed, which is what stops the two halves drifting apart. `e2e` installs Chromium alone, starts both halves, and runs the single browser test.
 
 Deliberately skipped in v1: snapshot tests of rendered graphs, load tests, coverage thresholds outside `domain/`, more than one end-to-end test.
+
+**Two things the browser half checks that no test can.** Whether the interface looks like somebody else's component library, and whether a greyscale screenshot still says everything the colour one did, are checked by a person against the twelve-line visual review checklist in `spec/workbench/README.md`. A checklist line is a checkable thing; it is checked by eye, on every screenshot, before any of it is shown to anyone.
 
 ---
 
@@ -195,7 +205,14 @@ katalyst/
 │                       strategies.py  the generators the property tests draw maps from
 ├── frontend/
 │   ├── package.json  package-lock.json  vite.config.ts  biome.jsonc
+│   ├── playwright.config.ts    starts both halves for the one browser test
+│   ├── e2e/            the one end-to-end test
 │   └── src/            App.tsx and its test  api/ (client and generated types)
+│                       world/ (the view model, the sources, the branches)
+│                       graph/ (the map: layout, wires, the diff)
+│                       components/ (tiles, chips, panels, overlays)
+│                       keyboard/ (the key map and moving along wires)
+│                       a11y/ (the map read aloud, and what it may say)
 │                       styles/ (design tokens)  test/ (test setup)
 ├── scripts/
 │   └── gen-types.sh    rewrites frontend/src/api/schema.ts from the server
@@ -205,7 +222,7 @@ katalyst/
 ├── .env.example  .dockerignore  .pre-commit-config.yaml  .cz.toml
 ├── evals/              [planned] saved examples and structural checks; run by hand
 └── .github/
-    ├── workflows/ci.yml        checks: backend · frontend · types-fresh · docker
+    ├── workflows/ci.yml        checks: backend · frontend · types-fresh · docker · e2e
     └── pull_request_template.md
 ```
 

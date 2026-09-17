@@ -61,6 +61,9 @@ export const SKY_GAP = 56;
 /** How much clear space a corridor needs before a wire will use it. */
 const CORRIDOR_CLEARANCE = 24;
 
+/** How close to a tile the edge of a clear band comes. */
+const CORRIDOR_LIP = 8;
+
 /**
  * Draw a path through these corners, with the corners rounded off.
  *
@@ -196,20 +199,61 @@ export function freeCorridor(
   toX: number,
   preferredY: number,
 ): number | null {
+  const band = freeBand(boxes, fromX, toX, preferredY);
+  return band === null ? null : (band.from + band.to) / 2;
+}
+
+/** A clear horizontal strip of the map, with room in it for one wire or several. */
+export interface Band {
+  /** The top of the clear strip. */
+  readonly from: number;
+  /** The bottom of it. */
+  readonly to: number;
+}
+
+/**
+ * The clear band nearest `preferredY` that crosses this strip of the map without
+ * touching a tile — or `null` when there is no room anywhere.
+ *
+ * The bands are the gaps between the tiles standing in the strip, plus the open
+ * space above the highest and below the lowest. A gap has to be at least twice
+ * the clearance deep before a wire will use it, so a wire never runs so close to
+ * a tile's edge that it looks attached to it.
+ *
+ * A band rather than a single line, because **two arrows can need the same gap**:
+ * once the strike is laid over the base map, both the strait and the strike push
+ * the oil price directly, and both have to cross the middle column. Sharing one
+ * line would put two wires and two plates on top of each other, so the band is
+ * given back whole and `planRoutes` divides it into lanes.
+ *
+ * @param boxes Every tile on the map, by identifier.
+ * @param fromX The left edge of the strip the wire has to cross.
+ * @param toX The right edge of the strip.
+ * @param preferredY Where the wire would have run if nothing were in the way.
+ */
+export function freeBand(
+  boxes: readonly Box[],
+  fromX: number,
+  toX: number,
+  preferredY: number,
+): Band | null {
   const inTheWay = boxes.filter((box) => box.x < toX && box.x + box.width > fromX);
   if (inTheWay.length === 0) {
-    return preferredY;
+    return { from: preferredY - CORRIDOR_CLEARANCE, to: preferredY + CORRIDOR_CLEARANCE };
   }
   const occupied = merged(inTheWay.map((box) => ({ from: box.y, to: box.y + box.height })));
-  const lanes: number[] = [];
+  const bands: Band[] = [];
 
   const highest = occupied[0];
   const lowest = occupied[occupied.length - 1];
   if (highest !== undefined) {
-    lanes.push(highest.from - CORRIDOR_CLEARANCE * 2);
+    bands.push({
+      from: highest.from - CORRIDOR_CLEARANCE * 3,
+      to: highest.from - CORRIDOR_CLEARANCE,
+    });
   }
   if (lowest !== undefined) {
-    lanes.push(lowest.to + CORRIDOR_CLEARANCE * 2);
+    bands.push({ from: lowest.to + CORRIDOR_CLEARANCE, to: lowest.to + CORRIDOR_CLEARANCE * 3 });
   }
   for (let i = 0; i < occupied.length - 1; i += 1) {
     const above = occupied[i];
@@ -218,14 +262,15 @@ export function freeCorridor(
       continue;
     }
     if (below.from - above.to >= CORRIDOR_CLEARANCE * 2) {
-      lanes.push((above.to + below.from) / 2);
+      bands.push({ from: above.to + CORRIDOR_LIP, to: below.from - CORRIDOR_LIP });
     }
   }
-  if (lanes.length === 0) {
+  if (bands.length === 0) {
     return null;
   }
-  return lanes.reduce((best, lane) =>
-    Math.abs(lane - preferredY) < Math.abs(best - preferredY) ? lane : best,
+  const middleOf = (band: Band) => (band.from + band.to) / 2;
+  return bands.reduce((best, band) =>
+    Math.abs(middleOf(band) - preferredY) < Math.abs(middleOf(best) - preferredY) ? band : best,
   );
 }
 
@@ -249,6 +294,14 @@ export function planRoutes(
 
   // The columns, as the layout left them: every distinct left edge, in order.
   const columns = [...new Set(all.map((box) => box.x))].sort((a, b) => a - b);
+
+  // Which arrows want which clear band, gathered before any of them is given a
+  // line to run along. Two arrows that want the same gap have to be told apart,
+  // and an arrow deciding on its own cannot know there is a second one.
+  const wanting = new Map<
+    string,
+    { band: Band; wires: { id: string; fromX: number; toX: number }[] }
+  >();
 
   for (const wire of wires) {
     if (wire.reflexive) {
@@ -281,7 +334,7 @@ export function planRoutes(
     // so a column's right edge is its left edge plus that width.
     const fromX = (from.x + from.width + nextColumn) / 2;
     const toX = (previousColumn + to.width + to.x) / 2;
-    const corridorY = freeCorridor(
+    const band = freeBand(
       all,
       fromX,
       toX,
@@ -289,14 +342,37 @@ export function planRoutes(
       // the middle of the tile it is heading for.
       to.y + to.height / 2,
     );
-    if (corridorY === null) {
+    if (band === null) {
       // Nowhere to run. Better a wire that crosses a tile than no wire at all,
       // and the stored example never reaches this line — but a map that did
       // would still draw every arrow it has.
       plans.set(wire.id, { kind: "direct" });
       continue;
     }
-    plans.set(wire.id, { kind: "corridor", fromX, toX, corridorY });
+    // **Keyed by the band, not by the strip.** Two arrows can cross different
+    // stretches of the map and still want the same gap between the same two rows
+    // of tiles — on the union, the strait and the strike both push the oil price
+    // and both come through the middle. Their strips differ; the gap they want is
+    // the same one, and it is the gap that has to be shared out.
+    const shared = `${band.from}:${band.to}`;
+    const sharing = wanting.get(shared);
+    if (sharing === undefined) {
+      wanting.set(shared, { band, wires: [{ id: wire.id, fromX, toX }] });
+    } else {
+      sharing.wires.push({ id: wire.id, fromX, toX });
+    }
+  }
+
+  // **A band shared by two arrows is divided into lanes**, evenly, in the order
+  // the map lists the arrows. One arrow gets the middle of the band; two get a
+  // third and two thirds of it; and so on. The lanes are far enough apart that
+  // neither the wires nor their plates can meet, and the answer is the same
+  // every time because the order is the map's.
+  for (const { band, wires: sharing } of wanting.values()) {
+    for (const [at, one] of sharing.entries()) {
+      const lane = band.from + ((band.to - band.from) * (at + 1)) / (sharing.length + 1);
+      plans.set(one.id, { kind: "corridor", fromX: one.fromX, toX: one.toX, corridorY: lane });
+    }
   }
   return plans;
 }

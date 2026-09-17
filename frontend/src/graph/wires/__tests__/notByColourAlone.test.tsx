@@ -29,7 +29,9 @@ function patternFor(shape: LinkShape) {
     lag: 2,
     reflexive: false,
     provenance: "argued",
-    conditional: { absence: { words: "no engine yet", reason: "Nothing has worked it out." } },
+    conditional: {
+      absence: { kind: "no_engine", words: "no engine yet", reason: "Nothing has worked it out." },
+    },
   };
   const { container } = render(
     <ReactFlowProvider>

@@ -31,7 +31,16 @@ export const TILE_WIDTH = 280;
  * Both are on the eight-pixel grid.
  */
 export const TILE_MIN_HEIGHT = 152;
-export const TILE_MAX_HEIGHT = 272;
+/**
+ * The ceiling was 272, which was what the densest tile in the stored example
+ * needed **before a tile could carry badges**. A claim the reader supposed and a
+ * later edit pushed back down says so on its own face, in one line that names
+ * the edit responsible — *Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed
+ * military strike on Iranian territory"* — and that line is three lines wide on
+ * a 280-pixel tile. A ceiling that cut it off would hide the one thing the tile
+ * is there to say.
+ */
+export const TILE_MAX_HEIGHT = 320;
 
 /* ---- The blocks a tile is made of, in pixels --------------------------- *
  * Measured in the browser, at the type sizes and line heights `tile.css`
@@ -54,8 +63,14 @@ const HEADER = 21;
  */
 const CLAIM_LINE = 20.25;
 
-/** The three belief chips: owner, number and range, with the rule above them. */
-const BELIEF_RAIL = 67;
+/**
+ * The three belief chips: owner, number and range, with the rule above them.
+ *
+ * Measured at 69 in the browser, which is two pixels more than the 67 written
+ * here before the chips grew their brightness bars. A row that is two pixels
+ * short takes them off the bottom of the tile.
+ */
+const BELIEF_RAIL = 69;
 
 /**
  * The line a dead end prints saying why nothing here can be traded. Clamped to
@@ -66,6 +81,33 @@ const FINDING = 35;
 /** One evidence clipping, and the gap between two of them. */
 const CLIPPING = 21;
 const CLIPPING_GAP = 4;
+
+/**
+ * One line of a claim's badges, and the hairline and padding the badges
+ * themselves add to the block once.
+ *
+ * Thirteen pixels over a line height of 1.35 is 17.5, and each badge is drawn
+ * with a hairline round it and a pixel of padding, which lifts a line box to
+ * about 19. Both measured in the browser against the stored example's strike
+ * branch, where the tallest badge line in the product — *Supposed · Oct 1 →
+ * Retracted · Oct 2 · by "…"* — runs to three lines.
+ */
+const BADGE_LINE = 19;
+const BADGE_PADDING = 4;
+
+/**
+ * Roughly how many characters of a badge fit on one line.
+ *
+ * The badges flow across the same 256 pixels the claim wraps in, set at thirteen
+ * pixels in the interface face, whose average character is about six and a half
+ * pixels wide — so about thirty-eight. An estimate, and safe to be one for the
+ * same reason the claim's is: the same number decides both how tall the tile is
+ * and how much room the badges get, so the two cannot disagree.
+ */
+const BADGE_CHARACTERS_PER_LINE = 38;
+
+/** The separator drawn between one badge and the next, counted into the width. */
+const BADGE_SEPARATOR = " → ";
 
 /**
  * Roughly how many characters of the claim fit on one line.
@@ -95,6 +137,24 @@ export function claimLines(claim: string): number {
   return Math.min(CLAIM_MAX_LINES, Math.max(1, wanted));
 }
 
+/**
+ * How many lines this claim's badges take.
+ *
+ * Zero when it has none, which is every claim on a map nobody has edited.
+ *
+ * @param claim The claim the tile is for.
+ */
+export function badgeLines(claim: ClaimView): number {
+  const badges = claim.badges ?? [];
+  if (badges.length === 0) {
+    return 0;
+  }
+  const characters =
+    badges.reduce((sum, badge) => sum + badge.words.length, 0) +
+    BADGE_SEPARATOR.length * (badges.length - 1);
+  return Math.max(1, Math.ceil(characters / BADGE_CHARACTERS_PER_LINE));
+}
+
 /** Round up to the eight-pixel grid the whole interface sits on. */
 function toGrid(height: number): number {
   return Math.ceil(height / 8) * 8;
@@ -119,6 +179,10 @@ export function tileHeight(claim: ClaimView): number {
   const clippings = claim.evidence.length;
   if (clippings > 0) {
     foot.push(CLIPPING * clippings + CLIPPING_GAP * (clippings - 1));
+  }
+  const badges = badgeLines(claim);
+  if (badges > 0) {
+    foot.push(BADGE_LINE * badges + BADGE_PADDING);
   }
   if (foot.length > 0) {
     blocks.push(foot.reduce((a, b) => a + b, 0) + GAP * (foot.length - 1));
@@ -183,6 +247,71 @@ export function smallestTextAt(zoom: number): number {
 
 /** The smallest a word is ever drawn on the reader's screen, in pixels. */
 export const TEXT_FLOOR = SMALLEST_READABLE_TEXT;
+
+/* ---- The first frame ----------------------------------------------------- */
+
+/** A rectangle in the map's own coordinates. */
+export interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** How far the map is moved and zoomed to put something in front of the reader. */
+export interface Frame {
+  /** How far in the map is zoomed, where 1 is life size. */
+  readonly zoom: number;
+  /** How far the map is slid sideways, in screen pixels. */
+  readonly x: number;
+  /** How far the map is slid up or down, in screen pixels. */
+  readonly y: number;
+}
+
+/** The breathing room left around the map when it is framed, as a share of its size. */
+const FIRST_FRAME_MARGIN = 0.04;
+
+/** The gap left at the edge when the map is too big to fit and has to be panned. */
+const EDGE_GAP = 16;
+
+/**
+ * How the map is framed the first time it is drawn — and the one promise that
+ * framing makes: **the first frame never shows summary tiles.**
+ *
+ * The obvious rule is "fit the whole map". On a wide screen with the panel beside
+ * it that lands at about 0.8 zoom on the stored example, which is under the zoom
+ * at which a full tile's smallest words would be drawn below eleven pixels — so
+ * every tile would open as a summary, and the reader's first sight of the
+ * product would be seven boxes with a headline and three numbers in them.
+ *
+ * So the rule has a floor, and the floor is the same eleven-pixel rule
+ * everything else here is derived from: frame the whole map if it fits at a
+ * readable size, and if it does not, keep the readable size and start at the
+ * map's beginning, on the left, where the hypothesis is. The reader pans to the
+ * rest. A tile changes representation rather than shrinking; the same principle,
+ * applied to the frame rather than to the tile.
+ *
+ * @param map Everything the frame has to hold, in the map's own coordinates.
+ * @param canvas How much room there is for it, in screen pixels.
+ */
+export function firstFrame(map: Box, canvas: { width: number; height: number }): Frame {
+  const fits = Math.min(
+    canvas.width / (map.width * (1 + FIRST_FRAME_MARGIN)),
+    canvas.height / (map.height * (1 + FIRST_FRAME_MARGIN)),
+  );
+  // Never blown up past life size, however small the map; never shrunk past the
+  // point where a full tile would have to become a summary.
+  const zoom = Math.max(SUMMARY_BELOW_ZOOM, Math.min(1, fits));
+  const place = (room: number, start: number, size: number): number => {
+    const shown = size * zoom;
+    return shown <= room ? (room - shown) / 2 - start * zoom : EDGE_GAP - start * zoom;
+  };
+  return {
+    zoom,
+    x: place(canvas.width, map.x, map.width),
+    y: place(canvas.height, map.y, map.height),
+  };
+}
 
 /** How many tiles a single layer may show before the rest are collapsed into one. */
 export const TILES_PER_LAYER = 7;
