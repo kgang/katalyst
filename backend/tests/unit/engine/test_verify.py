@@ -6,7 +6,7 @@ state this product exists to refuse.
 """
 
 from katalyst.domain import Belief, Beliefs, Link, Proposition, Resolution
-from katalyst.engine.expand import verdict
+from katalyst.engine.verify import verdict
 from katalyst.fixtures import FIXTURE_DATE, HORMUZ
 
 SOMEWHERE_ELSE = "Iranian crude exports return to pre-sanction levels."

@@ -15,6 +15,11 @@ refusal, a run that spends its ceiling, three refusals in a row on one claim —
 of which a live model will produce on demand, and all of which are rules the
 product rests on.
 
+**And they go through the same translation a live call goes through.** The
+answerers below hand the pipeline a `Said`, built by `client.what_it_said` out of
+these replies — the very function a real call uses — so what these tests exercise
+is what a real call exercises, and the pipeline itself never sees a vendor type.
+
 Nothing here talks to a network, and nothing here needs a key.
 """
 
@@ -27,6 +32,8 @@ from anthropic.types.refusal_stop_details import RefusalStopDetails
 from anthropic.types.server_tool_usage import ServerToolUsage
 
 from katalyst.domain import BaseRate, ContractPayoff, Resolution
+from katalyst.engine.client import what_it_said
+from katalyst.engine.outcome import Said
 from katalyst.engine.proposal import (
     ClaimProposal,
     LinkDraft,
@@ -103,7 +110,7 @@ def an_arrow(
         shape="step",
         half_life=None,
         rationale=rationale,
-        sources=tuple(SourceDraft(url=url, title="What the model says it read") for url in cites),
+        sources=tuple(SourceDraft(url=url) for url in cites),
     )
 
 
@@ -279,7 +286,8 @@ class Scripted:
             starting: The answers to hand back to the questions that turn a
                 person's own sentence into a claim.
             raises: Something to raise instead of answering, for the case where
-                an answer does not fit the shape we asked for.
+                an answer does not fit the shape we asked for. The seam raises one
+                of ours, so nothing past it knows whose complaint it was.
         """
         self._proposals = list(proposals or [])
         self._starting = list(starting or [])
@@ -288,22 +296,22 @@ class Scripted:
         self.asked: list[str] = []
         self.searched: list[bool] = []
 
-    def starting_claim(self, question: str) -> list[ParsedMessage[Proposal]]:
+    def starting_claim(self, question: str) -> Said:
         """Answer the question that turns one typed sentence into a claim."""
         with self._lock:
             self.asked.append(question)
             if self._raises is not None:
                 raise self._raises
-            return [self._next(self._starting)]
+            return what_it_said([self._next(self._starting)])
 
-    def proposal(self, question: str, *, may_search: bool) -> list[ParsedMessage[Proposal]]:
+    def proposal(self, question: str, *, may_search: bool) -> Said:
         """Answer the question that asks for the one next piece of the map."""
         with self._lock:
             self.asked.append(question)
             self.searched.append(may_search)
             if self._raises is not None:
                 raise self._raises
-            return [self._next(self._proposals)]
+            return what_it_said([self._next(self._proposals)])
 
     def _next(self, waiting: list[ParsedMessage[Proposal]]) -> ParsedMessage[Proposal]:
         """Take the next answer, or repeat the last one once they have run out."""
@@ -356,17 +364,17 @@ class Storyteller:
         self.asked_about: list[str] = []
         self.searched: list[bool] = []
 
-    def starting_claim(self, question: str) -> list[ParsedMessage[Proposal]]:
+    def starting_claim(self, question: str) -> Said:
         """Answer the question that turns one typed sentence into a claim."""
         with self._lock:
             self.asked.append(question)
             if not self._starting:
-                return [an_answer(a_starting_claim())]
+                return what_it_said([an_answer(a_starting_claim())])
             if len(self._starting) > 1:
-                return [self._starting.pop(0)]
-            return [self._starting[0]]
+                return what_it_said([self._starting.pop(0)])
+            return what_it_said([self._starting[0]])
 
-    def proposal(self, question: str, *, may_search: bool) -> list[ParsedMessage[Proposal]]:
+    def proposal(self, question: str, *, may_search: bool) -> Said:
         """Answer the question that asks for the one next piece of the map."""
         with self._lock:
             about = question.split(ASKING_ABOUT, 1)[1].splitlines()[0]
@@ -375,7 +383,7 @@ class Storyteller:
             self.searched.append(may_search)
             waiting = self._story.get(about)
             said = waiting.pop(0) if waiting else self._otherwise
-            return [_pointing_at(said, question, about)]
+            return what_it_said([_pointing_at(said, question, about)])
 
 
 def _pointing_at(

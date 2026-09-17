@@ -1,10 +1,11 @@
 """Rules we keep by reading our own source, because good intentions rot.
 
-Three of this pipeline's promises are about what the code *cannot* do, not about
-what it does with a given input: a model can never name an identifier, no call
-ever asks for a whole map, and no word about where a number came from is written
-anywhere it should not be. A test that fed inputs in could only ever show that
-those held today. These read the files instead.
+Several of this pipeline's promises are about what the code *cannot* do, not
+about what it does with a given input: a model can never name an identifier, no
+call ever asks for a whole map, one function builds every arrow, one module names
+the vendor library's types, and one rule chooses every route. A test that fed
+inputs in could only ever show that those held today. These read the files
+instead.
 
 The same trick the rules layer already uses to prove that nothing in it merges
 two owners' numbers into one.
@@ -126,3 +127,42 @@ def test_the_shapes_file_never_says_where_a_number_came_from() -> None:
     """Not in a field, not in a sentence: the word is not in that file at all."""
     said = Path(the_shapes.__file__).read_text(encoding="utf-8")
     assert "provenance" not in said
+
+
+def test_the_vendor_library_is_named_in_exactly_one_module() -> None:
+    """One seam talks to the model, and one seam knows what its replies look like.
+
+    Everything past `client.py` works in our own shapes, which is what lets the
+    rest of the pipeline be read, tested and replayed without the library at all.
+    """
+    names_it: set[str] = set()
+    for source in sorted(ENGINE.rglob("*.py")):
+        tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+        for node in ast.walk(tree):
+            brought_in: list[str] = []
+            if isinstance(node, ast.Import):
+                brought_in = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                brought_in = [node.module]
+            if any(one == "anthropic" or one.startswith("anthropic.") for one in brought_in):
+                names_it.add(source.name)
+    assert names_it == {"client.py"}, names_it
+
+
+def test_one_rule_chooses_every_route_and_it_is_the_maps_own() -> None:
+    """The change list, the path bar and the Verify door read the same rule.
+
+    A second search here would eventually disagree with the first, and two
+    readers would be shown two different best routes for one map.
+    """
+    from katalyst.domain.diff import best_backed_routes
+    from katalyst.engine import verify
+
+    assert verify.best_backed_routes is best_backed_routes
+    chose_a_route = [
+        f"{source.name}:{holder.name}"
+        for source in sorted(ENGINE.rglob("*.py"))
+        for holder in ast.walk(ast.parse(source.read_text(encoding="utf-8")))
+        if isinstance(holder, ast.FunctionDef) and "route" in holder.name
+    ]
+    assert chose_a_route == [], chose_a_route

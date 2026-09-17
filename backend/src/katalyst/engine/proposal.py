@@ -120,9 +120,10 @@ class SourceDraft(BaseModel):
     becomes something a reader can open, and it does so only if the search tool
     itself returned that address in the same call.
 
-    There is deliberately no field for the day it was fetched. That day is the
-    day *our* retrieval step fetched something, which is a fact about us, so a
-    model must have no way to write it.
+    One field, and deliberately no more. The day it was fetched is the day *our*
+    retrieval step fetched something, and the title is what the search tool itself
+    reported — both are facts about us rather than about the model, so both are
+    written where a source is built and a model has no way to reach either.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -132,9 +133,6 @@ class SourceDraft(BaseModel):
             "One address that opens, not a search query, and one the search tool "
             "returned to you in this call rather than one you are recalling."
         )
-    )
-    title: str = Field(
-        description="What a reader sees on arriving, in the publisher's words, not yours."
     )
 
 

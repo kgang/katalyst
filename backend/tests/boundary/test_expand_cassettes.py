@@ -36,7 +36,8 @@ from pathlib import Path
 import pytest
 
 from katalyst.engine.client import Model, live_answerer
-from katalyst.engine.expand import Accepted, Refused, expand
+from katalyst.engine.expand import expand
+from katalyst.engine.outcome import Accepted, Refused
 from katalyst.fixtures import HORMUZ
 
 CASSETTES = Path(__file__).resolve().parents[1] / "cassettes"

@@ -54,12 +54,12 @@ piece beats a large, vague one.
 
 What a claim is.
 A claim is something that will be plainly true or false by a date, settled by a
-named source. "Tensions ease" is not a claim, because two honest people will
-never agree on whether it happened. "At least fourteen consecutive days of
-unrestricted commercial transit through the Strait of Hormuz, counted by Lloyd's
-List, by the first of November" is a claim, because they will. Every claim you
-write carries the test, the name of whoever applies it, and the day by which the
-answer is known.
+named source. "The drug pipeline looks healthy" is not a claim, because two
+honest people will never agree on whether it happened. "The United States Food
+and Drug Administration grants full approval to at least one new obesity
+treatment, listed in its own approvals database, by the thirty-first of March" is
+a claim, because they will. Every claim you write carries the test, the name of
+whoever applies it, and the day by which the answer is known.
 
 Start from the outside, then come inside. Before you say how likely this claim
 is, ask what set of past cases it belongs to, how many of them came out true, and

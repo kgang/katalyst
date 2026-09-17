@@ -6,14 +6,10 @@ reading, which is the thing a source's own description already refuses.
 """
 
 from katalyst.domain import BaseRate, Link, Source, validate
-from katalyst.engine.expand import (
-    Accepted,
-    Refused,
-    expand,
-    found_in,
-    keep_cited,
-    provenance_of,
-)
+from katalyst.engine.client import what_it_said
+from katalyst.engine.expand import expand
+from katalyst.engine.grounding import found_in, keep_cited, provenance_of
+from katalyst.engine.outcome import Accepted, Refused
 from katalyst.fixtures import HORMUZ
 from tests.unit.engine.answers import (
     THE_DAY_THE_RUN_HAPPENED,
@@ -42,9 +38,9 @@ def ask(answerer: Scripted, frontier: str = "C") -> object:
 
 def test_a_source_is_built_from_the_tools_own_results_and_carries_the_day_we_looked() -> None:
     """The only place a source is made during generation reads the tool, and nothing else."""
-    answer = an_answer(a_claim("Anything.", cause="C"), found=(A_PAGE, ANOTHER_PAGE))
+    said = what_it_said([an_answer(a_claim("Anything.", cause="C"), found=(A_PAGE, ANOTHER_PAGE))])
 
-    found = found_in(answer, on=THE_DAY_THE_RUN_HAPPENED)
+    found = found_in(said, on=THE_DAY_THE_RUN_HAPPENED)
 
     assert [one.url for one in found] == [A_PAGE, ANOTHER_PAGE]
     assert all(one.retrieved == THE_DAY_THE_RUN_HAPPENED for one in found)
@@ -52,9 +48,9 @@ def test_a_source_is_built_from_the_tools_own_results_and_carries_the_day_we_loo
 
 def test_a_search_that_failed_reads_as_nothing_found_and_never_as_a_crash() -> None:
     """An error where a list of results would be is one more empty-handed call."""
-    answer = a_search_that_failed(a_claim("Anything.", cause="C"))
+    said = what_it_said([a_search_that_failed(a_claim("Anything.", cause="C"))])
 
-    assert found_in(answer, on=THE_DAY_THE_RUN_HAPPENED) == ()
+    assert found_in(said, on=THE_DAY_THE_RUN_HAPPENED) == ()
 
 
 def test_an_address_is_the_same_address_after_whitespace_and_one_trailing_slash() -> None:

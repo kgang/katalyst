@@ -9,7 +9,9 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from katalyst.domain import validate
-from katalyst.engine.expand import Accepted, Refused, Stopped, expand
+from katalyst.engine.client import AnswerWeCouldNotRead, _did_not_fit_the_shape
+from katalyst.engine.expand import expand
+from katalyst.engine.outcome import Accepted, Refused, Stopped
 from katalyst.engine.proposal import Proposal
 from katalyst.fixtures import HORMUZ
 from tests.unit.engine.answers import (
@@ -156,11 +158,14 @@ def test_expand_surfaces_a_refusal_as_a_rejected_proposal() -> None:
 
 
 def test_expand_reports_a_malformed_answer_and_does_not_crash() -> None:
-    """An answer that did not fit the shape is one more refusal, with a plain sentence."""
-    did_not_fit: ValidationError
+    """An answer that did not fit the shape is one more refusal, with a plain sentence.
+
+    The seam turns the library's own complaint into one of ours on the way out,
+    so nothing past it has to know whose complaint it was.
+    """
     with pytest.raises(ValidationError) as caught:
         TypeAdapter(Proposal).validate_json('{"kind": "claim"}')
-    did_not_fit = caught.value
+    did_not_fit = AnswerWeCouldNotRead(_did_not_fit_the_shape(caught.value))
 
     outcome = ask(Scripted(raises=did_not_fit))
 

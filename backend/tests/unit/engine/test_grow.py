@@ -5,7 +5,8 @@ asked about it — and the test checks the map that came out and the one reason 
 run gives for stopping.
 """
 
-from katalyst.engine.expand import Accepted, Caps, Finished, Outcome, Refused, grow
+from katalyst.engine.grow import Finished, grow
+from katalyst.engine.outcome import Accepted, Caps, Outcome, Refused
 from katalyst.engine.receipt import dollars_for
 from tests.unit.engine.answers import (
     FROM_THE_QUESTION,
@@ -195,7 +196,10 @@ def test_a_run_stops_at_its_spending_cap_and_says_so() -> None:
     expensive = an_answer(
         a_claim(A_STEP, cause=FROM_THE_QUESTION), read_fresh=400_000, written=200_000
     )
-    told = Storyteller({STARTED_AT: [expensive]}, starting=[expensive])
+    an_expensive_start = an_answer(
+        a_starting_claim(STARTED_AT), read_fresh=400_000, written=200_000
+    )
+    told = Storyteller({STARTED_AT: [expensive]}, starting=[an_expensive_start])
     steps = walk(told, at_once=1, dollars=1.0)
     finished = ending(steps)
 
@@ -208,14 +212,12 @@ def test_a_run_stops_at_its_spending_cap_and_says_so() -> None:
 
 def test_a_run_makes_no_further_call_once_it_has_spent_its_ceiling() -> None:
     """Stopping late is not stopping."""
-    expensive = an_answer(
-        a_claim(A_STEP, cause=FROM_THE_QUESTION), read_fresh=400_000, written=200_000
-    )
-    told = Storyteller({STARTED_AT: [expensive]}, starting=[expensive])
+    expensive = an_answer(a_starting_claim(STARTED_AT), read_fresh=400_000, written=200_000)
+    told = Storyteller(starting=[expensive])
     walk(told, at_once=1, dollars=1.0)
     stopped_after = len(told.asked)
 
-    told_again = Storyteller({STARTED_AT: [expensive]}, starting=[expensive])
+    told_again = Storyteller(starting=[expensive])
     walk(told_again, at_once=1, dollars=1.0)
 
     assert len(told_again.asked) == stopped_after
