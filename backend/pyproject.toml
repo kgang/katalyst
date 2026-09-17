@@ -19,6 +19,10 @@ dependencies = [
     "networkx>=3.5,<4.0",
     # Arrays and arithmetic for propagating beliefs.
     "numpy>=2.3,<3.0",
+    # Mints identifiers that are unique without any central register and that
+    # sort by the moment they were made. Used only at the edge, in engine/ids.py,
+    # because minting one needs a clock and randomness.
+    "python-ulid>=3.1,<4.0",
 ]
 
 # The model client library (the `anthropic` package) is deliberately absent.

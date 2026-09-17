@@ -26,5 +26,63 @@ What this layer must never do
   `test_domain_imports_nothing_impure`, reads every file in this package and
   fails if one of those imports appears.
 
-Nothing lives here yet. Stack 02 adds the data shapes and the validity rules.
+What is here now
+----------------
+The data shapes, and nothing that computes with them. `belief.py`, `proposition.py`
+and `link.py` hold the three things a map is made of; `graph.py` holds a whole
+map; `intervention.py` holds the six typed edits and `branch.py` the ordered list
+of them; `ids.py` holds the identifier names. Folding a branch onto a map and
+working the likelihoods through arrive in a later stack.
 """
+
+from katalyst.domain.belief import Belief, Beliefs
+from katalyst.domain.branch import Branch
+from katalyst.domain.graph import Graph
+from katalyst.domain.ids import BranchId, LinkId, PropositionId
+from katalyst.domain.intervention import (
+    Believe,
+    Do,
+    Insert,
+    Intervention,
+    Observe,
+    Refine,
+    Retune,
+)
+from katalyst.domain.link import Days, Link, Provenance, Source
+from katalyst.domain.proposition import (
+    BaseRate,
+    ContractPayoff,
+    Evidence,
+    Payoff,
+    PricePayoff,
+    Proposition,
+    Resolution,
+)
+
+__all__ = [
+    "BaseRate",
+    "Belief",
+    "Beliefs",
+    "Believe",
+    "Branch",
+    "BranchId",
+    "ContractPayoff",
+    "Days",
+    "Do",
+    "Evidence",
+    "Graph",
+    "Insert",
+    "Intervention",
+    "Link",
+    "LinkId",
+    "Observe",
+    "Payoff",
+    "PricePayoff",
+    "Proposition",
+    "PropositionId",
+    "Provenance",
+    "Refine",
+    "Resolution",
+    "Retune",
+    "Source",
+]
