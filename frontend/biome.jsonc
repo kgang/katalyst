@@ -11,7 +11,15 @@
     // and is never edited by hand. It is left exactly as the generator wrote
     // it, because a build job regenerates it and compares the result character
     // for character; reformatting it here would make that comparison fail.
-    "includes": ["**", "!src/api/schema.ts", "!dist"]
+    "includes": [
+      "**",
+      "!src/api/schema.ts",
+      "!dist",
+      // What the one browser test leaves behind when it runs. None of it is source.
+      "!test-results",
+      "!playwright-report",
+      "!blob-report"
+    ]
   },
   "formatter": {
     "enabled": true,
