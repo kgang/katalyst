@@ -27,8 +27,9 @@
  */
 
 import { Handle, Position, useStore } from "@xyflow/react";
+import { toDay } from "../graph/diff/days";
 import { claimLines, SUMMARY_BELOW_ZOOM, TILE_WIDTH, tileHeight } from "../graph/geometry";
-import type { ClaimKind, ClaimView } from "../world";
+import type { Badge, ClaimKind, ClaimView } from "../world";
 import { BeliefChip } from "./BeliefChip";
 import "./tile.css";
 
@@ -73,23 +74,16 @@ const KIND_WORDS: Record<ClaimKind, string> = {
 };
 
 /**
- * Print a date the way the map prints one: `Nov 1`.
- *
- * Read as a day in the map's own reckoning rather than in the reader's time
- * zone, because a claim settled on the first of November is settled on the
- * first of November wherever the reader happens to be sitting.
+ * What an edit did to this claim, in the words a reader hears rather than the
+ * word the code uses. Read out before the claim itself, so a reader who never
+ * sees the tile learns the same thing first.
  */
-export function toDay(isoDate: string): string {
-  const parsed = new Date(`${isoDate}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) {
-    return isoDate;
-  }
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(parsed);
-}
+const DIFF_WORDS: Record<string, string> = {
+  added: "added by your edit",
+  killed: "supposed false by your edit",
+  downstream: "your edit can reach this",
+  untouched: "your edit cannot reach this",
+};
 
 /** One published item, as a clipping: a letter for the publication and one line. */
 function Clipping({
@@ -123,6 +117,42 @@ function Clipping({
   );
 }
 
+/**
+ * What a claim's tile says about the edits behind it, in the order they were
+ * made.
+ *
+ * Two badges in a row are drawn as a sequence with an arrow between them, which
+ * is the whole point of UX-14: *Supposed · Oct 1 → Retracted · Oct 2 · by "a
+ * confirmed military strike on Iranian territory"*. Met as a sequence the rule
+ * that a later edit outranks an earlier supposition is obvious; met as a number
+ * that moved on its own it reads as a bug.
+ *
+ * Every badge is also a thing the keyboard can land on, because each one carries
+ * a sentence saying what it means, and a reason you cannot reach is not a reason.
+ */
+function Badges({ badges }: { badges: readonly Badge[] }) {
+  if (badges.length === 0) {
+    return null;
+  }
+  return (
+    <p className="tile__badges">
+      {badges.map((badge, index) => (
+        <span className="tile__badge-run" key={badge.words}>
+          {index === 0 ? null : (
+            <span className="tile__badge-arrow" aria-hidden="true">
+              {" → "}
+            </span>
+          )}
+          <button className="tile__badge" type="button" title={badge.reason}>
+            <span className="tile__hidden">{`${badge.reason} `}</span>
+            <span className="tile__badge-words">{badge.words}</span>
+          </button>
+        </span>
+      ))}
+    </p>
+  );
+}
+
 /** What a tile needs to draw itself. */
 export interface TileProps {
   /** The claim this tile is for. */
@@ -136,10 +166,18 @@ export interface TileProps {
    * describing a run that never happened.
    */
   readonly versions?: number;
+  /**
+   * The height the map reserved for this tile.
+   *
+   * Usually the same as the tile's own content needs. It differs only in a
+   * diff, where one box has to hold whichever of the two paintings is taller, so
+   * that flipping between them moves nothing.
+   */
+  readonly height?: number;
 }
 
 /** One claim's tile. */
-export function Tile({ claim, isHypothesis, versions }: TileProps) {
+export function Tile({ claim, isHypothesis, versions, height: reserved }: TileProps) {
   // How far the map is zoomed out. Below the threshold a tile stops showing
   // everything and shows a summary instead — the claim and the three chips —
   // because the alternative is type too small to read. The tile changes what it
@@ -157,13 +195,17 @@ export function Tile({ claim, isHypothesis, versions }: TileProps) {
   // As tall as this claim's own content, worked out the same way the layout
   // worked it out, so the box the map reserved and the box the browser draws
   // are the same box.
-  const height = tileHeight(claim);
+  const height = reserved ?? tileHeight(claim);
   const lines = claimLines(claim.claim);
   // The foot only exists when it has something in it. An empty one would still
   // take a gap above it, and the tile would have a step of dead space at the
   // bottom — which is the whole thing a clamped height is meant to avoid. When
   // the badges arrive, having one of those puts the foot there too.
-  const hasFoot = finding !== undefined || claim.evidence.length > 0;
+  const badges = claim.badges ?? [];
+  const hasFoot = finding !== undefined || claim.evidence.length > 0 || badges.length > 0;
+  // What an edit did to this claim, said in words before the claim itself for a
+  // reader who never sees the tile. Absent on a map nobody has edited.
+  const diffWords = claim.diff === undefined ? "" : `${DIFF_WORDS[claim.diff] ?? claim.diff}. `;
 
   return (
     <article
@@ -171,6 +213,7 @@ export function Tile({ claim, isHypothesis, versions }: TileProps) {
       data-kind={claim.kind}
       data-detail={detail}
       data-hypothesis={isHypothesis ? "yes" : "no"}
+      data-diff={claim.diff ?? "none"}
       style={{
         width: `${TILE_WIDTH}px`,
         height: `${height}px`,
@@ -178,7 +221,7 @@ export function Tile({ claim, isHypothesis, versions }: TileProps) {
         // worked out from, so the claim stops exactly where the box ends.
         ["--tile-claim-lines" as string]: `${lines}`,
       }}
-      aria-label={`${KIND_WORDS[claim.kind]}: ${claim.claim}`}
+      aria-label={`${diffWords}${KIND_WORDS[claim.kind]}: ${claim.claim}`}
     >
       <svg
         className="tile__outline"
@@ -266,12 +309,9 @@ export function Tile({ claim, isHypothesis, versions }: TileProps) {
             </ul>
           )}
 
-          {/* Where a claim's badges go — *Supposed · Oct 1*, *Retracted · Oct 2
-              · by "…"*, *Added*, *Retuned*. Empty here, because nothing on this
-              screen can edit the map yet: the buttons that earn a badge arrive
-              with the branch panel. The space is kept so that a tile does not
-              change height the day they do. */}
-          <div className="tile__badges" />
+          {/* What the edits behind this claim did to it, in order. Empty on a
+              map nobody has edited, and then it takes no room at all. */}
+          <Badges badges={badges} />
         </div>
       ) : null}
     </article>

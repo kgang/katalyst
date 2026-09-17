@@ -56,10 +56,18 @@
  * three chips side by side line up; words go in the interface face, because
  * they are words. */
 .belief-chip__reading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-hair);
+  min-width: 0;
   font-size: var(--text-md);
   font-weight: var(--weight-medium);
   color: var(--text);
   line-height: 1.25;
+}
+
+.belief-chip__figure {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -68,6 +76,42 @@
 .belief-chip[data-reading="number"] .belief-chip__reading {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---- The bounded bar the likelihood rides on --------------------------- *
+ * One of five brightnesses of the same blue-grey as the surface, the same size
+ * whatever the number is. Brightness is the whole of what it says: the number
+ * beside it is the reading, so five steps only ever have to be a glance, and
+ * nobody is asked to tell one step from the next by eye.
+ *
+ * It is drawn here and in the panel beside the map, and nowhere else. It never
+ * paints a whole tile — tile-wide brightness is already spent on the other world
+ * in a diff and on the hover lens — and it never carries text, because a bar is
+ * a graphic and needs three to one while every number is drawn in the text
+ * colour and clears four and a half. */
+
+.belief-chip__bar {
+  flex: none;
+  width: 12px;
+  height: var(--space-hair);
+  border-radius: 1px;
+  background: var(--p-0);
+}
+
+.belief-chip__bar[data-step="1"] {
+  background: var(--p-1);
+}
+
+.belief-chip__bar[data-step="2"] {
+  background: var(--p-2);
+}
+
+.belief-chip__bar[data-step="3"] {
+  background: var(--p-3);
+}
+
+.belief-chip__bar[data-step="4"] {
+  background: var(--p-4);
 }
 
 /* The range under the number — never omitted — or, on the reader's own empty

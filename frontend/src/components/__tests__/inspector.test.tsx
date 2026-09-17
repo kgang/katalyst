@@ -34,7 +34,13 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
         beliefs: {
           model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
           user: { reading: { p: 0.55, lo: 0.4, hi: 0.7 } },
-          market: { absence: { words: "no market", reason: "no venue quotes this claim" } },
+          market: {
+            absence: {
+              kind: "no_market",
+              words: "no market",
+              reason: "no venue quotes this claim",
+            },
+          },
         },
         evidenceInFull: [
           {
@@ -51,8 +57,14 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
         claim: "Brent crude settles below $68 for five sessions.",
         beliefs: {
           model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
-          user: { absence: { words: "—", reason: "You have not said." } },
-          market: { absence: { words: "no market", reason: "no venue quotes this claim" } },
+          user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+          market: {
+            absence: {
+              kind: "no_market",
+              words: "no market",
+              reason: "no venue quotes this claim",
+            },
+          },
         },
       }),
     ],
@@ -68,6 +80,7 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
             host: "eia.gov",
             retrieved: {
               absence: {
+                kind: "not_said",
                 words: "—",
                 reason: "nobody fetched this; a person put the address in by hand",
               },
@@ -89,7 +102,7 @@ describe("the panel, on a claim", () => {
       { kind: "claim", id: "B" } as const,
       { kind: "wire", id: "H->B" } as const,
     ]) {
-      const { container, unmount } = render(<Inspector world={world} subject={subject} />);
+      const { container, unmount } = render(<Inspector world={world} selection={subject} />);
       expect(container.querySelector("dialog")).toBeNull();
       expect(container.querySelector('[role="dialog"]')).toBeNull();
       expect(container.querySelector('[role="alertdialog"]')).toBeNull();
@@ -101,7 +114,7 @@ describe("the panel, on a claim", () => {
   it("test_always_renders_all_three_resolution_fields", () => {
     // A claim nobody can score is not a claim: the test, who applies it, and the
     // day it is applied by, all three, on every claim.
-    render(<Inspector world={hormuzish()} subject={{ kind: "claim", id: "H" }} />);
+    render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />);
     expect(
       screen.getByText("At least 14 consecutive days of unrestricted commercial transit."),
     ).toBeInTheDocument();
@@ -110,7 +123,7 @@ describe("the panel, on a claim", () => {
   });
 
   it("test_renders_three_owners_and_never_averages_them", () => {
-    render(<Inspector world={hormuzish()} subject={{ kind: "claim", id: "H" }} />);
+    render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />);
     const rows = document.querySelectorAll(".inspector__belief");
     expect(rows).toHaveLength(3);
     expect([...rows].map((row) => row.getAttribute("data-owner"))).toEqual([
@@ -126,7 +139,7 @@ describe("the panel, on a claim", () => {
   });
 
   it("test_renders_a_reason_for_every_absent_value", () => {
-    render(<Inspector world={hormuzish()} subject={{ kind: "claim", id: "B" }} />);
+    render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "B" }} />);
     // No market, and why: a fact about the world rather than about our plumbing.
     expect(screen.getByText("no market")).toBeInTheDocument();
     expect(screen.getByText("no venue quotes this claim")).toBeInTheDocument();
@@ -147,7 +160,7 @@ describe("the panel, on a claim", () => {
     // said about how sure they were. Printing "uncalibrated" over it would claim
     // an arithmetic that never ran.
     const { unmount } = render(
-      <Inspector world={hormuzish()} subject={{ kind: "claim", id: "H" }} />,
+      <Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />,
     );
     expect(screen.getByText("stated range · not computed")).toBeInTheDocument();
     expect(document.body.textContent).toContain("This range is stated, not computed");
@@ -155,7 +168,7 @@ describe("the panel, on a claim", () => {
     unmount();
 
     render(
-      <Inspector world={hormuzish({ versions: 2000 })} subject={{ kind: "claim", id: "H" }} />,
+      <Inspector world={hormuzish({ versions: 2000 })} selection={{ kind: "claim", id: "H" }} />,
     );
     expect(document.body.textContent).toContain("model interval, uncalibrated");
     expect(document.body.textContent).toContain("Across 2 000 versions of this map");
@@ -164,13 +177,13 @@ describe("the panel, on a claim", () => {
 
   it("test_the_band_slot_is_never_drawn_without_versions", () => {
     const { unmount } = render(
-      <Inspector world={hormuzish()} subject={{ kind: "claim", id: "H" }} />,
+      <Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />,
     );
     expect(document.querySelector(".inspector__band-slot")).toBeNull();
     unmount();
 
     render(
-      <Inspector world={hormuzish({ versions: 2000 })} subject={{ kind: "claim", id: "H" }} />,
+      <Inspector world={hormuzish({ versions: 2000 })} selection={{ kind: "claim", id: "H" }} />,
     );
     // The slot is reserved so the layout does not jump the day the sentence
     // arrives — and it is empty, because a sentence naming a percentage nobody
@@ -181,7 +194,7 @@ describe("the panel, on a claim", () => {
   });
 
   it("test_never_derives_a_displayed_number", () => {
-    render(<Inspector world={hormuzish()} subject={{ kind: "claim", id: "H" }} />);
+    render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />);
     // Seven of nine past cases came out true. The panel prints the count and
     // never the rate: dividing one by the other would be this half of the
     // product working out a number, and it would quietly claim that .78 is the
@@ -195,7 +208,7 @@ describe("the panel, on a claim", () => {
     // the panel is opened on a claim by selecting its tile. The check here is
     // that the panel never prints a number belonging to something it has not
     // named: the claim's own beliefs, its prior and its base-rate count.
-    render(<Inspector world={hormuzish()} subject={{ kind: "claim", id: "H" }} />);
+    render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />);
     const numbers = (document.body.textContent ?? "").match(/\.\d\d/g) ?? [];
     for (const number of numbers) {
       expect([".35", ".22", ".50", ".55", ".40", ".70", ".28", ".15", ".42"]).toContain(number);
@@ -205,20 +218,20 @@ describe("the panel, on a claim", () => {
 
 describe("the panel, on an arrow", () => {
   it("test_reads_the_push_back_in_words", () => {
-    render(<Inspector world={hormuzish()} subject={{ kind: "wire", id: "H->B" }} />);
+    render(<Inspector world={hormuzish()} selection={{ kind: "wire", id: "H->B" }} />);
     expect(screen.getByText("+1.6")).toBeInTheDocument();
     expect(screen.getByText(/a strong push toward/)).toBeInTheDocument();
   });
 
   it("test_says_what_kind_of_push_and_what_it_does_over_time", () => {
-    render(<Inspector world={hormuzish()} subject={{ kind: "wire", id: "H->B" }} />);
+    render(<Inspector world={hormuzish()} selection={{ kind: "wire", id: "H->B" }} />);
     expect(screen.getByText(/domino/)).toBeInTheDocument();
     expect(screen.getByText(/half gone after 30 days/)).toBeInTheDocument();
     expect(screen.getByText(/2 days after its cause becomes true/)).toBeInTheDocument();
   });
 
   it("test_renders_a_fetch_day_or_its_reason", () => {
-    render(<Inspector world={hormuzish()} subject={{ kind: "wire", id: "H->B" }} />);
+    render(<Inspector world={hormuzish()} selection={{ kind: "wire", id: "H->B" }} />);
     // Nothing was fetched for this arrow — a person put the address in by hand —
     // so the field says that rather than printing a day nobody fetched anything
     // on. A source with no retrieval day is never rendered as though it had one.
@@ -234,7 +247,7 @@ describe("the panel, on an arrow", () => {
     ] as [Provenance, number][]) {
       const world = hormuzish({ links: [aWire({ source: "H", target: "B", provenance })] });
       const { unmount } = render(
-        <Inspector world={world} subject={{ kind: "wire", id: "H->B" }} />,
+        <Inspector world={world} selection={{ kind: "wire", id: "H->B" }} />,
       );
       expect(document.querySelectorAll(".inspector__origin .origin-mark__dot")).toHaveLength(dots);
       // And the exact word of the seven, which is what this panel is for.
@@ -246,7 +259,7 @@ describe("the panel, on an arrow", () => {
 
 describe("the panel, on nothing", () => {
   it("test_an_empty_selection_is_a_state_with_its_own_words", () => {
-    render(<Inspector world={hormuzish()} subject={null} />);
+    render(<Inspector world={hormuzish()} selection={null} />);
     expect(screen.getByText("Nothing selected")).toBeInTheDocument();
     expect(document.body.textContent).toContain("Choose a claim or an arrow on the map");
   });

@@ -10,12 +10,16 @@
  * always the loudest thing in its own block.
  */
 
+/* The panel is a section of the column beside the map rather than a column of
+ * its own: the six things you can do sit above it, then your branches, then
+ * where the edit ends up, then this. It takes whatever height is left and
+ * scrolls on its own, so that reading a long rationale never scrolls the branch
+ * list out of sight. */
 .inspector {
-  flex: 0 0 auto;
-  width: 400px;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
-  border-left: 1px solid var(--hairline);
   background: var(--surface-raised);
 }
 

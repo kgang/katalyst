@@ -233,20 +233,102 @@
   white-space: nowrap;
 }
 
-/* Where a claim's badges go — *Supposed · Oct 1*, *Retracted · Oct 2 · by "…"*,
- * *Added*, *Retuned*. Nothing on this screen can edit the map yet, so it is
- * always empty for now, and while it is empty it takes no room at all: an
- * element of no height still earns the gap above it, and a gap with nothing in
- * it is the dead space a clamped height exists to avoid. The moment a badge
- * arrives the slot reappears, and the height the tile is given grows with it. */
+/* ---- What an edit did to this claim ------------------------------------- *
+ * Four states, each worked out from the branch and none of them from a number.
+ * Every one of them is carried by something that survives being printed in grey
+ * — a stroke, an opacity, a line through the words — and every one of them is
+ * also said in words: in what the tile is called when it is read out loud, and
+ * on the belief chip, which reads "no engine yet" wherever a likelihood would
+ * have moved. */
+
+/* Added: the claim your edit brought. Its own outline goes solid and takes the
+ * accent, so the newest thing on the map is the one thing drawn in a different
+ * ink. */
+.tile[data-diff="added"] .tile__outline path {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+/* Supposed false: ghosted, desaturated, and the claim struck through. Three
+ * cues, no colour among them. */
+.tile[data-diff="killed"] {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.tile[data-diff="killed"] .tile__claim {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* A claim your edit can reach, and one it provably cannot: a strip along the
+ * bottom edge, dashed for the first and absent for the second. The strip is the
+ * glance; the chip's "no engine yet" is the reading. */
+.tile[data-diff="downstream"]::after {
+  content: "";
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: 5px;
+  height: 0;
+  border-bottom: 1px dashed var(--accent);
+}
+
+.tile[data-diff="added"]::after {
+  content: "";
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: 5px;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* ---- Badges -------------------------------------------------------------- *
+ * What the edits behind this claim did to it, in the order they were made:
+ * *Supposed · Oct 1 → Retracted · Oct 2 · by "…"*. The arrow between two of them
+ * is the whole point — the surprising rule reads as a sequence rather than as a
+ * number that moved on its own.
+ *
+ * A badge is a button because each one carries a sentence saying what it means,
+ * and a reason the keyboard cannot reach is not a reason. It looks nothing like
+ * a button: a hairline, a hair of padding, no fill and no radius to speak of. */
+
 .tile__badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-hair);
+  display: block;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--text);
+  text-wrap: pretty;
 }
 
 .tile__badges:empty {
   display: none;
+}
+
+.tile__badge-arrow {
+  color: var(--text-muted);
+}
+
+.tile__badge {
+  display: inline;
+  margin: 0;
+  padding: 1px var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  background: var(--surface);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+  color: var(--text);
+  text-align: left;
+  cursor: help;
+}
+
+.tile__badge:hover {
+  border-color: var(--text-muted);
 }
 
 /* ---- The collapsed tile ------------------------------------------------- *

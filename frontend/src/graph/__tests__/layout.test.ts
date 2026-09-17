@@ -171,7 +171,7 @@ describe("how tall a tile is", () => {
       claim: text,
       beliefs: {
         model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-        user: { absence: { words: "—", reason: "You have not said." } },
+        user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
         market: { reading: { p: 0.48, lo: 0.45, hi: 0.52 } },
       },
       ...extra,
@@ -181,8 +181,10 @@ describe("how tall a tile is", () => {
   /** The three slots, with no market number in the market slot. */
   const noMarket = {
     model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-    user: { absence: { words: "—", reason: "You have not said." } },
-    market: { absence: { words: "no market", reason: "no venue quotes this claim" } },
+    user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+    market: {
+      absence: { kind: "no_market", words: "no market", reason: "no venue quotes this claim" },
+    },
   } as const;
 
   it("is decided by the content, not fixed for every tile", () => {

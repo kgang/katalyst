@@ -16,6 +16,7 @@ import { WireChip } from "../WireChip";
 /** The absence every arrow carries in this build, and the reason beside it. */
 const NO_ENGINE: Slot = {
   absence: {
+    kind: "no_engine",
     words: "no engine yet",
     reason: "Nothing has worked this number through the map yet.",
   },

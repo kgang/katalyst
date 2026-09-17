@@ -11,7 +11,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { aClaim, aWire, aWorld } from "./test/aMap";
-import type { WorldSource, WorldView } from "./world";
+import type { FixtureBundle, WorldSource, WorldView } from "./world";
 
 vi.mock("./api/client", () => ({
   readHealth: vi.fn(),
@@ -58,8 +58,10 @@ const WORLD: WorldView = aWorld({
       kind: "hypothesis",
       beliefs: {
         model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-        user: { absence: { words: "\u2014", reason: "You have not said." } },
-        market: { absence: { words: "no market", reason: "No venue quotes this claim." } },
+        user: { absence: { kind: "not_said", words: "\u2014", reason: "You have not said." } },
+        market: {
+          absence: { kind: "no_market", words: "no market", reason: "No venue quotes this claim." },
+        },
       },
     }),
     aClaim({
@@ -69,8 +71,10 @@ const WORLD: WorldView = aWorld({
       resolutionSource: "ICE Brent front-month settlement prices.",
       beliefs: {
         model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
-        user: { absence: { words: "\u2014", reason: "You have not said." } },
-        market: { absence: { words: "no market", reason: "No venue quotes this claim." } },
+        user: { absence: { kind: "not_said", words: "\u2014", reason: "You have not said." } },
+        market: {
+          absence: { kind: "no_market", words: "no market", reason: "No venue quotes this claim." },
+        },
       },
     }),
   ],
@@ -78,10 +82,25 @@ const WORLD: WorldView = aWorld({
   origin: "Every claim on this map was read from /api/fixtures/hormuz.",
 });
 
+/**
+ * The stored example in full, as the route serves it.
+ *
+ * The screen asks for the world *and* the bundle: the world is what gets drawn,
+ * and the bundle carries the branches somebody already made, which the panel
+ * beside the map lists. This one has none.
+ */
+const BUNDLE = {
+  id: "hormuz",
+  title: "Strait of Hormuz",
+  fixture_date: "2026-10-01",
+  graph: { hypothesis_id: "H", propositions: [], links: [] },
+  branches: [],
+} as unknown as FixtureBundle;
+
 /** A source that hands back the world above. */
 function sourceThatAnswers(): WorldSource {
   return {
-    readBundle: vi.fn(),
+    readBundle: vi.fn().mockResolvedValue(BUNDLE),
     readWorld: vi.fn().mockResolvedValue(WORLD),
   };
 }

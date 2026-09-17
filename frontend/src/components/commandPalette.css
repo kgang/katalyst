@@ -1,0 +1,96 @@
+/*
+ * The command palette.
+ *
+ * A panel that sits over the top left of the map and nothing else: no scrim
+ * behind it, nothing dimmed, nothing blurred, no "OK / Cancel", no spinner. The
+ * map keeps drawing beside it and under it, which is the whole difference
+ * between an overlay and a dialog.
+ *
+ * It is drawn as a piece of equipment rather than a search box: a hairline, the
+ * raised surface, and the fixed-width face on nothing but numbers.
+ */
+
+.palette {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 40;
+  display: grid;
+  row-gap: var(--space-1);
+  width: min(440px, calc(100% - var(--space-6)));
+  max-height: 60%;
+  padding: var(--space-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  overflow-y: auto;
+}
+
+.palette__what {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.palette__field {
+  width: 100%;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-interface);
+  font-size: var(--text-md);
+  color: var(--text);
+}
+
+.palette__list {
+  display: grid;
+  row-gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.palette__command {
+  display: grid;
+  row-gap: 1px;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  font-family: var(--font-interface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.palette__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+/* The row Enter would run. A hairline and a heavier name, never colour alone. */
+.palette__command[data-at="yes"] {
+  border-color: var(--hairline);
+  background: var(--surface);
+}
+
+.palette__command[data-at="yes"] .palette__name {
+  font-weight: var(--weight-semibold);
+}
+
+.palette__does {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.palette__nothing {
+  padding: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}

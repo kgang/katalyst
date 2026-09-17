@@ -15,7 +15,7 @@ import type { CausalEdge } from "./wires/CausalWire";
 
 /** A tile standing for one claim. */
 export type ClaimNode = Node<
-  { claim: ClaimView; isHypothesis: boolean; versions?: number },
+  { claim: ClaimView; isHypothesis: boolean; versions?: number; height: number },
   "claim"
 >;
 
@@ -63,17 +63,32 @@ function sockets(mode: LinkMode): { source: string; target: string } {
     : { source: "out-trigger", target: "in-trigger" };
 }
 
+/**
+ * What the tile standing in for a column's collapsed claims is called.
+ *
+ * The canvas reads the column back out of it, so that activating one of those
+ * tiles can open the outline filtered to that column — the claims behind it
+ * already have items there, and the tile only has to point at them.
+ */
+export const OVERFLOW_PREFIX = "more-in-column-";
+
 /** The identifier of the tile standing in for a column's collapsed claims. */
 function overflowId(layer: number): string {
-  return `more-in-column-${layer}`;
+  return `${OVERFLOW_PREFIX}${layer}`;
 }
 
 /**
  * Work out the tiles, the wires, and what the layout gets to see.
  *
  * @param world The world as the source handed it over.
+ * @param heights How tall each tile is to be drawn, when something outside knows
+ *   better than this claim alone does. A diff draws two worlds in one coordinate
+ *   space, and a claim can need more room in one of them than in the other — it
+ *   grows badges when an edit touched it — so the box is reserved for the taller
+ *   of the two and neither painting moves anything. Left out, each tile is as
+ *   tall as its own content.
  */
-export function toFlow(world: WorldView): MapDrawing {
+export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>): MapDrawing {
   const ids = world.claims.map((claim) => claim.id);
   const { shown, overflows } = capLayers(assignLayers(ids, world.links));
   const drawn = new Set(shown.map((one) => one.id));
@@ -90,7 +105,12 @@ export function toFlow(world: WorldView): MapDrawing {
       type: "claim",
       position: { x: 0, y: 0 },
       draggable: false,
-      data: { claim, isHypothesis: claim.id === world.hypothesisId, versions: world.versions },
+      data: {
+        claim,
+        isHypothesis: claim.id === world.hypothesisId,
+        versions: world.versions,
+        height: heights?.get(claim.id) ?? tileHeight(claim),
+      },
     });
   }
   for (const overflow of overflows) {
@@ -165,7 +185,7 @@ export function toFlow(world: WorldView): MapDrawing {
 
   const tiles: LayoutTile[] = nodes.map((node) =>
     node.type === "claim"
-      ? { id: node.id, height: tileHeight(node.data.claim) }
+      ? { id: node.id, height: node.data.height }
       : { id: node.id, height: TILE_MIN_HEIGHT },
   );
 

@@ -50,13 +50,28 @@ export interface Ranged {
 }
 
 /**
+ * Which of the three absences this is. It is what picks the words.
+ *
+ * - `no_engine` — nothing has worked this number through the map yet.
+ * - `no_market` — no venue quotes this claim.
+ * - `not_said` — nobody has given a number. The one dash on screen with a
+ *   meaning: the reader's own empty slot, inviting a number.
+ */
+export type AbsenceKind = "no_engine" | "no_market" | "not_said";
+
+/**
  * A number that is not here, and why.
  *
  * `words` is what the reader sees where the number would have been — "no
  * market", "no engine yet", or a dash. `reason` is the sentence that says why,
- * so no slot on screen is ever merely empty.
+ * so no slot on screen is ever merely empty. `kind` is which of the three this
+ * is, so that code can tell one absence from another without reading its words
+ * back — the dash that invites a number is not the dash that means nothing was
+ * computed.
  */
 export interface Absence {
+  /** Which absence this is. */
+  readonly kind: AbsenceKind;
   /** What is printed where the number would be. Never blank, never a zero. */
   readonly words: string;
   /** Why there is no number, in plain words. */
@@ -64,16 +79,19 @@ export interface Absence {
 }
 
 /**
- * One slot where a likelihood belongs.
+ * A value we may not have, with the reason standing in its place when we do not.
  *
  * `reading` is optional — every number slot in this view model is — and when it
  * is missing, `absence` is present and says why. The two halves are written as
  * a choice between two shapes so that the type itself forbids an empty slot
- * with no reason attached.
+ * with no reason attached: there is no way to write one down.
  */
-export type Slot =
-  | { readonly reading: Ranged; readonly absence?: undefined }
+export type Known<Reading> =
+  | { readonly reading: Reading; readonly absence?: undefined }
   | { readonly reading?: undefined; readonly absence: Absence };
+
+/** One slot where a likelihood belongs. */
+export type Slot = Known<Ranged>;
 
 /** The three voices on one claim, each in its own slot, never merged. */
 export interface BeliefSlots {
@@ -221,6 +239,67 @@ export interface ClaimView {
   readonly pathProduct: Slot;
   /** A word shown instead of a likelihood, when the claim is standing on the reader's say-so. */
   readonly standing?: Standing;
+  /**
+   * What an edit did to this claim, in one word. Absent on a world with no
+   * edits behind it — the base map, where nothing has been changed.
+   */
+  readonly diff?: DiffState;
+  /**
+   * What this claim's tile says about the edits behind it, in order.
+   *
+   * Two badges in a row read as a sequence: *Supposed · Oct 1* then *Retracted
+   * · Oct 2 · by "…"*. Empty on a claim no edit touched.
+   */
+  readonly badges?: readonly Badge[];
+  /**
+   * True when this claim is **not** in the world you are looking at.
+   *
+   * Two worlds are laid out once, together, and painted twice in the same
+   * coordinates. A claim that only one of them has is still drawn in the other,
+   * faint and dashed, so that flipping between them moves nothing and every
+   * difference you see is a real difference rather than a re-layout.
+   */
+  readonly ghost?: boolean;
+}
+
+/**
+ * What an edit did to a claim.
+ *
+ * Four of the five are worked out from the branch alone, with no arithmetic
+ * anywhere: following arrows is walking, not calculating.
+ *
+ * - `added` — the claim arrives in an **Add a claim** edit.
+ * - `killed` — the claim is the target of a **Suppose this is false**. Forced
+ *   false, full stop. "No path from the hypothesis reaches this any more" is a
+ *   fact about a route, and the panel's path bar reports it in those words.
+ * - `downstream` — the claim is in the affected set of at least one edit: a
+ *   claim your change **can** move. Drawn live, its model number reading its
+ *   absence, because nothing has worked the new number out.
+ * - `untouched` — everything else. Identical to the base world, and the map can
+ *   say so without hedging, because that is a proven property of an edit.
+ * - `shifted` — the number moved, with a before and an after. It needs two
+ *   numbers to compare, so nothing in this build ever produces one; it arrives
+ *   with the engine.
+ */
+export type DiffState = "added" | "killed" | "downstream" | "untouched" | "shifted";
+
+/**
+ * One thing a tile says about an edit behind it — *Added*, *Supposed · Oct 1*,
+ * *Retracted · Oct 2 · by "…"*.
+ *
+ * The words are copied from the shared vocabulary and never paraphrased, and
+ * none of the six operations' code names ever appears in one.
+ */
+export interface Badge {
+  /** The words on the badge. */
+  readonly words: string;
+  /** What the badge means, for the reader who asks. */
+  readonly reason: string;
+  /**
+   * True when this badge says an earlier one no longer holds, so the tile can
+   * draw the pair as a sequence with an arrow between them.
+   */
+  readonly overrides?: boolean;
 }
 
 /** One arrow, as a wire draws it. */
@@ -275,6 +354,27 @@ export interface LinkView {
    * order to sort it into.
    */
   readonly reflexive: boolean;
+  /**
+   * What an edit did to this arrow. Absent when no edit touched it.
+   *
+   * - `added` — an **Add a claim** edit brought it.
+   * - `cut` — a supposition cut it: "take this as given, and do not tell me what
+   *   caused it". It is still drawn, faint and dashed, because an arrow that
+   *   simply vanished would be a change nobody could see.
+   * - `retuned` — a **Change this push** edit moved its number.
+   */
+  readonly change?: "added" | "cut" | "retuned";
+  /**
+   * True when this arrow is **not** in the world you are looking at. Drawn faint
+   * in the same place, so that flipping between the two worlds moves nothing.
+   *
+   * A ghost arrow is carried by how faint it is and by nothing else. Its stroke
+   * is fully spent saying what kind of push it is — dot-dash for a spike that
+   * fades, solid for a switch that holds, doubled when the push only lasts while
+   * its cause does — and dashing it to say "other world" as well would leave it
+   * saying neither clearly.
+   */
+  readonly ghost?: boolean;
 }
 
 /**
@@ -291,6 +391,23 @@ export interface WorldView {
   readonly baseId: string;
   /** What the map is called on screen. */
   readonly title: string;
+  /**
+   * The day the map is set on, as the map itself writes it: `2026-10-01`.
+   *
+   * Every resolve-by date on the map is a span from this day, and an edit the
+   * reader makes takes effect on it, so the map reads the same whenever it is
+   * opened. The browser's own clock is never consulted: a supposition dated by
+   * the reader's time zone would make the same map read differently in two
+   * places.
+   */
+  readonly today: string;
+  /**
+   * The branch this world has applied, when it has one.
+   *
+   * Absent on the base world, which is the empty branch. What the branch panel
+   * lists, and what every diff state on the claims above was worked out from.
+   */
+  readonly branch?: BranchView;
   /** The claim the reader started from. */
   readonly hypothesisId: string;
   /** Every claim on the map. */
@@ -324,3 +441,133 @@ export interface WorldRequest {
   /** The branch to apply. Left out, this is the base world. */
   readonly branchId?: string;
 }
+
+/* ---- Editing the map: branches, and the six operations ------------------- */
+
+/**
+ * One arrow an **Add a claim** edit brings with it.
+ *
+ * Only the two ends, because that is all working out what an edit can reach
+ * needs. When the map itself supplied the arrow — as the stored example's own
+ * branch does — the whole arrow is on the branch's `links` as well, and that is
+ * what gets drawn.
+ */
+export interface AddedArrow {
+  /** The arrow's identifier. */
+  readonly id: string;
+  /** The claim the arrow starts at. */
+  readonly source: string;
+  /** The claim the arrow ends at. */
+  readonly target: string;
+}
+
+/**
+ * One edit in a branch.
+ *
+ * The six operations keep their code names — `do`, `observe`, `insert`,
+ * `retune`, `refine`, `believe` — **in code, in the wire format and in the
+ * spec, and nowhere on screen.** What the reader sees is the button they
+ * pressed and the badge it earns, both copied word for word from the shared
+ * vocabulary. `frontend/src/components/BranchPanel.tsx` is the one place those
+ * words are written.
+ */
+export type Edit =
+  /** Take this as given, and do not tell me what caused it. */
+  | {
+      readonly op: "do";
+      /** The claim being supposed true or false. */
+      readonly target: string;
+      /** True to suppose it holds, false to suppose it does not. */
+      readonly value: boolean;
+      /** The day the supposition takes effect, as the map writes a day. */
+      readonly at: string;
+    }
+  /** This is news — update what came before it too. */
+  | {
+      readonly op: "observe";
+      readonly target: string;
+      readonly value: boolean;
+      readonly at: string;
+    }
+  /** A claim and its arrows arrive together. */
+  | {
+      readonly op: "insert";
+      /** The new claim's identifier on the map. */
+      readonly claimId: string;
+      /** The new claim in its own words, which is what the badge quotes. */
+      readonly words: string;
+      /** The arrows that attach it. */
+      readonly arrows: readonly AddedArrow[];
+    }
+  /** One number on one arrow moves. */
+  | {
+      readonly op: "retune";
+      /** The arrow whose push is being changed. */
+      readonly link: string;
+      /** The new push, signed, on the same scale the arrow carries. */
+      readonly strength: number;
+      /** What the push was before, so the panel can read the change back. */
+      readonly wasStrength: number;
+    }
+  /** The finer claims add back up to the one they replace. Not built yet. */
+  | { readonly op: "refine"; readonly target: string }
+  /** The reader's own likelihood, beside the model's and the market's. */
+  | { readonly op: "believe"; readonly target: string; readonly belief: Ranged };
+
+/** The four hues a branch may take. Never amber: amber means "the money moves down". */
+export type BranchHue = "violet" | "teal" | "rose" | "slate";
+
+/**
+ * A named, ordered list of edits over a base map. A branch *is* the edits.
+ *
+ * It holds no likelihoods and no results. `claims` and `links` are the drawable
+ * detail for what an **Add a claim** edit brought with it, when the map
+ * supplied a whole claim rather than only its words — the stored example's own
+ * branch does; a claim the reader types does not, and is shown in the branch
+ * panel rather than drawn as a tile.
+ */
+export interface BranchView {
+  /** This branch's identifier. */
+  readonly id: string;
+  /** The name the reader reads. */
+  readonly label: string;
+  /** Which of the four hues its lane and its name chip take. */
+  readonly hue: BranchHue;
+  /** The edits, in the order they were made. Appended to, never rewritten. */
+  readonly edits: readonly Edit[];
+  /** Whole claims an edit added, when the map supplied them. */
+  readonly claims: readonly ClaimView[];
+  /** Whole arrows an edit added, when the map supplied them. */
+  readonly links: readonly LinkView[];
+}
+
+/**
+ * One ending the edit can reach, as the rail beside the map lists it.
+ *
+ * Every number on a row is optional, and before the engine every one of them is
+ * an absence with its reason. The rail ranks nothing and computes nothing.
+ */
+export interface DeltaRow {
+  /** The ending's identifier on the map. */
+  readonly claimId: string;
+  /** The ending in its own words. */
+  readonly label: string;
+  /** What kind of ending it is, which is what says whether anything trades. */
+  readonly kind: ClaimKind;
+  /** How far the number moved, and the day it moved furthest. */
+  readonly move: Known<{ readonly from: number; readonly to: number; readonly largestOn: string }>;
+  /** How firm: the width of this world's own range on the claim. */
+  readonly rangeWidth: Known<number>;
+  /** Same direction: the share of versions of the map that moved the same way. */
+  readonly agreement: Known<number>;
+}
+
+/**
+ * What the panel beside the map is open on, and what the map draws a ring
+ * around. One name for one thing: the map, the panel and the keyboard all mean
+ * the same shape by it.
+ */
+export type Selection =
+  | { readonly kind: "claim"; readonly id: string }
+  | { readonly kind: "wire"; readonly id: string }
+  | null;

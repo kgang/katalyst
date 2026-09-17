@@ -1,0 +1,90 @@
+/*
+ * The map as a list.
+ *
+ * Indentation carries the depth, and so does the markup — a reader who hears the
+ * page gets the level announced, and a reader who sees it gets the step. Nothing
+ * here uses colour for anything: this view is the strictest test the colour law
+ * has, because it has no colour to lean on at all.
+ */
+
+.outline {
+  display: grid;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  overflow-y: auto;
+}
+
+.outline__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.outline__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.outline__list {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outline__item[data-level="2"] {
+  padding-left: var(--space-2);
+}
+
+.outline__item[data-level="3"] {
+  padding-left: var(--space-4);
+}
+
+.outline__item[data-level="4"] {
+  padding-left: var(--space-5);
+}
+
+.outline__item[data-level="5"] {
+  padding-left: var(--space-6);
+}
+
+.outline__line {
+  display: grid;
+  grid-template-columns: 2.4em 1fr;
+  column-gap: var(--space-1);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid transparent;
+  border-left: 1px solid var(--hairline);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: none;
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+  text-align: left;
+  text-wrap: pretty;
+  cursor: pointer;
+}
+
+.outline__line:hover {
+  border-color: var(--hairline);
+  background: var(--surface);
+}
+
+.outline__item[aria-selected="true"] .outline__line {
+  border-color: var(--accent);
+}
+
+.outline__id {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+}

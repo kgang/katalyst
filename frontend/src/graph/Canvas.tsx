@@ -40,10 +40,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/base.css";
 import { Tile } from "../components/Tile";
 import { TileOverflow } from "../components/TileOverflow";
-import type { WorldView } from "../world";
-import { LARGEST_ZOOM, SMALLEST_ZOOM, SUMMARY_BELOW_ZOOM, TILE_WIDTH } from "./geometry";
+import type { MapKeys } from "../keyboard/useMapKeys";
+import { useMapKeys } from "../keyboard/useMapKeys";
+import type { Selection, WorldView } from "../world";
+import {
+  firstFrame,
+  LARGEST_ZOOM,
+  SMALLEST_ZOOM,
+  SUMMARY_BELOW_ZOOM,
+  TILE_WIDTH,
+} from "./geometry";
+import { assignLayers } from "./layers";
 import { useLayout } from "./layoutRunner";
-import { type ClaimNode, type MapEdge, type MapNode, type OverflowNode, toFlow } from "./toFlow";
+import {
+  type ClaimNode,
+  type MapEdge,
+  type MapNode,
+  OVERFLOW_PREFIX,
+  type OverflowNode,
+  toFlow,
+} from "./toFlow";
 import { CausalWire } from "./wires/CausalWire";
 import { onThePathFrom } from "./wires/lens";
 import { type Box, planRoutes, SKY_GAP, tailOffsets } from "./wires/route";
@@ -54,34 +70,18 @@ import "./canvas.css";
  * drawing library never has to rebuild its tiles because the object changed. */
 const TILE_TYPES = {
   claim: ({ data }: { data: ClaimNode["data"] }) => (
-    <Tile claim={data.claim} isHypothesis={data.isHypothesis} versions={data.versions} />
+    <Tile
+      claim={data.claim}
+      isHypothesis={data.isHypothesis}
+      versions={data.versions}
+      height={data.height}
+    />
   ),
   overflow: ({ data }: { data: OverflowNode["data"] }) => <TileOverflow count={data.count} />,
 };
 
 /** One kind of wire, ours, saying five things at once. */
 const WIRE_TYPES = { causal: CausalWire };
-
-/** What the panel beside the map is open on. */
-export type Selection =
-  | { readonly kind: "claim"; readonly id: string }
-  | { readonly kind: "wire"; readonly id: string }
-  | null;
-
-/**
- * How the map is framed the first time it is drawn: the whole of it — the one
- * backwards wire's run over the top included — with a margin of a twelfth of
- * the window around it, and never blown up past life size.
- *
- * The margin is as tight as it is on purpose. Whether the first frame shows the
- * full tiles or their summaries is decided by whether the whole map happens to
- * fit above the summary threshold, and a fat margin pushes a map that would
- * have fitted below it.
- */
-const FIRST_FRAME = { padding: 0.08, duration: 0 } as const;
-
-/** Never blown up past life size on the first frame, however small the map. */
-const FIRST_FRAME_MAX_ZOOM = 1;
 
 /** What the map needs beyond the world it draws. */
 interface SurfaceProps {
@@ -91,16 +91,54 @@ interface SurfaceProps {
   readonly selection: Selection;
   /** Called when the reader selects a claim or an arrow, by pointer or by keyboard. */
   readonly onSelect: (selection: Selection) => void;
+  /** Which claim the keyboard is on. Held outside the map, because the keys are. */
+  readonly focused: string | null;
+  /** Put the keyboard on a claim. */
+  readonly onFocused: (id: string | null) => void;
+  /**
+   * How tall to draw each tile, when a diff needs one box to hold two paintings.
+   * Left out, each tile is as tall as its own content.
+   */
+  readonly heights?: ReadonlyMap<string, number>;
+  /** Everything the keys that are not about moving are wired to. */
+  readonly keys: MapKeys;
+  /** Say what the last keystroke did, under the map. */
+  readonly onStatus: (line: string) => void;
+  /**
+   * The reader asked to see the claims a column had no room for.
+   *
+   * The collapsed tile does not expand: it opens the outline, filtered to that
+   * column. The outline is built from the world rather than from what is
+   * painted, so those claims already have items there and the tile only has to
+   * point at them.
+   */
+  readonly onOverflow: (column: { layer: number; claims: readonly string[] }) => void;
+  /**
+   * True while the map is arriving, which is when the one animation it spends on
+   * causality runs: the wires draw in the order the argument runs, a column at a
+   * time. Under reduced motion the ordering survives and the drawing goes.
+   */
+  readonly arriving: boolean;
 }
 
 /** The surface itself. Lives inside the provider so it can move the view. */
-function MapSurface({ world, selection, onSelect }: SurfaceProps) {
+function MapSurface({
+  world,
+  selection,
+  onSelect,
+  focused,
+  onFocused,
+  heights,
+  keys,
+  onStatus,
+  onOverflow,
+  arriving,
+}: SurfaceProps) {
   const flow = useReactFlow();
   const surface = useRef<HTMLDivElement>(null);
-  const [focused, setFocused] = useState<string | null>(null);
   const [pointingAt, setPointingAt] = useState<string | null>(null);
 
-  const drawing = useMemo(() => toFlow(world), [world]);
+  const drawing = useMemo(() => toFlow(world, heights), [world, heights]);
   const layout = useLayout(drawing.tiles, drawing.layoutEdges);
 
   // How far the map is zoomed out. Below the threshold a wire's plate would
@@ -134,14 +172,40 @@ function MapSurface({ world, selection, onSelect }: SurfaceProps) {
     [pointingAt, focused, world.links],
   );
 
+  // Which column each claim sits in, for the one animation this map spends on
+  // causality: the wires arrive in the order the argument runs, a column at a
+  // time. The order is read from the map's own shape, never from the clock.
+  const column = useMemo(() => {
+    const placed = new Map<string, number>();
+    for (const one of assignLayers(
+      world.claims.map((claim) => claim.id),
+      world.links,
+    )) {
+      placed.set(one.id, one.layer);
+    }
+    return placed;
+  }, [world]);
+
   const nodes: MapNode[] = useMemo(
     () =>
-      drawing.nodes.map((node) => ({
-        ...node,
-        position: layout.positions.get(node.id) ?? { x: 0, y: 0 },
-        selected: selection?.kind === "claim" && selection.id === node.id,
-        className: lens !== null && !lens.claims.has(node.id) ? "is-dimmed" : undefined,
-      })),
+      drawing.nodes.map((node) => {
+        const ghost = node.type === "claim" && node.data.claim.ghost === true;
+        return {
+          ...node,
+          position: layout.positions.get(node.id) ?? { x: 0, y: 0 },
+          selected: selection?.kind === "claim" && selection.id === node.id,
+          // Two classes and not one: the hover lens and the other world are both
+          // opacity, and a tile that is off the hovered path *and* in the other
+          // world has to land at the two multiplied together rather than at
+          // whichever rule happened to win. `canvas.css` multiplies them.
+          className: [
+            lens !== null && !lens.claims.has(node.id) ? "is-dimmed" : "",
+            ghost ? "is-ghost" : "",
+          ]
+            .filter((one) => one !== "")
+            .join(" "),
+        };
+      }),
     [drawing, layout, lens, selection],
   );
 
@@ -155,13 +219,26 @@ function MapSurface({ world, selection, onSelect }: SurfaceProps) {
     }));
     const plans = planRoutes(routable, boxes);
     const offsets = tailOffsets(routable);
+    const wires = new Map(world.links.map((link) => [link.id, link]));
     return drawing.edges.map((edge) => {
       if (edge.data === undefined) {
         return edge;
       }
+      const wire = wires.get(edge.id);
       return {
         ...edge,
         selected: selection?.kind === "wire" && selection.id === edge.id,
+        // The wave's place in the order, and whether this wire belongs to the
+        // world you are not looking at. Both are carried as classes, because a
+        // class is what the drawing library puts on the group the wire is drawn
+        // in, and a wire cannot know where the other wires are.
+        className: [
+          `wave-${Math.min(column.get(edge.source) ?? 0, 5)}`,
+          wire?.ghost === true ? "is-ghost" : "",
+          wire?.change === undefined ? "" : `is-${wire.change}`,
+        ]
+          .filter((one) => one !== "")
+          .join(" "),
         data: {
           ...edge.data,
           plan: plans.get(edge.id),
@@ -171,7 +248,7 @@ function MapSurface({ world, selection, onSelect }: SurfaceProps) {
         },
       };
     });
-  }, [drawing, boxes, lens, selection, tooSmallForWords]);
+  }, [drawing, boxes, lens, selection, tooSmallForWords, world, column]);
 
   /**
    * Everything the first frame has to hold: every tile, and the strip of empty
@@ -200,24 +277,48 @@ function MapSurface({ world, selection, onSelect }: SurfaceProps) {
     }
     if (layout.runs === 1) {
       const frame = mapBounds();
-      if (frame !== null) {
-        flow.fitBounds(frame, FIRST_FRAME);
-        if (flow.getZoom() > FIRST_FRAME_MAX_ZOOM) {
-          flow.zoomTo(FIRST_FRAME_MAX_ZOOM, { duration: 0 });
-        }
-      }
-      return;
-    }
-    if (focused !== null) {
-      const node = flow.getNode(focused);
-      if (node) {
-        flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + heightOf(focused) / 2, {
-          zoom: flow.getZoom(),
+      const room = surface.current?.getBoundingClientRect();
+      if (frame !== null && room !== undefined) {
+        // Framed to fit — but never zoomed out past the point where a full tile
+        // would have to become a summary. The reader's first sight of the map is
+        // tiles they can read; if the whole map does not fit at that size, it is
+        // framed from its beginning, on the left, and they pan to the rest.
+        flow.setViewport(firstFrame(frame, { width: room.width, height: room.height }), {
           duration: 0,
         });
       }
+      return;
     }
-  }, [layout.runs, flow, focused, heightOf, mapBounds]);
+  }, [layout.runs, flow, mapBounds]);
+
+  // The view follows whatever the keyboard is on, so a tile that arrives — the
+  // claim an edit just added — is framed rather than hunted for, and a step
+  // along a wire never walks off the edge of the glass.
+  useEffect(() => {
+    if (focused === null || layout.runs === 0) {
+      return;
+    }
+    const node = flow.getNode(focused);
+    if (node === undefined) {
+      return;
+    }
+    flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + heightOf(focused) / 2, {
+      zoom: flow.getZoom(),
+      duration: 0,
+    });
+  }, [focused, flow, heightOf, layout.runs]);
+
+  /** Show the claims a column had no room for, as a list. */
+  const openColumn = useCallback(
+    (layer: number) => {
+      onOverflow({
+        layer,
+        claims: [...column.entries()].filter(([, at]) => at === layer).map(([id]) => id),
+      });
+      onStatus(`the claims in column ${layer}, as a list`);
+    },
+    [column, onOverflow, onStatus],
+  );
 
   /**
    * What the reader just pointed at, or `null` when it was the empty map.
@@ -257,12 +358,16 @@ function MapSurface({ world, selection, onSelect }: SurfaceProps) {
       if (under === null && (event.target as HTMLElement).closest(".react-flow__controls")) {
         return;
       }
+      if (under?.kind === "claim" && under.id.startsWith(OVERFLOW_PREFIX)) {
+        openColumn(Number(under.id.slice(OVERFLOW_PREFIX.length)));
+        return;
+      }
       onSelect(under);
       if (under?.kind === "claim") {
-        setFocused(under.id);
+        onFocused(under.id);
       }
     },
-    [onSelect, whatIsUnder],
+    [onSelect, whatIsUnder, onFocused, openColumn],
   );
 
   /**
@@ -285,35 +390,66 @@ function MapSurface({ world, selection, onSelect }: SurfaceProps) {
       if (under.kind === "wire") {
         return;
       }
-      const id = under.id;
-      const box = target.closest<HTMLElement>(".react-flow__node");
-      setFocused(id);
-      const frame = surface.current?.getBoundingClientRect();
-      const tile = box?.getBoundingClientRect();
-      if (frame === undefined || tile === undefined) {
-        return;
-      }
-      const offScreen =
-        tile.left < frame.left ||
-        tile.right > frame.right ||
-        tile.top < frame.top ||
-        tile.bottom > frame.bottom;
-      if (!offScreen) {
-        return;
-      }
-      const node = flow.getNode(id);
-      if (node) {
-        flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + heightOf(id) / 2, {
-          zoom: flow.getZoom(),
-          duration: 0,
-        });
-      }
+      onFocused(under.id);
     },
-    [flow, heightOf, onSelect, whatIsUnder],
+    [onSelect, whatIsUnder, onFocused],
   );
 
+  // Where every tile ended up, in the shape moving along a wire needs: the
+  // keyboard asks what it can *walk to*, which reads the whole map, feedback
+  // arrows included.
+  const places = useMemo(() => {
+    const map = new Map<string, { x: number; y: number; height: number }>();
+    for (const [id, at] of layout.positions) {
+      map.set(id, { x: at.x, y: at.y, height: heightOf(id) });
+    }
+    return map;
+  }, [layout, heightOf]);
+
+  const claimWords = useCallback(
+    (id: string) => world.claims.find((claim) => claim.id === id)?.claim ?? id,
+    [world],
+  );
+
+  const onKeyDown = useMapKeys({
+    wires: world.links,
+    positions: places,
+    focused,
+    onFocused: (id) => {
+      onFocused(id);
+      // Reaching a tile with the keyboard and reaching it with the pointer do
+      // the same thing: the panel beside the map reads it out. Nothing opens
+      // over the map.
+      onSelect({ kind: "claim", id });
+      surface.current
+        ?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`)
+        ?.focus();
+    },
+    onStatus,
+    keys,
+    words: claimWords,
+  });
+
   return (
-    <div className="canvas" ref={surface} onFocusCapture={onFocus} onPointerDownCapture={onPointAt}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: the map is the surface the whole keyboard map is bound to, and every tile on it is itself a thing the keyboard can land on. Binding the keys to each tile instead would make the same key mean different things depending on where you were standing.
+    <div
+      className="canvas"
+      ref={surface}
+      data-arriving={arriving ? "yes" : "no"}
+      onFocusCapture={onFocus}
+      onPointerDownCapture={onPointAt}
+      onKeyDown={(event) => {
+        // A collapsed tile is reached with the keyboard like any other, and
+        // Enter opens what is behind it — the same thing a press does.
+        const at = (event.target as HTMLElement).closest<HTMLElement>(".react-flow__node");
+        if (event.key === "Enter" && at?.dataset.id?.startsWith(OVERFLOW_PREFIX) === true) {
+          event.preventDefault();
+          openColumn(Number(at.dataset.id.slice(OVERFLOW_PREFIX.length)));
+          return;
+        }
+        onKeyDown(event);
+      }}
+    >
       <WireMarks />
 
       <ReactFlow
@@ -357,20 +493,13 @@ function MapSurface({ world, selection, onSelect }: SurfaceProps) {
 }
 
 /** What the map needs to be dropped into a page. */
-export interface MapCanvasProps {
-  /** The world to draw. */
-  readonly world: WorldView;
-  /** What the panel beside the map is open on. */
-  readonly selection: Selection;
-  /** Called when the reader selects a claim or an arrow. */
-  readonly onSelect: (selection: Selection) => void;
-}
+export type MapCanvasProps = SurfaceProps;
 
 /** The map, ready to be dropped into a page. */
-export function MapCanvas({ world, selection, onSelect }: MapCanvasProps) {
+export function MapCanvas(props: MapCanvasProps) {
   return (
     <ReactFlowProvider>
-      <MapSurface world={world} selection={selection} onSelect={onSelect} />
+      <MapSurface {...props} />
     </ReactFlowProvider>
   );
 }

@@ -158,7 +158,9 @@ describe("the mark and the word", () => {
     const wireDots = wireMark?.querySelectorAll(".origin-mark__dot").length;
 
     const link: LinkView = aWire({ provenance: "asserted" });
-    render(<Inspector world={aWorld({ links: [link] })} subject={{ kind: "wire", id: link.id }} />);
+    render(
+      <Inspector world={aWorld({ links: [link] })} selection={{ kind: "wire", id: link.id }} />,
+    );
     const panelMark = document.querySelector(".inspector__origin .origin-mark");
     const panelDots = panelMark?.querySelectorAll(".origin-mark__dot").length;
 

@@ -39,24 +39,33 @@ import {
   pushInWords,
   shapeInWords,
 } from "../graph/wires/encodings";
-import type { BeliefOwner, ClaimKind, ClaimView, LinkView, Slot, WorldView } from "../world";
+import type {
+  BeliefOwner,
+  ClaimKind,
+  ClaimView,
+  LinkView,
+  Selection,
+  Slot,
+  WorldView,
+} from "../world";
 import { toReading, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
 import "./inspector.css";
 
-/** What is being looked at. Nothing selected is a real state with its own words. */
-export type Subject =
-  | { readonly kind: "claim"; readonly id: string }
-  | { readonly kind: "wire"; readonly id: string }
-  | null;
-
-/** What the panel needs to draw itself. */
+/**
+ * What the panel needs to draw itself.
+ *
+ * What it is open on is a `Selection` — the same shape, under the same name, as
+ * what the map draws a ring around and what the keyboard is on. One thing with
+ * one name: the panel, the map and the keyboard cannot disagree about what is
+ * selected if there is only one word for it.
+ */
 export interface InspectorProps {
   /** The map and its numbers. */
   readonly world: WorldView;
   /** What is selected. */
-  readonly subject: Subject;
+  readonly selection: Selection;
 }
 
 /** What each kind of claim is called on screen. No underscores and no code names. */
@@ -418,11 +427,11 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
 }
 
 /** The panel beside the map. */
-export function Inspector({ world, subject }: InspectorProps) {
+export function Inspector({ world, selection }: InspectorProps) {
   const claim =
-    subject?.kind === "claim" ? world.claims.find((one) => one.id === subject.id) : undefined;
+    selection?.kind === "claim" ? world.claims.find((one) => one.id === selection.id) : undefined;
   const wire =
-    subject?.kind === "wire" ? world.links.find((one) => one.id === subject.id) : undefined;
+    selection?.kind === "wire" ? world.links.find((one) => one.id === selection.id) : undefined;
 
   return (
     <aside className="inspector" aria-label="Why this number is what it is">

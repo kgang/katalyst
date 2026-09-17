@@ -1,0 +1,364 @@
+/*
+ * The branch panel and the six buttons.
+ *
+ * Both live inside the panel beside the map. Neither opens over anything, and
+ * neither has a close box that has to be found: the branch panel is always there,
+ * and the six buttons close with Escape or with the word *Done*, which is not a
+ * dismissal but a statement that you have finished.
+ *
+ * Nothing here is a rounded filled button. A button in this product is a word
+ * with a hairline round it, set in the interface face, and it tells you what it
+ * will do rather than shouting.
+ */
+
+.branch-panel {
+  display: grid;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.branch-panel__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.branch-panel__list {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.branch-panel__branch {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  column-gap: var(--space-1);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.branch-panel__branch:hover {
+  border-color: var(--hairline);
+  color: var(--text);
+}
+
+/* The branch you are in: a hairline round it and the words at full strength. The
+ * hue on the chip beside it is never the only thing saying which one is open. */
+.branch-panel__branch[data-open="yes"] {
+  border-color: var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: var(--weight-medium);
+}
+
+/* The name chip's colour. Four hues, on a branch's chip and its lane and nowhere
+ * else — never on a tile's meaning. Not amber: amber already means "the money
+ * moves down", and one hue cannot mean two things. */
+.branch-panel__chip {
+  align-self: center;
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: 2px;
+  background: var(--text-muted);
+}
+
+.branch-panel__chip[data-hue="base"] {
+  background: none;
+  border: 1px solid var(--text-muted);
+}
+
+.branch-panel__chip[data-hue="violet"] {
+  background: var(--branch-violet);
+}
+
+.branch-panel__chip[data-hue="teal"] {
+  background: var(--branch-teal);
+}
+
+.branch-panel__chip[data-hue="rose"] {
+  background: var(--branch-rose);
+}
+
+.branch-panel__chip[data-hue="slate"] {
+  background: var(--branch-slate);
+}
+
+.branch-panel__name {
+  text-wrap: pretty;
+}
+
+/* The branch's name chip arriving is one of the three animations this product
+ * spends: about two hundred milliseconds, no bounce, and nothing else moves. */
+.branch-panel__branch[data-open="yes"] .branch-panel__chip,
+.branch-panel__branch[data-open="yes"] .branch-panel__name {
+  animation: branch-arrives var(--duration-wave) ease-out backwards;
+}
+
+@keyframes branch-arrives {
+  from {
+    opacity: 0;
+  }
+}
+
+.branch-panel__count {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.branch-panel__fork,
+.branch-panel__go,
+.branch-panel__cancel {
+  justify-self: start;
+  margin: 0;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.branch-panel__fork:hover,
+.branch-panel__go:hover,
+.branch-panel__cancel:hover {
+  border-color: var(--text-muted);
+}
+
+.branch-panel__naming {
+  display: grid;
+  row-gap: var(--space-hair);
+}
+
+.branch-panel__field-label,
+.intervene__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.branch-panel__field,
+.intervene__field {
+  width: 100%;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.branch-panel__field-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.branch-panel__none {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* ---- The edits, in the order they were made ----------------------------- */
+
+.branch-panel__edits {
+  display: grid;
+  row-gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.branch-panel__edit {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--hairline);
+}
+
+.branch-panel__number {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.branch-panel__about {
+  display: grid;
+  row-gap: var(--space-hair);
+  min-width: 0;
+}
+
+.branch-panel__button-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.branch-panel__subject {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.branch-panel__badge {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: var(--space-hair);
+  padding: 1px var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.branch-panel__no-badge {
+  grid-column: 2;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ---- The six things you can do ------------------------------------------ */
+
+.intervene {
+  display: grid;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
+}
+
+.intervene__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.intervene__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.intervene__close {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.intervene__subject {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.intervene__buttons {
+  display: grid;
+  row-gap: var(--space-hair);
+}
+
+.intervene__button {
+  display: grid;
+  row-gap: 1px;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.intervene__button:hover {
+  border-color: var(--text-muted);
+}
+
+/* A button for something that is not built yet. It is still a button, still
+ * reachable, and it says what it would do and that it cannot yet — because a
+ * control that is quietly inert is worse than one that explains itself. The
+ * dashed edge is the glance; the words under it are the reading. */
+.intervene__button[data-live="no"] {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.intervene__hint {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
+}
+
+.intervene__form {
+  display: grid;
+  row-gap: var(--space-hair);
+  padding: var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+
+.intervene__three {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: var(--space-hair);
+}
+
+.intervene__go {
+  justify-self: start;
+  margin: 0;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.intervene__said {
+  margin: 0;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--hairline);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}

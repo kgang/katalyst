@@ -22,8 +22,12 @@ import type { components } from "../api/schema";
 import type { FixtureBundle, WorldSource } from "./source";
 import type {
   Absence,
+  AbsenceKind,
   BaseRateView,
+  BranchHue,
+  BranchView,
   ClaimView,
+  Edit,
   EvidenceClipping,
   LinkView,
   Slot,
@@ -36,6 +40,8 @@ type Proposition = components["schemas"]["Proposition"];
 type Belief = components["schemas"]["Belief"];
 type Evidence = components["schemas"]["Evidence"];
 type Source = components["schemas"]["Source"];
+type Branch = components["schemas"]["Branch"];
+type Graph = components["schemas"]["Graph"];
 
 /**
  * Turn a likelihood from the server into a filled slot, unchanged.
@@ -48,8 +54,8 @@ function filled(belief: Belief): Slot {
 }
 
 /** Turn "there is no number here" into the words and the reason for them. */
-function missing(words: string, reason: string): Slot {
-  const absence: Absence = { words, reason };
+function missing(kind: AbsenceKind, words: string, reason: string): Slot {
+  const absence: Absence = { kind, words, reason };
   return { absence };
 }
 
@@ -108,6 +114,7 @@ function source(item: Source): SourceView {
       item.retrieved === null || item.retrieved === undefined
         ? {
             absence: {
+              kind: "not_said",
               words: "—",
               reason: "nobody fetched this; a person put the address in by hand",
             },
@@ -132,6 +139,7 @@ function baseRate(
   if (stored === null || stored === undefined) {
     return {
       absence: {
+        kind: "not_said",
         words: "—",
         reason: "no reference class recorded for this claim",
       },
@@ -171,9 +179,13 @@ function marketAbsence(proposition: Proposition): Slot {
     // A dead end says why it is a dead end, in the map's own words. This is the
     // one reason a tile prints for itself, because it is an answer rather than
     // an apology.
-    return missing("no market", proposition.not_tradeable_reason ?? NO_MARKET_REASON.event);
+    return missing(
+      "no_market",
+      "no market",
+      proposition.not_tradeable_reason ?? NO_MARKET_REASON.event,
+    );
   }
-  return missing("no market", NO_MARKET_REASON[proposition.kind]);
+  return missing("no_market", "no market", NO_MARKET_REASON[proposition.kind]);
 }
 
 /** Turn one claim from the server into the claim a tile draws. */
@@ -192,7 +204,7 @@ function toClaim(proposition: Proposition): ClaimView {
       model: filled(beliefs.model),
       user: beliefs.user
         ? filled(beliefs.user)
-        : missing("—", "You have not put your own number on this claim yet."),
+        : missing("not_said", "—", "You have not put your own number on this claim yet."),
       market: beliefs.market ? filled(beliefs.market) : marketAbsence(proposition),
     },
     // At most two clippings on a tile; every one of them in the panel beside
@@ -204,6 +216,7 @@ function toClaim(proposition: Proposition): ClaimView {
     // it; there is no world yet, so there is no number, and the bar says which
     // route it would have been for and that nothing has worked it out.
     pathProduct: missing(
+      "no_engine",
       "no engine yet",
       "Nothing has worked this number through the map yet. The likelihood of a whole " +
         "chain is multiplied out where the map's numbers are computed, and never here.",
@@ -233,6 +246,7 @@ function toLink(link: components["schemas"]["Link"]): LinkView {
     // not exist yet — so every arrow in this build carries the absence and the
     // wire reads its push back in words instead.
     conditional: missing(
+      "no_engine",
       "no engine yet",
       "Nothing has worked this number through the map yet. The likelihood with this " +
         "arrow's cause supposed true costs a whole extra run of the map, so it is " +
@@ -240,6 +254,85 @@ function toLink(link: components["schemas"]["Link"]): LinkView {
     ),
     reflexive: link.reflexive,
   };
+}
+
+/**
+ * The four hues a branch's lane and name chip may take, in the order they are
+ * handed out. Never amber: amber already means "the money moves down".
+ */
+const HUES: readonly BranchHue[] = ["violet", "teal", "rose", "slate"];
+
+/**
+ * Turn one of the map's own branches into the branch the panel lists and the
+ * diff view folds on.
+ *
+ * A branch holds no claims and no numbers of its own — only the edits. What it
+ * does carry, when an **Add a claim** edit brought a whole claim with it, is
+ * that claim and its arrows, so the map has something to draw. A claim the
+ * reader types has only its words, and the branch panel shows it rather than the
+ * map.
+ *
+ * @param branch The branch as the server serves it.
+ * @param graph The base map, so that a **Change this push** edit can say what
+ *   the push was before it moved.
+ * @param hue Which of the four hues this branch takes.
+ * @param today The day the map is set on, for an edit that names no day of its
+ *   own.
+ */
+function toBranch(branch: Branch, graph: Graph, hue: BranchHue, today: string): BranchView {
+  const claims: ClaimView[] = [];
+  const links: LinkView[] = [];
+  // biome-ignore lint/suspicious/useIterableCallbackReturn: the six operations are the whole of what a branch can hold — the server's own description of itself says so — so every branch of the switch below returns and the type checker proves it. There is no path out of it without a value, and a default case would be a branch no input can reach.
+  const edits: Edit[] = branch.interventions.map((made): Edit => {
+    switch (made.kind) {
+      case "do":
+        return { op: "do", target: made.target, value: made.value, at: made.at ?? today };
+      case "observe":
+        // Observing carries no day of its own: you can only report what has
+        // already happened, and the map's window starts on its own first day.
+        return { op: "observe", target: made.target, value: made.value, at: today };
+      case "insert":
+        claims.push(toClaim(made.proposition));
+        links.push(...made.links.map(toLink));
+        return {
+          op: "insert",
+          claimId: made.proposition.id,
+          words: made.proposition.claim,
+          arrows: made.links.map((link) => ({
+            id: link.id,
+            source: link.source,
+            target: link.target,
+          })),
+        };
+      case "retune":
+        return {
+          op: "retune",
+          link: made.link,
+          strength: made.strength,
+          wasStrength: graph.links.find((link) => link.id === made.link)?.strength ?? made.strength,
+        };
+      case "refine":
+        return { op: "refine", target: made.target };
+      case "believe":
+        return {
+          op: "believe",
+          target: made.target,
+          belief: { p: made.belief.p, lo: made.belief.lo, hi: made.belief.hi },
+        };
+    }
+  });
+  return { id: branch.id, label: branch.label, hue, edits, claims, links };
+}
+
+/**
+ * The branches a stored example carries, ready to be folded onto its map.
+ *
+ * @param bundle The stored example in full, as the route serves it.
+ */
+export function branchesOf(bundle: FixtureBundle): BranchView[] {
+  return bundle.branches.map((branch, index) =>
+    toBranch(branch, bundle.graph, HUES[index % HUES.length] ?? "violet", bundle.fixture_date),
+  );
 }
 
 /**
@@ -276,6 +369,7 @@ export class FixtureWorldSource implements WorldSource {
     return {
       baseId: bundle.id,
       title: bundle.title,
+      today: bundle.fixture_date,
       hypothesisId: bundle.graph.hypothesis_id,
       claims: bundle.graph.propositions.map(toClaim),
       links: bundle.graph.links.map(toLink),
