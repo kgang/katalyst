@@ -42,6 +42,7 @@ from katalyst.domain import (
     Beliefs,
     Believe,
     Branch,
+    ContractPayoff,
     Do,
     Evidence,
     Graph,
@@ -50,6 +51,7 @@ from katalyst.domain import (
     Link,
     Observe,
     Payoff,
+    PricePayoff,
     Proposition,
     Refine,
     Resolution,
@@ -92,9 +94,16 @@ RATIONALE_SENTENCES: tuple[str, ...] = (
 )
 
 INSTRUMENTS: tuple[str, ...] = (
-    "a prediction-market contract on the stated outcome",
     "the front-month futures contract",
     "the energy-sector fund against the broad-market fund",
+    "the exchange-traded fund that tracks the sector",
+)
+
+CONTRACT_VENUES: tuple[str, ...] = ("Polymarket", "Kalshi")
+
+CONTRACT_TITLES: tuple[str, ...] = (
+    "Will the strait be open to unrestricted transit for a fortnight?",
+    "Will the price settle below the stated level before the year ends?",
 )
 
 NO_INSTRUMENT_REASONS: tuple[str, ...] = (
@@ -255,16 +264,27 @@ def resolutions(draw: Any) -> Resolution:
 
 @composite
 def payoffs(draw: Any) -> Payoff:
-    """What one tradeable ending is worth.
+    """What one tradeable ending is worth, either way round.
 
-    Generates: an instrument, a side, and how far it is expected to move.
-    Guarantees: the size of the move is never negative; the side carries the
-    direction.
+    Generates: half the time a named contract at a named venue and the side you
+    would take; the other half an instrument, which way you would take it, and how
+    far its price is expected to move.
+    Guarantees: both arms are built, so anything reading a payoff is made to cope
+    with both. A price move is never negative — the side carries the direction —
+    and a contract always names the venue and the contract, so a reader can look it
+    up. Neither arm says what the position costs; that is not this layer's business.
     """
-    return Payoff(
+    if draw(st.booleans()):
+        return ContractPayoff(
+            venue=draw(st.sampled_from(CONTRACT_VENUES)),
+            contract_id=draw(st.sampled_from(("brent-below-seventy", "strait-open-fortnight"))),
+            title=draw(st.sampled_from(CONTRACT_TITLES)),
+            side=draw(st.sampled_from(("yes", "no"))),
+        )
+    return PricePayoff(
         instrument=draw(st.sampled_from(INSTRUMENTS)),
         direction=draw(st.sampled_from(("long", "short"))),
-        magnitude=draw(st.floats(min_value=0.0, max_value=3.0, allow_nan=False)),
+        move=draw(st.floats(min_value=0.0, max_value=3.0, allow_nan=False)),
     )
 
 
@@ -375,7 +395,8 @@ def links(
     Generates: an identifier, the two ends, whether the push is a one-time shove or
     a continuous hold, how hard it pushes, how long it takes, its shape over time,
     the mechanism in a sentence, sometimes citations, and where the number came
-    from.
+    from. There is no field for how sure the model is of its own mechanism; the
+    sentence is the argument and the provenance is our receipt for it.
     Guarantees: the mechanism is never blank; an arrow whose provenance claims a
     document or a price cites at least one source; a feedback arrow always has a
     delay greater than zero. Valid by construction.
@@ -411,7 +432,6 @@ def links(
         sources=(
             (draw(sources()),) if claims_evidence else tuple(draw(st.lists(sources(), max_size=1)))
         ),
-        confidence=draw(st.sampled_from(("speculative", "argued", "documented"))),
         provenance=draw(
             st.sampled_from(
                 PROVENANCE_CLAIMING_EVIDENCE if claims_evidence else PROVENANCE_WITHOUT_EVIDENCE
