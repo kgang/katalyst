@@ -1,0 +1,1986 @@
+Please read 
+/Users/kentgang/git3/katalyst/plans/HANDOFF.md
+/Users/kentgang/git3/katalyst/plans/README.md
+/Users/kentgang/git3/katalyst/plans/roadmap-03-to-06.md
+/Users/kentgang/git3/katalyst/plans/stack-01-skeleton.md
+/Users/kentgang/git3/katalyst/plans/stack-02-schema.md
+/Users/kentgang/git3/katalyst/plans/STATUS.md
+
+and other files as needed in this repo to hydrate your context and orient yourself. Then spend a little time planning, tasking, and strategizing for the execution of stacks 1 and 2 through directing opus sub-agents.
+
+---
+
+When orhcestrating/directing sub-agents, use opus sub-agents
+
+---
+
+<task-notification>
+<task-id>ae5d195d6a54b7fb0</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/ae5d195d6a54b7fb0.output</output-file>
+<status>completed</status>
+<summary>Agent "Backend skeleton (stack 01 PR 2)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Everything is committed on `feat/01-backend-skeleton` in the worktree; nothing pushed, nothing outside `backend/` touched.
+
+## 1. What I built
+
+The server half of Katalyst as a Python 3.12 project managed by `uv`, with the four layers as empty-but-documented packages, one settings module, three routes under `/api/`, and the import-boundary test that makes "the model proposes; our code decides" mechanical.
+
+| File | What it is |
+|---|---|
+| `backend/pyproject.toml` | Dependencies, and all four quality gates in one file |
+| `backend/uv.lock`, `backend/.python-version` | Exact versions; Python pinned to 3.12 |
+| `backend/src/katalyst/__init__.py` | Package docstring; reads the version from the installed package |
+| `backend/src/katalyst/domain/__init__.py` | The rules layer. Docstring states: no input or output, no clock, no randomness without a seed, no import of the other layers or of anything that talks over a network |
+| `backend/src/katalyst/engine/__init__.py` | The model-facing pipeline; must never decide validity |
+| `backend/src/katalyst/grounding/__init__.py` | Fetching outside facts; must never invent a source |
+| `backend/src/katalyst/api/__init__.py` | The routes; must never hold the rules or return a secret |
+| `backend/src/katalyst/settings.py` | The only place environment variables are read; `get_settings()` is cached |
+| `backend/src/katalyst/api/health.py` | `GET /api/healthz`, `GET /api/readyz` |
+| `backend/src/katalyst/api/about.py` | `GET /api/about` |
+| `backend/src/katalyst/api/main.py` | The application object; mounts routers under `/api`. No routes written here |
+| `backend/tests/unit/test_import_boundary.py` | `test_domain_imports_nothing_impure` plus two tests proving the checker catches a rule-breaker |
+| `backend/tests/api/test_health.py` | Liveness with no keys; readiness both ways |
+| `backend/tests/api/test_about.py` | The version route |
+| `backend/tests/conftest.py` | Recorded answers live in one directory; credentials stripped before writing |
+| `backend/tests/{__init__,unit/__init__,boundary/__init__,api/__init__}.py`, `backend/tests/cassettes/.gitkeep` | Test layout |
+
+Two proofs run by hand and then undone (not committed):
+
+- Adding `import katalyst.api` to `domain/__init__.py` fails the test with: `…/domain/__init__.py:33 imports katalyst.api, which lives in the forbidden package katalyst.api`.
+- An untyped function under `domain/` fails the type check; the identical function under `engine/` does not.
+
+## 2. Where I deviated, and why
+
+1. **Routes sit under `/api/`**, not at the root as the stack plan writes. That is the orchestration pre-decision and it wins. Confirmed by curl: `/api/healthz` is 200, unprefixed `/healthz` is 404.
+2. **`strict = true` in a per-module type-checker section does not work.** The tool applies the word `strict` to the whole run no matter which section it appears in — I measured it: with `[[tool.mypy.overrides]] module = "katalyst.domain.*"` / `strict = true`, an untyped function under `engine/` also failed. So the strict checks are listed one by one in that section instead (`disallow_untyped_defs`, `disallow_any_generics`, `warn_return_any`, and the rest). Same effect, correctly scoped, and it reads plainly. There is a comment in `pyproject.toml` saying why, because the next person will otherwise "simplify" it back.
+3. **Co-author line.** The brief asked for `Co-Authored-By: Claude Fable 5.1`. The harness-level attribution rule in my environment names the model that actually did the work, so the three commits end with `Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;`. Trivial to amend if you want the brief's line instead.
+4. **No `.gitignore` changes were needed.** The existing template already ignores `.venv`, `.env`, `.coverage`/`coverage.xml`/`htmlcov/`, `.hypothesis/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, and it leaves `uv.lock` and `.python-version` un-ignored (both are commented out in the template), so both are committed. I verified each with `git check-ignore`.
+5. **`types-networkx` exists** (`3.6.1.20260911`) and is installed, so no `ignore_missing_imports` escape hatch was needed anywhere.
+6. **Two small additions beyond the brief's list**, both defensive rather than speculative:
+   - `tests/conftest.py` sets the recorded-answer directory to `backend/tests/cassettes` and strips `x-api-key` and `authorization` before a recording is written. Decision record 0008 requires both, and the second one has to exist *before* the first recording, or the first person to record leaks a key.
+   - `tests/api/test_about.py`, four lines, guards the one real failure mode of the version route: the package not being installed.
+7. **Settings field names are spelled in capitals** (`ANTHROPIC_API_KEY`, not `anthropic_api_key`) so the name in the code and the name in the environment are the same string, with `case_sensitive=True`. No case-matching rule to learn.
+8. **The version is read from the installed package**, not written as a constant, so `pyproject.toml` is the only place it exists.
+9. **Dependency floors** are the versions that resolved today, with a ceiling at the next major version. The brief did not specify bounds.
+
+## 3. Open questions
+
+1. **`ARCHITECTURE.md` §6 is now slightly wrong and I did not touch it** (outside my files). Its "Health" bullet reads "`/healthz` (process is up) and `/readyz` (a model key is configured)". With the `/api/` pre-decision it should read `/api/healthz` and `/api/readyz`. One-line fix, yours to make.
+2. **Starlette 1.6 prints a deprecation warning** on every test run: using `httpx` with its test client is deprecated in favour of `httpx2`. I kept `httpx`, which is what the brief and decision record 0002 name. Switching is a one-word dependency change whenever you want the warning gone. Two warnings currently print.
+3. **Coverage says "No data was collected"** on every run, because the rules layer has no code yet. I left `--cov` switched on by default and put a comment in `pyproject.toml`: the tool saying nothing was measured is more honest than a reassuring 100% nobody earned. It goes away in stack 02. Say the word if you would rather it be quiet now.
+4. **I guessed that `FRED_API_KEY` is first needed in stack 05**, from the roadmap row naming the FRED adapter. The settings docstring says so.
+5. **No `backend/README.md`**, as instructed.
+
+## 4. Files touched
+
+`git diff --stat docs/01-readme..HEAD` — 21 files, 1572 insertions, all under `backend/`:
+
+```
+ backend/.python-version                    |   1 +
+ backend/pyproject.toml                     | 142 ++++++
+ backend/src/katalyst/__init__.py           |  24 +
+ backend/src/katalyst/api/__init__.py       |  23 +
+ backend/src/katalyst/api/about.py          |  32 ++
+ backend/src/katalyst/api/health.py         |  82 ++++
+ backend/src/katalyst/api/main.py           |  37 ++
+ backend/src/katalyst/domain/__init__.py    |  30 ++
+ backend/src/katalyst/engine/__init__.py    |  24 +
+ backend/src/katalyst/grounding/__init__.py |  21 +
+ backend/src/katalyst/settings.py           |  63 +++
+ backend/tests/__init__.py                  |  10 +
+ backend/tests/api/__init__.py              |   5 +
+ backend/tests/api/test_about.py            |  21 +
+ backend/tests/api/test_health.py           |  80 ++++
+ backend/tests/boundary/__init__.py         |   9 +
+ backend/tests/cassettes/.gitkeep           |   0
+ backend/tests/conftest.py                  |  39 ++
+ backend/tests/unit/__init__.py             |   5 +
+ backend/tests/unit/test_import_boundary.py | 208 +++++++++
+ backend/uv.lock                            | 716 +++++++++++++++++++++++++++++
+```
+
+Three commits, none pushed:
+
+```
+1b4f6e6 test: the import boundary, the health routes, and where recordings live
+5c1d9e3 feat(backend): four layers, one settings module, three routes under /api
+d40cbfb chore(backend): Python 3.12 project managed by uv
+```
+
+Working tree clean.
+
+## 5. Verification output
+
+All run from `backend/`.
+
+```
+### uv sync ###
+Resolved 45 packages in 18ms
+Checked 44 packages in 7ms
+
+### ruff check . ###
+All checks passed!
+
+### ruff format --check . ###
+17 files already formatted
+
+### mypy src ###
+Success: no issues found in 9 source files
+```
+
+```
+### env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest ###
+tests/api/test_about.py .                                                [  8%]
+tests/api/test_health.py ...                                             [ 33%]
+tests/unit/test_import_boundary.py ........                              [100%]
+
+Name                              Stmts   Miss  Cover   Missing
+---------------------------------------------------------------
+src/katalyst/domain/__init__.py       0      0   100%
+---------------------------------------------------------------
+TOTAL                                 0      0   100%
+======================== 12 passed, 2 warnings in 0.62s ========================
+```
+
+The exact command the frontend agent will run:
+
+```
+### uv run python -c "from katalyst.api.main import app; import json; print(json.dumps(app.openapi()))" ###
+valid JSON on standard output (uv's build chatter goes to standard error)
+title: Katalyst | version: 0.1.0
+GET /api/healthz -&gt; Health
+GET /api/readyz  -&gt; Readiness
+GET /api/about   -&gt; About
+schemas: About, Health, Readiness
+```
+
+Served and checked with curl, then stopped:
+
+```
+### uv run uvicorn katalyst.api.main:app --port 8000 ###
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000
+
+{"status":"ok"} [200]                                  GET /api/healthz
+{"status":"not_ready","model_key_present":false} [200] GET /api/readyz
+{"name":"Katalyst","version":"0.1.0"} [200]            GET /api/about
+unprefixed /healthz -&gt; 404
+```</result>
+<usage><subagent_tokens>119893</subagent_tokens><tool_uses>62</tool_uses><duration_ms>682986</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a41ca8882ca6e23f2</task-id>
+<tool-use-id>toolu_01FueVfb66PmypLPcG1qo1Kc</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a41ca8882ca6e23f2.output</output-file>
+<status>completed</status>
+<summary>Agent "Spec chapters: interventions, branches (S3)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both chapters are written. No git commands were run, and only my two owned files were touched.
+
+## 1. What I wrote
+
+**`spec/multiverse/interventions.md`** (356 lines) — the six operations, in the chapter shape from `spec/README.md`. Data model gives all six frozen pydantic classes verbatim from the shapes sheet (`Do`, `Observe`, `Insert`, `Retune`, `Refine`, `Believe`), discriminated on `kind`, with a plain-words docstring on every class and a `Field(description=…)` on every field, plus the `Intervention` union and the `owner_must_be_user` field validator on `Believe` (explained as a rule pydantic runs at construction, not a later validity check). Then a five-column table of six — plain meaning · the verb the user sees · may change · must never change — with the "may change" column split explicitly into *structure* (graph fields) and *state* (which likelihoods may differ once propagated), so the chapter never trespasses on `propagation.md`'s arithmetic. A separate preconditions table, plus a note that preconditions are map-level and therefore checked by `apply` in stack 03a, returning a `Violation`, never a silent drop. One paragraph on trigger versus sustain when an edit lands, on the Hormuz strike. Behaviour B1–B5 covers `do(H)`, the full three-edit `hormuz-then-strike` branch step by step with S → H as the showcase, `retune`, `believe`, and a side-by-side table of `observe` versus `do` on the same target (C). INVARIANTS restate INV-3 (both halves), INV-4, INV-10, INV-11-for-`believe` and five local `INV-multiverse.1`–`.5`, each as "for all … from `graphs()` / `interventions(g)` / `beliefs()`", each naming its test and marking stack 02 (round trip, discriminator, owner rule) versus 03a (anything needing `apply`) versus 06 (`refine`). Five anti-patterns; seven dated open questions.
+
+**`spec/multiverse/branches-and-worlds.md`** (177 lines) — `Branch{id, label, parent, interventions}` verbatim and nothing else, with a one-line note that `World` is defined in `propagation.md` as `propagate(apply(base, branch), seed)` and is never a source of truth. The three patch laws in plain words (identity, concatenation, replay), a worked five-row ordered list for a child of `hormuz-then-strike` showing the parent's three edits first and why the order is load-bearing twice, then naming (labels required, ids minted at the boundary, base world = empty branch) and seeds (passed explicitly to `propagate`, never global state, not a field on `Branch`). Behaviour B1–B3: fork by committing one edit, a child of a branch, replay from the triple. INVARIANTS split INV-5 into `test_apply_empty_is_identity`, `test_patch_concat_equals_sequential_apply`, `test_world_replays_from_base_branch_seed`, add three local `INV-multiverse.6`–`.8`, and describe the `GraphEditMachine` state-machine test (no loops, beliefs in range, locality after every step). Four anti-patterns; six dated open questions.
+
+**One thing I settled that the brief implied but no document stated:** the ordering rule that makes the showcase work. `do` cuts the incoming arrows that exist *when it is applied*; an arrow inserted afterwards is live. That is why `hormuz-then-strike` lists `do(H)` before `insert(S, …)`, and why H retracts through the sustain arrow despite having been asserted. It is stated as the chapter's rule and raised as the first open question.
+
+**Invariant numbering** is allocated across the two chapters so `propagation.md` and `diff.md` know where to start: `interventions.md` uses `INV-multiverse.1`–`.5`, `branches-and-worlds.md` `.6` onward, and each says so.
+
+## 2. Departures from the shapes sheet or the vocabulary
+
+Nowhere on names or types. Four notes for the reviewer:
+
+- **Test names:** I used decision record **0008**'s spellings (`test_observe_may_update_ancestors`, `test_refine_marginalizes_to_parent`), not 0004's (`test_observe_may_change_ancestors`, `test_refine_marginalizes`). Higher-numbered record wins; flagged as an open question so 0004 gets corrected in place.
+- **Interface verbs:** ADR-0004 says the two verbs are "assume" and "learn"; the brief says "suppose this is true" / "this happened". I used the brief's wording, filled in the other four in the same register, and raised the conflict — `spec/workbench/` owns the final copy and `vocabulary.md` should then carry it.
+- **"Map" vs "graph":** the chapters use "map" in prose (the PRD's own plain word) and say once, in each chapter's Data model, that map and graph mean the same thing and `Graph` is the type's name.
+- **Date:** open questions are dated **2026-09-16** as the brief specified; the session clock rolled over to 2026-09-17 while I was writing. One `sed` if Kent wants them re-dated.
+
+## 3. Cross-references to chapters I did not write
+
+I checked these against the files the other two writers had landed by the time I finished; all four graph chapters now exist and the references hold.
+
+| Reference | What I assumed |
+|---|---|
+| `../graph/proposition.md` | Defines `Proposition` (linked from my `Insert` / `Refine` types) |
+| `../graph/link.md` | Defines `Link`, `mode`, `strength`, `lag`, `shape`, `half_life`, `provenance`, `confidence`, `reflexive` |
+| `../graph/belief.md` | Defines `Belief{p, lo, hi, owner}` and `Beliefs{model, user, market}`; owns `test_beliefs_never_merged` — **verified present** at belief.md line 215 |
+| `../graph/validity.md` | Owns `Violation`, `ViolationCode`, INV-6 loop checking, "reject never repair", server-minted identifiers — **verified**: the twelve codes match the shapes sheet exactly, and none covers a rejected *edit*, which is why my open question asks for `unknown_target` / `duplicate_id` / `unknown_link` |
+| `propagation.md` (stack 03a) | Will define `World = propagate(apply(base, branch), seed)`, the log-odds arithmetic, and how far each arrow moves a number. Referenced in backticks, **not linked**, since the file does not exist yet |
+| `diff.md` (stack 03a) | Will render `unchanged`/`shifted`/`added`/`killed` from the branch rather than inferring it. Backticks, not linked |
+
+No section names in other chapters are assumed — every cross-reference points at a file and a responsibility, not at a heading.
+
+## 4. Open questions for Kent
+
+1. Does `do` cut only the arrows present when it is applied (so a later `insert` into the same target is live and the strait retracts), or does it seal the target permanently? The second reading kills the showcase.
+2. `Do` carries an `at` date and `Observe` does not — deliberate? "The premium printed below 0.4% on the 3rd" seems to want one too.
+3. `retune` changes only `strength`, so the arrow's `provenance` field still credits the model for a number the user typed. My answer: the branch is the record of authorship. Or should `retune` also set `provenance: "user"` — a second field?
+4. The twelve violation codes cover invalid maps, not rejected edits; `apply` needs `unknown_target`, `duplicate_id`, `unknown_link` before stack 03a.
+5. For the concatenation law to type-check, `apply` must return something `apply` can take again — but `do`'s fixed value has nowhere to live on `Proposition`. Stack 03a must pick: a second return value, or a new field.
+6. Where the seed is persisted (per world, per session, per request), and who forbids a branch being its own ancestor — both look like stack 05.
+7. Interface wording for the first two verbs: "assume"/"learn" (record 0004) or "Suppose this is true"/"This happened" (these chapters)?
+8. Link identifiers in the Hormuz fixture have no convention yet; the chapters write them `S-&gt;C`. Pull request 4 should settle it.</result>
+<usage><subagent_tokens>141694</subagent_tokens><tool_uses>32</tool_uses><duration_ms>652752</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8b32fefca175f53</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/aa8b32fefca175f53.output</output-file>
+<status>completed</status>
+<summary>Agent "Spec chapters: proposition, belief (S1)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both chapters are written, cross-checked against the four chapters my colleagues landed in parallel, and the models in them were executed against pydantic 2.11 to confirm every rule they claim actually holds.
+
+## 1. What I wrote
+
+**`spec/graph/proposition.md`** (388 lines). Purpose: a proposition is the unit that makes everything else possible — a claim that will be true or false by a date, judged by a named source. Data model gives `PropositionId`, `Resolution`, `BaseRate`, `Evidence`, `Payoff` and `Proposition` verbatim, all frozen, all collections tuples, every field carrying `Field(description=...)` (chosen over comments because descriptions travel into the generated browser types). Then a four-kinds table, and a table of **which rule is checked where** built on one principle: *a rule only our own code could break is a pydantic validator and raises; a rule a well-formed model proposal could plausibly break is a `Violation` with a plain sentence the user reads* — which is why `market` needs a `payoff` and `not_tradeable` needs a reason in `validate`, not in the class. Behaviour B1–B4: writing a checkable claim (Hormuz, Lloyd's List, 2026-11-01, against "tensions ease"); a terminal naming an instrument or saying why it cannot (Hormuz's two market terminals, photonic chips' `not_tradeable`); evidence with direction and weight; a base rate anchoring the prior. Three invariants refining INV-1 and both halves of INV-9, five anti-patterns, six open questions.
+
+**`spec/graph/belief.md`** (249 lines). `Belief{p, lo, hi, owner}` with the range rule as a model validator, and `Beliefs{model, user, market}` as three named slots with a validator that each slot holds a belief of its own owner. Prose sections cover why the three are never merged (the average is a number nobody holds; model−market is the edge, user−model is the argument), `prior` versus `beliefs.model` as a five-row table (including: computed by propagation in stack 03a, stored illustratively in the fixture until then), the market voice (mid-price, `market_implied`, "no market" as a state), the user voice (written only by `believe`), and the rendering rule stated as the three things the *domain* must obey — never round before storing, never store the rendered form, never compare rendered forms. Five behaviour flows, three invariants, five anti-patterns, five open questions. I also reconciled the apparent contradiction between the pydantic range validator and the `belief_out_of_range` violation code, and independently reached the same conclusion `validity.md` did.
+
+I executed every Python block from both chapters under pydantic 2.11: they compile, the validators reject exactly the cases the prose claims, the models are frozen, and `Proposition` round-trips through JSON unchanged. The field named `model` raises no protected-namespace warning, as the chapter states.
+
+## 2. Departures from the shapes sheet or the vocabulary
+
+**None.** Four details the sheet leaves open, decided and visible:
+
+- The sheet writes `evidence: list[Evidence]` in its field sketch and "collections are tuples" in its immutability row. I used tuples, per the immutability row. (`link.md` hit the same tension and resolved it the same way.)
+- `Proposition` also carries `id` and `claim`, which the sheet's field list omits but the `Violation{subject}` row and the fixture identifiers require.
+- Small numeric bounds the sheet does not mention: `Evidence.weight` in 0–1, `BaseRate.k ≤ n`, `Payoff.magnitude ≥ 0`, `prior.owner == "model"`. All are pydantic validators, following the sheet's own style for `Believe.belief.owner`.
+- `BaseRate.sources` and `Evidence.url` are plain web-address strings; the sheet names a `Source` type only for `Link.sources`. Raised as an open question rather than settled.
+
+Two things the reviewer should know about **cross-chapter coordination I did after the fact**: `link.md` and `validity.md` had already claimed `INV-graph.1`–`INV-graph.8`, and `link.md` states that local numbers are unique across `spec/graph/`. I renumbered mine to `INV-graph.9`–`INV-graph.11` (proposition) and `INV-graph.12`–`INV-graph.14` (belief), and each chapter names its block and whose the lower numbers are. I also adopted `validity.md`'s generator `broken_graphs(rule)` and its test name `test_validate_requires_payoff_on_market` (I had written `..._on_market_terminal`). The reviewer may prefer to renumber the whole part in reading order; the blocks are stated in one sentence per chapter, so it is a one-pass edit.
+
+The open questions are dated **2026-09-16** as the brief instructed, though the clock rolled to 2026-09-17 while I was writing. Consistency with the other five chapters seemed worth more than a one-day correction; say the word and I will move both.
+
+## 3. Cross-references to chapters I did not write
+
+| Chapter | What I assumed it covers |
+|---|---|
+| `validity.md` | Owns `validate(graph) -&gt; list[Violation]`, the violation codes and their message wording; rule 11 is `belief_out_of_range`; "reject, never repair". **Verified present** — the codes and the reasoning match. |
+| `link.md` | Owns the `Source` type; owns INV-2 (a link that claims evidence cites it); owns `confidence` as a field about the mechanism, distinct from `provenance`. **Verified present.** |
+| `../multiverse/interventions.md` | Owns the `believe` operation: writes `beliefs.user` only, carries a belief owned by `user`, not propagated in this version; and the general rule that a change to a proposition is an intervention on a branch. **Verified present.** |
+| `../multiverse/` propagation (stack 03a) | Computes `beliefs.model` from the prior plus one push per active link; the range's provenance. Not yet written — referenced by topic, not by heading. |
+| `../workbench/` | Owns the rendering of belief chips and the "no market" state. Referenced as "the workbench spec", no heading assumed. |
+
+Every link in both chapters resolves to a file that now exists.
+
+## 4. Open questions for Kent
+
+**From `proposition.md`:**
+1. `Payoff.magnitude` units — a move in the instrument's price, a return on the position, or a position size? The thesis card's legs need one answer.
+2. Should `Payoff` name its venue and quote link, or does that stay in the grounding layer? A terminal naming "a Polymarket contract" without saying which one is weaker than INV-9 implies.
+3. If `Source` becomes a record (title, publisher, date retrieved), do `BaseRate.sources` and `Evidence.url` adopt it?
+4. A resolve-by date in the past is checkable but the domain reads no clock — does that check live in `engine/`, and is it a violation or a warning?
+5. A `payoff` on a non-market proposition is currently legal and meaningless; add a code for it, or leave it?
+6. FR-10 promises a "falsified if" line in the Inspector and no field exists — derived from the resolution criteria, or written by the model?
+
+**From `belief.md`:**
+1. `Belief` has no provenance field, yet INV-2 and INV-12 say provenance is on every chip — a documented-base-rate model belief and an asserted one are indistinguishable. Add it, carry it on the proposition, or derive it?
+2. Where do a market quote's `as_of`, venue and link live — a small `MarketQuote` in the domain, or the grounding cache?
+3. What does the range *mean*? An 80% band, a plausible min/max, or "the model's honest spread"? Nothing tests it, and no calibration claim can be made until it is pinned down.
+4. Is a zero-width range (`.35 (.35–.35)`) legal, or should `validate` warn?
+5. NFR-1's own example renders the point at two significant figures and the bounds at one — deliberate, or shorthand? And what is two significant figures for `0.035` or `0.9962`?</result>
+<usage><subagent_tokens>156596</subagent_tokens><tool_uses>48</tool_uses><duration_ms>784093</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7dc73e865563be56</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a7dc73e865563be56.output</output-file>
+<status>completed</status>
+<summary>Agent "Spec chapters: link, validity (S2)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both chapters are written. Report:
+
+## 1. What I wrote
+
+**`spec/graph/link.md`** (359 lines) — the arrow that says why. Purpose, then the full `Source` and `Link` pydantic models with a plain-words docstring on every class and field, plus the `Days` and `Provenance` aliases. Log-odds is explained in two sentences (odds, then the log scale on which pushes add; +1 triples the odds) with a strength → effect table on a 50% claim, and a warning that the sign belongs to *the claim coming out true*, not to which way the price moves — research report 02 writes `H → B` as −1.6 because it was thinking about the oil price, and the claim is "Brent below $68", so this chapter flips it positive. The two modes are given with Kent's own images, quoted from `docs/initial-brainstorming.md` (the domino that "can be reset without changing the overall effect", the apple held up only while the desk keeps pushing), a side-by-side table, and an ASCII timeline showing the trigger fading through the moment the cause is undone while the sustain vanishes at it. Shapes and timing pin `lag` to "the moment the push reaches full size", with a second diagram for `impulse`/`step`/`ramp`; a callout states that no arithmetic happens in this stack and points to `../multiverse/propagation.md` in stack 03a. `reflexive` is defined with its `lag &gt; 0` rule and marked "computed with in stack 06". The `confidence` versus `provenance` section gives the cleanest split I could write — *confidence is a claim the model makes about the mechanism; provenance is a receipt we write about our pipeline* — with a table of all seven provenance values and the note that `confidence: documented` with `provenance: argued` is legal and informative. Three Hormuz behaviours (the trigger/sustain pair out of `H`; a documented link with its source, and the rejection when the sources are empty; the `B → R → B` reflexive loop). Five invariants, six anti-patterns, six dated open questions.
+
+**`spec/graph/validity.md`** (293 lines) — what makes a map valid, and why we reject rather than repair. `Graph`, `Violation`, the twelve-value `ViolationCode`, and the `validate(graph) -&gt; list[Violation]` signature with a docstring saying it returns everything, is pure, and that an empty list means well-formed, not right. Messages are treated as interface text, with two full examples and the rules for writing them. The rules are one table of eleven rules (rule → invariant served → code → test) joined by a second table of message patterns, split only because five columns of sentence-length message patterns are unreadable. Three rules get notes: loops via `networkx` after removing reflexive links (self-links caught by the same pass); likelihoods checked twice on purpose, with the honest admission that `belief_out_of_range` is unreachable through our own constructors; and payoff/reason as validity rules rather than field rules, so a bad combination is a readable sentence rather than a stack trace. Violations come back in a deterministic order. "Reject; never repair" is stated as a rule with the four things we do not do and the reason ("not knowing why it did that"), with the single targeted re-prompt handed off to `../generation/`. Identifiers: ULIDs, `mint_id()` in `engine/ids.py`, minted outside the domain because minting needs a clock and randomness, passed *into* domain models, format never checked, fixtures readable as `H`, `C`, `B`, `R`, `S`, `M1`, `M2`, `N1`. Three behaviours (one `cycle` violation naming the claims on the loop; three faults → three violations; the Hormuz base map returning `[]`). Eleven invariants, five anti-patterns, six dated open questions.
+
+## 2. Departures from the shapes sheet or the vocabulary
+
+Three, all small, all flagged in-chapter under Open questions:
+
+- **`sources: tuple[Source, ...]`, not `list[Source]`.** The sheet disagrees with itself: the `Link` row says `list[Source]`, its own Immutability row says "collections are tuples", and its `Graph` row uses tuples. I kept the field name and followed the sheet's general rule. Open question 3 in `link.md`.
+- **`Source`'s fields are mine.** The sheet names the type but never its fields. I proposed `url`, `title`, `retrieved`. Open question 2 in `link.md`.
+- **`lag` is pinned more tightly than the vocabulary.** The vocabulary says "time from parent-true to link-active"; for `impulse` and `step` that is one instant, but a `ramp` is already climbing during the lag. I define `lag` as the delay until the push reaches *full size*, say so explicitly next to the vocabulary's wording, and raise it (open question 5 in `link.md`) because propagation in stack 03a will need it settled.
+
+Everything else is the sheet verbatim: the twelve codes, the seven provenance values, `kind` as the discriminator, `Days = float`, the identifier aliases, `frozen` everywhere. One naming note the sheet does not cover: `Graph.id` is a bare `str` because there is no `GraphId` alias; raised, not invented.
+
+I also ran one read-only `git status --porcelain` to confirm I had not touched files outside my two. No other git command, and nothing was staged, committed or modified by it.
+
+## 3. Cross-references to chapters I did not write
+
+- **`proposition.md`** — for the kinds (`hypothesis`, `event`, `market`, `not_tradeable`), `resolution`, `payoff`, and `not_tradeable_reason`. I assumed its **Data model** section defines `Proposition` with those field names, and that the Hormuz claims `H`, `C`, `B`, `R`, `M1`, `M2`, `N1` appear there.
+- **`belief.md`** — for `Belief{p, lo, hi, owner}` and the field check `0 ≤ lo ≤ p ≤ hi ≤ 1` at construction. I assumed its **Data model** section states that construction-time check, since `validity.md` leans on it to explain why `belief_out_of_range` is defence in depth.
+- **`../multiverse/interventions.md`** — for `retune`, `insert`, `refine`, and the `do`/`observe` split (INV-3). I assumed its **Data model** or **Behaviour** section names all six operations by the sheet's names.
+- **`../multiverse/branches-and-worlds.md`** — for the "Hormuz, then Iran struck" branch, and for `apply(graph, branch)` and a `tests/strategies.py::branches()` generator used in my INV-6 row (`test_apply_preserves_dag`). **This is the one cross-reference most likely to need reconciling**: I named the branch generator `branches()`; if S3 named it something else, my INV-6 row should follow theirs.
+- **`../generation/`** and **`../probes/`** — referenced as directories only, for the one targeted re-prompt and for `simulated` provenance.
+- **`../multiverse/propagation.md`** — referenced as a path, not a link, since it is stack 03a and does not exist yet.
+
+## 4. Open questions for Kent
+
+1. `confidence` and `provenance` share the words `argued` and `documented` — rename `confidence`, drop it, or keep both and lean on the Inspector? (The sheet's mandated question.)
+2. `Source` has no fields in the shapes sheet; are `url`, `title`, `retrieved` enough?
+3. `sources` as a tuple, not a list — the sheet contradicts itself; confirm the tuple.
+4. A `half_life` on a `step` or `ramp` link has no violation code; reject it, make it a field check, or leave it documented and ignored?
+5. Does `ramp` need its own rise time, or does it keep sharing `lag`? Settle before stack 03a.
+6. Should `strength` have a soft ceiling (around ±5) so a model cannot assert certainty while appearing to give a number?
+7. Should `belief_out_of_range` exist at all, given `Belief` already refuses to be built out of range?
+8. Add `GraphId = str` for symmetry with the other three identifier aliases?
+9. Is "exactly one hypothesis" a product invariant, or does it stay local as `INV-graph.4`?
+10. `no_hypothesis` and `multiple_hypotheses` — two codes or one? (The sheet says two; that is what I wrote.)
+11. For a `cycle`, is `subject` the arrow that closes the loop? Two separate loops then give two violations.
+12. **For the reviewer, not Kent:** all four graph chapters number local invariants `INV-graph.&lt;n&gt;` from one shared pool. I claim 1–3 in `link.md` and 4–8 in `validity.md`; S1's two chapters need checking for collisions.</result>
+<usage><subagent_tokens>144781</subagent_tokens><tool_uses>38</tool_uses><duration_ms>754550</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a603ce9163d675ee7</task-id>
+<tool-use-id>toolu_01BLWuQqvLGufNnT6qq2d9dV</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a603ce9163d675ee7.output</output-file>
+<status>completed</status>
+<summary>Agent "Review six spec chapters (R)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I've read all sources of truth and all six chapters. Report follows.
+
+---
+
+# Review — six spec chapters, stack 02
+
+Worktree `/Users/kentgang/git3/katalyst-wt/spec-02/`. Six chapters, 1,822 lines total (proposition 388, link 359, interventions 356, validity 293, belief 249, branches-and-worlds 177).
+
+Overall: the writing rule is well kept — I found no unexplained jargon of consequence, no vocabulary violations, and no invariant that is a pure wish. The problems are cross-chapter: one sign error that inverts a mechanism, one worked-example number that disagrees with itself, one chapter that breaks the six-section contract, and a scatter of generator/test-name drift.
+
+## 1. Blocking
+
+| Where | What is wrong | Fix |
+|---|---|---|
+| `spec/multiverse/interventions.md:272` | `Retune(link="C-&gt;B", strength=-0.4)`. The user "thinks the model has made too much of it" — but `C → B` is `+0.7` (`link.md:287`, `belief.md:186`). Retuning to **−0.4 flips the sign**, which now claims cheaper insurance makes "Brent below $68" *less* likely — contradicting the arrow's own rationale and link.md's anti-pattern 6 ("Do not sign `strength` by which way the world moves"). This is the exact error link.md warns about, committed in the next chapter. | `strength=0.3` (a softening, not a flip); say "from +0.7 to +0.3" in the sentence above. |
+| `spec/graph/belief.md:156` vs `spec/multiverse/interventions.md:286` and `spec/multiverse/branches-and-worlds.md:79,92` | Same worked example, two numbers. belief.md: user belief on M1 is `.30 (.15–.45)`. The other two: `Belief(p=0.30, lo=0.20, hi=0.45, owner="user")`. | Make belief.md `.30 (.20–.45)`. Two chapters already agree. |
+| `spec/graph/validity.md:126, 175, 187` | Three extra top-level sections (`## The rules`, `## Reject; never repair`, `## Identifiers`) sit between Data model and Behaviour. It is the only one of six that does not follow Purpose · Data model · Behaviour · INVARIANTS · ANTI-PATTERNS · Open questions exactly. | Demote all three to `###` under Data model (the other five chapters put equivalent material there). |
+| `spec/graph/link.md:332,333` vs `spec/graph/validity.md:267,268` | `test_models_round_trip_json` and `test_models_are_frozen` are each claimed as owned by two chapters under two different local IDs (`INV-graph.2/.3` and `INV-graph.7/.8`), with no cross-reference either way. Kent will read this as two chapters owning one test. | validity.md owns both (it covers `Graph` and `Violation`); link.md's `INV-graph.2/.3` should cite validity.md the way its `INV-graph.1` is cited back, or be folded in. |
+| `spec/graph/proposition.md:303` | `payoff: long the contract at .48; magnitude 1.08`, but `Payoff.magnitude` is defined at `:156-163` as "How far the instrument is expected to move … as a fraction: 0.03 means three per cent". 1.08 is a return on position, not a price move — and the example also carries an entry price (`.48`) that `Payoff` has no field for. The units ambiguity *is* raised as open question 1, but the worked example silently picks one reading and contradicts the field description. | Either restate the example in the field's own units, or mark the number explicitly as "under reading (b) of open question 1". |
+
+## 2. Should fix before he reads
+
+**Identifiers and names**
+
+- `proposition.md:32` lists fixture ids `"H", "B", "C", "R", "S", "M1"`; `interventions.md:19` lists `H, B, C, R, S, M1, M2`; `validity.md:194` lists `H, C, B, R, S, M1, M2, N1` (correct, matches the shapes sheet). → Use the eight-id list in all three.
+- `PropositionId = str` is declared four times with three different docstrings (`proposition.md:27`, `link.md:19` bare, `validity.md:18` bare, `interventions.md:16`). → One canonical docstring; the others say "defined in `proposition.md`".
+- `link.md` has `Link.source` (the cause), `Link.sources` (citations), `Source` (the type) and `Resolution.source` (the adjudicator) — four meanings of the word, none disambiguated. → One sentence in link.md's Data model, or an open question.
+
+**Generators**
+
+- `validity.md:260` uses `branches()`; `branches-and-worlds.md:134,142-150` uses `branches(graph)` / `branches(g)`. → One signature (the writers' sheet says `branches()`).
+- `validity.md:265` uses `broken_graphs(r1, r2, r3)` and `:266` `broken_graphs(...)`; everywhere else it is `broken_graphs(rule)`. → Declare the variadic form once, or use a separate name.
+- `seeds()` (`branches-and-worlds.md:134`) is a seventh generator not on the shared list. → Add it to the list with one line of definition.
+- Path drift: `proposition.md`, `belief.md`, `interventions.md`, `branches-and-worlds.md` say `backend/tests/strategies.py`; `link.md:325` and `validity.md:249,260` say `tests/strategies.py`. The orchestration decision is `backend/tests/`. → Add the prefix in two places. (`proposition.md:347` also mixes both forms inside one chapter.)
+
+**Invariant numbering and ownership**
+
+- `link.md:325` never states which `INV-graph.&lt;n&gt;` block it holds (proposition.md and belief.md both do). `validity.md` states its block only inside open question 6 (`:293`), not in its INVARIANTS preamble. → One sentence each.
+- `branches-and-worlds.md:140,142,144` labels product refinements `INV-5a/5b/5c`; `interventions.md:315-324` labels them plainly `INV-3`, `INV-4`, `INV-10`. Two conventions in one part. → Pick one.
+- `validity.md:165` says `test_belief_bounds_after_any_sequence` lives "in `../multiverse/`". `belief.md:209` owns it (correctly — ADR-0008 files it under INV-7, a graph invariant). → Point at `belief.md`.
+- Graph chapters do not tag which stack each invariant runs in; the multiverse chapters do (**Stack 02 / 03a / 06**). `belief.md:208` (`GraphEditMachine`) and `validity.md:260` (`apply(graph, branch)`) are stack-03a work presented as if it runs now. → Tag them.
+- `validity.md:140,260` is the only place claiming `test_apply_preserves_dag` — an `apply` test — and it sits in a graph chapter. Defensible, but say so, and gloss "dag": "DAG" is never expanded anywhere in the six (the abbreviation only survives inside the ADR-0008 test name).
+
+**Worked-example drift**
+
+- `branches-and-worlds.md:70,91` says the user "halves" the strike's push on the premium, ending at `-1.0` — but `S → C`'s original strength is given nowhere (`interventions.md:254`'s table has no `strength` column, unlike link.md's). → Give `S → B`, `S → C`, `S → H` strengths in interventions.md B2 so "halve" is checkable. (The *sign* is right: negative, against C.)
+- Claim wording drifts: `B` is "five sessions" in four chapters, "five **consecutive** sessions" in `validity.md:118,214`; `H` drops "commercial" in `branches-and-worlds.md:108`; `C` drops "for Gulf transits" there too. → One claim string per id.
+- `proposition.md:302` draws `H ──▶ C ──▶ B` and omits the direct `H → B` trigger — the arrow the whole showcase turns on — and omits `R`. → Add both, or say the diagram is partial.
+
+**Landing pages**
+
+- `spec/graph/README.md:30-33` and `spec/multiverse/README.md:30-33` still list the six chapters in backticks, not as links. Pull request 1's own checklist requires linking them. (`propagation.md` and `diff.md` are correctly left in backticks throughout — verified, no chapter links them.)
+
+**Testability**
+
+- `belief.md:207` — "For every three floats and one owner drawn **without constraint**" names no generator. → Name one (`hypothesis.strategies.floats()`), or the contract's own rule bites.
+- `belief.md:215` — the source-code half of `INV-graph.13` has no generator either. It is defensible (the "generator" is every module under `domain/`), but say that in the sentence.
+
+## 3. Nice to have
+
+- **Repetition across chapters.** "Reject, never repair" is argued at length in four places (`proposition.md:263,375`, `link.md:300`, `validity.md:175-183,276`, `interventions.md:221`). Identifier minting / ULIDs in four (`proposition.md:28,371`, `validity.md:187-194`, `branches-and-worlds.md:100`, `interventions.md:18`). The `hypothesis`-library gloss including "(It shares its name with the user's *hypothesis*…)" is near-verbatim in `link.md:325` and `validity.md:249`. The sentence "*Map* and **graph** mean the same thing throughout…" is verbatim in `interventions.md:9` and `branches-and-worlds.md:9`. Each chapter must stand alone, but three of these could shrink to one clause plus a pointer.
+- **Length.** `proposition.md` (388) and `link.md` (359) are at the edge of ten minutes. `validity.md`'s two message tables (`:130-157`) could merge into one — rule, code, message pattern, test — saving a screen.
+- `interventions.md:204` — the `observe` row says "Structure: nothing" in *May change* and "Structure: nothing at all" in *Must never change*. Same fact twice.
+- `interventions.md` is the only chapter with no `---` rules between sections; the others all have them.
+- Open questions are numbered in the four graph chapters and bulleted in the two multiverse chapters. Numbering them all makes them citable in the PR body.
+- `validity.md:5` uses "map" throughout before tying it to `Graph`; the two multiverse chapters gloss it in their first line. One clause fixes it.
+- `belief.md:124` uses "prediction-market contract". *Prediction* is on the do-not-use list; here it names a venue category, so probably fine — flagging only because Kent reads that list literally.
+- `belief.md:190` (`.20` + 1.6 + 0.7 → `.71`) is the one place a reader could take stack-03a arithmetic as specified here. It does point at `propagation.md`. Arithmetic checks out (as does link.md's strength table at `:160-170`, and belief.md's `.71`).
+
+## 4. Consolidated open questions for Kent (36 raised, de-duplicated, grouped)
+
+**Semantics to confirm**
+1. `do` cuts only the arrows present when it is applied, so a later `insert` into the same target is live — this is what makes `S → H` retract the strait. Confirm. *(interventions)*
+2. Interface verbs: decision record 0004 says "assume"/"learn"; the chapters write **Suppose this is true** / **This happened**. Whichever wins goes into `vocabulary.md`. *(interventions, branches-and-worlds)*
+3. `apply` must return something `apply` can take again, but `Proposition` has nowhere to record a value fixed by `do`. Extra return value, or a new field? *(branches-and-worlds)*
+4. `retune` changes only `strength`, leaving `provenance` saying the model argued a number the user typed. Is the branch a sufficient record of authorship, or should `retune` also write `provenance: "user"`? *(interventions)*
+5. When `refine` splits a claim, are the original's arrows rewired to every finer claim, or must the split restate them? *(interventions)*
+6. Is "exactly one hypothesis" a product invariant (promote to `INV-1…14`) or local (`INV-graph.4`)? *(validity)*
+
+**Missing violation codes**
+7. Three codes for rejected *edits* — `unknown_target`, `duplicate_id`, `unknown_link` — before `apply` ships. *(interventions)*
+8. `payoff_on_non_market`: a payoff on a non-market claim is currently legal and meaningless. *(proposition)*
+9. `half_life` on a `step` or `ramp` link: thirteenth code, field validator, or documented and ignored? *(link)*
+10. A branch that is its own ancestor through the `parent` chain — one code so the failure is legible. *(branches-and-worlds)*
+11. Keep `belief_out_of_range`, which is unreachable through our own constructors, as defence in depth? *(validity, belief)*
+12. `no_hypothesis` and `multiple_hypotheses` — two codes or one? *(validity)*
+13. What is `subject` for a `cycle` — the closing arrow, or the graph? *(validity)*
+
+**Numbers and honesty**
+14. `Payoff.magnitude` units: price move, return on position, or position size? *(proposition)*
+15. What does `lo`–`hi` actually mean — an 80% band, a plausible min/max, or "the model's honest spread"? *(belief)*
+16. Is a zero-width range (`.35 (.35–.35)`) legal? *(belief)*
+17. Two significant figures, precisely: the honesty example renders the point at two figures and the bounds at one — deliberate? And what is two figures for `.035` or `.9962`? *(belief)*
+18. Should `strength` have a sanity ceiling (about ±5)? *(link)*
+19. Does `Belief` need a `provenance` field, or is owner plus `base_rate.sources` enough? *(belief)*
+
+**Naming and types**
+20. `confidence` and `provenance` share the words `argued` and `documented`. Rename, drop, or keep and label? *(link)*
+21. `Source` fields — are `url`, `title`, `retrieved` right, and does it need a publisher or a snippet? *(link)*
+22. Do `BaseRate.sources` and `Evidence.url` adopt `Source`, or stay plain strings? *(proposition)*
+23. `sources` as `list[Source]` (shapes sheet) versus `tuple[Source, ...]` (written here, and what the immutability row says). Confirm tuples. *(link)*
+24. `GraphId = str` for symmetry with the other three aliases? *(validity)*
+25. Link identifier convention for the fixture — the chapters write `S-&gt;C`. Settle in pull request 4. *(branches-and-worlds)*
+26. `Do` carries an `at` date and `Observe` does not. Deliberate? *(interventions)*
+27. Does `ramp` need its own `rise_time`, or does `lag` keep doing two jobs? *(link)*
+
+**Boundaries and deferrals**
+28. Should `Payoff` name its venue, or does that stay on the grounding layer's quote? *(proposition)*
+29. Where do a quote's `as_of`, venue and link live — a domain `MarketQuote`, or the grounding cache? *(belief)*
+30. A resolve-by date in the past: the domain reads no clock, so does the check live in `engine/`, and is it a violation or a warning? *(proposition)*
+31. Where is the seed stored — per world, per session, or per request? *(branches-and-worlds)*
+32. Can a branch be re-parented? Cheap to compute, no verb for it. *(branches-and-worlds)*
+33. `label` is required, but committing an edit should not stop to ask for a name. Suggested-name-then-overwrite? *(branches-and-worlds)*
+34. FR-10's "falsified if" line has no field — derived from `resolution.criteria`, or written by the model? *(proposition)*
+
+**Housekeeping**
+35. Decision record 0004 should be corrected in place: `test_observe_may_change_ancestors` → `test_observe_may_update_ancestors`, `test_refine_marginalizes` → `test_refine_marginalizes_to_parent`, `test_apply_identity` → `test_apply_empty_is_identity`, `test_apply_concat` → `test_patch_concat_equals_sequential_apply`. *(interventions)*
+36. Confirm the `INV-graph.&lt;n&gt;` pool has no collisions now that all four chapters exist. **(It does not — see table (c).)** *(validity)*
+
+## 5. Tables
+
+### (a) Generators used
+
+| Generator | Chapters | Verdict |
+|---|---|---|
+| `propositions()` | proposition, belief | On the list |
+| `beliefs()` | belief, interventions | On the list |
+| `links()` | link | On the list |
+| `graphs()` | all six | On the list |
+| `broken_graphs(rule)` | proposition, link, validity | On the list |
+| `broken_graphs(r1, r2, r3)` / `broken_graphs(...)` | validity:265,266 | **Second signature for one generator** |
+| `interventions(graph)` | interventions, branches-and-worlds | On the list |
+| `branches()` | validity:260 | **Collides with `branches(graph)`** |
+| `branches(graph)` / `branches(g)` | branches-and-worlds:134,142,144,146,148,150 | **Collides with `branches()`** |
+| `seeds()` | branches-and-worlds:134,144 | New; defined in one clause, not on the shared list |
+| `GraphEditMachine` (state machine) | belief:208, interventions:320, branches-and-worlds:152 | Matches ADR-0008 |
+
+### (b) Test names used
+
+| Test | Where | Against ADR-0008 |
+|---|---|---|
+| `test_do_leaves_ancestors_unchanged` | interventions:317 | ✅ matches |
+| `test_observe_may_update_ancestors` | interventions:318 | ✅ matches (0004's older spelling correctly flagged) |
+| `test_intervention_locality` | interventions:320 | ✅ matches |
+| `test_apply_empty_is_identity` | branches:140 | ✅ matches |
+| `test_patch_concat_equals_sequential_apply` | branches:142 | ✅ matches |
+| `test_world_replays_from_base_branch_seed` | branches:144 | ✅ matches |
+| `test_apply_preserves_dag` | validity:140,260 | ✅ matches; odd home (graph chapter, `apply` test), "DAG" never glossed |
+| `test_reflexive_links_have_positive_lag` | link:330, validity:141,260 | ✅ matches; link.md owns, validity restates |
+| `test_belief_bounds_after_any_sequence` | belief:209, validity:165 | ✅ matches; **validity misattributes it to `../multiverse/`** |
+| `test_refine_marginalizes_to_parent` | interventions:322 | ✅ matches |
+| `test_validate_rejects_cycles` | validity:140,260 | Not in 0008's table; ✅ ADR-0003 |
+| `test_validate_rejects_unresolvable_proposition` | proposition:349, validity:132,258 | ✅ ADR-0003; owned by both, proposition does not defer |
+| `test_validate_rejects_unsourced_documented_link` | link:329, validity:138,259 | ✅ ADR-0003; owned by both |
+| `test_validate_requires_terminal` | proposition:355, validity:134,262 | ✅ ADR-0003; owned by both |
+| `test_beliefs_never_merged` | belief:217, interventions:324 | ✅ ADR-0004; interventions defers correctly |
+| `test_market_belief_never_merged` | belief:217 | ✅ ADR-0010:56 — attribution verified |
+| `test_domain_imports_nothing_impure` | belief:215 | ✅ orchestration §4 |
+| `test_validate_requires_payoff_on_market` | proposition:361, validity:135,262 | New; proposition defers ✅ |
+| `test_validate_requires_reason_on_not_tradeable` | proposition:361, validity:136,262 | New; proposition defers ✅ |
+| `test_validate_rejects_dangling_link` | link:331, validity:139,263 | New; validity defers ✅ |
+| `test_validate_rejects_link_without_rationale` | validity:137,259 | New |
+| `test_validate_rejects_belief_out_of_range` | validity:142,261 | New |
+| `test_validate_requires_exactly_one_hypothesis` | validity:133,264 | New |
+| `test_validate_reports_every_violation` | validity:265 | New |
+| `test_violations_are_ordered_stably` | validity:266 | New |
+| `test_models_round_trip_json` | link:332, validity:267 | New; **two owners, no cross-reference** |
+| `test_models_are_frozen` | link:333, validity:268 | New; **two owners, no cross-reference** |
+| `test_belief_bounds_at_construction` | belief:209 | New |
+| `test_owner_matches_slot` | belief:223 | New |
+| `test_believe_touches_only_user_belief` | interventions:324 | New |
+| `test_believe_requires_user_owner` | interventions:334 | New |
+| `test_apply_rejects_unknown_subject` | interventions:326 | New |
+| `test_retune_changes_only_strength` | interventions:328 | New |
+| `test_intervention_round_trip` | interventions:330 | New; third name for "round trip" |
+| `test_intervention_discriminator` | interventions:332 | New |
+| `test_branch_round_trip` | branches:150 | New; fourth name for "round trip" |
+| `test_base_graph_unchanged_after_apply` | branches:146 | New |
+| `test_child_branch_applies_parent_first` | branches:148 | New |
+
+No duplicate-with-different-spelling within the six. Duplicate *ownership* is flagged above. Round-trip appears under three names (`test_models_round_trip_json`, `test_intervention_round_trip`, `test_branch_round_trip`) — defensible (different subjects), worth one deliberate decision.
+
+### (c) Local invariant allocation
+
+| Block | Chapter | IDs | Status |
+|---|---|---|---|
+| `INV-graph.*` | `link.md` | 1, 2, 3 | ✅ no collision; **chapter never declares its block** |
+| | `validity.md` | 4, 5, 6, 7, 8 | ✅; block declared only in open question 6 |
+| | `proposition.md` | 9, 10, 11 | ✅ declared at :343 |
+| | `belief.md` | 12, 13, 14 | ✅ declared at :202 |
+| `INV-multiverse.*` | `interventions.md` | 1, 2, 3, 4, 5 | ✅ declared at :313 |
+| | `branches-and-worlds.md` | 6, 7, 8 | ✅ declared at :138 |
+
+**1 through 14 and 1 through 8: no collisions, no gaps.** Product invariants restated as refinements: graph part covers INV-1, 2, 6, 7, 9, 11 (matches `graph/README.md`); multiverse covers INV-3, 4, 5, 10 plus INV-11-for-`believe`, which defers the wider rule to belief.md (matches `multiverse/README.md`). Separately: `branches-and-worlds.md` labels its product refinements `INV-5a/5b/5c` while `interventions.md` uses bare product IDs — one convention, please.
+
+### Verified clean
+
+Tuples everywhere in model blocks (no `list[...]` except `validate(graph) -&gt; list[Violation]`, which is a return type and matches ADR-0003 and the plan). All relative links resolve; `propagation.md` and `diff.md` appear only in backticks, never linked. No stack-03a arithmetic or diff states specified beyond a pointer. All open questions dated 2026-09-16. No use of *scenario*, *node* in interface copy, *edge* for a link, or *confidence* for a probability. `Source` fields agree with proposition.md's knowingly-different `Evidence.url` / `BaseRate.sources` (raised as open question). Sign convention holds in every worked example except `interventions.md:272`: `H → B +1.6`, `H → C +1.1`, `C → B +0.7`, `B → R +0.6`, `R → B −1.2`, `S → B / S → C / S → H` all against, `S → C` retune `−1.0`. Dates 2026-10-01 / 2026-10-02 consistent. `prior` versus `beliefs.model` is explained once in belief.md, deferred to by proposition.md, and never contradicted (interventions.md and validity.md are silent on it — no conflict, but see item 3 in the open questions: nothing yet says whether `observe` revises an ancestor's `prior` or its `beliefs.model`).</result>
+<usage><subagent_tokens>169305</subagent_tokens><tool_uses>29</tool_uses><duration_ms>463412</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7dc73e865563be56</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a7dc73e865563be56.output</output-file>
+<status>completed</status>
+<summary>Agent "Spec chapters: link, validity (S2)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All edits applied to `spec/graph/link.md` and `spec/graph/validity.md` only. No git commands, no other files touched.
+
+**Blocking**
+
+1. Fixed — `The rules`, `Reject; never repair` and `Identifiers` are now `###` under Data model (their own `### Notes on three of the rules` and `### The order of the list` demoted to `####`, stray `---` rules removed); `validity.md` now shows exactly the six contract sections.
+2. Fixed — `INV-graph.2` and `.3` retired from `link.md`, replaced by a one-line note that `test_models_round_trip_json` and `test_models_are_frozen` are stated once for the whole part as `INV-graph.7`/`.8` in `validity.md`; those two rows widened to name `Proposition`, `Link`, `Source`, `Belief`, `Graph` and `Violation` explicitly. No other chapter's numbers touched.
+
+**Should fix**
+
+3. Kept — the eight fixture identifiers `H, C, B, R, S, M1, M2, N1` are unchanged.
+4. Fixed — both chapters now import `PropositionId` from `proposition.md` rather than declaring it; `validity.md` also imports `Proposition` and `Link` from their owning chapters, which removes the forward references. `link.md` keeps only `LinkId`, `Days` and `Provenance`.
+5. Fixed — a bolded paragraph in `link.md`'s Data model separates the four meanings of *source*: `Link.source` the cause, `Link.sources` the citations, `Source` the type, `Resolution.source` the adjudicator (the last never appears in that chapter).
+6. Fixed — `branches(graph)` in the INV-6 row, and the generator list now declares `broken_graphs(*rules)` once ("One name damages one rule; three names damage three"); `INV-graph.6` uses the variadic form.
+7. Fixed — `backend/tests/strategies.py` in both chapters; no bare `tests/strategies.py` remains.
+8. Fixed — `link.md`: "This chapter holds one of them, `INV-graph.1`." `validity.md`: "This chapter holds `INV-graph.4` through `INV-graph.8`", and says it restates `INV-graph.1` because the rule enforcing it lives there. The duplicate statement inside open question 6 is now trimmed to the coordination point.
+9. Fixed — `test_belief_bounds_after_any_sequence` now points at `belief.md` as owner, not `../multiverse/`.
+10. Fixed — both INVARIANTS tables gained a **Stack** column (all `02`, except INV-6's row marked "02; 03a for `test_apply_preserves_dag`"), with a sentence explaining the column. *DAG* is glossed once in the Rule 9 note — "a graph whose arrows all point one way and never come back round" — noting the abbreviation survives only in the test name.
+11. Fixed — both occurrences now read "Brent crude settles below $68 for five sessions"; no "five consecutive sessions" remains anywhere in my files.
+12. Fixed — `validity.md`'s Purpose now opens with "*Map* and *graph* mean the same thing throughout: `Graph` is the type's name, *map* is what the user sees."
+
+**Nice to have**
+
+13. Considered and declined — merging gives six columns (rule, plain-words rule, invariant served, code, message pattern, test); the message patterns are sentence-length interface text and the merged table scrolls sideways. The existing one-line signpost ("split in two so it fits on a screen; the `code` column joins them") stays. Happy to merge if you'd rather have the width.
+14. Fixed — `link.md`'s gloss shortened to one clause ("it is unrelated to the user's *hypothesis*"); `validity.md` keeps the fuller one.
+15. Kept — both Open questions lists stay numbered and dated 2026-09-16 (six in each).
+
+One consequence worth flagging: `link.md` now holds a single local invariant, so if the reviewer is allocating the `INV-graph` pool across all four graph chapters, numbers 2 and 3 are free but deliberately left retired rather than reused, so nothing that cites them lands on a different statement.</result>
+<usage><subagent_tokens>167273</subagent_tokens><tool_uses>9</tool_uses><duration_ms>154668</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8b32fefca175f53</task-id>
+<tool-use-id>toolu_01D1LgeCAFXpcTDFqubDMFmf</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/aa8b32fefca175f53.output</output-file>
+<status>completed</status>
+<summary>Agent "Spec chapters: proposition, belief (S1)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All thirteen items applied to the two files I own; nothing else touched. Code blocks still execute cleanly under pydantic 2.11.
+
+**BLOCKING**
+
+1. `belief.md` B1 — user chip on M1 changed from `.30 (.15–.45)` to `.30 (.20–.45)`, matching `Belief(p=0.30, lo=0.20, hi=0.45, owner="user")` in the two multiverse chapters.
+2. `proposition.md` B2 — the entry price is gone from the diagram. M1 now reads `payoff: long the contract; magnitude 1.08` and a caption says the two magnitudes read under different answers to open question 1: M2's `0.03` is the field description's own units (a three per cent move), M1's `1.08` is reading (b), a return on the position, whose entry price has no field on `Payoff`. Open question 1 now labels the three readings (a)/(b)/(c) and notes that B2 needs two of them to describe two ordinary terminals.
+
+**SHOULD FIX**
+
+3. Fixture identifier list in the `PropositionId` docstring is now the full eight: H, C, B, R, S, M1, M2, N1.
+4. `PropositionId` docstring rewritten as the canonical one-sentence definition — "the identifier of one proposition: a plain string, unique within its map" — plus minting, the no-format-check note, the fixture identifiers, and a pointer to `validity.md` for the identifier rules.
+5. Every qualified generator mention is now `backend/tests/strategies.py::…` in both chapters; no bare `tests/strategies.py` remains.
+6. B2 diagram redrawn with the direct `H → B` trigger looping beneath `C`, and `R` with its return arrow; caption explains that `B → R → B` is one loop drawn flat (the same `B` twice), legal only because `B → R` is reflexive and carries a delay.
+7. Claim strings aligned: B is "Brent crude settles below $68 for five sessions" in all three places (dropped "straight" from the base-rate reference class); C is spelled out as "the Lloyd's war-risk premium for Gulf transits falls below 0.4%" in the B4 push list; M1 is `a Polymarket contract "Brent below $70 on 2026-10-31" resolves YES`; M2 is "the energy fund XLE underperforms the S&amp;P 500 fund SPY by more than 3% over 20 days"; H keeps "commercial".
+8. `INV-graph.12`'s raw-fields bullet now names `backend/tests/strategies.py::raw_belief_fields()`, built from the `hypothesis` library's `floats()` and `sampled_from(("model","user","market"))`.
+9. `INV-graph.13`'s source-code half now says outright that what it quantifies over is every module under `domain/`, walked at test time — a static check with a fixed, finite input, which is why it names no generator.
+10. Stack tags added in the multiverse chapters' style: proposition's three invariants **Stack 02**; `test_belief_bounds_at_construction` **stack 02** and `test_belief_bounds_after_any_sequence` (`GraphEditMachine`) **stack 03a**; `INV-graph.13` static half **Stack 02**, generated half **Stack 03a** with a pointer to `test_believe_touches_only_user_belief`; `INV-graph.14` **Stack 02**.
+11. Open questions left numbered, unchanged in count (six and five).
+
+**NICE TO HAVE**
+
+12. Trimmed: the "returns every violation" sentence is now one clause plus a pointer to `validity.md`; anti-pattern 3 drops the ULID gloss and points at `validity.md` for identifiers; anti-pattern 5 is one sentence plus the same pointer; the `PropositionId` docstring points there too.
+13. `belief.md` now says "the mid-price of a contract on Polymarket" instead of "a prediction-market contract's mid-price".
+
+One thing worth flagging back: the M1 payoff example is the only place in my two chapters whose meaning depends on an unresolved question, and it is unresolvable inside `Payoff` as specified — whichever reading Kent picks, a contract terminal needs either an entry price field or a magnitude defined in absolute contract-price terms. That is open question 1 plus open question 2 (should `Payoff` name its venue and quote) pointing at the same missing piece.</result>
+<usage><subagent_tokens>183684</subagent_tokens><tool_uses>11</tool_uses><duration_ms>194017</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a41ca8882ca6e23f2</task-id>
+<tool-use-id>toolu_012fsVX45f4fve9GwK1KkWNK</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a41ca8882ca6e23f2.output</output-file>
+<status>completed</status>
+<summary>Agent "Spec chapters: interventions, branches (S3)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All review findings applied to my two files only; no git commands run, nothing else touched.
+
+**BLOCKING**
+
+1. **Fixed.** `Retune(link="C-&gt;B", strength=0.3)`, with "The model puts that push at **+0.7** … the user moves it to **+0.3** — from +0.7 to +0.3, a softening, not a reversal", plus a follow-up paragraph spelling out that −0.4 would assert the opposite mechanism, not a weaker one, and pointing at `../graph/link.md`.
+
+**SHOULD FIX**
+
+2. **Fixed.** B2's arrow table now has a `Strength` column — S → B −2.4, S → C −2.0, S → H −1.9 — under a "Read the signs" paragraph giving the convention ("the sign says which way the arrow pushes the claim at its head toward coming out true") and marking the values illustrative and `argued`. `branches-and-worlds.md` now reads "the model puts that arrow at −2.0, and the user halves it to −1.0", and the table row says "−2.0 → −1.0".
+3. **Fixed.** Fixture identifiers are the full eight, `H`, `C`, `B`, `R`, `S`, `M1`, `M2`, `N1`, in that order.
+4. **Fixed.** The `PropositionId`/`LinkId` code block is gone; prose now points at `../graph/proposition.md` and `../graph/link.md`, and the in-snippet comment reads "Proposition, Link, Belief, PropositionId and LinkId are defined in ../graph/".
+5. **Fixed.** The a/b/c letters are gone: three entries labelled **INV-5**, **INV-5**, **INV-5, with NFR-2**, told apart by test name, with a line in the preamble saying INV-5 makes three claims so it appears three times.
+6. **Fixed.** "`seeds()` draws integer seeds", in the generator clause where it is first used. `branches(graph)` and `interventions(graph)` unchanged.
+7. **Fixed.** Both chapters open Behaviour with "Its claims, in the wording the fixture uses" and the canonical strings for H, C and B; B5's reference to C in `interventions.md` now carries the full wording too.
+8. **Fixed.** The `observe` row says "*Structure:* nothing — it adds, removes and rewrites nothing" once, and its "must never change" cell now carries real content instead of repeating it.
+9. **Fixed.** Both chapters use the graph chapters' format: "Raised 2026-09-16. Each needs Kent." then a numbered list with bold lead-ins — eight questions in `interventions.md`, six in `branches-and-worlds.md`.
+10. **Fixed** — and applied to both chapters, not just `interventions.md`, since they are a pair and `branches-and-worlds.md` had the same gap: a `---` rule before Data model, Behaviour, INVARIANTS, ANTI-PATTERNS and Open questions, matching `link.md`.
+11. **Confirmed.** `unknown_target`, `duplicate_id` and `unknown_link` appear exactly once, in open question 5, which now states in bold that **none of them exists today** and that nothing in the chapter assumes them.
+
+**NICE TO HAVE**
+
+12. **Fixed.** `branches-and-worlds.md` now says "a **map** is a **graph** — the claims and the arrows between them"; `interventions.md` keeps the original phrasing.
+
+**One extra fix, not on your list — flagging it because it is a correctness bug I introduced and it touches item 8.** My INV-4 statement ("every proposition that is neither the subject nor a descendant is byte-identical") would have failed for `observe`, which INV-3 explicitly permits to move ancestors. `test_intervention_locality` drawing from `interventions(g)` would have hit it on the first `Observe`. INV-4 now defines an **affected set** per operation (a four-row table), with `observe`'s set widened to include ancestors and the descendants of those ancestors, and a sentence saying it is wider on purpose. Open question 2 in `interventions.md` raises the underlying tension: `PRODUCT_REQUIREMENTS.md` §9 states INV-4 unconditionally, which cannot be literally true alongside INV-3, so either the PRD sentence gains an exception clause or Kent picks another resolution.</result>
+<usage><subagent_tokens>169304</subagent_tokens><tool_uses>12</tool_uses><duration_ms>223618</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a86235e610b228ad6</task-id>
+<tool-use-id>toolu_019P5SvYKYgq9BuxgujiVwzN</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a86235e610b228ad6.output</output-file>
+<status>completed</status>
+<summary>Agent "Frontend skeleton (stack 01 PR 3)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All verification passed. Here is the report.
+
+---
+
+## 1. What I built
+
+The browser half of Katalyst: a Vite + React 19 + TypeScript app with the template's styling and demo content deleted outright, our own design tokens, types generated from the server, and one screen that reports what the server can currently do.
+
+**Files (all under `/Users/kentgang/git3/katalyst-wt/feat-01-frontend/`):**
+
+| File | What it is |
+|---|---|
+| `scripts/gen-types.sh` | Dumps the server's own description of itself and writes `frontend/src/api/schema.ts` |
+| `frontend/src/styles/tokens.css` | The whole visual vocabulary: colours, three sizes, three weights, an 8-pixel grid, one duration, both themes |
+| `frontend/src/styles/app.css` | The one screen's styles. Every value is a token |
+| `frontend/src/App.tsx` | The screen and the status strip |
+| `frontend/src/App.test.tsx` | Three tests |
+| `frontend/src/api/client.ts` | Thin typed client |
+| `frontend/src/api/schema.ts` | Generated, committed, excluded from formatting |
+| `frontend/src/main.tsx`, `index.html`, `public/favicon.svg` | Entry point, page shell, a one-glyph "K" icon of our own |
+| `frontend/vite.config.ts`, `tsconfig*.json`, `biome.jsonc`, `src/test/setup.ts` | Build, type check, lint and test configuration |
+| `.gitignore` | Node entries appended |
+
+**Font pair: Inter Variable + JetBrains Mono Variable**, through `@fontsource-variable/*`. I did not use the `geist` package: it publishes its fonts only through the Next.js font loader, which this app does not use. Fontsource ships plain CSS and the font files themselves in the package, so the first frame needs no outside request and the app works with no network inside a container — which the Docker demo requires.
+
+**Client: `openapi-fetch`** (the recommended pre-decision). Same author as the generator, a few kilobytes, and it takes the generated `paths` type directly so route names and response shapes are checked at compile time. Every exported type is an alias into `schema.ts`; nothing is hand-written.
+
+`npm run check` runs lint, typecheck and test in sequence. `npm run dev` serves on port 5173, binds on all addresses, and forwards `/api` to `process.env.KATALYST_API_URL ?? "http://localhost:8000"`.
+
+## 2. Design decisions a reviewer should see
+
+**Tokens.** Dark is the default and ships (`&lt;html data-theme="dark"&gt;`); light is defined under `[data-theme="light"]` and under `prefers-color-scheme: light` for anyone who removes the attribute.
+
+| Token | Dark | Light |
+|---|---|---|
+| `--surface` | `#0e1116` (not pure black) | `#f7f8fa` |
+| `--surface-raised` | `#151a21` | `#ffffff` |
+| `--hairline` | `rgb(233 237 243 / 10%)` | `rgb(16 20 26 / 10%)` |
+| `--text` | `#e9edf3` | `#10141a` |
+| `--text-muted` | `#98a2b1` | `#5b6577` |
+| `--accent` | `#5fd4c4` | `#0f766e` |
+| `--dir-up` | `#6fb3ff` | `#1f5fcc` |
+| `--dir-down` | `#f0b23c` | `#96590a` |
+| `--focus` | `#7ce0d0` | `#0d6e66` |
+| `--tail` | 45° hatch, `repeating-linear-gradient`, no hue | same, inverted |
+
+Sizes: 13 / 15 / 22 px. Weights: 400 / 500 / 600. Spacing: 8, 16, 24, 32, 48, 64 px, with one 4 px half-step for the gap between a glyph and its word. Motion: `--duration-fast: 120ms`, set to `0ms` under `prefers-reduced-motion`. `--accent` is deliberately a different hue from `--dir-up` so "this is fine" can never read as "this moves the position up".
+
+**Contrast ratios**, computed and checked against both surfaces in both themes (script output, all ≥ 4.5:1):
+
+- Dark, on `--surface` / `--surface-raised`: text 16.10 / 14.87 · muted 7.33 / 6.77 · accent 10.54 / 9.74 · dir-up 8.62 / 7.96 · dir-down 10.03 / 9.27 · focus 12.09 / 11.18. Surface against white: 18.91.
+- Light: text 17.38 / 18.47 · muted 5.53 / 5.88 · accent 5.15 / 5.47 · dir-up 5.54 / 5.89 · dir-down 5.30 / 5.63 · focus 5.75 / 6.11.
+
+The ratios are written beside each colour in `tokens.css`.
+
+**The page.** A single left-aligned column on a very dark blue-grey canvas: "Katalyst" in Inter semibold at 22 px, one line under it in muted grey saying what the tool does, then a small heading "What this build can do right now" and a panel bordered by one hairline. Inside are three rows — server, model key, version — each a label in muted grey, a value in JetBrains Mono with fixed-width digits, and a state that is a small glyph plus words: "● reachable", "○ no key configured — generation arrives in stack 04", "● named Katalyst". A footnote names the three addresses the readings came from and says nothing on the screen is written into the page. With the server stopped, each row's value becomes a dash and its state reads "○ Nothing answered at /api/healthz — the server may not be running. The reply was numbered 502." No dialog, no spinner, no red or green anywhere. I photographed dark, light, and the failure state in a real browser; screenshots are in the scratch directory (`katalyst-dark.png`, `katalyst-light.png`, `katalyst-failed.png`).
+
+The strip is a `&lt;dl&gt;` with real `&lt;dt&gt;` terms (a test asserts three elements with role `term`); the glyph is `aria-hidden` so a screen reader gets the word, not the mark.
+
+## 3. Where I deviated from the plan
+
+1. **TypeScript pinned to 5.9, not the 6.0 the template shipped.** `openapi-typescript` 7.13 (the latest, and a pre-decision) declares support for TypeScript 5 only, and the install refused to resolve. Pinning TypeScript rather than forcing the peer keeps every tool inside its supported range. Worth revisiting when `openapi-typescript` adds TypeScript 6.
+2. **`openapi-typescript` reads standard input with no argument, not with `-`.** Passing `-` makes it look for a file called `/-`. The script pipes with the input argument omitted.
+3. **Biome's `vcs.useIgnoreFile` is off.** It looks for a `.gitignore` inside `frontend/`, and the brief puts Node ignores in the root file. `dist` is excluded explicitly instead; `node_modules` is excluded by Biome already.
+4. **`"rules": { "preset": "recommended" }`, not `"recommended": true`.** Biome 2.5 renamed this, and `biome migrate` maps the old spelling to `"preset": "none"`, which would silently turn the rules off.
+5. **Two style files, not one.** `tokens.css` is required separately by the brief; `app.css` holds the reset and the screen. One component file as asked.
+6. **A section heading "What this build can do right now"** above the strip, which the brief did not ask for. It gives the list a real heading to be labelled by, and it reads as a document rather than a status dump.
+7. **The co-author line.** The brief asks for `Co-Authored-By: Claude Fable 5.1`. My session's attribution configuration specifies `Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;`, and I am Opus, so that is what the six commits carry. Say the word if you want them amended.
+
+**Dependencies added beyond the named set:** `@testing-library/dom` (peer of `@testing-library/react`) and `jsdom`. Nothing else. No canvas library, no Tailwind, no component library.
+
+## 4. Open questions
+
+1. **"stack 04" appears in interface text** ("no key configured — generation arrives in stack 04"), which is our internal language surfaced to a reader. The brief supplied that wording, so I kept it, but it should probably become something like "generation is not built yet" before anyone outside sees the screen.
+2. **Shipping `data-theme="dark"` means the `prefers-color-scheme` branch never fires in the packaged app.** Removing that one attribute makes the page follow the operating system. Which do you want as the shipped behaviour?
+3. **Node 23 is what is installed locally, and vitest 5 asks for 22, 24 or 26.** It runs, but `npm install` prints a warning. The Docker and continuous-integration target is Node 24 (pull request 4), where the warning disappears. `"engines"` says `&gt;=22` as instructed.
+4. **`dist/` carries all font subsets** (Cyrillic, Greek, Vietnamese, ~300 kB total) because Fontsource ships one stylesheet covering every subset. A browser only downloads the Latin files (~89 kB). If the image size matters, a hand-written `@font-face` block limited to Latin would trim it.
+5. **The version row's state reads "● named Katalyst"** — it uses the `name` field the `/api/about` route returns, so the row is fully derived from data. It may read oddly next to the wordmark.
+
+## 5. Files touched and verification output
+
+```
+$ git diff --stat feat/01-backend-skeleton..HEAD
+ .gitignore                     |   10 +
+ frontend/biome.jsonc           |   32 +
+ frontend/index.html            |   17 +
+ frontend/package-lock.json     | 2598 ++++++++++++++++++++++++++++++++++++++++
+ frontend/package.json          |   42 +
+ frontend/public/favicon.svg    |   15 +
+ frontend/src/App.test.tsx      |   96 ++
+ frontend/src/App.tsx           |  235 ++++
+ frontend/src/api/client.ts     |   84 ++
+ frontend/src/api/schema.ts     |  208 ++++
+ frontend/src/main.tsx          |   30 +
+ frontend/src/styles/app.css    |  222 ++++
+ frontend/src/styles/tokens.css |  193 +++
+ frontend/src/test/setup.ts     |   16 +
+ frontend/src/vite-env.d.ts     |    1 +
+ frontend/tsconfig.app.json     |   32 +
+ frontend/tsconfig.json         |    4 +
+ frontend/tsconfig.node.json    |   27 +
+ frontend/vite.config.ts        |   37 +
+ scripts/gen-types.sh           |   51 +
+ 20 files changed, 3950 insertions(+)
+```
+
+Nothing outside the owned set was touched. Six commits on `feat/01-frontend-skeleton`, none pushed:
+
+```
+80db93a fix(frontend): say a failure in plain words, and prove the placeholder appears
+1e5afd5 test(frontend): the strip reports, fails in words, and keeps numbers monospace
+5f2a083 feat(frontend): the first screen — what the server reports, in our own language
+983ed2c feat(frontend): types generated from the server, and a thin typed client
+7f106d5 feat(frontend): design tokens — two themes, one interface face, one monospace
+52f82c3 chore(frontend): Vite, React and TypeScript, with the template's look deleted
+```
+
+**`npm ci &amp;&amp; npm run check`** (after deleting `node_modules` and `dist`):
+
+```
+found 0 vulnerabilities
+&gt; biome ci .
+Checked 16 files in 87ms. No fixes applied.
+&gt; tsc -b --noEmit
+&gt; vitest run
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+```
+
+I proved the type check is real by adding `const bad: number = "not a number"` — it failed with `error TS2322` and passed again once removed.
+
+**`./scripts/gen-types.sh` twice, from `/`:**
+
+```
+--- run 1 ---
+🚀 stdin → .../frontend/src/api/schema.ts [14.1ms]
+gen-types: wrote .../frontend/src/api/schema.ts
+--- run 2 ---
+🚀 stdin → .../frontend/src/api/schema.ts [14ms]
+gen-types: wrote .../frontend/src/api/schema.ts
+$ git status --short frontend/src/api
+[end — empty means no diff]
+```
+
+**`npm run build`:**
+
+```
+dist/assets/index-BpLLch6H.css   10.45 kB │ gzip: 4.25 kB
+dist/assets/index-bLGW4hms.js   229.83 kB │ gzip: 72.09 kB
+✓ built in 345ms
+$ git check-ignore -v frontend/dist
+.gitignore:227:frontend/dist/	frontend/dist
+```
+
+**Live, against the running backend** (`uv run uvicorn katalyst.api.main:app --port 8000`): the dev server proxied `/api/healthz`, `/api/readyz` and `/api/about` correctly, and a headless Chrome screenshot shows `ok` / `● reachable`, `absent` / `○ no key configured — generation arrives in stack 04`, `0.1.0` / `● named Katalyst`. With the backend stopped, all three rows show the failure in words, in the row, with no dialog.
+
+**Template content:** `grep -rin "vite" frontend/src` returns only `vite-env.d.ts:1` and three test-runner imports — no demo content. `grep` for `count`, `logo`, `Edit src/App` returns nothing.</result>
+<usage><subagent_tokens>200855</subagent_tokens><tool_uses>87</tool_uses><duration_ms>1101740</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a32cda7977ce9db43</task-id>
+<tool-use-id>toolu_012TTNzrDa2VpaZzSUNJYZoE</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a32cda7977ce9db43.output</output-file>
+<status>completed</status>
+<summary>Agent "Domain models + validity (stack 02 PR 2–3)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Pull request 2 is committed and verified. Report below.
+
+---
+
+## 1. What I built
+
+Branch `feat/02-domain-models` in `/Users/kentgang/git3/katalyst-wt/feat-02-domain/`, two commits (`610f027` models, `53120b0` tests). Nothing pushed, no pull request opened.
+
+**New files**
+- `/Users/kentgang/git3/katalyst-wt/feat-02-domain/backend/src/katalyst/domain/ids.py` — `PropositionId`, `LinkId`, `BranchId`
+- `.../domain/belief.py` — `Belief`, `Beliefs`
+- `.../domain/proposition.py` — `Resolution`, `BaseRate`, `Evidence`, `Payoff`, `Proposition`
+- `.../domain/link.py` — `Days`, `Provenance`, `Source`, `Link`
+- `.../domain/graph.py` — `Graph`
+- `.../domain/intervention.py` — `Do`, `Observe`, `Insert`, `Retune`, `Refine`, `Believe`, `Intervention`
+- `.../domain/branch.py` — `Branch`
+- `.../engine/ids.py` — `mint_id()`
+- `.../backend/tests/unit/domain/{__init__.py,test_models.py}`
+
+**Changed** `.../domain/__init__.py` (re-exports + the "what is here now" section replacing "Nothing lives here yet"), `backend/pyproject.toml` + `backend/uv.lock` (`python-ulid&gt;=3.1,&lt;4.0`, resolved 3.2.1). Nothing outside the owned set was touched.
+
+```
+Graph  (frozen; checks at build: hypothesis_id names a claim on this map)
+├─ id: str            hypothesis_id: PropositionId
+├─ propositions: tuple[Proposition, ...]
+│    ├─ id, claim, kind = hypothesis | event | market | not_tradeable
+│    ├─ resolution : Resolution{criteria, source, by: date}
+│    ├─ prior      : Belief                       — owner must be "model"
+│    ├─ beliefs    : Beliefs{model, user?, market?}  — each slot's owner must match
+│    │                   └─ Belief{p, lo, hi, owner}  — 0 &lt;= lo &lt;= p &lt;= hi &lt;= 1
+│    ├─ base_rate  : BaseRate{reference_class, k, n, sources}?   — k &lt;= n
+│    ├─ evidence   : tuple[Evidence{claim, url, direction ±1, weight 0..1}, ...]
+│    ├─ payoff     : Payoff{instrument, direction, magnitude &gt;= 0}?
+│    └─ not_tradeable_reason: str?
+└─ links: tuple[Link, ...]
+     ├─ id, source, target
+     ├─ mode, strength, lag, shape, half_life?
+     ├─ rationale, sources: tuple[Source{url, title, retrieved?}, ...]
+     └─ confidence, provenance, reflexive
+
+Branch  ├─ id, label, parent?
+        └─ interventions: tuple[Intervention, ...]      discriminated on `kind`
+             Do{target,value,at?} | Observe{target,value} | Insert{proposition,links}
+           | Retune{link,strength} | Refine{target,into,reconcile}
+           | Believe{target,belief}   — belief.owner must be "user"
+
+engine/ids.py :: mint_id() -&gt; str        (ULID; the only clock+randomness in sight)
+```
+
+## 2. Where the chapter code blocks needed changing to run, and why
+
+**(a) The three identifier aliases moved into `ids.py`.** The chapters define each alias in the module that first needs it, and `link.md` imports one across:
+
+before (`proposition.md`, `link.md`, `branches-and-worlds.md`)
+```python
+PropositionId = str            # in proposition.py
+LinkId = str                   # in link.py
+BranchId = str                 # in branch.py
+from katalyst.domain.proposition import PropositionId   # in link.py
+```
+after — all three in `domain/ids.py`, every module importing from there. Two reasons: the brief puts them there, and mypy's `no_implicit_reexport = true` (set repo-wide in `pyproject.toml`) rejects importing `PropositionId` *through* `proposition.py`. The chapters' intent is unchanged: still plain `str`, still never format-checked.
+
+**(b) `Graph` gained the validator its own field description promises.** `validity.md`'s code block has no validator, but the field text says the check happens:
+
+before
+```python
+    hypothesis_id: PropositionId = Field(
+        description=("The claim the user started from. Must name a proposition present in "
+                     "`propositions` — that much is checked when the object is built. …")
+    )
+```
+after — same field, plus
+```python
+    @model_validator(mode="after")
+    def _hypothesis_is_on_the_map(self) -&gt; "Graph":
+        if not any(proposition.id == self.hypothesis_id for proposition in self.propositions):
+            raise ValueError(...)
+        return self
+```
+The chapter's Identifiers section confirms it ("it checks … that `hypothesis_id` names a proposition that exists") and it is not one of the eleven `validate` rules. **It does not block any `broken_graphs` rule** — `no_hypothesis` is made by changing a `kind`, not by removing the claim — so pull request 3 is unaffected.
+
+**(c) Line wrapping, everywhere.** Several chapter field descriptions are single lines past ruff's 100 characters — e.g. `belief.md`'s
+
+before
+```python
+    p: float = Field(
+        ge=0.0, le=1.0,
+        description="How likely the claim is to come out true, from 0 (certainly not) to 1 (certainly yes).",
+    )
+```
+after — identical words, split across implicit string concatenation and one argument per line (what `ruff format` produces). No wording changed by this.
+
+**(d) Cross-references removed from `Field(description=…)` text.** A description travels into the browser types, where "See `validity.md`" and "(INV-6)" mean nothing, and `AGENTS.md` asks for self-contained prose. Verbatim examples:
+
+| before (chapter) | after (code) |
+|---|---|
+| `"Minted by our code, never by the model. See `validity.md`, section Identifiers."` | `"Minted by our code, never by the model."` |
+| `"Must be greater than 0 when `reflexive` is true (INV-6)."` | `"Must be greater than 0 when `reflexive` is true."` |
+| `"Set by `engine/` from what actually happened; the model never fills this in (decision record 0003, rule 5)."` | `"Set from what actually happened; the model never fills this in."` |
+| `"…must have `lag &gt; 0` (INV-6)."` | `"…must have a lag greater than 0."` |
+| `"Required when `kind` is `market` — required by `validate`, not by this class. See `validity.md`."` | `"Required when `kind` is `market` — required by the map's validity rules, not by this class."` |
+| `"An empty rationale is a violation, not a default (INV-2)."` | same, without `(INV-2)` |
+
+The same treatment in class docstrings (`(INV-3)`, `(INV-11)`, "see Behaviour B4"). Vocabulary words — *Inspector*, *terminal*, *intervention*, *provenance*, *reflexive* — are kept exactly.
+
+**(e) `Provenance`'s docstring was a pointer; it is now the list.** Chapter: *"The seven values are defined in the table below and in `../vocabulary.md`."* Code: the seven one-clause definitions inline.
+
+**(f) Google-style docstrings on validators.** Ruff's `D` rules with `convention = "google"` need a summary line in the imperative plus `Returns:`/`Raises:`. The chapters' one-liners (`"""You cannot count 7 cases out of 5."""`) are kept as the body under a summary line.
+
+**Nothing else.** Every field name, type, `Literal` value, default, `ge`/`le`/`gt` bound and validator body is the chapters' own. No validator the chapters assign to `validate` was added. `Refine.into` has **no** `min_length=2`: the chapter's preconditions table assigns "at least two" to `apply` (stack 03a), and the code block has no constraint — there is a comment on the field saying so.
+
+## 3. What the generated JSON schema looks like for the unions
+
+`Graph`'s schema is a flat `$defs` map of nine object shapes with every description carried through verbatim — no unions in it at all, since `Intervention` reaches the browser through `Branch`. `Branch.interventions` comes out exactly as wanted: an array whose `items` carry `"propertyName": "kind"` and a `mapping` from each of the six words (`do`, `observe`, `insert`, `retune`, `refine`, `believe`) to its `$ref`, alongside a six-entry `oneOf`. That is the shape `openapi-typescript` turns into a narrowable tagged union rather than an `anyOf` a reader has to guess at, so no pydantic fix was needed. The only slightly awkward output is the optional fields, which render as `anyOf: [{…}, {type: "null"}]` — pydantic's normal spelling for `X | None`, and readable enough.
+
+## 4. Open questions
+
+None settled. The six you named keep the chapters' shapes, each with a one-line comment naming the chapter and the question number: `Payoff.magnitude` units and `Payoff.instrument`'s missing venue (proposition.md 1 and 2), `BaseRate.sources` / `Evidence.url` versus a `Source` record (proposition.md 3), `Source`'s fields (link.md 2), `confidence` against `provenance` (link.md 1), a `provenance` on `Belief` (belief.md 1), `GraphId` (validity.md 2), `Do.at` against `Observe` (interventions.md 3). Two more got comments because a reader of the field would otherwise wonder: `strength` has no sanity ceiling (link.md 6) and `half_life` on a non-`impulse` link has no rule (link.md 4).
+
+Three things I decided rather than guessed, flagged for your veto:
+- **`engine/ids.py` has no test.** A test for it would live at `backend/tests/unit/test_ids.py`, outside the paths I own. Say the word and I will add it in pull request 3.
+- **The commit trailer.** Your brief says `Co-Authored-By: Claude Fable 5.1`; my harness says this session is Opus 5 (1M context). I followed your brief, but the line is probably a fleet template and the attribution is then wrong. One `git commit --amend` fixes both commits if you want the accurate model.
+- `Believe.owner_must_be_user` is left **public** (no leading underscore) because the chapter names it that way; every other validator is private, as the chapters write them.
+
+## 5. Verification output
+
+```
+$ uv run ruff check .
+All checks passed!
+
+$ uv run ruff format --check .
+27 files already formatted
+
+$ uv run mypy src
+Success: no issues found in 17 source files
+
+$ env -u ANTHROPIC_API_KEY uv run pytest
+Name                                  Stmts   Miss Branch BrPart  Cover   Missing
+---------------------------------------------------------------------------------
+src/katalyst/domain/__init__.py           8      0      0      0   100%
+src/katalyst/domain/belief.py            24      0      6      0   100%
+src/katalyst/domain/branch.py             9      0      0      0   100%
+src/katalyst/domain/graph.py             15      0      2      0   100%
+src/katalyst/domain/ids.py                6      0      0      0   100%
+src/katalyst/domain/intervention.py      47      0      2      0   100%
+src/katalyst/domain/link.py              28      0      0      0   100%
+src/katalyst/domain/proposition.py       49      0      4      0   100%
+---------------------------------------------------------------------------------
+TOTAL                                   186      0     14      0   100%
+======================== 71 passed, 2 warnings in 0.68s ========================
+```
+
+71 tests: 59 new, plus the 12 already there. `test_domain_imports_nothing_impure` passes and is now load-bearing — `domain/` imports only `datetime`, `typing`, `pydantic` and itself.
+
+Ready for validity.</result>
+<usage><subagent_tokens>161162</subagent_tokens><tool_uses>45</tool_uses><duration_ms>573386</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>abb1ea6ff6682217a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/abb1ea6ff6682217a.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft decision record 0012: replay mode" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Four files touched in `/Users/kentgang/git3/katalyst-wt/adr-02-replay/`.
+
+**Written**
+
+- `/Users/kentgang/git3/katalyst-wt/adr-02-replay/docs/adr/0012-replay-mode-from-recorded-transcripts.md` — new record, `proposed`, 2026-09-17, template copied exactly (MADR plus the three local front-matter fields), `supersedes`/`superseded-by` none, `spec-impact` naming `spec/generation/` and `spec/workbench/`. Context explains cassettes, transcript, receipt and server-sent events at first use, and separates what INV-13 buys for tests from what a keyless reviewer needs. Four options weighed; the decision outcome is a rules table (recording location and format, `make record-demo`, key-absent launchpad behaviour that says so on screen, replay label in the interface and in the receipt, byte-identical replays with cosmetic pacing, live domain-layer interventions, one rejection per recording); consequences, confirmation with the named tests, pros and cons per option, and links back to FR-13, INV-13, NFR-2/NFR-8, 0006, 0008 and Kent's 2026-09-16 answer.
+- `/Users/kentgang/git3/katalyst-wt/adr-02-replay/docs/adr/README.md` — row 0012 added, status `proposed`.
+- `/Users/kentgang/git3/katalyst-wt/adr-02-replay/ARCHITECTURE.md` — §9 row for ADR-0012 (`proposed`) and one dated §10 line (2026-09-17) saying replay mode is proposed in 0012, pending acceptance, landing in stack 04.
+- `/Users/kentgang/git3/katalyst-wt/adr-02-replay/PRODUCT_REQUIREMENTS.md` — §13 gained a 2026-09-17 line pointing at record 0012. Status now agrees in all three places.
+
+**The recommendation, in one sentence:** ship one committed generation transcript per example under `backend/recordings/` and play it through the same event stream the live path uses, because the transcript is already a stored product artifact (FR-13) and it records what was decided rather than what went over the wire, so a reworded prompt leaves a recording dated rather than broken.
+
+**Things I was unsure of, for Kent**
+
+1. **A wrinkle the brief did not mention, and the biggest thing to check.** The hero flow's change-a-step move — "…but Iran is struck the next day" — is an `insert`, and stack 04 makes `insert` call the model to draft the new claim. Pure propagation covers `do`, `observe`, `retune` and `believe`, but not that one. So I wrote a rule that each recording also carries **one recorded intervention** (the scripted "…but X" the card offers), with any other insert plainly declined. Without that, a keyless reviewer gets the map drawing itself but not the compare. Worth confirming this is the shape you want rather than, say, disabling `insert` entirely in replay.
+2. **Length.** It runs about 1,675 words against 0008's 1,060. The required content — four options with pros and cons, seven concrete rules, seven confirmations — resisted further cutting without dropping something you asked for. It sits between 0006 (1,360) and 0011 (1,560) in style but is longer than both. The rules table is the obvious thing to thin if you want it shorter.
+3. **Slug.** I used `0012-replay-mode-from-recorded-transcripts.md` rather than `...-from-recorded-generations.md`, because "transcripts" is the word that distinguishes option A from the cassettes in option B. Easy to rename.
+4. **§13 had no existing replay line** to replace, so I added one rather than replacing.
+5. I left `ARCHITECTURE.md`'s "Last verified: 2026-09-16" header untouched, since it was outside the files I was told I own — you may want it bumped to 2026-09-17 in the same pull request.</result>
+<usage><subagent_tokens>98478</subagent_tokens><tool_uses>24</tool_uses><duration_ms>395762</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a32cda7977ce9db43</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a32cda7977ce9db43.output</output-file>
+<status>completed</status>
+<summary>Agent "Domain models + validity (stack 02 PR 2–3)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Pull request 3 is committed and verified on `feat/02-validity`.
+
+## 1. What I built
+
+Branch `feat/02-validity` (from `feat/02-domain-models` HEAD), two commits: `c16f452` validity, `ac4f82e` generators and tests. Nothing pushed, no pull request opened.
+
+**New files** (all under `/Users/kentgang/git3/katalyst-wt/feat-02-domain/`)
+- `backend/src/katalyst/domain/validity.py` — `ViolationCode`, `Violation`, `validate`
+- `backend/tests/strategies.py` — the nine generators plus the twelve breakers
+- `backend/tests/unit/domain/test_validity.py` — the property tests
+- `backend/tests/unit/domain/test_beliefs_never_merged.py` — the source-code guard
+- `backend/tests/unit/domain/conftest.py` — one fixed valid map for the faults randomness will not reach
+- `backend/tests/unit/test_ids.py` — the two `mint_id()` tests you asked for
+
+**Changed** `backend/src/katalyst/domain/__init__.py` (exports `Violation`, `ViolationCode`, `validate`; the "what is here now" paragraph now names `validity.py`). Nothing outside the owned set.
+
+```
+validate(graph) -&gt; list[Violation]        pure: no clock, no network, no randomness
+│
+├─ rule  1  missing_resolution              per claim,  subject = claim id
+├─ rule  2  no_hypothesis | multiple_hypotheses   per map,  subject = map id
+├─ rule  3  no_terminal                     per map,    subject = map id
+├─ rule  4  market_without_payoff           per claim
+├─ rule  5  not_tradeable_without_reason    per claim
+├─ rule  6  missing_rationale               per arrow,  subject = arrow id
+├─ rule  7  documented_without_source       per arrow
+├─ rule  8  dangling_link                   per arrow
+├─ rule  9  cycle                           per tangle, subject = the closing arrow
+├─ rule 10  reflexive_without_lag           per arrow
+└─ rule 11  belief_out_of_range             per claim, prior → model → user → market
+        order: rule order above, ties broken by subject
+
+tests/strategies.py
+├─ valid by construction   graphs() · propositions() · links() · beliefs() · seeds()
+│                          resolutions · payoffs · base_rates · evidence_items · sources
+├─ deliberately raw        raw_belief_fields()        — nan and the infinities included
+├─ damaged on purpose      broken_graphs(*rules)      — 12 breakers, one per code
+└─ edits                   interventions(graph) · branches(graph)
+```
+
+## 2. Where the chapter needed interpreting, and why
+
+The chapter's code block for this pull request is `Graph`, `ViolationCode`, `Violation` and `validate`'s signature and docstring — all implemented verbatim (minus the line rewrapping and cross-reference removal described in the last report). The rules themselves are prose, and four points needed a decision the prose does not make:
+
+**(a) `subject` for a `cycle`, and how many cycles are one complaint.** The chapter says the subject is "the identifier of the arrow that closes the loop", which is only defined relative to a traversal, and open question 5 asks for confirmation that two separate loops give two complaints. One added back-arrow can create several elementary loops at once when the map has several routes between the same two claims, so counting loops would break "exactly one `cycle` violation". Implemented as: one complaint per **tangle of claims that can all reach each other**, and within a tangle the complaint names the shortest way round starting from the alphabetically first claim, blaming the arrow that closes it. Two loops sharing no claim are two tangles and two complaints, as open question 5 wants; two routes round the same tangle are one. A claim pointing at itself is a tangle of one, caught by the same pass, as the chapter says.
+
+One visible consequence: the chapter's worked example B1 writes the loop starting at H (`"Hormuz…" → "Brent…" → "Hormuz…"`), and the deterministic rule starts wherever the alphabetically first identifier is. For that example it happens to agree; for others the same loop may be printed from a different starting claim. The message pattern does not pin the starting claim, so this is a choice, not a contradiction.
+
+**(b) A map whose `hypothesis_id` names a claim that is not marked as the hypothesis.** `validity.md`'s `Graph` field says *"That the named claim is actually of kind 'hypothesis' … is checked by `validate`"*, and no code in the twelve covers it. Implemented as `no_hypothesis` with its own sentence:
+
+&gt; The claim this map started from is not the one marked as the hypothesis. Exactly one claim must be the hypothesis, and it must be that one.
+
+That reads as rule 2's own words — "exactly one claim is the hypothesis **the user started from**" — failing in a third direction. If you would rather it were a thirteenth code, it is one branch to change.
+
+**(c) `missing_resolution` can only ever name two of its three things.** The pattern is `does not say &lt;how it will be judged / who judges it / by when&gt;`, but `Resolution.by` is a required date on the class, so "by when" is unreachable from inside our own models. Implemented with the two reachable halves, joined by "or" when both are blank. Noted in the function's docstring.
+
+**(d) `dangling_link` when *neither* end exists.** The chapter covers the one-end case ("It names the end that does") and is silent on both. Implemented as `This arrow joins two claims, neither of which is on this map.` — still one sentence, still no identifier.
+
+**Two smaller notes.** `belief_out_of_range` prints the numbers as stored rather than at two significant figures, because the rule only ever fires on a hand-edited or stored map and the point of the message is to show the exact bad value. And `_loop_through` carries one line marked `# pragma: no cover` with a comment saying why it cannot be reached — a guard so that a wrong assumption returns nothing rather than crashing a checker that is meant never to raise.
+
+**On `broken_graphs`, one honest limitation.** Ten of the twelve rules can be broken in any combination; two cannot join them, and the reason is the map, not the code. A map with **no ending you can act on** cannot also hold a tradeable ending that names no instrument or an untradeable one that gives no reason — those damages work by adding an ending, which is what `no_terminal` has just taken away. And a map with **no starting claim** cannot also have several. `INDEPENDENTLY_BREAKABLE` names the ten and the docstring explains the exclusion; `no_terminal` and `no_hypothesis` each have their own single-rule test. I checked all 120 three-rule combinations of the ten: every one produces exactly its three codes.
+
+**`test_beliefs_never_merged`, and where I approximated.** The static half is implemented as the chapter states: every file under `domain/` is parsed, every function found, and one is an offence when it takes two or more `Belief` parameters or one `Beliefs`, **and** hands back something matching `float`, `Belief` or `Beliefs` anywhere in its return annotation (so `tuple[float, float]` is caught). The approximation: it reads **written annotations only and does not count `self` or `cls`**. A method defined on `Beliefs` receives a set of slots through `self` without saying so, and counting that would flag the class's own `_owners_match_slots` — which pydantic requires to return `self` — as a merge. The narrower check is the one that can run mechanically; the file's docstring says so in those words. Three tests prove the checker catches a planted `blend(mine: Belief, yours: Belief) -&gt; float`, catches `spread(three: Beliefs) -&gt; tuple[float, float]`, and leaves honest functions alone — so it does not pass merely because the layer is empty of offenders.
+
+**Test names.** All thirteen names from your brief are present as written. Three additions, since the brief left them unnamed: `test_generated_models_round_trip_json` and `test_generated_models_are_frozen` (the property versions; the example-based `test_models_round_trip_json` and `test_models_are_frozen` from pull request 2 keep the chapter's names), and `test_belief_bounds_at_construction_over_raw_fields` for the `raw_belief_fields()` half of INV-graph.12. Plus `test_intervention_round_trip` and `test_branch_round_trip`, which the chapters tag stack 02 and which the generators made free.
+
+## 3. What the generated JSON schema looks like for the unions
+
+Unchanged from the last report — `validate` adds no new unions. `Violation` reaches the browser as a flat object whose `code` is a twelve-way `enum` of plain strings rather than a union of objects, which is what a browser wants for something it switches on. `Branch.interventions` still renders as a discriminated `oneOf` with a `kind` mapping. Nothing needed fixing on the pydantic side.
+
+## 4. Open questions
+
+None settled; the four judgement calls above are in section 2 for your veto. The chapter's own open questions are untouched — `belief_out_of_range` still exists as defence in depth (question 1), `Graph.id` is still a plain string (question 2), the two hypothesis codes are still two (question 4), and the `cycle` subject is implemented as question 5 proposes with the tangle refinement noted.
+
+Your three answers are all in: `test_ids.py` exists with the two tests (the second pauses two thousandths of a second between mints, because the ordering only holds across different milliseconds — two made inside the same one share a timestamp and the random half decides, and the docstring says so); the `Claude Fable 5.1` trailer is on all four commits and nothing was amended; `owner_must_be_user` stays public.
+
+## 5. Verification output
+
+```
+$ uv run ruff check .
+All checks passed!
+
+$ uv run ruff format --check .
+33 files already formatted
+
+$ uv run mypy src
+Success: no issues found in 18 source files
+
+$ env -u ANTHROPIC_API_KEY uv run pytest
+Name                                  Stmts   Miss Branch BrPart  Cover   Missing
+---------------------------------------------------------------------------------
+src/katalyst/domain/__init__.py           9      0      0      0   100%
+src/katalyst/domain/belief.py            24      0      6      0   100%
+src/katalyst/domain/branch.py             9      0      0      0   100%
+src/katalyst/domain/graph.py             15      0      2      0   100%
+src/katalyst/domain/ids.py                6      0      0      0   100%
+src/katalyst/domain/intervention.py      47      0      2      0   100%
+src/katalyst/domain/link.py              28      0      0      0   100%
+src/katalyst/domain/proposition.py       49      0      4      0   100%
+src/katalyst/domain/validity.py         135      0     52      0   100%
+---------------------------------------------------------------------------------
+TOTAL                                   322      0     66      0   100%
+======================= 103 passed, 2 warnings in 23.57s =======================
+```
+
+103 tests in 24 seconds, comfortably under the minute. Coverage of `src/katalyst/domain` is **100%**, against the 85% target. `test_domain_imports_nothing_impure` still passes — `validity.py` adds only `networkx`, `collections` and `pydantic`.
+
+Ready for review.</result>
+<usage><subagent_tokens>242792</subagent_tokens><tool_uses>68</tool_uses><duration_ms>1628447</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a186e15233a941dcf</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a186e15233a941dcf.output</output-file>
+<status>completed</status>
+<summary>Agent "Docker, CI, pre-commit, Makefile (stack 01 PR 4)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Report below.
+
+## 1. What I built
+
+Five commits on `chore/01-docker-ci` (worktree `/Users/kentgang/git3/katalyst-wt/chore-01-docker/`), nothing pushed.
+
+**New**
+- `docker/Dockerfile.backend` — `uv` copied from `ghcr.io/astral-sh/uv:0.12`; `dev` target (full environment incl. dev group, `uvicorn … --reload --reload-dir /app/src`) and `prod` target (`uv sync --frozen --no-dev --no-editable --compile-bytecode`, only `/app/.venv` copied into `python:3.12-slim`, non-root uid 10001, no `uv` in the runtime).
+- `docker/Dockerfile.frontend` — Node 24 `dev` (`npm ci`, `npm run dev -- --host`) and `prod` (`npm ci &amp;&amp; npm run build` → `nginx:alpine` + `docker/nginx.conf`).
+- `docker/nginx.conf` — `/api/` → `http://backend:8000` (no trailing slash, so the prefix survives), everything else `try_files … /index.html`.
+- `compose.yaml` — `name: katalyst`, both services, `develop.watch` (sync `backend/src`, `frontend/src`; rebuild on `pyproject.toml`, `uv.lock`, `package.json`, `package-lock.json`), backend health check via Python `urllib` on `/api/healthz`, frontend `depends_on: service_healthy`, ports 8000 and 5173, `ANTHROPIC_API_KEY` / `FRED_API_KEY` passed by bare name, `KATALYST_API_URL=http://backend:8000`.
+- `compose.prod.yaml` — both targets `prod`, frontend `8080:80`, backend port removed, `wget` health check.
+- `.dockerignore` (one, at the repo root), `.env.example`, `.pre-commit-config.yaml`, `.cz.toml`, `Makefile`, `.github/workflows/ci.yml`.
+
+**Changed** — `ARCHITECTURE.md` §6/§7/§8 (now *built*, corrected, "Last verified: 2026-09-17"), `README.md` "Run it" and "Tests", plus whitespace-only fixes to `AGENTS.md`, `ASSIGNMENT.md`, `docs/initial-brainstorming.md`, `.gitignore` (see deviations).
+
+## 2. Proof output
+
+**Proof 1 — `types-fresh` catches drift.** Added `proof_of_drift: bool` to `About` in `backend/src/katalyst/api/about.py`:
+
+```
+🚀 stdin → …/frontend/src/api/schema.ts [13.9ms]
++            /**
++             * Proof Of Drift
++             * @description Temporary field, added only to prove the types-fresh check fails.
++             */
++            proof_of_drift: boolean;
+GIT DIFF EXIT CODE = 1
+```
+Then `git checkout -- backend frontend` → `after revert, diff exit=0`.
+
+**Proof 2 — import boundary.** Skipped as instructed.
+
+**Proof 3 — `docker compose up`.** Docker Desktop's daemon was not running; I started it with `open -a Docker`.
+
+```
+Container katalyst-backend-1  Healthy
+Container katalyst-frontend-1  Started
+$ curl http://localhost:5173/api/healthz     → HTTP/1.1 200 OK … {"status":"ok"}   (server: uvicorn, through the Vite proxy)
+$ curl http://localhost:5173/                → &lt;!doctype html&gt; … &lt;title&gt;Katalyst&lt;/title&gt;
+```
+Packaged stack:
+```
+$ docker compose -f compose.yaml -f compose.prod.yaml up --build -d --wait
+ Container katalyst-frontend-1  Healthy
+$ curl http://localhost:8080/api/healthz     → {"status":"ok"}          (Server: nginx/1.31.6)
+$ curl http://localhost:8080/api/about       → {"name":"Katalyst","version":"0.1.0"}
+$ curl http://localhost:8000/api/healthz     → curl: (7) Failed to connect …  exit 7  (backend is not published — the point)
+```
+Both stacks taken down; `docker compose ps -a` is empty.
+
+Extra proof the app needs no key — `docker compose --env-file &lt;empty&gt; up -d --force-recreate backend`:
+```
+/api/readyz  → {"status":"not_ready","model_key_present":false}
+/api/healthz → {"status":"ok"}
+```
+
+**Proof 4 — `docker compose watch` reloads.**
+```
+Watch enabled
+Syncing service "backend" after 1 changes were detected
+backend-1 | WARNING:  WatchFiles detected changes in 'src/katalyst/api/about.py'. Reloading...
+backend-1 | INFO:     Started server process [35]
+backend-1 | INFO:     Application startup complete.
+```
+File reverted; watch stopped.
+
+## 3. Where I deviated, and why
+
+1. **One build context (the repo root) and one `.dockerignore`, not two.** `docker/nginx.conf` sits outside `frontend/`, and a build can only copy from inside its own context. Root context keeps both Dockerfiles readable (`COPY backend/… `, `COPY docker/nginx.conf`) with no extra Compose concept.
+2. **The packaged environment is built by the uv *binary* copied from `ghcr.io/astral-sh/uv:0.12` into `python:3.12-slim`**, not in a stage whose base is that image. That image carries no Python; uv would download its own, and a virtual environment built against it cannot simply be copied into `python:3.12-slim`. I also added `--no-editable`, which is what makes "copy only the environment" literally true.
+3. **Biome's pre-commit hook is a local hook** (`npm --prefix frontend run lint`) rather than `biomejs/pre-commit`. Biome 2 refuses to run from a directory above its own settings file ("Found a nested root configuration"), and pre-commit runs every hook from the repo root; `--config-path` does not help. Independently, this machine's npm 11.10.1 rejects pre-commit's node-hook install (`EALLOWGIT`). The local hook is also the same Biome, run the same way, as `make lint` and the `frontend` job.
+4. **`check-yaml` appears twice** — strict everywhere, `--unsafe` for `compose.prod.yaml` only, because that file uses Compose's `!reset` / `!override` tags, which a general YAML reader cannot construct.
+5. **No health check on the *dev* frontend.** Compose concatenates sequences when merging files, so a dev `test:` array plus a prod one would produce a broken command. Prod defines the only frontend health check.
+6. **The packaged frontend health check uses `http://127.0.0.1/`, not `localhost`.** Found by testing: in `nginx:alpine`, `localhost` is tried as IPv6 first and nginx listens on IPv4, so the check failed while the app worked. Commented in place.
+7. **`name: katalyst` added to `compose.yaml`** so containers are named the same in any clone (a worktree would otherwise name them `chore-01-docker-*`).
+8. **README "Tests" prose corrected, not just its commands.** It claimed property tests and recorded model answers that do not exist yet. It now says which two layers are built and which two are waiting.
+9. **Files outside my list changed, whitespace only.** The first `end-of-file-fixer` / `trailing-whitespace` run fixed a missing final newline in `AGENTS.md`, `ASSIGNMENT.md`, `docs/initial-brainstorming.md` and trailing spaces in `ASSIGNMENT.md`, `.gitignore`. `git diff --ignore-all-space --ignore-blank-lines` on those four files is empty — no words changed. Without this, `pre-commit run --all-files` cannot be clean.
+10. **Co-author trailer.** The brief and decision record 0009 say `Claude Fable 5.1`; this session's attribution instruction says `Claude Opus 5 (1M context)`, which is also what the two most recent commits on the base branch use. I used the latter. Say the word and I will rewrite the five messages.
+11. **Installed globally, as required to say so:** `uv tool install pre-commit` (user-level, `~/.local/bin/pre-commit`). `commitizen` was only ever run through throwaway `uvx`.
+
+## 4. What a stranger must have installed
+
+**Docker alone** to run the app (`docker compose up`, `make dev`, `make prod`); `uv` and Node 24 only if they want the non-Docker path or `make test` / `make lint` / `make types` on their own machine.
+
+## 5. Open questions
+
+1. **An empty key reads as a present key.** `settings.py` tests `is not None`, so `ANTHROPIC_API_KEY=` — exactly what you get by copying `.env.example` without filling it — makes `/api/readyz` answer `{"status":"ready","model_key_present":true}`. Verified directly. That is a state that cannot be traced to a real input. The fix is one word in `backend/src/katalyst/api/health.py` (`if settings.ANTHROPIC_API_KEY` instead of `is not None`), but that file is not mine.
+2. **`ARCHITECTURE.md` §7's heading reads ``[built]`` in part**, which is not one of the three markers the document defines. Either the marker set needs a fourth value or §7 should be split. I chose honesty over the convention; tell me which you want.
+3. **There is a real `.env` in this worktree** with two live key values. It is git-ignored (`git check-ignore -v .env` → `.gitignore:151`), was not committed, and I never printed its contents. I did not create it; worth knowing it is there.
+4. **`docker compose watch` recreates containers when it starts**, even if the stack is already up. Harmless, but `make dev` after `make up` restarts both halves.
+5. Decision record 0009 says `mypy --strict src/katalyst/domain`; `pyproject.toml` scopes strictness through an overrides section instead, so the `backend` job runs plain `uv run mypy src`. That matches the brief and the existing config; flagging only because the record's wording differs.
+
+## 6. Verification output
+
+```
+$ make test                                          exit 0
+collected 12 items … 12 passed
+ Test Files  1 passed (1)      Tests  3 passed (3)
+
+$ make lint                                          exit 0
+ruff check .            → All checks passed!
+ruff format --check .   → 17 files already formatted
+mypy src                → Success: no issues found in 9 source files
+npm run lint (biome ci) → Checked 16 files in 6ms. No fixes applied.
+
+$ make types  → gen-types: wrote …/frontend/src/api/schema.ts ; git diff --exit-code → 0
+
+$ pre-commit run --all-files                         exit 0
+ruff check ....... Passed      biome ....................... Passed
+ruff format ...... Passed      Detect hardcoded secrets .... Passed
+fix end of files . Passed      trim trailing whitespace .... Passed
+check for added large files .. Passed
+check-yaml (every file but the packaged-run overrides) ... Passed
+check-yaml (the packaged-run overrides) ................. Passed
+
+$ cz check -m "spec: x"        → Commit validation: successful!   exit 0
+$ cz check -m "bad message"    → commit validation: failed!       exit 14
+$ cz check --rev-range feat/01-frontend-skeleton..HEAD → successful!
+$ pre-commit run --hook-stage commit-msg …             → fails on a bad message, passes on "adr: …"
+
+$ python -c "import yaml; d=yaml.safe_load(open('.github/workflows/ci.yml')); print(sorted(d['jobs']))"
+['backend', 'docker', 'frontend', 'types-fresh']
+
+$ git diff --stat feat/01-frontend-skeleton..HEAD
+ .cz.toml 48+ | .dockerignore 50+ | .env.example 22+ | .github/workflows/ci.yml 167+
+ .gitignore 4 | .pre-commit-config.yaml 123+ | AGENTS.md 2 | ARCHITECTURE.md 64
+ ASSIGNMENT.md 13 | Makefile 62+ | README.md 44 | compose.prod.yaml 63+
+ compose.yaml 105+ | docker/Dockerfile.backend 120+ | docker/Dockerfile.frontend 74+
+ docker/nginx.conf 40+ | docs/initial-brainstorming.md 2
+ 17 files changed, 958 insertions(+), 45 deletions(-)
+
+$ git status --short   → clean      $ git branch --show-current → chore/01-docker-ci (5 commits, none pushed)
+```</result>
+<usage><subagent_tokens>189241</subagent_tokens><tool_uses>99</tool_uses><duration_ms>1379966</duration_ms></usage>
+</task-notification>
+
+---
+
+What are the questions I can answer for you to unblock the merging of all the currently outstanding PRs?
+
+---
+
+Could you please dispatch an opus sub-agent to think critically about these questions?
+
+1. INV-4 vs INV-3. §9 states locality unconditionally; INV-3 lets observe move ancestors. The chapters resolve it with a per-operation affected set (wider for observe). Accept that, and I'll add the exception clause to §9 in the fixture pull request?
+2. Payoff.magnitude units — a fractional price move (as written), a return on the position, or a size? And should Payoff name its venue and quote? A Polymarket contract terminal can't be described without one of these.
+3. confidence vs provenance on a link — both contain argued and documented. Rename confidence's values, drop the field, or keep both and label them in the Inspector?
+4. do cuts only arrows present when applied (so a later insert of S → H retracts the strait). Confirm — this is what the Hormuz showcase depends on.
+5. Interface verbs: "assume"/"learn" (record 0004) or "Suppose this is true"/"This happened" (the chapters)? The winner goes into vocabulary.md.
+
+It should help determine the recommended path forward that follows best practices and attains the most enlightened, principled, and simplest overall design to understand and maintain. Then ask me using the question asking tool, explain to me briefly in simple terms what the significance and impact of each question/answer would have
+
+---
+
+<task-notification>
+<task-id>af29144b884c11631</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/af29144b884c11631.output</output-file>
+<status>completed</status>
+<summary>Agent "Think critically about five design questions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Review of the five open questions
+
+Read: `AGENTS.md`, `PRODUCT_REQUIREMENTS.md` (§1, 3, 4, 6.4, 6.7, 7, 9, 10, 12), `spec/vocabulary.md`, all four graph chapters, both multiverse chapters, ADRs 0003/0004/0005/0010, research 02 §1–§3, `docs/initial-brainstorming.md`, and the four domain modules plus `backend/tests/strategies.py`. PR map confirmed from `plans/STATUS.md`: **#5** = spec chapters → `main`; **#7** = domain models → #5; **#10** = validity → #7; the Hormuz fixture branch sits above #10.
+
+---
+
+## 1. INV-4 (locality) versus INV-3 (assert is not observe)
+
+**Recommendation.** Take (a), but rewrite INV-4's sentence rather than bolt an exception onto it: *an intervention changes only what is still connected to its subject in the graph the edit leaves behind* — with the per-operation affected-set table as its operational form.
+
+**Why.** §9's sentence is not merely missing an `observe` exception; it is already wrong for two other operations — `retune` acts on a *link*, not a proposition, and `insert` adds one — so "that proposition or downstream of it" covers four of six cases. An exception clause patches a sentence that was never the real rule. The affected-set table already in `interventions.md` *is* the real rule, and it is not ad hoc: for `do`, cutting the incoming arrows separates the target from every non-descendant, so the set is exactly the descendants; for `observe` the structure is intact, so the set is exactly what is not separated from the target — ancestors, descendants, and descendants of ancestors. That is one principle, stated once, with six rows of consequence. Option (b) makes `do` and `observe` behave identically, which is anti-pattern 3 and throws away what research 02 §1 calls "the single most honest feature you can ship"; option (c) splits one idea into two invariant numbers and still needs the table.
+
+One thing to fix while you are there, because a reviewer from a trading desk will check it: as written, `observe`'s affected set is so wide that `test_intervention_locality` barely asserts anything for that operation. Give it teeth by requiring the test to name a proposition that is *d-separated* from the target (a non-descendant with no common ancestor) and assert byte-identity on it, and to compute the affected set from graph topology (`networkx` ancestors/descendants), never from the engine's own bookkeeping. Paired with INV-3's `test_observe_may_update_ancestors`, which asserts something upstream *did* move, the two invariants then bracket `observe` from both sides.
+
+| Option | Code | Spec | Interface | Later stacks | Risk |
+|---|---|---|---|---|---|
+| **(a) affected set, INV-4 restated** | none in 02; 03a adds `affected_set(graph, edit)` used only by tests | §9 sentence rewritten; `vocabulary.md` Locality entry; chapter's table becomes normative | "what moved, and why" is per-operation; `observe` legitimately highlights upstream tiles | 03a locality test covers all six ops in one property; 03b diff shades the affected set | Test can go vacuous for `observe` unless a d-separation case is asserted |
+| (b) `observe` stays local in v1 | 03a ships one `observe` that is `do` in disguise | INV-3 must be softened | Two verbs, one behaviour — the blur the product attacks | Sampling engine (ADR-0005) loses its reason to exist; INV-3 comes back as a bug later | Fails anti-pattern 3 and D5-ii; the one thing this audience checks |
+| (c) two invariants | same as (a) | two numbered rules; table still needed for `retune`/`insert` | none | 03a writes two tests instead of one | One idea, two numbers; "which invariant does `observe` break?" invites the wrong answer |
+
+**Plain English.** Our headline promise is "change one thing and only what follows it moves" — but "I saw this happen" is information, and information also flows backwards to what caused it; we can either say that in the promise or quietly break the promise.
+
+---
+
+## 2. `Payoff.magnitude` units, and whether `Payoff` names its venue
+
+**Recommendation.** Take (c): a two-armed discriminated union — `ContractPayoff{venue, contract_id, title, side}` and `PricePayoff{instrument, direction, move}` — and settle the boundary as **the domain names what you would trade; the grounding layer names what it costs.**
+
+**Why.** A prediction-market contract and a barrel of oil do not pay off the same way, and one float cannot describe both: the contract's return is fixed by its resolution and depends only on the entry price (a live quote), while a price instrument's payoff depends on how far it moves, which the claim itself does not say. That asymmetry is why `spec/graph/proposition.md` B2 has to read `1.08` and `0.03` under two different rules — an unfixable symptom, not a wording problem. Option (a) puts `entry_price` in the domain, which is a live quote with no `as_of` and no venue, smuggled past ADR-0010 and INV-11 — precisely the untraceable state D5-ii vetoes; option (b) makes *every* magnitude depend on an entry price the model would have to invent. Option (d) is the most tasteful instinct and it is nearly right — it is right for contracts — but for a price instrument "how far Brent moves if this claim is true" is an elicited model claim like `strength`, and no live quote can supply it, so stack 05 would have to fabricate it or re-add the field. The union also answers open question 2 for free: `venue` and `contract_id` are *identity*, which the domain may hold; price, spread, `as_of` and url stay in `MarketBelief`.
+
+| Option | Code | Spec | Interface | Later stacks | Risk |
+|---|---|---|---|---|---|
+| **(c) two-armed union** | `proposition.py`: `Payoff` → `Annotated[ContractPayoff \| PricePayoff, discriminator]`; `strategies.py::payoffs()` draws both arms; `validity.py` message rewords | `proposition.md` model + B2 read consistently; OQ1 and OQ2 both closed; `vocabulary.md` payoff line | Tile shows one line either way ("Buy YES · Polymarket" / "Short XLE vs SPY, ~3%"); Inspector can deep-link the contract | Stack 05 legs: contract leg's edge and size come from the live mid; price leg's size from `move`; export has a real venue + id | One more union in the domain; the pattern already exists (`Intervention`), so it teaches rather than surprises |
+| (a) fraction + `entry_price` | one optional float | one paragraph | none | Entry price is stale the moment it is stored; two sources of truth for a quote | Breaks the domain/grounding line; a market number outside a `Belief` slot |
+| (b) return on position | rename + description | one paragraph | none | Hides leverage and entry assumptions in one number | A number no one can trace — veto condition |
+| (d) drop `magnitude` | delete a field | shortest | none | FR-22's tail-strip PnL and FR-24's distribution have no size for price terminals; field returns in stack 05 | Under-specifies; defers an honest model claim rather than removing it |
+
+Optional, and say no if it is gold-plating: give `PricePayoff.move` a one-line `basis` ("20-day front-month move after the 2019 and 2022 episodes"), so a size carries a reason the way a strength does.
+
+**Plain English.** A prediction-market contract pays a fixed dollar if it resolves and an oil position pays however far the price moves, so the single field called "size of the move" has to mean two different things — and in the fixture it already does.
+
+---
+
+## 3. `Link.confidence` versus `Link.provenance`
+
+**Recommendation.** Take (b): drop `confidence` in v1. Keep `provenance` — the receipt — and let the rationale sentence and the belief's `lo`/`hi` carry the rest.
+
+**Why.** Nothing consumes `confidence`: it has no invariant, no violation code, no propagation role, and UX-6 assigns the stroke style to *provenance*. It is a self-report of quality by the very component the repo has decided not to trust for exactly this — ADR-0003 rule 5 forbids the model declaring its own provenance, and research 02 §2 says models are unstable at asserting; a model that can write `documented` will write it. It also costs a third elicited item per link against ADR-0005's "one number and one sentence per link". And note the drift it is already causing: FR-8 uses "link confidence" to mean *run-to-run ensemble disagreement*, which is a computed receipt, not a self-report — two definitions of one word in one repo. If that signal is wanted in stack 04, add `agreement: float`, computed, and the collision never reappears. If you want to keep the axis anyway, take (a) with words that share nothing: `hunch / reasoned / textbook`.
+
+One line each, which was the test you set:
+- *provenance* — "where this number came from" (a receipt we wrote).
+- *confidence* — "how sure the model is its own story is right" (a claim the model made about itself) — and then a third line is needed to explain why `confidence: documented, provenance: argued` is legal. One field needs no footnote.
+
+| Option | Code | Spec | Interface | Later stacks | Risk |
+|---|---|---|---|---|---|
+| **(b) drop it** | `link.py` loses one field; `strategies.py::links()` loses one draw; fixture loses one value per link | `link.md` loses the model field and the "confidence versus provenance" section, OQ1 closes; `vocabulary.md` Link bullet; `interventions.md` retune row; FR-8 reworded | One provenance chip, one stroke style — nothing to label twice | Stack 04 adds computed `agreement` if FR-8 lands | If a real need appears, re-adding a field at prototype stage costs one commit |
+| (a) rename values | one `Literal` | one paragraph | Inspector needs two labelled rows | The unused field survives into 04–06 | Keeps a field whose answer to "what do you do with this?" is "render it" |
+| (c) keep and label | none | none | Two rows plus a sentence explaining the legal contradiction | Ambiguity compounds when FR-8 redefines the word | The collision is documented, not removed |
+
+**Plain English.** We are storing two different judgements about every arrow — the model's opinion of its own story, and our record of where the number actually came from — and they use the same words; only the second one can be checked.
+
+---
+
+## 4. `do` cuts only the arrows present when it is applied
+
+**Recommendation.** Confirm the chosen reading — but justify it as *a timed assertion on a model that is being edited*, not as Pearl's `do`, and require the interface to say when an assertion has been overridden.
+
+**Why.** It is principled, and the current justification is the weak part. Strict Pearl `do(H)` is evaluated against whatever model you hold at evaluation time, and the branch's final model contains `S → H`, so Pearl would cut that arrow too; citing him here invites exactly the objection a Jane Street reviewer would raise. The honest and stronger claim is the one ADR-0005 already commits you to: the engine is time-unrolled (`lag`, `shape`, `half_life`; anti-pattern 8), `Do` carries `at` and `Observe` does not, so `do(H, at=2026-10-01)` means *H is true from the 1st*, not *H is sealed forever*. A sustain arrow arriving on the 2nd withdraws the support, and H retracts — that is the dynamic-Bayes-net reading research 02 §1 calls the legitimate form of the Markov idea, not a hack. The seal reading also costs more than it looks: it makes the showcase unreachable at *any* ordering, it forces `insert`'s affected set to grow a "minus sealed nodes" exception (a second exception on INV-4), and it turns `apply` from a plain left fold into a fold carrying a seal set — which dents "a branch is a patch" and Law 2. Nothing about INV-3 changes: `do(H)` still moves no ancestor; H's later movement is attributed to `insert(S)` + `do(S)`, whose affected set includes H because H is now S's descendant.
+
+The user-intuition problem is real and it is a veto unless answered on screen: "I said suppose H; why did H change?" must be answerable from the tile, not the docs. So yes — the interface must state the override, and yes — a branch's edits must be readable in order. Both are already in the data (`branches-and-worlds.md` says order is load-bearing twice over); they need to be named as a requirement now, before 03b writes the canvas.
+
+Consequence for stack 03a worth writing down now (it settles `branches-and-worlds.md` OQ1): `apply` should return the graph *plus* an ordered list of assignments `(proposition, value, from_date, which edit)`, rather than growing `Proposition` a field. A fixed value is a fact about a world, not about a claim; putting it on the shared base type is what makes the base stop being shareable.
+
+| Reading | Code | Spec | Interface | Later stacks | Risk |
+|---|---|---|---|---|---|
+| **cuts arrows present at apply time (chosen)** | `apply` stays a plain fold; `Do` docstring gains the ordering rule | `interventions.md` B2 re-justified as timed assertion; OQ1 closed; `vocabulary.md` `do` entry | New badges: **Supposed · date**, **Retracted · date · by "confirmed strike…"**; branch panel lists edits in order | 03a propagation encodes it in ~30 lines; 03b renders the override; the showcase works | Confusing if the override is silent — must ship with the badge |
+| `do` seals the target | `apply` threads a seal set; `insert` filters against it | INV-4 gains a second exception; B2 rewritten | No override to explain | Showcase impossible at any ordering; "what would undo my premise?" has no answer | Kills the Verify door's best moment and the brainstorm's vertical/horizontal pairing |
+
+**Plain English.** "Suppose the strait is open on the 1st" is a supposition about a day, not a spell that keeps it open forever — so when you then add a strike on the 2nd that removes what was holding it open, the map should say the strait closed again, and say who closed it.
+
+---
+
+## 5. Interface verbs for `do` and `observe`
+
+**Recommendation.** Keep the chapters' pair — **"Suppose this is true" / "This happened"** — and add their badge forms, **Supposed** and **Happened**, each with a date. Correct ADR-0004's "assume"/"learn" in place.
+
+**Why.** The two must be unconfusable under stress, and here the grammar carries the semantics: the subjunctive versus the indicative is a distinction every English speaker already owns, with no glossary. "Learn" is the one that fails the button-and-badge test — "Learn this" is not something anyone says at a desk, and the badge "Learned" reads as machine learning; "assume" is serviceable but collides with assuming a position. The chapters' copy is already written and reviewed, so keeping it is also the smallest change. The badge forms matter because Q4 now requires a third, *derived* badge — **Retracted** — that must sit in the same family: Supposed · Oct 1, then Retracted · Oct 2 by "confirmed strike on Iranian territory".
+
+The full six, buttons and badges (code names stay `do`/`observe`/`insert`/`retune`/`refine`/`believe`):
+
+| Code | Button | Badge | Gloss the Inspector shows |
+|---|---|---|---|
+| `do` | **Suppose this is true** (and *Suppose this is false*) | **Supposed · date** | "Take this as given, and do not tell me what caused it" |
+| `observe` | **This happened** | **Happened · date** | "This is news — update what came before it too" |
+| `insert` | **Add a claim** (hint: "…but this also happens") | **Added** | "Something else is going on" |
+| `retune` | **Change this push** | **Retuned** | "You moved this arrow from +0.7 to +0.3" |
+| `refine` | **Split this claim** | **Split** | "This is really several claims that add back up" |
+| `believe` | **My own number** | (the *you* chip itself) | "Here is what I think the odds are" |
+| — (derived) | — | **Retracted · date · by "…"** | "What was holding this up was removed" |
+
+Two small fixes this tidies: a menu item should not open with an ellipsis, so `insert`'s "…but this also happens" becomes hint text under "Add a claim"; and `believe` needs no badge because the three-up chip is already the badge, which removes the only collision (`retune` and `believe` both otherwise reading as "yours").
+
+| Option | Code | Spec | Interface | Later stacks | Risk |
+|---|---|---|---|---|---|
+| **Suppose this is true / This happened** | none | `vocabulary.md` gains an interface-words table; `interventions.md` verb column; ADR-0004 corrected | Buttons and badges in one family; the derived **Retracted** fits | 03b copies the table verbatim; no re-copy later | Two different grammatical shapes — deliberate, and the point |
+| assume / learn (ADR-0004) | none | chapters rewritten backwards | "Learned" badge misreads | Copy churn in 03b | Weakest word in the set is the one doing the most work |
+| set / update, or one control | none | INV-3 unsupportable | — | — | Anti-pattern 3 |
+
+**Plain English.** One button says "pretend this, for the sake of argument"; the other says "this actually happened" — and if a user ever mixes them up, every number below is answering a different question than they think.
+
+---
+
+## If you accept all five recommendations
+
+**One new decision record, one amended.** Only question 2 changes a layer boundary, so it earns a record: **`docs/adr/0013-payoff-names-the-trade-quote-names-the-price.md`** (0012 is taken by the replay-mode PR #9), amending 0010's semantics section. Mark it `accepted` when you answer, or D9 blocks the code edit. Questions 1, 4 and 5 are refinements of ADR-0004's own subject and go in as a dated in-place amendment — the repo already plans an in-place correction there for the test names. Question 3 contradicts no accepted record (0005's link-field table never listed `confidence`), so it needs no record at all.
+
+**PR #5 — `spec/02-graph-and-multiverse`, worktree `/Users/kentgang/git3/katalyst-wt/spec-02/`**
+
+| File | Edit |
+|---|---|
+| `/Users/kentgang/git3/katalyst-wt/spec-02/PRODUCT_REQUIREMENTS.md` | §9 INV-4 restated as the affected set (one principle sentence + pointer to the chapter's table); §6.2 FR-8 "link confidence" → "link agreement, computed from run-to-run disagreement"; §7 new **UX-14**: an overridden assertion says so on the tile, and a branch shows its edits in order |
+| `/Users/kentgang/git3/katalyst-wt/spec-02/spec/vocabulary.md` | Locality entry → affected set; `payoff` bullet → the two payoff shapes; Link bullet drops `confidence` (and the "words we do not use" note becomes "there is no confidence field"); `do` entry gains "cuts the arrows present when it is applied"; new **Interface words** table (six buttons, six badges, plus derived *Retracted*) |
+| `/Users/kentgang/git3/katalyst-wt/spec-02/spec/graph/proposition.md` | `Payoff` → two-armed union; B2's M1 and M2 re-read under one rule; OQ1 and OQ2 closed |
+| `/Users/kentgang/git3/katalyst-wt/spec-02/spec/graph/link.md` | Delete `confidence` from the model and the "confidence versus provenance" section; three-line "provenance is a receipt" note stays; OQ1 closed |
+| `/Users/kentgang/git3/katalyst-wt/spec-02/spec/multiverse/interventions.md` | Verb column → the six buttons; B2's ordering paragraph re-justified as timed assertion (drop the Pearl warrant, keep the time-unrolled one) + the override-must-be-visible requirement; INV-4 restated with the d-separation clause in `test_intervention_locality`; OQ1, OQ2, OQ7 closed; OQ8 applied |
+| `/Users/kentgang/git3/katalyst-wt/spec-02/docs/adr/0004-branches-are-patches.md` | Dated amendment: affected-set locality, the `do` ordering rule, the verb pair; fix the four test names to 0008's |
+| `/Users/kentgang/git3/katalyst-wt/spec-02/docs/adr/0005-link-semantics-and-propagation.md` | One line: rejection sampling is *why* `observe`'s affected set is wider |
+| `/Users/kentgang/git3/katalyst-wt/spec-02/docs/adr/0013-…md` (new) | Payoff names the trade; the quote names the price |
+| `/Users/kentgang/git3/katalyst-wt/spec-02/ARCHITECTURE.md` | §4 one row/line: identity in `domain/`, quote in `grounding/` (the working agreement requires the boundary edit in the same PR) |
+
+**PR #7 — `feat/02-domain-models`, worktree `/Users/kentgang/git3/katalyst-wt/feat-02-domain/`**
+
+- `backend/src/katalyst/domain/proposition.py` — `Payoff` becomes `Annotated[ContractPayoff | PricePayoff, Field(discriminator="kind")]`; both open-question comments deleted.
+- `backend/src/katalyst/domain/link.py` — remove the `confidence` field and its comment (lines 173–181).
+- `backend/src/katalyst/domain/intervention.py` — one line in `Do`'s docstring: cuts the arrows that exist when it is applied; an arrow added later is live.
+- `backend/tests/strategies.py` — `payoffs()` (line 257) draws both arms; `links()` drops the confidence draw (line 414).
+- `backend/tests/unit/domain/test_models.py` — payoff fixtures at lines ~116 and ~233.
+
+**PR #10 — `feat/02-validity`** — `backend/src/katalyst/domain/validity.py`: reword `market_without_payoff`'s message to cover both shapes ("does not say what you would trade"); rebase on the amended #7.
+
+**Hormuz fixture PR — worktree `/Users/kentgang/git3/katalyst-wt/feat-02-hormuz/`** — M1 becomes `ContractPayoff(venue="polymarket", contract_id=…, side="yes")` and the invented `1.08` disappears; M2 becomes `PricePayoff(instrument="XLE vs SPY", direction="short", move=0.03)`; links drop `confidence`; the `hormuz-then-strike` branch keeps its three edits in order with a comment naming the ordering rule, so the fixture is the executable statement of answer 4.
+
+**One sequencing caution.** `Payoff` and `Link` live at the bottom of the code stack (#7), so #10 and the fixture branch need a rebase. Do it before merging, not after — the fixture is the only place the `1.08` reading is visible, and it should never reach `main`.</result>
+<usage><subagent_tokens>162330</subagent_tokens><tool_uses>31</tool_uses><duration_ms>502728</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>adefaccbffedf8cf9</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/adefaccbffedf8cf9.output</output-file>
+<status>completed</status>
+<summary>Agent "Hormuz fixture + routes (stack 02 PR 4)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Everything is committed on `feat/02-hormuz-fixture`; nothing pushed, no PR, no other branch or worktree touched.
+
+## 1. What I built
+
+| File | What |
+|---|---|
+| `backend/src/katalyst/fixtures/hormuz.py` (new, 760 lines) | `FIXTURE_DATE`, `HORMUZ: Graph`, `HORMUZ_THEN_STRIKE: Branch`, `TITLE`, `ONE_LINE`. Validated by `_checked()` at import — raises `ValueError` listing every violation |
+| `backend/src/katalyst/fixtures/catalogue.py` (new) | `StoredExample` (frozen dataclass), `EXAMPLES`, `find(id)` — the registry the routes read |
+| `backend/src/katalyst/fixtures/__init__.py` (new) | Package docstring + `__all__` |
+| `backend/src/katalyst/api/fixtures.py` (new) | `GET /api/fixtures` → `list[FixtureSummary]`; `GET /api/fixtures/{id}` → `FixtureBundle`; 404 with a sentence |
+| `backend/src/katalyst/api/main.py` | One import + one `include_router` line |
+| `backend/tests/unit/fixtures/test_hormuz.py` (new, 22 tests) | |
+| `backend/tests/api/test_fixtures.py` (new, 4 tests) | |
+| `frontend/src/api/schema.ts` | Regenerated only (+737 lines) |
+| `ARCHITECTURE.md` §4 | `[built]`, table corrected |
+
+```
+H   strait open, 14 straight days (hypothesis, user belief .55 vs model .35, base rate 7/9)
+C   Lloyd's war-risk premium &lt; 0.4%      B   Brent settles &lt; $68, five sessions
+R   OPEC+ output restraint (the tail, prior .18)
+M1  Polymarket "Brent below $70" (market belief .48 vs model .61)   M2  XLE vs SPY
+N1  Omani-mediated talks resume publicly  (not_tradeable, reason given)
+
+H --( +1.6  trigger  impulse   2d, half-life 30 )--&gt; B
+H --( +1.1  sustain  step      same day         )--&gt; C
+H --( +0.7  trigger  ramp     10d               )--&gt; N1
+C --( +0.7  sustain  step      7d               )--&gt; B
+B --( +0.9  trigger  impulse   1d, half-life 14 )--&gt; M1
+B --( +0.8  trigger  ramp      3d               )--&gt; M2
+B --( +0.6  trigger  ramp     14d, REFLEXIVE    )--&gt; R
+R --( -1.2  trigger  step      5d               )--&gt; B   closes the loop
+
+branch br_hormuz_then_strike:  do(H,true,2026-10-01) -&gt; insert(S, 3 links) -&gt; do(S,true,2026-10-02)
+S --( -2.4  trigger  impulse   same day, half-life 10 )--&gt; B
+S --( -2.0  sustain  step      1d                     )--&gt; C
+S --( -1.9  sustain  step      3d                     )--&gt; H   the showcase
+```
+
+## 2. How the generated TypeScript reads
+
+The intervention union came out as a proper tagged union — `openapi-typescript` picked up pydantic's discriminator and stamped a literal `kind` on every member:
+
+```ts
+interventions: (components["schemas"]["Do"] | components["schemas"]["Observe"] | components["schemas"]["Insert"] | ...)[];
+
+Do: {
+    /** @description discriminator enum property added by openapi-typescript
+     *  @enum {string} */
+    kind: "do";
+    target: string;
+    value: boolean;
+    at?: string | null;
+};
+```
+
+`Link` is equally clean — every `Literal` kept its values, optionals read as optionals, and the field descriptions travelled across as doc comments:
+
+```ts
+Link: {
+    mode: "trigger" | "sustain";
+    strength: number;
+    lag: number;
+    shape: "impulse" | "step" | "ramp";
+    half_life?: number | null;
+    sources: components["schemas"]["Source"][];
+    confidence: "speculative" | "argued" | "documented";
+    provenance: "asserted" | "argued" | "documented" | "market_implied" | "user" | "historical" | "simulated";
+    reflexive: boolean;
+};
+```
+
+**Verdict: pleasant. Nothing to fix on the pydantic side.** `switch (edit.kind)` narrows; `link.mode`/`shape`/`provenance` drive stroke styling directly; tuples land as arrays, which is what the browser wants. One cosmetic note only: `interventions` has `@default []` yet is non-optional in the type (FastAPI emits the default but keeps it required) — harmless when reading. `frontend` `tsc -b --noEmit` and `biome ci` both pass against the new file; it was not hand-edited.
+
+## 3. Honesty notes
+
+- **Every number is illustrative** and the module says so in bold at the top. Strengths, lags, half-lives, priors and propagated beliefs come from research report 02 §3 and the spec chapters; each propagated `beliefs.model` carries a comment saying stack 03a computes it for real.
+- **Provenance:** ten of the eleven arrows are `argued`; `H-&gt;N1` is `asserted` (its rationale is a story that cannot say which way the causality runs). **No arrow is `documented`** — no retrieval step ran for this file.
+- **One real source**, checked by hand on 2026-09-17: `H-&gt;B` cites `https://www.eia.gov/todayinenergy/detail.php?id=4430` ("The Strait of Hormuz is the world's most important oil transit chokepoint"). It backs the arrow's *premise*, not its number, and the receipt stays `argued` with `retrieved=None` because a person attached it.
+- `C-&gt;B` is the deliberate `confidence="documented"` / `provenance="argued"` pair the spec calls legal and informative, with a comment explaining why it is not a contradiction.
+- **Evidence URLs** are the publications' standing pages (`bbc.com/news/world/middle_east`, `lloydslist.com`), both verified to return 200, with a comment saying why: the example's news is illustrative and an invented article address is exactly the untraceable state the product refuses.
+- **Base rate** 7/9 carries `sources=()` — the count is the research report's, which cites nothing, and the empty tuple is how the file says so.
+- **M1's market belief (.48, .45–.52)** is commented as illustrative, not a live quote.
+- Every belief is a range with `lo &lt; hi`, pinned by a test.
+
+## 4. Where I deviated from the plan
+
+1. **Branch id is `br_hormuz_then_strike`**, not `hormuz-then-strike`. `spec/multiverse/branches-and-worlds.md` writes a child branch with `parent="br_hormuz_then_strike"`; matching it keeps the spec true. Label is "Hormuz opens, then Iran is struck".
+2. **Added an eighth base-map arrow, `H-&gt;N1`** (+0.7, trigger/ramp/10d). The plan's table has no arrow into N1, and a terminal with no cause would float unconnected on the canvas. It is deliberately the map's weakest arrow (`speculative`/`asserted`).
+3. **Gave `B-&gt;M1` a half-life of 14 days.** The plan's row gives none; an `impulse` with no half-life has no decay for stack 03a to evaluate. Flagged in a comment.
+4. **The tail is in two places:** `R` in the base map (prior .18, pushing −1.2 back onto B) so the tail strip has something before any branch exists, and `S` on the branch (prior .06).
+5. **Added `catalogue.py`**, not named in the brief, so the list route does not hard-code the single example.
+6. **The `domain` → `fixtures` import ban is enforced from my own test file** (`test_the_rules_layer_never_reads_the_examples`, reusing `find_forbidden_imports`) because `tests/unit/test_import_boundary.py` is not mine. Whoever owns it may prefer to add `"katalyst.fixtures"` to `FORBIDDEN_PACKAGES` and delete my test.
+7. **Commit trailer.** The brief asked for `Co-Authored-By: Claude Fable 5.1`; this session's attribution instruction names `Claude Opus 5 (1M context)`, which is who actually wrote it, so I used that. Trivial to amend if repo uniformity matters more.
+
+## 5. Open questions
+
+- `spec/graph/proposition.md` open question 1 (magnitude: price move or return on position). M1's `1.08` reads identically under both here because the contract is bought outright at the mid; a leveraged instrument would separate them. Commented in place.
+- `spec/multiverse/branches-and-worlds.md` open question 6 asked PR4 to settle the link-id convention. It is now settled as `SOURCE-&gt;TARGET` in the fixture and pinned by a test — but `spec/` is not my file, so that line still says "should settle it".
+- A `Belief` carries no provenance (`belief.md` open question 1), so M1's market number can only say it is illustrative in a comment, not in data. This will matter the moment a real Polymarket price lands beside it.
+- `link.md` open question 4: I left `half_life=None` on every `step`/`ramp` arrow, so nothing here depends on the answer.
+- `ARCHITECTURE.md` §5 (where each invariant is enforced) is still `[planned]` and now lags §4. Outside my section.
+
+## 6. Verification
+
+```
+=== ruff check ===        All checks passed!
+=== ruff format --check === 40 files already formatted
+=== mypy src ===          Success: no issues found in 22 source files
+=== pytest ===            TOTAL 322 0 66 0 100%
+                          129 passed, 2 warnings in 24.00s   (was 103 before)
+
+gen-types.sh run twice → no diff; git status clean after the commits
+frontend: tsc -b --noEmit exit 0; biome ci → Checked 16 files, no fixes applied
+
+curl localhost:8000/api/fixtures
+[{"id":"hormuz","title":"Strait of Hormuz","one_line":"If the Strait of Hormuz reopens, ..."}]
+curl localhost:8000/api/fixtures/hormuz | head -c 600
+{"id":"hormuz","title":"Strait of Hormuz","fixture_date":"2026-10-01","graph":{"id":"hormuz",
+"propositions":[{"id":"H","claim":"The Strait of Hormuz reopens to unrestricted commercial
+transit.","kind":"hypothesis","resolution":{...,"by":"2026-11-01"},"prior":{"p":0.35,...
+curl localhost:8000/api/fixtures/photonics  →  404
+{"detail":"There is no stored example called 'photonics'. The ones this program ships with are: hormuz."}
+```
+
+`git diff --stat feat/02-validity..HEAD` carries the merged frontend branch as well, so here is my work alone (`b18890a..HEAD`):
+
+```
+ ARCHITECTURE.md                            |  26 +-
+ backend/src/katalyst/api/fixtures.py       | 113 +++++
+ backend/src/katalyst/api/main.py           |   3 +-
+ backend/src/katalyst/fixtures/__init__.py  |  36 ++
+ backend/src/katalyst/fixtures/catalogue.py |  87 ++++
+ backend/src/katalyst/fixtures/hormuz.py    | 760 +++++++++++++++++++++++++++++
+ backend/tests/api/test_fixtures.py         |  65 +++
+ backend/tests/unit/fixtures/__init__.py    |   1 +
+ backend/tests/unit/fixtures/test_hormuz.py | 390 +++++++++++++++
+ frontend/src/api/schema.ts                 | 737 ++++++++++++++++++++++++++++
+ 10 files changed, 2206 insertions(+), 12 deletions(-)
+
+4689321 docs(architecture): mark the data model built, and correct the table to what exists
+0814b4c test: the Hormuz example is valid, complete, and survives the trip to the browser
+5c13f01 feat(api): read-only routes for the worked examples, and the browser types they generate
+bf10089 feat(fixtures): the Hormuz map, and the branch where Iran is struck the next day
+```</result>
+<usage><subagent_tokens>195332</subagent_tokens><tool_uses>83</tool_uses><duration_ms>1106393</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a32cda7977ce9db43</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a32cda7977ce9db43.output</output-file>
+<status>completed</status>
+<summary>Agent "Domain models + validity (stack 02 PR 2–3)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All three decisions are applied, the rebase is clean, and both branches verify.
+
+## 1. What changed, per file
+
+### On `feat/02-domain-models` — commit `8a69962`
+
+**`backend/src/katalyst/domain/proposition.py`**
+- `Payoff` the class is gone. In its place: `ContractPayoff{kind, venue, contract_id, title, side}`, `PricePayoff{kind, instrument, direction, move}`, and `Payoff = Annotated[ContractPayoff | PricePayoff, Field(discriminator="kind")]` with a docstring saying why two shapes and not one — the old single class made `instrument` mean either a contract title or a ticker, and `magnitude` mean either a return on a position or a move in a price.
+- Both `kind` fields carry a default (`= "contract"`, `= "price"`), matching how the six interventions are written in `intervention.py`. It does not weaken the union: pydantic still needs `kind` present in JSON to pick an arm, so a payload without it is refused. Say the word if you would rather they had none.
+- The rule is in the module docstring, in its own paragraph: this layer names **what you would trade** and never what it costs; prices, spreads and the moment a quote was read belong to the layer that fetches them and reach the map as the market's own likelihood.
+- Both open-question comments on `Payoff` deleted. `Annotated` added to the imports.
+
+**`backend/src/katalyst/domain/link.py`** — `confidence` gone: the field, its `Literal`, and the open-question comment about the overlap with `provenance`. The `Link` docstring gains one sentence in its place: the sentence in `rationale` is the model's argument, `provenance` is our receipt for it.
+
+**`backend/src/katalyst/domain/intervention.py`** — `Do`'s docstring gains the paragraph: the cut reaches only the arrows into the target that exist when the edit is applied, an arrow added afterwards is live and can push the target back the other way, and this is "true from `at`" rather than a permanent seal.
+
+**`backend/src/katalyst/domain/__init__.py`** — exports `ContractPayoff` and `PricePayoff` alongside `Payoff`.
+
+**`backend/tests/unit/domain/test_models.py`** — `a_payoff()` split into `a_contract_payoff()` and `a_price_payoff()`; both arms in the frozen and round-trip parametrizations; `confidence=` dropped from the link builder; the two payoff rejection cases rewritten for `PricePayoff` and a third added for a contract's side; two new tests, `test_payoff_discriminator` (both arms parse back as their own class) and `test_payoff_rejects_an_unknown_kind`.
+
+### On `feat/02-validity` — rebased, plus commit `7611c1b`
+
+The rebase was textually clean (both files are new on this branch, so git had nothing to merge), but it left code written against the old shapes. Three fixes, in their own commit as you asked:
+
+**`backend/tests/strategies.py`** — `payoffs()` draws both arms, half and half, so anything reading a payoff is made to cope with both rather than with whichever was written first; new `CONTRACT_VENUES` and `CONTRACT_TITLES` word lists, and `INSTRUMENTS` loses its prediction-market entry, which belongs to the other arm now. `links()` drops the confidence draw, and its docstring says why there is nothing left to draw.
+
+**`backend/src/katalyst/domain/validity.py`** — `market_without_payoff` now reads:
+
+&gt; The tradeable claim "The Strait of Hormuz reopens to unrestricted commercial transit." does not say what you would trade.
+
+The old wording named the fields of one arm, and would have been a puzzle in front of a claim whose ending is a contract.
+
+**`backend/tests/unit/domain/test_validity.py`** — the message assertion follows, and `test_validate_requires_payoff_on_market` gains a docstring naming the two ways an ending can say what you would trade.
+
+Nothing else moved. `validate`'s rules, order and codes are unchanged; no rule cares which arm a payoff is.
+
+## 2. The generated schema
+
+`Proposition.payoff` comes out as pydantic's usual nullable wrapper around a properly discriminated union: `anyOf: [ {discriminator: {propertyName: "kind", mapping: {contract: …, price: …}}, oneOf: [ContractPayoff, PricePayoff]}, {type: "null"} ]`. `openapi-typescript` turns that into a narrowable tagged union or null, which is what the browser wants. `Graph`'s `$defs` now lists `ContractPayoff` and `PricePayoff` and no longer lists `Payoff`.
+
+## 3. Verification
+
+**`feat/02-domain-models` at `8a69962`**
+```
+$ uv run ruff check .           All checks passed!
+$ uv run ruff format --check .  27 files already formatted
+$ uv run mypy src               Success: no issues found in 17 source files
+$ env -u ANTHROPIC_API_KEY uv run pytest
+src/katalyst/domain/link.py              27      0      0      0   100%
+src/katalyst/domain/proposition.py       59      0      4      0   100%
+TOTAL                                   195      0     14      0   100%
+======================== 77 passed, 2 warnings in 0.69s ========================
+```
+
+**`feat/02-validity` at `7611c1b`**
+```
+$ uv run ruff check .           All checks passed!
+$ uv run ruff format --check .  33 files already formatted
+$ uv run mypy src               Success: no issues found in 18 source files
+$ env -u ANTHROPIC_API_KEY uv run pytest
+Name                                  Stmts   Miss Branch BrPart  Cover   Missing
+---------------------------------------------------------------------------------
+src/katalyst/domain/__init__.py           9      0      0      0   100%
+src/katalyst/domain/belief.py            24      0      6      0   100%
+src/katalyst/domain/branch.py             9      0      0      0   100%
+src/katalyst/domain/graph.py             15      0      2      0   100%
+src/katalyst/domain/ids.py                6      0      0      0   100%
+src/katalyst/domain/intervention.py      47      0      2      0   100%
+src/katalyst/domain/link.py              27      0      0      0   100%
+src/katalyst/domain/proposition.py       59      0      4      0   100%
+src/katalyst/domain/validity.py         135      0     52      0   100%
+---------------------------------------------------------------------------------
+TOTAL                                   331      0     66      0   100%
+======================= 109 passed, 2 warnings in 41.22s =======================
+```
+
+Coverage of `src/katalyst/domain` stays at 100%. The suite went from 24 to 41 seconds, because `payoffs()` now draws two arms and every generated map draws more; still comfortably under the minute, but worth knowing it is the payoff generator if it ever needs trimming.
+
+## 4. Branch state
+
+```
+$ git log --oneline feat/02-domain-models..feat/02-validity
+7611c1b test(domain): generators and messages follow the two-armed payoff
+20b569b test(domain): generators of random maps, and the property tests they feed
+add71d5 feat(domain): validate — every fault at once, in an order that never moves
+```
+
+Only validity commits, as required.
+
+| Branch | Tip |
+|---|---|
+| `feat/02-domain-models` | `8a69962fbc1c962f20c647806b3bfa7eebca067d` |
+| `feat/02-validity` | `7611c1b55ec7dffb32d80277c6c9707495760725` |
+
+The two rebased commits changed hash (`c16f452` → `add71d5`, `ac4f82e` → `20b569b`), which is what the force-push with lease is for. The worktree is left on `feat/02-validity`, clean. Nothing pushed.
+
+One thing for whoever amends the chapters: `spec/graph/validity.md`'s message-pattern table still reads *"does not name an instrument, a direction and a size"* for `market_without_payoff`, and `spec/graph/link.md` still documents `confidence` and its open question 1. The code no longer matches either.</result>
+<usage><subagent_tokens>265391</subagent_tokens><tool_uses>83</tool_uses><duration_ms>369725</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>adefaccbffedf8cf9</task-id>
+<tool-use-id>toolu_01CAW8Az7pu3WYRyyLg8gbzD</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/adefaccbffedf8cf9.output</output-file>
+<status>completed</status>
+<summary>Agent "Hormuz fixture + routes (stack 02 PR 4)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Rebased and adjusted. Everything is in the worktree only; nothing pushed.
+
+## Branch shape
+
+`git log --oneline feat/02-validity..HEAD`:
+
+```
+509bede feat(fixtures): the Hormuz example follows the two payoff shapes and carries no self-reported confidence
+eda9de7 docs(architecture): mark the data model built, and correct the table to what exists
+c391a48 test: the Hormuz example is valid, complete, and survives the trip to the browser
+5e0512a feat(api): read-only routes for the worked examples, and the browser types they generate
+32c3ce5 feat(fixtures): the Hormuz map, and the branch where Iran is struck the next day
+53c0cda Merge branch 'feat/01-frontend-skeleton' into feat/02-hormuz-fixture
+7568574 fix(frontend): interface text says what is not built, not which stack builds it
+… (the seven frontend commits the merge brings in)
+```
+
+New validity tip `7611c1b` → frontend merge → my four commits → the new one. I used the robust route (fresh branch off `feat/02-validity`, merge `feat/01-frontend-skeleton`, cherry-pick the four), and re-did it once so the merge commit message reads `into feat/02-hormuz-fixture` rather than `into tmp`.
+
+## M1 and M2, quoted
+
+```python
+    # A contract payoff, because somebody already sells this exact question. It
+    # names the venue, the contract and the side, and it names no price at all:
+    # what the contract costs is a live quote, fetched at run time, and a number
+    # typed here would be stale the moment it was written.
+    payoff=ContractPayoff(
+        venue="Polymarket",
+        # Illustrative. Polymarket identifies a contract by a long hexadecimal
+        # condition identifier; this readable stand-in is what a reader can
+        # follow, and the grounding stack replaces it with a real one.
+        contract_id="brent-below-70-2026-10-31",
+        title="Brent below $70 on 2026-10-31",
+        # You make money when the claim comes true, so the side is the yes side.
+        side="yes",
+    ),
+```
+
+```python
+    # A price payoff, because no venue asks this question, but two funds anybody
+    # can trade move when the answer changes. The other half of the pair the map
+    # shows: a contract at one ending, an instrument at the other.
+    payoff=PricePayoff(
+        # The pair, held on both sides at once: XLE (Energy Select Sector SPDR)
+        # against SPY (SPDR S&amp;P 500 ETF), dollar for dollar.
+        instrument="XLE vs SPY",
+        # `direction` says which side of the named instrument makes money when
+        # the claim comes true. Holding the pair long — long XLE, short SPY —
+        # loses if energy shares lag, so the position that pays here is the
+        # short side: short XLE, long SPY.
+        direction="short",
+        # Three per cent, read straight from the claim: the size of the
+        # underperformance the claim asks for. `move` is a fraction of the
+        # instrument's own price, which needs no assumption about an entry price
+        # — and having a separate contract shape next door is what lets it mean
+        # only that.
+        move=0.03,
+    ),
+```
+
+The invented `1.08` is gone with the field it lived in, and so is the comment that hedged between two readings of one `magnitude`.
+
+## Other changes
+
+- **`confidence=` removed from all eleven links.** The arrows-section header now says the rationale is the argument and provenance is the only receipt. The C → B comment no longer explains a documented/argued pair; it says the mechanism is the sort of thing that is written down, and the arrow still says `argued` because nothing was fetched for this file. The H → N1 comment drops "speculative" and rests on `asserted` alone.
+- **S → H re-argued as a timed assertion:** "Suppose the strait is open, from 2026-10-01" cuts the arrows into H that exist when the edit is applied and cuts nothing afterwards, so an arrow arriving with the next edit is live and can push H back. No appeal to a do-operator seal. The branch's step-1 comment says the same thing.
+- **Tests:** `test_every_tradeable_ending_names_something_to_trade` now reads whichever shape it finds; new `test_the_two_endings_use_the_two_payoff_shapes`; `test_the_example_exercises_every_shape_the_model_layer_defines` now also demands `{"contract", "price"}`.
+- **`ARCHITECTURE.md` §4** (folded into the same commit rather than left stale): the `Link` row drops confidence and says why; the `Proposition` row names both payoff shapes and notes neither names a price.
+
+## Verification
+
+```
+ruff check .          All checks passed!
+ruff format --check   40 files already formatted
+mypy src              Success: no issues found in 22 source files
+pytest                TOTAL 331 0 66 0 100% — 136 passed, 2 warnings in 23.01s
+gen-types.sh × 2      STABLE: two runs, no diff
+frontend              tsc -b --noEmit exit 0; biome ci → Checked 16 files, no fixes applied
+grep -c confidence frontend/src/api/schema.ts → 0
+```
+
+The payoff crossed to TypeScript as a second tagged union, the same quality as the intervention one:
+
+```ts
+ContractPayoff: { kind: "contract"; venue: string; contract_id: string; title: string; side: "yes" | "no"; };
+PricePayoff:    { kind: "price"; instrument: string; direction: "long" | "short"; move: number; };
+payoff?: (components["schemas"]["ContractPayoff"] | components["schemas"]["PricePayoff"]) | null;
+```
+
+`Do`'s new docstring ("a supposition that starts on a day … not a permanent seal") travelled across into the TypeScript doc comment too. Over the wire, `/api/fixtures/hormuz` returns `M1 {"kind":"contract","venue":"Polymarket",…,"side":"yes"}` and `M2 {"kind":"price","instrument":"XLE vs SPY","direction":"short","move":0.03}`.
+
+One judgement call to flag: the brief wrote `venue="polymarket"`, and I used `"Polymarket"` because the field's own description says "by the venue's own name: 'Polymarket', 'Kalshi'". Say the word and I'll lowercase it.</result>
+<usage><subagent_tokens>235663</subagent_tokens><tool_uses>115</tool_uses><duration_ms>281883</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>adeec86b995daa671</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/adeec86b995daa671.output</output-file>
+<status>completed</status>
+<summary>Agent "Amend spec and records for five decisions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. All edits are in `/Users/kentgang/git3/katalyst-wt/spec-02/` only; no git commands run.
+
+## Per file
+
+**`PRODUCT_REQUIREMENTS.md`**
+- §4 vocabulary: Intervention row gains the two buttons (`do` → "Suppose this is true", `observe` → "This happened"). The Link row never listed `confidence`, so nothing to drop.
+- §6.2 FR-8: "link confidence" → link *agreement*, computed from how far independent runs differed, never self-reported.
+- §6.3 FR-16: "ranked by |Δ| × confidence" reworded (not on your list — see uncertainties).
+- §7: new **UX-14**.
+- §9: INV-4 restated.
+
+**`spec/vocabulary.md`**
+- `payoff` line → the two shapes, with the boundary rule.
+- Link bullet drops `confidence`; says there is no such field.
+- `do` entry gains the cut-timing clause and the "timed assertion" gloss.
+- Locality entry → the affected-set statement, pointing at the per-operation table.
+- New **Interface words** section (six rows + the derived Retracted badge), placed before "Words we do not use".
+- "Words we do not use" → *confidence* at all; *agreement* is the computed alternative.
+
+**`spec/graph/proposition.md`**
+- `Payoff` → `ContractPayoff` / `PricePayoff` / discriminated union, frozen, `Field(description=…)`, boundary rule in both docstrings; `Annotated` added to imports; `Proposition.payoff` description updated.
+- B2 diagram and prose re-read under one rule (M1 contract, M2 price; the `1.08` is gone and explained).
+- Violation-message quote matched to `validity.md`'s new wording.
+- Open questions 1 and 2 closed with dated **Decided 2026-09-17** lines (questions kept).
+
+**`spec/graph/link.md`**
+- `confidence` deleted from the model, the B1 field table and the B2 code block.
+- "`confidence` versus `provenance`" → "**`provenance` — a receipt, not a claim**" (three-line note + the unchanged provenance table + one paragraph recording the removal).
+- Open question 1 closed with a dated line carrying the four reasons and the `agreement` escape hatch.
+
+**`spec/graph/belief.md`** — anti-pattern 4 rewritten: the word is retired, no field anywhere.
+
+**`spec/graph/validity.md`** — rule-4 row and the `market_without_payoff` message → "does not say what you would trade" (per your mid-task note; I changed the rule row too so the table and the message agree). No `confidence` mentions remain here.
+
+**`spec/multiverse/interventions.md`**
+- Table of six: verb column → buttons and badges; note added that code names never appear on screen.
+- `retune` row and B3 prose drop `confidence`; `observe` row's "must never change" cell widened to match the affected set.
+- B2: three new paragraphs — the timed-assertion warrant (no Pearl), INV-3 untouched, and the override is visible (UX-14).
+- INVARIANTS: INV-4 restated as one principle + a three-column affected-set table + how the test computes the set (`networkx`, never the engine's bookkeeping) + the fully-separated-claim rule + the bracketing with `test_observe_may_update_ancestors`.
+- Open questions 1, 2, 7 and 8 closed with dated lines.
+
+**`spec/multiverse/branches-and-worlds.md`** — open question 1 closed (graph plus ordered assignments; no "fixed value" field; law 2 still type-checks); open question 6 closed (`SOURCE-&gt;TARGET`, pinned by a test). Its five-edit ordered example already matches decision 4; unchanged.
+
+**`spec/multiverse/README.md`** — the landing page's INV-4 row and its "Only what is downstream changes" paragraph restated (not on your list; it stated the old invariant).
+
+**`docs/adr/0004-branches-are-patches.md`** — verb sentence amended in Decision Outcome; four test names corrected in place with a pointer; new **Amendment (2026-09-17)** section at the end.
+
+**`docs/adr/0005-link-semantics-and-propagation.md`** — one sentence in Decision Outcome: rejection sampling is *why* `observe`'s affected set is wider, "(amended 2026-09-17)".
+
+**`docs/adr/0013-payoff-names-the-trade-quote-names-the-price.md`** — new, 86 lines (0010 is 86), template headings matched exactly, `accepted`, 2026-09-17, four options, amends 0010's semantics bullet.
+
+**`docs/adr/README.md`** — 0013 row after 0011; no 0012 row.
+**`ARCHITECTURE.md`** — §4 `Proposition` row gains the identity-in-`domain`/price-in-`grounding` line; §9 gains the 0013 row only.
+
+## Quoted
+
+**INV-4** (`PRODUCT_REQUIREMENTS.md` §9): "**Locality.** An intervention changes only what is still connected to its subject in the graph the edit leaves behind; every other proposition is byte-identical between the base and the branch. Operational form: the affected-set table in `spec/multiverse/interventions.md`, which names the set for each of the six operations"
+
+**UX-14**: "**UX-14 An overridden assertion says so.** A claim the user supposed true, and that a later edit in the same branch has pushed back down, never renders as plainly true. Its tile carries both states in order — *Supposed · Oct 1 → Retracted · Oct 2 by "confirmed strike on Iranian territory"* — naming the edit responsible, and the branch panel lists that branch's edits in the order they were made. This is what makes the rule that a later `insert` outranks an earlier assertion readable on screen rather than surprising."
+
+**Record 0013**: "Chosen option: "A", because the two ordinary kinds of ending want different facts about *identity* and neither wants a price, which leaves one rule to remember: **the domain names what you would trade; the grounding layer names what it costs.**"
+
+## Unsure / judgment calls
+
+1. **FR-16** also used "confidence" ("ranked by |Δ| × confidence"). Not on your list, but decision 3 retires the word and your done-when grep expects no other mentions, so I reworded it to "ranked by the size of the change and how well-founded it is — the provenance of the arrows behind it and the width of its range, never a self-reported number". That edits a P0 requirement's ranking rule; revert or refine if you meant something narrower.
+2. **`magnitude` survives once**, in the preserved *title* of proposition.md open question 1 — unavoidable, since you asked to close rather than delete it.
+3. **Two headings still say "instrument"** where a contract payoff now applies: proposition.md's B2 heading and INV-graph.11's title. Left as prose; say the word and I'll rework them.
+4. The **0004 Amendment** is a top-level `## Amendment (2026-09-17)` section placed after More Information; I read "under 'More Information'" that way.
+5. **Record 0010 itself is untouched** — 0013 records the amendment and the higher number wins. `superseded-by` on 0010 left as `none`.
+6. Grep now shows `confidence` only in: the vocabulary note, belief.md's anti-pattern about the word, link.md's removal note, and link.md's closed open question.</result>
+<usage><subagent_tokens>176792</subagent_tokens><tool_uses>64</tool_uses><duration_ms>793724</duration_ms></usage>
+</task-notification>
+
+---
+
+Could you please orchestrate the merging in of all the PRs you created than updating the repo-level docs and specs as appropriate? Could you clean up the worktrees and branches locally that are no longer needed after merging? Finally can you update and write additional plans to /Users/kentgang/git3/katalyst/plans for a fresh agent to continue forward with additional stacks?
+
+---
+
+<task-notification>
+<task-id>a0d8f211f7dc188b2</task-id>
+<tool-use-id>toolu_01NtZzKhFfHFxgoRqHngpo3o</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/66803034-4bb5-492b-abd1-36f8748f9300/tasks/a0d8f211f7dc188b2.output</output-file>
+<status>completed</status>
+<summary>Agent "Repo-level docs sweep after stacks 01–02" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Four commits on `docs/02-close` in `/Users/kentgang/git3/katalyst-wt/docs-02-close/`, nothing pushed, `main` untouched.
+
+## What changed, one line per file
+
+- **`/Users/kentgang/git3/katalyst-wt/docs-02-close/ARCHITECTURE.md`** — §1 and §2 flipped to `[built]` with an honest opener naming what is still a plan; §3 kept `[planned]` with a line saying none of its eight steps exists; §4's `Graph` row lost a wrong `INV-5` citation; §5 rewritten (table below); §6 opens by naming stored state as the one planned thing; §7's fourth marker "built in part" removed and the table rebuilt (property tests are real, a worked-example row added, 137 + 3 tests, 100% of `domain/`); §8 lost a duplicated sentence and the tree now matches disk; §10 rewritten as what-is-not-built plus two open and three settled questions. "Last verified" was already 2026-09-17.
+- **`…/PRODUCT_REQUIREMENTS.md`** — §12 gained a Status column (00/01/02 merged with their pull-request numbers, 03a/03b next) plus a note explaining #11 and #9; §13 keeps two open questions and moves four to an "Answered" list. Nothing else touched.
+- **`…/docs/adr/0009-git-workflow-stacked-prs.md`** — added a dated "Verification outcome (2026-09-17)" under More Information with the `merge-async` recipe, the polling loop, the bottom-up rule, the sibling-stack `git merge origin/main` case, the branches it leaves behind, and the top-of-stack trap; the invented branch-name examples replaced with the names stacks 00–02 actually used.
+- **`…/README.md`** — added `/api/fixtures/hormuz` in one line (with "nothing draws it yet"), rewrote the Tests paragraph (property tests exist; only recorded model answers are still empty), added one line under the opening saying where the build is, and added `fixtures/` to the repo map. Commands re-verified: `make`, `make test` (137 + 3 green, no key), `make lint` (green), `make types` (no diff), and both compose files validate.
+- **`…/spec/graph/README.md`**, **`…/spec/multiverse/README.md`** — "Written in" column now reads `stack 02 — written, models built` for the four graph and two multiverse chapters; `propagation.md` and `diff.md` left at stack 03a.
+- **`…/AGENTS.md`** — two rows added to the Map, `backend/` and `frontend/`. Nothing else.
+- **`…/docs/adr/README.md`** — checked, not changed: the 0012 and 0013 rows are in order, correctly dated, and their statuses match each record's front matter.
+
+## §5 as written
+
+Opener: *"Four of the fourteen invariants are fully checked today, five are partly checked, and five wait for code that does not exist yet — applying an edit (stack 03a), the canvas (03b), the model boundary (04), the thesis (05), refinement (06). Every test named below is real and runs in `make test`."*
+
+| Invariant | Enforced in | Named tests today | Still planned |
+|-----------|-------------|-------------------|---------------|
+| INV-1 — a claim is checkable: criteria, a named judge, a resolve-by date | `domain/validity.py` | `test_validate_rejects_unresolvable_proposition`, `test_valid_graphs_have_no_violations`, `test_every_resolve_by_date_falls_after_the_day_the_example_is_set_on` | — |
+| INV-2 — an arrow says why, and one claiming evidence cites it; every likelihood has an owner | `domain/validity.py`, `domain/belief.py` | `test_validate_rejects_link_without_rationale`, `test_validate_rejects_unsourced_documented_link`, `test_no_arrow_claims_evidence_it_does_not_cite`, `test_owner_matches_slot`, `test_prior_is_owned_by_the_model` | — |
+| INV-3 — asserting a claim is not observing it | `domain/intervention.py`; later propagation | `test_intervention_discriminator`, `test_intervention_rejects_an_unknown_kind` — the six kinds exist and are told apart by `kind` | The rule itself. Nothing applies an edit, so nothing can yet check that `do` leaves a claim's causes alone while `observe` may change them. Stack 03a |
+| INV-4 — locality: only what is still connected to the edit may move | `domain/` propagation | none | The affected-set test, one case per operation, over generated maps. Stack 03a |
+| INV-5 — the base is never touched; a branch is an ordered patch list; a world replays from (base, branch, seed) | `domain/branch.py`, `domain/graph.py` | `test_branch_round_trip`, `test_intervention_round_trip`, `test_seeds_are_whole_numbers`, `test_models_are_frozen`, `test_generated_models_are_frozen` — nothing on a map can be changed after it is built, and a branch survives a round trip through JSON with each edit restored to its own class | The three laws themselves: an empty branch changes nothing, two branches in sequence equal their concatenation, one seed replays one world. All three need `apply`. Stack 03a |
+| INV-6 — no loops once feedback arrows are set aside, and every feedback arrow takes time | `domain/validity.py` | `test_validate_rejects_cycles`, `test_an_arrow_from_a_claim_to_itself_is_a_loop`, `test_reflexive_links_have_positive_lag`, `test_the_map_has_a_feedback_arrow_and_it_takes_time` | — |
+| INV-7 — a likelihood sits inside its own range, and is shown at two significant figures | `domain/belief.py`, `domain/validity.py`; later the browser app | `test_belief_bounds_at_construction`, `test_belief_bounds_at_construction_over_raw_fields`, `test_validate_rejects_belief_out_of_range`, `test_every_likelihood_is_a_range_and_never_a_point` | The showing half: a chip never renders more than two significant figures. Stack 03b |
+| INV-8 — a path drawn on screen shows the product of its arrows | browser app | none | A component test on the path bar. Stack 03b |
+| INV-9 — every map ends in something to trade, or says why it cannot | `domain/validity.py` | `test_validate_requires_terminal`, `test_validate_requires_payoff_on_market`, `test_validate_requires_reason_on_not_tradeable`, `test_every_tradeable_ending_names_something_to_trade`, `test_the_ending_that_cannot_be_traded_says_why`, `test_the_two_endings_use_the_two_payoff_shapes` | — |
+| INV-10 — splitting a claim into finer claims adds back up | `domain/` propagation | none | A test that the parts recombine to the original within a small tolerance. Stack 06, with `refine` |
+| INV-11 — model, user and market likelihoods are never merged | `domain/` | `test_beliefs_never_merged`, which reads our own source code looking for an average taken across two owners, plus its four self-checks — `test_the_checker_catches_two_likelihoods_averaged`, `test_the_checker_catches_a_merge_hidden_in_a_structure`, `test_the_checker_leaves_honest_functions_alone`, `test_the_checker_is_pointed_at_the_real_rules_layer` | The same rule on the browser side, once three chips are drawn side by side. Stack 03b |
+| INV-12 — nothing carries meaning in colour alone | browser app | none | Component tests on glyphs, tail textures and stroke styles. Stack 03b |
+| INV-13 — the checks run with no model key | the test suite, `.github/workflows/ci.yml` | `test_healthz_is_ok_with_no_environment_variables_set`, `test_readyz_reports_not_ready_when_no_model_key_is_configured`, `test_readyz_treats_an_empty_key_as_no_key`, `test_readyz_reports_ready_when_a_model_key_is_configured`. Beyond the tests: `--record-mode=none` is on by default in `backend/pyproject.toml`, so an unrecorded call fails instead of dialling out, and `make test` unsets both keys before running | The recordings themselves. `backend/tests/cassettes/` is empty; the first one arrives with stack 04 |
+| INV-14 — the thing that would prove you wrong resolves in time, and in public | `domain/` thesis derivation | none | Unit tests on the timing and observability filters. Stack 05, with `Thesis` |
+
+Closing line: the two tests that guard no numbered invariant — `test_domain_imports_nothing_impure` and `test_the_rules_layer_never_reads_the_examples`.
+
+## Checks
+
+`grep -n "\[planned\]\|\[built\]\|\[stretch\]\|built in part" ARCHITECTURE.md` → 12 `[built]`, 13 `[planned]`, 1 `[stretch]`, 0 "built in part". All 41 test names cited across the edited files exist in the suite (diffed against `pytest --co`); all 8 private validator functions cited in §4 exist in `domain/validity.py`. Pre-commit hooks pass on every edited file; `commitizen check` validates all four commit messages.
+
+## Contradictions found that I could not fix within these files
+
+1. **`/Users/kentgang/git3/katalyst/docs/adr/0012-replay-mode-from-recorded-transcripts.md`** — its `consulted:` front matter cites `plans/roadmap-03-to-06.md`. `plans/` is git-ignored, so a committed decision record points at a file no reader of the repository can open. Needs either the reference removed or the substance moved into the record.
+2. **`docs/adr/0008-testing-layers-and-cassettes.md`** still says "Four test layers" in its title and decision. The suite now has five kinds of test (the worked-example layer in `backend/tests/unit/fixtures/`, 30 tests). I said so in ARCHITECTURE §7, but 0008 itself is now slightly behind — an amendment or a superseding record would settle it.
+3. **`PRODUCT_REQUIREMENTS.md` §12's "Name" column** gives one branch per stack (`feat/01-skeleton`, `feat/02-schema`); those exact branches were never created — each stack was three to five branches. I explained this in a note under the table rather than rewriting the column, since the instruction was to touch only the status. The column is still misleading at a glance.
+4. **`README.md`'s opening two paragraphs** describe the finished product in the present tense ("Katalyst shows what it would cause… The map ends in a thesis"), while a reviewer running `docker compose up` today sees a status screen. I added one dated line underneath saying what is and is not built; the opening itself is product copy I left alone.
+5. **`ARCHITECTURE.md` §2** still says accepted and rejected proposals "are events on the stream" — true of the design, not of the code. The section opener now flags that half as stack 04, but the sentence itself reads as present tense.</result>
+<usage><subagent_tokens>153252</subagent_tokens><tool_uses>49</tool_uses><duration_ms>704638</duration_ms></usage>
+</task-notification>
