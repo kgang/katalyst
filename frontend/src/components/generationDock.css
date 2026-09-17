@@ -1,0 +1,28 @@
+/*
+ * The panel beside a map that is being generated.
+ *
+ * It holds more than the panel beside a stored map does — the Verify door's
+ * answer, every refusal, what the run cost, the one edit that needs the model,
+ * and the panel itself — so it is the one panel in this product that scrolls as
+ * a whole rather than section by section.
+ *
+ * **Why as a whole.** A panel whose sections each scroll inside themselves hides
+ * things twice over: a refusal can scroll out of the strip while the strip is
+ * itself scrolled out of the panel, and a reader who looks away for a minute of
+ * a run cannot tell what they have missed. Scrolling once means there is one
+ * place to be, and everything that arrived is somewhere above or below it.
+ */
+
+.dock--generation {
+  overflow-y: auto;
+}
+
+/* Inside a panel that scrolls as a whole, the section that reads out whatever is
+ * selected is as tall as what is in it, like every other section. Left to its
+ * own scrolling it would be a box inside a box, and the reader would have to
+ * find which of the two was under the pointer. */
+.dock--generation .inspector {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+}

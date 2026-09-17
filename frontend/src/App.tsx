@@ -16,22 +16,38 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { branchAnnouncement } from "./a11y/announcement";
+import { growthAnnouncement } from "./a11y/growth";
 import { outlineOf } from "./a11y/sentences";
-import type { About, FixtureSummary, Health, Readiness } from "./api/client";
+import type { About, FixtureSummary, Health } from "./api/client";
 import { RefusedBranch, readAbout, readExampleList, readHealth, readReadiness } from "./api/client";
+import { AddAClaim } from "./components/AddAClaim";
 import { BranchPanel, InterventionPanel } from "./components/BranchPanel";
 import { type Command, CommandPalette } from "./components/CommandPalette";
 import { DeltaRail } from "./components/DeltaRail";
+import { DoneLine } from "./components/DoneLine";
+import type { Asked } from "./components/InputBar";
 import { Inspector } from "./components/Inspector";
 import { Launchpad } from "./components/Launchpad";
 import { Outline } from "./components/Outline";
+import { ReceiptStrip } from "./components/ReceiptStrip";
 import { Refusal } from "./components/Refusal";
+import { RefusalStrip } from "./components/RefusalStrip";
+import { ReplayBadge } from "./components/ReplayBadge";
 import { ShortcutsSheet } from "./components/ShortcutsSheet";
+import { VerdictCard } from "./components/VerdictCard";
+import "./components/generationDock.css";
 import { MapCanvas } from "./graph/Canvas";
 import { bothPaintings, type Engine, railRows } from "./graph/diff/branchWorld";
 import { endings, NO_SUMMARY_YET } from "./graph/diff/endings";
 import { roomFor } from "./graph/geometry";
 import type { MapKeys } from "./keyboard/useMapKeys";
+import { generate } from "./stream/generate";
+import type { Growth } from "./stream/growth";
+import { fold, waitingFor } from "./stream/growth";
+import type { Readiness } from "./stream/readiness";
+import { withRecordings } from "./stream/readiness";
+import type { Working } from "./stream/transcript";
+import { readTranscript } from "./stream/transcript";
 import {
   type Absence,
   ApiWorldSource,
@@ -81,6 +97,16 @@ interface Reading {
 /** Turn whatever a failed request threw into one sentence. */
 function inWords(reason: unknown): string {
   return reason instanceof Error ? reason.message : "The reason was not recorded.";
+}
+
+/**
+ * Ask what this copy can do, and read the list of recordings off the answer.
+ *
+ * Defined at module level because the hook below runs it once and needs the same
+ * function on every render.
+ */
+function askReadiness(): Promise<Readiness> {
+  return readReadiness().then(withRecordings);
 }
 
 /**
@@ -162,7 +188,10 @@ function modelKeyReading(answer: Answer<Readiness>): Reading {
             label: "model key",
             value: "absent",
             glyph: "○",
-            state: "no key configured — generating a map is not built yet",
+            state:
+              answer.value.replayable.length === 0
+                ? "no key configured, and nothing recorded to play instead"
+                : `no key configured — ${answer.value.replayable.length} example(s) play from recordings`,
             tone: "quiet",
           };
     case "failed":
@@ -195,19 +224,6 @@ function versionReading(answer: Answer<About>): Reading {
 }
 
 /**
- * Why the three examples that need the model are not live, in one sentence.
- *
- * Read from the server's own answer rather than written into the page, so that
- * the reason on screen is the real one.
- */
-function notLiveReason(answer: Answer<Readiness>): string {
-  if (answer.state === "answered" && !answer.value.model_key_present) {
-    return "Turning your own words into a map needs the model, and this server has no key for one.";
-  }
-  return "Turning your own words into a map is not built yet.";
-}
-
-/**
  * One row: a label, the value the server gave, and what that value means.
  *
  * While the value is missing the cell holds a bar of the same height, so the
@@ -232,10 +248,12 @@ function StatusRow({ reading }: { reading: Reading }) {
   );
 }
 
-/** Which of the two screens is showing. */
+/** Which of the screens is showing. */
 type Screen =
   | { at: "launchpad" }
   | { at: "opening"; id: string }
+  /** A map being built in front of the reader, from a sentence they typed. */
+  | { at: "growing"; asked: Asked }
   | {
       at: "map";
       world: WorldView;
@@ -277,24 +295,31 @@ const WHILE_ASKING: Absence = {
  *
  * Not "no engine yet": the engine is there and it answered — it said the branch
  * does not fit the map, and it said why. The words have to be true of that, and
- * `spec/vocabulary.md`'s three rows are all about a number nobody has worked
- * out rather than one that could not be. **A fourth row is proposed** — *the
- * engine refused the branch these numbers would come from* → **not worked out**
- * — and until that lands this uses those words with the reason naming the
- * refusal, because the nearest existing row says the wrong thing.
+ * the vocabulary's first three rows are all about a number nobody has worked out
+ * rather than one that could not be. So there is a **fourth row** — *the engine
+ * refused the branch these numbers would come from* → **not worked out** — and a
+ * kind of its own to go with it, because "nothing has run yet" invites waiting
+ * and "the engine turned this down" invites repairing what it turned down.
  */
 const REFUSED: Absence = {
-  kind: "no_engine",
+  kind: "refused",
   words: "not worked out",
   reason:
     "The engine would not work this map out from this branch: the branch does not fit the map. " +
     "Every reason is beside the map, and nothing on the map has changed.",
 };
 
-/** What stands there when the engine could not be reached at all. */
+/**
+ * What stands there when the engine could not be reached at all.
+ *
+ * The same words and the same kind as a refusal, because from this slot's point
+ * of view the two are one fact: the engine was asked for this number and did not
+ * work it out. What differs is the reason beside them, and the reason is the
+ * sentence the failure itself arrived with.
+ */
 function unreachable(reason: string): Absence {
   return {
-    kind: "no_engine",
+    kind: "refused",
     words: "not worked out",
     reason: `The engine did not answer, so this number was never worked out. ${reason}`,
   };
@@ -896,6 +921,289 @@ function MapScreen({
   );
 }
 
+/* ---- A map being built in front of you ----------------------------------- */
+
+/**
+ * Run one generation and fold what comes back into what the screen knows.
+ *
+ * **No component talks to the network**: this hook holds the one request, and
+ * everything on screen is drawn from the state it folds. The run stops when the
+ * reader leaves the page, which is what stops the spending — the route checks
+ * whether the client is still there before its next model call.
+ *
+ * @param asked The sentence, the destination if there was one, and the reader's
+ *   own likelihood if they gave one.
+ */
+function useGeneration(asked: Asked): Growth {
+  const [growth, setGrowth] = useState<Growth>(() => waitingFor(asked.hypothesis, asked.target));
+
+  useEffect(() => {
+    const stop = new AbortController();
+    let stillOnScreen = true;
+    setGrowth(waitingFor(asked.hypothesis, asked.target));
+
+    const run = async (): Promise<void> => {
+      const stream = generate(
+        {
+          hypothesis: asked.hypothesis,
+          ...(asked.target === null ? {} : { target: asked.target }),
+          // "I don't know" sends nothing at all. Not a half, not a wide band.
+          ...(asked.belief === null ? {} : { user_belief: asked.belief }),
+        },
+        { signal: stop.signal },
+      );
+      for await (const event of stream) {
+        if (!stillOnScreen) {
+          return;
+        }
+        setGrowth((was) => fold(was, event));
+      }
+    };
+
+    run().catch((failure: unknown) => {
+      if (!stillOnScreen) {
+        return;
+      }
+      // Never reaching the route at all is the one thing that is not an event:
+      // there is no stream to read and nothing to draw, so it is folded in by
+      // hand as the sentence the failure arrived with.
+      setGrowth((was) => fold(was, { event: "failed", message: inWords(failure) }));
+    });
+
+    return () => {
+      stillOnScreen = false;
+      stop.abort();
+    };
+  }, [asked.hypothesis, asked.target, asked.belief]);
+
+  return growth;
+}
+
+/**
+ * The screen a map builds itself on.
+ *
+ * The same canvas, the same panel and the same keyboard as every other map. What
+ * is different is where the map comes from: it arrives claim by claim down one
+ * request, with a reserved rectangle standing wherever the next one will go, and
+ * every proposal the rules refused listed beside it.
+ *
+ * **There is no spinner here, and no moment where a blank screen turns into a
+ * finished picture.** The growing *is* the loading state.
+ */
+function GenerationScreen({
+  asked,
+  replaying,
+  onLeave,
+}: {
+  asked: Asked;
+  /**
+   * True when this copy has no model key, so the run is a recording being played
+   * back. Known before the stream says anything, which is why the badge can be
+   * on screen from the first frame.
+   */
+  replaying: boolean;
+  onLeave: () => void;
+}) {
+  const growth = useGeneration(asked);
+  const [selection, setSelection] = useState<Selection>(null);
+  const [focused, setFocused] = useState<string | null>(null);
+  const [overlay, setOverlay] = useState<"sheet" | null>(null);
+  const [dock, setDock] = useState<"panel" | "outline">("panel");
+  const [openAt, setOpenAt] = useState<number | null>(null);
+  const [status, setStatus] = useState(
+    "Press ? for every key. j and k walk a column; h and l follow the wires.",
+  );
+  const [working, setWorking] = useState<Working>({ state: "reading" });
+
+  const { generationId, phase } = growth;
+  const finished = phase === "settled" || phase === "stopped" || phase === "failed";
+
+  // The working of the run, read once the run has finished. It is asked for then
+  // rather than as it goes, because the server writes it from the same pass that
+  // writes the stream and a half-read one would be a second, staler copy.
+  useEffect(() => {
+    if (generationId === null || !finished) {
+      return;
+    }
+    let stillWanted = true;
+    readTranscript(generationId).then((read) => {
+      if (stillWanted) {
+        setWorking(read);
+      }
+    });
+    return () => {
+      stillWanted = false;
+    };
+  }, [generationId, finished]);
+
+  const outline = useMemo(() => outlineOf(growth.world), [growth.world]);
+  const announcement = useMemo(() => growthAnnouncement(growth), [growth]);
+
+  // The keyboard follows the growing edge: a claim that has just arrived takes
+  // focus, exactly as a claim a branch adds does. That is what keeps the newest
+  // tile on the glass through a run that goes on for minutes — the canvas
+  // already brings whatever the keyboard is on into view, so nothing here
+  // re-frames the map and nothing re-lays it out. A tile that is already placed
+  // stays exactly where it is; what moves is where the reader is looking.
+  const newest = growth.world.claims[growth.world.claims.length - 1]?.id ?? null;
+  const lastArrived = useRef<string | null>(null);
+  useEffect(() => {
+    if (newest === null || newest === lastArrived.current) {
+      return;
+    }
+    lastArrived.current = newest;
+    setFocused(newest);
+  }, [newest]);
+
+  const pick = useCallback((id: string) => {
+    setFocused(id);
+    setSelection({ kind: "claim", id });
+  }, []);
+
+  // Nothing on this screen is bound to the map's own six operations yet, so the
+  // keys that open them say so rather than doing nothing.
+  const keys: MapKeys = useMemo(
+    () => ({
+      intervene: () => setStatus("a generated map takes edits through Add a claim, beside the map"),
+      branch: () => setStatus("a branch is started on a stored map; this one is still being built"),
+      flipWorlds: () => setStatus("there is nothing to flip to — no branch is open"),
+      outline: () =>
+        setDock((was) => {
+          const next = was === "outline" ? "panel" : "outline";
+          setStatus(next === "outline" ? "the map as a list" : "the panel beside the map");
+          return next;
+        }),
+      panel: () => setStatus("the panel is beside the map"),
+      palette: () => setOverlay("sheet"),
+    }),
+    [],
+  );
+
+  return (
+    <main className="page page--map">
+      <header className="map-bar">
+        <button className="map-bar__back" type="button" onClick={onLeave}>
+          <span aria-hidden="true">←</span> Back to the launchpad
+        </button>
+        <h1 className="map-bar__title">{growth.world.title}</h1>
+        <p className="map-bar__where">
+          {asked.target === null ? "Explore" : "Verify"}
+          <span className="map-bar__side">
+            {asked.target === null ? "what your sentence would cause" : asked.target}
+          </span>
+        </p>
+        <button className="map-bar__sheet" type="button" onClick={() => setOverlay("sheet")}>
+          Every key (?)
+        </button>
+      </header>
+
+      <div className="map-body">
+        <div className="map-stage">
+          <MapCanvas
+            world={growth.world}
+            selection={selection}
+            onSelect={setSelection}
+            focused={focused}
+            onFocused={setFocused}
+            mapKey={generationId ?? "a run that has not started"}
+            keys={keys}
+            onStatus={setStatus}
+            onOverflow={() => setStatus("every claim is in the list beside the map")}
+            arriving={!finished}
+            reserved={growth.skeletons}
+            badge={
+              replaying ? (
+                <ReplayBadge
+                  recordingDate={growth.receipt?.recording_date ?? null}
+                  receiptMode={growth.receipt?.mode ?? null}
+                />
+              ) : undefined
+            }
+          />
+          {overlay === "sheet" ? (
+            <ShortcutsSheet open={true} onClose={() => setOverlay(null)} />
+          ) : null}
+          <p className="map-status">
+            <span className="map-status__mark">last key</span>
+            {status}
+          </p>
+        </div>
+
+        <aside className="dock dock--generation" aria-label="The panel beside the map">
+          {/* The map as a list, in place of the panel, exactly as it is on a
+              stored map: press O for it, press O again for the panel. It grows
+              as the map grows, in the same causal order, so a reader who never
+              sees the canvas hears the map being built rather than a silence
+              followed by a finished list. */}
+          {dock === "outline" ? (
+            <Outline items={outline} onPick={pick} focused={focused} />
+          ) : (
+            <>
+              {/* The Verify door's answer, at the top, when a destination was named. */}
+              {growth.verdict === null || asked.target === null ? null : (
+                <VerdictCard
+                  verdict={growth.verdict}
+                  target={asked.target}
+                  world={growth.world}
+                  onSelect={pick}
+                />
+              )}
+
+              <RefusalStrip
+                refusals={growth.refusals}
+                openAt={openAt}
+                onOpen={(at) => {
+                  setOpenAt(at);
+                  setSelection({ kind: "generation", id: generationId ?? "" });
+                }}
+              />
+
+              {growth.receipt === null ? null : (
+                <ReceiptStrip
+                  receipt={growth.receipt}
+                  onOpen={() => {
+                    setOpenAt(null);
+                    setSelection({ kind: "generation", id: generationId ?? "" });
+                  }}
+                />
+              )}
+
+              {finished && growth.world.baseId !== "" ? (
+                <AddAClaim baseId={growth.world.baseId} />
+              ) : null}
+
+              <Inspector
+                world={growth.world}
+                selection={selection}
+                generation={{
+                  receipt: growth.receipt,
+                  working,
+                  unknown: growth.unknown,
+                  openAt,
+                }}
+              />
+            </>
+          )}
+        </aside>
+      </div>
+
+      <p className="map-live" aria-live="polite">
+        {announcement}
+      </p>
+
+      <div className="map-origin">
+        <p className="map-origin__line">{growth.world.origin}</p>
+        <DoneLine done={growth.done} failure={growth.failure} />
+        {(growth.world.warnings ?? []).map((warning) => (
+          <p className="map-origin__line" key={warning}>
+            {warning}
+          </p>
+        ))}
+      </div>
+    </main>
+  );
+}
+
 /**
  * Where maps come from: the engine.
  *
@@ -945,7 +1253,7 @@ export function App({
   listExamples = readExampleList,
 }: AppProps = {}) {
   const health = useAnswer(readHealth);
-  const readiness = useAnswer(readReadiness);
+  const readiness = useAnswer(askReadiness);
   const about = useAnswer(readAbout);
   const examples = useAnswer(listExamples);
 
@@ -996,10 +1304,26 @@ export function App({
 
   const toLaunchpad = useCallback(() => setScreen({ at: "launchpad" }), []);
 
+  /** Build a map from a sentence, and watch it arrive. */
+  const build = useCallback((asked: Asked) => setScreen({ at: "growing", asked }), []);
+
   const readings = useMemo(
     () => [serverReading(health), modelKeyReading(readiness), versionReading(about)],
     [health, readiness, about],
   );
+
+  if (screen.at === "growing") {
+    return (
+      <GenerationScreen
+        asked={screen.asked}
+        // Known before the stream has said anything, which is the whole reason
+        // the badge can be on screen from the first frame. When the receipt
+        // arrives it is the authority, and the badge takes its word.
+        replaying={readiness.state === "answered" && !readiness.value.model_key_present}
+        onLeave={toLaunchpad}
+      />
+    );
+  }
 
   if (screen.at === "map") {
     return (
@@ -1037,7 +1361,12 @@ export function App({
 
   return (
     <main className="page">
-      <div className="column">
+      {/* The first screen is the one wide column in this product: it holds the
+          two doors, a map that is already drawn, the four sentences from the
+          brief and the field you type your own into, and stacking all of that
+          in the 660-pixel measure the rest of the page reads at pushes the
+          field below the fold. `launchpad.css` owns the width. */}
+      <div className="column column--launchpad">
         <header className="masthead">
           <h1 className="wordmark">Katalyst</h1>
           <p className="purpose">
@@ -1049,8 +1378,9 @@ export function App({
         <Launchpad
           examples={examples.state === "answered" ? examples.value : null}
           failure={examples.state === "failed" ? examples.reason : null}
-          notLiveReason={notLiveReason(readiness)}
+          readiness={readiness.state === "answered" ? readiness.value : null}
           onOpen={open}
+          onBuild={build}
         />
 
         <section aria-labelledby="status-heading">

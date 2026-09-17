@@ -1,0 +1,40 @@
+/*
+ * Why the run ended, said once, under the map.
+ *
+ * One line of words with a small label in front of it. No icon, no colour, no
+ * banner: a run that reached its claim cap and a run that finished cleanly are
+ * both things that happened, and dressing one of them as a warning would teach a
+ * reader to read the colour instead of the sentence.
+ */
+
+.done-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.done-line__word {
+  padding: 0 var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.done-line__why {
+  color: var(--text);
+}
+
+.done-line__counts {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

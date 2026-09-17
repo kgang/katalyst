@@ -29,16 +29,6 @@ import { describe, expect, it } from "vitest";
  * Deliberately not the whole tree: the file that works out where a wire goes
  * does nothing but pixel geometry, and pixel geometry is arithmetic on pixels.
  */
-const DRAWS_THE_MAPS_NUMBERS = [
-  "/src/graph/wires/encodings.ts",
-  "/src/graph/wires/WireChip.tsx",
-  "/src/graph/wires/CausalWire.tsx",
-  "/src/graph/wires/lens.ts",
-  "/src/components/Inspector.tsx",
-  "/src/components/PathBar.tsx",
-  "/src/components/OriginMark.tsx",
-];
-
 /**
  * Every module in the tree, read as text by the build tool rather than off the
  * disk — so this test needs nothing but the browser types the rest of the app is
@@ -49,6 +39,24 @@ const SOURCE = import.meta.glob("/src/**/*.{ts,tsx}", {
   import: "default",
   eager: true,
 }) as Record<string, string>;
+
+const DRAWS_THE_MAPS_NUMBERS = [
+  "/src/graph/wires/encodings.ts",
+  "/src/graph/wires/WireChip.tsx",
+  "/src/graph/wires/CausalWire.tsx",
+  "/src/graph/wires/lens.ts",
+  "/src/components/Inspector.tsx",
+  "/src/components/PathBar.tsx",
+  "/src/components/OriginMark.tsx",
+  // A generation's own numbers arrive on events and are printed straight onto
+  // the screen. The reducer that folds them holds a likelihood, a route's
+  // multiplied-out likelihood and a receipt, and combines not one of them.
+  "/src/components/VerdictCard.tsx",
+  "/src/components/ReceiptStrip.tsx",
+  ...Object.keys(SOURCE).filter(
+    (path) => path.startsWith("/src/stream/") && !path.includes("__tests__"),
+  ),
+];
 
 /**
  * The names a number off the map goes by.

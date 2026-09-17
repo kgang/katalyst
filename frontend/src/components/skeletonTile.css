@@ -1,0 +1,58 @@
+/*
+ * A reserved rectangle at the growing edge of the map.
+ *
+ * Everything here is deliberately quieter than a tile. It sits on `--surface`
+ * rather than on `--surface-raised`, so it reads as a space held open rather than
+ * as a card with nothing in it, and its border is one hairline with a dashed
+ * pattern — dashed because "this is not here yet" has to survive a greyscale
+ * print, and a fainter solid line would not.
+ *
+ * **No animation of any kind.** Nothing scales, pulses, sweeps or loops. The one
+ * movement a rectangle is allowed is appearing and going, which is opacity and at
+ * most `--duration-fast`.
+ */
+
+.skeleton-tile {
+  display: grid;
+  align-content: start;
+  row-gap: var(--space-1);
+  box-sizing: border-box;
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius);
+  animation: skeleton-arrives var(--duration-fast) ease-out;
+}
+
+@keyframes skeleton-arrives {
+  from {
+    opacity: 0;
+  }
+}
+
+/* What the box is, said in words rather than implied by a shape. Set in the
+ * number face because it is a label on the interface rather than something
+ * anybody claimed. */
+.skeleton-tile__mark {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The one line it carries, clamped to four so that a long sentence cannot grow
+ * the box past the height the layout reserved for it. */
+.skeleton-tile__words {
+  margin: 0;
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--text-muted);
+  text-wrap: pretty;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}

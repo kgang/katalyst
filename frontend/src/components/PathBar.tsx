@@ -38,6 +38,19 @@ import type { ClaimView, LinkView, WorldView } from "../world";
 import { toTwoFigures } from "./BeliefChip";
 import "./pathBar.css";
 
+/**
+ * The honest wart, written once and printed wherever a multiplied-out route
+ * likelihood is shown.
+ *
+ * Two surfaces print it: this bar, and the Verify door's card for a destination
+ * the map reached. One wording, one place it is written — a caveat paraphrased on
+ * a second screen is a second caveat, and one of them is eventually wrong.
+ */
+export const PATH_PRODUCT_WART =
+  "Each step of this route is read on its own resolve-by day, so the number multiplies " +
+  "likelihoods read on different days. It is the most honest single number there is for a " +
+  "chain, and it is not the chance of the whole chain happening together.";
+
 /** One step of a route: the arrow taken, and the claim it lands on. */
 export interface RouteStep {
   /** The arrow walked along. */
@@ -258,11 +271,7 @@ export function PathBar({ world, claimId }: PathBarProps) {
         </p>
       )}
 
-      <p className="path-bar__wart">
-        Each step of this route is read on its own resolve-by day, so the number multiplies
-        likelihoods read on different days. It is the most honest single number there is for a
-        chain, and it is not the chance of the whole chain happening together.
-      </p>
+      <p className="path-bar__wart">{PATH_PRODUCT_WART}</p>
     </section>
   );
 }

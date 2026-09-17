@@ -1,0 +1,76 @@
+/*
+ * What a run cost, beside the map it produced.
+ *
+ * A label column and a reading column, the readings in the number face with
+ * fixed-width digits so the column of figures lines up and a number that changes
+ * does not make the one below it jump sideways.
+ */
+
+.receipt-strip {
+  flex: 0 0 auto;
+  display: grid;
+  align-content: start;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface-raised);
+}
+
+.receipt-strip__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.receipt-strip__lines {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: 0;
+}
+
+.receipt-strip__line {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: baseline;
+}
+
+.receipt-strip__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.receipt-strip__reading {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.receipt-strip__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* A row of text that answers to a press, not a button with a fill. */
+.receipt-strip__open {
+  justify-self: start;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.receipt-strip__open::after {
+  content: " →";
+  font-family: var(--font-mono);
+}

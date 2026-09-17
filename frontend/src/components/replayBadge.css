@@ -1,0 +1,68 @@
+/*
+ * The mark in the top-right corner of the map saying this run is a recording.
+ *
+ * **Top right, and that is the whole of the reasoning.** The map is laid out
+ * left to right and grows rightwards, so its first claim is drawn at the left and
+ * the first thing on screen is the rectangle held open for it. A badge in that
+ * corner would sit on top of the one thing the reader is waiting for. The
+ * right-hand corner is the last part of the map to fill and the first to be
+ * scrolled past, and the zoom buttons already have the bottom left.
+ *
+ * It is a plain block of words with one hairline, like every other thing in this
+ * product that says something about the session.
+ */
+
+.replay-badge {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-1);
+  row-gap: var(--space-hair);
+  align-items: baseline;
+  max-width: 34rem;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+
+/* The word itself, in the number face and spaced out, so it reads as a label on
+ * the session rather than as something anybody claimed. */
+.replay-badge__word {
+  grid-column: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.replay-badge__line {
+  grid-column: 2;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* The day the recording was made, in the number face because it is a reading off
+ * the receipt rather than a word. */
+.replay-badge__day {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+/* The two sources disagreed. The badge is drawn with a doubled left edge rather
+ * than a colour, so it survives a grey print, and the sentence beside it already
+ * says what happened. */
+.replay-badge[data-disagreed="yes"] {
+  border-left-width: 4px;
+  border-left-style: double;
+}

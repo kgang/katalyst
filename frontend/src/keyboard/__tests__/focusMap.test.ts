@@ -56,8 +56,7 @@ function wiredTo(id: string): Set<string> {
 }
 
 describe("moving along the wires", () => {
-  // test_h_and_l_land_only_on_a_wired_neighbour
-  it("lands only on a claim a wire joins to the one you were on", () => {
+  it("test_h_and_l_land_only_on_a_wired_neighbour", () => {
     for (const id of WHERE.keys()) {
       for (const way of ["in", "out"] as const) {
         const step = alongWire(id, way, WIRES, WHERE);
@@ -71,8 +70,7 @@ describe("moving along the wires", () => {
     }
   });
 
-  // test_a_feedback_arrow_is_still_something_you_can_walk_along
-  it("walks the feedback arrow, which the diff sets aside", () => {
+  it("test_a_feedback_arrow_is_still_something_you_can_walk_along", () => {
     // One rule, two questions. *What can move* reads the map with feedback
     // arrows set aside; *what can I walk to* reads the whole map.
     const out = alongWire("B", "out", WIRES, WHERE);
@@ -81,8 +79,7 @@ describe("moving along the wires", () => {
     expect(new Set([out?.to, ...(out?.others ?? [])])).toEqual(reachable);
   });
 
-  // test_the_step_takes_the_nearest_and_leaves_the_rest_for_up_and_down
-  it("takes the nearest neighbour and leaves the others a keystroke away", () => {
+  it("test_the_step_takes_the_nearest_and_leaves_the_rest_for_up_and_down", () => {
     // B sits at 300 and is 176 tall, so its middle is 388. M2's middle is 496
     // and M1's is 216, so M2 is nearer — and M1 and R become the set that up and
     // down walk at the tile you land on. Two keystrokes reach any neighbour, and
@@ -93,16 +90,14 @@ describe("moving along the wires", () => {
     expect(stepThrough("M2", step?.others ?? [], WHERE, -1)).toBe("M1");
   });
 
-  // test_no_wire_that_way_is_a_quiet_no_op
-  it("does not move when there is no wire that way", () => {
+  it("test_no_wire_that_way_is_a_quiet_no_op", () => {
     // The endings of the map cause nothing, so pressing forward on one is a
     // quiet no-op rather than a jump to whatever was nearby.
     expect(alongWire("M1", "out", WIRES, WHERE)).toBeNull();
     expect(alongWire("H", "in", WIRES, WHERE)).toBeNull();
   });
 
-  // test_a_step_never_lands_on_a_claim_the_map_is_not_drawing
-  it("never lands on a claim the map is not drawing", () => {
+  it("test_a_step_never_lands_on_a_claim_the_map_is_not_drawing", () => {
     // A claim behind a collapsed tile has no position, and a step that landed on
     // one would put the keyboard somewhere with nothing to see.
     const hidden = new Map(WHERE);
@@ -114,13 +109,11 @@ describe("moving along the wires", () => {
 });
 
 describe("walking a column", () => {
-  // test_a_column_is_the_claims_at_the_same_remove_from_the_start
-  it("reads a column from the top down", () => {
+  it("test_a_column_is_the_claims_at_the_same_remove_from_the_start", () => {
     expect(inColumn("N1", WHERE)).toEqual(["C", "N1", "R"]);
   });
 
-  // test_focus_does_not_wrap
-  it("stops at the end of a column rather than wrapping round", () => {
+  it("test_focus_does_not_wrap", () => {
     // Wrapping teleports you to the other end and you lose your place. The line
     // under the map says "last claim in this column" instead.
     expect(stepThrough("R", inColumn("R", WHERE), WHERE, 1)).toBeNull();

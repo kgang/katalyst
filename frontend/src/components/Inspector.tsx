@@ -40,6 +40,8 @@ import {
   pushInWords,
   shapeInWords,
 } from "../graph/wires/encodings";
+import type { Receipt } from "../stream/events";
+import type { Working } from "../stream/transcript";
 import type {
   BeliefOwner,
   ClaimKind,
@@ -53,6 +55,7 @@ import type {
 import { toMovement, toReading, toShare, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
+import { ReceiptLines } from "./ReceiptStrip";
 import "./inspector.css";
 
 /**
@@ -68,6 +71,26 @@ export interface InspectorProps {
   readonly world: WorldView;
   /** What is selected. */
   readonly selection: Selection;
+  /**
+   * The run that produced this map, when there was one.
+   *
+   * Absent on a stored example, which nobody generated. Present on a generated
+   * map, and then the panel's third subject is readable: what the run cost, and
+   * every proposal it made.
+   */
+  readonly generation?: GenerationDetail;
+}
+
+/** Everything the panel knows about the run that produced this map. */
+export interface GenerationDetail {
+  /** What the run cost. Null until the receipt arrives; never estimated meanwhile. */
+  readonly receipt: Receipt | null;
+  /** The working of the run, or the plain reason it could not be read. */
+  readonly working: Working;
+  /** Event names this build did not know, and how many of each arrived. */
+  readonly unknown: ReadonlyMap<string, number>;
+  /** Which line of the working the panel was opened at, when it was opened at one. */
+  readonly openAt: number | null;
 }
 
 /** What each kind of claim is called on screen. No underscores and no code names. */
@@ -679,16 +702,139 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
   );
 }
 
+/**
+ * The run that produced this map: what it cost, and every proposal it made.
+ *
+ * **The panel's third subject.** Until now it opened on a claim or an arrow; it
+ * also opens on the run behind them, which is neither, and so gets a section of
+ * its own rather than being squeezed into one.
+ *
+ * **Every number is a field and this panel adds nothing up.** It does not total
+ * the two token counts, does not work a cost out of a token count and a price,
+ * and does not time anything — the same rule that already forbids it adding up an
+ * arrow's pushes to explain a likelihood.
+ *
+ * **Every line of the working is in the engine's own words.** An accepted line
+ * names the claim it became; a refused line quotes what the model wrote and then
+ * carries the validator's own sentence, one per rule broken, with nothing added;
+ * a stopped line carries the model's own one-sentence reason. This panel composes
+ * no sentence about any of the three, and a refused claim is quoted rather than
+ * given an identifier or a tile.
+ *
+ * **Three kinds of line, not two.** A proposal was accepted, a proposal was
+ * refused, or the model answered *Stop* on a line and it closed with nothing
+ * added. The third is the one a reader would otherwise never see: it makes no
+ * event on the stream, because nothing about the map changed. **A stopped line
+ * carries no place in the working** — the count counts what was proposed, and a
+ * stop proposed nothing — so the numbers here have gaps in them, and the gaps are
+ * the stops.
+ */
+function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
+  const { receipt, working, unknown, openAt } = detail;
+  return (
+    <>
+      <header className="inspector__head">
+        <p className="inspector__claim">This generation</p>
+        <p className="inspector__kind">the run that built this map</p>
+      </header>
+
+      <Section title="What it cost">
+        {receipt === null ? (
+          <>
+            {/* Before the receipt arrives the section is not drawn. No running
+                estimate, no partial total, no ticking cost: a cost nobody has
+                totalled is a number nobody computed. */}
+            <p className="inspector__words">no engine yet</p>
+            <p className="inspector__reason">
+              The run has not sent its receipt. Nothing here estimates what it has spent so far — a
+              cost nobody has totalled is a number nobody computed.
+            </p>
+          </>
+        ) : (
+          <ReceiptLines receipt={receipt} />
+        )}
+      </Section>
+
+      <Section title="Every proposal, in order">
+        {working.state === "reading" ? (
+          <p className="inspector__reason">
+            Reading the working of this run back from the server, which holds it for as long as it
+            is running.
+          </p>
+        ) : working.state === "gone" ? (
+          <>
+            <p className="inspector__words">—</p>
+            {/* The route's own sentence, printed as it came. A transcript lives
+                for the life of the process that made it; there is no storage in
+                this build. */}
+            <p className="inspector__reason">{working.reason}</p>
+          </>
+        ) : (
+          <ol className="inspector__transcript">
+            {working.transcript.lines.map((line, place) => (
+              <li
+                className="inspector__line"
+                // Two lines can genuinely carry the same words on different
+                // claims, and a stopped line has no place of its own, so its
+                // position in the list is the only stable name it has.
+                // biome-ignore lint/suspicious/noArrayIndexKey: the working arrives as one list from one answer and is never reordered, added to or removed.
+                key={`${place}-${line.at ?? "stopped"}`}
+                data-what={line.what}
+                data-open={line.at !== null && line.at === openAt ? "yes" : "no"}
+              >
+                <span className="inspector__line-at">{line.at === null ? "—" : line.at}</span>
+                <span className="inspector__line-what">{line.what}</span>
+                <span className="inspector__line-words">
+                  {line.in_words}
+                  {line.violations.map((violation) => (
+                    <span className="inspector__line-reason" key={violation.message}>
+                      {violation.message}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Section>
+
+      {unknown.size === 0 ? null : (
+        <Section title="Events this build does not know">
+          {/* Ignored, counted, and said out loud. A browser that crashed on a new
+              event would make the server unable to add one; a browser that
+              dropped one silently would make a missing feature look like a
+              working one. */}
+          <dl className="inspector__pairs">
+            {[...unknown].map(([name, count]) => (
+              <Fragment key={name}>
+                <dt>{name}</dt>
+                <dd className="inspector__mono">{count}</dd>
+              </Fragment>
+            ))}
+          </dl>
+          <p className="inspector__reason">
+            This build has no name for these, so it changed nothing when they arrived and counted
+            them here instead.
+          </p>
+        </Section>
+      )}
+    </>
+  );
+}
+
 /** The panel beside the map. */
-export function Inspector({ world, selection }: InspectorProps) {
+export function Inspector({ world, selection, generation }: InspectorProps) {
   const claim =
     selection?.kind === "claim" ? world.claims.find((one) => one.id === selection.id) : undefined;
   const wire =
     selection?.kind === "wire" ? world.links.find((one) => one.id === selection.id) : undefined;
+  const run = selection?.kind === "generation" ? generation : undefined;
 
   return (
     <aside className="inspector" aria-label="Why this number is what it is">
-      {claim !== undefined ? (
+      {run !== undefined ? (
+        <GenerationDetailPanel detail={run} />
+      ) : claim !== undefined ? (
         <ClaimDetail world={world} claim={claim} />
       ) : wire !== undefined ? (
         <WireDetail world={world} wire={wire} />

@@ -58,27 +58,39 @@ export interface Ranged {
 }
 
 /**
- * Which of the three absences this is. It is what picks the words.
+ * Which of the five absences this is. It is what picks the words.
  *
  * - `no_engine` — nothing has worked this number through the map yet.
  * - `no_market` — no venue quotes this claim.
  * - `not_said` — nobody has given a number. The one dash on screen with a
  *   meaning: the reader's own empty slot, inviting a number.
+ * - `refused` — the engine was asked and **would not** work this number out. It
+ *   is its own kind rather than a shade of `no_engine`, because the two are
+ *   different facts: *nothing has run yet* invites waiting, and *the engine
+ *   turned this down, here is why* invites repairing the thing it turned down.
+ *   Reusing one word for both would make the reason on screen the only thing
+ *   telling them apart, and a reason is not something code can read back.
+ * - `ask_failed` — the engine was asked and one attempt did not come back. It is
+ *   the only absence that is not a fact about the map, so it is the only one
+ *   that is never kept: ask again and it may well be gone.
+ *
+ * **The last two are not the same and must not be merged.** A refusal is an
+ * answer — the engine looked and said no, and said why — and it will say the
+ * same thing every time until the thing it refused is repaired. A failed ask is
+ * not an answer at all.
  */
-export type AbsenceKind = "no_engine" | "no_market" | "not_said" | "ask_failed";
+export type AbsenceKind = "no_engine" | "no_market" | "not_said" | "refused" | "ask_failed";
 
 /**
  * A number that is not here, and why.
  *
  * `words` is what the reader sees where the number would have been — "no
- * market", "no engine yet", or a dash. `reason` is the sentence that says why,
- * so no slot on screen is ever merely empty. `kind` is which of the four this
- * is, so that code can tell one absence from another without reading its words
- * back — the dash that invites a number is not the dash that means nothing was
- * computed, and neither of those is `ask_failed`: the engine is there and it
- * was asked, and one attempt did not come back. That last one is the only
- * absence that is not a fact about the map, so it is the only one that is never
- * kept — ask again and it may well be gone.
+ * market", "no engine yet", "not worked out", or a dash. `reason` is the sentence
+ * that says why, so no slot on screen is ever merely empty. `kind` is which of
+ * the five this is, so that code can tell one absence from another without
+ * reading its words back — the dash that invites a number is not the dash that
+ * means nothing was computed, and neither of those is a refusal or an ask that
+ * did not come back.
  */
 export interface Absence {
   /** Which absence this is. */
@@ -792,4 +804,14 @@ export interface DeltaRow {
 export type Selection =
   | { readonly kind: "claim"; readonly id: string }
   | { readonly kind: "wire"; readonly id: string }
+  /**
+   * The run that produced the map, rather than anything on it.
+   *
+   * The panel's third subject: not a claim and not an arrow, but the generation
+   * itself — what it cost and every proposal it made, accepted or refused. The
+   * identifier is the one the engine minted and sent on the run's first event.
+   * Nothing on the canvas draws a ring for it, because there is nothing on the
+   * canvas that is it.
+   */
+  | { readonly kind: "generation"; readonly id: string }
   | null;

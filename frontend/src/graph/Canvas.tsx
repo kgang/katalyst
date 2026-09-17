@@ -37,8 +37,9 @@ import {
   useReactFlow,
   useStore,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/base.css";
+import { SkeletonTile } from "../components/SkeletonTile";
 import { Tile } from "../components/Tile";
 import { TileOverflow } from "../components/TileOverflow";
 import type { MapKeys } from "../keyboard/useMapKeys";
@@ -60,6 +61,9 @@ import {
   type MapNode,
   OVERFLOW_PREFIX,
   type OverflowNode,
+  RESERVED_PREFIX,
+  type ReservedBox,
+  type SkeletonNode,
   toFlow,
 } from "./toFlow";
 import { CausalWire } from "./wires/CausalWire";
@@ -81,6 +85,7 @@ const TILE_TYPES = {
     />
   ),
   overflow: ({ data }: { data: OverflowNode["data"] }) => <TileOverflow count={data.count} />,
+  skeleton: ({ data }: { data: SkeletonNode["data"] }) => <SkeletonTile words={data.words} />,
 };
 
 /** One kind of wire, ours, saying five things at once. */
@@ -130,6 +135,20 @@ interface SurfaceProps {
    * time. Under reduced motion the ordering survives and the drawing goes.
    */
   readonly arriving: boolean;
+  /**
+   * The rectangles the map is holding open at its growing edge, while a map is
+   * still being built.
+   *
+   * Empty on every finished map, which is every map this canvas drew before
+   * generation existed — so nothing about a stored example changes.
+   */
+  readonly reserved?: readonly ReservedBox[];
+  /**
+   * What the canvas says about the session it is in, such as that this run is a
+   * recording being played back. Drawn in the corner of the surface, over
+   * nothing.
+   */
+  readonly badge?: ReactNode;
 }
 
 /** The surface itself. Lives inside the provider so it can move the view. */
@@ -145,12 +164,14 @@ function MapSurface({
   onStatus,
   onOverflow,
   arriving,
+  reserved,
+  badge,
 }: SurfaceProps) {
   const flow = useReactFlow();
   const surface = useRef<HTMLDivElement>(null);
   const [pointingAt, setPointingAt] = useState<string | null>(null);
 
-  const drawing = useMemo(() => toFlow(world, heights), [world, heights]);
+  const drawing = useMemo(() => toFlow(world, heights, reserved), [world, heights, reserved]);
   const layout = useLayout(drawing.tiles, drawing.layoutEdges, mapKey);
 
   // How far the map is zoomed out. Below the threshold a wire's plate would
@@ -211,7 +232,14 @@ function MapSurface({
           // world has to land at the two multiplied together rather than at
           // whichever rule happened to win. `canvas.css` multiplies them.
           className: [
-            lens !== null && !lens.claims.has(node.id) ? "is-dimmed" : "",
+            // A rectangle held open for a claim that has not arrived is never
+            // dimmed by the lens. The lens answers "what does this have to do
+            // with anything", and a box standing for a claim that does not exist
+            // yet is not on anybody's path — dimming it would hide the one thing
+            // a reader watching a map build itself is waiting for.
+            lens !== null && !lens.claims.has(node.id) && !node.id.startsWith(RESERVED_PREFIX)
+              ? "is-dimmed"
+              : "",
             ghost ? "is-ghost" : "",
           ]
             .filter((one) => one !== "")
@@ -375,7 +403,10 @@ function MapSurface({
       return { kind: "wire", id: wire.dataset.id };
     }
     const tile = target?.closest<HTMLElement>(".react-flow__node");
-    if (tile?.dataset.id !== undefined) {
+    // A rectangle held open for a claim that has not arrived is a box, not a
+    // claim: there is nothing behind it to read out, so pressing it does nothing
+    // and the panel is left where it was.
+    if (tile?.dataset.id !== undefined && !tile.dataset.id.startsWith(RESERVED_PREFIX)) {
       return { kind: "claim", id: tile.dataset.id };
     }
     return null;
@@ -630,6 +661,8 @@ function MapSurface({
       onPointerDownCapture={onPointAt}
     >
       <WireMarks />
+
+      {badge}
 
       <ReactFlow
         nodes={nodes}

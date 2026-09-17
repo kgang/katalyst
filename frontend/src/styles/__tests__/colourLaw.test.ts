@@ -96,16 +96,9 @@ describe("the tokens the law names", () => {
     }
   });
 
-  it("test_reduced_motion_zeroes_every_tween_and_keeps_the_stagger", () => {
-    // The tweening goes and the ordering stays. The gap between one layer of the
-    // map and the next is the order the argument runs in — the ordering is the
-    // causality, and removing it would remove the one thing the movement was
-    // for.
-    const reduced = TOKENS.slice(TOKENS.indexOf("prefers-reduced-motion"));
-    expect(reduced).toContain("--duration-fast: 0ms");
-    expect(reduced).toContain("--duration-wave: 0ms");
-    expect(reduced).not.toContain("--duration-stagger: 0ms");
-  });
+  // What reduced motion does to the three durations is the motion budget's own
+  // statement, and it is checked where the chapter says it is:
+  // `motionBudget.test.ts`, beside the rule that there are only three of them.
 });
 
 describe("the brightness channel", () => {
