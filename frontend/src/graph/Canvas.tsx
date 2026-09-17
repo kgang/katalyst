@@ -62,6 +62,7 @@ import {
 } from "./toFlow";
 import { CausalWire } from "./wires/CausalWire";
 import { onThePathFrom } from "./wires/lens";
+import { planPlates } from "./wires/plates";
 import { type Box, planRoutes, SKY_GAP, tailOffsets } from "./wires/route";
 import { ARROWHEAD, WireMarks } from "./wires/WireMarks";
 import "./canvas.css";
@@ -225,9 +226,17 @@ function MapSurface({
       target: edge.target,
       handle: edge.sourceHandle ?? "out-trigger",
       reflexive: edge.data?.reflexive === true,
+      mode: edge.data?.mode ?? "trigger",
+      strength: edge.data?.strength ?? 0,
+      lag: edge.data?.lag ?? 0,
     }));
     const plans = planRoutes(routable, boxes);
     const offsets = tailOffsets(routable);
+    // Where every plate goes, worked out for the whole map at once. A wire
+    // cannot see its neighbours, and once two worlds are laid over each other
+    // that is not enough: the union crowds the middle of the map and plates
+    // began landing on one another.
+    const plates = planPlates({ wires: routable, boxes, plans, tailOffsets: offsets });
     const wires = new Map(world.links.map((link) => [link.id, link]));
     return drawing.edges.map((edge) => {
       if (edge.data === undefined) {
@@ -252,6 +261,8 @@ function MapSurface({
           ...edge.data,
           plan: plans.get(edge.id),
           tailOffset: offsets.get(edge.id),
+          plateAt: plates.get(edge.id),
+          wave: Math.min(column.get(edge.source) ?? 0, 5),
           dimmed: lens !== null && !lens.wires.has(edge.id),
           tooSmallForWords,
         },

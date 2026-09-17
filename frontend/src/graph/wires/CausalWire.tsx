@@ -40,6 +40,7 @@ import {
 import { OriginMark } from "../../components/OriginMark";
 import type { LinkMode, LinkShape, Provenance, Slot } from "../../world";
 import { strokeFor, widthFor } from "./encodings";
+import { MARK_STANDOFF } from "./plates";
 import {
   corridorCorners,
   longestRunMidpoint,
@@ -78,13 +79,30 @@ export interface WireData extends Record<string, unknown> {
    * arrows leaving the same socket do not draw their marks on top of each other.
    */
   readonly tailOffset?: number;
+  /**
+   * Where this wire's plate goes, worked out for the whole map at once.
+   *
+   * A wire cannot see its neighbours, and on a map with two worlds laid over
+   * each other that is not enough: plates began landing on one another. So the
+   * spot is decided in one pass over every wire — `plates.ts` — and handed in.
+   * Left out, the wire falls back to placing its own, which is what it does when
+   * it is drawn on its own in a test.
+   */
+  readonly plateAt?: { readonly x: number; readonly y: number };
+  /**
+   * Which column of the map this wire belongs to, for the one animation the map
+   * spends on causality.
+   *
+   * The wire itself is revealed by a stylesheet rule keyed on a class the canvas
+   * puts on it. Its plate and its mark are drawn in another layer entirely, so
+   * they are given the same delay here — otherwise the reading arrives a beat
+   * before the wire it is a reading of.
+   */
+  readonly wave?: number;
 }
 
 /** A wire as the canvas knows it. */
 export type CausalEdge = Edge<WireData, "causal">;
-
-/** How far past the socket the mark at the tail starts. */
-const MARK_STANDOFF = 2;
 
 /**
  * How far the plate is nudged along the wire, away from the mark at its tail.
@@ -164,6 +182,14 @@ export function WireLabels({
   plateAnchor,
   selected,
 }: WireLabelsProps) {
+  // The wire itself is revealed a column at a time by a rule in `canvas.css`,
+  // keyed on a class the canvas puts on it. Its plate and its mark are drawn in
+  // another layer, outside that rule's reach, so they are given the same delay
+  // here — otherwise the reading of a wire arrives before the wire.
+  const waveDelay = {
+    "--wave-delay": `calc(${data.wave ?? 0} * var(--duration-stagger))`,
+  } as React.CSSProperties;
+
   return (
     <>
       {/* The mark that says where this arrow came from, at the tail, where the
@@ -173,6 +199,7 @@ export function WireLabels({
         className="wire-mark"
         data-dimmed={data.dimmed ? "yes" : "no"}
         style={{
+          ...waveDelay,
           transform:
             `translate(0, -50%) translate(${sourceX + MARK_STANDOFF}px, ` +
             `${sourceY + (data.tailOffset ?? 0)}px)`,
@@ -193,6 +220,7 @@ export function WireLabels({
         data-dimmed={data.dimmed ? "yes" : "no"}
         data-selected={selected ? "true" : "false"}
         style={{
+          ...waveDelay,
           transform: `translate(-50%, ${plateAnchor}) translate(${plateAt[0]}px, ${plateAt[1]}px)`,
         }}
       >
@@ -302,7 +330,7 @@ export function CausalWire({
   // plates from one tile can never land on each other — or on the marks at the
   // other socket's tails, which is what went wrong before this rule existed.
   const asideBelow = ridesAside && data.mode === "sustain";
-  const plateAt: Point = asideBelow
+  const ownPlateAt: Point = asideBelow
     ? [chipAt[0], (targetY > sourceY ? targetY : sourceY) + PLATE_STANDOFF]
     : ridesAside
       ? [chipAt[0], (targetY < sourceY ? targetY : sourceY) - PLATE_STANDOFF]
@@ -312,11 +340,15 @@ export function CausalWire({
           ? [(plan.fromX + plan.toX) / 2, plan.corridorY]
           : chipAt;
 
-  /** Where the plate's own box is pinned to the point worked out above. */
-  const plateAnchor = asideBelow ? "0" : ridesAside ? "-100%" : "-50%";
+  // The spot the whole-map pass gave this plate, when there was one. It is
+  // already the middle of the plate's box, so nothing is pinned to an edge.
+  const planned = data.plateAt;
+  const plateAt: Point = planned === undefined ? ownPlateAt : [planned.x, planned.y];
 
-  // And what shape it is. A gutter is tall and narrow and a corridor is wide and
-  // short, so the plate stacks in one and lies along the wire in the other.
+  /** Where the plate's own box is pinned to the point above. */
+  const plateAnchor =
+    planned !== undefined ? "-50%" : asideBelow ? "0" : ridesAside ? "-100%" : "-50%";
+
   const plateLayout = plan.kind === "direct" ? "stacked" : "inline";
 
   return (
