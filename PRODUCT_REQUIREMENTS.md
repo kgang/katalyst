@@ -240,16 +240,16 @@ Execution and order routing · accounts and multi-user · agent-society simulati
 
 Each stack's bottom PR is docs-only (spec + ADR) and merges first. Branch names carry the stack number: `<type>/<NN>-<slug>`.
 
-| Stack | Name | Proves | Depends on | Status |
+| Stack | Branches (`<type>/<NN>-<slug>`; one per pull request) | Proves | Depends on | Status |
 |-------|------|--------|-----------|--------|
 | 00 | `docs/00-kickoff` | This document, `ARCHITECTURE.md`, decision records 0001–0011, the `spec/` book skeleton (landing page per idea) and vocabulary, research | — | **merged** — #1 |
-| 01 | `feat/01-skeleton` | Backend + frontend hello-world, Docker (dev + prod), CI, pre-commit, type generation | ADR-0002 accepted | **merged** — #2, #3, #6, #11 |
-| 02 | `feat/02-schema` | Pydantic domain models → OpenAPI → TS types; the Hormuz fixture graph (base + "Iran struck" branch) | ADR-0003/0004/0005 accepted | **merged** — #5, #7, #10, #12 |
-| 03a | `feat/03-engine` | Propagation, `do/observe/insert/retune`, patch algebra, locality, sensitivity sweep — pure, property-tested | 02 | **next** |
-| 03b | `feat/03-canvas` | React Flow canvas: rich tiles, typed ports/wires, ELK layout, streaming from fixture, ghost diff, Inspector | 02, ADR-0007 accepted | **next** |
-| 04 | `feat/04-generation` | LLM engine: structured outputs, SSE streaming, web-search grounding, cassettes, evals on the four examples | 03a, 03b, ADR-0006/0008 accepted | not started |
-| 05 | `feat/05-thesis` | Tail strip, invalidation derivation, thesis card, Polymarket + FRED adapters, strategy export | 04, ADR-0010 accepted | not started |
-| 06 | `feat/06-probes` | `refine`, Monte Carlo distribution, probes, value-of-information ranking | 05 | not started |
+| 01 | `docs/01-*`, `feat/01-*`, `chore/01-*` | Backend + frontend hello-world, Docker (dev + prod), CI, pre-commit, type generation | ADR-0002 accepted | **merged** — #2, #3, #6, #11 |
+| 02 | `spec/02-*`, `feat/02-*` | Pydantic domain models → OpenAPI → TS types; the Hormuz fixture graph (base + "Iran struck" branch) | ADR-0003/0004/0005 accepted | **merged** — #5, #7, #10, #12 |
+| 03a | `spec/03-*`, `feat/03-engine-*` | Propagation, `do/observe/insert/retune`, patch algebra, locality, sensitivity sweep — pure, property-tested | 02 | **next** |
+| 03b | `spec/03-*`, `feat/03-canvas-*` | React Flow canvas: rich tiles, typed ports/wires, ELK layout, streaming from fixture, ghost diff, Inspector | 02, ADR-0007 accepted | **next** |
+| 04 | `*/04-*` | LLM engine: structured outputs, SSE streaming, web-search grounding, cassettes, evals on the four examples | 03a, 03b, ADR-0006/0008 accepted | not started |
+| 05 | `*/05-*` | Tail strip, invalidation derivation, thesis card, Polymarket + FRED adapters, strategy export | 04, ADR-0010 accepted | not started |
+| 06 | `*/06-*` | `refine`, Monte Carlo distribution, probes, value-of-information ranking | 05 | not started |
 
 Stacks 03a and 03b run in parallel (D11).
 

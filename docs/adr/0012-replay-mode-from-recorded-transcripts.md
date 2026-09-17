@@ -3,7 +3,7 @@
 status: proposed
 date: 2026-09-17
 decision-makers: Kent Gang
-consulted: ADR-0006 (model boundary), ADR-0008 (testing layers and cassettes), plans/roadmap-03-to-06.md (stack 04)
+consulted: ADR-0006 (model boundary), ADR-0008 (testing layers and cassettes); the roadmap for stack 04 (generation), where replay would be built
 informed: future agents working in backend/src/katalyst/engine and on the launchpad
 supersedes: none
 superseded-by: none
