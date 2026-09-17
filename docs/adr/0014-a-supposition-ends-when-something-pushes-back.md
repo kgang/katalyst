@@ -64,7 +64,7 @@ It stops holding on the day the **cause** of the first live arrow pushing agains
 | State | Hormuz H, the strait is open | What the tile shows | Why |
 |---|---|---|---|
 | **supposed** | 1 October | **Supposed · Oct 1** | The user pulled a lever; H is true in every world |
-| **withdrawn** | 2–4 October, `.35` | **Retracted · Oct 2 · by "confirmed strike on Iranian territory"**, with "withdrawn — no live push yet" beside the number | The strike became true on the 2nd, so we stop taking the user's word; H falls back to its own prior `.35`, and S → H's three-day delay has not run |
+| **withdrawn** | 2–4 October, `.35` | **Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"**, with "withdrawn — no live push yet" beside the number | The strike became true on the 2nd, so we stop taking the user's word; H falls back to its own prior `.35`, and S → H's three-day delay has not run |
 | **pushed** | from 5 October, about `.07` | the number, same badge | The delay has run; S → H's −1.9 push lands on the prior and `.35` becomes `.07` |
 
 The warrant is **ADR-0004's amendment: a `do` is a timed assertion.** `Do(H, true, at=1 October)` says *H holds from the 1st*, not *H is sealed for ever against whatever you tell me next*. Do **not** cite Pearl's do-operator as the warrant; that operator has no clock in it, and the clock is the whole of this rule.
