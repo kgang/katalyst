@@ -1,0 +1,78 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M32HT3X9BWPH4A05GH9S4GSS",
+  "session_id": "b3719e32-fae2-4866-b0f9-fedf04e7fad7",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-21T17:56:52.44202Z",
+  "branch": "feat/04b-evals",
+  "checkpoints_count": 3,
+  "save_step_count": 5,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "ed631e36e081",
+  "checkpoint_transcript_start": 845,
+  "transcript_lines_at_start": 845,
+  "compact_transcript_start": 150,
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 14123,
+    "cache_read_tokens": 3462300,
+    "output_tokens": 7978,
+    "api_call_count": 12,
+    "subagent_tokens": {
+      "input_tokens": 376,
+      "cache_creation_tokens": 217033,
+      "cache_read_tokens": 69897413,
+      "output_tokens": 106909,
+      "api_call_count": 188
+    }
+  },
+  "session_metrics": {
+    "turn_count": 10
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
