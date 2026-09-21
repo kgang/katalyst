@@ -194,10 +194,14 @@ def test_one_cause_at_a_time_equals_the_full_table() -> None:
 
     # The pass averages each cause on its own, because the rates add. Here the same
     # answer is worked out the slow way instead: every combination of the two causes'
-    # arrival slices, enumerated and weighed.
+    # arrival slices, enumerated and weighed. An arrival slice is turned into the row
+    # of its arrow's push it takes, because arrival slices whose push is the same
+    # array of numbers are kept once between them.
     leak = added.leak[:, 0, -1]
     first = added.helps[0].over_the_window()[:, 0, :]
     second = added.helps[1].over_the_window()[:, 0, :]
+    first_row = forward.shapes["effect"].carried[0].of_each_reading
+    second_row = forward.shapes["effect"].carried[1].of_each_reading
     when_first = _given_it_happened(forward.times["first"], slices)
     when_second = _given_it_happened(forward.times["second"], slices)
 
@@ -205,7 +209,9 @@ def test_one_cause_at_a_time_equals_the_full_table() -> None:
     for one in range(slices):
         for other in range(slices):
             weight = when_first[:, one] * when_second[:, other]
-            not_yet = not_yet + weight * numpy.exp(-(leak + first[:, one] + second[:, other]))
+            not_yet = not_yet + weight * numpy.exp(
+                -(leak + first[:, first_row[one]] + second[:, second_row[other]])
+            )
 
     assert numpy.allclose(forward.table["effect"][:, 1, 1, 1], 1.0 - not_yet, atol=1e-12)
 

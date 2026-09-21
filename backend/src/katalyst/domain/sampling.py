@@ -86,21 +86,23 @@ class Ready:
     leak: NDArray[numpy.float64]
     """`(combos, slices)` surviving the no-cause rate through each slice.
 
-    `combos` counts the combinations of arrival slices of the arrows that hold the
-    claim back — the one place the work still multiplies out.
+    `combos` counts the combinations of the **different** pushes the arrows that hold
+    the claim back carry — the one place the work still multiplies out. Arrival slices
+    whose push is the same array of numbers count once between them.
     """
 
     helps: Mapping[int, NDArray[numpy.float64]]
-    """Arrow -> `(combos, cause readings, slices)` surviving that helping cause.
+    """Arrow -> `(combos, different pushes, slices)` surviving that helping cause.
 
-    The middle axis is what the arrow's push is indexed by: the slice its cause
-    arrived in for an arrow that reads only the moment its cause came on, and the
-    pair *(on-slice, off-slice)* flattened for one that reads its cause's whole
-    stretch. Its last reading means the cause never came.
+    The middle axis is the row of the arrow's push a world takes: its cause's arrival
+    slice for an arrow that reads only the moment its cause came on, and the pair
+    *(on-slice, off-slice)* for one that reads its cause's whole stretch, each turned
+    into a row by `Carried.of_each_reading`. The row a cause that never came takes
+    holds nothing, so such a cause pushes nothing.
     """
 
     stops: Mapping[int, NDArray[numpy.float64]]
-    """Arrow -> `(cause readings, on-slice, slices)` surviving that ending cause.
+    """Arrow -> `(different pushes, on-slice, slices)` surviving that ending cause.
 
     Only a **state** has these, one per arrow that can end it. The entry says the
     chance the state has not stopped by the end of a slice, given it came on in a
@@ -239,8 +241,7 @@ def ready_to_sample(shapes: ClaimShapes, rates: Rates, added: AddedUp, *, versio
 
     stops: dict[int, NDArray[numpy.float64]] = {}
     for position in shapes.ends:
-        carried = shapes.carried[position]
-        by_reading = carried.reshape(-1, carried.shape[-2], carried.shape[-1])
+        by_reading = shapes.carried[position].push
         whole = shapes.width * by_reading.mean(axis=2)
         from_the_middle = shapes.width * numpy.where(at_or_after_the_middle, by_reading, 0.0).mean(
             axis=2
@@ -533,29 +534,37 @@ def _readings(
     off_slice: Mapping[PropositionId, NDArray[numpy.int64]],
     slices: int,
 ) -> dict[int, NDArray[numpy.int64]]:
-    """Which reading of each arrow's push this world calls for.
+    """Which of the different pushes each arrow carries this world calls for.
 
-    An arrow that reads only the moment its cause came on is indexed by the slice
-    that happened in. An arrow that reads its cause's whole stretch is indexed by
-    the pair *(on-slice, off-slice)*, flattened with the on-slice changing slowest —
-    the same layout the forward pass lays a cause's times out in.
+    An arrow that reads only the moment its cause came on is read by the slice that
+    happened in. An arrow that reads its cause's whole stretch is read by the pair
+    *(on-slice, off-slice)*, flattened with the on-slice changing slowest — the same
+    layout the forward pass lays a cause's times out in.
+
+    That reading is then turned into the row of the arrow's push it takes. Readings
+    whose push is the same array of numbers share one row, which is what the whole
+    pass is built at, so this is where a world stops counting readings and starts
+    counting pushes.
 
     Args:
-        shapes: The claim's shapes, whose carried push says which of the two it is.
+        shapes: The claim's shapes, whose carried push says which of the two it is
+            and which readings carry the same numbers.
         causes: The claims each arrow comes from, in the claim's arrow order.
         on_slice: Every claim already drawn -> the slice it came on in.
         off_slice: Every claim already drawn -> the slice it went off in.
         slices: How many slices a window is cut into.
 
     Returns:
-        Arrow position -> one reading per world.
+        Arrow position -> one row of that arrow's push per world.
     """
     out: dict[int, NDArray[numpy.int64]] = {}
     for position, source in enumerate(causes):
-        if shapes.carried[position].ndim == 3:
-            out[position] = on_slice[source]
+        carried = shapes.carried[position]
+        if carried.whole_stretch:
+            reading = on_slice[source] * (slices + 1) + off_slice[source]
         else:
-            out[position] = on_slice[source] * (slices + 1) + off_slice[source]
+            reading = on_slice[source]
+        out[position] = carried.of_each_reading[reading]
     return out
 
 
@@ -583,9 +592,7 @@ def _not_yet(
         `(worlds in this block, slices)`.
     """
     if shapes.holds_back:
-        each = tuple(
-            int(numpy.prod(shapes.carried[position].shape[:-2])) for position in shapes.holds_back
-        )
+        each = tuple(shapes.carried[position].different for position in shapes.holds_back)
         combination = numpy.ravel_multi_index(
             tuple(readings[position] for position in shapes.holds_back), each
         ).astype(numpy.int64)

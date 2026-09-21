@@ -53,6 +53,7 @@ from katalyst.domain.rates import (
 from katalyst.domain.states import (
     Times,
     as_joint,
+    chance_of_each_reading,
     holding_under_each_truth,
     is_true_on_its_deadline,
     needs_the_joint,
@@ -301,19 +302,6 @@ def _pinned_times(
     return _a_states_times(claim, square.reshape(versions, -1))
 
 
-def _reading_of(shapes: ClaimShapes, position: int, times: Times) -> NDArray[numpy.float64]:
-    """How much chance sits on each reading one arrow's carried push is indexed by.
-
-    An arrow that reads only the moment its cause came on is indexed by the slice
-    that happened in. An arrow that reads its cause's whole stretch is indexed by the
-    pair *(the slice it came on in, the slice it went off in)*, flattened the same
-    way the cause's own times are.
-    """
-    if shapes.carried[position].ndim == 3:
-        return times.spread
-    return as_joint(times).reshape(times.spread.shape[0], -1)
-
-
 def _an_events_table(
     shapes: ClaimShapes,
     added: AddedUp,
@@ -330,8 +318,10 @@ def _an_events_table(
     Args:
         shapes: The claim's shapes, for its arrow order and what each arrow does.
         added: The claim's rates already added up across the window.
-        under_each_truth: For each arrow, the spread of its cause's timing given the
-            cause is false and given it is true, in the arrow order of `shapes`.
+        under_each_truth: For each arrow, how much chance sits on each of the
+            **different** pushes it carries — given its cause is false and given it is
+            true, in the arrow order of `shapes`. That is what
+            `states.chance_of_each_reading` hands back.
 
     Returns:
         `(versions,) + (2,) * how many arrows` the chance the claim happened by its
@@ -463,7 +453,13 @@ def forward_pass(
                 persistence=kind,
                 joint=wants_pairs,
             )
-            if kind == "state":
+            # A state nothing on the map can end never goes off, so *holding on its
+            # deadline* and *came on by its deadline* are the same question, and it
+            # takes the event's own table rather than a second arithmetic that
+            # answers the same thing. That is decision record 0017's sentence — such
+            # a state is identical to the same claim written as an event — made a
+            # property of the code rather than of two routes happening to agree.
+            if kind == "state" and shapes.ends:
                 happened = holding_under_each_truth(shapes, rates, added, under_each_truth)
             else:
                 happened = _an_events_table(
@@ -471,8 +467,8 @@ def forward_pass(
                     added,
                     [
                         (
-                            _reading_of(shapes, position, pair[0]),
-                            _reading_of(shapes, position, pair[1]),
+                            chance_of_each_reading(shapes.carried[position], pair[0]),
+                            chance_of_each_reading(shapes.carried[position], pair[1]),
                         )
                         for position, pair in enumerate(under_each_truth)
                     ],

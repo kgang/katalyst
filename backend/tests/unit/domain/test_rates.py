@@ -189,7 +189,7 @@ def test_an_arrival_is_taken_at_the_middle_of_its_slice() -> None:
     assert not numpy.any(shapes.middle_day[:-1] == finishes)
     assert not numpy.any(shapes.middle_day[:-1] == starts)
 
-    pushed = shapes.carried[0]
+    pushed = shapes.carried[0].for_each_reading()
     for arrived in range(window.slices):
         pushing = pushed[arrived] > 0.0
         assert numpy.array_equal(pushing, shapes.points >= shapes.middle_day[arrived])
@@ -207,9 +207,10 @@ def test_a_cause_judged_sooner_than_its_effect_is_read_on_its_own_slices() -> No
 
     # The cause is judged halfway through the effect's window, so the day that stands
     # for its last slice is halfway through the effect's grid, not at the end of it.
-    last = float(shapes.carried[0][window.slices - 1].argmax())
+    pushed = shapes.carried[0].for_each_reading()
+    last = float(pushed[window.slices - 1].argmax())
     assert last >= 0.0
-    first_push = shapes.points[shapes.carried[0][window.slices - 1] > 0.0].min()
+    first_push = shapes.points[pushed[window.slices - 1] > 0.0].min()
     assert first_push < shapes.middle_day[window.slices - 1]
     assert first_push > shapes.middle_day[window.slices // 2 - 1]
 
@@ -259,10 +260,13 @@ def test_a_sustain_arrow_out_of_a_state_is_dead_once_its_cause_stops_holding() -
 
     # A trigger arrow reads the day its cause came on and nothing else, so its push
     # is held for each arrival slice alone.
-    assert shapes.carried[0].shape == (window.slices + 1, window.slices, POINTS_IN_A_SLICE)
+    triggered = shapes.carried[0].for_each_reading()
+    assert not shapes.carried[0].whole_stretch
+    assert triggered.shape == (window.slices + 1, window.slices, POINTS_IN_A_SLICE)
     # A sustain arrow out of a state reads the whole stretch, so its push is held for
     # each pair of *came on here, went off there*.
-    sustained = shapes.carried[1]
+    sustained = shapes.carried[1].for_each_reading()
+    assert shapes.carried[1].whole_stretch
     assert sustained.shape == (
         window.slices + 1,
         window.slices + 1,
@@ -272,7 +276,7 @@ def test_a_sustain_arrow_out_of_a_state_is_dead_once_its_cause_stops_holding() -
 
     came_on, still_holding = 0, window.slices
     alive = sustained[came_on, still_holding]
-    assert numpy.array_equal(alive, shapes.carried[0][came_on])
+    assert numpy.array_equal(alive, triggered[came_on])
     for went_off in range(window.slices):
         stopped = sustained[came_on, went_off]
         gone = shapes.points >= shapes.middle_day[went_off]
@@ -287,7 +291,9 @@ def test_a_sustain_arrow_out_of_an_event_reads_one_moment_like_any_other_arrow()
     triggered = _arrow("other", "effect", mode="trigger")
     shapes = _shapes(effect, (sustained, triggered), window)
 
-    assert numpy.array_equal(shapes.carried[0], shapes.carried[1])
+    assert numpy.array_equal(
+        shapes.carried[0].for_each_reading(), shapes.carried[1].for_each_reading()
+    )
 
 
 # --- Which of the three things an arrow does --------------------------------
@@ -505,16 +511,88 @@ def test_a_helping_causes_total_is_nothing_until_it_arrives_and_nothing_if_it_ne
     rates = rates_of(shapes, _one(0.3), {0: _one(0.6)}, persistence="event")
     added = added_up(shapes, rates)
 
-    assert added.helps[0].shape == (1, 1, window.slices + 1, window.slices)
-    never = added.helps[0].whole()[:, :, window.slices, :]
+    # Every axis below the shapes counts the arrow's **different** pushes, so an
+    # arrival slice is turned into the row of the push it takes before it is read.
+    row = shapes.carried[0].of_each_reading
+    assert added.helps[0].shape == (1, 1, shapes.carried[0].different, window.slices)
+    never = added.helps[0].whole()[:, :, row[window.slices], :]
     assert numpy.all(never == 0.0)
     for arrived in range(window.slices):
-        running = added.helps[0].whole()[0, 0, arrived]
+        running = added.helps[0].whole()[0, 0, row[arrived]]
         # Nothing before the slice the cause arrived in, because the push had not
         # started; and never falling afterwards, because a rate is never negative.
         assert numpy.all(running[:arrived] == 0.0)
         assert numpy.all(numpy.diff(running) >= 0.0)
         assert float(running[-1]) > 0.0
+
+
+def test_arrival_slices_that_push_the_same_are_kept_once_between_them() -> None:
+    """The fold, stated as shapes and as an identity — never as a clock.
+
+    A cause judged long after the claim it pushes has arrival slices that start after
+    the claim's own deadline, and an arrow whose cause arrives then pushes **nothing
+    at all** over that claim's window: the same array of noughts, over and over. They
+    are kept once between them, and the chances of the readings that share a row are
+    added together before anything is worked out.
+    """
+    window = window_of(_map(_claim("effect", days=10)), DAY_ZERO, slices=6)
+    effect = _claim("effect", days=10)
+    slow = _arrow("slow", "effect", strength=1.4, lag=2.0)
+    carried = _shapes(effect, (slow,), window, days={"slow": 120}).carried[0]
+
+    # Nothing is lost: the fold written back out is the push read by read.
+    written_out = carried.for_each_reading()
+    assert written_out.shape == (window.slices + 1, window.slices, POINTS_IN_A_SLICE)
+    assert numpy.array_equal(written_out, carried.push[carried.of_each_reading])
+    assert carried.readings == window.slices + 1
+
+    # The cause is judged twelve times later than the claim, so only its first
+    # arrival slice lands inside the claim's window at all; every later one, and
+    # *the cause never came*, push nothing, and those share one row.
+    assert carried.different < carried.readings
+    pushes_nothing = ~written_out.any(axis=(1, 2))
+    assert pushes_nothing.sum() > 1
+    assert len(set(carried.of_each_reading[pushes_nothing].tolist())) == 1
+
+    # Folding a spread of chances keeps the whole of the chance and puts each
+    # reading's share on the row that reading takes.
+    spread = numpy.linspace(0.02, 0.3, carried.readings)[None, :]
+    spread = spread / spread.sum()
+    folded = carried.fold(spread)
+    assert folded.shape == (1, carried.different)
+    assert numpy.allclose(folded.sum(), spread.sum(), atol=1e-15)
+    for row in range(carried.different):
+        belongs = carried.of_each_reading == row
+        assert numpy.isclose(folded[0, row], spread[0, belongs].sum(), atol=1e-15)
+
+
+def test_a_block_is_already_a_running_total_so_no_version_takes_one() -> None:
+    """The second fix, as an identity: the adding-up across slices happens once.
+
+    Every block a `Spread` keeps is a running total from day zero to the end of each
+    slice, taken where the block is a few hundred numbers rather than the same block
+    repeated once per version. Two things say so without a clock: a running total
+    never falls, and the total on the deadline read off the pieces is the very same
+    array of bytes as the last slice of the whole thing built out.
+    """
+    window = window_of(_map(_claim("effect", days=60)), DAY_ZERO, slices=5)
+    effect = _claim("effect", prior=0.3, days=60)
+    helping = _arrow("helps", "effect", strength=1.4, shape="impulse", half_life=9.0)
+    holding = _arrow("holds", "effect", strength=-1.1, shape="ramp", lag=3.0)
+    shapes = _shapes(effect, (helping, holding), window)
+    own = numpy.array([0.12, 0.3, 0.47])
+    rates = rates_of(
+        shapes,
+        own,
+        {0: numpy.array([0.4, 0.55, 0.7]), 1: numpy.array([0.03, 0.07, 0.15])},
+        persistence="event",
+    )
+    added = added_up(shapes, rates)
+
+    for block in added.helps[0].blocks:
+        assert numpy.all(numpy.diff(block, axis=-1) >= -1e-15)
+    assert numpy.all(numpy.diff(added.leak, axis=-1) >= 0.0)
+    assert numpy.array_equal(added.helps[0].over_the_window(), added.helps[0].whole()[..., -1])
 
 
 def test_an_arrow_that_holds_a_claim_back_is_carried_over_every_arrival_it_could_have() -> None:
@@ -529,23 +607,31 @@ def test_an_arrow_that_holds_a_claim_back_is_carried_over_every_arrival_it_could
     rates = rates_of(shapes, own, {0: _one(0.6), 1: hold, 2: hold}, persistence="event")
     added = added_up(shapes, rates)
 
-    combos = (window.slices + 1) ** 2
+    # A combination names one row of each holding-back arrow's push, not one arrival
+    # slice of each, because arrival slices whose push is the same array of numbers
+    # are kept once between them. Here every arrival pushes differently, so the count
+    # is the same either way, and the two rows below are what turns a slice into a row.
+    rows_of_first = shapes.carried[1].of_each_reading
+    rows_of_second = shapes.carried[2].of_each_reading
+    sides = (shapes.carried[1].different, shapes.carried[2].different)
+    combos = sides[0] * sides[1]
+    assert combos == (window.slices + 1) ** 2
     assert added.leak.shape == (1, combos, window.slices)
-    assert added.helps[0].shape == (1, combos, window.slices + 1, window.slices)
+    assert added.helps[0].shape == (1, combos, shapes.carried[0].different, window.slices)
 
     over_the_window = added.leak[:, :, -1]
     # Neither holding-back cause ever came: the rate is the plain one, and the claim
     # comes back out at its own stated chance.
     neither = numpy.ravel_multi_index(
-        (window.slices, window.slices), (window.slices + 1, window.slices + 1)
+        (rows_of_first[window.slices], rows_of_second[window.slices]), sides
     )
     assert numpy.allclose(_chance_by_the_deadline(over_the_window[:, neither]), own, atol=1e-12)
 
     # Both came on at the very start: the rate is held down as far as it can be, so
     # the claim's chance is lower than when neither of them came; and one of them
     # alone sits between the two.
-    both_early = numpy.ravel_multi_index((0, 0), (window.slices + 1, window.slices + 1))
-    one_early = numpy.ravel_multi_index((0, window.slices), (window.slices + 1, window.slices + 1))
+    both_early = numpy.ravel_multi_index((rows_of_first[0], rows_of_second[0]), sides)
+    one_early = numpy.ravel_multi_index((rows_of_first[0], rows_of_second[window.slices]), sides)
     assert (
         float(over_the_window[0, both_early])
         < float(over_the_window[0, one_early])

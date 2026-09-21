@@ -187,6 +187,118 @@ class Drawn:
 
 
 @dataclass(frozen=True)
+class Carried:
+    """One arrow's push, carried onto its target's reading days, with the repeats folded together.
+
+    **A *reading* is one thing the arrow's cause might have done** — the slice it came
+    on in, or, for an arrow that reads a state's whole stretch, the pair *(the slice
+    it came on in, the slice it went off in)*. The arrow's push over its target's
+    window is a different array of numbers for each of those.
+
+    **Except that it very often is not.** A cause judged long after its target has
+    slices that start after the target's own deadline, and an arrow whose cause
+    arrives then pushes **nothing at all** over the target's window — the same array
+    of noughts, over and over. So does the reading that means *the cause never came*.
+    On the committed Hormuz strike branch the two arrows that hold the oil price back
+    carry twenty-five readings each and only five and twenty-five different arrays of
+    numbers between them, so the combinations the arithmetic must work through fall
+    from six hundred and twenty-five to a hundred and twenty-five.
+
+    **The fold changes no answer.** Two readings whose pushes are the same array of
+    numbers give the same everything downstream, entry for entry, so averaging over
+    the readings and averaging over the different pushes with the readings' chances
+    added up first are the same sum written in a different order.
+    """
+
+    push: NDArray[numpy.float64]
+    """`(different, slices, POINTS_IN_A_SLICE)` each **different** push, once each.
+
+    `different` counts the arrays of numbers that are not equal to one another, not
+    the readings. `for_each_reading` writes them back out one per reading.
+    """
+
+    of_each_reading: NDArray[numpy.int64]
+    """`(readings,)` which row of `push` each reading takes.
+
+    The readings are flattened in the order the arrow's cause-time axes are written —
+    for an arrow that reads a whole stretch, the slice the cause came on in changing
+    slowest — which is the very layout a claim's times are held in
+    (`states.Times.spread` and `states.Times.pairs`).
+    """
+
+    whole_stretch: bool
+    """Whether a reading is a **pair** *(came on, went off)* rather than one slice.
+
+    True only for a `sustain` arrow out of a claim that holds over a stretch of time.
+    It is what says how many readings there are — `slices + 1` when false and that
+    squared when true — and which of a cause's two arrays of times to read.
+    """
+
+    @property
+    def readings(self) -> int:
+        """How many different *when its cause happened* this arrow's push is held for."""
+        return int(self.of_each_reading.shape[0])
+
+    @property
+    def different(self) -> int:
+        """How many of those readings carry arrays of numbers that are not all equal."""
+        return int(self.push.shape[0])
+
+    def fold(self, chance: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
+        """Add a chance spread over every reading up into one number per different push.
+
+        Args:
+            chance: `(versions, readings)` how much chance sits on each reading, in
+                the flattened order `of_each_reading` is written in.
+
+        Returns:
+            `(versions, different)` the same chance, with the readings that carry the
+            same push added together.
+        """
+        together = numpy.argsort(self.of_each_reading, kind="stable")
+        starts = numpy.searchsorted(self.of_each_reading[together], numpy.arange(self.different))
+        folded: NDArray[numpy.float64] = numpy.add.reduceat(chance[:, together], starts, axis=1)
+        return folded
+
+    def for_each_reading(self) -> NDArray[numpy.float64]:
+        """This arrow's push written back out once per reading, repeats and all.
+
+        The shape the fold was taken from: `(slices + 1, slices, POINTS_IN_A_SLICE)`
+        for an arrow that reads the moment its cause came on, and `(slices + 1,
+        slices + 1, slices, POINTS_IN_A_SLICE)` for one that reads a whole stretch.
+
+        Nothing in the arithmetic calls this; it is how a reader, or a test, sees the
+        push the fold was taken from.
+        """
+        whole: NDArray[numpy.float64] = self.push[self.of_each_reading]
+        if not self.whole_stretch:
+            return whole
+        side = round(self.readings**0.5)
+        return whole.reshape(side, side, *whole.shape[1:])
+
+
+def _folded(pushed: NDArray[numpy.float64], *, whole_stretch: bool) -> Carried:
+    """Put an arrow's push away with the readings that carry identical numbers folded together.
+
+    Args:
+        pushed: The push at every reading day, for everything the cause might have
+            done: `(…cause-time axes…, slices, POINTS_IN_A_SLICE)`.
+        whole_stretch: Whether a reading is a pair *(came on, went off)*.
+
+    Returns:
+        The same push, each different array of numbers kept once.
+    """
+    slices, points = pushed.shape[-2], pushed.shape[-1]
+    flat = pushed.reshape(-1, slices * points)
+    kept, which = numpy.unique(flat, axis=0, return_inverse=True)
+    return Carried(
+        push=kept.reshape(-1, slices, points),
+        of_each_reading=which.reshape(-1).astype(numpy.int64),
+        whole_stretch=whole_stretch,
+    )
+
+
+@dataclass(frozen=True)
 class ClaimShapes:
     """One claim's arrows worked out as far as the map's shape alone allows.
 
@@ -245,28 +357,28 @@ class ClaimShapes:
     its ending causes, so a state nothing on the map can end does not end.
     """
 
-    carried: Mapping[int, NDArray[numpy.float64]]
+    carried: Mapping[int, Carried]
     """Arrow -> the arrow's push carried to this claim's reading days, for each time its cause came.
 
-    Two shapes, and which one an arrow has is decided by the kind of truth its
+    Two layouts, and which one an arrow has is decided by the kind of truth its
     **source** is and by the arrow's mode:
 
-    * `(slices + 1, slices, POINTS_IN_A_SLICE)` — a `trigger` arrow, which reads only
-      the day its cause came on and keeps pushing afterwards. The first axis is the
-      slice the cause arrived in, its last index meaning *the cause never came*.
-    * `(slices + 1, slices + 1, slices, POINTS_IN_A_SLICE)` — a `sustain` arrow out
-      of a **state**, which reads its cause's whole stretch and is dead once the
-      cause stops holding. Its first two axes are the slice the cause came on in and
-      the slice it went off in.
+    * `slices + 1` readings — a `trigger` arrow, which reads only the day its cause
+      came on and keeps pushing afterwards. The reading is the slice the cause
+      arrived in, its last index meaning *the cause never came*.
+    * `(slices + 1) * (slices + 1)` readings — a `sustain` arrow out of a **state**,
+      which reads its cause's whole stretch and is dead once the cause stops holding.
+      The reading is the pair *(the slice it came on in, the slice it went off in)*,
+      flattened with the on-slice changing slowest.
 
-    The second shape is slices **cubed**, and it is the cost `needs_the_joint`
-    exists so that a state nobody reads the stretch of never pays.
+    The second layout is slices **squared** readings, and it is the cost
+    `needs_the_joint` exists so that a state nobody reads the stretch of never pays.
 
-    **Everything that reads one of these reads the leading axes flattened**, into
-    one *cause-time* axis of `slices + 1` entries for the first shape and
-    `(slices + 1) * (slices + 1)` for the second — the very layout a claim's times
-    are held in (`states.Times.spread`), so a cause's times and the push its arrow
-    carries are contracted against each other with no unpacking on either side.
+    **That flattened order is the very layout a claim's times are held in**
+    (`states.Times.spread` and `states.Times.pairs`), so a cause's times and the push
+    its arrow carries are contracted against each other with no unpacking on either
+    side — after `Carried.fold` has added the chances of the readings that carry the
+    same push together.
     """
 
     area: Mapping[int, float]
@@ -376,8 +488,14 @@ class Spread:
     blocks: tuple[NDArray[numpy.float64], ...]
     """One per term: `(rows, readings, slices)` that term's push, which no version changes.
 
-    `rows` is however many combinations of arrival times the arrows in **that term**
-    have between them — one for the term that names no arrow at all.
+    `rows` is however many combinations of the **different** pushes the arrows in
+    **that term** have between them — one for the term that names no arrow at all.
+
+    **Already a running total from day zero to the end of each slice.** Adding up
+    across the slices is a sum, and a sum can be taken before the version's number is
+    multiplied through as well as after; taking it here means it is taken over a block
+    of a few hundred numbers rather than over the same block repeated once per
+    version, which on the Hormuz strike branch was a quarter of the whole run.
     """
 
     rows: tuple[NDArray[numpy.int64], ...]
@@ -390,13 +508,13 @@ class Spread:
     """How many combinations of the holding-back arrows' arrival times there are."""
 
     readings: int
-    """How many different *when its cause happened* this arrow's push is held for.
+    """How many **different** pushes this arrow carries: `Carried.different`.
 
-    `slices + 1` for an arrow that reads only the day its cause came on, and
-    `(slices + 1) * (slices + 1)` for one that reads its cause's whole stretch, in the
-    flattened layout `ClaimShapes.carried` describes. The entries where the cause
-    never came hold nought, so the exponential of minus them is one and such a cause
-    pushes nothing.
+    Not how many readings the arrow has. Readings whose push is the same array of
+    numbers are folded together by `Carried.fold`, which is exact, and it is the
+    folded count that every array here is built at. The entries where the cause never
+    came hold nought, so the exponential of minus them is one and such a cause pushes
+    nothing.
     """
 
     slices: int
@@ -433,9 +551,7 @@ class Spread:
         total = numpy.zeros((last - first, self.combos, self.readings, self.slices))
         for term, (block, row) in enumerate(zip(self.blocks, self.rows, strict=True)):
             total += self.coefficients[first:last, term][:, None, None, None] * block[row][None]
-        built: NDArray[numpy.float64] = self.rate[first:last, None, None, None] * numpy.cumsum(
-            total, axis=-1
-        )
+        built: NDArray[numpy.float64] = self.rate[first:last, None, None, None] * total
         return built
 
     def whole(self) -> NDArray[numpy.float64]:
@@ -445,16 +561,16 @@ class Spread:
     def over_the_window(self) -> NDArray[numpy.float64]:
         """The running total on the claim's deadline, which is the end of its last slice.
 
-        Read straight off the pieces rather than off the running total: the total to
-        the end of the last slice is simply the whole of each block added up, so
-        nothing per slice is ever built and every version is done at once.
+        Read straight off the pieces rather than off the whole: every block is already
+        a running total, so the total on the deadline is its last slice, and nothing
+        per slice is ever built. Every version is done at once.
 
         Returns:
             `(versions, combos, readings)`.
         """
         ends = numpy.zeros((self.versions, self.combos, self.readings))
         for term, (block, row) in enumerate(zip(self.blocks, self.rows, strict=True)):
-            ends += self.coefficients[:, term][:, None, None] * block.sum(axis=-1)[row][None]
+            ends += self.coefficients[:, term][:, None, None] * block[..., -1][row][None]
         whole: NDArray[numpy.float64] = self.rate[:, None, None] * ends
         return whole
 
@@ -473,11 +589,12 @@ class AddedUp:
     end of a slice is the exponential of minus the entries added together, and
     nothing that reads this has to take a running total or multiply by a rate first.
 
-    `combos` counts the combinations of arrival times of the arrows that **hold the
-    claim back**. Those are the one place the cost still multiplies out: three of
-    them cost about twice a plain pass and ten cost about seventy times it. Every
-    other kind of arrow is averaged one cause at a time, which is exact because the
-    rates add.
+    `combos` counts the combinations of the **different** pushes the arrows that
+    **hold the claim back** carry — readings whose push is the same array of numbers
+    having been folded together first by `Carried`. Those combinations are the one
+    place the cost still multiplies out: three arrows cost about twice a plain pass
+    and ten cost about seventy times it. Every other kind of arrow is averaged one
+    cause at a time, which is exact because the rates add.
     """
 
     leak: NDArray[numpy.float64]
@@ -657,7 +774,7 @@ def shapes_of(
     helps: list[int] = []
     holds_back: list[int] = []
     ends: list[int] = []
-    carried: dict[int, NDArray[numpy.float64]] = {}
+    carried: dict[int, Carried] = {}
     area: dict[int, float] = {}
     for position, arrow in enumerate(arrows):
         with_it = stated_chance_with(own, numpy.array([float(arrow.strength)]))
@@ -670,14 +787,15 @@ def shapes_of(
 
         theirs = window_cut_to(window.day_zero, source_deadline[arrow.id], window.slices)
         pushed = _push_at(arrow, points[None, :, :] - theirs.middle_day[:, None, None])
-        if arrow.mode == "sustain" and source_persistence[arrow.id] == "state":
+        whole_stretch = arrow.mode == "sustain" and source_persistence[arrow.id] == "state"
+        if whole_stretch:
             # The push is dead once its cause stops holding, so it is read for every
             # pair of *came on in this slice, went off in that one*. The last index of
             # the off axis is *still holding*, whose day is positive infinity, and a
             # reading day is always before that.
             still_on = points[None, None, :, :] < theirs.middle_day[None, :, None, None]
             pushed = pushed[:, None, :, :] * still_on
-        carried[position] = pushed
+        carried[position] = _folded(pushed, whole_stretch=whole_stretch)
         area[position] = float((width * _push_at(arrow, points).mean(axis=1)).sum())
 
     return ClaimShapes(
@@ -787,11 +905,6 @@ def rates_of(
     return Rates(leak=leak, helps=helps, leaves=leaves, ends=ends, saturated=saturated)
 
 
-def _cause_times(pushes: NDArray[numpy.float64]) -> int:
-    """How many different *when its cause happened* an arrow's push is held for."""
-    return int(numpy.prod(pushes.shape[:-2]))
-
-
 def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
     """Add each rate up across the window, once, so the forward pass is gathers and products.
 
@@ -804,6 +917,12 @@ def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
     their arrival times is carried through, which is where the cost of three of them
     (about twice a plain pass) and of ten (about seventy times it) comes from.
 
+    **What does partly collapse is the arrival times that push the same.** A cause
+    judged long after this claim, or one that never came at all, pushes nothing over
+    this claim's window, so many of its arrival times are the same array of noughts;
+    `Carried` folds those together before any combination is formed, which is exact
+    and on the Hormuz strike branch takes the combinations from 625 to 125.
+
     Args:
         shapes: This claim's shapes.
         rates: This claim's rates, one column per version.
@@ -815,21 +934,18 @@ def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
     versions = int(rates.leak.shape[0])
     slices = int(shapes.width.shape[0])
     held = shapes.holds_back
-    per_held = tuple(_cause_times(shapes.carried[position]) for position in held)
+    per_held = tuple(shapes.carried[position].different for position in held)
     combos = int(numpy.prod(per_held)) if held else 1
 
-    # Which arrival time each holding-back arrow has in each combination: one row
-    # per arrow, one column per combination.
+    # Which of its different pushes each holding-back arrow has in each combination:
+    # one row per arrow, one column per combination.
     every = (
         numpy.indices(per_held).reshape(len(held), -1)
         if held
         else numpy.zeros((0, 1), dtype=numpy.int64)
     )
 
-    flat = {
-        position: pushes.reshape(_cause_times(pushes), slices, POINTS_IN_A_SLICE)
-        for position, pushes in shapes.carried.items()
-    }
+    flat = {position: one.push for position, one in shapes.carried.items()}
 
     leak_total = numpy.zeros((versions, combos, slices))
     coefficients: list[NDArray[numpy.float64]] = []
@@ -855,7 +971,11 @@ def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
                 if term
                 else numpy.zeros(combos, dtype=numpy.int64)
             )
-            spread = shapes.width[None, :] * product.mean(axis=2)
+            # **Added up across the slices here, where the block is small.** A running
+            # total is a sum, and a version enters as one number multiplying it, so
+            # taking the total before the version rather than after is the same
+            # arithmetic over a few hundred numbers instead of over millions.
+            spread = numpy.cumsum(shapes.width[None, :] * product.mean(axis=2), axis=-1)
             leak_total += coefficient[:, None, None] * spread[here][None, :, :]
             # **The version axis stops here.** Each helping arrow's block is kept as
             # it is — nothing about a version changes it — beside the one number per
@@ -865,11 +985,13 @@ def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
             help_rows.append(here)
             for position in shapes.helps:
                 together = product[:, None, :, :] * flat[position][None, :, :, :]
-                help_blocks[position].append(shapes.width[None, None, :] * together.mean(axis=3))
+                help_blocks[position].append(
+                    numpy.cumsum(shapes.width[None, None, :] * together.mean(axis=3), axis=-1)
+                )
 
     stacked = numpy.stack(coefficients, axis=1) if coefficients else numpy.ones((versions, 0))
     return AddedUp(
-        leak=rates.leak[:, None, None] * numpy.cumsum(leak_total, axis=-1),
+        leak=rates.leak[:, None, None] * leak_total,
         helps={
             position: Spread(
                 rate=rates.helps[position],
@@ -878,7 +1000,7 @@ def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
                 rows=tuple(help_rows),
                 versions=versions,
                 combos=combos,
-                readings=_cause_times(shapes.carried[position]),
+                readings=shapes.carried[position].different,
                 slices=slices,
             )
             for position, blocks in help_blocks.items()

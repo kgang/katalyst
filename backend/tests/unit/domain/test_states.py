@@ -20,7 +20,7 @@ from katalyst.domain.belief import Belief, Beliefs
 from katalyst.domain.graph import Graph
 from katalyst.domain.link import Link
 from katalyst.domain.proposition import Proposition, Resolution
-from katalyst.domain.rates import AddedUp, ClaimShapes, Rates, Spread, Window
+from katalyst.domain.rates import AddedUp, ClaimShapes, Rates, Spread, Window, _folded
 from katalyst.domain.states import (
     Times,
     as_joint,
@@ -114,6 +114,13 @@ def some_shapes(
     claim: str = "claim-b",
     slices: int = SLICES,
 ) -> ClaimShapes:
+    """One claim's shapes from pushes written out in full, one per reading.
+
+    The pushes are put away the way the engine puts them away: readings whose push is
+    the same array of numbers kept once between them, with a note of which reading
+    takes which. That fold is the engine's own, so nothing here is a second copy of
+    it, and the answers below are the answers a map gets.
+    """
     width = slice_widths(window, slices)
     return ClaimShapes(
         claim=claim,
@@ -126,7 +133,9 @@ def some_shapes(
         helps=helps,
         holds_back=holds_back,
         ends=ends,
-        carried=carried,
+        carried={
+            index: _folded(push, whole_stretch=push.ndim == 4) for index, push in carried.items()
+        },
         area={index: area_of(push, width, slices) for index, push in carried.items()},
     )
 
@@ -167,8 +176,7 @@ def added_up_by_hand(
     ).copy()
     helps = {}
     for index in shapes.helps:
-        push = shapes.carried[index]
-        per_slice = width * push.reshape(-1, push.shape[-2], push.shape[-1]).mean(axis=2)
+        per_slice = numpy.cumsum(width * shapes.carried[index].push.mean(axis=2), axis=-1)
         helps[index] = one_block(per_slice, rates.helps[index], combinations, slices)
     return AddedUp(leak=leak, helps=helps)
 
@@ -179,9 +187,9 @@ def one_block(
     """One helping arrow's added-up push where no arrow holds the claim back at all.
 
     Then the expansion has one term, whose number per version is one, and every
-    combination reads the same row of it. `Spread` does the running total and
-    multiplies the rate through, so what is handed over here is the push per slice
-    and nothing else.
+    combination reads the same row of it. `Spread` multiplies the rate through, so
+    what is handed over here is the push added up to the end of each slice and
+    nothing else.
     """
     return Spread(
         rate=rate,

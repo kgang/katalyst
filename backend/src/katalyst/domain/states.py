@@ -32,16 +32,19 @@ taken at the middle of its slice, and the last index of a slice axis meaning
 
 Two conventions this file settles, which the rest of the engine must match
 --------------------------------------------------------------------------
-* **An arrow's arrival readings are whatever its carried push is indexed by.** An
-  arrow's entry in `ClaimShapes.carried` carries one leading axis when it reads only
-  the moment its cause came on, and two when it reads its cause's whole stretch.
-  Flattened in the order they are written — the on-slice changing slowest — they
-  line up entry for entry with the cause's own times, which is how a push is
-  averaged over the times of the claim that caused it.
+* **An arrow's arrival readings are whatever its carried push is read by.** An
+  arrow's entry in `ClaimShapes.carried` is read by the slice its cause came on in
+  when it reads only that moment, and by the pair *(came on, went off)* when it reads
+  its cause's whole stretch. Flattened in the order they are written — the on-slice
+  changing slowest — they line up entry for entry with the cause's own times, which
+  is how a push is averaged over the times of the claim that caused it. **Readings
+  whose push is the same array of numbers are folded together first**, which is the
+  same sum in a different order; `chance_of_each_reading` is the one place that fold
+  is taken, and every axis below it is the folded count.
 * **Combinations of the arrows that hold a claim back run in the arrow order of
   `ClaimShapes.holds_back`, the last arrow changing fastest.** That is the axis
   `AddedUp` calls `combos`, and the chance of each combination is the product of the
-  arrival readings of the arrows that make it up.
+  folded arrival chances of the arrows that make it up.
 
 Nothing here searches for a number by trial. There is no loop that narrows a
 bracket, and nothing is clipped into range: every rate arrives already worked out
@@ -60,7 +63,7 @@ from numpy.typing import NDArray
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import PropositionId
 from katalyst.domain.proposition import Proposition
-from katalyst.domain.rates import AddedUp, ClaimShapes, Persistence, Rates, Spread
+from katalyst.domain.rates import AddedUp, Carried, ClaimShapes, Persistence, Rates, Spread
 
 NEVER: Final = -1
 """The marker for *this claim never came on*, where a day index is expected."""
@@ -188,28 +191,33 @@ def is_true_on_its_deadline(times: Times) -> NDArray[numpy.float64]:
     return last
 
 
-def _arrival_weight(carried: NDArray[numpy.float64], when: Times) -> NDArray[numpy.float64]:
-    """How much of the chance sits in each reading one arrow's carried push is indexed by.
+def chance_of_each_reading(carried: Carried, when: Times) -> NDArray[numpy.float64]:
+    """How much of the chance sits on each **different** push one arrow carries.
 
-    An arrow that reads only the moment its cause came on is indexed by the slice
-    that happened in, so its weights are the cause's own `spread`. An arrow that
-    reads its cause's whole stretch is indexed by the pair *(on-slice, off-slice)*,
-    so its weights are that cause's pair of times, flattened the same way.
+    An arrow that reads only the moment its cause came on is read by the slice that
+    happened in, so its chances are the cause's own `spread`. An arrow that reads its
+    cause's whole stretch is read by the pair *(on-slice, off-slice)*, so its chances
+    are that cause's pair of times, flattened the same way.
+
+    Either way the answer is then **folded**: readings whose push is the same array of
+    numbers have their chances added together, because everything downstream of them
+    is the same array of numbers too. That is the same sum written in a different
+    order, and it is what keeps a cause judged long after this claim — whose late
+    arrival slices all push nothing at all — from costing a reading each.
 
     Args:
-        carried: That one arrow's push carried to the claim's reading days. Only its
-            shape is read here, and the shape is what says which of the two readings
-            the arrow is indexed by.
+        carried: That one arrow's push carried to the claim's reading days, which
+            says which of the two readings the arrow is read by and which of them
+            carry the same numbers.
         when: The times of the claim that arrow comes from.
 
     Returns:
-        `(versions, readings)` adding to one along the second axis.
+        `(versions, different)` adding to one along the second axis.
     """
-    if carried.ndim == 3:
-        return when.spread
+    if not carried.whole_stretch:
+        return carried.fold(when.spread)
     square = as_joint(when)
-    flat: NDArray[numpy.float64] = square.reshape(square.shape[0], -1)
-    return flat
+    return carried.fold(square.reshape(square.shape[0], -1))
 
 
 def _chance_of_each_combination(
@@ -234,7 +242,7 @@ def _chance_of_each_combination(
     """
     chance = numpy.ones((versions, 1), dtype=numpy.float64)
     for index in shapes.holds_back:
-        arrival = _arrival_weight(shapes.carried[index], cause_times[index])
+        arrival = chance_of_each_reading(shapes.carried[index], cause_times[index])
         paired = chance[:, :, None] * arrival[:, None, :]
         chance = paired.reshape(versions, -1)
     return chance
@@ -353,7 +361,7 @@ def _came_on(
             [
                 _a_helping_arrows_factors(
                     added.helps[index],
-                    [_arrival_weight(shapes.carried[index], cause_times[index])],
+                    [chance_of_each_reading(shapes.carried[index], cause_times[index])],
                 )[0]
                 for index in shapes.helps
             ],
@@ -404,8 +412,7 @@ def _ending_pushes(shapes: ClaimShapes, rates: Rates) -> list[_EndingPush]:
     at_or_after_the_middle = shapes.middle_day[:slices, None] <= shapes.points
     pushes = []
     for index in shapes.ends:
-        carried = shapes.carried[index]
-        by_reading = carried.reshape(-1, carried.shape[-2], carried.shape[-1])
+        by_reading = shapes.carried[index].push
         whole = shapes.width * by_reading.mean(axis=2)
         part = shapes.width * numpy.where(at_or_after_the_middle, by_reading, 0.0).mean(axis=2)
         pushes.append(
@@ -422,7 +429,9 @@ def _ending_arrivals(
     shapes: ClaimShapes, cause_times: Sequence[Times]
 ) -> list[NDArray[numpy.float64]]:
     """How likely each reading of each ending arrow's cause was, in the order `ends` lists them."""
-    return [_arrival_weight(shapes.carried[index], cause_times[index]) for index in shapes.ends]
+    return [
+        chance_of_each_reading(shapes.carried[index], cause_times[index]) for index in shapes.ends
+    ]
 
 
 def _split_the_stretch(
@@ -722,7 +731,10 @@ def holding_under_each_truth(
     helping = {
         index: _a_helping_arrows_factors(
             added.helps[index],
-            [_arrival_weight(shapes.carried[index], when) for when in under_each_truth[index]],
+            [
+                chance_of_each_reading(shapes.carried[index], when)
+                for when in under_each_truth[index]
+            ],
         )
         for index in shapes.helps
     }
@@ -732,7 +744,7 @@ def holding_under_each_truth(
         ending[index] = tuple(
             numpy.einsum(
                 "vd,vda->va",
-                _arrival_weight(shapes.carried[index], when),
+                chance_of_each_reading(shapes.carried[index], when),
                 left,
                 optimize=True,
             )
