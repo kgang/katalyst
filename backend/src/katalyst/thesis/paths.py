@@ -42,6 +42,16 @@ the window there is no histogram to borrow, and the fallback is a straight line
 down to nothing. Which of the two was used is carried on the answer, because four
 to five points of *the stop is reached first* ride on that shape.
 
+**What it prices, and what it does not.** The rule prices **the chance a claim
+comes true**. It does not price *the chance it stops*, because nothing asks the
+model for that number yet — it is one line of the one shape freeze. So the path is
+exact for an **event**, which once it comes on holds to the end of the window, and
+on a **state** it carries a known gap: a state already on when the window opened
+sits in the entry price and the whole level gap falls away on the day it stops,
+with nothing having been priced in against that. Two tests say exactly what that
+costs, and the chapter states it as the antecedent of the no-drift rule rather
+than leaving it to be discovered.
+
 **Three conditions this rule needs, and one of them is not ours to enforce.** The
 stated move must be a **level gap** — the level in a world where the claim is true
 against the level in a world where it is false, both read at the same moment — and
@@ -73,6 +83,8 @@ What this file must never do
   refusal is in `position.py`, by name.
 """
 
+import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
@@ -81,7 +93,7 @@ import numpy
 from numpy.typing import NDArray
 
 from katalyst.domain import PropositionId
-from katalyst.thesis.draws import Draws, Weights
+from katalyst.thesis.draws import NEVER, STILL_HOLDING, Draws, Weights
 
 Levels = NDArray[numpy.float64]
 """Prices: one row per drawn world, one column per day of the window."""
@@ -140,15 +152,28 @@ class ClaimMove:
     market_chance_from: MarketChanceFrom
 
     def __post_init__(self) -> None:
-        """Check the move is in price units and the market's chance is usable.
+        """Check the move is a real number and the market's chance is usable.
+
+        A **negative** move is ordinary: it is a claim whose coming true pushes the
+        instrument down rather than up, and the level gap carries its own sign.
 
         Raises:
-            ValueError: If the market's chance is below nothing, or is one or more.
-                A chance of one says the market is already certain: there is no
-                surprise to apply, nothing left to give back, and the schedule's
-                arithmetic has nothing to divide by.
+            ValueError: If the move is not a real number, or if the market's chance
+                is below nothing or is one or more. A chance of one says the market
+                is already certain: there is no surprise to apply, nothing left to
+                give back, and the schedule's arithmetic has nothing to divide by.
         """
-        raise NotImplementedError
+        if not math.isfinite(self.move):
+            raise ValueError(
+                f"a claim's move is a level gap in price units; got {self.move} for '{self.claim}'"
+            )
+        if not 0.0 <= self.market_chance < 1.0:
+            raise ValueError(
+                "the market's chance of a claim is from nothing up to but not including "
+                f"one; got {self.market_chance} for '{self.claim}'. A chance of one says "
+                "the market is already certain, so there is no surprise to apply and "
+                "nothing left to give back"
+            )
 
 
 @dataclass(frozen=True)
@@ -176,7 +201,7 @@ class Paths:
     entry: float
     level: Levels
     weight: Weights
-    decay_shape: dict[PropositionId, DecayShape]
+    decay_shape: Mapping[PropositionId, DecayShape]
 
 
 def giveback_schedule(draws: Draws, move: ClaimMove) -> tuple[Schedule, DecayShape]:
@@ -208,7 +233,19 @@ def giveback_schedule(draws: Draws, move: ClaimMove) -> tuple[Schedule, DecaySha
     Raises:
         KeyError: If the claim is not among the drawn worlds' claims.
     """
-    raise NotImplementedError
+    chance = move.market_chance
+    grid = numpy.arange(draws.days + 1)
+    came_on = draws.on_day[:, draws.column(move.claim)]
+    inside = (came_on != NEVER) & (came_on > 0)
+    arriving = float(draws.weight[inside].sum())
+    if arriving <= 0.0:
+        return chance * (draws.days - grid) / draws.days, "straight_line"
+
+    by = numpy.array(
+        [float(draws.weight[inside & (came_on <= day)].sum()) / arriving for day in grid]
+    )
+    after = 1.0 - by
+    return chance * after / (1.0 - chance * by), "arrival_days"
 
 
 def walk(
@@ -257,4 +294,77 @@ def walk(
             variability is negative, or if the entry price is not above nothing.
         KeyError: If a move names a claim the drawn worlds do not carry.
     """
-    raise NotImplementedError
+    named = [one.claim for one in moves]
+    if len(set(named)) != len(named):
+        raise ValueError(
+            "a claim moves the price by one level gap, and two of these name the same claim"
+        )
+    if not math.isfinite(daily_move) or daily_move < 0.0:
+        raise ValueError(
+            f"a day's variability is a distance in price units, never below nothing; "
+            f"got {daily_move}"
+        )
+    if not math.isfinite(entry) or entry <= 0.0:
+        raise ValueError(f"an entry price is above nothing; got {entry}")
+
+    grid = numpy.arange(draws.days + 1)
+    steps = numpy.random.default_rng(seed).standard_normal((draws.worlds, draws.days))
+    level = entry + numpy.concatenate(
+        [numpy.zeros((draws.worlds, 1)), numpy.cumsum(daily_move * steps, axis=1)], axis=1
+    )
+
+    shapes: dict[PropositionId, DecayShape] = {}
+    for one in moves:
+        schedule, shapes[one.claim] = giveback_schedule(draws, one)
+        carried = _carried(draws, one.claim, schedule, grid)
+        level = level + one.move * (carried - carried[:, :1])
+
+    return Paths(
+        day_zero=draws.day_zero,
+        days=draws.days,
+        entry=entry,
+        level=level,
+        weight=draws.weight,
+        decay_shape=shapes,
+    )
+
+
+def _carried(
+    draws: Draws, claim: PropositionId, schedule: Schedule, grid: NDArray[numpy.int64]
+) -> Levels:
+    """How much of one claim's move the price carries, per drawn world and per day.
+
+    Three states and no fourth. **Holding** — the claim came on and has not gone off
+    — carries the whole move, because the move is the level gap between a world
+    where the claim is true and one where it is false. **Gone off** carries nothing,
+    because the level gap goes when the claim does; an event never goes off, so this
+    only ever touches a state. **Not yet** carries the schedule's share, which is the
+    part the market has already priced and gives back day by day.
+
+    The walk subtracts each world's own day-zero amount, so every path starts at the
+    entry price whatever state its claims were in when the window opened. A claim
+    already on at day zero therefore moves the price by nothing at all — which is
+    not a special case but the surprise rule read at a market chance of one: a claim
+    that has already happened is in today's price, so there is no surprise to apply
+    and nothing left to give back.
+
+    Args:
+        draws: The drawn worlds.
+        claim: Which claim's move this is.
+        schedule: The share of the move the price carries on each day while the
+            claim has not happened.
+        grid: The days of the window, from zero.
+
+    Returns:
+        A share of the move per drawn world per day.
+    """
+    column = draws.column(claim)
+    came_on = draws.on_day[:, column][:, None]
+    went_off = draws.off_day[:, column][:, None]
+    started = (came_on != NEVER) & (came_on <= grid[None, :])
+    holding = started & ((went_off == STILL_HOLDING) | (went_off > grid[None, :]))
+    gone = started & ~holding
+    carried: Levels = numpy.where(
+        holding, 1.0, numpy.where(gone, 0.0, numpy.broadcast_to(schedule, holding.shape))
+    )
+    return carried

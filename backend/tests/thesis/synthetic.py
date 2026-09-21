@@ -110,6 +110,8 @@ def draws(
     worlds: int | None = None,
     days: int | None = None,
     even_weights: bool = False,
+    already_on: bool = True,
+    events_only: bool = False,
 ) -> Draws:
     """Generate a set of drawn worlds with coarse arrival days and real weights.
 
@@ -125,6 +127,13 @@ def draws(
         days: How long the window runs for, or nothing to let it choose.
         even_weights: True to weight every world the same, for a test about
             something other than weighting.
+        already_on: False to leave out claims that were already on when the window
+            opened.
+        events_only: True to make every claim an event — once it comes on it holds
+            to the end of the window. **The path prices the chance a claim comes
+            true and not the chance it stops**, because nothing asks the model for
+            that second number yet, so a test about the path inventing no advantage
+            has to say so and leave states out.
 
     Returns:
         One set of drawn worlds.
@@ -133,6 +142,8 @@ def draws(
     how_many_worlds = worlds if worlds is not None else draw(st.integers(4, 40))
     how_long = days if days is not None else draw(st.integers(8, 60))
     grid = slice_middles(how_long)
+    if not already_on:
+        grid = tuple(day for day in grid if day > 0) or (1,)
 
     came = numpy.full((how_many_worlds, how_many_claims), NEVER, dtype=numpy.int32)
     went = numpy.full((how_many_worlds, how_many_claims), NEVER, dtype=numpy.int32)
@@ -143,7 +154,9 @@ def draws(
             came[world, claim] = draw(st.sampled_from(grid))
             later = [day for day in grid if day >= came[world, claim]]
             went[world, claim] = (
-                STILL_HOLDING if draw(st.booleans()) else draw(st.sampled_from(later))
+                STILL_HOLDING
+                if events_only or draw(st.booleans())
+                else draw(st.sampled_from(later))
             )
 
     counts = (
@@ -205,3 +218,31 @@ def positions(draw: Any, *, trades: str = "instrument", ending: str = "ending-0"
 def whole_days(draws_from: Draws) -> SearchStrategy[int]:
     """Every day of a window, as something to draw one of."""
     return st.integers(0, draws_from.days)
+
+
+def the_models_own_chance(drawn: Draws, claim: str) -> float:
+    """The model's own chance that a claim comes on inside the window, read off the draws.
+
+    The neutral assumption behind the surprise rule is that **the market believes
+    what the model believes**, except where a venue says otherwise. Read straight
+    off the drawn worlds, that chance is the weighted share of them in which the
+    claim comes on inside the window — among the worlds where it was not already on
+    when the window opened, because a claim already on is in today's price and the
+    question does not arise for it.
+
+    With the market's chance set to exactly this number, the mean price over the
+    drawn worlds is the entry price on **every** day, exactly rather than within a
+    sampling error. That is what makes the no-drift test an identity instead of a
+    measurement.
+
+    Args:
+        drawn: The drawn worlds.
+        claim: Which claim.
+
+    Returns:
+        A chance between nothing and one.
+    """
+    came_on = drawn.on_day[:, drawn.column(PropositionId(claim))]
+    open_to_it = float(drawn.weight[came_on != 0].sum())
+    inside = float(drawn.weight[(came_on != NEVER) & (came_on > 0)].sum())
+    return inside / open_to_it if open_to_it > 0.0 else 0.0
