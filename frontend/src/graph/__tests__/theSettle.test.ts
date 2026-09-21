@@ -6,7 +6,8 @@
  * clauses a test can hold:
  *
  * 1. a tile keeps its **row** — its vertical place and its order within its
- *    column — for as long as the map is growing;
+ *    column — for as long as the map is growing, unless the arrows send it into
+ *    a column where that row is taken, and then it takes the nearest free row;
  * 2. a tile's **column** is re-read from the arrows on every pass, so no arrow
  *    points backwards at any moment;
  * 3. when the run stops, every pin is dropped and the map is laid out once,
@@ -259,13 +260,14 @@ describe("a tile keeps its row while the map grows", () => {
   it("test_a_tile_keeps_its_row_while_the_map_grows", async () => {
     // The half of the rule that stops all of this becoming *never pin
     // anything*: the reader's vertical scan of the map survives every arrival.
-    // A box that stays in the column it is in never moves a pixel — and the
+    // **A box that stays in the column it is in never moves a pixel**, and the
     // only box that ever takes a new row while the map is growing is one the
-    // arrows have just sent into a different column, where the row it wants was
-    // taken. (Measured, 2026-09-21: that happens twice on the live Verify run
-    // and once on the committed recording, always to the tile that moved. See
-    // `readPositions` for why the alternative is two claims drawn on top of
-    // each other.)
+    // arrows have just sent into a different column where that row was already
+    // taken — and then it takes the nearest free row, which the test below is
+    // about. Measured, 2026-09-22: that happens once in the whole of the live
+    // Verify run, by 48 pixels, and not at all on the committed recording. See
+    // `readPositions` for why holding the row regardless was worse: on the
+    // recording it drew one claim 140 pixels on top of another.
     for (const [name, events] of THE_REAL_STREAMS) {
       const frames = await everyFrameOf(events);
       const was = new Map<string, Position>();
@@ -292,6 +294,84 @@ describe("a tile keeps its row while the map grows", () => {
       // was checked.
       expect(was.size, name).toBeGreaterThan(1);
     }
+  });
+
+  it("test_a_tile_sent_into_a_taken_row_takes_the_nearest_free_row", async () => {
+    // The second half of the rule, said as a statement about distance rather
+    // than about a coordinate. **A box built on purpose**: it is pinned in one
+    // column, this pass puts it in another, and the row it wants there is held
+    // by a reserved rectangle whose own row leaves a free row a little way
+    // **above** it and a long way below. The rule this replaced only ever slid
+    // downwards, which on Kent's own Verify run sent the destination tile 392
+    // pixels down past a free row 48 pixels up.
+    const column = TILE_WIDTH + COLUMN_GAP;
+    const standing = { id: "a rectangle already there", at: { x: column, y: 1000 }, height: 200 };
+    const mover = { id: "the tile the arrows moved", height: 100 };
+
+    // The two rows that clear the rectangle, worked out from its own box rather
+    // than written down: just above it, and just below it.
+    const above = standing.at.y - COLUMN_GAP - mover.height;
+    const below = standing.at.y + standing.height + COLUMN_GAP;
+    // A row inside the rectangle's own span, so it really is taken — and nearer
+    // the row above than the row below.
+    const wanted = standing.at.y + COLUMN_GAP;
+
+    const answer = readPositions(
+      {
+        id: "map",
+        children: [
+          { id: standing.id, x: standing.at.x, y: standing.at.y, height: standing.height },
+          // Wherever the engine would have put it. The row it keeps is its pin's.
+          { id: mover.id, x: column, y: 0, height: mover.height },
+        ],
+      },
+      new Map([
+        [standing.id, standing.at],
+        [mover.id, { x: 0, y: wanted }],
+      ]),
+    );
+    const took = answer.get(mover.id) as Position;
+
+    // It went to the free row nearer the one it wanted, which here is upwards,
+    // and it is not the row the old rule would have sent it to.
+    expect(took.x).toBe(column);
+    expect(Math.abs(took.y - wanted)).toBeLessThan(Math.abs(below - wanted));
+    expect(took.y).toBe(above);
+    // And the rectangle did not move, and is not drawn over.
+    expect(answer.get(standing.id)).toEqual(standing.at);
+    expect(took.y + mover.height + COLUMN_GAP).toBeLessThanOrEqual(standing.at.y);
+  });
+
+  it("test_a_tie_between_two_free_rows_goes_down", async () => {
+    // Reading order breaks the tie: of two free rows the same distance away, the
+    // one further down the map is the one the reader's eye reaches later, so it
+    // disturbs less of what they have already read.
+    const column = TILE_WIDTH + COLUMN_GAP;
+    const standing = { id: "a tile already there", at: { x: column, y: 1000 }, height: 200 };
+    const mover = { id: "the tile the arrows moved", height: 100 };
+    const above = standing.at.y - COLUMN_GAP - mover.height;
+    const below = standing.at.y + standing.height + COLUMN_GAP;
+    // Exactly between the two, so neither is nearer.
+    const wanted = (above + below) / 2;
+
+    const answer = readPositions(
+      {
+        id: "map",
+        children: [
+          { id: standing.id, x: standing.at.x, y: standing.at.y, height: standing.height },
+          { id: mover.id, x: column, y: 0, height: mover.height },
+        ],
+      },
+      new Map([
+        [standing.id, standing.at],
+        [mover.id, { x: 0, y: wanted }],
+      ]),
+    );
+    const took = answer.get(mover.id) as Position;
+
+    // The tie is a real tie, or this is testing the case above again.
+    expect(Math.abs(above - wanted)).toBe(Math.abs(below - wanted));
+    expect(took.y).toBe(below);
   });
 
   it("test_no_two_boxes_are_drawn_on_top_of_each_other", async () => {

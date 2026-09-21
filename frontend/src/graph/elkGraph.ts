@@ -222,16 +222,65 @@ interface Placed {
 }
 
 /**
+ * The nearest row in this box's column where it clears everything already
+ * standing there.
+ *
+ * Its own row, when that row is free — which is the answer almost every time,
+ * and is what *a tile keeps its row* means. Otherwise the closest row that is
+ * free, **up or down**, because the point of the whole rule is that a tile a
+ * reader is watching travels as little as it can. Only sliding downwards was
+ * measured at 392 pixels on Kent's own Verify run for a tile that had a free row
+ * 48 pixels above it (2026-09-22).
+ *
+ * **A tie goes down**, which is reading order: given the choice of two rows the
+ * same distance away, the one further down the map is the one a reader's eye
+ * reaches later, so it disturbs less of what they have already read.
+ *
+ * **A reserved rectangle is a box here like any other.** It is never room to be
+ * drawn over — a claim on top of the rectangle held open for it is the same
+ * mistake as two claims on top of each other — and the case above does not ask
+ * it to be: the tile goes *above* the rectangle rather than through it.
+ *
+ * There is always an answer. The row below every box in the column clears all of
+ * them, and it is one of the rows tried.
+ *
+ * @param box The box wanting a row, at the row it would rather have.
+ * @param settled Everything already placed, in every column.
+ */
+function nearestFreeRow(box: Placed, settled: readonly Placed[]): Position {
+  const free = (y: number): boolean =>
+    !settled.some((other) => runsInto({ ...box, at: { x: box.at.x, y } }, other));
+  if (free(box.at.y)) {
+    return box.at;
+  }
+
+  const rows: number[] = [];
+  for (const other of settled) {
+    if (sameColumn(box, other)) {
+      rows.push(other.at.y - COLUMN_GAP - box.height); // just above it
+      rows.push(other.at.y + other.height + COLUMN_GAP); // just below it
+    }
+  }
+  const wanted = box.at.y;
+  const answer = rows
+    .filter(free)
+    .sort((one, other) => Math.abs(one - wanted) - Math.abs(other - wanted) || other - one)[0];
+  return answer === undefined ? box.at : { x: box.at.x, y: answer };
+}
+
+/**
  * Read the layout engine's answer back, keeping every tile that was already
  * placed in the row it was already in — and making a tile that has just arrived,
  * or just changed column, find a gap rather than land on one of them.
  *
  * **A tile keeps its row, and only its row** *(decision record 0024,
- * 2026-09-21; this used to keep the column too)*. The vertical place is what
- * keeps the reader's place: the map they are scanning does not shuffle up and
- * down under them while it is being written. The hint in `toElkGraph` asks the
- * engine to keep each column in the order it is already in, and it mostly does —
- * but "mostly" is not a promise, so the rule is made absolute on our side.
+ * 2026-09-21; this used to keep the column too)* — unless the arrows send it
+ * into a column where that row is taken, and then it takes the nearest free one.
+ * The vertical place is what keeps the reader's place: the map they are scanning
+ * does not shuffle up and down under them while it is being written. The hint in
+ * `toElkGraph` asks the engine to keep each column in the order it is already
+ * in, and it mostly does — but "mostly" is not a promise, so the rule is made
+ * absolute on our side.
  *
  * **The column is taken from this pass's answer, every pass.** Which column a
  * claim belongs in is decided by the arrows into it, and arrows keep arriving. A
@@ -242,19 +291,17 @@ interface Placed {
  * back, which is a picture of an argument running the wrong way. So the claim
  * moves sideways instead, on the arrival that proves it, and keeps its row.
  *
- * **A tile that moved needs a gap as much as one that arrived.** `elk.position`
+ * **A tile that moved needs a row as much as one that arrived.** `elk.position`
  * is a hint about the order of a column, not a coordinate the engine is bound
  * by: it lays the whole map out freshly and we put the rows back. A tile sent
  * into a column it has not been in before arrives at a row worked out for a
  * different arrangement, and so can land on a tile already standing there — the
- * same failure that once put one claim exactly on top of another. So every box
- * that is not staying exactly where it was is settled afterwards, in the order
- * the engine proposed them: each keeps its new column, starts at the row it
- * wants, and slides **down** until it clears every box already settled by the
- * column's own gap. On both real generated maps this repository holds, nothing
- * has ever had to slide — a tile that moves column keeps its row exactly — and
- * the rule is here so that the one map where two tiles want one row is drawn
- * honestly rather than drawn twice in one place.
+ * same failure that once put one claim exactly on top of another, and which
+ * holding the row absolutely was measured to produce, 140 pixels deep, on the
+ * committed recording. So every box that is not staying exactly where it was
+ * takes the **nearest free row** in its new column, in the order the engine
+ * proposed them: its own row whenever that row is free, and otherwise the
+ * closest one that is, up or down, with a tie going down. See `nearestFreeRow`.
  *
  * Reserved rectangles are boxes here like any other. A claim drawn on top of the
  * rectangle that was held open for it is the same mistake as two claims on top of
@@ -281,7 +328,8 @@ export function readPositions(
     } else if (column === pinned.x) {
       staying.push({ id: child.id, at: pinned, height });
     } else {
-      // The arrows moved it sideways. It keeps the row it has.
+      // The arrows moved it sideways. It keeps the row it has, or the nearest
+      // free row to it when something is already standing there.
       looking.push({ id: child.id, at: { x: column, y: pinned.y }, height });
     }
   }
@@ -293,17 +341,7 @@ export function readPositions(
 
   const settled: Placed[] = [...staying];
   for (const box of looking) {
-    let at = box.at;
-    // Each pass can only push the box further down, and there are finitely many
-    // boxes below it, so this always settles.
-    for (let pass = 0; pass <= settled.length; pass += 1) {
-      const inTheWay = settled.find((other) => runsInto({ ...box, at }, other));
-      if (inTheWay === undefined) {
-        break;
-      }
-      at = { x: at.x, y: inTheWay.at.y + inTheWay.height + COLUMN_GAP };
-    }
-    settled.push({ ...box, at });
+    settled.push({ ...box, at: nearestFreeRow(box, settled) });
   }
 
   return new Map(settled.map((box) => [box.id, box.at]));
