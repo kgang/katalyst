@@ -221,7 +221,7 @@ All under `/api/`, like everything else, in `backend/src/katalyst/api/generate.p
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed` |
+| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed`. **A live run here asks the model for `medium` effort** unless `KATALYST_EFFORT` says otherwise (Kent, G13): a reader is waiting, and the `receipt` event says which effort made the map |
 | `POST /api/generate/insert` | `{base_id, branch, claim_in_words, position}` | A `DraftedInsert`: one `Insert` intervention — a claim and its arrows, drafted and already validated — **and its own small receipt** |
 | `GET /api/generate/{generation_id}/transcript` | — | The transcript of a generation this process still holds; `404` with a plain sentence when it does not |
 

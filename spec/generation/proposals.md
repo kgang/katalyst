@@ -406,6 +406,24 @@ What was built is kept, not thrown away: a partial map with a visible reason bea
 
 **The model is one setting** (Kent, 2026-09-20). The prototype runs on `claude-sonnet-5`; `claude-opus-5` is one setting away for a final recording if quality asks for it. **Nothing else in the pipeline knows which model it is** — not `expand`, not the caps, not the provenance rule — and **`Receipt.model` names the one that actually ran**, so no reader has to guess what a map came from.
 
+**Record rich, run live fast** (Kent, G13, 2026-09-21). How hard the model is
+asked to try is one setting, `KATALYST_EFFORT`, with **two pinned defaults**
+behind it. The recorder sends nothing and takes the service's own: a recording is
+made once and played back by everybody, so it is worth the model's best, and the
+request stays byte for byte what it was before anybody had an opinion. A live run
+through the stream route asks for **`medium`**: somebody watching a map arrive is
+waiting, and the measurement is 27 seconds a call against 79. The setting
+overrides either. It is pinned for a whole run and never varied between its
+calls, because it sits in the part of a request the service remembers.
+
+**The receipt says which effort made the map**, as a plain word — `default` when
+nothing was sent — and so does a recording's header, so a reader of a replay
+knows which of the two they are looking at.
+
+**Record rich, run live fast** (Kent, G13, 2026-09-21). How hard the model is asked to try is one setting, `KATALYST_EFFORT`, with **two pinned defaults** behind it. The recorder sends nothing and takes the service's own: a recording is made once and played back by everybody, so it is worth the model's best, and the request stays byte for byte what it was before anybody had an opinion. A live run through the stream route asks for **`medium`**: somebody watching a map arrive is waiting, and the measurement is 27 seconds a call against 79. The setting overrides either. It is pinned for a whole run and never varied between its calls, because it sits in the part of a request the service remembers.
+
+**The receipt says which effort made the map**, as a plain word — `default` when nothing was sent — and so does a recording's header, so a reader of a replay knows which of the two they are looking at.
+
 **How long a call waits, and how often it tries again, are decisions** (*decided here*, 2026-09-20; both read from the `claude-api` reference bundle that day). The library's own defaults are ten minutes and two retries, over 408, 409, 429, every 5xx and every connection failure. Two retries is kept and written down — a failed request is not billed, so trying again is free, and what it costs is time. Ten minutes is not: a whole question measures about two hundred seconds and one round of it far less, so ten minutes is a hang rather than a timeout, and three attempts of it is half an hour of somebody watching a stream that will never move. **Five minutes**, which is comfortably above anything measured and bounds a whole question, retries and all, at fifteen.
 
 **Every failure of the service is a sentence, not a crash.** A 429 or a 529 on call twenty of forty is ordinary; it used to take the whole run with it, leaving no partial map, no receipt and no `Finished` — and dropping the round's other two paid answers unread. Every error the library raises now stops at the seam and crosses it as one of ours, carrying one plain sentence a person could act on: the model is busy, the model did not answer in time, this run asked too much too quickly, this key is not allowed to ask this model. Never a class name, never a status code, never a stack trace. `expand` folds it exactly as it folds an answer it could not read — a refusal, counted toward the three in a row, shown, never repaired.

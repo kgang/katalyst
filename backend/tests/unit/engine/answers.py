@@ -34,7 +34,7 @@ from anthropic.types.server_tool_usage import ServerToolUsage
 
 from katalyst.domain import BaseRate, ContractPayoff, Resolution
 from katalyst.engine.client import what_it_said
-from katalyst.engine.outcome import Said
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO, Said
 from katalyst.engine.proposal import (
     ClaimProposal,
     LinkDraft,
@@ -320,6 +320,7 @@ class Scripted:
         self.asked: list[str] = []
         self.searched: list[bool] = []
         self.purse: list[tuple[Receipt, float]] = []
+        self.effort_used = WHAT_THE_SERVICE_DEFAULTS_TO
 
     def watching(self, spent: Receipt, cap: float) -> None:
         """Take note of the purse and do nothing with it.
@@ -412,6 +413,7 @@ class Storyteller:
         self.asked_about: list[str] = []
         self.searched: list[bool] = []
         self.purse: list[tuple[Receipt, float]] = []
+        self.effort_used = WHAT_THE_SERVICE_DEFAULTS_TO
 
     def watching(self, spent: Receipt, cap: float) -> None:
         """Take note of the purse and do nothing with it.

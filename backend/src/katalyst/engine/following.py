@@ -27,7 +27,7 @@ from collections.abc import Generator, Iterable
 
 from katalyst.engine.events import Event, Receipt, growth_event
 from katalyst.engine.grow import Finished
-from katalyst.engine.outcome import Outcome
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO, Outcome
 from katalyst.engine.prompt import prompt_hash
 from katalyst.engine.receipt import Receipt as Spent
 from katalyst.engine.receipt import fold, nothing_spent_yet
@@ -130,12 +130,16 @@ class Following:
         )
         return self.working
 
-    def receipt(self, *, mode: str = "live", recording_date: object = None) -> Receipt:
+    def receipt(
+        self, *, mode: str = "live", recording_date: object = None, effort: str | None = None
+    ) -> Receipt:
         """The receipt event, built from the running total.
 
         Args:
             mode: Whether this run called a model or played a recording back.
             recording_date: The day a recording was made, when this is a replay.
+            effort: How hard the model was asked to try, as the plain word a
+                reader sees.
 
         Returns:
             The event. A run that broke before its first call still gets one, of
@@ -143,12 +147,21 @@ class Following:
             what it cost has no exception for runs that went wrong.
         """
         return receipt_event(
-            self.spent, seconds=self.seconds, mode=mode, recording_date=recording_date
+            self.spent,
+            seconds=self.seconds,
+            mode=mode,
+            recording_date=recording_date,
+            effort=effort,
         )
 
 
 def receipt_event(
-    spent: Spent, *, seconds: float, mode: str = "live", recording_date: object = None
+    spent: Spent,
+    *,
+    seconds: float,
+    mode: str = "live",
+    recording_date: object = None,
+    effort: str | None = None,
 ) -> Receipt:
     """Turn what a run spent into the receipt event it puts on the stream.
 
@@ -160,6 +173,8 @@ def receipt_event(
         seconds: How long it took, wall clock.
         mode: Whether it called a model or played a recording back.
         recording_date: The day a recording was made, when this is a replay.
+        effort: How hard the model was asked to try, as the plain word a reader
+            sees. The service's own default when not said.
 
     Returns:
         The event.
@@ -175,5 +190,6 @@ def receipt_event(
         seconds=seconds,
         mode="live" if mode == "live" else "replay",
         recording_date=recording_date,  # type: ignore[arg-type]
+        effort=effort or WHAT_THE_SERVICE_DEFAULTS_TO,
         prompt_hash=prompt_hash(),
     )

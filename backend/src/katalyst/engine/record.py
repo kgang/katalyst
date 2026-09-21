@@ -59,7 +59,7 @@ from katalyst.engine.expand import add_a_claim
 from katalyst.engine.following import Following, receipt_event
 from katalyst.engine.grow import Finished, grow
 from katalyst.engine.ids import mint_id, mint_seed
-from katalyst.engine.outcome import Caps, Outcome
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO, Caps, Outcome
 from katalyst.engine.pricing import PRICES_READ_ON
 from katalyst.engine.prompt import prompt_hash
 from katalyst.engine.receipt import Receipt as RunningTotal
@@ -206,6 +206,8 @@ class Run(BaseModel):
     transcript: Transcript
     finished: Finished | None
     scripted_insert: Insert | None = None
+    effort: str = WHAT_THE_SERVICE_DEFAULTS_TO
+    """How hard the model was asked to try, as the plain word a reader sees."""
     broke: str | None = None
     """One plain sentence when the run stopped for a reason nobody chose."""
     kept_at: Path | None = None
@@ -306,10 +308,10 @@ def run_one(
         its_seed,
         today,
         started,
-        (*written, *_closing_events(finished, so_far, started)),
+        (*written, *_closing_events(finished, so_far, started, answerer.effort_used)),
         _with_the_ending(working, finished),
         finished,
-    ).model_copy(update={"broke": broke})
+    ).model_copy(update={"broke": broke, "effort": answerer.effort_used})
     kept_at = keep(so_far_a_run, (NOT_FINISHED_YET,), folder=keep_in)
     telling(f"  what it has so far is on disk at {kept_at}")
     so_far_a_run = so_far_a_run.model_copy(update={"kept_at": kept_at})
@@ -353,14 +355,20 @@ def run_one(
         its_seed,
         today,
         started,
-        (*written, *_closing_events(finished, so_far, started)),
+        (*written, *_closing_events(finished, so_far, started, answerer.effort_used)),
         _with_the_ending(working, finished),
         finished,
-    ).model_copy(update={"scripted_insert": drafted, "kept_at": kept_at})
+    ).model_copy(
+        update={
+            "scripted_insert": drafted,
+            "kept_at": kept_at,
+            "effort": answerer.effort_used,
+        }
+    )
 
 
 def _closing_events(
-    finished: Finished | None, spent: RunningTotal, started: float
+    finished: Finished | None, spent: RunningTotal, started: float, effort: str
 ) -> tuple[Event, ...]:
     """The events that close a generation: the verdict, the receipt and the ending.
 
@@ -375,6 +383,7 @@ def _closing_events(
         spent: The running total, which is what the receipt is built from — a
             walk that broke hands nothing back, and what it spent is still spent.
         started: When the clock was started.
+        effort: How hard the model was asked to try, as a plain word.
 
     Returns:
         The closing events, in the order the grammar wants them. Empty when the
@@ -385,7 +394,7 @@ def _closing_events(
     closing: list[Event] = []
     if finished.graph is not None and finished.destination is not None:
         closing.append(verdict(finished.graph, finished.destination))
-    closing.append(receipt_event(spent, seconds=_since(started)))
+    closing.append(receipt_event(spent, seconds=_since(started), effort=effort))
     closing.append(
         Done(
             reason=finished.reason,
@@ -591,6 +600,7 @@ def write_recording(run: Run, *, folder: Path | None = None) -> Path:
     built = run.finished.graph if run.finished is not None else None
     header = {
         "base_id": "" if built is None else built.id,
+        "effort": run.effort,
         "seed": run.seed,
         "recording_date": run.on.isoformat(),
         "prompt_hash": prompt_hash(),

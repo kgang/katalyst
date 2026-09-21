@@ -18,8 +18,11 @@ from typing import Any
 import anthropic
 import httpx
 import pytest
+from anthropic import omit
 
 from katalyst.engine.client import (
+    EFFORT_WHEN_LIVE,
+    EFFORT_WHEN_RECORDING,
     MAY_NOT_SEARCH,
     MAY_SEARCH,
     ROUNDS_OF_RESEARCH,
@@ -29,6 +32,7 @@ from katalyst.engine.client import (
     TheModelDidNotAnswer,
     live_answerer,
 )
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO
 from katalyst.engine.prompt import STANDING_TEXT
 from katalyst.engine.receipt import nothing_spent_yet
 from katalyst.settings import get_settings
@@ -321,3 +325,78 @@ def test_research_stops_at_five_rounds() -> None:
 
     assert said.calls == ROUNDS_OF_RESEARCH == 5
     assert len(wire.sent) == ROUNDS_OF_RESEARCH
+
+
+# --- Record rich, run live fast --------------------------------------------
+
+
+def a_key(monkeypatch: pytest.MonkeyPatch, **rest: str) -> None:
+    """A copy of the program with a key and whatever settings a test names."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    monkeypatch.delenv("KATALYST_EFFORT", raising=False)
+    for name, said in rest.items():
+        monkeypatch.setenv(name, said)
+    get_settings.cache_clear()
+
+
+def test_the_recorder_sends_no_effort_and_takes_the_services_own(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Record rich (Kent, G13, 2026-09-21).
+
+    A recording is made once and played back by everybody, so it is worth the
+    service's best — and the request stays byte for byte what it was before
+    anybody had an opinion.
+    """
+    a_key(monkeypatch)
+    try:
+        asking = live_answerer(when_nothing_is_said=EFFORT_WHEN_RECORDING)
+    finally:
+        get_settings.cache_clear()
+
+    assert asking is not None
+    assert asking.effort_used == WHAT_THE_SERVICE_DEFAULTS_TO
+    assert asking._trying is omit
+
+
+def test_a_live_run_asks_for_medium(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run live fast (Kent, G13, 2026-09-21).
+
+    Somebody watching a map arrive is waiting. Measured 2026-09-21 on one Hormuz
+    map each: 27 seconds a call at medium against 79 at the service's default.
+    """
+    a_key(monkeypatch)
+    try:
+        asking = live_answerer(when_nothing_is_said=EFFORT_WHEN_LIVE)
+    finally:
+        get_settings.cache_clear()
+
+    assert asking is not None
+    assert asking.effort_used == "medium"
+
+
+@pytest.mark.parametrize("default", [EFFORT_WHEN_RECORDING, EFFORT_WHEN_LIVE])
+def test_the_one_setting_overrides_both_defaults(
+    monkeypatch: pytest.MonkeyPatch, default: str
+) -> None:
+    """One setting, two pinned defaults, and the setting wins over either."""
+    a_key(monkeypatch, KATALYST_EFFORT="xhigh")
+    try:
+        asking = live_answerer(when_nothing_is_said=default)
+    finally:
+        get_settings.cache_clear()
+
+    assert asking is not None
+    assert asking.effort_used == "xhigh"
+
+
+def test_the_effort_is_pinned_for_a_whole_run_and_never_varies_between_calls() -> None:
+    """Changing it mid-run would throw away the prefix the run reads back cheaply."""
+    wire = Wire([an_answer(a_claim("One.", cause="C")), an_answer(a_claim("Two.", cause="C"))])
+    asking = Model(wire, effort="medium")  # type: ignore[arg-type]
+
+    asking.proposal("q", may_search=True)
+    asking.proposal("q again", may_search=True)
+
+    assert [one["output_config"] for one in wire.sent] == [{"effort": "medium"}] * 2
+    assert asking.effort_used == "medium"

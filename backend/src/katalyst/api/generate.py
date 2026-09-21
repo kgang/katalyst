@@ -49,7 +49,7 @@ from starlette.concurrency import run_in_threadpool
 from katalyst.domain import Belief, Branch, Graph, Insert, Violation, apply, validate
 from katalyst.engine import events, replay
 from katalyst.engine import worlds as engine
-from katalyst.engine.client import Answerer, live_answerer
+from katalyst.engine.client import EFFORT_WHEN_LIVE, Answerer, live_answerer
 from katalyst.engine.events import (
     BeliefsPropagated,
     Done,
@@ -395,7 +395,7 @@ async def _written_out(request: Request, asked: GenerateRequest) -> AsyncIterato
     Yields:
         The wire's lines, one event at a time.
     """
-    answerer = live_answerer()
+    answerer = live_answerer(when_nothing_is_said=EFFORT_WHEN_LIVE)
     stepping = _replayed(asked) if answerer is None else _lived(asked, answerer)
     try:
         while True:
@@ -473,7 +473,7 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
 
     finished, broke = watching.finished, watching.broke
     if finished is None or finished.graph is None:
-        yield watching.receipt()
+        yield watching.receipt(effort=answerer.effort_used)
         if broke is None and finished is not None and finished.reason == "spend_cap":
             # **Stopping because the money ran out is a decision, not a fault**,
             # whether it runs out on call forty or call one — `events.py` says so
@@ -503,13 +503,13 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         finished.graph.id, None, seed, versions=asked.versions, worlds=asked.worlds
     )
     if world is None or isinstance(world, list):  # pragma: no cover - our own map, just built
-        yield watching.receipt()
+        yield watching.receipt(effort=answerer.effort_used)
         yield Failed(message="The map was built but its likelihoods could not be worked through.")
         return
     yield BeliefsPropagated(world=world)
     if finished.destination is not None:
         yield verdict(finished.graph, finished.destination, beliefs=world.beliefs)
-    yield watching.receipt()
+    yield watching.receipt(effort=answerer.effort_used)
     yield Done(
         reason=finished.reason,
         claims=finished.claims,

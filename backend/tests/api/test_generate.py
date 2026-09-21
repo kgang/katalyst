@@ -362,7 +362,7 @@ def test_readyz_says_what_can_be_replayed_before_anything_runs() -> None:
 
 def a_scripted_run(monkeypatch: pytest.MonkeyPatch, told: object) -> None:
     """Make the route believe a model is configured, and hand it a script."""
-    monkeypatch.setattr(generate, "live_answerer", lambda: told)
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: told)
 
 
 def test_a_live_run_streams_the_same_grammar_the_replay_does(
@@ -501,7 +501,7 @@ def test_the_stream_stops_calling_the_model_when_the_client_goes_away(
 
 def a_live_run(monkeypatch: pytest.MonkeyPatch, answerer: object) -> list[tuple[str, Any]]:
     """Stream one generation against a stand-in answerer rather than a recording."""
-    monkeypatch.setattr(generate, "live_answerer", lambda: answerer)
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: answerer)
     return stream(hypothesis="A sentence with no recording behind it.")
 
 
@@ -537,6 +537,8 @@ def test_a_live_run_that_breaks_some_other_way_still_ends_the_stream(
     class Exploding:
         """An answerer that fails in a way nobody planned for."""
 
+        effort_used = "default"
+
         def watching(self, spent: object, cap: float) -> None:
             """Take note of nothing."""
 
@@ -569,7 +571,7 @@ def test_a_run_that_empties_the_purse_before_it_has_a_map_still_says_done(
     way (2026-09-20).
     """
     expensive = a_declined_answer("Not this one.", written=400_000)
-    monkeypatch.setattr(generate, "live_answerer", lambda: Scripted(starting=[expensive]))
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: Scripted(starting=[expensive]))
     monkeypatch.setattr(generate, "Caps", lambda: Caps(dollars=1.0))
 
     read = stream(hypothesis="A sentence with no recording behind it.")
@@ -592,6 +594,9 @@ class AnswersThenBreaks:
     purse, which is outside the part of a round that turns a failure into a
     refusal — so the whole walk stops, which is the case finding 1 is about.
     """
+
+    effort_used = "default"
+    """The plain word a receipt shows. A stand-in asks nobody anything."""
 
     def __init__(self, *, after: int) -> None:
         """Set out how many questions to answer before the walk breaks."""
@@ -624,7 +629,7 @@ def test_a_run_that_breaks_still_says_what_it_spent(monkeypatch: pytest.MonkeyPa
     back. The running total has to leave the walk as it goes (2026-09-20).
     """
     answerer = AnswersThenBreaks(after=2)
-    monkeypatch.setattr(generate, "live_answerer", lambda: answerer)
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: answerer)
 
     read = stream(hypothesis="A sentence with no recording behind it.")
 
@@ -642,7 +647,7 @@ def test_a_run_that_breaks_leaves_its_working_behind_too(
 ) -> None:
     """The transcript is a product artifact and it is read after the fact."""
     answerer = AnswersThenBreaks(after=2)
-    monkeypatch.setattr(generate, "live_answerer", lambda: answerer)
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: answerer)
 
     read = stream(hypothesis="A sentence with no recording behind it.")
     announced = next(
@@ -686,7 +691,7 @@ def test_a_reader_who_goes_away_mid_round_still_leaves_the_bill_behind(
     deleting the disconnect check left it green.
     """
     told = a_story()
-    monkeypatch.setattr(generate, "live_answerer", lambda: told)
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: told)
 
     with client().stream(
         "POST", "/api/generate", json={"hypothesis": STARTED_AT, **SMALL}
@@ -865,7 +870,7 @@ def test_the_readers_own_likelihood_is_stamped_on_the_hypothesis(
     away: `grep -rn user_belief backend/src` found only its declaration
     (2026-09-20).
     """
-    monkeypatch.setattr(generate, "live_answerer", lambda: a_story())
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: a_story())
 
     read = stream(
         hypothesis=STARTED_AT,
@@ -882,7 +887,7 @@ def test_the_readers_own_likelihood_is_stamped_on_the_hypothesis(
 
 def test_saying_nothing_stamps_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     """ "I don't know" is an answer, and it is not a likelihood of one half."""
-    monkeypatch.setattr(generate, "live_answerer", lambda: a_story())
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: a_story())
 
     read = stream(hypothesis=STARTED_AT)
 

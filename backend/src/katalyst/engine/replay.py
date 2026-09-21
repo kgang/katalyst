@@ -62,6 +62,7 @@ from katalyst.engine.events import (
     ProposalRejected,
     Receipt,
 )
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO
 from katalyst.engine.verify import Verdict
 from katalyst.settings import get_settings
 
@@ -133,6 +134,16 @@ class RecordingHeader(BaseModel):
     seed: int = Field(description="The one number the rules layer re-propagates with.")
     recording_date: date = Field(description="The day `make record-demo` wrote this file.")
     prompt_hash: str = Field(description="The fingerprint of the prompt the run was made against.")
+    effort: str = Field(
+        default=WHAT_THE_SERVICE_DEFAULTS_TO,
+        description=(
+            "How hard the model was asked to try when this was recorded, as a "
+            "plain word. A recording is made **rich** — nothing sent, the "
+            "service's own default — while a live run is made fast, so a reader "
+            "watching a replay is entitled to know which of the two they are "
+            "looking at (Kent, G13, 2026-09-21)."
+        ),
+    )
     insert: RecordedInsert = Field(
         description="The one scripted intervention this recording can answer."
     )
@@ -454,6 +465,10 @@ def _rebuilt(recorded: dict[str, Any], recording: Recording) -> Receipt:
         seconds=0.0,
         mode="replay",
         recording_date=recording.header.recording_date,
+        # The effort the **recorded** run was made with, not this replay's: a
+        # replay asks nothing of anybody, and what a reader wants to know is how
+        # the map they are watching was made.
+        effort=recording.header.effort,
         prompt_hash=recording.header.prompt_hash,
     )
 

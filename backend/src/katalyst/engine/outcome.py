@@ -277,6 +277,15 @@ def costing(
 # --- Every limit a run has --------------------------------------------------
 
 
+WHAT_THE_SERVICE_DEFAULTS_TO = "default"
+"""The plain word for "no effort was sent, so the service's own default applied".
+
+A receipt and a recording header say which effort made a map, and the word has to
+mean something to somebody reading it months later — an empty string reads as a
+field nobody filled in.
+"""
+
+
 class Caps(BaseModel):
     """Every limit a run has, in one place, each with a default and a reason.
 

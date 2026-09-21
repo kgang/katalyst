@@ -57,7 +57,7 @@ from anthropic.types import (
 )
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
-from katalyst.engine.outcome import FoundPage, Said
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO, FoundPage, Said
 from katalyst.engine.prompt import STANDING_TEXT
 from katalyst.engine.proposal import Proposal, StartingClaim
 from katalyst.engine.receipt import Receipt, fold, nothing_spent_yet, over_the_cap
@@ -236,6 +236,22 @@ class AnswerWeCouldNotRead(Exception):
         self.why = why
 
 
+EFFORT_WHEN_RECORDING = ""
+"""What the recorder sends when nothing says otherwise: nothing at all.
+
+**Record rich** (Kent, G13, 2026-09-21). A recording is made once and played back
+by everybody, so it is worth the service's own default — its best — and the
+request is byte for byte what it was before anybody had an opinion.
+"""
+
+EFFORT_WHEN_LIVE = "medium"
+"""What a live run through the stream route sends when nothing says otherwise.
+
+**Run live fast** (Kent, G13, 2026-09-21). Somebody watching a map arrive is
+waiting; the measured difference is 27 seconds a call against 79, for a map of
+nine claims against twenty. `KATALYST_EFFORT` overrides this and the line above.
+"""
+
 HOW_LONG_TO_WAIT = 300.0
 """How long one request may take before it is given up on, in seconds.
 
@@ -316,6 +332,9 @@ class Answerer(Protocol):
     fit the shape.
     """
 
+    effort_used: str
+    """Which effort this answerer asks with, as the plain word a receipt shows."""
+
     def watching(self, spent: Receipt, cap: float) -> None:
         """Say what the run has spent and what it may spend, before the next question.
 
@@ -374,6 +393,7 @@ class Model:
         self._trying: OutputConfigParam | Omit = (
             OutputConfigParam(effort=chosen) if chosen else omit
         )
+        self.effort_used = str(chosen) if chosen else WHAT_THE_SERVICE_DEFAULTS_TO
         self._spent = nothing_spent_yet(self._model)
         self._cap = float("inf")
 
@@ -664,7 +684,12 @@ def _named(path: str) -> Any:
     return getattr(import_module(module), name)()
 
 
-def live_answerer(*, effort: str | None = None, model: str | None = None) -> Model | None:
+def live_answerer(
+    *,
+    effort: str | None = None,
+    model: str | None = None,
+    when_nothing_is_said: str = EFFORT_WHEN_RECORDING,
+) -> Model | None:
     """Build the live answerer, or say plainly that there is no key for one.
 
     The one function that knows whether this program can call a model at all.
@@ -676,6 +701,10 @@ def live_answerer(*, effort: str | None = None, model: str | None = None) -> Mod
             has said. The settings decide when it has not.
         model: Which model to ask, when a measurement run has said. The settings
             decide when it has not.
+        when_nothing_is_said: The effort to use when neither the caller nor the
+            settings name one. One setting, two pinned defaults: the recorder
+            sends nothing and takes the service's own, a live run asks for
+            `medium` (Kent, G13, 2026-09-21).
 
     Returns:
         A live answerer, or nothing at all when no key is configured.
@@ -689,6 +718,6 @@ def live_answerer(*, effort: str | None = None, model: str | None = None) -> Mod
             timeout=HOW_LONG_TO_WAIT,
             max_retries=HOW_OFTEN_TO_TRY_AGAIN,
         ),
-        effort=effort,
+        effort=effort or get_settings().KATALYST_EFFORT or when_nothing_is_said,
         model=model,
     )

@@ -16,7 +16,7 @@ from collections.abc import Callable
 from datetime import date
 
 from katalyst.engine.client import TheModelDidNotAnswer
-from katalyst.engine.outcome import Said
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO, Said
 from katalyst.engine.receipt import Receipt
 from tests.unit.engine.answers import (
     FROM_THE_QUESTION,
@@ -76,6 +76,7 @@ class BreaksOnCall:
         self._after = after
         self._raising = raising
         self.calls = 0
+        self.effort_used = WHAT_THE_SERVICE_DEFAULTS_TO
 
     def watching(self, spent: Receipt, cap: float) -> None:
         """Take note of nothing."""

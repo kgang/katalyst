@@ -1946,6 +1946,12 @@ export interface components {
              */
             recording_date?: string | null;
             /**
+             * Effort
+             * @description How hard the model was asked to try, as a plain word — `default` when nothing was sent and the service's own applied, otherwise `low`, `medium`, `high`, `xhigh` or `max`. One setting with two pinned defaults behind it: a recording is made rich and a live run is made fast, and a reader of a map is entitled to know which this was (Kent, G13, 2026-09-21).
+             * @default default
+             */
+            effort: string;
+            /**
              * Prompt Hash
              * @description The fingerprint of the prompt this run was made against.
              */
