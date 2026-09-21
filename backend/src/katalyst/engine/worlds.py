@@ -74,27 +74,53 @@ WORLDS = 8
 The inner loop: how the dice fall. The same number `propagate` defaults to.
 """
 
-MOST_VERSIONS = 8_000
+MOST_VERSIONS = 2_400
 """The most versions of the map one request may ask for. See `MOST_WORLDS`."""
 
-MOST_WORLDS = 16
+MOST_WORLDS = 8
 """The most worlds one request may run under each version.
 
-**Measured, not chosen.** Both ceilings come from one measurement, taken on this
-machine on 2026-09-17 and written down here with it: the stored Hormuz example,
-seven claims over a sixty-one-day window, takes **394 milliseconds** at the two
-ceilings together — 8 000 versions of 16 worlds, 128 000 worlds in all. Working
-every likelihood through costs claims times days times worlds, and
-`spec/multiverse/propagation.md` measured that it is linear in the claims, so the
-largest map this program will build — thirty claims, its own cap — is about
-**1.7 seconds**. The worst request is a comparison, which builds two worlds, and
-the build machine runs about two and a half times slower than this one: **about
-eight and a half seconds**.
+**Derived from a measurement and a stated budget, and re-derived on 2026-09-21**
+when the engine changed underneath the first one. Both ceilings come out of one
+sum, so they are written down together here.
 
-The budget that sits against is a product judgement rather than a measurement,
-and it is said out loud: **ten seconds** is as long as somebody will wait for a
-world before deciding the program has stopped. What was measured is which loop
-sizes fit inside it.
+What it costs. Working every likelihood through a map costs claims times days
+times worlds, and `spec/multiverse/propagation.md` measured that it is linear in
+each. The figures it now measures, after the fix that computes every day and
+thins only the wire: at the shipped loop sizes — 2 000 versions of 8 worlds,
+16 000 worlds in all — **sixty claims over sixty-one days take 542 ms, and
+sixty claims over a year take 2.7 seconds**.
+
+The budget. **Ten seconds** is as long as somebody will wait for a world before
+deciding the program has stopped. That is a product judgement, not a
+measurement, and it is said out loud. The worst request is a *comparison*, which
+builds two worlds, and the build machine runs about two and a half times slower
+than the one those figures were taken on — so one world's work must fit inside
+**two seconds** here to fit inside ten there.
+
+The worst map this program will build. Its own cap is thirty claims, and a model
+can write a resolve-by date a year out, so: thirty claims over a year, which is
+half of the 2.7-second figure — **1.35 seconds** at the shipped loop sizes. The
+ceiling is therefore the loop sizes that keep that inside two seconds:
+16 000 times (2 / 1.35) is about **23 700 worlds**, and `2 400 * 8 = 19 200` sits
+under it with room to spare. A comparison of that map at the ceiling is about
+**8 seconds** on the build machine.
+
+**These are much lower than the ceilings they replace**, which were 8 000 by 16 —
+128 000 worlds, eight times the shipped budget. They were derived on 2026-09-17
+from the seven-claim example, before the engine computed every day; against the
+cost it really has, that pair would take about twenty-two seconds for one world
+of a sixty-claim year-long map, and over a minute for a comparison of one on the
+build machine. The measurement moved, so the ceiling moves with it.
+
+**One case is over budget and is not pretended away.** A *sixty*-claim map over
+a year — twice this program's own cap, so one it can only be handed rather than
+build — costs 2.7 seconds a world even at the shipped sizes, which is about
+thirteen seconds for a comparison on the build machine. No pair of ceilings at
+or above the shipped defaults fixes that; only a smaller default would, and that
+is a change to what every run does rather than to what a request may ask for.
+Written down here so the next person meets it as a known number rather than as a
+slow afternoon.
 
 Neither ceiling is below the shipped default, and a request above one is refused
 rather than quietly reduced: a caller who asks for one run and silently gets a
