@@ -699,3 +699,47 @@ On the terms of service, we can commit a dated quote for research and developmen
 **Not fixed, not mine:** the final review's paste-ready box for 0017 carries superseded numbers (`.6133/.1675/.2920/.2590`); the record's own box matches its body. I *did* fix one drift I own: the owed note said twelve existing codes are `&lt;subject&gt;_without_&lt;required thing&gt;`; it is six, as the records say.</result>
 <usage><subagent_tokens>299280</subagent_tokens><tool_uses>62</tool_uses><duration_ms>1963959</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a8d683dc44ff898c9</task-id>
+<tool-use-id>toolu_016B1oHLpEDfypQZE4gDH8RT</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a8d683dc44ff898c9.output</output-file>
+<status>completed</status>
+<summary>Agent "Trim records 0016 and 0017" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me with:** `python3 /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/numbers_kept.py` (and `--sections`), then `git diff` in the worktree, then §11 of `plans/notes/2026-09-21-stack-05-docs-owed.md`.
+
+**`numbers_kept.py` output — unchanged, the same four tokens:**
+
+```
+0016  6031 words before,  5436 after
+    MISSING number (1):        700
+    MISSING number+unit (2):   66.4 ms · 700 ms
+    MISSING backticked (1):    228.2 ms
+0017  4228 words before,  4121 after
+0021  2521 words before,  2496 after
+4 token(s) present before and absent after
+```
+
+All four are option (C) of the old *Open for Kent* item 1, which R24 removes; `66.4` and `228.2` still appear in the body, only without their unit or backticks.
+
+**Final word counts (`wc -w`).** 0016 **5436** (was 6031), 0017 **4121** (4228), 0021 **2496** (2521).
+
+**The four passages are now pointer-only.** Each keeps its heading, the result a decision rests on with its figures and conditions, and one line saying the full working is held for the `spec/multiverse/propagation.md` rewrite, which cannot be edited until stack 04 lands.
+
+| Section | before → after | what stays in the record |
+|---|---|---|
+| 0016 *How it is worked out* | 441 → **299** | exact to `4.4e-16`; middle-of-slice `.0290 → .0027` at 24 slices; 24 not 12 (2.50% against 0.00%); locality and the width shares; undated observations |
+| 0016 *Honest cost* | 219 → **201** | the session estimates, `1 335 insertions across 12 files`, the four items named, 259 and 189 on `feat-04b-evals` |
+| 0017 *How a state is carried* | 236 → **242** | `64, 150 and 2 ms` unchanged by a state; `.00835` against `.00794` over 82 skeletons; `224.4 → 508.9 ms` and `26.9 → 55.7` |
+| 0017 *The Hormuz strike, worked* | 308 → **267** | the four-row table the box quotes, both events at `1.0000`, the third defect's `.001` / thirty days |
+
+0017's carrying section is six words longer than committed, not shorter: the committed text had no pointer line and did not yet name R24's target. Its *working* is gone; only the results remain.
+
+**I added §11.8 to the owed note** — the *Honest cost* file-and-line inventory, verbatim from `HEAD`. It was the one authorised passage not already there, so the five browser citations, `1 459`, `34 of 46`, and the `main` decimal counts 239 and 166 now have their home before the record dropped them.
+
+**0016's kill-criterion section: the history is now three sentences of dated fact** — the two misses with their conditions (10× at 200 versions and 12 slices; 1.2× at 2 000 and 24 slices; 29 527 ms like for like), R19's fixed 600 ms, then R24's proportional target with Kent's quoted words. The standalone *misses* paragraph is gone, folded into that. The section is 868 words: a 250-word evidence table and a 150-word speed-up table, with about 250 of prose around them — structural rather than fat, so I stopped there as instructed.</result>
+<usage><subagent_tokens>317038</subagent_tokens><tool_uses>73</tool_uses><duration_ms>2144801</duration_ms></usage>
+</task-notification>
