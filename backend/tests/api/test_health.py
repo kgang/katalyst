@@ -18,6 +18,25 @@ from katalyst.settings import Settings, get_settings
 FAKE_KEY = "not-a-real-key"
 
 
+@pytest.fixture(autouse=True)
+def a_recordings_folder_with_nothing_in_it(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Point every test here at an empty recordings folder of its own.
+
+    These tests ask one question: does the program know whether it has a model
+    key? The readiness answer also lists what can be replayed, and with no key a
+    single recording is enough to make the program ready. So read against the
+    folder the repository ships, the answers below would change the day a
+    recording is committed — which is exactly what happened the day the first
+    one was. A test must not depend on what happens to be on the shelf.
+
+    What readiness says when a recording IS there is pinned where recordings are
+    tested, by `test_readyz_says_what_can_be_replayed_before_anything_runs`.
+    """
+    monkeypatch.setenv("KATALYST_RECORDINGS", str(tmp_path_factory.mktemp("no-recordings")))
+
+
 @pytest.fixture
 def client() -> Iterator[TestClient]:
     """A client that calls the application directly, opening no port."""
