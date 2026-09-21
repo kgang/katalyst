@@ -14,6 +14,33 @@
 
 <!-- NEXT ENTRY GOES HERE — newest first. Add above the rule below; change nothing beneath it. -->
 
+## 2026-09-21 — `make eval ONLY=hormuz`, twice: once at each effort
+
+The first two rounds the scorecard ever ran against a real key, side by side on one sentence, one model, one prompt and one evening. **They are the measurement behind Kent's decision that development runs at `medium`** (2026-09-21): only the recorder sends no effort; a live run and `make eval` ask for `medium`. What each scored is in [`evals/runs/2026-09-21.tsv`](../evals/runs/2026-09-21.tsv), which owns those figures; this entry is what each cost.
+
+| | Effort left to the service (`EFFORT=as-recorded` today) | `medium` (the default today) |
+|---|---|---|
+| Model | `claude-sonnet-5` | `claude-sonnet-5` |
+| Code | `dacd6da` | `dacd6da` plus the uncommitted change of default |
+| Started (UTC) | 17:57:30 | 18:19:46 |
+| Calls | 15 | 13 |
+| Searches | 55 | 24 |
+| Dollars | $2.17 | $0.94 |
+| Wall clock | 27 m 25 s | 11 m 16 s |
+| Seconds a call | 110 | 52 |
+| Written tokens, of which thinking | 92 949, 74 421 | 32 823, 22 385 |
+| Map reached | 6 claims, 9 arrows, 1 ending | 4 claims, 5 arrows, no ending |
+| Refused by the rules | 1 | 3 — two `duplicate_link`, one `market_without_payoff` |
+| Stopped because | `reached_terminal` | `no_terminal` |
+| The eight checks | all eight held | seven held; *an ending that names a trade, or says why there is none* did not |
+| Raw record | `backend/.runs/hormuz-2026-09-21T18-24-54Z-01M32HVA1F3SX18H513M6GTNPT.json` | `backend/.runs/hormuz-2026-09-21T18-31-02Z-01M32K42Z4036436TG96Q46RN0.json` |
+
+**What the pair buys, and what it gives up.** `medium` was 2.4 times faster and 2.3 times cheaper, which is the whole reason for it: a scorecard that takes the best part of an hour is not run while a prompt is being worked on. It also drew the smaller map, and **its one tradeable ending was refused by our own rules** — the model proposed a market claim and named no payoff — so the map ended nowhere a reader can act. Kent saw these numbers and kept the decision. **One round each proves a direction, not a rate**: the evaluation chapter says plainly that one prompt scores slightly differently twice. The refusal itself is a known gap, not a new one — requiring a payoff in the shape the model fills is already written and is held for the one change of shape at the end of the engine work, because it moves the prompt's fingerprint and every recording would have to be paid for again.
+
+**The two rounds ran at once**, the second starting 22 minutes into the first, so neither wall clock is a clean solo timing; the first had the key to itself for most of its length.
+
+---
+
 ## 2026-09-21 — the committed Strait of Hormuz recording
 
 The generation a keyless clone plays back, made by `make record-demo ONLY=hormuz`. It is the only
