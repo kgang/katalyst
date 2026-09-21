@@ -93,7 +93,7 @@ import numpy
 from numpy.typing import NDArray
 
 from katalyst.domain import PropositionId
-from katalyst.thesis.draws import NEVER, STILL_HOLDING, Draws, Weights
+from katalyst.thesis.draws import NEVER, STILL_HOLDING, Draws, SampleFrom, Weights
 
 Levels = NDArray[numpy.float64]
 """Prices: one row per drawn world, one column per day of the window."""
@@ -188,9 +188,15 @@ class Paths:
         days: How many days the window runs for. The levels below have one more
             column than this, because day zero is a column too.
         entry: The price the reader entered at, which every path starts from.
+        daily_move: How far the instrument moves in a day, in price units, which
+            these paths were stepped at. Carried because the correction a daily
+            check needs is built from it, and a stop checked against a path walked
+            at some other variability would be corrected by the wrong amount.
         level: The price in each drawn world on each day, day zero first.
         weight: How much each drawn world counts, carried from the draws so that
             whoever reads these paths does not have to hold both.
+        sample: Which sampler the days came from, carried through so that no
+            first-touch number can be reported without naming it.
         decay_shape: For each claim that moves the price, which shape its giveback
             followed. Carried because the shape is an assumption and the Inspector
             says which one was used.
@@ -199,8 +205,10 @@ class Paths:
     day_zero: date
     days: int
     entry: float
+    daily_move: float
     level: Levels
     weight: Weights
+    sample: SampleFrom
     decay_shape: Mapping[PropositionId, DecayShape]
 
 
@@ -323,8 +331,10 @@ def walk(
         day_zero=draws.day_zero,
         days=draws.days,
         entry=entry,
+        daily_move=daily_move,
         level=level,
         weight=draws.weight,
+        sample=draws.sample,
         decay_shape=shapes,
     )
 

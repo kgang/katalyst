@@ -57,8 +57,10 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Final, Literal
 
-from katalyst.domain import Proposition, PropositionId
-from katalyst.thesis.draws import Days, SampleFrom
+import numpy
+
+from katalyst.domain import ContractPayoff, Proposition, PropositionId
+from katalyst.thesis.draws import NEVER, Days, SampleFrom, effective_draws, weighted_share
 from katalyst.thesis.paths import Paths
 
 ZETA_HALF: Final = -1.4603545088095868
@@ -263,7 +265,32 @@ def position_on(
             reader did: whatever offered this claim as tradeable offered the wrong
             claim.
     """
-    raise NotImplementedError
+    payoff = ending.payoff
+    if payoff is None:
+        raise ValueError(
+            f"'{ending.id}' names no trade, so there is no position to take on it; whatever "
+            "offered it as tradeable offered the wrong claim"
+        )
+    traded: Trades = "contract" if isinstance(payoff, ContractPayoff) else "instrument"
+    if isinstance(payoff, ContractPayoff):
+        named, side = payoff.contract_id, payoff.side == "yes"
+    else:
+        named, side = payoff.instrument, payoff.direction == "long"
+
+    wanted = Position(
+        ending=ending.id,
+        instrument=named,
+        side="long" if side else "short",
+        trades=traded,
+        entry=entry,
+        stop=stop,
+        target=target,
+        horizon=horizon,
+        risk_budget=risk_budget,
+        daily_move=daily_move,
+    )
+    refused = what_the_form_refuses(wanted, ending)
+    return refused if refused else wanted
 
 
 def what_the_form_refuses(position: Position, ending: Proposition) -> tuple[Refusal, ...]:
@@ -287,7 +314,26 @@ def what_the_form_refuses(position: Position, ending: Proposition) -> tuple[Refu
         Every refusal, in the order of the table above. Empty when the form is
         good.
     """
-    raise NotImplementedError
+    losing = -1.0 if position.side == "long" else 1.0
+    found: list[Refusal] = []
+    if losing * (position.stop - position.entry) <= 0.0:
+        found.append(_refusing("stop_on_the_wrong_side", "stop"))
+    if losing * (position.target - position.entry) >= 0.0:
+        found.append(_refusing("target_not_beyond_entry", "target"))
+    if position.horizon > ending.resolution.by:
+        found.append(_refusing("horizon_after_the_claim", "horizon"))
+    if not 0.0 < position.risk_budget <= 1.0:
+        found.append(_refusing("risk_budget_out_of_range", "risk budget"))
+    if position.trades == "contract" and not all(
+        0.0 <= one <= 1.0 for one in (position.entry, position.stop, position.target)
+    ):
+        found.append(_refusing("price_outside_the_contract", "entry"))
+    return tuple(found)
+
+
+def _refusing(code: RefusalCode, field: str) -> Refusal:
+    """One refusal, with the sentence written once for every screen that prints it."""
+    return Refusal(code=code, field=field, sentence=REFUSALS[code])
 
 
 def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
@@ -308,11 +354,54 @@ def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
         ending names a contract rather than something traded.
 
     Raises:
-        ValueError: If the paths were not walked from this position's entry price.
-            Checking a stop against a path that started somewhere else would
-            answer a question nobody asked.
+        ValueError: If the paths were not walked from this position's entry price,
+            or at its own day-to-day variability. Checking a stop against a path
+            that started somewhere else answers a question nobody asked, and one
+            walked at another variability would be corrected by the wrong amount.
     """
-    raise NotImplementedError
+    if position.trades == "contract":
+        return _refusing("first_touch_on_a_contract", "ending")
+    if paths.entry != position.entry or paths.daily_move != position.daily_move:
+        raise ValueError(
+            "a stop is checked against the path the reader's own position was walked "
+            f"through; these paths started at {paths.entry} and stepped at "
+            f"{paths.daily_move}, and the position says {position.entry} and "
+            f"{position.daily_move}"
+        )
+
+    # Each level moves toward the entry price by the shift, and never past it: a
+    # level nearer the entry than the shift is touched on the first day either way.
+    shift = BARRIER_SHIFT * position.daily_move
+    losing = -1.0 if position.side == "long" else 1.0
+    stop_at = position.entry + losing * max(0.0, abs(position.stop - position.entry) - shift)
+    target_at = position.entry - losing * max(0.0, abs(position.target - position.entry) - shift)
+
+    walked = paths.level[:, 1:]
+    beyond = (walked <= stop_at) if position.side == "long" else (walked >= stop_at)
+    reached = (walked >= target_at) if position.side == "long" else (walked <= target_at)
+    never = walked.shape[1] + 1
+    stop_on = numpy.where(beyond.any(axis=1), beyond.argmax(axis=1), never)
+    target_on = numpy.where(reached.any(axis=1), reached.argmax(axis=1), never)
+    stop_won = (stop_on <= target_on) & (stop_on < never)
+    target_won = target_on < stop_on
+
+    last = paths.level[:, -1]
+    past_the_readers_stop = (
+        (last < position.stop) if position.side == "long" else (last > position.stop)
+    )
+    return FirstTouch(
+        stop_first=weighted_share(stop_won, paths.weight),
+        target_first=weighted_share(target_won, paths.weight),
+        neither=weighted_share(~stop_won & ~target_won, paths.weight),
+        stop_touched=weighted_share(beyond.any(axis=1), paths.weight),
+        finished_beyond_the_stop=weighted_share(past_the_readers_stop, paths.weight),
+        stop_at=stop_at,
+        target_at=target_at,
+        shift=shift,
+        effective_draws=effective_draws(paths.weight),
+        stop_first_on=numpy.where(stop_won, stop_on + 1, NEVER).astype(numpy.int32),
+        sample=paths.sample,
+    )
 
 
 def what_your_risk_budget_implies(position: Position) -> float:
@@ -337,4 +426,10 @@ def what_your_risk_budget_implies(position: Position) -> float:
         ValueError: If the stop is the entry price, where the arithmetic has
             nothing to divide by and the position has no loss to size against.
     """
-    raise NotImplementedError
+    away = abs(position.entry - position.stop)
+    if away == 0.0:
+        raise ValueError(
+            "a stop at the entry price is not a loss to size against, so there is nothing "
+            "here for a risk budget to imply"
+        )
+    return position.risk_budget * position.entry / away
