@@ -7,7 +7,7 @@ consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/not
 informed: agents working in `frontend/src/graph/` — `layoutRunner.ts`, `elkGraph.ts`, `layers.ts`, `Canvas.tsx`, `geometry.ts` — and in `frontend/e2e/`
 supersedes: none
 superseded-by: none
-spec-impact: spec/workbench/streaming-growth.md (B3, INV-workbench.64, .79, two new invariants, anti-pattern 7, open question 2); spec/workbench/layout-and-zoom.md (B3); spec/workbench/README.md visual review checklist VR13; ARCHITECTURE.md §10
+spec-impact: spec/workbench/streaming-growth.md (B3 rewritten, INV-workbench.64 rewritten, .79 given a dated clause, anti-pattern 7 rewritten, anti-pattern 12 reworded, open question 2 reopened and answered); spec/workbench/layout-and-zoom.md (B3, INV-workbench.22 and .23); spec/workbench/README.md visual review checklist VR13; ARCHITECTURE.md §10 — and spec/workbench/diff-view.md INV-workbench.40 explicitly untouched
 ---
 
 # ADR-0024: When a tile may move
@@ -76,7 +76,7 @@ One whole layout at the end also shortens the picture a great deal: wire length 
 
 ## Decision Outcome
 
-Chosen option: **"L1 + L2 — both"**, because L1 alone leaves the finished picture longer and more crossed than it needs to be, L2 alone leaves the map wrong for the ten minutes a reader is actually watching it, and together they cost, on the maps where the defect exists, five tile-moves and one settle.
+Chosen option: **"L1 + L2 — both"**, because L1 alone leaves the finished picture longer than it needs to be, L2 alone leaves the map wrong for the ten minutes a reader is actually watching it, and together they cost, on the maps where the defect exists, five tile-moves and one settle.
 
 **Kent's decision, 2026-09-21 (R37):** *"Both: during the run and once at the end."*
 
@@ -113,6 +113,7 @@ This is not a new event and not a new frame. `GenerationScreen.tsx` already pass
 
 * **A reader will see tiles move.** On the two Verify runs, five moves and three moves; on the eighteen-claim recording, forty-four across fourteen arrivals. The furthest single move during a run is 800 pixels. That is a real cost against the promise that made the growing map calm, and it is paid on purpose, because an arrow pointing the wrong way is a lie about the argument and a tile sliding right is not.
 * **One moment where everything moves.** At the settle, every tile takes a new place — on the recording, 18 of 18, the furthest 1 968 pixels. `setCenter` on the focused tile is what keeps that from being disorienting.
+* **Shorter is not always fewer crossings.** Measured on the same three maps: laying the eighteen-claim recording out whole takes its wire crossings from **2 to 5** while halving its wire and cutting 630 pixels of height; on the two Verify runs crossings fall, 8 → 2 and 2 → 1. The layout minimises total arrow length, not crossings, so a map that is much shorter can cross itself slightly more. That is the trade, said out loud rather than discovered later.
 * **The pinned evidence is thin.** The defect exists only on a live Verify map. The one stream committed to this repository is an Explore run with zero backwards arrows, and `backend/.runs/` is git-ignored — so on the repository's own evidence the defect is invisible, and `test_no_arrow_points_backwards_at_any_moment` cannot be written as the analysis first specified. One kept live Verify run should be committed as a test fixture (the events only, a few kilobytes, from a run already paid for on 2026-09-21). It is not a launchpad recording, nothing replays it to a reader, and it costs nothing — R9 forbids making new recordings, not committing an old run as an input to a test. **If Kent would rather not, the test falls back to a hand-built map of the same shape, which proves the rule and not the case.**
 
 ### Consequences

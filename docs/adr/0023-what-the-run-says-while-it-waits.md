@@ -7,7 +7,7 @@ consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/not
 informed: agents working in `frontend/src/stream/`, `frontend/src/components/`, `frontend/src/a11y/` and `frontend/e2e/`; the stack-06-4 dock lane, which owned the *Run details* move until this record pulled it forward
 supersedes: none
 superseded-by: none
-spec-impact: spec/workbench/streaming-growth.md (B1, B3, a new B11, INV-workbench.60, .73, .78, a new .80, anti-pattern 8, open question 1); PRODUCT_REQUIREMENTS.md UX-8 and §10 anti-pattern 9; ARCHITECTURE.md §1 and §10
+spec-impact: spec/workbench/streaming-growth.md (B1, the dock's fourth section, a new B11, B10, INV-workbench.78, two new invariants .80 and .81, anti-pattern 8 and a new 13, open question 1 answered — and INV-workbench.60, .18 and .73 explicitly unchanged); spec/workbench/README.md visual review checklist VR13; PRODUCT_REQUIREMENTS.md UX-8 and §10 anti-pattern 9; ARCHITECTURE.md §1 and §10
 ---
 
 # ADR-0023: What the run says while it waits
@@ -76,7 +76,9 @@ Every sentence in this table is a string that exists today. The strip is only wh
 | failed | `stopped` | the one plain sentence the run left | no |
 | ended early | `ended early` | the stream ended before the run said it had finished | no |
 
-**The seconds are a measurement of silence, never an estimate of what is left.** The reading is *how long since the last event*, from the browser's own clock. There is no percentage, no bar, no "about a minute left", and no count of calls — the browser cannot know how many calls are in flight and must not guess.
+**While a live run waits, the sentence names what is open.** Both growth events already carry `frontier` — which claims are still open — and it is the field the reserved rectangles on the map are drawn from, so saying it in words costs nothing and invents nothing: *Working on what follows from "war-risk premiums fall below 0.4%" and two others.* That part of option M1 is free and ships either way.
+
+**The seconds are a measurement of silence, never an estimate of what is left.** The reading is *how long since the last event*, from the browser's own clock. There is no percentage, no bar, no "about a minute left", and no count of calls — the browser cannot know how many calls are in flight and must not guess. A round asks about three claims at once (`at_once` defaults to 3 in `backend/src/katalyst/engine/outcome.py`), so events land in bursts of up to three and the screen is then still for about a minute.
 
 **A replay shows no seconds.** At 0.6 seconds an event the number would reset twice a second for no reason, and it would be measuring our own pacing rather than a wait. This is the one place where a replay and a live run legitimately differ on screen, and the reason is that the thing being measured does not exist in a replay.
 

@@ -1242,11 +1242,17 @@ land.**
 | stored map | `stored` | the map's own origin — *this map was built earlier and is drawn as it was written* | no |
 | stored map, the engine asked | `asking` | the reason the map screen already prints while a world is being worked out | yes |
 | replay | `replay` | the replay sentence, and how much has arrived so far | **no** |
-| live, waiting | `live` | the opening line, or the last thing that changed | yes |
+| live, waiting | `live` | the opening line, or the last thing that changed — **and what is being worked on**, named from the `frontier` both growth events already carry | yes |
 | live, arriving | `live` | what just changed, in its own words | yes |
 | finished | `finished` | why it stopped, with the run's own counts | no |
 | failed | `stopped` | the one plain sentence the run left | no |
 | ended early | `ended early` | the stream ended before the run said it had finished, and how many claims arrived first | no |
+
+**While a live run waits, the sentence names what is open.** The two growth events each carry
+`frontier` — which claims are still open — which is the same field the reserved rectangles are drawn
+from (B2), so saying it in words costs nothing and invents nothing. What it may **not** say is how
+many model calls are in flight: three calls may be out against one open claim, and the browser has no
+way to know. It counts proposals, and it says *proposals*.
 
 **The printed sentence is the spoken sentence.** The live region goes on saying what *changed*
 (INV-workbench.78) and the strip prints the same words. There is no state in which the only account
