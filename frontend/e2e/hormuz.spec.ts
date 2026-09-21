@@ -170,6 +170,15 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // test compares against this rather than against a number typed in here: the
   // stored example's numbers are curated and have already changed once, and the
   // claim being made is "the same number as before", not "this particular number".
+  // Wait for the engine's answer before reading anything. The map draws at once
+  // and the numbers arrive a moment later; a text read once, straight away, is
+  // sometimes read before they do, and on a slower build machine often.
+  await expect(
+    page.locator('.react-flow__node[data-id="R"] .belief-chip__reading').first(),
+  ).toHaveText(/^\.\d+$/);
+  await expect(
+    page.locator('.react-flow__node[data-id="H"] .belief-chip__reading').first(),
+  ).toHaveText(/^\.\d+$/);
   const opecBefore = await page
     .locator('.react-flow__node[data-id="R"] .belief-chip__reading')
     .first()
