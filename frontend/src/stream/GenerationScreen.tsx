@@ -247,85 +247,90 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
             </p>
           </div>
 
-          <aside
-            className="dock dock--generation"
-            ref={panel}
-            {...edgeMarks(edges)}
-            aria-label="The panel beside the map"
-          >
-            {/* The map as a list, in place of the panel, exactly as it is on a
+          {/* The frame holds the two rules that say there is more above or more
+              below. They are drawn on it rather than inside the panel so that
+              turning one on cannot change the scroll height it was worked out
+              from — see `useTheEdges.ts`. */}
+          <div className="dock-frame" {...edgeMarks(edges)}>
+            <aside
+              className="dock dock--generation"
+              ref={panel}
+              aria-label="The panel beside the map"
+            >
+              {/* The map as a list, in place of the panel, exactly as it is on a
                 stored map: press O for it, press O again for the panel. It grows
                 as the map grows, in the same causal order, so a reader who never
                 sees the canvas hears the map being built rather than a silence
                 followed by a finished list. */}
-            {dock === "outline" ? (
-              <Outline items={outline} onPick={pick} focused={focused} />
-            ) : (
-              <>
-                {/* The Verify door's answer, at the top, when a destination was named. */}
-                {growth.verdict === null || run.asked.target === null ? null : (
-                  <VerdictCard
-                    verdict={growth.verdict}
-                    target={run.asked.target}
-                    world={growth.world}
-                    onSelect={pick}
-                  />
-                )}
+              {dock === "outline" ? (
+                <Outline items={outline} onPick={pick} focused={focused} />
+              ) : (
+                <>
+                  {/* The Verify door's answer, at the top, when a destination was named. */}
+                  {growth.verdict === null || run.asked.target === null ? null : (
+                    <VerdictCard
+                      verdict={growth.verdict}
+                      target={run.asked.target}
+                      world={growth.world}
+                      onSelect={pick}
+                    />
+                  )}
 
-                <RefusalStrip
-                  refusals={growth.refusals}
-                  finished={finished}
-                  openAt={openAt}
-                  onOpen={(at) => {
-                    setOpenAt(at);
-                    setSelection({ kind: "generation", id: generationId ?? "" });
-                  }}
-                />
-
-                {growth.receipt === null ? null : (
-                  <ReceiptStrip
-                    receipt={growth.receipt}
-                    onOpen={() => {
-                      setOpenAt(null);
+                  <RefusalStrip
+                    refusals={growth.refusals}
+                    finished={finished}
+                    openAt={openAt}
+                    onOpen={(at) => {
+                      setOpenAt(at);
                       setSelection({ kind: "generation", id: generationId ?? "" });
                     }}
                   />
-                )}
 
-                {finished && growth.world.baseId !== "" ? (
-                  // The same control, the same words and the same refusals as the
-                  // one on a stored map's six-button panel. What differs is only
-                  // what happens next: a generated map has no branch panel on this
-                  // screen yet, so the claim is drafted, checked and said, and
-                  // putting it on a branch of this map is the next piece of work.
-                  // No branch is sent because there is none to send.
-                  //
-                  // **It waits for the map to have a name of its own**, which is
-                  // the engine's `base_id` arriving with the likelihoods. A run
-                  // that broke or whose stream was dropped never gets one, and
-                  // offering to add a claim to a map that has no identifier
-                  // would send the *run's* name to a route that asks for the
-                  // map's — a different thing of the same shape.
-                  <AddAClaim
-                    baseId={growth.world.baseId}
-                    andThen="It is checked against this map and ready to go onto a branch of it."
+                  {growth.receipt === null ? null : (
+                    <ReceiptStrip
+                      receipt={growth.receipt}
+                      onOpen={() => {
+                        setOpenAt(null);
+                        setSelection({ kind: "generation", id: generationId ?? "" });
+                      }}
+                    />
+                  )}
+
+                  {finished && growth.world.baseId !== "" ? (
+                    // The same control, the same words and the same refusals as the
+                    // one on a stored map's six-button panel. What differs is only
+                    // what happens next: a generated map has no branch panel on this
+                    // screen yet, so the claim is drafted, checked and said, and
+                    // putting it on a branch of this map is the next piece of work.
+                    // No branch is sent because there is none to send.
+                    //
+                    // **It waits for the map to have a name of its own**, which is
+                    // the engine's `base_id` arriving with the likelihoods. A run
+                    // that broke or whose stream was dropped never gets one, and
+                    // offering to add a claim to a map that has no identifier
+                    // would send the *run's* name to a route that asks for the
+                    // map's — a different thing of the same shape.
+                    <AddAClaim
+                      baseId={growth.world.baseId}
+                      andThen="It is checked against this map and ready to go onto a branch of it."
+                    />
+                  ) : null}
+
+                  <Inspector
+                    world={growth.world}
+                    selection={selection}
+                    generation={{
+                      seed: growth.seed,
+                      promptFingerprint: growth.receipt?.prompt_hash ?? null,
+                      working,
+                      unknown: growth.unknown,
+                      openAt,
+                    }}
                   />
-                ) : null}
-
-                <Inspector
-                  world={growth.world}
-                  selection={selection}
-                  generation={{
-                    seed: growth.seed,
-                    promptFingerprint: growth.receipt?.prompt_hash ?? null,
-                    working,
-                    unknown: growth.unknown,
-                    openAt,
-                  }}
-                />
-              </>
-            )}
-          </aside>
+                </>
+              )}
+            </aside>
+          </div>
         </div>
 
         {/* Said out loud, and said once — and it says what just **changed**

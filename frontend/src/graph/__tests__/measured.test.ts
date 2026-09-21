@@ -28,6 +28,9 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { A_REAL_RUN, THE_REAL_SENTENCE } from "../../stream/__tests__/aRealRun";
+import { BELIEFS, THE_GROWTH, THE_SENTENCE } from "../../stream/__tests__/aStream";
+import { foldAll, waitingFor } from "../../stream/growth";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
 import { TILE_WIDTH } from "../geometry";
 import { toFlow } from "../toFlow";
@@ -63,11 +66,22 @@ describe("no tile waits to be measured", () => {
   });
 
   it("test_what_a_tile_says_is_what_the_layout_was_given", () => {
-    // Two maps, because a tile's height comes from two different places: its own
-    // claim, and a diff that reserved the taller of two paintings for it so that
-    // flipping between them moves nothing.
+    // Five maps, because a tile's height comes from three different places — its
+    // own claim, a diff that reserved the taller of two paintings for it, and
+    // the floor every box that is not a claim is drawn at — and because a map
+    // that is still being built has a third kind of box on it. **A reserved
+    // rectangle is the box that needs saying most**: it stands where a claim is
+    // about to arrive, so it is on screen at the exact moment the page is
+    // busiest and the browser is likeliest to drop an observation.
+    const reserved = [{ id: "skeleton:H", words: "one step on from …", after: "H" }];
     const taller = new Map([["B", 400]]);
-    const maps = [toFlow(stored()), toFlow(stored(), taller)];
+    const maps = [
+      toFlow(stored()),
+      toFlow(stored(), taller),
+      toFlow(foldAll(waitingFor(THE_SENTENCE, null), THE_GROWTH).world, undefined, reserved),
+      toFlow(foldAll(waitingFor(THE_SENTENCE, null), [...THE_GROWTH, BELIEFS]).world),
+      toFlow(foldAll(waitingFor(THE_REAL_SENTENCE, null), A_REAL_RUN).world),
+    ];
 
     for (const drawing of maps) {
       const reservedFor = new Map(drawing.tiles.map((tile) => [tile.id, tile.height]));
@@ -83,6 +97,7 @@ describe("no tile waits to be measured", () => {
 
     // And the map with a taller box in it really did have one, or the walk above
     // compared every tile with itself.
-    expect(maps[1]?.nodes.find((node) => node.id === "B")?.initialHeight).toBe(400);
+    const withTaller = maps[1];
+    expect(withTaller?.nodes.find((node) => node.id === "B")?.initialHeight).toBe(400);
   });
 });

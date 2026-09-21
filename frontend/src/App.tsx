@@ -832,59 +832,60 @@ function MapScreen({
         </div>
 
         {dock === "away" ? null : (
-          <aside
-            className="dock"
-            ref={panel}
-            {...edgeMarks(edges)}
-            aria-label="The panel beside the map"
-          >
-            {dock === "outline" ? (
-              <Outline
-                items={outline}
-                onPick={pick}
-                focused={focused}
-                {...(onlyColumn === null
-                  ? {}
-                  : {
-                      only: new Set(onlyColumn.claims),
-                      filter:
-                        `Only the claims in column ${onlyColumn.layer}, which is what the ` +
-                        `collapsed tile on the map stands for. Press O for all of them.`,
-                    })}
-              />
-            ) : (
-              <>
-                {intervening ? (
-                  <InterventionPanel
-                    world={world}
-                    selection={selection}
-                    onEdit={edit}
-                    onClose={() => setIntervening(false)}
-                  />
-                ) : null}
-                <BranchPanel
-                  branches={shop.branches}
-                  openId={shop.openId}
-                  world={world}
-                  onOpen={(id) => setShop((was) => openBranch(was, id))}
-                  onFork={(label) => setShop((was) => forkBranch(was, label))}
-                  naming={naming}
-                  onNaming={setNaming}
+          // The frame holds the two rules that say there is more above or more
+          // below. They are drawn on it rather than inside the panel so that
+          // turning one on cannot change the scroll height it was worked out
+          // from — see `useTheEdges.ts`.
+          <div className="dock-frame" {...edgeMarks(edges)}>
+            <aside className="dock" ref={panel} aria-label="The panel beside the map">
+              {dock === "outline" ? (
+                <Outline
+                  items={outline}
+                  onPick={pick}
+                  focused={focused}
+                  {...(onlyColumn === null
+                    ? {}
+                    : {
+                        only: new Set(onlyColumn.claims),
+                        filter:
+                          `Only the claims in column ${onlyColumn.layer}, which is what the ` +
+                          `collapsed tile on the map stands for. Press O for all of them.`,
+                      })}
                 />
-                {answer.at === "refused" ? (
-                  <Refusal asking="this map" reasons={answer.reasons} />
-                ) : null}
-                {open === undefined ? null : (
-                  <DeltaRail
-                    rows={rows}
-                    ranked={computed !== undefined}
-                    summary={computed === undefined ? NO_SUMMARY_YET : computed.change.summary}
+              ) : (
+                <>
+                  {intervening ? (
+                    <InterventionPanel
+                      world={world}
+                      selection={selection}
+                      onEdit={edit}
+                      onClose={() => setIntervening(false)}
+                    />
+                  ) : null}
+                  <BranchPanel
+                    branches={shop.branches}
+                    openId={shop.openId}
+                    world={world}
+                    onOpen={(id) => setShop((was) => openBranch(was, id))}
+                    onFork={(label) => setShop((was) => forkBranch(was, label))}
+                    naming={naming}
+                    onNaming={setNaming}
                   />
-                )}
-                <Inspector world={world} selection={selection} />
-              </>
-            )}
-          </aside>
+                  {answer.at === "refused" ? (
+                    <Refusal asking="this map" reasons={answer.reasons} />
+                  ) : null}
+                  {open === undefined ? null : (
+                    <DeltaRail
+                      rows={rows}
+                      ranked={computed !== undefined}
+                      summary={computed === undefined ? NO_SUMMARY_YET : computed.change.summary}
+                    />
+                  )}
+                  <Inspector world={world} selection={selection} />
+                </>
+              )}
+            </aside>
+          </div>
         )}
       </div>
 

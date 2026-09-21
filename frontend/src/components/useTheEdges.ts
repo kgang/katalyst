@@ -17,9 +17,23 @@
  *
  * The measuring differs because the two boxes are different — one is scrolled
  * and one is panned — and the rule and its drawing do not.
+ *
+ * **Two hard rules about the measuring, both learned the same way.**
+ *
+ * *The answer must not change the question.* The rules are drawn on a frame
+ * around the panel rather than inside it, so that turning one on cannot change
+ * the scroll height it was worked out from. A measurement that changes the thing
+ * measured is a loop, and a browser ends a size-observation loop by abandoning
+ * the rest of that frame's observations.
+ *
+ * *And nothing is observed twice.* Asking the browser to watch a box it is
+ * already watching makes it re-deliver that box's size, so re-watching the panel
+ * and its five sections on every render fills a frame's budget of observations
+ * with answers nobody needed. The budget is shared with the drawing library,
+ * which uses it to measure tiles — and it draws nothing it has not measured.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Which edges of a box have more beyond them. */
 export interface Edges {
@@ -50,14 +64,18 @@ export function edgeMarks(edges: Edges): Record<string, string> {
  * A scrolling panel, measuring itself.
  *
  * It is watched three ways because the panel changes for three different
- * reasons: the reader scrolls it, a claim arrives and makes it taller, and the
- * window is resized and makes it shorter. Missing any one of them leaves a rule
- * drawn at an edge with nothing beyond it, which is the panel claiming something
- * a reader can check in one gesture.
+ * reasons: the reader scrolls it, a claim arrives and makes a section taller,
+ * and the window is resized and makes the panel shorter. Missing any one of them
+ * leaves a rule drawn at an edge with nothing beyond it, which is the panel
+ * claiming something a reader can check in one gesture.
  *
- * @returns The ref to put on the panel, and which of its edges have more beyond
- *   them. A panel scrolls in one direction here, so the two sideways edges are
- *   always false.
+ * The sections are watched as well as the panel, because a section growing
+ * inside a panel that stays exactly the same size is the commonest of the three
+ * and the only one the panel's own box does not report.
+ *
+ * @returns The ref to put on the scrolling panel, and which of its edges have
+ *   more beyond them — for the frame around it to draw. A panel scrolls in one
+ *   direction here, so the two sideways edges are always false.
  */
 export function useTheEdgesOfThePanel(): {
   panel: React.RefObject<HTMLElement | null>;
@@ -66,36 +84,69 @@ export function useTheEdgesOfThePanel(): {
   const panel = useRef<HTMLElement | null>(null);
   const [edges, setEdges] = useState<Edges>(NOTHING_BEYOND);
 
+  /**
+   * Read how far the panel is scrolled and how much it holds.
+   *
+   * Written once and never rebuilt, so that the one observer below can be built
+   * once and never rebuilt either.
+   */
+  const measure = useCallback((): void => {
+    const it = panel.current;
+    if (it === null) {
+      return;
+    }
+    // A pixel of slack, because a panel scrolled to its very end lands a
+    // fraction short of its own height often enough to matter.
+    const above = it.scrollTop > 1;
+    const below = it.scrollTop + it.clientHeight < it.scrollHeight - 1;
+    setEdges((was) =>
+      was.above === above && was.below === below ? was : { ...NOTHING_BEYOND, above, below },
+    );
+  }, []);
+
+  // One observer for the life of the screen. A page that cannot watch a box
+  // change size — a simulated one in a test — still gets the scrolling half
+  // rather than nothing at all.
+  const [watching] = useState<ResizeObserver | null>(() =>
+    typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure),
+  );
+  const watched = useRef(new Set<Element>());
+
+  // Which boxes are being watched is settled after every render, because the
+  // panel's sections come and go — but a box already being watched is left
+  // exactly as it is.
+  useEffect(() => {
+    const it = panel.current;
+    if (it === null || watching === null) {
+      return;
+    }
+    const wanted = new Set<Element>([it, ...it.children]);
+    for (const box of watched.current) {
+      if (!wanted.has(box)) {
+        watching.unobserve(box);
+        watched.current.delete(box);
+      }
+    }
+    for (const box of wanted) {
+      if (!watched.current.has(box)) {
+        watching.observe(box);
+        watched.current.add(box);
+      }
+    }
+  });
+
+  // The reader scrolling it, and the first reading of all.
   useEffect(() => {
     const it = panel.current;
     if (it === null) {
       return;
     }
-    const measure = (): void => {
-      // A pixel of slack, because a panel scrolled to its very end lands a
-      // fraction short of its own height often enough to matter.
-      const above = it.scrollTop > 1;
-      const below = it.scrollTop + it.clientHeight < it.scrollHeight - 1;
-      setEdges((was) =>
-        was.above === above && was.below === below ? was : { ...NOTHING_BEYOND, above, below },
-      );
-    };
     measure();
     it.addEventListener("scroll", measure, { passive: true });
-    // Watching a box change size is the browser's own job, and a page that
-    // cannot do it — a simulated one in a test — still gets the scrolling half
-    // rather than nothing at all.
-    const watching =
-      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
-    watching?.observe(it);
-    for (const child of it.children) {
-      watching?.observe(child);
-    }
-    return () => {
-      it.removeEventListener("scroll", measure);
-      watching?.disconnect();
-    };
-  });
+    return () => it.removeEventListener("scroll", measure);
+  }, [measure]);
+
+  useEffect(() => () => watching?.disconnect(), [watching]);
 
   return { panel, edges };
 }

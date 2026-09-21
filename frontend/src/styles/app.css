@@ -242,36 +242,55 @@ body {
 
    So the panel says it. It measures itself — how far it is scrolled and how much
    it holds — and writes down whether there is more above and more below; these
-   two rules are drawn from what it wrote. They are pinned to the panel's own
-   edges rather than to the page, so each one sits across whichever section
-   happens to be cut there.
+   two rules are drawn from what it wrote.
+
+   **The rules are drawn on the frame around the panel, and never inside it.**
+   They used to be sticky pseudo-elements of the scrolling box itself, which put
+   two more children into a flex column with a one-pixel gap: turning one on
+   changed the scroll height of the very box whose scroll height had just been
+   measured. A measurement that changes the thing measured is a loop, and the
+   browser ends a loop by abandoning the rest of that frame's size observations —
+   *"a ResizeObserver loop completed with undelivered notifications"*. The
+   observations it abandoned were the drawing library's, and a tile the library
+   never measured is a tile it draws `visibility: hidden` for ever.
+
+   Drawn on a frame, each rule is positioned against a box that does not scroll,
+   takes no space in anything, and cannot change a single measurement.
 
    A line rather than a shadow, like every other separation in this product: a
    shadow is a veto condition. */
-.dock::before,
-.dock::after {
+.dock-frame {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.dock-frame::before,
+.dock-frame::after {
   content: "";
-  position: sticky;
-  z-index: 2;
-  flex: 0 0 2px;
+  position: absolute;
+  left: 0;
+  right: 0;
   height: 2px;
+  z-index: 2;
   background: var(--text-muted);
+  pointer-events: none;
 }
 
-.dock::before {
+.dock-frame::before {
   top: 0;
-  margin-bottom: -2px;
 }
 
-.dock::after {
+.dock-frame::after {
   bottom: 0;
-  margin-top: -2px;
 }
 
 /* Drawn only where it is true. A rule at an edge with nothing beyond it would be
    the panel claiming something a reader can check in one gesture. */
-.dock:not([data-more-above="yes"])::before,
-.dock:not([data-more-below="yes"])::after {
+.dock-frame:not([data-more-above="yes"])::before,
+.dock-frame:not([data-more-below="yes"])::after {
   display: none;
 }
 
