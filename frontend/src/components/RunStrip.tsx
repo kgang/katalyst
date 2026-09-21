@@ -50,10 +50,13 @@ export interface RunStripProps {
    *
    * A **number** turns the reading on: it prints how long it has been since
    * anything last arrived, and it starts again whenever this number changes.
-   * **Null turns it off**, and three screens want it off. A stored map is not
-   * waiting for anything. A finished run is not waiting for anything. And a
-   * **replay** is paced by the server, at six tenths of a second an event, so
-   * the reading would reset twice a second and would be measuring our own pacing
+   * It is on while the screen is waiting on the server — a live run between two
+   * events, or a stored map whose world has been asked for and not come back.
+   *
+   * **Null turns it off**, and three states want it off. A stored map at rest is
+   * not waiting for anything. A finished run is not waiting for anything. And a
+   * **replay** is paced by us, at six tenths of a second an event, so the
+   * reading would reset twice a second and would be measuring our own pacing
    * rather than any wait.
    */
   readonly arrivals: number | null;
