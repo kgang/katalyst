@@ -9,7 +9,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { type PinnedTile, type Position, pinsFor, readPositions } from "../../graph/elkGraph";
+import {
+  COLUMN_GAP,
+  type PinnedTile,
+  type Position,
+  pinsFor,
+  readPositions,
+} from "../../graph/elkGraph";
+import { TILE_WIDTH } from "../../graph/geometry";
 import { toFlow } from "../../graph/toFlow";
 import { inFewWords } from "../../world/naming";
 import type { ProposalAccepted, StreamEvent } from "../events";
@@ -132,11 +139,35 @@ describe("the rectangles are the frontier, drawn", () => {
   });
 });
 
-describe("nothing already placed moves", () => {
-  it("test_a_tile_keeps_its_place_when_a_later_tile_arrives", () => {
-    // The real machinery, over the real run: at every step the map is laid out
-    // again, and the rule the layout obeys — a tile that had a position keeps it,
-    // to the pixel — is checked against what came out.
+describe("a tile keeps its row until the run stops", () => {
+  /**
+   * An answer of the kind the layout engine gives, for one pass.
+   *
+   * Every box gets a column of its own and a row nobody asked for, and both
+   * change from pass to pass as boxes come and go. That is the point: the rule
+   * being checked is what **we** do with the engine's answer, and an answer that
+   * agreed with the pins would prove nothing. Columns are a whole tile and a
+   * gap apart, so no box in this answer is in another's column and nothing has
+   * to find room.
+   */
+  function anAnswer(tiles: readonly { id: string }[]) {
+    return {
+      id: "map",
+      children: tiles.map((tile, place) => ({
+        id: tile.id,
+        x: place * (TILE_WIDTH + COLUMN_GAP),
+        y: place * (TILE_WIDTH + COLUMN_GAP),
+      })),
+    };
+  }
+
+  it("test_nothing_moves_except_a_column_until_the_run_stops", () => {
+    // The real machinery, over the chapter's own run: at every step the map is
+    // laid out again, and what we do with the answer is checked against what
+    // came out. **The rule, rewritten 2026-09-21 by decision record 0024:** a
+    // tile that had a place keeps its **row**, to the pixel, and takes its
+    // **column** from this pass's answer — because which column a claim belongs
+    // in is decided by the arrows into it, and arrows keep arriving.
     //
     // **The whole run, `beliefs_propagated` included.** It used to stop at the
     // last growth event, which left out the one event that replaces the world
@@ -147,6 +178,7 @@ describe("nothing already placed moves", () => {
     // was the one moment the walk did not reach.
     let placed = new Map<string, PinnedTile>();
     let seen = new Map<string, Position>();
+    let columnsWereReRead = false;
 
     for (const state of everyStateOf([...THE_GROWTH, BELIEFS])) {
       const drawing = toFlow(state.world, undefined, state.skeletons);
@@ -160,21 +192,21 @@ describe("nothing already placed moves", () => {
         }
       }
 
-      // The layout engine is asked again and answers with somewhere new for
-      // everything. What comes back keeps every pinned tile exactly where it was.
-      const laidOut = {
-        id: "map",
-        children: drawing.tiles.map((tile, place) => ({
-          id: tile.id,
-          x: 1000 + place * 7,
-          y: 2000 + place * 11,
-        })),
-      };
-      const positions = readPositions(laidOut, pins);
+      const answer = anAnswer(drawing.tiles);
+      const saidColumn = new Map(answer.children.map((child) => [child.id, child.x]));
+      const positions = readPositions(answer, pins);
 
       for (const [id, was] of seen) {
-        if (positions.has(id)) {
-          expect(positions.get(id)).toEqual(was);
+        const now = positions.get(id);
+        if (now === undefined) {
+          continue;
+        }
+        // Its row is the row it had. Nothing takes that away while the map grows.
+        expect(now.y, id).toBe(was.y);
+        // Its column is this pass's, never the one it is remembered at.
+        expect(now.x, id).toBe(saidColumn.get(id));
+        if (now.x !== was.x) {
+          columnsWereReRead = true;
         }
       }
 
@@ -186,8 +218,44 @@ describe("nothing already placed moves", () => {
     }
 
     // And the claims really did arrive one after another rather than all at once,
-    // or the walk above would have proved nothing.
+    // or the walk above would have proved nothing — and a column really was read
+    // afresh at least once, or the second assertion is true by accident.
     expect(seen.size).toBeGreaterThan(1);
+    expect(columnsWereReRead).toBe(true);
+  });
+
+  it("test_every_pin_goes_when_the_run_stops", () => {
+    // The settle. Nothing about it is a new event or a new frame: it is the one
+    // moment every pin is dropped, so the whole map is laid out as one thing and
+    // takes the places the argument asks for, rows included. On the page it is
+    // the same flag that re-frames the view, handed to the layout as well.
+    let placed = new Map<string, PinnedTile>();
+    let drawing = toFlow(waitingFor(THE_SENTENCE, null).world);
+
+    for (const state of everyStateOf([...THE_GROWTH, BELIEFS])) {
+      drawing = toFlow(state.world, undefined, state.skeletons);
+      const positions = readPositions(anAnswer(drawing.tiles), pinsFor(placed, drawing.tiles));
+      const heights = new Map(drawing.tiles.map((tile) => [tile.id, tile.height]));
+      placed = new Map(
+        [...positions].map(([id, at]) => [id, { at, height: heights.get(id) ?? 0 }]),
+      );
+    }
+
+    // While the run was going, the map remembered where everything was.
+    expect(pinsFor(placed, drawing.tiles).size).toBe(placed.size);
+    expect(placed.size).toBeGreaterThan(1);
+
+    // On the one pass where it has just stopped, it remembers nothing — so every
+    // box takes the place this layout gives it, and no pin can hold a tile in a
+    // column the arrows have moved on from.
+    const atTheSettle = pinsFor(placed, drawing.tiles, true);
+    expect(atTheSettle.size).toBe(0);
+    const settled = readPositions(anAnswer(drawing.tiles), atTheSettle);
+    const said = new Map(anAnswer(drawing.tiles).children.map((one) => [one.id, one]));
+    for (const [id, at] of settled) {
+      expect(at.y, id).toBe(said.get(id)?.y);
+      expect(at.x, id).toBe(said.get(id)?.x);
+    }
   });
 });
 

@@ -37,34 +37,51 @@ export interface PinnedTile {
 /**
  * The pins to hand the layout engine — all of them, or none.
  *
- * **A pin is only good for the boxes it was made with.** Pinning exists for a
- * map that *grows*: a claim arriving must not shove the claims already drawn, so
- * every tile that has a place keeps it to the pixel. A tile that **changes
- * size** is a different question with a different answer, and holding a grown
- * tile where its shorter self went runs it into whatever sits below.
+ * **A pin holds a tile's row.** Pinning exists for a map that *grows*: a claim
+ * arriving must not shove the claims already drawn up or down, so every tile
+ * that has a place keeps that row. It does not hold the tile's **column** — see
+ * `readPositions`, which re-reads the column from the arrows on every pass, so
+ * that no arrow is ever drawn pointing backwards.
  *
- * It has to be all or none, and the reason is worth writing down: a tile's place
- * in a column is decided by its neighbours as much as by itself. Drop one tile's
- * pin and keep its neighbour's, and the engine places the unpinned one freely
- * while we force the pinned one back to a coordinate worked out for a map that
- * no longer exists — and the two meet in the middle. So the moment any box is a
- * different size from the one it was placed at, **every** pin goes and the map is
- * laid out again from scratch.
+ * **Two things drop every pin at once.**
  *
- * That costs nothing the reader can see. The layout is a pure function of the
- * map, so the answer is the same every time; columns cannot slide, because which
- * column a tile is in is decided by the arrows and never by a height; and the
- * reader's place is kept by the view centring on whatever the keyboard is on,
- * which is what `layout-and-zoom.md` asks for and what the canvas already does.
+ * A tile that **changes size** is a different question with a different answer,
+ * and holding a grown tile where its shorter self went runs it into whatever
+ * sits below. It has to be all or none, and the reason is worth writing down: a
+ * tile's place in a column is decided by its neighbours as much as by itself.
+ * Drop one tile's pin and keep its neighbour's, and the engine places the
+ * unpinned one freely while we force the pinned one back to a coordinate worked
+ * out for a map that no longer exists — and the two meet in the middle. So the
+ * moment any box is a different size from the one it was placed at, **every**
+ * pin goes and the map is laid out again from scratch.
+ *
+ * And **the run stopping** drops them all, once. That is the settle (decision
+ * record 0024): a map written while a reader watched is laid out once, whole, at
+ * the moment it stops, and never again. It is the one moment a tile may take a
+ * new row, and it is what takes the finished picture from the arrangement a
+ * chain of pins left behind to the arrangement the argument actually makes.
+ * Whoever calls this says when that moment is; nothing here can know.
+ *
+ * Dropping every pin costs nothing the reader can see. The layout is a pure
+ * function of the map, so the answer is the same every time; and the reader's
+ * place is kept by the view centring on whatever the keyboard is on, which is
+ * what `layout-and-zoom.md` asks for and what the canvas already does.
  *
  * @param placed Where tiles sat after the last layout, with the heights they
  *   were placed at.
  * @param tiles Every tile to place now, with the height it will be drawn at.
+ * @param theRunHasJustStopped True on the one pass where a map that was being
+ *   written has stopped being written. Every pin goes, so the whole map is laid
+ *   out afresh. False on every other pass, including the ones after it.
  */
 export function pinsFor(
   placed: ReadonlyMap<string, PinnedTile>,
   tiles: readonly LayoutTile[],
+  theRunHasJustStopped = false,
 ): Map<string, Position> {
+  if (theRunHasJustStopped) {
+    return new Map();
+  }
   const resized = tiles.some((tile) => {
     const pin = placed.get(tile.id);
     return pin !== undefined && pin.height !== tile.height;
@@ -206,60 +223,76 @@ interface Placed {
 
 /**
  * Read the layout engine's answer back, keeping every tile that was already
- * placed exactly where it was — and making a tile that has just arrived find a
- * gap rather than land on one of them.
+ * placed in the row it was already in — and making a tile that has just arrived,
+ * or just changed column, find a gap rather than land on one of them.
  *
- * The hint in `toElkGraph` asks the engine to leave placed tiles alone, and it
- * mostly does — but "mostly" is not a promise, and losing your place because a
- * new tile arrived is the thing this is here to prevent. So the rule is made
- * absolute on our side: **a tile that had a position keeps that position, to the
- * pixel, and only a tile that had none takes a new one.**
+ * **A tile keeps its row, and only its row** *(decision record 0024,
+ * 2026-09-21; this used to keep the column too)*. The vertical place is what
+ * keeps the reader's place: the map they are scanning does not shuffle up and
+ * down under them while it is being written. The hint in `toElkGraph` asks the
+ * engine to keep each column in the order it is already in, and it mostly does —
+ * but "mostly" is not a promise, so the rule is made absolute on our side.
  *
- * **That half alone is not enough, and a map that builds itself is where it
- * shows.** `elk.position` is a hint about the *order* of a column, not a
- * coordinate the engine is bound by: it lays the whole map out freshly, moving
- * the placed tiles as it sees fit, and then we put those back where they were.
- * The tile that arrived keeps a coordinate worked out for an arrangement that no
- * longer exists — and the two meet in the middle, which on the Hormuz run put
- * one claim exactly on top of another.
+ * **The column is taken from this pass's answer, every pass.** Which column a
+ * claim belongs in is decided by the arrows into it, and arrows keep arriving. A
+ * claim drawn before anything pointed at it — which on the Verify door is the
+ * destination, every time — starts in the leftmost column and belongs three
+ * columns right by the end of the run. Holding it where it started does not stop
+ * the map changing; it only makes the four arrows into it be drawn doubling
+ * back, which is a picture of an argument running the wrong way. So the claim
+ * moves sideways instead, on the arrival that proves it, and keeps its row.
  *
- * So the arriving tiles are settled afterwards, in the order the engine proposed
- * them: each keeps its column, starts where the engine put it, and slides **down**
- * until it clears every box already settled by the column's own gap. Nothing that
- * was already placed moves a pixel; the late arrival finds a gap, which is what
- * the chapter says happens and what nothing was making happen.
+ * **A tile that moved needs a gap as much as one that arrived.** `elk.position`
+ * is a hint about the order of a column, not a coordinate the engine is bound
+ * by: it lays the whole map out freshly and we put the rows back. A tile sent
+ * into a column it has not been in before arrives at a row worked out for a
+ * different arrangement, and so can land on a tile already standing there — the
+ * same failure that once put one claim exactly on top of another. So every box
+ * that is not staying exactly where it was is settled afterwards, in the order
+ * the engine proposed them: each keeps its new column, starts at the row it
+ * wants, and slides **down** until it clears every box already settled by the
+ * column's own gap. On both real generated maps this repository holds, nothing
+ * has ever had to slide — a tile that moves column keeps its row exactly — and
+ * the rule is here so that the one map where two tiles want one row is drawn
+ * honestly rather than drawn twice in one place.
  *
  * Reserved rectangles are boxes here like any other. A claim drawn on top of the
  * rectangle that was held open for it is the same mistake as two claims on top of
  * each other.
  *
  * @param laidOut What the layout engine returned.
- * @param placed Where tiles already sat before it ran.
+ * @param placed Where tiles already sat before it ran. Empty at the settle, and
+ *   then every tile takes the place this answer gives it, row included.
  * @returns Where every tile sits now.
  */
 export function readPositions(
   laidOut: ElkNode,
   placed: ReadonlyMap<string, Position>,
 ): Map<string, Position> {
-  const settled: Placed[] = [];
-  const arriving: Placed[] = [];
+  const staying: Placed[] = [];
+  const looking: Placed[] = [];
 
   for (const child of laidOut.children ?? []) {
     const height = child.height ?? 0;
+    const column = child.x ?? 0;
     const pinned = placed.get(child.id);
-    if (pinned !== undefined) {
-      settled.push({ id: child.id, at: pinned, height });
+    if (pinned === undefined) {
+      looking.push({ id: child.id, at: { x: column, y: child.y ?? 0 }, height });
+    } else if (column === pinned.x) {
+      staying.push({ id: child.id, at: pinned, height });
     } else {
-      arriving.push({ id: child.id, at: { x: child.x ?? 0, y: child.y ?? 0 }, height });
+      // The arrows moved it sideways. It keeps the row it has.
+      looking.push({ id: child.id, at: { x: column, y: pinned.y }, height });
     }
   }
 
   // The engine's own order, so the same map always settles the same way. The
   // identifier breaks a tie, because two boxes proposed at the same height must
   // not depend on which the engine happened to list first.
-  arriving.sort((one, other) => one.at.y - other.at.y || one.id.localeCompare(other.id));
+  looking.sort((one, other) => one.at.y - other.at.y || one.id.localeCompare(other.id));
 
-  for (const box of arriving) {
+  const settled: Placed[] = [...staying];
+  for (const box of looking) {
     let at = box.at;
     // Each pass can only push the box further down, and there are finitely many
     // boxes below it, so this always settles.

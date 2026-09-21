@@ -154,17 +154,24 @@ interface SurfaceProps {
    */
   readonly badge?: ReactNode;
   /**
-   * A word that changes when the map should be framed again.
+   * A word that changes when the map should be framed again — and settled.
    *
    * The map is framed once, when it is first drawn, and never again — losing
    * your place because the map was rearranged is the most disorienting thing a
    * canvas can do. A map that **builds itself** has one more moment worth
-   * framing: the one where it stops. Nothing on it moves then, the reader is
-   * about to start reading, and a four-column map framed for its first single
-   * rectangle is a map they would otherwise have to hunt around.
+   * framing: the one where it stops. The reader is about to start reading, and a
+   * four-column map framed for its first single rectangle is a map they would
+   * otherwise have to hunt around.
+   *
+   * **It is also the moment the map settles** (decision record 0024): every pin
+   * is dropped and the whole map is laid out once, so that a picture written one
+   * claim at a time becomes the picture the argument makes. The canvas hands
+   * this same word to the layout, so the settle and the re-frame are one moment
+   * and cannot come apart. It is a cut and not an animation: every tile is in
+   * its new place in one frame.
    *
    * It is a word rather than a flag so that the effect has something to compare:
-   * the map is framed once for each value it has ever had.
+   * the map is framed once, and settled once, for each value it has ever had.
    */
   readonly frameAgainOn?: string;
 }
@@ -191,7 +198,9 @@ function MapSurface({
   const [pointingAt, setPointingAt] = useState<string | null>(null);
 
   const drawing = useMemo(() => toFlow(world, heights, reserved), [world, heights, reserved]);
-  const layout = useLayout(drawing.tiles, drawing.layoutEdges, mapKey);
+  // The same word twice, on purpose: the map settles and the view re-frames on
+  // one moment, and there is nothing that could make them come apart.
+  const layout = useLayout(drawing.tiles, drawing.layoutEdges, mapKey, frameAgainOn);
 
   // How far the map is zoomed out. Below the threshold a wire's plate would
   // have its words drawn under eleven pixels on the glass, which is the one
@@ -467,8 +476,10 @@ function MapSurface({
     // Which framing this would be. While a map is being asked to frame again —
     // which is only ever when a generation has stopped — the layout's own run
     // count is part of the answer, so that a frame taken while the last claims
-    // were still being placed is taken again when they have been. Nothing lays a
-    // finished map out again, so this settles after one or two.
+    // were still being placed is taken again when they have been. That same
+    // moment settles the map (decision record 0024), which is one more layout,
+    // so the last frame of all is taken on the map's settled shape and then
+    // nothing lays it out again.
     const frameFor =
       frameAgainOn === undefined ? mapKey : `${mapKey}:${frameAgainOn}:${layout.runs}`;
     if (layout.runs === 0 || layout.laidOutFor !== mapKey || framed.current === frameFor) {
