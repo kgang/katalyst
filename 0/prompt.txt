@@ -28,3 +28,28 @@ Your job this session is to do some of the work in stacks 5 and 6 for the purpos
 
 
 Please do a principled analysis on what work can be done right now on stack 5 and 6. Another agent right now is working on the completion of stack 4. Use opus 5 sub-agents to execute your work.
+
+---
+
+<task-notification>
+<task-id>af9cc1b157d2587d4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/af9cc1b157d2587d4.output</output-file>
+<status>completed</status>
+<summary>Agent "Polymarket contract look (R11)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me by opening, in order:** `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-polymarket-look.md` · then `/Users/kentgang/git3/katalyst/plans/analysis/scripts/polymarket-look/commands.sh` and re-run it (it needs `--resolve`; see below) · then `event-hormuz-oct31.json` and `clob-book-hormuz-oct31-yes.json` in that directory. `git status` is clean — I changed no tracked file.
+
+**What I did.** About twenty-five keyless calls to Polymarket's Gamma, CLOB and docs hosts, all raw responses saved, no key, no cookie, $0. **Network gotcha:** Kent's LAN resolver answers NXDOMAIN for every `polymarket.com` host; 1.1.1.1 answers normally, so every call carries `--resolve`. A live read will fail on this machine as configured.
+
+**The answer.** **No Brent contract exists on Polymarket** — every hit for *brent* is a person's name or Brentford FC; crude is WTI-only, daily/weekly/current-month. So `M1`'s stand-in can never be made real. **But the map's hypothesis has one:** *"Strait of Hormuz traffic returns to normal by October 31?"* — bid .06 / offer .08 / **mid .07**, $119k resting, $755k traded, settling 2026-11-01, **the same day claim `H` resolves**. Different counter (IMF PortWatch, not Lloyd's List) and an easier test (one 7-day-average print ≥ 60 vs fourteen consecutive days), so: near miss on the words, exact on subject and date. Recommended: rewrite `H`'s criteria to the venue's words, add a `market` ending off `H` naming the contract, keep `M1` as the honest *"no contract quotes this claim"* path.
+
+**Not optional, whatever Kent picks:** `N1.not_tradeable_reason` ("no venue quotes a contract on a diplomatic round") is **false** — *"US x Iran diplomatic meeting by October 31, 2026?"* trades .33/.35 on $184k, and its rules explicitly admit mediated indirect talks.
+
+**Two corrections to accepted docs.** ADR-0010's rate limits ("4,000 per 10 s…") appear **nowhere** in today's 178-page docs — it states a number nobody can cite. And "the quoted spread becomes the range" is wrong in kind: a bid-offer spread is a cost, not an interval; the venue publishes no interval, so the fixture's `market=Belief(.48, .45, .52)` traces to nothing.
+
+**Owed once stack 04 has landed:** the `hormuz.py` and ADR-0010 edits above — both files are on the do-not-touch list; exact replacement wording is in the report.
+
+**Unsure / unresolved:** I could **not** read Polymarket's terms of use (client-rendered page). Somebody must, before a dated quote file is committed. Also unchecked: fees, Kalshi, the POST batch endpoints, geoblock.</result>
+<usage><subagent_tokens>132448</subagent_tokens><tool_uses>38</tool_uses><duration_ms>478374</duration_ms></usage>
+</task-notification>
