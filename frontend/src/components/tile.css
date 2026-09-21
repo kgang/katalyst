@@ -126,14 +126,24 @@
   overflow: hidden;
 }
 
-/* ---- The three beliefs -------------------------------------------------- *
- * Side by side, equal widths, with a hairline between them. Three columns
- * because there are three owners and they are never merged into one number —
- * the shape of the row is the argument. */
+/* ---- The beliefs -------------------------------------------------------- *
+ * Side by side, equal widths, with a hairline between them. One column per
+ * owner who has something to say: the model always, and the reader and a venue
+ * where they hold a number. They are never merged into one number — the shape
+ * of the row is the argument — and a column with nothing in it is not drawn.
+ *
+ * The columns are made by the chips rather than declared as three, so the row
+ * shares its whole width between whichever of them are there: one chip fills
+ * the tile, two take half each, three take a third each exactly as before.
+ * **The tile does not change size either way.** Its height and its width are
+ * written on its own box from `geometry.ts`, which reserves the same rail
+ * whatever the chips hold — so a number arriving later widens the survivors and
+ * re-lays out nothing. */
 
 .tile__beliefs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   column-gap: var(--space-1);
   padding-top: var(--space-1);
   border-top: 1px solid var(--hairline);
@@ -434,6 +444,12 @@
 }
 
 .tile[data-detail="summary"] .tile__beliefs {
+  /* One line per owner, stacked. The row above makes its columns from the
+   * chips themselves, so out here the flow has to be turned back to rows as
+   * well — otherwise a second chip takes a column of its own beside the first
+   * and the two lines are printed over each other (Kent saw exactly that on the
+   * one tile holding a venue's number, 2026-09-22). */
+  grid-auto-flow: row;
   grid-template-columns: minmax(0, 1fr);
   row-gap: var(--space-hair);
 }
@@ -448,7 +464,12 @@
    * has to be set at that size before the column is worked out. */
   font-size: var(--text-lg);
   grid-template-rows: auto;
-  grid-template-columns: 4.4em auto auto;
+  /* The owner's column is as wide as the longest owner, *market*, and no wider.
+   * It was a fifth wider than that, and the line then ran past the row by 5
+   * pixels on an ordinary tile and by 17 on the two whose outline cuts into one
+   * side — far enough that the end of the range was cut off (measured on the
+   * stored example at the furthest zoom, 2026-09-22). */
+  grid-template-columns: 3.5em auto auto;
   grid-auto-flow: column;
   justify-items: start;
   align-items: baseline;

@@ -381,7 +381,7 @@ describe("the panel, on an arrow", () => {
 
   it("test_says_what_kind_of_push_and_what_it_does_over_time", () => {
     render(<Inspector world={hormuzish()} selection={{ kind: "wire", id: "H->B" }} />);
-    expect(screen.getByText(/domino/)).toBeInTheDocument();
+    expect(screen.getByText(/undoing the cause later does not undo it/)).toBeInTheDocument();
     expect(screen.getByText(/half gone after 30 days/)).toBeInTheDocument();
     expect(screen.getByText(/2 days after its cause becomes true/)).toBeInTheDocument();
   });

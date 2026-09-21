@@ -122,8 +122,27 @@ describe("what kind of push it is", () => {
   });
 
   it("test_each_kind_of_push_reads_as_a_sentence_not_a_word_to_look_up", () => {
-    expect(modeInWords("trigger")).toContain("domino");
-    expect(modeInWords("sustain")).toContain("apple on a desk");
+    // Each one says what the push does and what follows from it, in the words
+    // a reader already has. The two differ in exactly one thing — whether the
+    // push survives its cause going away — so that is what each sentence leads
+    // with.
+    expect(modeInWords("trigger")).toContain("fires once");
+    expect(modeInWords("trigger")).toContain("undoing the cause later does not undo it");
+    expect(modeInWords("sustain")).toContain("holds while the cause holds");
+    expect(modeInWords("sustain")).toContain("goes the moment it stops");
+  });
+
+  it("test_no_kind_of_push_is_explained_by_a_picture_of_something_else", () => {
+    // Kent, 2026-09-21: "avoid the more idiosyncratic examples of an apple on a
+    // desk and dominoes and aim to present vocabulary and concepts in a more
+    // terse, professional manner." Both sentences reach a reader — on the
+    // arrow's `kind` row and on every line of a number's working — so neither
+    // may stand something in for the thing itself.
+    for (const mode of ["trigger", "sustain"] as const) {
+      expect(modeInWords(mode)).not.toContain("domino");
+      expect(modeInWords(mode)).not.toContain("apple");
+      expect(modeInWords(mode)).not.toContain("desk");
+    }
   });
 });
 
