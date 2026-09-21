@@ -243,3 +243,46 @@ def test_the_kept_run_is_readable_json_a_person_could_open(tmp_path: Path) -> No
     assert read["example"] == "hormuz"
     assert read["prompt_hash"]
     assert "\n" in written.read_text(encoding="utf-8")
+
+
+# --- What `--cap` actually buys -------------------------------------------
+
+
+def test_a_run_that_has_spent_its_cap_makes_no_further_paid_call(tmp_path: Path) -> None:
+    """`--cap 0.5` bought $1.60 of model calls (2026-09-21).
+
+    The generation stopped for money, as it should — and the recorder then went
+    on to draft the scripted intervention anyway, because `add_a_claim` checked
+    the ceiling between its arrows and not before its first call. Two dear calls
+    later the run had spent three times its cap.
+
+    A run that ended for money drafts nothing, and says so in its own verdict:
+    a recording whose card's button does nothing is worse than no recording.
+    """
+    finished = run_the_recorder(
+        tmp_path,
+        "--only",
+        "hormuz",
+        "--cap",
+        "0.5",
+        answerer="tests.unit.engine.dear_stand_in:dear",
+    )
+
+    kept = the_kept_run(tmp_path)
+    assert kept.done is not None
+    assert kept.done.reason == "spend_cap"
+    assert kept.receipt is not None
+    # A round's calls are all in flight before the first is folded, so the bound
+    # is the cap plus what was already in the air — never another whole insert.
+    assert kept.receipt.dollars < 0.5 + A_WHOLE_ROUND_IN_FLIGHT
+    assert any("money ran out" in one for one in kept.faults)
+    assert finished.returncode != 0
+
+
+A_WHOLE_ROUND_IN_FLIGHT = 4.0
+"""What a round of dear calls can add after the ceiling is read, in dollars.
+
+Three calls at about a dollar each, and each of those may take its own rounds of
+research. The real bound is stated in `receipt.py` and in the chapters; this is
+a figure a test can compare against, generous enough not to be about arithmetic.
+"""

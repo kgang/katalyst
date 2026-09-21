@@ -580,6 +580,7 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
     )
     at = 0
     worked_through = False
+    graph = None
     try:
         # Building the map from the file is as much "reading the recording" as
         # playing it is, so it sits inside the same guard.
@@ -608,7 +609,6 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
                 yield event.model_copy(update={"seconds": time.monotonic() - started})
                 continue
             yield event
-        held.remember(working, graph, in_flight=False)
     except replay.CannotBeRead as unreadable:
         # Half a map and an open connection is the worst of both worlds. This
         # ends where it is, with what it spent — nothing — and one plain sentence
@@ -621,6 +621,13 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
         logging.getLogger(__name__).exception("a replay stopped where it should not have")
         yield _nothing_spent(time.monotonic() - started)
         yield Failed(message=WENT_WRONG)
+    finally:
+        # **However this ends**, including a reader closing the tab — which
+        # raises `GeneratorExit` here and skips every `except` there is. Marking
+        # a run in flight and clearing it on the last line of the `try` left
+        # every abandoned replay un-evictable for ever: forty of them against a
+        # bound of eight (Kent, 2026-09-21).
+        held.remember(working, graph, in_flight=False)
 
 
 def _line_from(event: ProposalAccepted | ProposalRejected, at: int) -> TranscriptLine:

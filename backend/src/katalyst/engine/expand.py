@@ -487,6 +487,12 @@ def add_a_claim(
     cap = Caps().dollars if dollars is None else dollars
     spent: list[Outcome] = []
     running = nothing_spent_yet()
+    if over_the_cap(running, cap):
+        # **Before the first call, not after it.** A run given `--cap 0.5` that
+        # had already spent it went on to draft an insert anyway, because the
+        # only check was between the arrows: `$0.80` calls took a `$0.50` run to
+        # `$1.60` (Kent, 2026-09-21).
+        return None, ()
     answerer.watching(running, cap)
     drafting = _drafted(graph, sentence, answerer=answerer, on=on, may_search=may_search)
     spent.append(drafting)

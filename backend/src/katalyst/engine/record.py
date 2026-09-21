@@ -319,7 +319,10 @@ def run_one(
         return so_far_a_run
 
     drafted: Insert | None = None
-    if finished is not None and finished.graph is not None:
+    out_of_money = finished is not None and finished.reason == "spend_cap"
+    if out_of_money:
+        telling("  the money ran out, so the one intervention the card offers is not drafted")
+    if finished is not None and finished.graph is not None and not out_of_money:
         telling(f"  drafting the one intervention the card offers: {THE_ONE_THEY_OFFER[example]!r}")
         try:
             drafted, its_calls = add_a_claim(
@@ -509,6 +512,12 @@ def faults_of(run: Run) -> tuple[str, ...]:
         One sentence per reason, or nothing at all when it may.
     """
     found: list[str] = []
+    if run.finished is not None and run.finished.reason == "spend_cap":
+        found.append(
+            "This run stopped because the money ran out, so the one intervention "
+            "its card offers was never drafted. A recording whose button does "
+            "nothing is worse than no recording."
+        )
     if run.broke is not None:
         found.append(run.broke)
     if get_settings().KATALYST_ANSWERER:

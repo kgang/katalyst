@@ -21,7 +21,7 @@ from katalyst.api.main import app
 from katalyst.engine import replay
 from katalyst.engine.grow import grow
 from katalyst.engine.outcome import Caps
-from katalyst.engine.transcript import held
+from katalyst.engine.transcript import HOW_MANY_GENERATIONS_A_PROCESS_KEEPS, held
 from katalyst.settings import get_settings
 from tests.unit.engine.a_recording import A_MAP, THE_SCRIPTED_INSERT, THE_SENTENCE, written_to
 from tests.unit.engine.answers import (
@@ -1094,3 +1094,54 @@ def test_a_width_overrun_a_branch_introduces_is_refused(
     )
 
     assert over.status_code == 422, over.text
+
+
+# --- Nothing is held for ever ---------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "how_it_ends",
+    ["read to the end", "abandoned half way", "the file stops being readable"],
+)
+def test_a_replay_is_always_let_go_of_however_it_ends(tmp_path: Path, how_it_ends: str) -> None:
+    """Forty replays against a bound of eight (2026-09-21).
+
+    A run is marked in flight while it streams so a busy process cannot forget
+    one somebody is still watching — and the mark was cleared on the last line of
+    the `try`. Both `except` arms skipped it, and so did a reader closing the
+    tab, which raises `GeneratorExit` and skips every `except` there is. Every
+    abandoned replay was then un-evictable for ever, which is the one thing a
+    bounded store exists to prevent.
+    """
+    sentence = THE_SENTENCE
+    if how_it_ends == "the file stops being readable":
+        sentence = "A sentence whose recording goes wrong part way through."
+        good = (tmp_path / "recordings" / "hormuz.jsonl").read_text(encoding="utf-8")
+        (tmp_path / "recordings" / "half-old.jsonl").write_text(
+            good.replace(THE_SENTENCE, sentence) + '{"event":"weather_changed","data":{}}\n',
+            encoding="utf-8",
+        )
+
+    for _ in range(40):
+        if how_it_ends == "abandoned half way":
+            with client().stream(
+                "POST", "/api/generate", json={"hypothesis": sentence, **SMALL}
+            ) as answer:
+                next(iter(answer.iter_lines()))
+        else:
+            stream(hypothesis=sentence)
+
+    assert held.how_many() <= HOW_MANY_GENERATIONS_A_PROCESS_KEEPS
+
+
+def test_a_live_run_is_always_let_go_of_too(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same guard on the same shape of mistake, on the other path."""
+    monkeypatch.setattr(generate, "live_answerer", lambda **_: a_story())
+
+    for _ in range(40):
+        with client().stream(
+            "POST", "/api/generate", json={"hypothesis": STARTED_AT, **SMALL}
+        ) as answer:
+            next(iter(answer.iter_lines()))
+
+    assert held.how_many() <= HOW_MANY_GENERATIONS_A_PROCESS_KEEPS

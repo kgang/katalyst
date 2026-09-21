@@ -363,7 +363,7 @@ The stream ends with one `done` event carrying **one** of seven reasons. **The r
 
 | # | `done.reason` | Chosen when |
 |---|---|---|
-| 1 | `spend_cap` | **Override.** The running receipt reached the run's spending cap. Checked after every call, so nothing further is asked |
+| 1 | `spend_cap` | **Override.** The running receipt reached the run's spending cap. A run that ended this way drafts no scripted intervention. Checked after every call, so nothing further is asked |
 | 2 | `no_terminal` | **Override.** The map ends nowhere you can act on, even after the last ending-seeking call (B6) |
 | 3 | `depth_cap` · `width_cap` · `claim_cap` | The last open claim was closed by that cap: it sat at the depth cap, it already had its full width of children, or the map was full |
 | 4 | `refusal_cap` | The last open claim was closed by the refusals cap — three proposals in a row for it were refused. The map is finished, and one line was abandoned rather than ended. *(Named `model_stopped` until 2026-09-17; renamed because the model did not stop — our rules refused it — and a value must mean what it says. A model that answers `Stop` is the row below.)* |
@@ -401,6 +401,8 @@ The generated map is not the shipped fixture and does not pretend to be: it has 
 ### B5 — the spending cap stops the run and says what it bought
 
 `engine/receipt.py` folds every `Outcome`'s counters into the run's one receipt, and **the running receipt is checked against the spending cap after every call — and, once a call can research, between the rounds inside a call too** ([`grounding.md`](grounding.md)). Over the cap, the generation stops where it is: `done.reason = "spend_cap"`, and one plain sentence naming what was spent and what was got — *"This run reached its spending limit of <cap>. It spent <spent> and built <n> claims and <n> arrows."* No figure is written into that sentence, because every one of its slots is filled from the receipt at run time.
+
+**What a ceiling really promises.** A round of up to three questions goes out together and is all billed before the first of them is folded, so "checked after every call" overstates it. The honest bound: **a run can pass its ceiling by at most the calls that were in flight when it was reached, plus the rounds of research one of those calls may still run.** Nothing further is *asked* once it is reached, which is the part that matters — including the scripted intervention, which a run that ended for money does not draft at all (Kent, 2026-09-21).
 
 What was built is kept, not thrown away: a partial map with a visible reason beats a blank screen with a silent one. The price table lives in `engine/pricing.py` and nothing else, per model, with the day it was read beside it and the `claude-api` skill named — prices change, and memory is unreliable (`test_a_run_stops_at_its_spending_cap_and_says_so`).
 

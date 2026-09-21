@@ -3,7 +3,15 @@
 Every call to a model spends money. A run that could not say how much would be a
 number nobody computed sitting on the screen, which is the one thing this product
 refuses to show — so the counters come back with every answer, they are folded in
-here, and the total is checked against the run's ceiling **after every call**.
+here, and the total is checked against the run's ceiling after every call and
+between the rounds of research inside one.
+
+**What that ceiling really promises.** A round of up to three questions goes out
+together and is all billed before the first of them is folded, so "checked after
+every call" overstates it. The honest bound is that a run can pass its ceiling by
+at most the calls that were in flight when it was reached, plus the rounds of
+research one of those may still run. What is exact is the other half: nothing
+further is *asked* once it is reached.
 
 Where each number comes from
 ----------------------------
