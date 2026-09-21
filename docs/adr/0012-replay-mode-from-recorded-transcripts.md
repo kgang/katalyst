@@ -49,7 +49,7 @@ If accepted, the rules are:
 | **A replay says it is a replay** | A `replay` badge on the canvas for the session; the receipt stores `mode: "replay"`, the recording's date and hash, and zero dollars rather than the original run's cost. Any number still clicks through to that transcript, marked replayed |
 | **Byte-identical every run** (NFR-2) | Pacing is cosmetic — a fixed delay between events so growth reads at human speed — and never changes content or order; an `instant` flag drops it for tests. Beliefs are not replayed as numbers: the recording carries the seed and `domain/` re-propagates, so replay and live agree by construction (INV-5) |
 | **Interventions are computed live** | `do`, `observe`, `retune` and `believe` are pure arithmetic in `domain/` — no model, no key, full fidelity. `insert` is the exception: a typed "…but Iran is struck the next day" drafts a claim through the model, so **each recording also carries one recorded intervention**, the scripted "…but X" its card offers. Any other insert is plainly declined: "drafting a new claim needs a model key" |
-| **The recording must show a miss** | Each of the four holds at least one `proposal_rejected` event — a proposal that would close a loop, or a claim with no resolution criteria — so the reviewer watches the validator refuse the model, not only the happy path |
+| **The recording must show a miss** | Each of the four holds at least one `proposal_rejected` event — a proposal that would close a loop, or a claim with no resolution criteria — so the reviewer watches the validator refuse the model, not only the happy path. *(Amended 2026-09-20, after the live runs of 2026-09-17: a recording shows **every** refusal that occurred, and when there were none the screen says so in one line. Nothing is re-run to manufacture a miss. See the amendment at the foot of this record; the original rule stands as written.)* |
 
 ### Consequences
 
@@ -66,7 +66,7 @@ If accepted, the rules are:
 * `test_replay_is_labelled_in_receipt` — the receipt carries `mode: "replay"`, the recording's date and hash, and zero dollars.
 * `test_intervention_on_replayed_world_needs_no_model` — `do`, `observe`, `retune`, `believe` on a replayed map resolve inside `domain/`.
 * Frontend rendering test: with no key configured, the launchpad shows the four cards **and** the "these run from recordings" sentence, and the replay badge is on the canvas.
-* `make record-demo` exists, is in the README, and is the only way recordings are written. Continuous-integration job `recordings`: every file under `backend/recordings/` parses, holds at least one `proposal_rejected` event, and carries a prompt hash equal to the current prompt's. `gitleaks` already scans them for keys (NFR-8).
+* `make record-demo` exists, is in the README, and is the only way recordings are written. Continuous-integration job `recordings`: every file under `backend/recordings/` parses, holds at least one `proposal_rejected` event, and carries a prompt hash equal to the current prompt's. `gitleaks` already scans them for keys (NFR-8). *(Amended 2026-09-20: the job keeps the parse check and the prompt-hash check and loses the refusal check — see the amendment at the foot.)*
 
 ## Pros and Cons of the Options
 
@@ -100,3 +100,17 @@ If accepted, the rules are:
 * `plans/roadmap-03-to-06.md`, stack 04 ("Propose replay mode here") and the Definition of done: *"With no API key, replay mode still demonstrates the full flow"*.
 * FR-13 (replay from base graph, branch and seed; transcripts stored) · INV-13 (keyless continuous integration) · NFR-2 (determinism) · NFR-8 (no key in a committed file) · FR-3 and UX-13 (the launchpad's four cards) · FR-5 and UX-8 (streaming is the loading state).
 * ADR-0006 (one proposal per call over server-sent events; the receipt; the transcript) and ADR-0008 (cassettes, and the re-recording rule this decision copies).
+
+## Amendment (2026-09-20) — a recording shows what happened, refusals or none
+
+**The rule "each of the four holds at least one `proposal_rejected` event" is replaced by: a recording holds *every* refusal that occurred, and when there were none, the screen says so in one line.** Kent decided this on 2026-09-20, after the first live runs were measured, and it is the honest form of what the original rule was reaching for.
+
+**The evidence, plainly.** Two full live generations of the Hormuz example, made on **2026-09-17**, produced **twenty-six proposals and not one refusal**. The measured run — the one whose receipt survived — made 10 model calls and 9 searches, cost **$1.32**, took **10 minutes 54 seconds**, and ended at the width cap with 10 claims and 9 arrows; the earlier run accepted 16 proposals in about 9 minutes. The validator was working the whole time; the model simply did not break a rule. Re-running until it errs costs a **full generation each time — about a dollar and a third, and about eleven minutes, at the rate measured** — with no guarantee that any given run produces one. The original rule therefore could not be satisfied except by staging a miss, and a staged miss is a number nobody computed wearing a different hat.
+
+**What a reviewer with no key still sees the validator do.** A **refused edit of their own** shows every reason at once, in the validator's own sentences — built in stack 04a's join and pinned by `test_a_refused_branch_shows_every_reason_at_once`. Interventions are live arithmetic on a replayed map (the rule above), so this path needs no key and no luck. The validator refusing *the model* is shown whenever it happened; the validator refusing *the user* is shown on demand.
+
+**Nothing is staged and nothing is re-run to improve a recording.** No hand-written refusal is dropped into a file, no recording is thrown away for being too clean, and `make record-demo` remains the only way a recording is written. A recording says what happened on the day it was made.
+
+**What this changes elsewhere in this record.** The `recordings` job keeps two of its three checks — every file parses, and every prompt hash equals the current prompt's — and **loses the refusal check**; a recording with no refusal in it is green. The *Consequences* bullet that says the one-rejection rule takes away "a standing temptation to record only the runs that went well" now rests on two different rules: a recording is exactly what `make record-demo` wrote, and the screen states what the recording contains, including the one-line sentence when nothing was refused. The *Pros and Cons* line "rejections included" reads as *every rejection that occurred, included*.
+
+Amended in place rather than superseded, because nothing in the decision changed: replay still plays the real stream through the real canvas, and the one rule that moved was a rule about what a recording must contain, which measurement showed we cannot honestly require.

@@ -112,7 +112,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 - **FR-5 (P0)** Generation streams. Propositions and links arrive one at a time over server-sent events (a one-way stream from server to browser) and render as they arrive; layout reserves space so the graph grows without reflowing violently.
 - **FR-6 (P0)** Every graph terminates in ≥1 `market` proposition, or in an explicit "not tradeable — because…" terminal (INV-9).
 - **FR-7 (P0)** Verify door returns a graded path A→B or an explicit `no_path` verdict with the nearest reachable proposition. Never a fabricated bridge.
-- **FR-8 (P1)** Ensemble: N independent generations reconciled into one graph; run-to-run disagreement surfaces as link *agreement* — a number computed from how far the independent runs differed, never a self-report by the model.
+- **FR-8 (P1)** Where a claim's starting number and range come from: **the likelihood and range the model stated in its proposal**, stamped as a `model` belief by us, shown under the label *model interval, uncalibrated*, and never merged with a user's or a market's number (amended 2026-09-17; decision record 0015). **No ensemble in v1**: no claim is asked about twice, no map is generated several times over, and **two maps are never reconciled into one** — `spec/multiverse/diff.md` anti-pattern 4, *do not infer a difference by matching two maps*, is the warrant. A **measured run-to-run number** — how far independent generations differed about a claim, computed and never self-reported — is deferred, and the word *agreement* is kept free on screen for the day one exists. One condition reopens it and no other: if FR-30's pastcast shows stated ranges missing badly against the evaluation scorecard, measure whether re-asking widens them *toward the truth* — the **median** of several answers, never a "trimmed mean" of three, which is only the middle one — and decide then.
 - **FR-9 (P1)** Adversarial critique pass before beliefs are final. **(P2)** Persona red-teams ("Lloyd's underwriter", "OPEC desk") that propose *missing* propositions and links — hypothesis diversity, not outcome simulation.
 
 ### 6.3 Audit
@@ -144,7 +144,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 - **FR-27 (P1)** Strategy export: a declarative JSON document (schema in `spec/thesis/`) with legs, conditions, and the graph references that justify each — the shape a downstream trading agent could ingest.
 
 ### 6.8 Grounding
-- **FR-28 (P1)** Evidence retrieval at generation time (server-side web search); sources attach to links with direction and weight.
+- **FR-28 (P1)** Retrieval at generation time (server-side web search). **A search result becomes a `Source` on an arrow and nothing else** — an address that opens, the page's own title, and the day it was fetched; a source carries **no direction and no weight** (amended 2026-09-20: the old wording, "sources attach to links with direction and weight", named two different things at once). Direction and weight belong to an **`Evidence`** item on a *claim* — what the Inspector draws as bars for and against — and **generation writes none**, because both of those numbers would have to be invented; a generated claim's evidence list is empty and the panel says so. A base rate is kept only when it cites a page the search returned, on the same rule.
 - **FR-29 (P2)** Historical-analog panel: for a link, past instances and how prices moved around them, with an uncertainty band (an event study).
 - **FR-30 (P2)** Pastcast self-test: run a chain on a resolved 2024–25 event with a date-frozen corpus and show the Brier score (the standard accuracy score for probability forecasts; lower is better), including when it is bad.
 
@@ -176,13 +176,13 @@ The direction is D3. The research's "Instrument" craft rules (typography, color,
 
 ## 8. Non-functional requirements
 
-- **NFR-1 Honesty.** Beliefs render at two significant figures — the number and both ends of its range — with their interval (`.35 (.22–.50)`), never `.347`, and never as a certainty: what would round to `1.0` prints `>.99`, and what would round to `.0` prints `<.01`. Every number is one click from rationale, sources, base rate.
+- **NFR-1 Honesty.** Beliefs render at two significant figures — the number and both ends of its range — with their interval (`.35 (.22–.50)`), never `.347`, and never as a certainty: **a likelihood below `.01` prints `<.01`, and one above `.99` prints `>.99`** (amended 2026-09-20: that is where the guard begins, rather than wherever rounding happens to reach `.0` or `1.0`). **A move is not a likelihood**: the size of a change keeps two significant figures however small — `.36 · up by .0090` — because a move rounded away reads as no move at all, and the engine and the browser round by the same rule, pinned by a test that compares them. Every number is one click from rationale, sources, base rate.
 - **NFR-2 Determinism.** Propagation is pure and seeded; the same `(graph, branch, seed)` yields byte-identical worlds.
 - **NFR-3 Tests.** The core graph code is property-tested (the Hypothesis library generates thousands of random graphs and shrinks any failure to a minimal example) against the invariants in §9; the model boundary is tested with recorded API responses ("cassettes") committed to the repo; evals run out-of-band on the four assignment examples. CI is green with no API key (INV-13).
 - **NFR-4 Docker.** `docker compose up` yields a working app; `docker compose watch` gives hot reload for both halves; a production-ish compose builds slim images with healthchecks. No database service in v1.
 - **NFR-5 Legibility.** Every architectural decision is a numbered decision record; every feature with invariants has a spec; every PR names the invariant it satisfies; conventional commits with `spec:` and `adr:` types.
 - **NFR-6 Cost visibility.** Each generation records model, tokens, cache hits, and dollars; shown in the Inspector's transcript view.
-- **NFR-7 Performance.** 60 tiles render and re-layout in <100ms on a laptop; streaming first-paint within 1s of the first token.
+- **NFR-7 Performance.** 60 tiles render and re-layout in <100ms on a laptop; **streaming first paint within 1 s of the request being accepted — a reserved rectangle at its column; this pipeline returns whole proposals, not tokens** (amended 2026-09-20: the old wording read "within 1s of the first token", and there are no tokens to paint — a call comes back with a finished proposal, seconds later, so what must appear inside the second is the space the first claim will land in).
 - **NFR-8 Secrets.** One `.env.example`; keys read once via settings; a secret scanner (`gitleaks`) runs before every commit; recorded API responses are scrubbed of keys.
 
 ---
@@ -268,7 +268,6 @@ Status as of 2026-09-17; the numbers are pull requests on `kgang/katalyst`. A st
 Dated so this section visibly ages. An answered question moves to the list below rather than disappearing, so the change stays visible.
 
 - **2026-09-16** Strategy export schema (FR-27): mirror Polymarket negative-risk / Kalshi combo leg structure, or a simpler `legs[] + conditions[]`? Decide in the strategy-export chapter of `spec/thesis/`.
-- **2026-09-16** Ensemble size N for FR-8 — how many independent generations to reconcile into one map — and its cost per generation. Measure in stack 04.
 
 ### Answered
 
@@ -276,6 +275,7 @@ Dated so this section visibly ages. An answered question moves to the list below
 - **Asked 2026-09-16, answered 2026-09-17.** Does the GitHub native stacked-PR preview work on `kgang/katalyst`? **Yes**, and stacks 01 and 02 were merged that way; `git-spice` was not needed. The command-line tool `gh` refuses to merge a stacked pull request and points at an asynchronous merge route instead; that route, and the one trap in it, are written down under *More Information* in decision record 0009.
 - **Asked 2026-09-16, answered 2026-09-17.** Reflexive links (`market → world`, lag > 0): **schema in stack 02, propagation deferred to stack 06.** The schema is built, and the stored Hormuz example carries such a link with a delay on it.
 - **Asked 2026-09-17, answered 2026-09-17.** Replay mode (FR-13) — a reviewer with no model key walks the hero flow on the four example hypotheses, played from committed generation transcripts through the live event stream. Written down as decision record 0012 and accepted the same day; built in stack 04.
+- **Asked 2026-09-16, answered 2026-09-17 — and the question changed.** Ensemble size N for FR-8 — how many independent generations to reconcile into one map, and the cost of each — has no answer, because no map is reconciled against another and no generation is run twice. Decision record 0015 ships the range the model stated, labelled as stated, and refuses whole-map reconciliation outright: `spec/multiverse/diff.md` anti-pattern 4, *do not infer a difference by matching two maps*, is the warrant. What remains open is a different question, and it is asked of a measurement rather than of a number: **would re-asking a claim widen its range toward the truth?** FR-30's pastcast, read against the evaluation scorecard built in stack 04, is the test, and it is the one thing that reopens this. FR-8 is amended to match.
 
 ---
 

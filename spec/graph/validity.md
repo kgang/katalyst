@@ -92,7 +92,7 @@ class Violation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     code: ViolationCode = Field(
-        description="Which rule was broken. One of eighteen stable strings."
+        description="Which rule was broken. One of nineteen stable strings."
     )
     subject: str = Field(
         description=(
@@ -214,7 +214,7 @@ The reason is the product's first principle. A silently dropped arrow is a map t
 
 Repair is also a lie about provenance. The whole point of `provenance` is that it records what actually happened during generation ([`link.md`](link.md)). A repaired map's provenance describes a pipeline that eventually stopped violating things — which is not a source.
 
-What the model-facing pipeline is allowed to do about a rejection is a different question, and not this chapter's: `engine/` may issue **one** targeted re-prompt that names the violations and asks for a corrected proposal, bounded and logged; a second failure surfaces as a proper error state, not a spinner (decision record 0003, rule 2). That loop, its bounds, and what the user sees while it runs belong to [`../generation/`](../generation/) and are written in stack 04. `domain/` knows nothing about it. `validate` returns a list and has no opinion about what anyone does next.
+What the model-facing pipeline is allowed to do about a rejection is a different question, and not this chapter's: `engine/` asks again for the same claim — up to three fresh proposals, and no call is ever told why the last was refused, so a prompt can never steer the model toward passing the validator rather than being right; three refusals in a row close that claim, and every refusal is shown with the validator's own sentence (decision record 0003, rule 2, as amended 2026-09-17). That loop, its bounds, and what the user sees while it runs belong to [`../generation/`](../generation/) and are written in stack 04. `domain/` knows nothing about it. `validate` returns a list and has no opinion about what anyone does next.
 
 ### Identifiers
 
