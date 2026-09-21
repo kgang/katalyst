@@ -267,13 +267,15 @@ export interface paths {
          * Generate
          * @description Build a map from one sentence, and write it out as it is built.
          *
-         *     With a key this calls a model; with none it plays a committed recording back
-         *     through the same events. Either way the answer is one long response the
-         *     browser reads as it arrives.
+         *     **The request says how the run starts.** Asked for a live run this calls a
+         *     model, or refuses in one sentence when there is no key; asked for a recording
+         *     it plays the committed one back through the same events, whether or not a key
+         *     is configured. Either way the answer is one long response the browser reads as
+         *     it arrives.
          *
          *     Args:
          *         request: The request itself, so the run can stop when the client goes.
-         *         asked: The sentence, and everything optional beside it.
+         *         asked: The sentence, how the run starts, and everything optional beside it.
          *         settings: The program's settings, which say whether a key is configured.
          *
          *     Returns:
@@ -1050,6 +1052,13 @@ export interface components {
              * @default 8
              */
             worlds: number;
+            /**
+             * Start
+             * @description How this run starts. `replay` plays the committed recording of this sentence back, through the same events and the same canvas, spending nothing and reading no key. `live` calls a model. **The server does what it was asked, or says plainly why it cannot, and never substitutes one for the other**: a recording asked for plays even with a key configured, and a live run asked for with no key is refused in one sentence rather than quietly replaced by a recording. **It defaults to `replay` because a request that did not ask to spend money must never spend it** — the recorded Strait of Hormuz run's own receipt reads 29 model calls, about thirty-six minutes and $4.04, which is what the other reading of a silent request could cost. That default is not the server choosing on anybody's behalf: it is a property of this shape, published in this description and identical on every copy of the program, and it reads no key, no environment and no folder. A third value is reserved for a finished generation served back by its identifier, which belongs here rather than on a route of its own.
+             * @default replay
+             * @enum {string}
+             */
+            start: "replay" | "live";
         };
         /**
          * Graph
@@ -1352,7 +1361,7 @@ export interface components {
             model_key_present: boolean;
             /**
              * Replayable
-             * @description The examples this copy can play back from a committed recording, and the day each one was made. The first screen reads it before anything runs, which is the only way it can name a date at all: the day a recording was made travels on the receipt, and the receipt arrives last.
+             * @description The examples this copy can play back from a committed recording, the day each one was made, and what making it cost — the recorded run's own calls, seconds and dollars, read off the file's own receipt. The first screen reads it before anything runs, which is the only way it can name a date or a price at all: both travel on the receipt, and the receipt arrives last.
              * @default []
              */
             replayable: components["schemas"]["RecordingSummary"][];
@@ -1365,7 +1374,16 @@ export interface components {
         };
         /**
          * RecordingSummary
-         * @description One recording the first screen can offer, and when it was made.
+         * @description One recording the first screen can offer, when it was made, and what making it cost.
+         *
+         *     The three figures are the **recorded run's own**, read off the receipt line
+         *     inside the file and never worked out here. They are the only measured price
+         *     and the only measured duration this product owns, so they are what the first
+         *     screen prints beside a live run before anybody presses it — with the day they
+         *     were measured, which is `recording_date`.
+         *
+         *     They are absent together when the file holds no receipt this engine can read,
+         *     and the screen then prints no figure at all rather than a guess.
          */
         RecordingSummary: {
             /**
@@ -1379,6 +1397,21 @@ export interface components {
              * @description The day `make record-demo` wrote it.
              */
             recording_date: string;
+            /**
+             * Calls
+             * @description How many times the recorded run called a model. Absent when the file holds no receipt this engine can read.
+             */
+            calls?: number | null;
+            /**
+             * Seconds
+             * @description How long the recorded run took, wall clock, in seconds — the receipt's own field and its own unit, so nothing converts it on the way here. Absent when the file holds no readable receipt.
+             */
+            seconds?: number | null;
+            /**
+             * Dollars
+             * @description What the recorded run cost, in United States dollars — the receipt's own field and its own unit. Absent when the file holds no readable receipt.
+             */
+            dollars?: number | null;
         };
         /**
          * Refine

@@ -138,12 +138,45 @@ class RecordingHeader(BaseModel):
 
 
 class RecordingSummary(BaseModel):
-    """One recording the first screen can offer, and when it was made."""
+    """One recording the first screen can offer, when it was made, and what making it cost.
+
+    The three figures are the **recorded run's own**, read off the receipt line
+    inside the file and never worked out here. They are the only measured price
+    and the only measured duration this product owns, so they are what the first
+    screen prints beside a live run before anybody presses it — with the day they
+    were measured, which is `recording_date`.
+
+    They are absent together when the file holds no receipt this engine can read,
+    and the screen then prints no figure at all rather than a guess.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     example: str = Field(description="The short name of the example, matching its file name.")
     recording_date: date = Field(description="The day `make record-demo` wrote it.")
+    calls: int | None = Field(
+        default=None,
+        description=(
+            "How many times the recorded run called a model. Absent when the file "
+            "holds no receipt this engine can read."
+        ),
+    )
+    seconds: float | None = Field(
+        default=None,
+        description=(
+            "How long the recorded run took, wall clock, in seconds — the "
+            "receipt's own field and its own unit, so nothing converts it on the "
+            "way here. Absent when the file holds no readable receipt."
+        ),
+    )
+    dollars: float | None = Field(
+        default=None,
+        description=(
+            "What the recorded run cost, in United States dollars — the receipt's "
+            "own field and its own unit. Absent when the file holds no readable "
+            "receipt."
+        ),
+    )
 
 
 class Recording(BaseModel):
@@ -334,13 +367,71 @@ def every_recording(folder: Path | None = None) -> tuple[Recording, ...]:
     return tuple(found)
 
 
+def summary_of(recording: Recording) -> RecordingSummary:
+    """Describe one recording the way the first screen needs it described.
+
+    **One builder, used by everything that lists recordings**, because two of
+    them would be two answers to "what does this example cost to run", and the
+    difference would show up as a number on somebody's first screen.
+
+    Args:
+        recording: A recording that read.
+
+    Returns:
+        Its name, the day it was made, and what making it cost.
+    """
+    calls, seconds, dollars = _what_the_recorded_run_cost(recording)
+    return RecordingSummary(
+        example=recording.example,
+        recording_date=recording.header.recording_date,
+        calls=calls,
+        seconds=seconds,
+        dollars=dollars,
+    )
+
+
+def _what_the_recorded_run_cost(
+    recording: Recording,
+) -> tuple[int | None, float | None, float | None]:
+    """Read the recorded run's own receipt: how many calls, how long, how much.
+
+    **Read off the file, never worked out here.** These are the figures of the
+    paid run this recording was made from, in the receipt's own fields and the
+    receipt's own units, so a screen printing them is quoting a measurement
+    rather than repeating a number somebody typed.
+
+    The receipt is the one event `why_it_cannot_be_played` deliberately does not
+    check, because a replay rebuilds it rather than emitting it — so a file that
+    plays perfectly well can still carry a receipt this engine cannot read. That
+    is an absence, not a fault: the three come back empty together and the screen
+    says it was not told.
+
+    Args:
+        recording: The recording to read.
+
+    Returns:
+        The calls, the seconds and the dollars, or three absences.
+    """
+    for name, payload in reversed(recording.lines):
+        if name != events.NAMES[Receipt]:
+            continue
+        try:
+            said = Receipt.model_validate(payload)
+        except ValidationError:
+            return None, None, None
+        return said.calls, said.seconds, said.dollars
+    return None, None, None
+
+
 def summaries(folder: Path | None = None) -> tuple[RecordingSummary, ...]:
     """List what this copy of the program can play back, and when each was made.
 
     Read by the first screen before anything runs, which is how the sentence
     record 0012 requires — *"No model key configured — these run from recordings
     made on <date>"* — can name a date at all: the date lives on the receipt, and
-    the receipt arrives last.
+    the receipt arrives last. The same reason carries the three figures beside it:
+    what a live run of this example costs and how long it takes has to be on
+    screen **before** the press, and a receipt arrives long after.
 
     Args:
         folder: Where the recordings live. The committed folder when not said.
@@ -349,10 +440,7 @@ def summaries(folder: Path | None = None) -> tuple[RecordingSummary, ...]:
         One summary per recording, by file name.
     """
     good, _ = readable(folder)
-    return tuple(
-        RecordingSummary(example=one.example, recording_date=one.header.recording_date)
-        for one in good
-    )
+    return tuple(summary_of(one) for one in good)
 
 
 def find(hypothesis: str, folder: Path | None = None) -> Recording | None:

@@ -338,9 +338,19 @@ export function App({
    * from an effect: an effect runs twice in development by design, and this is
    * the one request in the product where running twice means paying twice.
    */
-  const build = useCallback((asked: Asked) => {
-    setScreen({ at: "growing", run: askForAMap(asked) });
-  }, []);
+  // **The press says how the run starts; the route no longer reads the key to
+  // decide** (record 0012, amended 2026-09-21). This is the expression the route
+  // used to work out for itself, said here instead, so what happens with a key
+  // and without one is exactly what happened before. The first screen replaces it
+  // with what the reader chose, which is the whole point of moving it.
+  const hasKey = readiness.state === "answered" && readiness.value.model_key_present;
+  const build = useCallback(
+    (asked: Asked) => {
+      const run = askForAMap({ ...asked, start: hasKey ? "live" : "replay" });
+      setScreen({ at: "growing", run });
+    },
+    [hasKey],
+  );
 
   /**
    * Leave a generation: let go of it first, then go back.

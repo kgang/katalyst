@@ -47,6 +47,17 @@ export interface Asked {
    * know*. Nothing at all is not a half.
    */
   readonly belief: Ranged | null;
+  /**
+   * How the run starts: `live` calls a model, `replay` plays the committed
+   * recording of this sentence back. Absent leaves it to the route's own default,
+   * which is a recording.
+   *
+   * Not something this bar draws. It is set by whoever assembles the press,
+   * because **the server no longer reads the key to choose** (record 0012,
+   * amended 2026-09-21) — and when the first screen offers the choice, this is
+   * the field the reader's press fills in.
+   */
+  readonly start?: "replay" | "live";
 }
 
 /** What the bar needs to draw itself. */

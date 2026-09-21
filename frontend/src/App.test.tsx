@@ -9,7 +9,7 @@
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { aClaim, aWire, aWorld } from "./test/aMap";
 import type { FixtureBundle, WorldSource, WorldView } from "./world";
 
@@ -456,5 +456,80 @@ describe("the strip at the foot of the launchpad", () => {
       "Build 0.1.0, reported by Katalyst.",
     );
     expect(document.querySelector(".status-value")?.textContent).toBe("absent");
+  });
+});
+
+describe("how a run is asked for", () => {
+  /**
+   * Catch every request body the browser posts, and answer with a stream that
+   * ends at once.
+   *
+   * The run itself is not the subject here — what is said when the press goes
+   * out is. Nothing reaches a network: the global fetch is replaced, and it is
+   * put back after every case.
+   */
+  function catchingWhatIsAsked(): string[] {
+    const bodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_address: string, options?: RequestInit) => {
+        bodies.push(String(options?.body ?? ""));
+        return Promise.resolve(
+          new Response(
+            'event: done\ndata: {"reason":"reached_terminal","claims":0,"links":0,"rejected":0}\n\n',
+            { status: 200, headers: { "content-type": "text/event-stream" } },
+          ),
+        );
+      }),
+    );
+    return bodies;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("test_the_press_says_how_the_run_starts_rather_than_leaving_it_to_the_key", async () => {
+    // **The route used to read the key and decide; now the caller says.** This
+    // is the same decision, said out loud by the side that knows what the reader
+    // pressed — so with a key and without one the browser behaves exactly as it
+    // did, and the first screen can later replace the expression with a choice.
+    serverAnswersNormally();
+    vi.mocked(readReadiness).mockResolvedValue({
+      status: "ready",
+      model_key_present: true,
+      replayable: [],
+      unreadable: [],
+    });
+    const bodies = catchingWhatIsAsked();
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Strait of Hormuz is going to open/ }),
+    );
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((JSON.parse(bodies[0] ?? "{}") as Record<string, unknown>).start).toBe("live");
+  });
+
+  it("test_a_copy_with_no_key_asks_for_the_recording_by_name", async () => {
+    // The keyless path is unchanged in what it gets and changed in how it says
+    // so: the recording is now asked for rather than fallen into.
+    serverAnswersNormally();
+    vi.mocked(readReadiness).mockResolvedValue({
+      status: "ready",
+      model_key_present: false,
+      replayable: [{ example: "hormuz", recording_date: "2026-09-21" }],
+      unreadable: [],
+    });
+    const bodies = catchingWhatIsAsked();
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Strait of Hormuz is going to open/ }),
+    );
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((JSON.parse(bodies[0] ?? "{}") as Record<string, unknown>).start).toBe("replay");
   });
 });
