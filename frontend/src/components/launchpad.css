@@ -1,20 +1,22 @@
 /*
- * The first screen.
+ * The first screen: four ways to start, each a numbered section with a list of
+ * rows under it.
  *
- * Two lists, both of them plain lists of text with a hairline between the rows.
- * No card shadows, no rounded blue buttons, no illustration — the words are the
- * interface, and the only thing that separates one row from the next is a line
- * at a tenth of the text colour.
+ * Plain lists of text with a hairline between the rows. No card shadows, no
+ * rounded blue buttons, no illustration — the words are the interface, and the
+ * only thing that separates one row from the next is a line at a tenth of the
+ * text colour. The four numbers down the left are the whole of the ordering;
+ * nothing is coloured to mean *pick this one*.
  */
 
 /*
  * **The first screen is wider than the column the page centres.**
  *
  * That column is 660 pixels, which was right when this screen was a list of
- * examples and a status strip. It now also holds the four sentences from the
- * brief and the field you type your own into, and stacking all of that in one
- * narrow column pushes the field — the point of the whole screen — below the
- * fold on the window this interface is designed against.
+ * examples and a status strip. It now holds four ways to start, one of them a
+ * form, and stacking all of that in one narrow column pushes the form — the
+ * point of the whole screen — below the fold on the window this interface is
+ * designed against.
  *
  * So the launchpad takes its own width and centres itself inside the column it
  * sits in, which is itself centred on the page. The masthead above it and the
@@ -25,94 +27,138 @@
   max-width: min(1180px, calc(100vw - 2 * var(--space-6)));
 }
 
+/*
+ * **Ways 1, 2 and 3 run down the left; way 4 takes the right.**
+ *
+ * The four are read in order whichever shape the window is: on a wide window the
+ * three free-standing ways stack on the left and the form stands beside them,
+ * and on a narrow one the whole thing becomes one column in the order it is
+ * written. Nothing re-orders, because an order that changes with the window is
+ * an order a reader cannot be told about.
+ */
 .launchpad {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  /* Two rows on the left, each as tall as what is in it, and a third that takes
-   * whatever is left — so the left column reads top to bottom with no pool of
-   * air in the middle of it while the right column is the tall one. */
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto auto;
   align-content: start;
   column-gap: var(--space-5);
-  row-gap: var(--space-5);
+  row-gap: var(--space-3);
 }
 
-/* The two doors, the map that is already drawn and the field you type your own
- * event into stack down the left; the four sentences from the brief take the
- * right. */
-.launchpad__doors {
-  grid-column: 1;
+.launchpad__ways {
+  grid-column: 1 / -1;
   grid-row: 1;
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--text-md);
+  color: var(--text-muted);
+  text-wrap: pretty;
 }
 
-.launchpad__drawn {
+.launchpad__ways strong {
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.way--open {
   grid-column: 1;
   grid-row: 2;
 }
 
-.launchpad__yours {
+.way--recording {
   grid-column: 1;
   grid-row: 3;
 }
 
-.launchpad__build {
-  grid-column: 2;
-  grid-row: 1 / -1;
+.way--live {
+  grid-column: 1;
+  grid-row: 4;
 }
 
-/* On a narrow window there is one column and everything stacks, in the order it
- * is written. */
+.way--yours {
+  grid-column: 2;
+  grid-row: 2 / -1;
+}
+
 @media (width < 1100px) {
   .launchpad {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .launchpad__doors,
-  .launchpad__drawn,
-  .launchpad__yours,
-  .launchpad__build {
+  .launchpad__ways,
+  .way {
     grid-column: 1;
     grid-row: auto;
   }
 }
 
-/* ---- The two doors ------------------------------------------------------ */
+/* ---- One way to start ---------------------------------------------------- */
 
-.doors {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-  background: var(--surface-raised);
-}
-
-.door {
+/* Each way is a heading, then whatever it offers, then the reason it cannot be
+ * taken where there is one. Its rows sit at the top rather than stretching to
+ * fill the column: a list of one row with a hundred pixels of air inside it
+ * reads as a mistake. */
+.way {
   display: grid;
-  grid-template-columns: 7rem minmax(0, 1fr);
-  gap: var(--space-2);
+  align-content: start;
+  row-gap: var(--space-1);
+}
+
+/* The number, the name and the price, on one line. The number is the ordering
+ * and nothing else — it is hidden from a screen reader, which hears the four
+ * headings in the order they are written. */
+.way__head {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  gap: var(--space-1);
   align-items: baseline;
-  padding: var(--space-1) var(--space-2);
+  margin: 0;
 }
 
-.door + .door {
-  border-top: 1px solid var(--hairline);
+.way__number {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
 }
 
-.door__name {
+.way__name {
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
   color: var(--text);
 }
 
-.door__line {
+.way__cost {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* What the recorded run cost, above the rows it is about. The figure line is in
+ * the ordinary text colour because it is a measurement a reader is meant to act
+ * on; the note under it is quieter because it is about the measurement. */
+.way__measure {
+  display: grid;
+  row-gap: var(--space-hair);
+}
+
+.way__measure-line {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.way__measure-note {
+  margin: 0;
   font-size: var(--text-sm);
   color: var(--text-muted);
   text-wrap: pretty;
 }
 
-/* ---- The examples -------------------------------------------------------- */
+/* ---- The rows ------------------------------------------------------------ */
 
 .examples {
   margin: 0;
@@ -136,15 +182,24 @@
   color: var(--text);
 }
 
-/* The one card that opens something. It is a row of text that answers to a
+/* A row that opens or starts something. It is a row of text that answers to a
  * click, not a button with a fill: the fill would be the loudest thing on a
- * quiet screen, and what it opens is the point, not the pressing of it. */
-.example--live {
+ * quiet screen, and what it starts is the point, not the pressing of it. */
+button.example {
   cursor: pointer;
 }
 
-.example--live:hover {
+button.example:hover:enabled {
   background: var(--surface);
+}
+
+/* **A row that is drawn and cannot be pressed.** It stays a row of the same
+ * shape in the same place, so the four ways read the same however this copy is
+ * configured — the words go quiet and the reason is printed under the list. The
+ * two colour rules that go with it are written at the foot of this section,
+ * after the rules they override, so the cascade reads top to bottom. */
+button.example:disabled {
+  cursor: default;
 }
 
 .example__claim {
@@ -155,10 +210,10 @@
 }
 
 /* A row that is not a control: nothing is known about it yet, because the
- * server has not answered or because the ask did not come back. It reads
- * quieter than a card that opens something — and the reading, not the quiet, is
- * what says so: it carries no action line and so no arrow after it, which is
- * the mark every row that opens something has and this one cannot. */
+ * server has not answered. It reads quieter than a row that opens something —
+ * and the reading, not the quiet, is what says so: it carries no action line
+ * and so no arrow after it, which is the mark every row that starts something
+ * has and this one cannot. */
 .example--waiting .example__claim {
   color: var(--text-muted);
 }
@@ -169,31 +224,53 @@
   text-wrap: pretty;
 }
 
-/* The line that says what happens if you take this row up on its offer. */
-.example__action {
+/* The foot of a row: what happens if you take it up, and any mark that belongs
+ * beside that. It wraps rather than squeezing, because a date pushed off the
+ * end of a row is a date nobody read. */
+.example__foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-1);
   margin-top: var(--space-hair);
+}
+
+.example__action {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
   font-size: var(--text-sm);
   color: var(--accent);
 }
 
-.example--live .example__action::after {
+button.example .example__action::after {
   content: "→";
   font-family: var(--font-mono);
 }
 
-/* A card that is going to play a recording rather than call a model says so on
- * its own face, in a word with a hairline round it, beside the day it was
- * made. */
+/* The words of a row that cannot be pressed, quiet. Written here rather than
+ * beside `button.example:disabled` above so that it comes after the two rules
+ * it overrides. */
+button.example:disabled .example__claim,
+button.example:disabled .example__action {
+  color: var(--text-muted);
+}
+
+/* A row that plays a recording rather than calling a model says so on its own
+ * face, in a word with a hairline round it, beside the day it was made. */
 .example__badge {
   padding: 0 var(--space-hair);
   border: 1px solid var(--hairline);
   border-radius: 2px;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  color: var(--text);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.example__aside {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -204,39 +281,23 @@
   border-top: 1px solid var(--hairline);
 }
 
-/* The one sentence a copy with no model key says about itself, under the four
- * cards and again under the field. It sits in the ordinary text colour rather
- * than in a warning hue: it is a fact about this copy, not a problem with it. */
-.launchpad__keyless {
-  margin: var(--space-1) 0 0;
+/* ---- Why a way cannot be taken ------------------------------------------- *
+ * Beside the way it disables, never in a banner over the screen: a reader
+ * looking at a control they cannot press is owed the reason there rather than
+ * somewhere above. It sits in the ordinary text colour rather than a warning
+ * hue — it is a fact about this copy, not a problem with it. */
+
+.launchpad__why {
+  margin: 0;
   font-size: var(--text-sm);
   color: var(--text);
   text-wrap: pretty;
 }
 
-.example[data-state="replay"] .example__badge {
-  color: var(--text-muted);
-}
-
-.example--live[data-state] .example__action {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-}
-
-/* The section that builds a map holds a form as well as a list, so it needs a
- * gap between the two that a bare section does not. Its rows sit at the top of
- * the column rather than stretching to fill it: a list of two doors with a
- * hundred pixels of air inside it reads as a mistake. */
-.launchpad > section {
-  display: grid;
-  align-content: start;
-  row-gap: var(--space-2);
-}
-
-/* A second sentence under the cards, where there is one: today, the server's own
- * words about a recording it could not read. Quieter than the first, because the
- * first is about what this copy can do and this one is about one file in it. */
-.launchpad__keyless--quiet {
+/* A second sentence under a list, where there is one: which sentences have
+ * nothing recorded, and the server's own words about a recording it could not
+ * read. Quieter than the first, because the first is about what this copy can
+ * do and this one is about one file in it. */
+.launchpad__why--quiet {
   color: var(--text-muted);
 }
