@@ -386,4 +386,34 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
   await expect(
     page.getByText("this claim moved only because the observation made some versions count more."),
   ).toBeVisible();
+
+  await test.step("test_the_tile_says_why_the_engine_reports_no_change", async () => {
+    // The strait's own tile, on the same branch. The engine names one cause of
+    // an unmoved number and only one — the observation changing how much each
+    // version counts — and where it names it, the tile says it.
+    const strait = page.locator(
+      '.react-flow__node[data-id="H"] .tile__badge[data-badge="movement"]',
+    );
+    await expect(strait.locator(".tile__badge-words")).toHaveText("no change");
+    await expect(strait).toHaveAttribute(
+      "title",
+      /inside every version of the map its number held still/,
+    );
+
+    // And the talks, which plainly did move and still came out unchanged
+    // because the versions of the map did not agree on which way. **This is the
+    // case the sentence was wrong about.** The tile used to tell this reader
+    // that the number "did not move by enough to report" while the engine's own
+    // two readings, a click away, were two points apart.
+    const talks = page.locator(
+      '.react-flow__node[data-id="N1"] .tile__badge[data-badge="movement"]',
+    );
+    await expect(talks.locator(".tile__badge-words")).toHaveText("no change");
+    const why = (await talks.getAttribute("title")) ?? "";
+    expect(why).toMatch(/reports no change on this claim: it read \.\d+ then \.\d+/);
+    expect(why).toMatch(/of the versions of the map moved the same way/);
+    // It names no half of the engine's test, because the engine names none.
+    expect(why).not.toMatch(/did not move by enough/);
+    expect(why).toContain("Which of the two it was is the engine's to say, and it does not say.");
+  });
 });
