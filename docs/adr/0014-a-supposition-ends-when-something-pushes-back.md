@@ -14,7 +14,7 @@ spec-impact: spec/graph/belief.md (what the range means; open questions 3 and 4)
 
 > **Amended in place on 2026-09-17** — see *Amendment (2026-09-17) — the direction is read with the number's own weights*, at the end. It says how the versions are counted while section D decides that something moved. Nothing in the decision changed, and no measurement below was rewritten.
 >
-> **Second amendment proposed 2026-09-21, and this one reverses something** — see *Second amendment (2026-09-21) — decision A is reversed, and the band's machinery changes while its meaning does not*, at the end. **Decision A below — how a supposition ends — is reversed by proposed record 0017**, and section B's machinery is replaced by proposed record 0016. Both take effect **only when those records are accepted**; until then everything below is live. What `lo` and `hi` mean does not change. No measurement below was rewritten.
+> **Second amendment 2026-09-21, and this one reverses something** — see *Second amendment (2026-09-21) — decision A is reversed, and the band's machinery changes while its meaning does not*, at the end. **Decision A below — how a supposition ends — is reversed by record 0017**, and section B's machinery is replaced by record 0016. Both are **in force from 2026-09-21**, when Kent accepted those records. What `lo` and `hi` mean does not change. No measurement below was rewritten.
 
 ## Context and Problem Statement
 
@@ -271,11 +271,11 @@ A version with no surviving world reports nothing to the number and nothing to t
 
 ## Second amendment (2026-09-21) — decision A is reversed, and the band's machinery changes while its meaning does not
 
-**Proposed, not in force.** It takes effect **when proposed records 0016 and 0017 are accepted**, and not before. It is the first amendment to this record that **reverses** part of it, so it is written here rather than as a quiet edit: a reader who knew decision A must be told it is gone and why.
+**In force from 2026-09-21**, when Kent accepted records 0016 and 0017 (decisions note, row R32). It is the first amendment to this record that **reverses** part of it, so it is written here rather than as a quiet edit: a reader who knew decision A must be told it is gone and why.
 
 **Nothing measured for this record was rewritten.** The figures in sections B and C were taken on the engine of 2026-09-17 and stand as taken. Every one of them moves when the new engine's default is flipped, and the diff of one generated numbers file is what states the new ones.
 
-### Decision A is reversed by proposed record 0017
+### Decision A is reversed by record 0017
 
 Gone: the rule that a supposition *"stops holding on the day the cause of the first live arrow pushing against it becomes true"*; the three-state table of **supposed · withdrawn · pushed** and the sentences that go with it; the `Retracted · date · by "…"` badge; the `withdrawn` and `pushed` day-states; and the two confirmation tests `test_retraction_dates_from_the_cause_not_the_push` and the Hormuz golden series that pins the retraction date.
 
@@ -283,7 +283,7 @@ Gone: the rule that a supposition *"stops holding on the day the cause of the fi
 
 **What stands.** *"While a `do` holds, the claim is true in every simulated world — a hard fact, not a strong push"*, and *"the tile shows the words **Supposed · date**, never a number"*. Both are unchanged. What record 0017 changes is that **nothing ends a supposition but another edit**: the strike no longer un-happens the opening, and what falls instead is a **state** — *the strait stays open to commercial transit through 1 November* — which is the claim everything downstream was resting on.
 
-### Section B's machinery is replaced by proposed record 0016; its meaning is not
+### Section B's machinery is replaced by record 0016; its meaning is not
 
 **What `lo` and `hi` mean does not change**, and that is the whole point of this record: they stay the 10th and 90th percentiles of the likelihood itself, a wide range still never means the event is more volatile, and a stated `{p, lo, hi}` still defines a bell curve on the log-odds scale with its two halves fitted separately. The **two kinds of not-knowing kept apart** is the decision, and it survives intact.
 

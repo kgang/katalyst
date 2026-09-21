@@ -1,6 +1,6 @@
 ---
 # ADR-0021: What version one does not build
-status: proposed
+status: accepted
 date: 2026-09-21
 decision-makers: Kent Gang
 consulted:
@@ -14,7 +14,7 @@ spec-impact: PRODUCT_REQUIREMENTS.md FR-8, FR-17, FR-18, FR-20, FR-24, FR-29, FR
 
 # ADR-0021: What version one does not build
 
-> **The number is 0021 on purpose.** 0018, 0019 and 0020 are reserved for stack 06 — like with like, a stop is a price the reader owns, and quotes recorded first. **Only 0019 is Kent's**, decided on 2026-09-21; 0018 and 0020 come from the coordinator's plan and are written when that stack opens.
+> **The number is 0021 on purpose.** 0018, 0019 and 0020 belong to stack 06 — like with like, a stop is a price the reader owns, and quotes recorded first. They were written the same day and accepted with this record on 2026-09-21, and they land with that stack's own documents.
 
 > **In short.** One record accounts for everything in the requirements that version one does not build, because the finishing checklist wants an accepted record behind every cut. **Not built:** three or more branches side by side (FR-17), splitting a claim into finer ones (FR-18), probes (FR-20), three quantities inside FR-24 — the average loss in the worst 5% of runs, the largest peak-to-trough loss and the chance of being wiped out — the historical-analog panel (FR-29) and the pastcast self-test (FR-30). **INV-10** is met by a refusal the product already returns in its own sentence. **FR-31 is shrunk, not cut** (Kent, R12): a finished generation is served back by its id from the same line-by-line file a recording is — one format, one loader, **no database in version one at all**.
 >
@@ -22,13 +22,13 @@ spec-impact: PRODUCT_REQUIREMENTS.md FR-8, FR-17, FR-18, FR-20, FR-24, FR-29, FR
 >
 > **What it costs.** Nothing here is started. Cutting FR-30 removes the one condition that could have reopened an ensemble, so none is built in version one.
 >
-> **Open for Kent.** Nothing. **FR-17 and FR-29** reached this page with no earlier decision behind them, and Kent has now cut both himself (R31); each goes on the *what I would do next* page.
+> **Also decided.** **FR-17 and FR-29** reached this page with no earlier decision behind them; Kent cut both himself (R31), and each goes on the *what I would do next* page.
 
 ## Context and Problem Statement
 
 This project's finishing checklist requires **every decision, including every requirement cut, to have an accepted record.** Six functional requirements and one invariant are cut, and one requirement shrunk, and until this record exists all seven are cut nowhere and built nowhere. A reader comparing `PRODUCT_REQUIREMENTS.md` against what ships would find them simply missing — the same shape of dishonesty as a number nobody computed.
 
-**Who decided what, exactly.** **Kent decided three of these himself** (2026-09-21): FR-31's shrink (R12), and the cuts of **FR-17** and **FR-29** (R31) — the two that reached this page with no prior decision behind them at all, and which now go on the *what I would do next* page. **Everything else on this page is the coordinator's call, written `proposed` here and accepted only when Kent accepts this record**; the reasons below for those are the coordinator's, offered as proposals.
+**Who decided what, exactly.** **Kent decided three of these himself** (2026-09-21): FR-31's shrink (R12), and the cuts of **FR-17** and **FR-29** (R31) — the two that reached this page with no prior decision behind them at all, and which now go on the *what I would do next* page. **Everything else on this page was the coordinator's call, and Kent accepted it with this record on 2026-09-21**; the reasons below for those are the coordinator's.
 
 This record is short on purpose: one entry each, the requirement in its own words and one sentence of reason.
 
@@ -95,7 +95,7 @@ A kept run already writes that file and the replay path already reads it. Anti-p
 
 ### Cut nowhere, and belonging elsewhere
 
-So this record cannot be read as the complete list of everything absent. **The path product** (FR-11, INV-8) is replaced, not cut, by proposed record 0022. **The derived stop-loss** (INV-14, FR-22, FR-23 and the rest of FR-24) is reshaped by proposed record 0019 in stack 06. **The other three example inputs** (FR-3) are not cut: all four are recorded once at stack 05's shape freeze. **Kalshi**, the third venue named in FR-26, is **scheduled nowhere and cut nowhere** — it belongs to no record yet, and this one does not claim it.
+So this record cannot be read as the complete list of everything absent. **The path product** (FR-11, INV-8) is replaced, not cut, by record 0022. **The derived stop-loss** (INV-14, FR-22, FR-23 and the rest of FR-24) is reshaped by record 0019 in stack 06. **The other three example inputs** (FR-3) are not cut: all four are recorded once at stack 05's shape freeze. **Kalshi**, the third venue named in FR-26, is **scheduled nowhere and cut nowhere** — it belongs to no record yet, and this one does not claim it.
 
 ### Consequences
 
@@ -114,10 +114,11 @@ So this record cannot be read as the complete list of everything absent. **The p
 
 ## Open for Kent
 
-**Nothing.** The one item this record carried — **FR-17 and FR-29**, cut on this page for the first time with no earlier decision behind them — is decided: Kent cut both (**R31**), and both go on the *what I would do next* page. Every other cut here is still the coordinator's proposal and is accepted only when Kent accepts this record.
+**Nothing.** The one item this record carried — **FR-17 and FR-29**, cut on this page for the first time with no earlier decision behind them — is decided: Kent cut both (**R31**), and both go on the *what I would do next* page. Every other cut here was the coordinator's proposal, accepted with this record on 2026-09-21.
 
 ## More Information
 
+* **Accepted by Kent on 2026-09-21**, decisions note row **R32**, in his words: *“All these ADRs written are accepted!”*
 * **Kent's decisions, 2026-09-21**, in the dated decisions note kept locally under `plans/notes/`: **R12** — shrink FR-31 to the file we already write, a finished generation served back by its id from the same line-by-line file a recording is, one format, one loader, no database; and **R31** — cut **FR-17** and **FR-29** for version one, both onto the *what I would do next* page. *(The decisions note's words for his choices, not a transcript of his own.)*
 * **What prompted this record**: the adversarial pass of 2026-09-21, finding S6 — six functional requirements cut with no record at all, against a checklist requiring one for every decision.
-* **Related.** ADR-0015 (no ensemble; this record removes the one condition that would have reopened it) · ADR-0013 · ADR-0010 (why the analog panel has nothing to read) · ADR-0012 (the file FR-31 now uses) · proposed ADR-0016, 0017 and 0022 (which replace rather than cut) · 0018–0020, reserved for stack 06.
+* **Related.** ADR-0015 (no ensemble; this record removes the one condition that would have reopened it) · ADR-0013 · ADR-0010 (why the analog panel has nothing to read) · ADR-0012 (the file FR-31 now uses) · ADR-0016, 0017 and 0022 (which replace rather than cut) · ADR-0018, 0019 and 0020 (stack 06; 0019 owns what is kept of FR-24).

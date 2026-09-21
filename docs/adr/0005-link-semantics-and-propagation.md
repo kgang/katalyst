@@ -12,7 +12,7 @@ spec-impact: spec/graph/ (Link fields, INV-7), spec/multiverse/ (propagation, re
 
 # ADR-0005: Links carry trigger/sustain mode, log-odds strength, lag and shape; beliefs propagate by seeded forward Monte Carlo
 
-> **Amendment proposed 2026-09-21** — see *Amendment (2026-09-21) — the arrows bend a rate, and the `mode` table waits on events and states*, at the end. It names the sentences that proposed records 0016 and 0017 change, and **takes effect only when those records are accepted**. Until then everything below is live. Nothing that was measured for this record was rewritten.
+> **Amended 2026-09-21** — see *Amendment (2026-09-21) — the arrows bend a rate, and the `mode` table waits on events and states*, at the end. It names the sentences that records 0016 and 0017 change, and **is in force from 2026-09-21**, when Kent accepted both. Nothing that was measured for this record was rewritten.
 
 ## Context and Problem Statement
 
@@ -122,13 +122,13 @@ Rendering: two significant figures and the interval, always (`.35 (.2–.5)`); t
 * Interview decision D2 (truth source; the drill-down stretch), 2026-09-16; brainstorm notes on sequential versus sustaining causality, spikes versus steps, and the actuarial wipe-out (`docs/initial-brainstorming.md`).
 * `docs/research/02-causal-modeling-formalisms.md` §1 (formalism table), §3 (link fields, aggregation formula, Hormuz example), §4 (verdicts), §6.
 * Judea Pearl's causal hierarchy — we work at its second level, intervention ("what if we made X happen"), not the third, counterfactuals about a specific past: https://www.emergentmind.com/topics/pearl-s-causal-hierarchy-pch
-* Related: ADR-0003, ADR-0004; `refine` and probes (FR-18, FR-20) extend this record in stack 06. *(2026-09-21: `refine` and probes are not built in version one — proposed record 0021.)*
+* Related: ADR-0003, ADR-0004; `refine` and probes (FR-18, FR-20) extend this record in stack 06. *(2026-09-21: `refine` and probes are not built in version one — record 0021.)*
 
 ## Amendment (2026-09-21) — the arrows bend a rate, and the `mode` table waits on events and states
 
-**Proposed, not in force.** This amendment takes effect **when proposed records 0016 and 0017 are accepted**, and not before. Amended in place rather than superseded, because the shape of the decision does not change: one number and one sentence per arrow, the arrows add on a scale where independent pushes add instead of multiplying, and every rejected option stays rejected.
+**In force from 2026-09-21**, when Kent accepted records 0016 and 0017 (decisions note, row R32). Amended in place rather than superseded, because the shape of the decision does not change: one number and one sentence per arrow, the arrows add on a scale where independent pushes add instead of multiplying, and every rejected option stays rejected.
 
-### What proposed record 0016 changes here
+### What record 0016 changes here
 
 It keeps the arrow's fields and changes what they bend. `strength`, `lag`, `shape`, `half_life` and `reflexive` keep their names and their meanings; they now bend a **rate** — how likely a claim is to happen on each day — rather than a likelihood read on one day, and the claim's number is that rate added up across its window.
 
@@ -143,7 +143,7 @@ It keeps the arrow's fields and changes what they bend. `strength`, `lag`, `shap
 
 **Untouched:** the link-fields table apart from its `mode` row; *"elicitation is one number and one sentence per link"*; two significant figures and the interval on the canvas; the withdrawn staged-delivery paragraph, which stays visible as history; and every option this record rejected — per-combination tables, scenario trees, Markov steady states, role-played simulation and model narration. Where the two numbers on an arrow come from is changed by the shape freeze at the end of stack 05, which amends record 0006, not this record.
 
-### What proposed record 0017 changes here
+### What record 0017 changes here
 
 **The `mode` row of the link-fields table**, which today reads *"`sustain` — the effect holds only while the parent holds; remove the parent and it retracts"*. Under record 0016 nothing that has happened can un-happen, so measured on the same map a `sustain` arrow and a `trigger` arrow produce the identical number — `0.442471` against `0.442471` — and `mode` becomes dead data. Record 0017 gives it a job back: a `sustain` arrow may leave **only** a claim that can stop holding — a *state*. The row is rewritten to say so.
 

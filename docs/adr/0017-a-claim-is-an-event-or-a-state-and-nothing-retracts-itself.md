@@ -1,11 +1,11 @@
 ---
 # ADR-0017: A claim is an event or a state; nothing retracts itself
-status: proposed
+status: accepted
 date: 2026-09-21
 decision-makers: Kent Gang
 consulted:
   - the stack-05 states spike, both rounds, 2026-09-21 — what a state is in the arithmetic, what it costs, and the re-measurement under the additive rate; scripts and logs kept locally under `plans/analysis/scripts/spike-05/states/` and `…/states/round2/`
-  - the adversarial pass over the 2026-09-21 design (M3, which proved `sustain` does not survive proposed record 0016)
+  - the adversarial pass over the 2026-09-21 design (M3, which proved `sustain` does not survive record 0016)
   - ADR-0005 (which calls trigger-versus-sustain the best idea in the brainstorm); ADR-0014 (whose decision A this reverses)
 informed: agents in `backend/src/katalyst/domain`, on the canvas, and on stack 05's shape freeze
 supersedes: none
@@ -15,7 +15,7 @@ spec-impact: spec/graph/proposition.md, spec/graph/link.md, spec/graph/validity.
 
 # ADR-0017: A claim is an event or a state; nothing retracts itself
 
-> **`proposed`.** It depends on proposed record 0016 being accepted — it exists because that record deletes something. Its measurements were re-run under that record's **additive** rate and the middle-of-the-slice convention, so no caveat about a superseded rate model remains; every number below is the re-run's. Kent has answered both questions it left open (R26, R27).
+> **This record exists because of record 0016**, accepted with it. Its measurements were re-run under that record's **additive** rate and the middle-of-the-slice convention, so no caveat about a superseded rate model remains; every number below is the re-run's.
 
 > **In short.** A claim is an **event** — it happens once and stays happened — or a **state**, which holds over a stretch of time and can stop. A `sustain` arrow may leave only a state, and **automatic retraction is deleted** (Kent, R2). The in-between `kind` is renamed `event` → **`step`** (R21), so the four kinds read `hypothesis · step · market · not_tradeable`, and the new field is `persistence: event | state`.
 >
@@ -23,13 +23,13 @@ spec-impact: spec/graph/proposition.md, spec/graph/link.md, spec/graph/validity.
 >
 > **What it costs.** Mostly deletion — about **65** lines of server code, **85** of browser code and eleven named tests. A state costs **nothing** in the exact solve (the same 64, 150 and **2 ms** as a map with no state) but its on–off joint is the one expensive piece: on a twenty-claim map five states take the forward pass from `224.4` to **`508.9 ms`** at 2 000 versions, which is what puts record 0016's hard case over its time target. About **1.3 sessions**, riding the one shape freeze with the re-recording.
 >
-> **Open for Kent.** Nothing. An arrow that ends a state is asked for **the chance it stops** (R26), and **`persistence` is always required** — a map without it is refused by name (R27).
+> **Also decided.** An arrow that ends a state is asked for **the chance it stops** (Kent, R26), and **`persistence` is always required** — a map without it is refused by name (R27).
 
 ## Context and Problem Statement
 
 Record 0005 gives every arrow a `mode`, the pair it calls *"the best idea in the brainstorm"*. A **`trigger`** arrow is a domino: it fires when its cause becomes true, and standing the cause back up later does not undo it. A **`sustain`** arrow is a desk holding an apple: the effect holds only while the cause holds.
 
-Proposed record 0016 deletes the distinction as a side effect. Under that record a claim's number is *the chance it has happened by day t* — a **first passage** probability, the first day something crosses a line — and what has happened never un-happens. The moment that is true, the quantity a `sustain` arrow reads (its cause's truth on each day) and the one a `trigger` arrow reads (whether its cause has fired) become the same array. **Measured:** not close, the same number — `0.442471` against `0.442471` — so `mode` becomes dead data fully determined by `shape` (adversarial pass, `attack3.py` §B; re-run 2026-09-21 by this record's author).
+Record 0016 deletes the distinction as a side effect. Under that record a claim's number is *the chance it has happened by day t* — a **first passage** probability, the first day something crosses a line — and what has happened never un-happens. The moment that is true, the quantity a `sustain` arrow reads (its cause's truth on each day) and the one a `trigger` arrow reads (whether its cause has fired) become the same array. **Measured:** not close, the same number — `0.442471` against `0.442471` — so `mode` becomes dead data fully determined by `shape` (adversarial pass, `attack3.py` §B; re-run 2026-09-21 by this record's author).
 
 The only mechanism that can make a true claim untrue is **automatic retraction** — record 0014's rule, which ends a supposition on a calendar read off the map's shape. That rule is itself one of the three defects record 0016 exists to fix, so it cannot be what saves `sustain`. **And the brief's own sentence is modelled wrong:** *"The Strait of Hormuz opened but Iran was struck the next day"* asks for a world in which **both things happened**, where today the strike retracts the opening, so Monday's event un-happens because of Tuesday's news.
 
@@ -128,7 +128,7 @@ The spike considered six further rules and added none; two are worth naming. A s
 
 **The in-between kind is renamed `step` (Kent, R21)**, because `kind: event, persistence: state` — the commonest claim of all, a step in the middle of a chain that can stop holding — parses as a contradiction until you know the rule. **The four kinds become `hypothesis · step · market · not_tradeable`, and `persistence: event | state` keeps Kent's words**; he rejected `middle` as unintuitive. An arrow's `shape` also has a value `step`, but that is a field on an arrow and this one is on a claim, so no claim reads as a contradiction. The rename is **46 lines of code and 21 of spec and records** where `kind` and the word *event* meet (re-measured after stack 04 landed; it was 42 and 17 before), plus the recording, the fixture, the generated browser types and the validator's messages. *Everywhere below that describes today's code or quotes a file that exists, the word is still `event`, because that is what is written there today.*
 
-**Every claim says which kind of truth it is.** No code in the pure core can read a claim's sentence and decide; that is the model's judgement, which is why this field moves the **prompt fingerprint** — `1c224cc3…` on `main` against `1e80b47b…` with `persistence` added (adversarial pass). And measured against `backend/recordings/hormuz.jsonl`, now on `main`: **the recording states no `persistence` at all**, on any of its 18 accepted claims, so under R27 every claim on it is refused — as its **six `sustain` arrows** would be under a default of `event`, all six leaving claims the recording marks `kind: event`. Either way it is stale until the freeze re-records it, so **`persistence`, its two rules, the rename and the re-recording land in one pull request — stack 05's shape freeze — and this record is accepted before that freeze is written.**
+**Every claim says which kind of truth it is.** No code in the pure core can read a claim's sentence and decide; that is the model's judgement, which is why this field moves the **prompt fingerprint** — `1c224cc3…` on `main` against `1e80b47b…` with `persistence` added (adversarial pass). And measured against `backend/recordings/hormuz.jsonl`, now on `main`: **the recording states no `persistence` at all**, on any of its 18 accepted claims, so under R27 every claim on it is refused — as its **six `sustain` arrows** would be under a default of `event`, all six leaving claims the recording marks `kind: event`. Either way it is stale until the freeze re-records it, so **`persistence`, its two rules, the rename and the re-recording land in one pull request — stack 05's shape freeze.**
 
 The field is wanted rather than imposed: the six claims those `sustain` arrows leave each name a level that can move back — a war-risk premium, a Baltic freight assessment, the Japan–Korea LNG marker — or say outright that something *"holds for at least 30 consecutive days"*. The model has been writing states with no field in which to say so. *(What a model would answer if asked directly has not been measured, because nothing has asked it.)*
 
@@ -138,7 +138,7 @@ The field is wanted rather than imposed: the six claims those `sustain` arrows l
 * Bad, because the model must make a judgement nothing in our code can check: a claim marked an event that is really a state simply never stops holding, and the only signal is a reader reading the sentence.
 * Bad, because it adds a claim to the Hormuz map, so everything downstream of the strait moves again.
 * Bad, because a `sustain` child's reading of the on–off joint is what takes record 0016's hard case over its time target at 2 000 versions.
-* Bad, because **nobody has measured what a state does to the range**, under either rate. Every version of the map draws each claim's likelihood from its stated range; a state has two rates and the second is fitted rather than drawn, and nothing says what varies. The spike names this as a real gap, closed before this record is accepted.
+* Bad, because **nobody has measured what a state does to the range**, under either rate. Every version of the map draws each claim's likelihood from its stated range; a state has two rates and the second is fitted rather than drawn, and nothing says what varies. The spike names this as a real gap, and it is measured before the engine is built against this record.
 * Neutral, because the canvas loses a badge and two colours and gains nothing to draw.
 
 ### Confirmation
@@ -158,6 +158,7 @@ The field is wanted rather than imposed: the six claims those `sustain` arrows l
 
 ## More Information
 
+* **Accepted by Kent on 2026-09-21**, decisions note row **R32**, in his words: *“All these ADRs written are accepted!”*
 * **Kent's decisions, 2026-09-21**, in the dated decisions note kept locally under `plans/notes/`: **R2** — events and states, automatic retraction deleted, both events left standing through the strike, record 0014's decision A reversed, and the model saying which kind each claim is, so the field rides the one shape freeze; **R21** — the in-between `kind` renamed `event` → `step`, `persistence: event | state` keeping his words, `middle` rejected as unintuitive; **R26** — an ending arrow asked for *the chance it stops*, one sentence in the freeze, amending record 0006; **R27** — `persistence` always required, refused by name. *(Those are the decisions note's words for his choices, not a transcript of his own.)*
 * **The measurements.** The states spike's two rounds, 2026-09-21, scripts and logs kept locally under `plans/analysis/scripts/spike-05/states/`; round two re-measured every number here under record 0016's additive rate and middle-of-the-slice convention, on the same maps and seeds. The `sustain`-equals-`trigger` identity and the fingerprint pair are the adversarial pass's; the recording's counts were measured independently from `main`.
-* **Related.** Proposed ADR-0016 (which this record exists because of) · ADR-0005 (its `mode` table amended here) · ADR-0014 (decision A reversed) · ADR-0003, ADR-0006, ADR-0012.
+* **Related.** ADR-0016 (which this record exists because of) · ADR-0005 (its `mode` table amended here) · ADR-0014 (decision A reversed) · ADR-0003, ADR-0006, ADR-0012.

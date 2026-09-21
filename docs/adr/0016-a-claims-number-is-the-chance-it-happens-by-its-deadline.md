@@ -1,6 +1,6 @@
 ---
 # ADR-0016: A claim's number is the chance it happens by its deadline; whether is solved exactly, when is sampled
-status: proposed
+status: accepted
 date: 2026-09-21
 decision-makers: Kent Gang
 consulted:
@@ -15,15 +15,13 @@ spec-impact: spec/multiverse/propagation.md (rewritten), spec/multiverse/diff.md
 
 # ADR-0016: A claim's number is the chance it happens by its deadline; whether is solved exactly, when is sampled
 
-> **`proposed`.** Both rounds of the stack-05 spike and the composition analysis have reported, their numbers are in, and Kent has answered both questions this record left open (R24, R25).
-
 > **In short.** A claim's number becomes **the chance it happens by its deadline**. Whether each claim happens is solved exactly; when it happens comes from one forward pass. Causes **add** to a claim's rate — each an independent route (Kent, R18): two causes that each alone take a claim from 10% to 40% give **59%** together, not 91%. Where two causes really work through one mechanism the repair is the map, not the arithmetic (R22).
 >
 > **On screen.** Every number on the Hormuz map changes once, in one reviewable diff. *This happened* on Brent moves what caused it, where today it leaves the cause at `.3000` and the hand-worked answer is `.4562`. Supposing the insurance premium or OPEC+ restraint moves both endings, where today they move by `0.0000`.
 >
 > **What it costs.** One world with its range on a twenty-claim map: **360 ms** at 2 000 versions, **538 ms** when three claims are held back by an arrow, **644 ms** with five states feeding `sustain` arrows. The limit is now **a target proportional to the map** (Kent, R24, superseding R19's fixed **600 ms**, itself a relaxation after the spike's 300 ms criterion failed twice) — **30 ms a claim** at 2 000 versions, derived from the 600 ms measured at twenty claims. Met on all-event maps, **not yet met with states**. On four-claim maps at 50 000 worlds, no number is off by more than **`.005`**. **Five to seven sessions.**
 >
-> **Open for Kent.** Nothing. R24 made the time limit a proportional target and R25 settled what the screen says about *This happened*.
+> **Also decided.** One sentence in the Inspector, on a branch where *This happened* is in force, says the answer rests on a seeded sample (Kent, R25); the ordinary screen says nothing.
 
 ## Context and Problem Statement
 
@@ -129,7 +127,7 @@ Two properties come free: **locality becomes a theorem**, a claim cut off from t
 
 ### What `World.series` now means, and what stays
 
-Today `series` is a per-day likelihood allowed to **fall**, and the golden test pins it (`test_hormuz_golden.py:117-120`): `1.0` on day zero, between `.25` and `.45` on days one and three — the same value on both — and below `.10` on day four. **Under "the chance it has happened by day *t*" a series can only rise**, so that test cannot survive; the events-and-states reading of the same branch replaces it, proposed record 0017's to write. What the field keeps, how a day between grid points is read, and what all this does to `DeltaRow.peak_delta`, `at_day` and the golden domino assertion are carried by the owed-edits note.
+Today `series` is a per-day likelihood allowed to **fall**, and the golden test pins it (`test_hormuz_golden.py:117-120`): `1.0` on day zero, between `.25` and `.45` on days one and three — the same value on both — and below `.10` on day four. **Under "the chance it has happened by day *t*" a series can only rise**, so that test cannot survive; the events-and-states reading of the same branch replaces it, record 0017's to write. What the field keeps, how a day between grid points is read, and what all this does to `DeltaRow.peak_delta`, `at_day` and the golden domino assertion are carried by the owed-edits note.
 
 **A supposed claim's stored `p = 1.0` stays** — three live readers, not the one the first draft assumed: `diff.py:817-818`, `diff.py:460`, and the browser's `world/apiSource.ts:266` (browser line numbers here and below are `feat-04b-evals`, which is what `main` will hold). `Belief.p` allows no gap (`belief.py:39-45`), so removing it is a wire break.
 
@@ -192,6 +190,7 @@ The first estimate of three missed four things, verified on `main` unless marked
 
 ## More Information
 
+* **Accepted by Kent on 2026-09-21**, decisions note row **R32**, in his words: *“All these ADRs written are accepted!”*
 * **Kent's decisions, 2026-09-21**, in the dated decisions note kept locally under `plans/notes/`: **R1**, an exact core with a sampler on top and the time model kept and made sound, behind a spike with a kill criterion; **R18**, causes add as independent routes; **R19**, a 600 ms budget at 2 000 versions, **superseded by R24**, a target proportional to the map; **R22**, the remedy for causes that share a route is the map; **R25**, one Inspector sentence about the sample. *(Those are the decisions note's words for his choices, except where a sentence is quoted and attributed to it.)*
 * **The evidence.** The stack-05 spike's two rounds, the composition analysis, and the engine digest and adversarial pass that preceded them, all 2026-09-21, kept locally under `plans/analysis/` with their scripts. Every measurement here is quoted from one of those reports with its script named, or was re-run on 2026-09-21 by this record's author.
-* **Related.** ADR-0005 and ADR-0014 (amended, not superseded) · ADR-0015 (intact) · proposed ADR-0017, ADR-0021, ADR-0022. Chapters rewritten: `spec/multiverse/propagation.md`, `spec/multiverse/diff.md`.
+* **Related.** ADR-0005 and ADR-0014 (amended, not superseded) · ADR-0015 (intact) · ADR-0017, ADR-0021, ADR-0022. Chapters rewritten: `spec/multiverse/propagation.md`, `spec/multiverse/diff.md`.

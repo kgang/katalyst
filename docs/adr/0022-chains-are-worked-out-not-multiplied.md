@@ -1,6 +1,6 @@
 ---
 # ADR-0022: Chains are worked out, not multiplied
-status: proposed
+status: accepted
 date: 2026-09-21
 decision-makers: Kent Gang
 consulted:
@@ -14,7 +14,7 @@ spec-impact: PRODUCT_REQUIREMENTS.md INV-8 and FR-11; spec/workbench/ (the path 
 
 # ADR-0022: Chains are worked out, not multiplied
 
-> **`proposed`.** It needs proposed record 0016's exact core to exist before the replacement can be computed, and it lands after that record's flip — a different pull request. Written separately so it can be accepted, or not, on its own.
+> **This record needs record 0016's exact core** to exist before the replacement can be computed, and it lands after that record's flip — a different pull request.
 
 > **In short.** The multiplied-out path likelihood goes. Multiplying along a route is not the chance of anything once two claims share a cause: if a second claim is true exactly when the first is and both stand at `.5`, the product says `.25` where the chance every step goes right is `.5`. Three worked-out quantities replace it (Kent, R3): **the shift** the hypothesis makes to its destination, **the joint** — the chance every step on the named route goes right — and **the weakest arrow**, which single arrow carries most of that shift. INV-8 becomes *chains are worked out, not multiplied*, and FR-11 is rewritten to ask for the three.
 >
@@ -22,7 +22,7 @@ spec-impact: PRODUCT_REQUIREMENTS.md INV-8 and FR-11; spec/workbench/ (the path 
 >
 > **What it costs.** One or two extra solves each on record 0016's core — where one exact solve of a twenty-claim map measures `12.4 ms` at 200 versions and `80.4 ms` at 2 000 — and the first is the number stack 06's card needs anyway. **Server only:** the browser never read the product and already renders its absence. One browser test goes with the sentence it checked.
 >
-> **Open for Kent.** Nothing. It lands after record 0016's flip, in a pull request of its own.
+> **When.** After record 0016's flip, in a pull request of its own.
 
 ## Context and Problem Statement
 
@@ -86,6 +86,7 @@ The *Decision Drivers* and *Decision Outcome* above carry each option's case; in
 
 ## More Information
 
+* **Accepted by Kent on 2026-09-21**, decisions note row **R32**, in his words: *“All these ADRs written are accepted!”*
 * **Kent's decision, 2026-09-21**, recorded as row R3 of the dated decisions note kept locally under `plans/notes/`: replace the path product with three real quantities — the shift the hypothesis makes to the destination, the chance every step on the route goes right as a true joint, and which arrow carries most of the shift; INV-8 becomes *chains are worked out, not multiplied*, and FR-11 is rewritten. *(Those are the decisions note's words for his choice, not a transcript of his own.)*
 * **The evidence.** The engine digest §5.2 of 2026-09-21, which located the multiplication, priced its deletion and its replacement, and confirmed the browser does not read it; and the adversarial pass of the same date, which independently confirmed that `Verdict.product → None` is backend-only.
-* **Related records.** Proposed ADR-0016 (the exact core these three quantities are computed on) · ADR-0014 (whose section E wart this removes) · ADR-0005 (the arrows these routes walk).
+* **Related records.** ADR-0016 (the exact core these three quantities are computed on) · ADR-0014 (whose section E wart this removes) · ADR-0005 (the arrows these routes walk).
