@@ -8,7 +8,7 @@
  * from, and that a failure is printed in the page rather than in a pop-up.
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { aClaim, aWire, aWorld } from "./test/aMap";
 import type { FixtureBundle, WorldSource, WorldView } from "./world";
@@ -28,9 +28,11 @@ vi.mock("./graph/Canvas", () => ({
   MapCanvas: ({
     world,
     onSelect,
+    keys,
   }: {
     world: WorldView;
-    onSelect: (selection: { kind: "wire"; id: string }) => void;
+    onSelect: (selection: { kind: "wire" | "claim"; id: string }) => void;
+    keys: { flipWorlds: () => void; intervene: () => void };
   }) => (
     <div data-testid="the-map">
       {`${world.claims.length} claims, ${world.links.length} arrows`}
@@ -39,6 +41,24 @@ vi.mock("./graph/Canvas", () => ({
           {`select ${link.id}`}
         </button>
       ))}
+      {world.claims.map((claim) => (
+        <button
+          key={claim.id}
+          type="button"
+          onClick={() => onSelect({ kind: "claim", id: claim.id })}
+        >
+          {`select claim ${claim.id}`}
+        </button>
+      ))}
+      {/* The two keys this screen's own behaviour hangs on: Space flips which of
+          the two worlds is in front, and E opens the six things you can do to a
+          claim. Both are the map's keys and both are answered outside it. */}
+      <button type="button" onClick={keys.flipWorlds}>
+        flip worlds
+      </button>
+      <button type="button" onClick={keys.intervene}>
+        change this claim
+      </button>
     </div>
   ),
 }));
@@ -219,6 +239,64 @@ describe("opening a map", () => {
     fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
     await screen.findByText(".58 (.42–.73)");
     expect(source.readConditional).toHaveBeenCalledTimes(1);
+  });
+
+  it("test_a_wires_number_is_asked_again_when_the_branch_changes", async () => {
+    serverAnswersNormally();
+    const source = sourceThatAnswers();
+    render(<App source={source} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    // A branch of the reader's own, and one arrow asked about.
+    fireEvent.click(screen.getByRole("button", { name: "Start a branch" }));
+    fireEvent.change(screen.getByLabelText(/What is this branch called/), {
+      target: { value: "Your own branch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start this branch" }));
+    fireEvent.click(await screen.findByRole("button", { name: "select H->B" }));
+    await screen.findByText(".58 (.42–.73)");
+    expect(source.readConditional).toHaveBeenCalledTimes(1);
+
+    // Now an edit. The branch is append-only, so this is a different branch
+    // with the same name — and the number worked out for the branch before the
+    // edit is a number for a map that no longer exists.
+    fireEvent.click(screen.getByRole("button", { name: "select claim B" }));
+    fireEvent.click(screen.getByRole("button", { name: "change this claim" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Suppose this is true/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(2));
+    // And the second question carries the branch as it now stands.
+    const asked = vi.mocked(source.readConditional).mock.calls.at(-1)?.[0];
+    expect(asked?.branch?.edits).toHaveLength(1);
+  });
+
+  it("test_a_wires_number_belongs_to_the_map_that_is_showing", async () => {
+    serverAnswersNormally();
+    const source = sourceThatAnswers();
+    render(<App source={source} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a branch" }));
+    fireEvent.change(screen.getByLabelText(/What is this branch called/), {
+      target: { value: "Your own branch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start this branch" }));
+    fireEvent.click(await screen.findByRole("button", { name: "select H->B" }));
+    await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(source.readConditional).mock.calls[0]?.[0]?.branch).toBeDefined();
+
+    // Flip to the map as it was written. The number on screen was worked out for
+    // the other map, and a number that belongs to a map the reader is not
+    // looking at is the one thing this product must never draw.
+    fireEvent.click(screen.getByRole("button", { name: "flip worlds" }));
+    await screen.findByText("as it was written");
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(2));
+    // Asked for the map that is showing: no branch at all.
+    expect(vi.mocked(source.readConditional).mock.calls[1]?.[0]?.branch).toBeUndefined();
   });
 
   it("test_a_missing_world_falls_back_and_says_so", async () => {

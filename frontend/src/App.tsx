@@ -468,10 +468,35 @@ function MapScreen({
   const painted = paintings === null ? base : showing === "now" ? paintings.now : paintings.before;
   const seed = painted.seed;
 
-  /** What names one arrow's number: which branch, which seed, which arrow. */
+  /**
+   * The branch the map in front is drawn from — nothing, when the map in front
+   * is the one as it was written.
+   *
+   * Flipping to "as it was written" puts the base map on screen, and an arrow's
+   * number worked out under a branch is not a number about that map. This is the
+   * branch every arrow number on this screen is asked for and named by, so the
+   * question asked and the map drawn can never come apart.
+   */
+  const shownBranch = paintings === null || showing === "before" ? undefined : open;
+
+  /**
+   * What names one arrow's number: which branch, how far that branch has got,
+   * which seed, which arrow.
+   *
+   * The edit count is in the name because a branch's `id` outlives its edits: an
+   * edit appends to the branch and hands back a new one with the same id, so a
+   * name without the count would hand a reader the number worked out before
+   * their edit. Counting is enough to tell two branches apart because edits are
+   * only ever appended — `appendEdit` is the one function that touches them, and
+   * there is no undo (INV-workbench.49).
+   */
   const wireKey = useCallback(
-    (linkId: string) => `${shop.openId ?? "as-written"}:${seed ?? "no-seed"}:${linkId}`,
-    [shop.openId, seed],
+    (linkId: string) => {
+      const whose =
+        shownBranch === undefined ? "as-written" : `${shownBranch.id}@${shownBranch.edits.length}`;
+      return `${whose}:${seed ?? "no-seed"}:${linkId}`;
+    },
+    [shownBranch, seed],
   );
 
   // The map as it is drawn: the world above, with any arrow number already
@@ -547,7 +572,7 @@ function MapScreen({
     }
     let stillWanted = true;
     source
-      .readConditional({ baseId: base.baseId, branch: open, linkId: selection.id })
+      .readConditional({ baseId: base.baseId, branch: shownBranch, linkId: selection.id })
       .then(
         (slot) => slot,
         (failure: unknown): Known<Ranged> => ({
@@ -566,7 +591,7 @@ function MapScreen({
     return () => {
       stillWanted = false;
     };
-  }, [selection, source, base.baseId, open, wireKey, wireNumbers]);
+  }, [selection, source, base.baseId, shownBranch, wireKey, wireNumbers]);
 
   // A branch has just been opened or made. Three things follow, in this order:
   // the map says out loud what the branch did, the wires arrive again in causal
