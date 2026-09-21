@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M32VJF4TXDVMNF15AWJSCTRP",
+  "strategy": "manual-commit",
+  "branch": "docs/05-06-requirements-catch-up",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 30422,
+    "cache_read_tokens": 1669825,
+    "output_tokens": 13887,
+    "api_call_count": 9,
+    "subagent_tokens": {
+      "input_tokens": 770,
+      "cache_creation_tokens": 896618,
+      "cache_read_tokens": 62770416,
+      "output_tokens": 290157,
+      "api_call_count": 385
+    }
+  }
+}
