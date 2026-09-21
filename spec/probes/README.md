@@ -6,7 +6,15 @@ Not every step of an argument deserves the same effort. A **probe** attaches ext
 
 The tool also says where a probe is worth it: rank propositions by how much the trade depends on them times how uncertain they are (*value of information*).
 
-This part is stretch scope. It is designed for now so the graph and multiverse do not have to change later.
+## Chapters
+
+There are none, and none is planned; here is where that stands, in three sentences.
+
+**What a probe would have been:** the one place a user could spend more compute on a single claim and get a better number back — splitting it into finer claims that add back up to it, running a distribution over it instead of a point, or sending role-played experts to look for causes nobody put on the map — with whatever came back landing as a belief that says where it came from.
+
+**Why it was not built:** nothing in the assignment asks for it and the walk the product is judged on never wants a finer claim, so on 2026-09-21 the whole part was cut from version one along with `refine`, the unrolling of feedback loops and the random-simulation probe; what exists of it in code is the shape and an honest refusal — `Refine` is a typed edit in `backend/src/katalyst/domain/intervention.py`, and folding one onto a map answers *"splitting the claim … into finer claims is not built yet"* rather than half-doing it or dropping it in silence.
+
+**What would have to be true to build it:** a claim on a real map would have to be both the thing the trade turns on and too coarse to score — one tile a user cannot say true or false about, with finer claims underneath it that a named source could actually judge — and the first thing to build would then be `refine` and the adding-up check that goes with it, because the other two probes are ways of getting a number and that one is a way of checking one.
 
 ## Terms this part owns
 
@@ -14,13 +22,4 @@ Probe · Refine · Value of information · Persona red-team.
 
 ## Invariants this part owns
 
-None product-level yet; `INV-10` (refinement marginalizes) is owned by `multiverse/` and exercised here.
-
-## Chapters
-
-| Chapter | Covers | Written in |
-|---------|--------|-----------|
-| `refine.md` | Splitting a proposition; the marginalization constraint; reconciling coarse and fine estimates | stack 06 |
-| `monte-carlo.md` | Distribution probes; seeds; what a distribution chip shows | stack 06 |
-| `personas.md` | Role-played experts as proposers of missing structure — never as outcome simulators | stack 06 |
-| `value-of-information.md` | The ranking, and how the interface says "spend here" | stack 06 |
+None product-level. `INV-10` (refinement adds up: after a claim is split, the finer claims' combined likelihood equals the original's) is owned by `multiverse/` and is met today by the refusal above — the operation that could break it cannot be applied at all.
