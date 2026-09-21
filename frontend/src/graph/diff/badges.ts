@@ -81,18 +81,17 @@ export function supposed(at: string, value: boolean): Badge {
 /**
  * The badge the news earns. Exported for the same reason the one above is.
  *
- * **News can be that something did not happen, and the word for that is not
- * settled.** `spec/vocabulary.md` gives one badge for `observe` — *Happened ·
- * date* — and the panel only ever sends `value: true`, so no button on this
- * canvas can reach the other case. A branch written elsewhere can: the wire
- * format carries the value, the engine acts on it, and the world comes back
- * with it. Reading that world and printing *Happened* over it would be the
- * canvas telling the reader the opposite of what the engine was told.
+ * **News can be that something did not happen, and it reads *Did not happen ·
+ * date*** — the mirror of *Happened · date* (Kent, 2026-09-21, G12;
+ * `spec/vocabulary.md`, *Interface words*). The panel only ever sends `value:
+ * true`, so no button on this canvas reaches the other case today. A branch
+ * written elsewhere does: the wire format carries the value, the engine acts on
+ * it, and the world comes back with it. Reading that world and printing
+ * *Happened* over it would be the canvas telling the reader the opposite of
+ * what the engine was told.
  *
- * So the negative reads *Did not happen · date* here, and **that wording is
- * this file's guess and not Kent's**: the vocabulary has no row for it. It is
- * raised in the report for the chapter to settle, and when it does, this is the
- * one place the words change.
+ * Both words are written here and nowhere else, so the tile and the panel
+ * cannot come to say it differently.
  *
  * @param at The day the news is reported on.
  * @param value What was reported: that it happened, or that it did not.

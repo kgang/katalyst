@@ -477,6 +477,26 @@ describe("what a tile says about the edits behind it", () => {
     ]);
   });
 
+  it("test_news_that_something_did_not_happen_reads_the_mirror_of_happened", () => {
+    // The panel sends only `value: true` today, so no button on this canvas
+    // reaches this case — but the wire format carries the value and a branch
+    // written elsewhere does. Printing *Happened* over it would tell the reader
+    // the opposite of what the engine was told. The word is Kent's
+    // (2026-09-21, G12) and lives in `spec/vocabulary.md`.
+    const news = badgesByClaim(
+      [
+        { op: "observe", target: "H", value: true, at: "2026-10-01" },
+        { op: "observe", target: "S", value: false, at: "2026-10-02" },
+      ],
+      context,
+    );
+    expect((news.get("H") ?? []).map((badge) => badge.words)).toEqual(["Happened \u00b7 Oct 1"]);
+    expect((news.get("S") ?? []).map((badge) => badge.words)).toEqual([
+      "Did not happen \u00b7 Oct 2",
+    ]);
+    expect((news.get("S") ?? [])[0]?.reason).toContain("that this did not happen");
+  });
+
   it("test_a_supposed_claim_shows_the_word_and_a_retracted_one_does_not", () => {
     const badges = badgesByClaim(STRIKE_EDITS, context);
     const standing = standingByClaim(STRIKE_EDITS, badges);

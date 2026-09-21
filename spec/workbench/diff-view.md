@@ -351,7 +351,8 @@ A claim the user supposed true, and that a later edit in the same branch pushed 
 
 **While an edit has fixed a claim's value, its tile shows the word where a likelihood would go** —
 *Supposed · Oct 1* where the user took it as given, *Happened · Oct 1* where they reported it as
-news — not `1.0`, not `.98` and not `>.99`. Either way the claim is settled in every simulated world
+news, *Did not happen · Oct 1* where the news is that it did not (Kent, 2026-09-21, G12) — not
+`1.0`, not `.98` and not `>.99`. Either way the claim is settled in every simulated world
 while it holds, so there is no number to show, and inventing one answers a question nobody asked.
 **This is one rule, not a rule about suppositions**: it reaches the chip, the movement row, the rail
 row and the panel alike, and nothing but the path product reads the stored number underneath.
@@ -417,7 +418,7 @@ Hormuz opens, then Iran is struck                        ● violet
 | Code name (never on screen) | The button | The badge afterwards |
 |---|---|---|
 | `do` | **Suppose this is true** (and **Suppose this is false**) | **Supposed · date** |
-| `observe` | **This happened** | **Happened · date** |
+| `observe` | **This happened** | **Happened · date**, and **Did not happen · date** where the news is that it did not |
 | `insert` | **Add a claim**, hinted as "…but this also happens" | **Added** |
 | `retune` | **Change this push** | **Retuned** |
 | `refine` | **Split this claim** | **Split** |
@@ -496,7 +497,8 @@ deltaRail › `test_how_firm_and_same_direction_are_columns_not_factors`.
 
 **INV-workbench.48 — a claim whose value an edit fixed shows the word, and the retraction comes from
 the world.** For every claim under a live supposition and every claim reported as news, the tile
-renders **Supposed · date** or **Happened · date** where a likelihood would go and renders no
+renders **Supposed · date**, **Happened · date** or — where the news is that it did not happen —
+**Did not happen · date** where a likelihood would go, and renders no
 likelihood for it at all; where a later edit undermined the supposition, both
 states render in order with the arrow between them. And for every world that carries `retractions`,
 every **Retracted · date · by "…"** badge on screen is read from that record — its day, its arrow and

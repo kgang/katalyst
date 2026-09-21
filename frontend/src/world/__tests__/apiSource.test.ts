@@ -260,6 +260,25 @@ describe("asking the engine", () => {
     expect(news?.standing?.reason).toContain("settled in every version of the map");
   });
 
+  it("test_news_that_something_did_not_happen_reads_the_mirror_word", async () => {
+    // Read off the world rather than worked out from the branch, and the word
+    // beside the number is the one the engine was told — *Did not happen ·
+    // date*, the mirror of *Happened · date* (Kent, 2026-09-21, G12).
+    vi.mocked(readWorld).mockResolvedValue({
+      ...WORLD,
+      assignments: [{ target: "S", value: false, at: null, by: 0, kind: "observe" }],
+      retractions: [],
+      states: { H: ["sampled", "sampled", "sampled"], S: ["sampled", "sampled", "sampled"] },
+    } as unknown as World);
+
+    const world = await new ApiWorldSource().readWorld({ baseId: "example", branch: BRANCH });
+    const news = world.claims.find((claim) => claim.id === "S");
+    expect(news?.standing?.words).toBe("Did not happen \u00b7 Oct 1");
+    expect((news?.badges ?? []).map((badge) => badge.words)).toContain(
+      "Did not happen \u00b7 Oct 1",
+    );
+  });
+
   it("test_the_world_supplies_the_badges_and_the_standing", async () => {
     const world = await new ApiWorldSource().readWorld({ baseId: "example", branch: BRANCH });
     const h = world.claims.find((claim) => claim.id === "H");

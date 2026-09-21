@@ -79,7 +79,7 @@ The six operations keep their code names in code, in the wire format and in this
 | Code name | The button | The badge afterwards | What the interface says it means |
 |---|---|---|---|
 | `do` | **Suppose this is true** (and **Suppose this is false**) | **Supposed · date** | "Take this as given, and do not tell me what caused it" |
-| `observe` | **This happened** | **Happened · date** | "This is news — update what came before it too" |
+| `observe` | **This happened** | **Happened · date**, and **Did not happen · date** where the news is that it did not (Kent, 2026-09-21, G12) | "This is news — update what came before it too" |
 | `insert` | **Add a claim**, hinted as "…but this also happens" | **Added** | A claim and its arrows arrive together |
 | `retune` | **Change this push** | **Retuned** | "You moved this arrow from +0.7 to +0.3" |
 | `refine` | **Split this claim** | **Split** | The finer claims add back up to the one they replace |
