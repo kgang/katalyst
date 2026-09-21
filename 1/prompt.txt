@@ -2120,3 +2120,56 @@ Lint and typecheck pass. Six affected vitest files pass (19+9+22+11+9+27+2). Not
 <status>completed</status>
 <summary>Background command "Run growth's suite and 20 cold runs on the final rebased tree, through the queue" completed (exit code 0)</summary>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a9dd150c52a22354d</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a9dd150c52a22354d.output</output-file>
+<status>completed</status>
+<summary>Agent "Build the worked-numbers file" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Fix round complete, rebased, and green.
+
+## What changed
+
+**MUST FIX — `DIGITS = 5`.** I reproduced your measurement independently before changing anything (throwaway script in `scratchpad/numbers/margins.py`). Every figure matched:
+
+| | six places | **five places** |
+|---|---|---|
+| within one float32 step (5.96e-08) of a boundary | **40** of 280 | **0** |
+| closest margin | 9.98e-09 | **6.52e-08** |
+| lines changed by the perturbation | **3** of 389 | **0** |
+
+**Measured closest margin at five places: 6.516e-08** — about 1.09 float32 steps. Real headroom, but thin, which is why it is checked rather than believed.
+
+**Perturbation result** (`numpy.exp` → `nextafter(exp(x), +inf)`, regenerating the whole file): at five places, **zero of 389 lines change**. At six places it changes exactly the three lines you named — all `M2 · observed B`, `0.538753` → `0.538752`. 230 of 280 numbers moved, largest movement 5.96e-08 = exactly one float32 step, so nothing amplifies. The two-significant-figure column's closest margin is **2.49e-05**, matching your figure. (My first pass wrongly measured moves and shares in that column and reported 0; I fixed it to ask `_two_figures` itself which numbers it is handed — 199 of them.)
+
+My count is 280 computed numbers, not 281 — one off from yours, immaterial, but flagged so nobody chases it.
+
+**New test: `test_no_computed_number_sits_on_a_rounding_boundary`.** It reads `computed_numbers()`, which comes from the *same run* that lays out the file (`_worked_out()` returns both), so a number added to the file is checked from the moment it is added and nobody has to remember. `HOW_CLOSE_IS_TOO_CLOSE = 2.0**-24` with the reason in its docstring. The failure message says what it means and offers the two real choices: lower `DIGITS` and regenerate, or widen the bar and write down why. The "coarser by ten" claim is gone from all three places and replaced by the measured statement plus "measured, not guaranteed".
+
+**Should-fixes, all done:** template line split in two, date dropped, PR-touches instruction kept · `ARCHITECTURE.md` uncounted figure dropped, Intel → x86-64 · CI comment explaining why the two steps' order *and* the `working-directory` override are load-bearing · probes page re-split into short sentences with INV-10 quoted including "within a small tolerance" · twelve → **thirteen**-line checklist in both places.
+
+**Nits taken:** "no *engine* number" · one stable retraction name shape (a count line always present, plus one line per retraction) · band-shares clause saying they are not meant to sum to one · `StopIteration` → plain sentence · `make numbers` strips both keys.
+
+## Rebase
+
+Rebased onto `origin/main` (`d44634a`), **no conflicts**. `make numbers` produces no diff on the new base. Both `plans/notes/msgs/` documents updated to say five places and why, plus the note that the seed is now hand-typed in four places and unifying it needs `fixtures/hormuz.py`, outside my files.
+
+Ten commits on `chore/04-worked-numbers`; worktree clean; nothing pushed. `domain/`, `frontend/` and the golden test untouched.
+
+## Suite tail
+
+```
+18:40:22 START N: server suite after review fixes + rebase (waited 835s, load 4.36)
+18:42:14 END   N: server suite after review fixes + rebase exit=0 took=112s
+
+TOTAL                                  1304      0    348      0   100%
+563 passed, 1 warning in 111.06s (0:01:51)
+[exited with code 0]
+```
+
+`ARCHITECTURE.md`'s count is now **563**, measured from that run rather than worked out by adding. Local: ruff, ruff format, both mypy runs, and the five tests in the file all green.</result>
+<usage><subagent_tokens>356226</subagent_tokens><tool_uses>61</tool_uses><duration_ms>1503757</duration_ms></usage>
+</task-notification>
