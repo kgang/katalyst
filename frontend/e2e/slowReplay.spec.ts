@@ -57,7 +57,11 @@ test("the foot of the screen says what is happening through a real silence", asy
     "This server has no committed recording to play, so there is no generation to watch.",
   );
 
-  const card = page.getByRole("button", { name: new RegExp(THE_SENTENCE) });
+  // The first screen draws this sentence twice — once as a recording to watch and
+  // once as a live run — so the press names which one it means.
+  const card = page.getByRole("button", {
+    name: new RegExp(`${THE_SENTENCE}[\\s\\S]*Watch the recording`),
+  });
   await card.click();
 
   // The run has started: the first event says so and is sent before any model

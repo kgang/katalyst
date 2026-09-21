@@ -24,7 +24,7 @@ test("test_a_tile_seen_from_far_away_prints_every_belief_line_whole", async ({ p
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto("/");
   await page
-    .getByRole("button", { name: /Strait of Hormuz/ })
+    .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
   await expect(page.locator(".react-flow__node .tile").first()).toBeVisible();

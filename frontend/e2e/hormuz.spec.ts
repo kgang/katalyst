@@ -527,7 +527,7 @@ async function howManyTheMapSaidMoved(page: Page): Promise<number> {
 async function theStoredMapWithTheStrikeBranch(page: Page): Promise<void> {
   await page.goto("/");
   await page
-    .getByRole("button", { name: /Strait of Hormuz/ })
+    .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
   await waitForTheLayout(page, 7);
@@ -608,7 +608,7 @@ for (const window of WINDOWS) {
 test("test_the_mouse_alone_reaches_the_six_things_you_can_do", async ({ page }) => {
   await page.goto("/");
   await page
-    .getByRole("button", { name: /Strait of Hormuz/ })
+    .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
   await waitForTheLayout(page, 7);
@@ -671,7 +671,7 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
 
   // The launchpad, reached and opened with the keyboard. Tab to the one example
   // that is live and press Enter.
-  const hormuz = page.getByRole("button", { name: /Strait of Hormuz/ }).first();
+  const hormuz = page.getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ }).first();
   await hormuz.focus();
   await expect(hormuz).toBeFocused();
   await page.keyboard.press("Enter");
@@ -1058,7 +1058,7 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
 test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   await page.goto("/");
   await page
-    .getByRole("button", { name: /Strait of Hormuz/ })
+    .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
   await waitForTheLayout(page, 7);
@@ -1107,7 +1107,7 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
 test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({ page }) => {
   await page.goto("/");
   await page
-    .getByRole("button", { name: /Strait of Hormuz/ })
+    .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
   await waitForTheLayout(page, 7);
@@ -1215,7 +1215,7 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
   test.setTimeout(120_000);
   await page.goto("/");
   await page
-    .getByRole("button", { name: /Strait of Hormuz/ })
+    .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
   await waitForTheLayout(page, 7);
@@ -1360,7 +1360,7 @@ test("test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification", asy
 
   await page.goto("/");
   await page
-    .getByRole("button", { name: /Strait of Hormuz/ })
+    .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
   await waitForTheLayout(page, 7);
