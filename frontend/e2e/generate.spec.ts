@@ -41,6 +41,28 @@ import { whereTheMapCameToRest, whereTheTileSits } from "./waiting.js";
 const THE_SENTENCE = "The Strait of Hormuz is going to open next week.";
 
 /**
+ * How long a whole run is allowed to take before this test gives up on it.
+ *
+ * **A replay takes as long as its recording**, because the pacing is the
+ * server's and the number of events is the file's — a twenty-proposal run is
+ * four times the twenty seconds a five-proposal one takes, and neither number
+ * is this test's to know. So the bound below is not a measurement and is not
+ * tuned to a machine: it is generous on purpose, and exists only so that a run
+ * which has genuinely stopped fails as a test rather than hanging.
+ *
+ * The default fifteen seconds is the wrong bound for exactly one thing in this
+ * file — waiting for a run to finish — and the right one everywhere else, so it
+ * is named here and used there.
+ */
+const A_WHOLE_RUN = 120_000;
+
+// Every test here plays a recording from beginning to end, so each needs room
+// for one. It is set on the file rather than in the configuration because it is
+// a fact about these tests: the stored example's tests next door are right to
+// be held to a minute.
+test.describe.configure({ timeout: A_WHOLE_RUN + 60_000 });
+
+/**
  * What this copy of the server says it can play back without a key.
  *
  * Asked of the server rather than read off the screen: whether this test has
@@ -221,14 +243,15 @@ async function whatItSaw(page: Page): Promise<WhatItSaw> {
  * the run cost and the closing line is why it ended, and a screen that had the
  * first and not the second would be read here as finished when it is not.
  *
- * **No timeout of its own.** A wait that asks for longer than the whole test is
- * allowed is a number that can never elapse, and a number that can never elapse
- * reads as care while doing nothing at all. The config's timeout is the one
- * bound, in one place.
+ * **This is the one wait in this file with a bound of its own**, and it is the
+ * one that needs one: everything else here is waiting for the page to catch up
+ * with something that has already happened, where fifteen seconds is generous.
+ * This waits for a whole recording to play, which takes as long as the
+ * recording is — see `A_WHOLE_RUN`.
  */
 async function waitUntilItStops(page: Page): Promise<void> {
-  await expect(page.locator(".receipt-strip")).toBeVisible();
-  await expect(page.locator(".done-line")).toBeVisible();
+  await expect(page.locator(".receipt-strip")).toBeVisible({ timeout: A_WHOLE_RUN });
+  await expect(page.locator(".done-line")).toBeVisible({ timeout: A_WHOLE_RUN });
   // Every rectangle goes when the likelihoods land: the set of claims still open
   // is empty by definition once the map is finished.
   await expect(page.locator(".skeleton-tile")).toHaveCount(0);
