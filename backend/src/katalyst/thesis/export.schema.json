@@ -149,6 +149,21 @@
           "description": "The top of that range. Absent together with `lo`.",
           "title": "Hi"
         },
+        "kind": {
+          "description": "What the number is, which decides how it is written: a likelihood and a share carry a guard word at each end, a move keeps its two figures however small, and a price, a count and a day are written as they are.",
+          "enum": [
+            "likelihood",
+            "share",
+            "move",
+            "size",
+            "ratio",
+            "price",
+            "count",
+            "days"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
         "lo": {
           "anyOf": [
             {
@@ -194,6 +209,7 @@
       },
       "required": [
         "value",
+        "kind",
         "owner",
         "about"
       ],
@@ -921,7 +937,6 @@
           "type": "string"
         },
         "probability": {
-          "default": null,
           "description": "Always nothing at all. A shock is supposed, not forecast, and this document will not carry a number here.",
           "title": "Probability",
           "type": "null"
@@ -935,6 +950,7 @@
       "required": [
         "name",
         "placed_by",
+        "probability",
         "change_to_the_position",
         "says"
       ],
@@ -1035,9 +1051,20 @@
           "title": "Claim",
           "type": "string"
         },
-        "days_before_the_stop": {
+        "coverage": {
           "$ref": "#/$defs/Figure",
-          "description": "The typical days between this claim coming on and the stop being touched."
+          "description": "How often the interval on the share above is meant to cover its true share. A figure rather than words inside a sentence, so that it cannot be printed without saying whose number it is."
+        },
+        "days_before_the_stop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The typical days between this claim coming on and the stop being touched. **Nothing at all** where no drawn world had it come on before the stop, which is an absence and never a day count of nothing."
         },
         "draws": {
           "$ref": "#/$defs/Figure",
@@ -1046,6 +1073,18 @@
         "lift": {
           "$ref": "#/$defs/Figure",
           "description": "How much more often this claim had already come on where the stop went first than it came on across all the drawn worlds. Three means three times as often; one means it tells you nothing. No interval, because no coverage is claimed for a ratio of two shares over overlapping sets."
+        },
+        "no_days_because": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why there is no day count, in plain words. Nothing where there is one.",
+          "title": "No Days Because"
         },
         "says": {
           "description": "Its claim, in one sentence.",
@@ -1060,7 +1099,9 @@
         "came_on_first",
         "came_on",
         "draws",
-        "days_before_the_stop"
+        "days_before_the_stop",
+        "no_days_because",
+        "coverage"
       ],
       "title": "TakesYouOutRow",
       "type": "object"
@@ -1185,6 +1226,10 @@
           "$ref": "#/$defs/Figure",
           "description": "How many equally-weighted worlds the whole rail rests on."
         },
+        "floor": {
+          "$ref": "#/$defs/Figure",
+          "description": "The fewest equally-weighted worlds a row may rest on."
+        },
         "left_off": {
           "description": "Every claim the rail leaves off, with its reason, in full sentences.",
           "items": {
@@ -1200,6 +1245,15 @@
           },
           "title": "Rows",
           "type": "array"
+        },
+        "sample_says": {
+          "description": "Which sample these worlds came from and where the market's chance of each claim came from, in one sentence, said once for the whole section rather than on every line of it.",
+          "title": "Sample Says",
+          "type": "string"
+        },
+        "stop_first_worlds": {
+          "$ref": "#/$defs/Figure",
+          "description": "How many drawn worlds ended with the stop touched first, before weighting."
         },
         "too_few_draws": {
           "anyOf": [
@@ -1218,7 +1272,10 @@
         "rows",
         "left_off",
         "too_few_draws",
-        "draws"
+        "draws",
+        "stop_first_worlds",
+        "floor",
+        "sample_says"
       ],
       "title": "WhatTakesYouOutShown",
       "type": "object"
@@ -1295,10 +1352,11 @@
       "type": "string"
     },
     "refuses": {
-      "description": "What this document does not know, in full sentences, carried as data.",
+      "description": "What this document does not know, in full sentences, carried as data. Never empty: a document with no limits is a claim nobody on this map may make.",
       "items": {
         "type": "string"
       },
+      "minItems": 1,
       "title": "Refuses",
       "type": "array"
     },
@@ -1307,6 +1365,7 @@
       "description": "What the reader typed about getting out."
     },
     "schema": {
+      "const": "katalyst.thesis/1",
       "description": "What this document calls itself, so a program knows what it has.",
       "title": "Schema",
       "type": "string"

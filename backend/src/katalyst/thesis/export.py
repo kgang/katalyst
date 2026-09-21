@@ -41,18 +41,27 @@ What this file must never do
 """
 
 import json
+from collections.abc import Callable, Sequence
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from katalyst.domain import BranchId, PropositionId
+
+# The one rule for writing a likelihood. It is public as `katalyst.domain.two_figures`
+# on the trunk, beside the class that holds a likelihood; this branch is four commits
+# behind that move and still carries the rule under its old private name. **One line
+# changes when this branch is rebased**: `from katalyst.domain import two_figures`.
+from katalyst.domain.diff import _two_figures as two_figures
 from katalyst.thesis.card import (
     OWNER_SAYS,
     Card,
     CeilingShown,
     Figure,
+    Kind,
     NotPriced,
     PricedIn,
     ShockRow,
@@ -66,7 +75,15 @@ from katalyst.thesis.card import (
 )
 from katalyst.thesis.position import Side, Trades
 
-SCHEMA_NAME = "katalyst.thesis/1"
+SchemaName = Literal["katalyst.thesis/1"]
+"""The one name a document of this shape may call itself.
+
+Written as a closed list of one so that the committed description **pins** it: a
+document calling itself something else is refused by any program checking against
+that description, rather than passing as a thesis it is not.
+"""
+
+SCHEMA_NAME: SchemaName = "katalyst.thesis/1"
 """What this document calls itself, so a program reading one knows what it has.
 
 The number changes when a field is removed or its meaning changes, and never when
@@ -175,7 +192,6 @@ class ShockExported(BaseModel):
     name: str = Field(description="What they supposed, in their own words.")
     placed_by: Literal["reader"] = Field(description="Who placed it. Always the reader.")
     probability: None = Field(
-        default=None,
         description=(
             "Always nothing at all. A shock is supposed, not forecast, and this document "
             "will not carry a number here."
@@ -253,7 +269,7 @@ class Export(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    schema_name: str = Field(
+    schema_name: SchemaName = Field(
         alias="schema",
         serialization_alias="schema",
         description="What this document calls itself, so a program knows what it has.",
@@ -267,7 +283,11 @@ class Export(BaseModel):
         description="Every tradeable ending on the map, ranked by two rules kept apart."
     )
     refuses: tuple[str, ...] = Field(
-        description="What this document does not know, in full sentences, carried as data."
+        min_length=1,
+        description=(
+            "What this document does not know, in full sentences, carried as data. Never "
+            "empty: a document with no limits is a claim nobody on this map may make."
+        ),
     )
     not_advice: str = Field(description="What this document is not, in one line.")
     execution: str = Field(
@@ -356,6 +376,7 @@ def _shock(row: ShockRow) -> ShockExported:
     return ShockExported(
         name=row.name,
         placed_by=row.placed_by,
+        probability=None,
         change_to_the_position=row.change_to_the_position,
         says=row.says,
     )
@@ -394,11 +415,103 @@ def schema_json() -> str:
 # --- The page a person reads -------------------------------------------------
 
 
+def two_significant(value: float) -> str:
+    """Write a number that is not a likelihood: two significant figures, sign and all.
+
+    **A move is not a likelihood.** The rule that writes a likelihood turns
+    anything under a hundredth into `<.01` and anything over ninety-nine
+    hundredths into `>.99`, because a likelihood of `.0090` is one this product
+    declines to state that precisely. A **move** of `.0090` is a different thing
+    entirely: it is a real quantity a reader acts on, and guarding it would be a
+    lie about an edge. So a move, a share of capital and a ratio come through here
+    instead — two significant figures, the sign kept, the nought before the point
+    dropped, and no guard at either end.
+
+    Both figures are always printed, so `.0090` and not `.009`: dropping a trailing
+    nought would claim less precision than we have.
+
+    **Never scientific notation.** Asking Python for two significant figures
+    directly gives `9.0e-03` below a hundredth, which is not a sentence anybody can
+    read aloud. The rounding is done on the number's own decimal digits instead —
+    the shortest decimal that reads back as this exact number, its point shifted by
+    counting rather than by multiplying — which is how the likelihood rule does it
+    too.
+
+    Args:
+        value: The number.
+
+    Returns:
+        It, written out. Exactly `0` where it is nothing at all, because two
+        significant figures of nothing is still nothing.
+    """
+    exact = Decimal(repr(value))
+    if exact == 0:
+        return "0"
+    rounded = exact.quantize(Decimal(1).scaleb(exact.adjusted() - 1), rounding=ROUND_HALF_UP)
+    return _without_the_leading_nought(format(rounded, "f"))
+
+
+def as_it_is(value: float) -> str:
+    """Write a price, a count or a number of days as it stands.
+
+    None of the three is a likelihood and none is a move: a price is money in the
+    instrument's or the contract's own units, a count is how many worlds, a day is
+    a day. Rounding any of them would be this file inventing precision it was not
+    given, so the shortest decimal that reads back as the number is what is
+    written, with a trailing `.0` dropped because `70.0` worlds is not a thing.
+
+    Args:
+        value: The number.
+
+    Returns:
+        It, written out, never in scientific notation.
+    """
+    exact = Decimal(repr(value)).normalize()
+    return format(exact, "f")
+
+
+HOW_A_NUMBER_IS_WRITTEN: dict[Kind, Callable[[float], str]] = {
+    "likelihood": two_figures,
+    "share": two_figures,
+    "move": two_significant,
+    "size": two_significant,
+    "ratio": two_significant,
+    "price": as_it_is,
+    "count": as_it_is,
+    "days": as_it_is,
+}
+"""Which rule writes each kind of number, as a closed table.
+
+One entry per kind, so that adding a kind without deciding how it is written is a
+failure the type checker points at rather than a number that quietly prints six
+figures.
+"""
+
+
+def _without_the_leading_nought(written: str) -> str:
+    """Drop the nought before the point, keeping the sign where there is one.
+
+    Args:
+        written: A number already written out, such as `0.0090` or `-0.0040`.
+
+    Returns:
+        The same without its leading nought — `.0090`, `-.0040` — and unchanged
+        where there is none.
+    """
+    if written.startswith("0."):
+        return written[1:]
+    if written.startswith("-0."):
+        return "-" + written[2:]
+    return written
+
+
 def say(figure: Figure) -> str:
-    """Write one number out with its owner, and its range where it has one.
+    """Write one number out, by the rule its kind names, with its owner beside it.
 
     Every number this program shows a reader names who it belongs to in the same
-    breath. Written once, here, so that the page below cannot show one without.
+    breath, and is written by the one rule for numbers of its kind. Both live here,
+    once, so the page below cannot show a number without an owner or write a
+    likelihood at six significant figures.
 
     Args:
         figure: The number.
@@ -406,32 +519,38 @@ def say(figure: Figure) -> str:
     Returns:
         One line: what it is, what it is, whose it is, and where it came from.
     """
-    said = f"{figure.value:.6g}"
+    write = HOW_A_NUMBER_IS_WRITTEN[figure.kind]
+    said = write(figure.value)
     if figure.lo is not None and figure.hi is not None:
-        said += f" (range {figure.lo:.6g} to {figure.hi:.6g})"
+        said += f" (range {write(figure.lo)} to {write(figure.hi)})"
     said += f" — {OWNER_SAYS[figure.owner]}"
     if figure.source is not None:
         said += f", {figure.source}"
     return f"{figure.about}: {said}"
 
 
-def _lines(figures: tuple[Figure, ...]) -> list[str]:
-    """Write a run of numbers out as list items.
+def _lines(figures: Sequence[Figure | None]) -> list[str]:
+    """Write a run of numbers out as list items, skipping the ones that are not there.
+
+    An absent number is not written as a blank line and never as a zero: whatever
+    section holds it says in words why it is absent, which is a different sentence
+    from any number.
 
     Args:
-        figures: The numbers, in the order they should be read.
+        figures: The numbers, in the order they should be read. An entry that is
+            nothing at all is left out.
 
     Returns:
-        One list item per number.
+        One list item per number that is there.
     """
-    return [f"- {say(one)}" for one in figures]
+    return [f"- {say(one)}" for one in figures if one is not None]
 
 
 def as_markdown(card: Card) -> str:
     """Write the card out as a page a person reads, with an owner on every number.
 
-    The same eight sections the panel shows, in the same order, ending with what
-    this card does not know. Every number carries its owner on its own line; there
+    The nine sections the panel shows, in the same order, ending with what this
+    card does not know. Every number carries its owner on its own line; there
     is no way to write one that does not, because the one place a number is written
     is `say`.
 
@@ -597,8 +716,8 @@ def _takes_you_out(rail: WhatTakesYouOutShown) -> list[str]:
     Returns:
         The lines.
     """
-    out = ["## What takes you out", ""]
-    out += _lines((rail.draws,))
+    out = ["## What takes you out", "", rail.sample_says + ".", ""]
+    out += _lines((rail.draws, rail.stop_first_worlds, rail.floor))
     out += [""]
     if rail.too_few_draws is not None:
         out += [rail.too_few_draws, ""]
@@ -608,11 +727,14 @@ def _takes_you_out(rail: WhatTakesYouOutShown) -> list[str]:
             (
                 row.lift,
                 row.came_on_first,
+                row.coverage,
                 row.came_on,
                 row.draws,
                 row.days_before_the_stop,
             )
         )
+        if row.no_days_because is not None:
+            out += [f"- {row.no_days_because}"]
         out += [""]
     for left in rail.left_off:
         out += [f"- Left off — {left}"]
@@ -645,7 +767,7 @@ def _watch(card: Card) -> list[str]:
         out += ["### Unhedgeable", ""]
         out += [
             f"- **{one.claim}** — {one.why} Judged {one.resolves.isoformat()}; "
-            f"{'published' if one.can_be_seen else 'nobody publishes the answer'}."
+            + ("the answer is published." if one.can_be_seen else "nobody publishes the answer.")
             for one in card.unhedgeable
         ]
         out += [""]
@@ -679,6 +801,8 @@ def _your_exit(card: Card) -> list[str]:
     if touches:
         out += _lines(touches)
         out += [""]
+    if exit_.sample_says is not None:
+        out += [exit_.sample_says + ".", ""]
     if exit_.method is not None:
         out += [exit_.method, ""]
     if exit_.first_touch_refused is not None:

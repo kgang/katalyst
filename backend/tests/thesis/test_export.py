@@ -34,7 +34,9 @@ from katalyst.thesis import (
     Carried,
     Dropped,
     Export,
+    Figure,
     Leg,
+    LiftRow,
     RiskExit,
     Shocked,
     Tail,
@@ -47,7 +49,8 @@ from katalyst.thesis import (
     say,
     schema_json,
 )
-from katalyst.thesis.card import NOT_ADVICE, REFUSES
+from katalyst.thesis.card import NO_DAYS_TO_COUNT, NOT_ADVICE, REFUSES
+from katalyst.thesis.export import two_figures
 from katalyst.thesis.position import REFUSALS, Refusal
 from tests.strategies import seeds
 from tests.thesis.cards import (
@@ -96,9 +99,11 @@ def complaints(written: Any, against: dict[str, Any], defs: dict[str, Any], at: 
 
     Understood: a named type, a fixed value, a closed list of values, an object's
     required keys and the description of each key it has, a list's item
-    description, a reference to a shape described elsewhere, and a choice between
-    several descriptions. Everything else — titles, prose, formats, defaults — is
-    read past, because it constrains nothing.
+    description and its shortest allowed length, a reference to a shape described
+    elsewhere, and a choice between several descriptions. Everything else —
+    titles, prose, formats, defaults — is read past, because it constrains
+    nothing, and a test below fails the day the description grows a rule that is
+    neither.
 
     Args:
         written: The part of the document being read.
@@ -133,9 +138,13 @@ def complaints(written: Any, against: dict[str, Any], defs: dict[str, Any], at: 
         for name, description in against.get("properties", {}).items():
             if name in written:
                 found += complaints(written[name], description, defs, f"{at}.{name}")
-    if kind == "array" and "items" in against:
-        for index, one in enumerate(written):
-            found += complaints(one, against["items"], defs, f"{at}[{index}]")
+    if kind == "array":
+        least = against.get("minItems")
+        if least is not None and len(written) < least:
+            found.append(f"{at} holds {len(written)} where the description requires {least}")
+        if "items" in against:
+            for index, one in enumerate(written):
+                found += complaints(one, against["items"], defs, f"{at}[{index}]")
     return found
 
 
@@ -203,7 +212,12 @@ def test_the_reader_of_the_description_bites() -> None:
             "shocks": [{**a_shock, "probability": 0.2}],
         },
     }
-    renamed = {**whole, "schema": ["not a string"]}
+    renamed = {**whole, "schema": "something.else/9"}
+    emptied = {**whole, "refuses": []}
+    a_third_word = {
+        **whole,
+        "legs": [{**whole["legs"][0], "priced_in": {**whole["legs"][0]["priced_in"], "kind": "x"}}],
+    }
     unowned = {
         **whole,
         "risk_exit": {
@@ -217,6 +231,10 @@ def test_the_reader_of_the_description_bites() -> None:
     assert complaints(guessed, description, defs, "the")
     assert complaints(renamed, description, defs, "the")
     assert complaints(unowned, description, defs, "the")
+    assert complaints(emptied, description, defs, "the")
+    assert any(
+        "answers none of the" in one for one in complaints(a_third_word, description, defs, "the")
+    )
 
 
 def test_every_export_answers_the_committed_description() -> None:
@@ -549,13 +567,26 @@ def test_a_page_leads_with_an_edge_worth_taking_and_gives_no_reason_not_to() -> 
 
 
 def test_a_page_says_when_a_fee_and_a_cost_are_unknown() -> None:
-    """A fee nobody has read is not a fee of nothing, and the page says which it is."""
+    """A fee nobody has read is not a fee of nothing, and the page says which it is.
+
+    Each sentence appears only where it is about something: the venue's fee on an
+    ending a venue quotes, the cost of getting in and out on one naming an
+    instrument. Neither page carries the other's.
+    """
     world = a_world()
 
-    page = as_markdown(a_card(world, position=a_position("instrument"), costs=None))
+    an_instrument = as_markdown(a_card(world, position=a_position("instrument"), costs=None))
+    a_contract = as_markdown(
+        a_card(
+            world,
+            position=a_position("contract", trades="contract", entry=0.4, stop=0.3, target=0.7),
+            answers={"contract": what_was_priced(world, "contract", None)},
+        )
+    )
 
-    assert "Nobody has read this venue's fee schedule" in page
-    assert "Nobody has stated what it costs to get in and out" in page
+    assert "Nobody has stated what it costs to get in and out" in an_instrument
+    assert "Nobody has read this venue's fee schedule" not in an_instrument
+    assert "Nobody has read this venue's fee schedule" in a_contract
 
 
 def test_a_number_with_a_range_says_so_and_one_without_does_not() -> None:
@@ -690,3 +721,151 @@ def test_a_document_written_at_any_price_still_answers_its_description(bid: floa
     )
 
     assert fails(card) == []
+
+
+# --- The fix round: the page writes a likelihood the way this product writes one ---
+
+
+THE_HOUSE_RULE = (
+    (0.462076, ".46"),
+    (0.297995, ".30"),
+    (0.193548, ".19"),
+    (0.9999, ">.99"),
+    (4e-07, "<.01"),
+    (1.0, ">.99"),
+    (0.0, "<.01"),
+)
+"""Every likelihood the reviewer showed the page could meet, and what the house rule prints."""
+
+
+@pytest.mark.parametrize(("value", "printed"), THE_HOUSE_RULE)
+def test_every_likelihood_the_page_can_meet_is_written_by_the_house_rule(
+    value: float, printed: str
+) -> None:
+    """Two significant figures, the nought dropped, never a certainty and never scientific."""
+    line = say(Figure(value=value, owner="model", about="a chance", kind="likelihood"))
+
+    assert line == f"a chance: {printed} — the model's"
+
+
+def test_a_move_keeps_its_two_figures_however_small() -> None:
+    """A move of nine thousandths is a real quantity a reader acts on. It is not a likelihood.
+
+    The rule that writes a likelihood turns anything under a hundredth into `<.01`,
+    which would be a lie about an edge. A move gets its own two figures, keeps its
+    sign, and is never guarded.
+    """
+    small = say(Figure(value=0.009, owner="computed", about="what buying is worth", kind="move"))
+    against = say(
+        Figure(value=-0.004, owner="computed", about="what selling is worth", kind="move")
+    )
+
+    assert small == "what buying is worth: .0090 — computed"
+    assert against == "what selling is worth: -.0040 — computed"
+
+
+def test_a_price_a_count_and_a_day_are_written_as_they_are() -> None:
+    """A price is not a likelihood, and neither is a number of worlds or a number of days."""
+    assert say(
+        Figure(value=70.0, owner="reader", about="the price you entered at", kind="price")
+    ) == ("the price you entered at: 70 — yours")
+    assert say(Figure(value=940.0, owner="computed", about="worlds", kind="count")) == (
+        "worlds: 940 — computed"
+    )
+    assert say(Figure(value=2.0, owner="computed", about="days", kind="days")) == (
+        "days: 2 — computed"
+    )
+
+
+def test_the_page_writes_the_model_number_at_two_significant_figures() -> None:
+    """The builder's own sample page printed `0.462076 (range 0.297995 to 0.6541)`."""
+    world = a_world()
+    card = a_card(
+        world,
+        position=a_position("contract", trades="contract", entry=0.4, stop=0.3, target=0.7),
+        answers={"contract": what_was_priced(world, "contract", agreeing_quote(world, "contract"))},
+    )
+
+    page = as_markdown(card)
+
+    model = card.priced_in.model  # type: ignore[union-attr]
+    assert model.lo is not None and model.hi is not None
+    band = f"{two_figures(model.lo)} to {two_figures(model.hi)}"
+    assert f"the chance this claim comes true: {two_figures(model.value)} (range {band})" in page
+    assert "0.462076" not in page
+
+
+UNDERSTOOD = {
+    "$ref",
+    "anyOf",
+    "oneOf",
+    "const",
+    "enum",
+    "type",
+    "required",
+    "properties",
+    "items",
+    "minItems",
+}
+"""Every rule of the description language the reader above can read."""
+
+CONSTRAINS_NOTHING = {"$defs", "title", "description", "default", "discriminator", "format"}
+"""Everything in the description that a reader may pass over without missing a rule.
+
+`format` is here because it is advisory: the reference implementation ignores it
+too unless format checking is asked for, so neither reader is weaker than the
+other by passing over it.
+"""
+
+
+def every_description(node: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every place in the committed file that describes a value, and nowhere else.
+
+    Walks into the shapes named under `$defs`, the description of each key, each
+    branch of a choice and a list's items — and never into a name, which is why
+    a shape called `items` would not be mistaken for the rule of that name.
+    """
+    found = [node]
+    for one in node.get("$defs", {}).values():
+        found += every_description(one)
+    for one in node.get("properties", {}).values():
+        found += every_description(one)
+    for either in ("anyOf", "oneOf"):
+        for one in node.get(either, ()):
+            found += every_description(one)
+    if "items" in node:
+        found += every_description(node["items"])
+    return found
+
+
+def test_the_description_states_no_rule_the_reader_cannot_read() -> None:
+    """The reader passes over what it does not understand, so this fails the day one appears.
+
+    That is the one real risk in reading a description with something smaller than
+    a full implementation: the day a shape grows a lower bound, a fixed length or a
+    pattern, the committed file would carry a rule nothing checks and every test
+    would still pass. This test is what stops that being silent.
+    """
+    beyond = {
+        rule
+        for described in every_description(the_committed_description())
+        for rule in described
+        if rule not in UNDERSTOOD and rule not in CONSTRAINS_NOTHING
+    }
+
+    assert beyond == set(), (
+        f"the committed description states {sorted(beyond)}, which the reader in this file "
+        "passes over; teach it those rules or stop stating them"
+    )
+
+
+def test_a_page_says_why_a_rail_row_has_no_day_count() -> None:
+    """An absence is written as a sentence, never as a day count of nothing."""
+    world = a_world()
+    row = a_lift_row("step", 3.1)
+    without = LiftRow(**{**row.__dict__, "days_before_the_stop": None})
+
+    page = as_markdown(a_card(world, rail=a_rail(rows=(without,))))
+
+    assert NO_DAYS_TO_COUNT in page
+    assert "the typical days between this claim coming on" not in page

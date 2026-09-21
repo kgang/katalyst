@@ -88,6 +88,29 @@ it out over the drawn worlds or from numbers above. Every figure on a card names
 exactly one of the four, and no two are ever merged into a third.
 """
 
+Kind = Literal["likelihood", "share", "move", "size", "ratio", "price", "count", "days"]
+"""What a number on the card **is**, as a closed list, so a rendering knows how to write it.
+
+This product writes a likelihood one way and everything else another, and the
+rule is not a matter of taste: a likelihood is written at two significant figures
+with a guard word at each end, because `1.0` claims a thing cannot fail and `.0`
+claims it cannot happen, and nobody on this map is entitled to either. A **move**
+is not a likelihood and must never come through that rule — a move of `.0090` is a
+real quantity a reader acts on, where a likelihood of `.0090` is one this product
+declines to state that precisely.
+
+`likelihood` — a chance something comes true, between nothing and one. `share` —
+a part of a whole, on the same scale and written the same way. `move` — a signed
+difference of likelihoods: an edge, a shift, what a turn does to an ending.
+`size` — a share of capital, which may be more than all of it. `ratio` — how many
+times as often, which has no upper end. `price` — money, in the instrument's or
+the contract's own units. `count` — how many worlds. `days` — how many days.
+
+**It is a field rather than a comment because a rendering holding a figure cannot
+otherwise know which rule applies to it**, and a renderer that has to remember is
+one that will forget.
+"""
+
 OWNER_SAYS: Mapping[Owner, str] = {
     "reader": "yours",
     "model": "the model's",
@@ -197,6 +220,30 @@ NO_SHIFT_WAS_WORKED_OUT = (
 )
 """Why an instrument ending is left out of the ranking."""
 
+NO_DAYS_TO_COUNT = (
+    "No drawn world had this claim come on before the stop was touched, so there is no "
+    "typical number of days to report. That is a claim that kept company with the trade "
+    "working, not one with a day count of nothing."
+)
+"""Why a rail row has no day count, said rather than written as a zero.
+
+A zero here would read *it came on the same day the stop was touched*, which is a
+measurement. An absence is not one, and the two must never print the same.
+"""
+
+AN_ANSWER_FOR_ANOTHER_CLAIM = (
+    "the answer filed under '{filed}' is the answer for '{about}'. A card prints a claim's "
+    "own number, quote, edges and break-even under that claim's name, so the two have to be "
+    "the same claim before either can be shown."
+)
+"""What is said when a priced answer is filed under a claim it is not about.
+
+A broken promise between our own pieces of code rather than anything a reader
+did — whatever priced the endings filed one wrongly — so it is raised, the way a
+quote for another contract is one layer down, and never turned into a card row
+nobody can trace.
+"""
+
 NOTHING_WAS_PRICED = (
     "Nothing was priced for this ending, so there is no edge to rank it by and no refusal "
     "to explain why."
@@ -234,6 +281,13 @@ class Figure(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     value: float = Field(description="The number itself, at full precision. A rendering rounds.")
+    kind: Kind = Field(
+        description=(
+            "What the number is, which decides how it is written: a likelihood and a share "
+            "carry a guard word at each end, a move keeps its two figures however small, and "
+            "a price, a count and a day are written as they are."
+        )
+    )
     owner: Owner = Field(
         description=(
             "Whose number this is: the reader's, the model's, a venue's, or a computation "
@@ -260,17 +314,18 @@ class Figure(BaseModel):
     )
 
 
-def readers(value: float, about: str) -> Figure:
+def readers(value: float, about: str, *, kind: Kind) -> Figure:
     """Build a figure the reader typed.
 
     Args:
         value: The number they typed.
         about: What it is, in plain words.
+        kind: What the number is, which decides how it is written.
 
     Returns:
         A figure owned by the reader, with no source: they are the source.
     """
-    return Figure(value=value, owner="reader", about=about)
+    return Figure(value=value, kind=kind, owner="reader", about=about)
 
 
 def models(belief: Belief, about: str, source: str | None = None) -> Figure:
@@ -294,22 +349,31 @@ def models(belief: Belief, about: str, source: str | None = None) -> Figure:
             f"a card reads the model's own number here; this one is owned by '{belief.owner}'"
         )
     return Figure(
-        value=belief.p, owner="model", about=about, source=source, lo=belief.lo, hi=belief.hi
+        value=belief.p,
+        kind="likelihood",
+        owner="model",
+        about=about,
+        source=source,
+        lo=belief.lo,
+        hi=belief.hi,
     )
 
 
-def venues(value: float, about: str, source: str) -> Figure:
+def venues(value: float, about: str, source: str, *, kind: Kind = "likelihood") -> Figure:
     """Build a figure a venue published.
 
     Args:
         value: The number the venue gave.
         about: What it is, in plain words.
         source: The venue and the day, which a venue's number always names.
+        kind: What the number is. A venue's prices on a contract are likelihoods —
+            a contract paying one when a claim comes true trades between nothing
+            and one — so that is the ordinary case; its fee is a price.
 
     Returns:
         A figure owned by a venue.
     """
-    return Figure(value=value, owner="venue", about=about, source=source)
+    return Figure(value=value, kind=kind, owner="venue", about=about, source=source)
 
 
 def computed(
@@ -317,6 +381,7 @@ def computed(
     about: str,
     source: str | None = None,
     *,
+    kind: Kind,
     lo: float | None = None,
     hi: float | None = None,
 ) -> Figure:
@@ -327,13 +392,16 @@ def computed(
         about: What it is, in plain words.
         source: What it was worked out over — the sample, the rule — where that
             needs saying.
+        kind: What the number is, which decides how it is written.
         lo: The bottom of the interval around it, where one was measured.
         hi: The top of that interval.
 
     Returns:
         A figure owned by a computation over the drawn worlds.
     """
-    return Figure(value=value, owner="computed", about=about, source=source, lo=lo, hi=hi)
+    return Figure(
+        value=value, kind=kind, owner="computed", about=about, source=source, lo=lo, hi=hi
+    )
 
 
 # --- What the card is handed -------------------------------------------------
@@ -718,8 +786,22 @@ class TakesYouOutRow(BaseModel):
         description="The share of all the drawn worlds where it came on at all."
     )
     draws: Figure = Field(description="How many equally-weighted worlds the share above is worth.")
-    days_before_the_stop: Figure = Field(
-        description="The typical days between this claim coming on and the stop being touched."
+    days_before_the_stop: Figure | None = Field(
+        description=(
+            "The typical days between this claim coming on and the stop being touched. "
+            "**Nothing at all** where no drawn world had it come on before the stop, which "
+            "is an absence and never a day count of nothing."
+        )
+    )
+    no_days_because: str | None = Field(
+        description="Why there is no day count, in plain words. Nothing where there is one."
+    )
+    coverage: Figure = Field(
+        description=(
+            "How often the interval on the share above is meant to cover its true share. A "
+            "figure rather than words inside a sentence, so that it cannot be printed "
+            "without saying whose number it is."
+        )
     )
 
 
@@ -741,6 +823,17 @@ class WhatTakesYouOutShown(BaseModel):
         )
     )
     draws: Figure = Field(description="How many equally-weighted worlds the whole rail rests on.")
+    stop_first_worlds: Figure = Field(
+        description="How many drawn worlds ended with the stop touched first, before weighting."
+    )
+    floor: Figure = Field(description="The fewest equally-weighted worlds a row may rest on.")
+    sample_says: str = Field(
+        description=(
+            "Which sample these worlds came from and where the market's chance of each claim "
+            "came from, in one sentence, said once for the whole section rather than on every "
+            "line of it."
+        )
+    )
 
 
 class WhatToWatch(BaseModel):
@@ -838,6 +931,13 @@ class YourExit(BaseModel):
     )
     method: str | None = Field(
         description="How the shares were arrived at, printed wherever they are."
+    )
+    sample_says: str | None = Field(
+        description=(
+            "Which sample the event days came from and where the market's chance of each "
+            "claim came from, in one sentence, said once for the whole section. Nothing at "
+            "all where there is no first touch to say it about."
+        )
     )
 
 
@@ -1107,8 +1207,9 @@ def what_else_can_i_trade(
         ValueError: If `priced` carries an answer about a claim that is not on this
             map, which would mean two different maps had been mixed.
     """
-    for claim in priced:
+    for claim, filed in priced.items():
         _the_claim(base, claim)
+        _the_answer_is_for_this_claim(claim, filed)
     by_edge: list[RankedEnding] = []
     by_shift: list[RankedEnding] = []
     left_out: list[NotRanked] = []
@@ -1134,7 +1235,7 @@ def what_else_can_i_trade(
                     )
                 )
             else:
-                by_edge.append(_ranked_by_edge(ending, answer))
+                by_edge.append(_ranked_by_edge(ending, payoff, answer))
             continue
         shift = shifts.get(ending.id)
         if shift is None:
@@ -1158,15 +1259,44 @@ def what_else_can_i_trade(
     )
 
 
-def _ranked_by_edge(ending: Proposition, edge: Edge) -> RankedEnding:
+def _the_answer_is_for_this_claim(claim: PropositionId, answer: Edge | NotComparable) -> None:
+    """Check that a priced answer is about the claim it was filed under.
+
+    Both an edge and a refusal carry the claim they are about, so a card never has
+    to take a caller's filing on trust. One filed wrongly would print one claim's
+    number, quote, edges and break-even under another claim's name — state nobody
+    could trace back to an input, which is the one thing this product refuses on
+    sight.
+
+    Args:
+        claim: The claim it was filed under.
+        answer: What was filed there.
+
+    Raises:
+        ValueError: If the answer is about a different claim.
+    """
+    if answer.claim != claim:
+        raise ValueError(AN_ANSWER_FOR_ANOTHER_CLAIM.format(filed=claim, about=answer.claim))
+
+
+def _ranked_by_edge(ending: Proposition, payoff: ContractPayoff, edge: Edge) -> RankedEnding:
     """Rank one ending by the size of its edge, whichever side it favours.
 
     The key is the better of the two edges, and it may be negative: an ending a
     venue prices out of reach is still an ending the reader asked about, and it
     ranks last rather than disappearing.
 
+    **A row is led with only when its better edge is worth taking.** When neither
+    side is, that is a complete answer rather than a gap, and the row says so —
+    the more a venue prices an ending out of reach, the *less* worth leading with
+    it is. The tick guard is read the same way round: a gap is narrow when it is
+    smaller than one price step, not when its size is.
+
     Args:
         ending: The ending.
+        payoff: What it names, which is where the contract's own identifier comes
+            from — a reader-typed quote carries none, and a claim identifier is
+            not an instrument.
         edge: The edge built against the venue's two prices, which its caller has
             already found is not inside the model's own stated range.
 
@@ -1175,24 +1305,30 @@ def _ranked_by_edge(ending: Proposition, edge: Edge) -> RankedEnding:
     """
     best = max(edge.buying, edge.selling)
     side = "buying" if edge.buying >= edge.selling else "selling"
-    narrow = edge.tick is not None and abs(best) < edge.tick
+    narrow = edge.tick is not None and best < edge.tick
+    lead, because = True, None
+    if best <= 0.0:
+        lead, because = False, NO_EDGE_AT_THIS_PRICE
+    elif narrow:
+        lead, because = False, NARROWER_THAN_A_TICK
     return RankedEnding(
         ending=ending.id,
         says=ending.claim,
         trades="contract",
-        instrument=edge.quote.market_id or ending.id,
+        instrument=payoff.contract_id,
         ranked_by="the_size_of_its_edge",
         key=computed(
             best,
             f"the better of the two edges, which is the edge of {side}",
             "the size of its edge, whichever side it favours",
+            kind="move",
         ),
         made_of=(
-            computed(edge.buying, "what buying is worth, at the offer, after the fee"),
-            computed(edge.selling, "what selling is worth, at the bid, after the fee"),
+            computed(edge.buying, "what buying is worth, at the offer, after the fee", kind="move"),
+            computed(edge.selling, "what selling is worth, at the bid, after the fee", kind="move"),
         ),
-        headline=not narrow,
-        not_headlined_because=NARROWER_THAN_A_TICK if narrow else None,
+        headline=lead,
+        not_headlined_because=because,
     )
 
 
@@ -1222,15 +1358,18 @@ def _ranked_by_shift(ending: Proposition, payoff: PricePayoff, shift: Shift) -> 
             abs(shift.points) * payoff.move,
             "how far the hypothesis moves this ending, times the move its payoff names",
             "the shift times the move",
+            kind="move",
         ),
         made_of=(
             computed(
                 shift.points,
                 "how far the hypothesis moves this ending, as a difference of two likelihoods",
                 shift.worked_out_by,
+                kind="move",
             ),
             Figure(
                 value=payoff.move,
+                kind="move",
                 owner="model",
                 about=(
                     "how far the instrument moves if the claim comes true, as the model stated it"
@@ -1379,8 +1518,9 @@ def _carries(base: World, carried: Carried) -> WhatCarriesIt:
         points=computed(
             carried.points,
             "how much of the hypothesis's effect on this ending this claim's arrows carry",
+            kind="move",
         ),
-        share=computed(carried.share, "what part of the whole shift that is"),
+        share=computed(carried.share, "what part of the whole shift that is", kind="share"),
     )
 
 
@@ -1388,6 +1528,13 @@ def _priced_in(
     answer: Edge | NotComparable, position: Position, costs: float | None
 ) -> WhatIsPricedIn:
     """Turn an edge, or the refusal that stands where one could not be built, into a card section.
+
+    **Two thresholds decide what may be led with, and the card names the one that
+    bit.** Neither side worth taking is a complete answer. And an edge worth taking
+    at one end of the model's own stated range and not at the other is not led with
+    either — the gap being called an edge is smaller than the model's own
+    uncertainty about the number it is made from, and record 0018 says such an edge
+    is neither headlined nor ranked.
 
     An instrument ending gets the break-even its own entry price makes computable:
     the price at which the position is worth nothing, which is the entry price moved
@@ -1404,13 +1551,19 @@ def _priced_in(
     Returns:
         Either the priced section or the refused one.
     """
+    names_a_venue = position.trades == "contract"
     unknown_fee = (
         "Nobody has read this venue's fee schedule, so these are before fees."
-        if answer.fee is None
+        if answer.fee is None and names_a_venue
         else None
     )
     fee = (
-        venues(answer.fee, "what the venue charges on one filled trade", "the venue's schedule")
+        venues(
+            answer.fee,
+            "what the venue charges on one filled trade",
+            "the venue's schedule",
+            kind="price",
+        )
         if answer.fee is not None
         else None
     )
@@ -1424,6 +1577,7 @@ def _priced_in(
                 position.entry + away,
                 "the price at which this position is worth nothing",
                 "the entry price you typed, moved by what it costs to get in and out",
+                kind="price",
             )
             unknown_costs = (
                 "Nobody has stated what it costs to get in and out of this instrument, so "
@@ -1437,12 +1591,20 @@ def _priced_in(
             fee=fee,
             fee_is_unknown=unknown_fee,
             buy_below=(
-                computed(answer.break_even.buy_below, "worth buying at any offer below this")
+                computed(
+                    answer.break_even.buy_below,
+                    "worth buying at any offer below this",
+                    kind="likelihood",
+                )
                 if answer.break_even is not None
                 else None
             ),
             sell_above=(
-                computed(answer.break_even.sell_above, "worth selling at any bid above this")
+                computed(
+                    answer.break_even.sell_above,
+                    "worth selling at any bid above this",
+                    kind="likelihood",
+                )
                 if answer.break_even is not None
                 else None
             ),
@@ -1450,12 +1612,16 @@ def _priced_in(
             costs_are_unknown=unknown_costs,
         )
     best = max(answer.buying, answer.selling)
+    narrow = answer.tick is not None and best < answer.tick
     headline: Literal["buying", "selling", "no_edge_at_this_price"]
+    said_instead: str | None
     if best <= 0.0:
-        headline = "no_edge_at_this_price"
+        headline, said_instead = "no_edge_at_this_price", NO_EDGE_AT_THIS_PRICE
+    elif answer.inside_the_model_range:
+        headline, said_instead = "no_edge_at_this_price", INSIDE_THE_MODEL_RANGE
     else:
         headline = "buying" if answer.buying >= answer.selling else "selling"
-    narrow = answer.tick is not None and abs(best) < answer.tick
+        said_instead = NARROWER_THAN_A_TICK if narrow else None
     read_on = answer.quote.as_of.date()
     typed = answer.quote.source == "user"
     said = (
@@ -1466,7 +1632,9 @@ def _priced_in(
 
     def price(value: float, about: str) -> Figure:
         """Build a price figure, owned by whoever gave the price."""
-        return readers(value, about) if typed else venues(value, about, said)
+        if typed:
+            return readers(value, about, kind="likelihood")
+        return venues(value, about, said)
 
     return PricedIn(
         model=models(answer.model, "the chance this claim comes true"),
@@ -1481,18 +1649,20 @@ def _priced_in(
         ),
         fee=fee,
         fee_is_unknown=unknown_fee,
-        buying=computed(answer.buying, "what buying is worth, at the offer, after the fee"),
-        selling=computed(answer.selling, "what selling is worth, at the bid, after the fee"),
-        headline=headline,
-        not_headlined_because=(
-            NO_EDGE_AT_THIS_PRICE
-            if headline == "no_edge_at_this_price"
-            else NARROWER_THAN_A_TICK
-            if narrow
-            else None
+        buying=computed(
+            answer.buying, "what buying is worth, at the offer, after the fee", kind="move"
         ),
-        buy_below=computed(answer.break_even.buy_below, "worth buying at any offer below this"),
-        sell_above=computed(answer.break_even.sell_above, "worth selling at any bid above this"),
+        selling=computed(
+            answer.selling, "what selling is worth, at the bid, after the fee", kind="move"
+        ),
+        headline=headline,
+        not_headlined_because=said_instead,
+        buy_below=computed(
+            answer.break_even.buy_below, "worth buying at any offer below this", kind="likelihood"
+        ),
+        sell_above=computed(
+            answer.break_even.sell_above, "worth selling at any bid above this", kind="likelihood"
+        ),
         mixture=_mixture(answer.mixture),
     )
 
@@ -1513,21 +1683,25 @@ def _mixture(mixture: Mixture | None) -> MixtureShown | None:
         supposed=mixture.supposed,
         weight_supposed=Figure(
             value=mixture.weight_supposed,
+            kind="likelihood",
             owner="model",
             about="the map's own chance of the claim you supposed coming out that way",
         ),
         weight_otherwise=Figure(
             value=mixture.weight_otherwise,
+            kind="likelihood",
             owner="model",
             about="one minus it, which is the chance it comes out the other way",
         ),
         reading_supposed=Figure(
             value=mixture.reading_supposed,
+            kind="likelihood",
             owner="model",
             about="this ending's likelihood in the world you are looking at",
         ),
         reading_otherwise=Figure(
             value=mixture.reading_otherwise,
+            kind="likelihood",
             owner="model",
             about="this ending's likelihood where that same claim goes the other way",
         ),
@@ -1542,6 +1716,18 @@ def _rail(
 ) -> WhatTakesYouOutShown:
     """Turn the lift rail into card rows, naming the sample every share was taken over.
 
+    **The sample is named twice over, and each time for a different reason.** Every
+    figure carries the short name of the sample its number was read from, because
+    no number read off drawn worlds may be shown without one. The whole sentence —
+    which sample, and where the market's chance of each claim came from — is said
+    **once for the section**, because repeating a forty-word sentence on every line
+    of a rail is how a page stops being one a person reads.
+
+    **A claim with no day count keeps its absence.** Where no drawn world had a
+    claim come on before the stop was touched there is nothing to average, and the
+    row carries nothing at all with the reason beside it. A zero there would read
+    *it came on the day the stop was touched*, which is a measurement nobody made.
+
     Args:
         base: The world whose map names each claim.
         rail: The rail as `lift.py` ranked it.
@@ -1552,6 +1738,7 @@ def _rail(
         The rail as the card shows it, with what was left off in full sentences.
     """
     said = where_the_numbers_came_from(rail.sample, market_chance_from)
+    drawn = THE_SAMPLE_SAYS[rail.sample]
     rows = tuple(
         TakesYouOutRow(
             claim=one.claim,
@@ -1559,27 +1746,36 @@ def _rail(
             lift=computed(
                 one.lift,
                 "how much more often this claim had already come on where the stop went first",
-                said,
+                drawn,
+                kind="ratio",
             ),
             came_on_first=computed(
                 one.came_on_first,
                 "the share of the stop-first worlds where it had already come on",
-                f"{said}; the interval covers this share {one.coverage:.0%} of the time",
+                drawn,
+                kind="share",
                 lo=one.came_on_first_lo,
                 hi=one.came_on_first_hi,
             ),
             came_on=computed(
-                one.came_on, "the share of all the drawn worlds where it came on at all", said
+                one.came_on,
+                "the share of all the drawn worlds where it came on at all",
+                drawn,
+                kind="share",
             ),
             draws=computed(
                 one.effective_draws,
                 "how many equally-weighted worlds this row rests on",
-                said,
+                drawn,
+                kind="count",
             ),
-            days_before_the_stop=computed(
-                one.days_before_the_stop,
-                "the typical days between this claim coming on and the stop being touched",
-                said,
+            days_before_the_stop=_days(one.days_before_the_stop, drawn),
+            no_days_because=None if one.days_before_the_stop is not None else NO_DAYS_TO_COUNT,
+            coverage=computed(
+                one.coverage,
+                "how often the interval above is meant to cover the true share",
+                "the interval's own stated coverage",
+                kind="share",
             ),
         )
         for one in rail.rows
@@ -1591,9 +1787,45 @@ def _rail(
         draws=computed(
             rail.effective_draws,
             "how many equally-weighted worlds the whole rail rests on",
-            f"{said}; {rail.stop_first_worlds} worlds ended with the stop touched first, and no "
-            f"row may rest on fewer than {rail.floor} equally-weighted ones",
+            drawn,
+            kind="count",
         ),
+        stop_first_worlds=computed(
+            float(rail.stop_first_worlds),
+            "how many drawn worlds ended with the stop touched first, before weighting",
+            drawn,
+            kind="count",
+        ),
+        floor=computed(
+            float(rail.floor),
+            "the fewest equally-weighted worlds a row may rest on",
+            "a chosen floor, carried over from the finance analysis and not measured",
+            kind="count",
+        ),
+        sample_says=said,
+    )
+
+
+def _days(days: float | None, drawn: str) -> Figure | None:
+    """The typical days before the stop, or nothing at all where there were none to count.
+
+    Args:
+        days: What the rail measured, or nothing at all where its numerator counted
+            no world.
+        drawn: The short name of the sample those days came from.
+
+    Returns:
+        The figure, or nothing at all. Never a figure of zero standing for an
+        absence: *it came on the day the stop was touched* and *no world had it
+        come on first* are opposite facts.
+    """
+    if days is None:
+        return None
+    return computed(
+        days,
+        "the typical days between this claim coming on and the stop being touched",
+        drawn,
+        kind="days",
     )
 
 
@@ -1613,7 +1845,11 @@ def _watch(base: World, watched: Watched) -> WhatToWatch:
         says=claim.claim,
         resolves=watched.resolves,
         observed_by=watched.observed_by,
-        hurts_by=computed(watched.hurts_by, "how far this turn moves the ending against your side"),
+        hurts_by=computed(
+            watched.hurts_by,
+            "how far this turn moves the ending against your side",
+            kind="move",
+        ),
     )
 
 
@@ -1646,6 +1882,10 @@ def _your_exit(
 ) -> YourExit:
     """Arrange what the reader typed, what it implies, and how often each end is reached first.
 
+    Every figure carries the short name of the sample it was read from; the whole
+    sentence — which sample, and where the market's chance of each claim came from
+    — is said once for the section, for the same reason the rail says it once.
+
     Args:
         position: What they typed.
         ceiling: The greyed ceiling, or the reason there is none.
@@ -1657,17 +1897,26 @@ def _your_exit(
     Returns:
         The exit section.
     """
+    typed = {
+        "entry": readers(position.entry, "the price you entered at", kind="price"),
+        "stop": readers(position.stop, "the price at which you get out for a loss", kind="price"),
+        "target": readers(
+            position.target, "the price at which you get out for a gain", kind="price"
+        ),
+        "risk_budget": readers(
+            position.risk_budget,
+            "the share of your capital you are prepared to lose here",
+            kind="share",
+        ),
+        "implied_size": readers(
+            implied_size, "the share of capital your own risk budget implies", kind="size"
+        ),
+    }
     shown = _ceiling(ceiling)
     if isinstance(touch, Refusal):
         return YourExit(
-            entry=readers(position.entry, "the price you entered at"),
-            stop=readers(position.stop, "the price at which you get out for a loss"),
-            target=readers(position.target, "the price at which you get out for a gain"),
+            **typed,
             horizon=position.horizon,
-            risk_budget=readers(
-                position.risk_budget, "the share of your capital you are prepared to lose here"
-            ),
-            implied_size=readers(implied_size, "the share of capital your own risk budget implies"),
             ceiling=shown,
             stop_first=None,
             target_first=None,
@@ -1676,35 +1925,40 @@ def _your_exit(
             target_at=None,
             first_touch_refused=touch.sentence,
             method=None,
+            sample_says=None,
         )
-    said = where_the_numbers_came_from(touch.sample, market_chance_from)
+    drawn = THE_SAMPLE_SAYS[touch.sample]
     return YourExit(
-        entry=readers(position.entry, "the price you entered at"),
-        stop=readers(position.stop, "the price at which you get out for a loss"),
-        target=readers(position.target, "the price at which you get out for a gain"),
+        **typed,
         horizon=position.horizon,
-        risk_budget=readers(
-            position.risk_budget, "the share of your capital you are prepared to lose here"
-        ),
-        implied_size=readers(implied_size, "the share of capital your own risk budget implies"),
         ceiling=shown,
         stop_first=computed(
-            touch.stop_first, "how often your stop is touched before your target", said
+            touch.stop_first,
+            "how often your stop is touched before your target",
+            drawn,
+            kind="share",
         ),
-        target_first=computed(touch.target_first, "how often your target is touched first", said),
-        neither=computed(touch.neither, "how often the window closes with neither touched", said),
+        target_first=computed(
+            touch.target_first, "how often your target is touched first", drawn, kind="share"
+        ),
+        neither=computed(
+            touch.neither, "how often the window closes with neither touched", drawn, kind="share"
+        ),
         stop_at=computed(
             touch.stop_at,
             "the level actually checked for the stop, after the barrier shift",
-            said,
+            drawn,
+            kind="price",
         ),
         target_at=computed(
             touch.target_at,
             "the level actually checked for the target, after the barrier shift",
-            said,
+            drawn,
+            kind="price",
         ),
         first_touch_refused=None,
         method=THE_BARRIER_SHIFT,
+        sample_says=where_the_numbers_came_from(touch.sample, market_chance_from),
     )
 
 
@@ -1723,6 +1977,7 @@ def _ceiling(ceiling: Ceiling) -> CeilingShown:
                 ceiling.fraction,
                 "the most of your capital the Kelly rule would put on, quartered",
                 "worked out at the unfavourable end of the model's own stated range",
+                kind="size",
             )
             if ceiling.fraction is not None
             else None
@@ -1732,6 +1987,7 @@ def _ceiling(ceiling: Ceiling) -> CeilingShown:
             computed(
                 ceiling.at,
                 "the likelihood it was worked out at: the unfavourable end of the model's range",
+                kind="likelihood",
             )
             if ceiling.at is not None
             else None
@@ -1760,7 +2016,11 @@ def _tails(base: World, tails: Sequence[Tail]) -> tuple[TailRow, ...]:
             claim=one.claim,
             says=_the_claim(base, one.claim).claim,
             likelihood=models(one.likelihood, "the model's own chance of this claim"),
-            harm=computed(one.harm, "what this would do to the position, as a loss in price units"),
+            harm=computed(
+                one.harm,
+                "what this would do to the position, as a loss in price units",
+                kind="price",
+            ),
             what_could_be_done=one.what_could_be_done,
         )
         for one in tails
@@ -1783,6 +2043,7 @@ def _shock(shocked: Shocked) -> ShockRow:
         change_to_the_position=computed(
             shocked.change_to_the_position,
             "what the position is worth on that branch less what it is worth without it",
+            kind="price",
         ),
         says=A_SHOCK_HAS_NO_PROBABILITY,
     )

@@ -128,6 +128,28 @@ def a_card_map() -> Graph:
     )
 
 
+def a_no_side_map() -> Graph:
+    """A map whose one tradeable ending takes the **no** side of a contract.
+
+    A no-side ending makes money when the claim fails, so the number it is priced
+    against is one minus the claim's own. Nothing else on this branch has one, and
+    the arithmetic on that side cannot be kept correct by tests that never meet it.
+    """
+    return Graph(
+        id="a-no-side-map",
+        hypothesis_id="start",
+        propositions=(
+            a_claim("start", "hypothesis"),
+            a_claim("step", "event"),
+            a_claim("no-side", "market", payoff=a_contract("no")),
+        ),
+        links=(
+            an_arrow("start-to-step", "start", "step"),
+            an_arrow("step-to-no-side", "step", "no-side"),
+        ),
+    )
+
+
 def a_world(seed: int = 1) -> World:
     """The world with nothing fixed by an edit, over the map above."""
     return world_of(a_card_map(), seed=seed)

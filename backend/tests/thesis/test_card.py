@@ -35,6 +35,7 @@ from katalyst.thesis import (
     Dropped,
     Edge,
     Figure,
+    LiftRow,
     NotPriced,
     PricedIn,
     Refusal,
@@ -50,6 +51,7 @@ from katalyst.thesis.card import (
     A_PRICE_YOU_ENTERED,
     INSIDE_THE_MODEL_RANGE,
     NARROWER_THAN_A_TICK,
+    NO_DAYS_TO_COUNT,
     NO_EDGE_AT_THIS_PRICE,
     NO_SHIFT_WAS_WORKED_OUT,
     NOT_ADVICE,
@@ -70,13 +72,14 @@ from tests.thesis.cards import (
     a_ceiling,
     a_first_touch,
     a_lift_row,
+    a_no_side_map,
     a_position,
     a_rail,
     a_shift,
     a_world,
     what_was_priced,
 )
-from tests.thesis.test_edge import agreeing_quote, pays_on, world_of
+from tests.thesis.test_edge import MARKET, agreeing_quote, pays_on, world_of
 
 SOME_DAY = date(2026, 10, 15)
 """One day before the endings on this map are judged. Nothing reads it as a number."""
@@ -319,7 +322,9 @@ def test_unknown_costs_are_said_and_the_break_even_is_the_entry_itself() -> None
     """Nobody has stated what it costs to get in and out, so the card says so in words.
 
     An unknown cost treated quietly as nothing would print a number that looks net
-    when it is not.
+    when it is not. And **no venue's fee is mentioned at all** on an ending no
+    venue quotes: a sentence about this venue's schedule, on a claim whose whole
+    refusal is that no contract quotes it, names something that is not there.
     """
     world = a_world()
 
@@ -330,7 +335,7 @@ def test_unknown_costs_are_said_and_the_break_even_is_the_entry_itself() -> None
     assert priced_in.price_break_even is not None
     assert priced_in.price_break_even.value == a_position().entry
     assert priced_in.costs_are_unknown is not None
-    assert priced_in.fee_is_unknown is not None
+    assert priced_in.fee_is_unknown is None
 
 
 def test_a_contract_ending_with_no_quote_keeps_its_break_even_in_likelihoods() -> None:
@@ -426,6 +431,9 @@ def test_the_better_edge_ranks_the_row_and_names_its_side() -> None:
     assert other.key.value == selling.selling > selling.buying
     assert "selling" in other.key.about
     assert {figure.value for figure in one.made_of} == {buying.buying, buying.selling}
+    # The row names the venue's own contract, never the claim's identifier: a
+    # reader-typed quote carries no market identifier, and a claim is not a trade.
+    assert one.instrument == MARKET != one.ending
 
 
 def test_the_shift_rule_is_the_shift_times_the_move_and_shows_both() -> None:
@@ -710,12 +718,14 @@ def test_a_first_touch_number_names_its_sample_and_every_market_chance() -> None
         market_chance_from={"step": "venue_quote", "instrument": "model"},
     )
 
-    said = card.your_exit.stop_first
-    assert said is not None and said.source is not None
-    assert THE_SAMPLE_SAYS["built_by_hand"] in said.source
-    assert THE_CHANCE_CAME_FROM["venue_quote"] in said.source
-    assert THE_CHANCE_CAME_FROM["model"] in said.source
-    assert "step" in said.source and "instrument" in said.source
+    share = card.your_exit.stop_first
+    said = card.your_exit.sample_says
+    assert share is not None and share.source == THE_SAMPLE_SAYS["built_by_hand"]
+    assert said is not None
+    assert THE_SAMPLE_SAYS["built_by_hand"] in said
+    assert THE_CHANCE_CAME_FROM["venue_quote"] in said
+    assert THE_CHANCE_CAME_FROM["model"] in said
+    assert "step" in said and "instrument" in said
 
 
 def test_a_map_where_nothing_moves_the_price_says_that_instead() -> None:
@@ -745,9 +755,11 @@ def test_the_rail_says_what_every_share_rests_on_and_what_it_left_off() -> None:
     assert row.came_on_first.lo is not None and row.came_on_first.hi is not None
     assert row.lift.lo is None and row.lift.hi is None
     assert row.draws.value == 410.0
+    assert row.coverage.value == 0.95
     assert card.takes_you_out.left_off == ("contract: " + dropped.sentence,)
-    assert card.takes_you_out.draws.source is not None
-    assert "200" in card.takes_you_out.draws.source
+    assert card.takes_you_out.floor.value == 200.0
+    assert card.takes_you_out.stop_first_worlds.value == 1000.0
+    assert THE_SAMPLE_SAYS["built_by_hand"] in card.takes_you_out.sample_says
 
 
 def test_an_empty_rail_says_why_it_is_empty() -> None:
@@ -898,3 +910,160 @@ def test_the_watchlist_and_the_unhedgeable_rows_carry_their_reasons() -> None:
     assert card.unhedgeable[0].can_be_seen is True
     assert card.unhedgeable[0].why
     assert card.carried_by[0].points.owner == "computed"
+
+
+# --- The fix round: the reviewer's failing inputs, reproduced ----------------
+
+
+def a_contract_card(**rest: object) -> Card:
+    """One card on the yes-side contract ending, with whatever a test wants changed."""
+    world = a_world()
+    answers = rest.pop("answers", None) or {
+        "contract": what_was_priced(world, "contract", agreeing_quote(world, "contract"), fee=0.01)
+    }
+    return a_card(
+        world,
+        position=a_position("contract", trades="contract", entry=0.4, stop=0.3, target=0.7),
+        answers=answers,  # type: ignore[arg-type]
+        **rest,  # type: ignore[arg-type]
+    )
+
+
+def test_an_edge_inside_the_model_range_is_not_led_with_either() -> None:
+    """Record 0018: such an edge is neither headlined nor ranked. Today only the ranking obeys.
+
+    The reviewer's input: a quote five points under the claim's own number, so
+    buying is worth something at the middle of the model's stated range and
+    nothing at its bottom end.
+    """
+    world = a_world()
+    pays = pays_on(world, "contract")
+    straddling = what_was_priced(
+        world,
+        "contract",
+        quote_at(world, "contract", bid=pays.lo - 0.05, offer=pays.p - 0.05),
+    )
+
+    card = a_contract_card(answers={"contract": straddling})
+
+    assert isinstance(straddling, Edge) and straddling.inside_the_model_range
+    assert isinstance(card.priced_in, PricedIn)
+    assert card.priced_in.buying.value > 0.0
+    assert card.priced_in.headline == "no_edge_at_this_price"
+    assert card.priced_in.not_headlined_because == INSIDE_THE_MODEL_RANGE
+
+
+def test_a_ranked_row_whose_best_edge_is_a_loss_is_never_led_with() -> None:
+    """A venue pricing an ending out of reach makes it less worth leading with, not more.
+
+    The reviewer's input: a quote four tenths either side of the claim's own
+    number, so neither side is worth taking by a wide margin.
+    """
+    world = a_world()
+    pays = pays_on(world, "contract")
+    hopeless = what_was_priced(
+        world, "contract", quote_at(world, "contract", bid=pays.p - 0.4, offer=pays.p + 0.4)
+    )
+
+    unticked = what_was_priced(
+        world,
+        "contract",
+        quote_at(world, "contract", bid=pays.p - 0.4, offer=pays.p + 0.4, tick=None),
+    )
+
+    row = what_else_can_i_trade(world, {"contract": hopeless}, {}).by_the_size_of_its_edge[0]
+    no_step = what_else_can_i_trade(world, {"contract": unticked}, {}).by_the_size_of_its_edge[0]
+
+    assert row.key.value < 0.0
+    assert row.headline is False
+    assert row.not_headlined_because == NO_EDGE_AT_THIS_PRICE
+    # And with no price step published there is no tick rule to lean on, so the
+    # only thing keeping this row from being led with is that it is a loss.
+    assert no_step.key.value < 0.0
+    assert no_step.headline is False
+    assert no_step.not_headlined_because == NO_EDGE_AT_THIS_PRICE
+
+
+def test_an_answer_filed_under_the_wrong_claim_is_refused_by_name() -> None:
+    """A card that printed one claim's numbers under another's name is untraceable state."""
+    world = a_world()
+    elsewhere = what_was_priced(world, "other-contract", None)
+
+    with pytest.raises(ValueError, match="is the answer for"):
+        what_else_can_i_trade(world, {"contract": elsewhere}, {})
+    with pytest.raises(ValueError, match="is the answer for"):
+        a_contract_card(answers={"contract": elsewhere})
+
+
+def test_a_rail_row_with_no_day_count_says_why_rather_than_reading_nothing() -> None:
+    """A claim that kept company with the trade working has no days to count, and says so."""
+    world = a_world()
+    row = a_lift_row("step", 3.1)
+    without = LiftRow(**{**row.__dict__, "days_before_the_stop": None})
+
+    card = a_card(world, rail=a_rail(rows=(without,)))
+
+    shown = card.takes_you_out.rows[0]
+    assert shown.days_before_the_stop is None
+    assert shown.no_days_because == NO_DAYS_TO_COUNT
+
+
+def test_a_no_side_contract_card_prices_the_side_that_pays_when_the_claim_fails() -> None:
+    """An ending taking the no side pays when the claim fails, and the card reads it that way.
+
+    Worked by hand on this map. The claim's own number is `p`; the no outcome is a
+    separate order book that pays one when the claim fails, so what this side pays
+    on is `1 - p`, with its range turned over: the low end of *false* is one minus
+    the high end of *true*. The quote below is built out of that flipped number, so
+    both edges are exactly nothing and neither is the claim's own number.
+
+    Three things nothing else on this branch guards: the claim's own number and
+    what the side pays on are **different** figures here; the model figure is the
+    claim's own number and not the flipped one; and the trade says `no`.
+    """
+    world = world_of(a_no_side_map())
+    claim = world.beliefs["no-side"]
+    answer = what_was_priced(world, "no-side", agreeing_quote(world, "no-side"))
+
+    card = a_card(
+        world,
+        position=a_position("no-side", trades="contract", entry=0.4, stop=0.3, target=0.7),
+        answers={"no-side": answer},
+    )
+
+    priced_in = card.priced_in
+    assert isinstance(priced_in, PricedIn)
+    assert card.the_trade.contract_side == "no"
+    assert priced_in.model.value == claim.p
+    assert priced_in.pays_on.value == 1.0 - claim.p
+    assert (priced_in.pays_on.lo, priced_in.pays_on.hi) == (1.0 - claim.hi, 1.0 - claim.lo)
+    assert priced_in.model.value != priced_in.pays_on.value
+    assert priced_in.quote.bid.value == 1.0 - claim.p
+    assert priced_in.buying.value == 0.0 and priced_in.selling.value == 0.0
+
+
+def test_the_two_break_even_prices_are_not_written_out_the_wrong_way_round() -> None:
+    """Worth buying below, worth selling above — and the card carries each where it belongs."""
+    world = a_world()
+    answer = what_was_priced(world, "contract", agreeing_quote(world, "contract"), fee=0.01)
+
+    card = a_contract_card(answers={"contract": answer})
+
+    assert isinstance(answer, Edge) and isinstance(card.priced_in, PricedIn)
+    assert card.priced_in.buy_below.value == answer.break_even.buy_below
+    assert card.priced_in.sell_above.value == answer.break_even.sell_above
+    assert card.priced_in.buy_below.value < card.priced_in.sell_above.value
+
+
+def test_the_two_first_touch_levels_are_not_written_out_the_wrong_way_round() -> None:
+    """The stop is checked below the entry and the target above it, and they stay apart."""
+    world = a_world()
+    touch = a_first_touch()
+    typed = a_position()
+
+    card = a_card(world, position=typed, touch=touch)
+
+    assert card.your_exit.stop_at is not None and card.your_exit.target_at is not None
+    assert card.your_exit.stop_at.value == touch.stop_at
+    assert card.your_exit.target_at.value == touch.target_at
+    assert card.your_exit.stop_at.value < typed.entry < card.your_exit.target_at.value
