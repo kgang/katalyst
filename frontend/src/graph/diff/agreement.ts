@@ -34,8 +34,14 @@ import type { DiffState } from "../../world/types";
 /** One of the four words the engine uses for what happened to a claim. */
 export type EngineState = "unchanged" | "shifted" | "added" | "killed";
 
-/** What each of the engine's words means, in the reader's own. */
-const ENGINE_IN_WORDS: Record<EngineState, string> = {
+/**
+ * What each of the engine's words means, in the reader's own.
+ *
+ * Exported because the change list says the same thing on a row the engine
+ * ranked no move on, and one table read twice cannot drift the way two tables
+ * written apart do.
+ */
+export const ENGINE_IN_WORDS: Record<EngineState, string> = {
   unchanged: "it did not move",
   shifted: "it moved",
   added: "it arrived with the edit",

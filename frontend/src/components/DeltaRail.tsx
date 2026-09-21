@@ -14,23 +14,25 @@
  * looks like an answer, and a ranking is the one thing the rail exists to tell
  * you.
  *
- * **An ending that did not move still gets a row.** The engine lists the ones
- * that moved; an ending missing from that list could mean either "it held still"
- * or "it is not on this map", and silence cannot be told from absence. So the
- * unmoved ones follow the ranked ones, reading *no change*, never mixed in among
- * them. On the stored example's strike branch that is the row worth reading: the
- * talks make the biggest move on the map, the one arrow into them is the map's
- * one bare assertion, and the versions of the map end up disagreeing which way
- * the talks went — so the engine will not call it a move, and the row says so
- * rather than disappearing.
+ * **An ending the engine ranked no move on still gets a row — whatever the
+ * reason.** The engine ranks an ending only when it calls it moved; an ending
+ * missing from that ranking could mean it held still, or that it is not on this
+ * map, or that you forced it false a moment ago, and a reader cannot tell those
+ * apart by looking at a list something was left out of. So every other ending
+ * the edit reaches follows the ranked ones, never mixed in among them. On the
+ * stored example's strike branch the row worth reading is the talks: they make
+ * the biggest move on the map, the one arrow into them is the map's one bare
+ * assertion, and the versions of the map end up disagreeing which way the talks
+ * went — so the engine will not call it a move, and the row says so rather than
+ * disappearing.
  *
- * **There is one kind of quiet row and it carries its reason in words.** Every
+ * **There is one kind of quieter row and it carries its reason in words.** Every
  * row has a half-line under the ending's own words: which way it went and the
- * day the two maps were furthest apart where it moved, and why it held still
- * where it did not — *barely moved*, or *the versions disagreed which way*, in
- * the engine's own word for which half of its test the claim failed. Being a
- * shade quieter than the rows above is not a reading: it says nothing once the
- * screen is read in grey, and nothing at all read out loud.
+ * day the two maps were furthest apart where it moved, and where it did not,
+ * the engine's own word for why — *barely moved*, *the versions disagreed which
+ * way*, *it was supposed false*, *it arrived with the edit*. Being a shade
+ * quieter than the rows above is not a reading: it says nothing once the screen
+ * is read in grey, and nothing at all read out loud.
  *
  * The two columns are never folded into any ordering. They answer different
  * questions and a trader weighs them separately; folding the width into a rank
@@ -150,17 +152,18 @@ function sameDirectionOf(row: DeltaRow): Known<string> {
  * A row that moved says which way it went and the day the two maps were
  * furthest apart, because a row is read on that day rather than on the claim's
  * own judging day and a number whose day is not said is a number nobody can
- * check. A row that held still says why it held still, in the engine's own
- * word: it barely moved, or the versions of the map disagreed which way.
+ * check. A row the engine ranked no move on says why, in the engine's own word:
+ * it barely moved, the versions of the map disagreed which way, you supposed it
+ * false, or it arrived with the edit.
  *
- * **This is what makes a greyed row readable in grey.** A row that held still is
- * a shade quieter than the ones above it, and a shade is not a reading: convert
- * the screen to grey, or read the list out loud, and being paler says nothing.
- * Its own sentence is still one press away in the column beside it; this is the
+ * **This is what makes a quieter row readable in grey.** Such a row is a shade
+ * quieter than the ones above it, and a shade is not a reading: convert the
+ * screen to grey, or read the list out loud, and being paler says nothing. Its
+ * own sentence is still one press away in the column beside it; this is the
  * half-line that means a reader never has to press anything to learn that the
  * ending is on the list and why.
  *
- * @param row One ending, as the engine handed it over.
+ * @param row One ending, as the change list carries it.
  * @returns The half-line, or nothing at all where there is nothing true to put
  *   in it — a row before the engine has answered, and one the engine gave no
  *   word for.
@@ -170,7 +173,7 @@ function noteOn(row: DeltaRow): string | undefined {
   if (move !== undefined) {
     return `${move.way} · largest on ${toDay(move.largestOn)}`;
   }
-  return row.noChangeBecause;
+  return row.note;
 }
 
 /** The rail beside the map. */
@@ -233,7 +236,13 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
                     className="delta-rail__row"
                     key={row.claimId}
                     data-about={row.claimId}
-                    data-moved={row.noChange === true ? "no" : "yes"}
+                    // Did the engine give this ending a row of its own? That is
+                    // the question the mark answers, and it is the one the
+                    // quieter styling keys on. It used to read `data-moved`,
+                    // which was a fair name while only claims that held still
+                    // landed here and a plain untruth the moment a forced-false
+                    // ending did.
+                    data-ranked={row.unranked === true ? "no" : "yes"}
                   >
                     <p className="delta-rail__label">
                       {/* Where this ending sits in the engine's own order, which
@@ -258,7 +267,7 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
 
           <p className="delta-rail__order">
             {ranked
-              ? "In the order the engine put them in: the size of the move times the weakest arrow on the best-backed route behind it. Endings that did not move follow, and are not ranked."
+              ? "In the order the engine put them in: the size of the move times the weakest arrow on the best-backed route behind it. Every other ending your edit reaches follows, unranked, saying why the engine ranked no move on it."
               : "In map order. Nothing has ranked these, because nothing has worked out a number to rank them by."}
           </p>
 

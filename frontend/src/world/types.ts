@@ -830,30 +830,33 @@ export interface DeltaRow {
   /** Same direction: the share of versions of the map that moved the same way. */
   readonly agreement: Known<number>;
   /**
-   * True when this row is here only to say the ending did **not** move.
+   * True when the engine gave this ending no row of its own.
    *
-   * The engine lists the endings that moved; an ending missing from that list
-   * could mean either "it did not move" or "it is not on this map", and silence
-   * cannot be told from absence. So the rail adds a quiet row reading *no
-   * change* for every ending the edit can reach that the engine left out, after
-   * the ones it ranked and never mixed in among them.
+   * The engine ranks an ending only when it calls it **shifted**. An ending
+   * missing from that ranking could mean it held still, or that it is not on
+   * this map, or that you forced it false a moment ago — and a reader cannot
+   * tell those apart by looking at a list something was left out of. So the
+   * change list keeps a quieter row for **every** ending the edit can reach
+   * that the engine left out, after the ones it ranked and never mixed in among
+   * them. What each such row says is `graph/diff/noChange.ts`'s one rule.
    */
-  readonly noChange?: boolean;
+  readonly unranked?: boolean;
   /**
-   * Why that ending did not move, in a handful of words, for the row to say out
-   * loud.
+   * The half-line under the ending's own words: why the engine ranked no move
+   * on it, in a handful of words.
    *
    * It stands in the same slot a row that moved uses for *down · largest on Oct
-   * 4*, so a greyed row carries its reason **in words** rather than only in
+   * 4*, so a quieter row carries its reason **in words** rather than only in
    * being paler than its neighbours — which says nothing in grey and nothing at
-   * all read aloud. A claim that barely moved and a claim whose versions of the
-   * map disagreed which way say different, true things.
+   * all read aloud. A claim that barely moved, a claim whose versions of the map
+   * disagreed which way, and a claim you supposed false say different, true
+   * things.
    *
    * **`graph/diff/noChange.ts` writes it and nothing else does**, from the
-   * engine's own word for which half of the test the claim failed. Absent where
-   * the engine gave no such word, and on every row that moved.
+   * engine's own word for what happened to the claim. Absent where there is
+   * nothing true to put in it, and on every row that moved.
    */
-  readonly noChangeBecause?: string;
+  readonly note?: string;
 }
 
 /**

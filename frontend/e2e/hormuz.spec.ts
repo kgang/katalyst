@@ -445,17 +445,6 @@ async function everyOutlineItemIsASentenceWide(page: Page): Promise<void> {
  * would be asserting today's arithmetic in the one file that is supposed to be
  * checking that the two halves are joined up.
  *
- * It is still a real wait. Before the engine answers the map says *"…claims
- * your edit can reach…"* and adds that the numbers are on their way, which this
- * does not fit; before the branch is opened there is no line at all.
- *
- * The noun is allowed to be singular so that a branch moving exactly one claim
- * fails on the count below, where the message says what the map said, rather
- * than on a wait that runs out and says only that it ran out.
- */
-const WHAT_THE_STRIKE_DID =
-  /^Branch created\. One claim added, \w+ claims? moved, one supposition retracted\.$/;
-
 /** The first twelve counts as the map says them, which is how it says a count. */
 const IN_WORDS = [
   "no",
@@ -471,6 +460,36 @@ const IN_WORDS = [
   "ten",
   "eleven",
 ] as const;
+
+/**
+ * The shape of the line the map says out loud once the strike branch has been
+ * folded on and the engine has answered.
+ *
+ * **Two of its three counts are written down and the third is not.** One claim
+ * added and one supposition retracted are facts about the branch and about
+ * which arrows lead where, so they read the same on every machine. *How many
+ * claims moved* is the engine's own count of the claims it called shifted, and
+ * it changes whenever the arithmetic does — as it did the day every arrow's
+ * push was first drawn as wide as its backing says. A test that wrote it down
+ * would be asserting today's arithmetic in the one file that is supposed to be
+ * checking that the two halves are joined up.
+ *
+ * **It refuses "no claims moved" by spelling out the words it will take.** With
+ * a wildcard there it fitted a map that moved nothing at all, and the three
+ * window tests wait on this line and nothing else — so an engine that had
+ * stopped answering would have taken them straight past their own subject.
+ *
+ * It is still a real wait for the same reason. Before the engine answers the map
+ * says *"…claims your edit can reach…"* and adds that the numbers are on their
+ * way, which this does not fit; before the branch is opened there is no line at
+ * all. The noun is allowed to be singular so that a branch moving exactly one
+ * claim fails on the count below, where the message says what the map said,
+ * rather than on a wait that runs out and says only that it ran out.
+ */
+const WHAT_THE_STRIKE_DID = new RegExp(
+  `^Branch created\\. One claim added, (${IN_WORDS.slice(1).join("|")}) claims? moved, ` +
+    `one supposition retracted\\.$`,
+);
 
 /**
  * How many claims the map said moved, read back out of the line it said.
@@ -893,6 +912,21 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   );
   expect(states.filter((word) => word === "none")).toHaveLength(0);
 
+  // **And two of them by name, so the counts above cannot agree with each other
+  // about nothing.** Every line so far reads the engine's word for each claim;
+  // a run in which the engine answered but said the wrong thing about every
+  // claim would satisfy all of them together. These two are the map's own
+  // story: the strait is what you supposed, the strike pushes straight at it
+  // and at the insurance premium, and both must come back moved. If the day
+  // comes when the engine honestly says otherwise about one of them, the
+  // branch's whole walk has changed and this is the right place to be told.
+  for (const claim of ["H", "C"]) {
+    await expect(page.locator(`.react-flow__node[data-id="${claim}"] .tile`)).toHaveAttribute(
+      "data-diff",
+      "shifted",
+    );
+  }
+
   // The rail beside the map lists the endings, in the engine's own order, with
   // the two columns that are never folded into it.
   const rail = page.locator(".delta-rail");
@@ -901,46 +935,69 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(rail).toContainText("same direction");
   await expect(rail).not.toContainText("no engine yet");
 
-  // **Every ending the edit can reach is on the list, and none of them
-  // vanishes.** How many that is, is read off the map rather than written down:
-  // an ending is a claim that names something you could trade or names why
-  // there is nothing to trade, and the list carries the ones the edit reaches.
-  // A row dropped because the engine would not call its move a move is the
-  // exact failure this counts against — on this branch the talks make the
-  // biggest move on the map and are the row at risk.
-  const reachableEndings = await page.locator(".tile").evaluateAll(
-    (tiles) =>
-      tiles.filter((tile) => {
-        const { kind, diff } = (tile as HTMLElement).dataset;
+  // **Exactly the endings the edit can reach are on the list, by name.** Which
+  // those are is read off the map rather than written down: an ending is a
+  // claim that names something you could trade or names why there is nothing to
+  // trade, and the list carries the ones the edit reaches. Compared as a set of
+  // names rather than as a count, because a row that vanished and a row that
+  // was invented cancel out in a count and this is exactly the failure being
+  // guarded — an ending the engine gives no row of its own used to be dropped
+  // outright when the reader forced it false.
+  const endings = await page.locator(".react-flow__node").evaluateAll((nodes) =>
+    nodes
+      .filter((node) => {
+        const { kind, diff } = node.querySelector<HTMLElement>(".tile")?.dataset ?? {};
         return (kind === "market" || kind === "not_tradeable") && diff !== "untouched";
-      }).length,
+      })
+      .map((node) => (node as HTMLElement).dataset.id ?? "?"),
   );
-  expect(reachableEndings).toBeGreaterThan(0);
-  // Counted before they are walked: a list taken while the rows are still
-  // arriving is a list that agrees with itself and says nothing.
-  await expect(rail.locator(".delta-rail__row")).toHaveCount(reachableEndings);
-  await expect(rail.locator('.delta-rail__row[data-about="N1"]')).toHaveCount(1);
+  expect(endings.length, "the map drew no ending this edit can reach").toBeGreaterThan(0);
+  // Read in one go, and after the endings: a list taken while the rows are
+  // still arriving is a list that agrees with itself and says nothing.
+  const onTheList = await rail.locator(".delta-rail__row").evaluateAll((rows) =>
+    rows.map((row) => ({
+      about: (row as HTMLElement).dataset.about ?? "?",
+      ranked: (row as HTMLElement).dataset.ranked ?? "?",
+    })),
+  );
+  expect(onTheList.map((row) => row.about).sort()).toEqual([...endings].sort());
 
-  // Every row the engine ranked carries three readings, and there is at least
-  // one — a ranking of nothing would pass every line above.
-  const ranked = rail.locator('.delta-rail__row[data-moved="yes"] .delta-rail__values');
-  expect(await ranked.count()).toBeGreaterThan(0);
-  for (const cell of await ranked.all()) {
+  // **And the talks are one of the quiet ones.** This is the one place the
+  // engine's own verdict on one row is written down on purpose: the talks make
+  // the biggest move on the map, the only arrow into them is the map's one bare
+  // assertion, and the engine will not call that a move — which is the whole
+  // case the quiet row exists for. Without it the loop below has nothing to
+  // walk and passes on an empty list. `docs/worked-numbers.txt`, line
+  // `N1 · strike · what happened`, is where to look the day this goes red.
+  const quiet = onTheList.filter((row) => row.ranked === "no");
+  expect(
+    quiet.map((row) => row.about),
+    "the change list has no quiet row to check",
+  ).toContain("N1");
+
+  // Every row the engine ranked carries three readings and nothing else — the
+  // count of cells tied to the count of rows read off the same page, so a rail
+  // that drew one row and three cells cannot pass for a rail that drew three.
+  const ranked = rail.locator('.delta-rail__row[data-ranked="yes"]');
+  const many = onTheList.length - quiet.length;
+  expect(many, "the engine ranked no ending at all").toBeGreaterThan(0);
+  await expect(ranked).toHaveCount(many);
+  await expect(ranked.locator(".delta-rail__value")).toHaveCount(many * 3);
+  for (const cell of await ranked.locator(".delta-rail__values").all()) {
     // The change, then how firm, then the share that moved the same way. Every
     // one at two significant figures, and a share that is not quite all of them
     // printed as `>99%` rather than rounded up into all of them.
     await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+\.\d+[<>]?\d+%$/);
   }
 
-  // And every row that held still says so in words, and says why in words:
-  // the engine's own verdict in the change column, and under the ending's own
-  // sentence the half of the engine's test it failed. Which words go with
-  // which of the engine's two answers is pinned in
-  // `src/components/__tests__/deltaRail.test.tsx`; what is checked here is that
-  // they reach the screen at all, rather than the row being nothing but a
-  // paler shade of the rows above it.
-  for (const row of await rail.locator('.delta-rail__row[data-moved="no"]').all()) {
-    await expect(row).toContainText("no change");
+  // And every quiet row says what happened in words, and says why in words:
+  // the engine's own verdict where a move would be, and under the ending's own
+  // sentence the reason it ranked none. Which words go with which verdict is
+  // pinned in `src/components/__tests__/deltaRail.test.tsx`; what is checked
+  // here is that they reach the screen at all, rather than the row being
+  // nothing but a paler shade of the rows above it.
+  for (const row of await rail.locator('.delta-rail__row[data-ranked="no"]').all()) {
+    await expect(row.locator(".delta-rail__value").first()).not.toBeEmpty();
     await expect(row.locator(".delta-rail__note")).not.toBeEmpty();
   }
 
@@ -1037,10 +1094,10 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   // where a move turns into something a reader can act on. A rail that stayed
   // empty here would make **This happened** a button that does nothing.
   const rail = page.locator(".delta-rail");
-  await expect(rail.locator('.delta-rail__row[data-moved="yes"]')).toHaveCount(2);
+  await expect(rail.locator('.delta-rail__row[data-ranked="yes"]')).toHaveCount(2);
   await expect(rail).toContainText("In the order the engine put them in");
   // Every reading on those rows is the engine's, and none is typed in here.
-  const moved = rail.locator('.delta-rail__row[data-moved="yes"] .delta-rail__values');
+  const moved = rail.locator('.delta-rail__row[data-ranked="yes"] .delta-rail__values');
   await expect(moved).toHaveCount(2);
   for (const cell of await moved.all()) {
     await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+\.\d+[<>]?\d+%$/);
@@ -1097,9 +1154,9 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
 
     // And the talks, which plainly did move and still came out unchanged
     // because the versions of the map did not agree on which way. **This is the
-    // case the sentence was wrong about.** The tile used to tell this reader
-    // that the number "did not move by enough to report" while the engine's own
-    // two readings, a click away, were two points apart.
+    // case the sentence was wrong about.** The tile used to tell this reader the
+    // number had not moved enough to report while the engine's own two readings,
+    // a click away, were two points apart.
     const talks = page.locator(
       '.react-flow__node[data-id="N1"] .tile__badge[data-badge="movement"]',
     );
@@ -1121,10 +1178,14 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
       /The engine says which half it failed: (the move is smaller than the engine will report at all|the move is far enough, and the versions of the map did not agree which way it went)\./;
     await expect(talks).toHaveAttribute("title", half);
     await expect(talks).not.toHaveAttribute("title", /it does not say/);
-    // It never reports the half it did not fail, in either direction.
+    // **One half, never both and never neither.** The alternation above is
+    // satisfied by a sentence that went on to name the other half as well, so
+    // the halves are counted rather than matched. A guard written against a
+    // phrase that appears nowhere in the product would sit here for ever
+    // looking like a check and never being one, which is what the line it
+    // replaced was.
     const said = (await talks.getAttribute("title")) ?? "";
-    expect(half.exec(said)).not.toBeNull();
-    expect(said).not.toMatch(/did not move by enough/);
+    expect([...said.matchAll(/The engine says which half it failed:/g)]).toHaveLength(1);
   });
 });
 

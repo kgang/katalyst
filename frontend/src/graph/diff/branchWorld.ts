@@ -46,7 +46,7 @@ import type {
 import { badgesByClaim, standingByClaim } from "./badges";
 import { toDay } from "./days";
 import { readDiff } from "./diffState";
-import { NO_CHANGE, noChangeInAWord, noChangeReason } from "./noChange";
+import { NO_CHANGE, noChangeReason, quietRow } from "./noChange";
 import type { Arrow } from "./reach";
 
 /**
@@ -207,9 +207,11 @@ function movedBadge(
  * left out.** The engine's `rows` hold only the endings that came out `shifted`,
  * so a reader looking at that list alone cannot tell *"it did not move"* from
  * *"it is not on this map"* — and silence that could mean either is the state
- * the traceability rule exists to forbid. So the reachable endings the engine
- * left out follow, greyed and unranked, in map order, each reading **no change**
- * where the move would be.
+ * the traceability rule exists to forbid. So **every** reachable ending the
+ * engine left out follows, quieter and unranked, in map order, each saying its
+ * own true thing where the move would be: *no change* on one that held still,
+ * the word on one whose value your edit fixed, *Added* on one that arrived with
+ * the edit. `noChange.ts` owns which is which.
  *
  * **Where the verdict comes from matters as much as the row.** *Did not move* is
  * read off `ClaimDiff.state`, which the engine states for every claim in either
@@ -256,46 +258,53 @@ export function railRows(painted: WorldView, change: DiffView): readonly DeltaRo
     };
   });
 
+  // **Every ending the edit can reach, whatever the engine said about it.** The
+  // filter asks only where the ending is — on this map, inside the edit's reach,
+  // and not already ranked above. It asks nothing about the engine's word,
+  // because every word the engine has is a reason to keep the row rather than a
+  // reason to drop it: an ending that held still, one you forced false and one
+  // that arrived with the edit are three different findings and none of them is
+  // "not on this map". Asking for `unchanged` here is what made a forced-false
+  // ending vanish from the list outright.
   const listed = new Set(ranked.map((row) => row.claimId));
-  const held: DeltaRow[] = painted.claims
+  const unranked: DeltaRow[] = painted.claims
     .filter(
       (claim) =>
         (claim.kind === "market" || claim.kind === "not_tradeable") &&
         claim.diff !== undefined &&
         claim.diff !== "untouched" &&
-        !listed.has(claim.id) &&
-        change.claims.get(claim.id)?.state === "unchanged",
+        !listed.has(claim.id),
     )
-    .map((claim) => ({
-      claimId: claim.id,
-      label: claim.claim,
-      kind: claim.kind,
-      move: {
-        absence: inTheEnginesWords(
-          NO_CHANGE,
-          `${noChangeReason(change.claims.get(claim.id)?.moved)} It is listed so that holding ` +
-            `still cannot be mistaken for not being here.`,
-        ),
-      },
-      // Why it did not move, in the handful of words the row says out loud —
-      // the engine's own word for which half of its test the claim failed,
-      // turned into words in the one module that owns them.
-      noChangeBecause: noChangeInAWord(change.claims.get(claim.id)?.moved),
-      rangeWidth: {
-        absence: noReadingAtAll(
-          "How firm a number is only says something about a number that moved.",
-        ),
-      },
-      agreement: {
-        absence: noReadingAtAll(
-          "Whether the versions of the map agreed on a direction only says something about a " +
-            "claim that had a direction.",
-        ),
-      },
-      noChange: true,
-    }));
+    .map((claim) => {
+      // What such a row says is one rule in one place, keyed on the engine's
+      // own word. Nothing here decides it by looking at a number.
+      const quiet = quietRow(
+        change.claims.get(claim.id)?.state,
+        change.claims.get(claim.id)?.moved,
+        standing.get(claim.id),
+      );
+      return {
+        claimId: claim.id,
+        label: claim.claim,
+        kind: claim.kind,
+        move: { absence: inTheEnginesWords(quiet.words, quiet.reason) },
+        note: quiet.note,
+        rangeWidth: {
+          absence: noReadingAtAll(
+            "How firm a number is only says something about a number that moved.",
+          ),
+        },
+        agreement: {
+          absence: noReadingAtAll(
+            "Whether the versions of the map agreed on a direction only says something about a " +
+              "claim that had a direction.",
+          ),
+        },
+        unranked: true,
+      };
+    });
 
-  return [...ranked, ...held];
+  return [...ranked, ...unranked];
 }
 
 /**

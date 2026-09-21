@@ -32,7 +32,9 @@
  */
 
 import { toShare, toTwoFigures } from "../../components/BeliefChip";
-import type { Movement } from "../../world/types";
+import type { Movement, Standing } from "../../world/types";
+import { ENGINE_IN_WORDS, type EngineState } from "./agreement";
+import { ADDED } from "./badges";
 
 /** What the line reads where a move would go, when the engine says there was none. */
 export const NO_CHANGE = "no change";
@@ -117,4 +119,89 @@ export function noChangeReason(moved: Movement | undefined): string {
     `only when it is far enough and the versions agree on its direction, and this one did not ` +
     `clear both. ${whichHalf}`
   );
+}
+
+/** What a change-list row says when the engine ranked no move on that ending. */
+export interface QuietRow {
+  /** What stands in the change column, where a move would have been. */
+  readonly words: string;
+  /** The sentence behind those words, which is what a reader gets on a press. */
+  readonly reason: string;
+  /**
+   * The half-line under the ending's own words, or nothing where there is
+   * nothing true to put in it.
+   */
+  readonly note: string | undefined;
+}
+
+/**
+ * What a change-list row says when the engine gave that ending no row of its
+ * own — **one rule for every reason it might not have one.**
+ *
+ * The engine ranks an ending only when it calls it `shifted`. Everything else
+ * falls to the change list, and the change list keeps the row: an ending missing
+ * from the list could mean it held still, or that it is not on this map, or that
+ * you forced it false a moment ago, and a reader cannot tell those apart by
+ * looking at a list something was left out of. Forcing an ending false is the
+ * loudest thing an edit can do to one, and it used to be the quietest thing on
+ * this screen — the row simply was not drawn.
+ *
+ * **Each state says its own true thing, read off the engine's word.** Nothing
+ * here is decided by looking at a number.
+ *
+ * | The engine's word | What the row reads | Why |
+ * |---|---|---|
+ * | it did not move | *no change*, and which half of the engine's test it failed | The engine compared two numbers and would not call the difference a move |
+ * | it was supposed false | the word the tile shows — *Supposed · Oct 1* | Your edit fixed its value, so it is false in every version of the map and there is no likelihood to show |
+ * | it arrived with the edit | *Added* | There is no earlier reading of it to put beside the new one |
+ *
+ * **A claim whose value an edit fixed shows the word, never a number**, here as
+ * on its tile: the engine stores a flat `0` for a forced-false claim, and a row
+ * reading `.46 ▼ <.01` would be that zero wearing the certainty guard's clothes.
+ *
+ * @param state The engine's own word for what happened to this ending, or
+ *   nothing at all where the engine did not mention it.
+ * @param moved What the engine read on it: the two numbers, which way they went,
+ *   the share of versions that agreed, and which half of its test it failed.
+ * @param standing The word this ending's tile shows instead of a likelihood,
+ *   when an edit has fixed its value.
+ */
+export function quietRow(
+  state: EngineState | undefined,
+  moved: Movement | undefined,
+  standing: Standing | undefined,
+): QuietRow {
+  if (state === "killed") {
+    return {
+      words: standing?.words ?? ENGINE_IN_WORDS.killed,
+      reason:
+        `${standing?.reason ?? "Your edit fixed this ending's value to false."} So there is no ` +
+        `likelihood here to put beside the one this ending had before, and no move for the ` +
+        `engine to rank. It is on the list because forcing an ending false is the loudest thing ` +
+        `an edit can do to one, and a list it had vanished from would say nothing at all ` +
+        `happened.`,
+      note: ENGINE_IN_WORDS.killed,
+    };
+  }
+  if (state === "added") {
+    return {
+      words: standing?.words ?? ADDED.words,
+      reason:
+        `${standing?.reason ?? ADDED.reason} There is no earlier reading of it to put beside ` +
+        `this world's, so the engine ranked no move on it. It is on the list because an ending ` +
+        `you added is still an ending your edit reaches.`,
+      note: ENGINE_IN_WORDS.added,
+    };
+  }
+  return {
+    words: NO_CHANGE,
+    reason:
+      `${noChangeReason(moved)} It is listed so that holding still cannot be mistaken for not ` +
+      `being here.`,
+    // Which half of the engine's test this claim failed — its own word, and
+    // nothing at all where it gave none. *It did not move* is already in the
+    // change cell beside it, so there is nothing to fall back to and nothing
+    // lost: the row is still carried by words rather than by being paler.
+    note: noChangeInAWord(moved),
+  };
 }

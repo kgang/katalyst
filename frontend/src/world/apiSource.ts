@@ -38,8 +38,7 @@ import type { ClaimDiff, Diff, World } from "../api/client";
 import { readConditional, readDiff, readExample, readWorld } from "../api/client";
 import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
-import { NO_CHANGE, noChangeInAWord, noChangeReason } from "../graph/diff/noChange";
-import { inTheEnginesWords, noReadingAtAll } from "./absence";
+import { noReadingAtAll } from "./absence";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
 import { NOT_ON_THIS_MAP } from "./naming";
 import type { FixtureBundle, WorldSource } from "./source";
@@ -393,46 +392,16 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
     };
   });
 
-  // An ending the engine left off that list did not move. Silence cannot be
-  // told from absence — a reader would not know whether the ending held still
-  // or is simply not on this map — so it gets a quiet row of its own, after
-  // every ranked row and never mixed in among them.
-  const listed = new Set(ranked.map((row) => row.claimId));
-  const held: DeltaRow[] = claims
-    .filter(
-      (claim) =>
-        (claim.kind === "market" || claim.kind === "not_tradeable") &&
-        !listed.has(claim.id) &&
-        changed.get(claim.id)?.state === "unchanged",
-    )
-    .map((claim) => ({
-      claimId: claim.id,
-      label: claim.claim,
-      kind: claim.kind,
-      move: {
-        absence: inTheEnginesWords(
-          NO_CHANGE,
-          `${noChangeReason(changed.get(claim.id)?.moved)} It is listed so that holding still ` +
-            `cannot be mistaken for not being here.`,
-        ),
-      },
-      noChangeBecause: noChangeInAWord(changed.get(claim.id)?.moved),
-      rangeWidth: {
-        absence: noReadingAtAll(
-          "How firm a number is only says something about a number that moved.",
-        ),
-      },
-      agreement: {
-        absence: noReadingAtAll(
-          "Whether the versions of the map agreed on a direction only says something about a " +
-            "claim that had a direction.",
-        ),
-      },
-      noChange: true,
-    }));
-
+  // **The endings the engine left off that list get their rows somewhere else,
+  // and it matters that it is only somewhere else.** `rows` is what the engine
+  // ranked, in the engine's order, and nothing more — which is what this field
+  // says it is. Completing the list is `railRows` in `graph/diff/branchWorld.ts`:
+  // it is the one that knows which endings the edit can reach and which claims
+  // stand on the reader's own say-so, and a second builder here answered the
+  // same question with less to go on. Two builders of one row is how a
+  // forced-false ending came to be dropped by one of them and kept by neither.
   const summary: Known<string> = { reading: difference.summary };
-  return { claims: changed, rows: [...ranked, ...held], summary, warnings: difference.warnings };
+  return { claims: changed, rows: ranked, summary, warnings: difference.warnings };
 }
 
 /**

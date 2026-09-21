@@ -11,8 +11,10 @@
  * token the law names exists with a measured contrast ratio beside it. The
  * stroke and mark channels are checked in `graph/wires/__tests__`, and the hue
  * channel in `components/__tests__/directionReadout.test.tsx`. Texture and lane
- * colour are checked by eye, on line 3 of the visual review checklist: convert
- * the screenshot to grey and everything still reads.
+ * colour are checked by eye, on `VR3` of the visual review checklist in
+ * `spec/workbench/README.md` — convert the screenshot to grey and everything
+ * still reads. The lines of that list carry names now, so a citation still
+ * points at the check it meant when a line is added above it.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";

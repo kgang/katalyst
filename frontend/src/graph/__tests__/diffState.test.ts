@@ -418,8 +418,8 @@ describe("the second world", () => {
       // And the row's own half-line — the words a reader gets without pressing
       // anything — comes from the same module and the same engine word, so the
       // glance and the sentence behind it cannot say two different things.
-      expect(held?.noChangeBecause).toBe(noChangeInAWord(moved));
-      expect(held?.noChangeBecause).toBe("the versions disagreed which way");
+      expect(held?.note).toBe(noChangeInAWord(moved));
+      expect(held?.note).toBe("the versions disagreed which way");
     });
 
     it("test_an_ending_the_versions_disagree_about_stays_on_the_list", () => {
@@ -445,8 +445,87 @@ describe("the second world", () => {
       );
       expect(listed.map((row) => row.claimId)).toContain("N1");
       const talks = listed.find((row) => row.claimId === "N1");
-      expect(talks?.noChange).toBe(true);
-      expect(talks?.noChangeBecause).toBe("the versions disagreed which way");
+      expect(talks?.unranked).toBe(true);
+      expect(talks?.note).toBe("the versions disagreed which way");
+    });
+
+    it("test_an_ending_you_forced_false_stays_on_the_list_and_is_not_no_change", () => {
+      // **The loudest thing an edit can do to an ending used to be the quietest
+      // thing on this screen.** Suppose the Brent contract false and the engine
+      // calls it `killed`; it ranks only what it calls moved, so it gives that
+      // ending no row — and the change list used to add one only for an ending
+      // it called `unchanged`. The reader forced an ending false and the list
+      // said nothing at all.
+      const edits: Edit[] = [{ op: "do", target: "M1", value: false, at: "2026-10-01" }];
+      const forcedFalse: BranchView = {
+        id: "br_kill_the_contract",
+        label: "Suppose the Brent contract does not come true",
+        hue: "violet",
+        edits,
+        claims: [],
+        links: [],
+      };
+      const change: DiffView = {
+        claims: new Map([["M1", { state: "killed" as const }]]),
+        rows: [],
+        summary: { reading: "It moves no ending." },
+        warnings: [],
+      };
+      // The world the engine built, in which the contract carries the word its
+      // tile shows instead of a likelihood. The word is not written out here:
+      // it comes from the one function that makes one.
+      const said = standingByClaim(edits, new Map());
+      expect(said.get("M1")?.words).toMatch(/^Supposed · /);
+      const asTheEngineBuiltIt = {
+        ...base(),
+        claims: base().claims.map((claim) =>
+          claim.id === "M1" ? { ...claim, standing: said.get("M1") } : claim,
+        ),
+      };
+      const listed = railRows(
+        branchWorld(base(), forcedFalse, { at: "answered", now: asTheEngineBuiltIt, change }),
+        change,
+      );
+
+      const contract = listed.find((row) => row.claimId === "M1");
+      expect(contract).toBeDefined();
+      expect(contract?.unranked).toBe(true);
+      // And it says what is true rather than what is convenient. *No change* is
+      // flatly false of an ending the reader has just forced false, and a
+      // likelihood would be the flat zero the engine stores for it wearing the
+      // certainty guard's clothes. It reads the word its tile reads.
+      expect(contract?.move.absence?.words).toBe(said.get("M1")?.words);
+      expect(contract?.move.absence?.words).not.toBe("no change");
+      expect(contract?.note).toBe("it was supposed false");
+      expect(contract?.move.absence?.reason).toContain("supposed this is false");
+    });
+
+    it("test_a_forced_false_ending_is_on_the_list_even_with_no_word_to_show", () => {
+      // The same rule with the browser's own half missing: whatever else is or
+      // is not known, an ending the engine called `killed` is **on the list**.
+      // The row falls back to the engine's own word for what happened rather
+      // than to silence or to *no change*, either of which would be untrue.
+      const forcedFalse: BranchView = {
+        id: "br_kill_the_contract",
+        label: "Suppose the Brent contract does not come true",
+        hue: "violet",
+        edits: [{ op: "do", target: "M1", value: false, at: "2026-10-01" }],
+        claims: [],
+        links: [],
+      };
+      const change: DiffView = {
+        claims: new Map([["M1", { state: "killed" as const }]]),
+        rows: [],
+        summary: { reading: "It moves no ending." },
+        warnings: [],
+      };
+      const contract = railRows(
+        branchWorld(base(), forcedFalse, { at: "answered", now: base(), change }),
+        change,
+      ).find((row) => row.claimId === "M1");
+      expect(contract?.unranked).toBe(true);
+      expect(contract?.move.absence?.words).not.toBe("no change");
+      expect(contract?.note).toBe("it was supposed false");
     });
   });
 

@@ -10,7 +10,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { NO_CHANGE, noChangeInAWord, noChangeReason } from "../../graph/diff/noChange";
+import { quietRow } from "../../graph/diff/noChange";
 import type { DeltaRow, Movement } from "../../world";
 import { absence, inTheEnginesWords, noReadingAtAll } from "../../world/absence";
 import { DeltaRail } from "../DeltaRail";
@@ -86,15 +86,16 @@ function heldFor(because: Movement["unchangedBecause"]): DeltaRow {
     sameDirection: { reading: 0.5 },
     unchangedBecause: because,
   };
+  const quiet = quietRow("unchanged", moved, undefined);
   return {
     claimId: "N1",
     label: "Omani-mediated talks resume publicly.",
     kind: "not_tradeable",
-    move: { absence: inTheEnginesWords(NO_CHANGE, noChangeReason(moved)) },
+    move: { absence: inTheEnginesWords(quiet.words, quiet.reason) },
     rangeWidth: NOT_YET,
     agreement: NOT_YET,
-    noChange: true,
-    noChangeBecause: noChangeInAWord(moved),
+    unranked: true,
+    note: quiet.note,
   };
 }
 
@@ -231,7 +232,7 @@ describe("the rail beside the map", () => {
       />,
     );
     expect(screen.getByText("no change")).toBeInTheDocument();
-    expect(screen.getByText(/Endings that did not move follow/)).toBeInTheDocument();
+    expect(screen.getByText(/Every other ending your edit reaches follows/)).toBeInTheDocument();
 
     // It is on the list, it is the row it says it is, and it is marked as one
     // that held still — read off the row rather than off its words, because the
@@ -239,7 +240,7 @@ describe("the rail beside the map", () => {
     // that sentence would be a test of the copy.
     const rows = [...container.querySelectorAll(".delta-rail__row")];
     expect(rows.map((row) => row.getAttribute("data-about"))).toEqual(["M1", "N1"]);
-    expect(rows.map((row) => row.getAttribute("data-moved"))).toEqual(["yes", "no"]);
+    expect(rows.map((row) => row.getAttribute("data-ranked"))).toEqual(["yes", "no"]);
   });
 
   it("test_the_no_change_sentence_comes_from_the_engines_own_word", () => {
@@ -280,7 +281,7 @@ describe("the rail beside the map", () => {
     const { container } = render(
       <DeltaRail rows={[heldFor("versions_disagree")]} ranked={true} summary={SUMMARY} />,
     );
-    const row = container.querySelector('.delta-rail__row[data-moved="no"]') as HTMLElement;
+    const row = container.querySelector('.delta-rail__row[data-ranked="no"]') as HTMLElement;
     const words = (row.textContent ?? "").toLowerCase();
     expect(words).toContain("no change");
     expect(words).toContain("the versions disagreed which way");
