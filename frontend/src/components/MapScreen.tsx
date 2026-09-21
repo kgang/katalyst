@@ -51,6 +51,7 @@ import { Inspector } from "./Inspector";
 import { MapFrame } from "./MapFrame";
 import { Outline } from "./Outline";
 import { Refusal } from "./Refusal";
+import { RunStrip } from "./RunStrip";
 import { ShortcutsSheet } from "./ShortcutsSheet";
 
 /** How long the wires take to arrive, column by column, before the map settles. */
@@ -196,6 +197,9 @@ export function MapScreen({
   // whenever the branch changes — which is what makes the six buttons move
   // numbers: pressing one appends an edit, and the whole branch goes back.
   const [answer, setAnswer] = useState<Answered>({ at: "nothing-open" });
+  // How many times the engine has been asked, so that the strip's reading of
+  // how long this question has been out starts again with each one.
+  const [asks, setAsks] = useState(0);
   useEffect(() => {
     if (open === undefined) {
       setAnswer({ at: "nothing-open" });
@@ -203,6 +207,10 @@ export function MapScreen({
     }
     let stillWanted = true;
     setAnswer({ at: "asking" });
+    // One more question has gone out. The strip at the foot starts its count of
+    // seconds again from here — this is the only thing that count is for, and it
+    // is a count of questions asked, never of anything on the map.
+    setAsks((many) => many + 1);
     Promise.all([
       source.readWorld({ baseId: base.baseId, branch: open }),
       source.readDiff({ baseId: base.baseId, branch: open }),
@@ -695,7 +703,30 @@ export function MapScreen({
         </>
       }
       status={status}
-      saying={announcement}
+      // The same one strip the generating screen has, in the same place, with
+      // the same polite line inside it — so a reader who has learned one of
+      // these screens has learned the other.
+      //
+      // **The seconds count while this screen is waiting on the server, and only
+      // then.** Here that is the state where a branch's world has been asked for
+      // and has not come back — usually a fraction of a second, occasionally
+      // not, and already the one state this screen says something about under
+      // the map. When the answer lands there is nothing left to measure and the
+      // reading goes; a stored map at rest is not waiting for anything.
+      //
+      // **The sentence is the one this screen already said**, word for word. A
+      // second sentence swapped in while the engine is being asked would be a
+      // second thing announced to a screen reader for one edit, and the line
+      // already says the numbers are on their way.
+      strip={
+        announcement === "" ? null : (
+          <RunStrip
+            word={answer.at === "asking" ? "asking" : "stored"}
+            saying={announcement}
+            arrivals={answer.at === "asking" ? asks : null}
+          />
+        )
+      }
       panel={dock === "away" ? null : THE_PANEL}
       origin={
         <>

@@ -46,7 +46,9 @@ import {
   pushInWords,
   shapeInWords,
 } from "../graph/wires/encodings";
+import { GENERATE_ADDRESS } from "../stream/generate";
 import type { UnreadLine } from "../stream/growth";
+import { NO_LIKELIHOOD_YET, NOTHING_HERE_WAS_TYPED_IN } from "../stream/growth";
 import type { Working } from "../stream/transcript";
 import type {
   BeliefOwner,
@@ -121,6 +123,15 @@ export interface InspectorProps {
 
 /** Everything the panel knows about the run that produced this map. */
 export interface GenerationDetail {
+  /**
+   * The engine's own name for this run, as its twenty-six characters.
+   *
+   * The one identifier in this product that is printed on screen, and it is
+   * deliberate: it is how somebody asks for this answer again — the map, the
+   * seed and the working — and the working is asked for by it. Null until the
+   * run's first event has arrived.
+   */
+  readonly generationId: string | null;
   /**
    * The seed every likelihood in this run was worked out from, as its digits.
    *
@@ -964,6 +975,66 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
   );
 }
 
+/**
+ * Where this map is coming from: the route, the run's own name, and the seed.
+ *
+ * **It moved here from the foot of the screen** (decision R16, brought forward
+ * on 2026-09-21). Where it stood it was an always-on strip of prose reading
+ * *"Every claim and arrow on this map arrived from /api/generate, in generation
+ * …, at seed …"* — written from the run's first event onward, which is to say
+ * **over a map with nothing on it yet**. It asserted arrivals that had not
+ * happened, it repeated what the strip now says in words, and it was the third
+ * of three stacked strips at the foot of a screen whose reader could not tell
+ * whether anything was happening at all.
+ *
+ * **What it says here is true from the first frame.** Nothing on this map is
+ * typed in — that is a fact about how the map is built, not about how much of it
+ * has arrived — and the three readings beside it are the three things a reader
+ * needs to ask for the same answer again.
+ *
+ * **A plain section that is always here.** Not a dialog, not a disclosure, not
+ * something that opens over the map. Folding the panel's sections behind their
+ * summaries is a later stack's work and this is written to be folded.
+ */
+function RunDetails({
+  detail,
+  theMapsOwn,
+}: {
+  detail: GenerationDetail;
+  theMapsOwn: string | null;
+}) {
+  const { generationId, seed } = detail;
+  return (
+    <Section title="Run details">
+      <dl className="inspector__pairs inspector__pairs--facts">
+        <dt>route</dt>
+        <dd className="inspector__mono">{GENERATE_ADDRESS}</dd>
+        <dt>generation</dt>
+        <dd className="inspector__mono">{generationId ?? NOT_YET}</dd>
+        <dt>seed</dt>
+        {/* The digits that came off the wire, never a parsed number: a seed can
+            be nineteen digits and a browser holds a whole number exactly only up
+            to sixteen. */}
+        <dd className="inspector__mono">{seed ?? NOT_YET}</dd>
+      </dl>
+      {/* While the map is being built these two are the whole of what is true
+          about where it came from. The moment the engine hands its own world
+          over it also hands over its own origin sentence — which says the same
+          thing and more, at the seed and over the versions it really used — so
+          that one is printed instead. It is never printed at the foot of the
+          screen as well: one account, in one place. */}
+      {theMapsOwn === null ? (
+        <>
+          <p className="inspector__reason">{NOTHING_HERE_WAS_TYPED_IN}</p>
+          <p className="inspector__reason">{NO_LIKELIHOOD_YET}</p>
+        </>
+      ) : (
+        <p className="inspector__reason">{theMapsOwn}</p>
+      )}
+    </Section>
+  );
+}
+
 /** The panel beside the map. */
 export function Inspector({
   world,
@@ -980,6 +1051,15 @@ export function Inspector({
 
   return (
     <aside className="inspector" aria-label="Why this number is what it is">
+      {/* Where this map is coming from, always in the panel while there is a
+          run — except while the panel is already reading that run out, which
+          says the same three things at more length. */}
+      {generation === undefined || run !== undefined ? null : (
+        <RunDetails
+          detail={generation}
+          theMapsOwn={world.versions === undefined ? null : world.origin}
+        />
+      )}
       {run !== undefined ? (
         <GenerationDetailPanel detail={run} />
       ) : claim !== undefined ? (

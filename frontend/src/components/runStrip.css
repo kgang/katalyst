@@ -1,0 +1,60 @@
+/*
+ * The one strip at the foot of a map that says what is happening to it.
+ *
+ * One row, three parts, and nothing in it moves: the state as one word in the
+ * mono box the line above it already uses, the run's own sentence, and — only
+ * while a live run is open — how long it has been since anything arrived.
+ *
+ * **There is no animation in this file and there will not be one.** The seconds
+ * change because a number in JavaScript changed, which spends no duration here
+ * and costs the motion budget nothing. A spinner, a pulse, a shimmer or a bar
+ * sliding across itself would all be motion standing in for a sentence, and the
+ * sentence is right there.
+ */
+
+.run-strip {
+  /* Never squashed. This is the line that says whether the tool is alive. */
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-raised);
+  font-size: var(--text-sm);
+  color: var(--text);
+  min-height: 1.9em;
+}
+
+/* The state, as one word. The same box, the same hairline and the same mono
+ * face as the last-key mark on the line above, because they are the same kind
+ * of thing: a label on a line, not a badge. */
+.run-strip__mark {
+  flex: none;
+  padding: 1px var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* The sentence, which is also the polite live region. It takes the width so the
+ * reading is pushed to the far end and stays in one place while the sentence
+ * under it changes length. */
+.run-strip__saying {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* How long since anything arrived. Quiet, and its digits are the same width as
+ * each other, so a two-digit second does not shove the words beside it. */
+.run-strip__waited {
+  flex: none;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

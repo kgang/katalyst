@@ -1,10 +1,15 @@
 /*
- * Why the run ended, said once, under the map.
+ * The tail of the strip once the run has stopped: its own counts, and the offer
+ * to ask again after a stream that was cut.
  *
- * One line of words with a small label in front of it. No icon, no colour, no
- * banner: a run that reached its claim cap and a run that finished cleanly are
- * both things that happened, and dressing one of them as a warning would teach a
- * reader to read the colour instead of the sentence.
+ * No icon, no colour, no banner: a run that reached its claim cap and a run that
+ * finished cleanly are both things that happened, and dressing one of them as a
+ * warning would teach a reader to read the colour instead of the sentence.
+ *
+ * **Why it is a strip and not a line any more.** Until 2026-09-21 it printed the
+ * run's own sentence too, under a live region that was clipped to one pixel. Now
+ * the strip prints that sentence once, and this draws what the sentence does not
+ * say.
  */
 
 .done-line {
@@ -18,18 +23,10 @@
   text-wrap: pretty;
 }
 
-.done-line__word {
-  padding: 0 var(--space-hair);
-  border: 1px solid var(--hairline);
-  border-radius: 2px;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.done-line__why {
-  color: var(--text);
+/* A run that broke has no counts and no offer, and an empty box with a gap
+ * around it would be a thing on screen that says nothing. */
+.done-line:empty {
+  display: none;
 }
 
 /*

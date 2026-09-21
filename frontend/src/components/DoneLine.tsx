@@ -2,6 +2,15 @@
  * Why the generation stopped, in the engine's words for each reason — and, when
  * something broke instead, the one plain sentence it left.
  *
+ * **The sentence itself is no longer printed here.** From 2026-09-21 the run's
+ * one sentence lives in the strip at the foot of the map, which is also the
+ * polite region a screen reader hears, so a copy of it here would be the same
+ * words twice in two of three stacked strips of prose — which is exactly what
+ * the strip was built to end. The seven sentences below are still written here,
+ * because this is where they belong and because the spoken line reads them; what
+ * this component now draws is the tail of the strip: the run's own counts, and
+ * the offer to run a cut stream again.
+ *
  * **One reason arrives, never a list**, and it names what closed the last claim
  * that was still open, with the spending limit and the no-ending case overriding
  * everything above them.
@@ -82,50 +91,46 @@ export interface DoneLineProps {
   };
 }
 
-/** Why the run ended, said once, under the map. */
+/**
+ * What a run that has stopped puts at the end of the strip: its own counts, and
+ * the offer to ask again when the stream was cut.
+ *
+ * Nothing until the run stops, because until then there is nothing to say that
+ * the strip's sentence is not already saying.
+ */
 export function DoneLine({ done, failure, endedEarly = false, runAgain }: DoneLineProps) {
-  if (endedEarly) {
-    return (
-      <p className="done-line" data-kind="ended_early">
-        <span className="done-line__word">ended early</span>
-        <span className="done-line__why">
-          {THE_STREAM_ENDED_EARLY} Everything that arrived is on the map, and nothing was made up to
-          fill the gap.
-        </span>
-        {runAgain === undefined ? null : (
-          <button className="done-line__again" type="button" onClick={runAgain.go}>
-            {/* The offer, with its price on it. A control that quietly spends
-                money the second time it is pressed is the one control in this
-                product that must say so before it is pressed. */}
-            {runAgain.costsMoney
-              ? "Run it again — this asks the model again, and spends again"
-              : "Play it again — this plays the recording again, and spends nothing"}
-          </button>
-        )}
-      </p>
-    );
-  }
-  if (failure !== null) {
-    return (
-      <p className="done-line" data-kind="failed">
-        <span className="done-line__word">stopped</span>
-        {/* One plain sentence, never a stack trace. The map that had been built
-            stays exactly where it is: a reader whose run broke after twenty
-            claims keeps the twenty claims. */}
-        <span className="done-line__why">{failure}</span>
-      </p>
-    );
-  }
-  if (done === null) {
+  const kind = endedEarly
+    ? "ended_early"
+    : failure !== null
+      ? "failed"
+      : done === null
+        ? null
+        : done.reason;
+  if (kind === null) {
     return null;
   }
   return (
-    <p className="done-line" data-kind={done.reason}>
-      <span className="done-line__word">finished</span>
-      <span className="done-line__why">{WHY_IT_STOPPED[done.reason]}</span>
-      <span className="done-line__counts">
-        {`${done.claims} claims · ${done.links} arrows · ${done.rejected} refused`}
-      </span>
+    <p className="done-line" data-kind={kind}>
+      {/* The run's own three figures, exactly as the closing event counted
+          them. Nothing here adds two numbers together. */}
+      {done === null || endedEarly || failure !== null ? null : (
+        <span className="done-line__counts">
+          {`${done.claims} claims · ${done.links} arrows · ${done.rejected} refused`}
+        </span>
+      )}
+      {endedEarly ? (
+        <span className="done-line__counts">nothing was made up to fill the gap</span>
+      ) : null}
+      {runAgain === undefined ? null : (
+        <button className="done-line__again" type="button" onClick={runAgain.go}>
+          {/* The offer, with its price on it. A control that quietly spends
+              money the second time it is pressed is the one control in this
+              product that must say so before it is pressed. */}
+          {runAgain.costsMoney
+            ? "Run it again — this asks the model again, and spends again"
+            : "Play it again — this plays the recording again, and spends nothing"}
+        </button>
+      )}
     </p>
   );
 }

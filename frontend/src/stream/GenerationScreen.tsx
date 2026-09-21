@@ -27,12 +27,14 @@ import { Outline } from "../components/Outline";
 import { ReceiptStrip } from "../components/ReceiptStrip";
 import { RefusalStrip } from "../components/RefusalStrip";
 import { ReplayBadge, replaySentence } from "../components/ReplayBadge";
+import { RunStrip } from "../components/RunStrip";
 import { ShortcutsSheet } from "../components/ShortcutsSheet";
 import { VerdictCard } from "../components/VerdictCard";
 import { MapCanvas } from "../graph/Canvas";
 import { useEveryKey } from "../keyboard/everyKey";
 import type { MapKeys } from "../keyboard/useMapKeys";
 import type { Selection } from "../world";
+import type { Growth, Phase } from "./growth";
 import { hasStopped } from "./growth";
 import type { TheRun, WhereItHasGot } from "./theRun";
 import type { Working } from "./transcript";
@@ -53,6 +55,36 @@ import "../components/generationDock.css";
  */
 function useTheRun(run: TheRun): WhereItHasGot {
   return useSyncExternalStore(run.watch, run.now, run.now);
+}
+
+/**
+ * The state of the run, as the one word the strip puts in front of its
+ * sentence.
+ *
+ * Six phases and seven words, because *live* and *replay* are the same phase
+ * seen two ways and the difference matters to a reader: one is spending money
+ * and taking a minute a call, the other is a recording being played back.
+ *
+ * @param phase Where the run has got to.
+ * @param replaying True when this copy has no model key and is playing a
+ *   recording back.
+ */
+export function theWordFor(phase: Phase, replaying: boolean): string {
+  switch (phase) {
+    case "waiting":
+    case "growing":
+      return replaying ? "replay" : "live";
+    // A cap stopping a run and a run reaching its own end are both a finished
+    // map: the map is on screen, nothing more is coming, and *why* is the
+    // sentence beside the word rather than the word itself.
+    case "settled":
+    case "stopped":
+      return "finished";
+    case "failed":
+      return "stopped";
+    case "ended_early":
+      return "ended early";
+  }
 }
 
 /** What the screen needs. */
@@ -87,6 +119,27 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
 
   const { generationId, phase } = growth;
   const finished = hasStopped(phase);
+
+  // **How many events have arrived**, so the strip at the foot knows when to
+  // start counting the silence again.
+  //
+  // It counts the run's own state being replaced, which is one for one with an
+  // event arriving: `fold` hands back a new state for every one of the eight
+  // events — it says so in its own words, *there is no event this hands its
+  // argument back for* — so a new object here is something having landed.
+  //
+  // **It is a count of arrivals and nothing else, and it is never drawn.**
+  // The browser can count what it was sent; it cannot count the model's calls,
+  // and must never print a number as if it could.
+  const [arrivals, setArrivals] = useState(0);
+  const lastSeen = useRef<Growth | null>(null);
+  useEffect(() => {
+    if (lastSeen.current === growth) {
+      return;
+    }
+    lastSeen.current = growth;
+    setArrivals((many) => many + 1);
+  }, [growth]);
 
   // The same three keys as every other screen, from the one module that binds
   // them — this screen prints *Press ? for every key* under the map, and until
@@ -209,7 +262,11 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
           setStatus("the panel beside the map");
         },
       },
-      ...(generationId === null
+      // **Only once there is a working.** It is read back from the server when
+      // the run stops, so a press before then leaves the panel saying *Reading
+      // the working of this run…* until the run ends — a command that appears to
+      // do nothing for two minutes.
+      ...(generationId === null || !finished
         ? []
         : [
             {
@@ -233,7 +290,7 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
         run: onLeave,
       },
     ],
-    [generationId, onLeave],
+    [generationId, finished, onLeave],
   );
 
   const keys: MapKeys = useMemo(
@@ -306,13 +363,35 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
         </>
       }
       status={status}
-      // Said out loud, and said once — and it says what just **changed** rather
-      // than re-reading the whole run. Here the same facts are already drawn:
-      // the claims on the canvas, the refusals in the panel, why the run
-      // stopped under the map. Printing them again made the foot of the screen
-      // three strips of prose saying the same thing twice.
-      saying={saying}
-      spokenOnly={true}
+      // The one strip that says what this run is doing: the state as a word,
+      // the run's own sentence — said out loud and printed, one element so the
+      // two cannot drift — and, only on a live run that is still open, how long
+      // it has been since anything arrived.
+      strip={
+        <RunStrip
+          word={theWordFor(phase, replaying)}
+          saying={saying}
+          // **A replay counts no seconds, and neither does a run that has
+          // stopped.** A replay is paced by the server at six tenths of a
+          // second an event, so the reading would reset twice a second and
+          // would be measuring our own pacing rather than any wait.
+          arrivals={replaying || finished ? null : arrivals}
+          after={
+            <DoneLine
+              done={growth.done}
+              failure={growth.failure}
+              endedEarly={phase === "ended_early"}
+              // The offer is made only where there is something to offer: a
+              // stream that stopped without saying why. A run that finished has
+              // its map on screen, and a button asking whether to spend it all
+              // again would be a control looking for a reason to exist.
+              runAgain={
+                phase === "ended_early" ? { costsMoney: !replaying, go: onRunAgain } : undefined
+              }
+            />
+          }
+        />
+      }
       panel={
         /* The map as a list, in place of the panel, exactly as it is on a
            stored map: press O for it, press O again for the panel. It grows as
@@ -352,8 +431,16 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
                 whose stream was cut had none at all. That last one is the worst
                 of the three: the working is the only record of how far a cut
                 run got, the screen fetches it for exactly that reason, and then
-                offered the reader no way to read it. */}
-            {generationId === null ? null : (
+                offered the reader no way to read it.
+
+                **And it appears only once there is a working.** It used to be
+                drawn from the run's first event, while the thing it opens is
+                read back from the server only when the run stops — so pressing
+                it during the two minutes a reader is most likely to press it
+                left the panel saying *Reading the working of this run…* until
+                the run ended. A control that cannot do what it says is worse
+                than no control. */}
+            {generationId === null || !finished ? null : (
               <section className="generation-working" aria-label="The working of this run">
                 <button
                   className="generation-working__open"
@@ -392,6 +479,7 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
               world={growth.world}
               selection={selection}
               generation={{
+                generationId,
                 seed: growth.seed,
                 promptFingerprint: growth.receipt?.prompt_hash ?? null,
                 working,
@@ -404,7 +492,14 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
       }
       origin={
         <>
-          <p className="map-origin__line">{growth.world.origin}</p>
+          {/* **Where this map came from is not here any more.** The route, the
+              run's own name, the seed and the map's own origin sentence are all
+              read in *Run details*, in the panel — R16, brought forward. The
+              line that stood here said *"Every claim and arrow on this map
+              arrived from…"* from the run's first event, which is to say over a
+              map with nothing on it yet, and it was the third of three stacked
+              strips of prose at the foot of a screen that could not say whether
+              anything was happening at all. */}
           {replaying ? (
             <p className="map-origin__line">
               {replaySentence({
@@ -413,18 +508,6 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
               })}
             </p>
           ) : null}
-          <DoneLine
-            done={growth.done}
-            failure={growth.failure}
-            endedEarly={phase === "ended_early"}
-            // The offer is made only where there is something to offer: a stream
-            // that stopped without saying why. A run that finished has its map on
-            // screen, and a button asking whether to spend it all again would be
-            // a control looking for a reason to exist.
-            runAgain={
-              phase === "ended_early" ? { costsMoney: !replaying, go: onRunAgain } : undefined
-            }
-          />
           {(growth.world.warnings ?? []).map((warning) => (
             <p className="map-origin__line" key={warning}>
               {warning}

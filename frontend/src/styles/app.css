@@ -168,22 +168,19 @@ body {
   color: var(--text-muted);
 }
 
-/* What a branch did, said out loud. It is a visible line as well as a spoken
- * one: a reader looking at the picture should be told the same thing a reader
- * hearing it is told, and the counts are the ones the diff worked out rather
- * than any number nobody computed. */
+/* The one polite line, said out loud and printed.
+ *
+ * **It is a visible line as well as a spoken one, on every screen** — a reader
+ * looking at the picture is told the same thing a reader hearing it is told, and
+ * it is one element rather than two so the two can never drift apart. It lives
+ * inside the strip at the foot of the map (`components/runStrip.css`), which is
+ * where its box, its hairline and its background now come from; what is left
+ * here is how the words read. */
 .map-live {
   margin: 0;
-  padding: var(--space-1) var(--space-3);
-  border-top: 1px solid var(--hairline);
-  background: var(--surface-raised);
   font-size: var(--text-sm);
   color: var(--text);
   text-wrap: pretty;
-}
-
-.map-live:empty {
-  display: none;
 }
 
 /* The panel beside the map: the six things you can do, your branches, where the
@@ -430,6 +427,13 @@ body {
 
 .map-origin__line {
   margin: 0;
+}
+
+/* A generated map keeps nothing here until it has something to say — where it
+ * came from is read in the panel now. An empty strip with a hairline above it
+ * would be a band at the foot of the screen that means nothing. */
+.map-origin:empty {
+  display: none;
 }
 
 /* What the screen says while the map is on its way, or when it could not be
