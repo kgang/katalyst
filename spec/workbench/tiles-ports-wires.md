@@ -75,12 +75,14 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 | What | Value |
 |---|---|
 | Width | **280 px**, fixed, so the layout engine can place a tile before the browser has finished measuring its text |
-| Height | **Content-fit, clamped 152–272 px**, on the eight-pixel grid, and **computed from the content** — how many lines the claim takes, whether there are clippings, whether the tile carries its own reason. Never measured from the screen, so layout stays a pure function and one number sets the box, the claim's line clamp and the height handed to the layout engine |
+| Height | **Content-fit, clamped 152–320 px**, on the eight-pixel grid, and **computed from the content** — how many lines the claim takes, whether there are clippings, whether the tile carries its own reason, and what its badges have to say. Never measured from the screen, so layout stays a pure function and one number sets the box, the claim's line clamp and the height handed to the layout engine |
 | Internal padding | **12 px** — `--space-1` plus `--space-hair`, the one half-step the spacing scale allows |
 | Every other margin and gap | From the eight-pixel scale: `--space-1`, `--space-2`, `--space-3` |
 | Border | One hairline at `--hairline`, which is 10% of the text colour |
 | Shadow | **None.** Not a soft one, not a small one |
 | Corner | `--radius` (6 px), except where the kind silhouette changes the outline |
+
+**The ceiling is 320, and the reason is one badge** *(Kent, 2026-09-20, G11; K9's 152–272 read 272)*. Content-fit means the ceiling is whatever the densest tile the product can produce actually needs, and that tile turned out to be the hypothesis on the strike branch: a three-line claim, two evidence clippings, the overridden-assertion badge pair — which runs to three lines on a 280-pixel tile on its own — and a line saying how far its number moved. At 272 the last of those was cut off, which is the one thing the badge exists to say. Nothing else about K9 changes: the height is still content-fit, still on the eight-pixel grid, still computed from the claim and never measured off the screen.
 
 ### The six things a tile shows, and no more
 
@@ -355,9 +357,9 @@ Local numbers in this part are `INV-workbench.<n>`. This chapter holds **1 – 1
 
 ### INV-workbench.1 — The tile's geometry
 
-For every tile rendered from any map: its width is exactly 280 px; its height is computed from its content, lands between 152 and 272 px, and is a multiple of 8; every margin and gap is a value from the spacing scale; its border is one hairline at `--hairline`; and it casts no shadow. The height is never read back from the rendered element, so the same input always gives the same number.
+For every tile rendered from any map: its width is exactly 280 px; its height is computed from its content, lands between 152 and 320 px, and is a multiple of 8; every margin and gap is a value from the spacing scale; its border is one hairline at `--hairline`; and it casts no shadow. The height is never read back from the rendered element, so the same input always gives the same number.
 
-- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_is_280_wide_and_on_the_eight_pixel_grid` and `test_tile_height_is_content_fit_within_152_and_272`.
+- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_is_280_wide_and_on_the_eight_pixel_grid` and `frontend/src/graph/__tests__/layout.test.ts` › `test_tile_height_is_content_fit_within_152_and_320`.
 - **Also:** visual review checklist line 8 — measure the tile, do not eyeball it.
 
 ### INV-workbench.2 — The claim is never cut mid-word
@@ -459,5 +461,5 @@ For every module under `frontend/src/graph/` and for the tile and chip component
 2. **Two significant figures for an awkward number.** The table is in [`keyboard-and-access.md`](keyboard-and-access.md) B6; `.995` and `.06` are still open there.
 3. **The "no market" reason when the world carries none.**
    **Decided 2026-09-17 (Kent, K7):** the tile says **no market** and nothing else; the reason lives on the hover, in the accessible name and in the Inspector, is written once in [`../vocabulary.md`](../vocabulary.md), and is chosen by the claim's `kind` — except on a `not_tradeable` ending, which keeps its own stored reason on the tile because that one is a finding. In the body above.
-4. **How many badges fit.** The overridden-assertion badge is long — *Supposed · Oct 1 → Retracted · Oct 2 · by "…"* — and even at the 272-pixel clamp a tile with a three-line claim has room for about one such line. What happens to a tile carrying three badges is not settled.
+4. **How many badges fit.** *Settled by the ceiling above (Kent, 2026-09-20, G11), and kept here because the question was a real one.* The overridden-assertion badge is long — *Supposed · Oct 1 → Retracted · Oct 2 · by "…"* — and on a 280-pixel tile it runs to three lines on its own. At the old 272-pixel clamp a tile with a three-line claim had room for about one such line, and the hypothesis on the strike branch carries that badge pair **and** a line saying how far its number moved. So the ceiling is 320 and the badge is not cut off. A tile carrying more than that is still unsettled, and the clamp is what stops it growing without limit.
 5. **Two clippings from the same publisher** give the same monogram twice, and a host name that starts with a digit gives a monogram that reads as a number. A two-letter monogram fixes both and is harder to read at a glance.

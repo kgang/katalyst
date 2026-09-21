@@ -32,30 +32,76 @@ import type { BeliefOwner, Known, Ranged, Standing } from "../world";
 import "./beliefChip.css";
 
 /**
- * Print a number to two significant figures, the way this product prints one.
+ * A number at two significant figures, split into its digits and where the point
+ * sits — or nothing at all, for a number there is no sense in printing.
  *
- * A likelihood is between zero and one, so the leading zero is dropped: `.35`,
- * not `0.35`. Two significant figures means two digits that carry information,
- * and both of them are always printed — `.060` keeps its trailing nought,
- * because dropping it would claim less precision than we have, and "two figures
- * except when the second is a nought" would be a second rule for one ugly case.
- *
- * **It never prints a certainty.** Rounding to two figures turns .995 into
- * `1.0`, and nothing at all into `.0`, and both are claims nobody on this map
- * is entitled to make: one says the thing cannot fail, the other that it cannot
- * happen. So those two print as what they actually are, `>.99` and `<.01`. The
- * upper guard catches everything from .995 up, including 1 itself. The lower
- * one is rarer than it looks: two figures keeps two digits however small the
- * number gets, so `.0035` prints `.0035` and `.00012` prints `.00012`, and the
- * only value that would ever print as `.0` is exactly zero.
+ * The value it stands for is `figures × 10^(exponent − 1)`: `.35` is 35 and −1,
+ * `.0035` is 35 and −3, `1.0` is 10 and 0.
  *
  * **Why it does not use the obvious shortcut.** A computer stores .995 as
  * 0.99499999999999999556, so asking it directly for two figures gives `.99` —
- * under the guard, and the chip would print the one thing the rule forbids. So
- * the rounding is done on the number's own decimal digits instead: the shortest
- * decimal that reads back as this exact number, its point shifted by counting
- * rather than by multiplying, and then rounded half-up. `.995` shifts to
- * exactly 99.5, which rounds to 100, which is 1, which is `>.99`.
+ * and .995 is precisely the case the certainty guard exists for. So the rounding
+ * is done on the number's own decimal digits instead: the shortest decimal that
+ * reads back as this exact number, its point shifted by counting rather than by
+ * multiplying, and then rounded half-up. `.995` shifts to exactly 99.5, which
+ * rounds to 100, which carries to 1.
+ *
+ * @param value Any number from 0 up.
+ */
+function twoFigures(value: number): { figures: number; exponent: number } | null {
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  const [mantissa = "0", place = "0"] = value.toExponential().split("e");
+  let exponent = Number(place);
+  // The two figures, as a whole number from 10 to 99.
+  let figures = Math.round(Number(`${mantissa}e1`));
+  if (figures >= 100) {
+    // Rounding up carried into the next place: .0999 becomes .10, not .100.
+    figures = 10;
+    exponent += 1;
+  }
+  return { figures, exponent };
+}
+
+/**
+ * Write those two figures out.
+ *
+ * Both digits are always printed — `.060` keeps its trailing nought, because
+ * dropping it would claim less precision than we have, and "two figures except
+ * when the second is a nought" would be a second rule for one ugly case.
+ */
+function written({ figures, exponent }: { figures: number; exponent: number }): string {
+  if (exponent < 0) {
+    return `.${"0".repeat(-exponent - 1)}${figures}`;
+  }
+  const digits = `${figures}`;
+  // A number at or above one: the point sits inside or after the two figures.
+  return exponent === 0 ? `${digits[0]}.${digits[1]}` : digits + "0".repeat(exponent - 1);
+}
+
+/**
+ * Print a **likelihood** — or an end of the range around one, which is a
+ * likelihood too — the way this product prints one.
+ *
+ * **A likelihood, and only a likelihood.** How far a number moved and how wide a
+ * band is are measured on the same scale and are not likelihoods; they take
+ * `toSize` below, and the difference is the guard.
+ *
+ * **Two significant figures.** A likelihood is between zero and one, so the
+ * leading zero is dropped: `.35`, not `0.35`. Both figures are always printed.
+ *
+ * **It never prints a certainty, at either end.** A likelihood of 1 says the
+ * thing cannot fail and a likelihood of 0 says it cannot happen, and nothing on
+ * this map is entitled to either. So the guard is applied to the number **as it
+ * would print**: what two figures would print at or above `1.0` prints `>.99`,
+ * and what they would print below `.010` prints `<.01` (Kent, 2026-09-20, G10).
+ * `.0099` is below the line and reads `<.01`; `.010` is on it and reads `.010`.
+ *
+ * **This rule is written twice and the two copies must move together.** The
+ * engine writes the same numbers into the one-line summary it carries, in
+ * `backend/src/katalyst/domain/diff.py::_two_figures`. A screen and a sentence
+ * that round the same number differently are two answers to one question.
  *
  * @param value A likelihood, at full precision.
  * @returns The number as it is shown on screen.
@@ -67,27 +113,93 @@ export function toTwoFigures(value: number): string {
   if (value >= 1) {
     return ">.99";
   }
-  // The shortest decimal that reads back as this exact number, split into its
-  // digits and where the point sits: .995 becomes "9.95" and -1.
-  const [mantissa = "0", place = "0"] = value.toExponential().split("e");
-  let exponent = Number(place);
-  // The two figures, as a whole number from 10 to 99. Shifting the point in the
-  // text and letting the parser read the result is what keeps .995 at 99.5
-  // rather than a hair under it.
-  let figures = Math.round(Number(`${mantissa}e1`));
-  if (figures >= 100) {
-    // Rounding up carried into the next place: .0999 becomes .10, not .100.
-    figures = 10;
-    exponent += 1;
+  const rounded = twoFigures(value);
+  if (rounded === null) {
+    return "<.01";
   }
-  if (exponent >= 0) {
+  // Read off the printed value rather than the one that came in. Two figures
+  // put the point one place after them, so anything below a hundredth lands at
+  // an exponent under −2 — and `.00996` rounds up to `.010` and stays.
+  if (rounded.exponent >= 0) {
     return ">.99";
   }
-  return `.${"0".repeat(-exponent - 1)}${figures}`;
+  if (rounded.exponent < -2) {
+    return "<.01";
+  }
+  return written(rounded);
+}
+
+/**
+ * Print a **size** on the likelihood scale: how far a number moved, or how wide
+ * a band is.
+ *
+ * **A size is not a likelihood, and it takes no guard.** `<.01` on a likelihood
+ * says "nothing here, but we are not calling it impossible" — a claim about the
+ * world. A move of nine thousandths is not a claim about the world at all; it is
+ * a measurement, and rounding it away to `<.01` would throw out the only thing
+ * the reader came for. So two significant figures, however small: `.0090`,
+ * `.0035`, `.00012` (Kent, 2026-09-20, G10).
+ *
+ * The other end takes no guard either: a move of exactly one is a real move, and
+ * it prints `1.0`.
+ *
+ * @param value A distance between two likelihoods, at full precision. Its sign
+ *   is said in words elsewhere, so pass its size.
+ */
+export function toSize(value: number): string {
+  const rounded = twoFigures(Math.abs(value));
+  return rounded === null ? "0" : written(rounded);
+}
+
+/** The chevron and the word each direction goes by. Neither is a colour. */
+const WAY = {
+  up: { chevron: "▲", word: "up" },
+  down: { chevron: "▼", word: "down" },
+} as const;
+
+/**
+ * How far a number moved, in the one form every surface prints it in.
+ *
+ * **Never a chevron between two readings that print the same.** Two figures is
+ * the whole of what this product shows, and a move smaller than the second
+ * figure leaves the before and the after printing identically — `.36 ▲ .36`,
+ * which says "it went up" and "it is where it was" in the same breath and reads
+ * as a fault in the tool. So where the two readings differ the row is the pair
+ * with the chevron between them, and where they do not it is the one reading and
+ * the size of the move in words: `.36 · up by .0090`.
+ *
+ * The size is the engine's own, at two significant figures **and no guard**: a
+ * move of nine thousandths is a measurement, not a claim about the world, and
+ * rounding it away to `<.01` would throw out the only thing the reader came
+ * for (Kent, 2026-09-20, G10).
+ *
+ * @param from The first world's likelihood, at full precision.
+ * @param to The second world's likelihood, at full precision.
+ * @param by How far it moved, as the engine reported it. Its sign is already
+ *   said by `way`, so only its size is printed.
+ * @param way Which way it went, as the engine read it.
+ */
+export function toMovement(from: number, to: number, by: number, way: "up" | "down"): string {
+  const before = toTwoFigures(from);
+  const after = toTwoFigures(to);
+  if (before !== after) {
+    return `${before} ${WAY[way].chevron} ${after}`;
+  }
+  // Nothing moved at all — the engine's own difference is zero — so there is no
+  // direction to name. "up by 0" would be a direction invented for a number that
+  // has none.
+  if (by === 0) {
+    return after;
+  }
+  return `${after} · ${WAY[way].word} by ${toSize(by)}`;
 }
 
 /**
  * Print a range the way this product prints one: `.22–.50`.
+ *
+ * Both ends are likelihoods, so both take the guard: a band whose bottom end
+ * sits under a hundredth reads `<.01–.03`, which says the low end is small
+ * without calling it impossible.
  *
  * The dash is an en dash, the one used for a span between two numbers.
  */
@@ -121,42 +233,6 @@ export function toShare(share: number): string {
     return "<1%";
   }
   return `${whole}%`;
-}
-
-/** The chevron and the word each direction goes by. Neither is a colour. */
-const WAY = {
-  up: { chevron: "▲", word: "up" },
-  down: { chevron: "▼", word: "down" },
-} as const;
-
-/**
- * How far a number moved, in the one form every surface prints it in.
- *
- * **Never a chevron between two readings that print the same.** Two figures is
- * the whole of what this product shows, and a move smaller than the second
- * figure leaves the before and the after printing identically — `.36 ▲ .36`,
- * which says "it went up" and "it is where it was" in the same breath and reads
- * as a fault in the tool. So where the two readings differ the row is the pair
- * with the chevron between them, and where they do not it is the one reading and
- * the size of the move in words: `.36 · up by .0090`.
- *
- * The size is the engine's own, at two significant figures with the same guard
- * as everything else — a move too small even for that prints `<.01`, which is
- * true and is the honest end of the scale.
- *
- * @param from The first world's likelihood, at full precision.
- * @param to The second world's likelihood, at full precision.
- * @param by How far it moved, as the engine reported it. Its sign is already
- *   said by `way`, so only its size is printed.
- * @param way Which way it went, as the engine read it.
- */
-export function toMovement(from: number, to: number, by: number, way: "up" | "down"): string {
-  const before = toTwoFigures(from);
-  const after = toTwoFigures(to);
-  if (before !== after) {
-    return `${before} ${WAY[way].chevron} ${after}`;
-  }
-  return `${after} · ${WAY[way].word} by ${toTwoFigures(Math.abs(by))}`;
 }
 
 /**

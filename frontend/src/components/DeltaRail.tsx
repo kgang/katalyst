@@ -27,7 +27,7 @@
 
 import { useId, useState } from "react";
 import type { DeltaRow, Known } from "../world";
-import { toMovement, toShare, toTwoFigures } from "./BeliefChip";
+import { toMovement, toShare, toSize } from "./BeliefChip";
 import "./deltaRail.css";
 
 /** What the rail needs to draw itself. */
@@ -103,11 +103,18 @@ function changeOf(row: DeltaRow): Known<string> {
   return { reading: toMovement(move.from, move.to, move.by, move.way) };
 }
 
-/** How firm the new number is: the width of its own range, printed like a likelihood. */
+/**
+ * How firm the new number is: the width of its own range.
+ *
+ * A width is a **size**, not a likelihood: it is how far apart the two ends of a
+ * band sit. So it takes no certainty guard — a band four thousandths wide is a
+ * remarkably firm number and the reader wants to see it, where `<.01` would say
+ * only that it is small.
+ */
 function firmnessOf(row: DeltaRow): Known<string> {
   return row.rangeWidth.reading === undefined
     ? { absence: row.rangeWidth.absence }
-    : { reading: toTwoFigures(row.rangeWidth.reading) };
+    : { reading: toSize(row.rangeWidth.reading) };
 }
 
 /** The share of versions of the map that moved the same way, as a whole percentage. */

@@ -13,7 +13,15 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Known, Ranged } from "../../world";
-import { BeliefChip, toMovement, toReading, toShare, toTwoFigures } from "../BeliefChip";
+import {
+  BeliefChip,
+  toMovement,
+  toRange,
+  toReading,
+  toShare,
+  toSize,
+  toTwoFigures,
+} from "../BeliefChip";
 
 /**
  * Count the significant figures in a printed number.
@@ -222,8 +230,6 @@ describe("a belief chip", () => {
     expect(toTwoFigures(0.0712)).toBe(".071");
     expect(toTwoFigures(0.4999)).toBe(".50");
     expect(toTwoFigures(0.06)).toBe(".060");
-    expect(toTwoFigures(0.0035)).toBe(".0035");
-    expect(toTwoFigures(0.00012)).toBe(".00012");
     expect(toTwoFigures(0.995)).toBe(">.99");
     expect(toTwoFigures(0.9962)).toBe(">.99");
     expect(toTwoFigures(1)).toBe(">.99");
@@ -249,6 +255,45 @@ describe("a belief chip", () => {
     expect(toShare(0.0004)).toBe("<1%");
   });
 
+  it("test_the_lower_guard_begins_at_a_hundredth", () => {
+    // Kent, 2026-09-20, G10. The guard is applied to the number **as it would
+    // print**: what two figures would print below `.010` prints `<.01`, and
+    // what they would print at `.010` or above prints its figures. A likelihood
+    // of a thousandth is not a number this product is entitled to call anything
+    // more precise than "small".
+    expect(toTwoFigures(0.0099)).toBe("<.01");
+    expect(toTwoFigures(0.0035)).toBe("<.01");
+    expect(toTwoFigures(0.00012)).toBe("<.01");
+    // On the line, and just under it after rounding carries.
+    expect(toTwoFigures(0.01)).toBe(".010");
+    expect(toTwoFigures(0.00996)).toBe(".010");
+    expect(toTwoFigures(0.0104)).toBe(".010");
+    expect(toTwoFigures(0.011)).toBe(".011");
+
+    // A range end is a likelihood, so it takes the same guard — and a band
+    // whose bottom sits under a hundredth says so without being called
+    // impossible.
+    expect(toRange(0.004, 0.031)).toBe("<.01–.031");
+    expect(toReading(0.006, 0.0002, 0.03)).toBe("<.01 (<.01–.030)");
+  });
+
+  it("test_a_size_is_not_a_likelihood_and_takes_no_guard", () => {
+    // How far a number moved, and how wide a band is, are measured on the
+    // likelihood scale and are not likelihoods. `<.01` on a likelihood is a
+    // claim about the world — "small, but we are not calling it impossible".
+    // A move of nine thousandths is a measurement, and rounding it away would
+    // throw out the only thing the reader came for.
+    expect(toSize(0.008967961923746659)).toBe(".0090");
+    expect(toSize(0.0035)).toBe(".0035");
+    expect(toSize(0.00012)).toBe(".00012");
+    // The sign is said in words elsewhere, so only the size is printed.
+    expect(toSize(-0.0035)).toBe(".0035");
+    // And no guard at the top either: a move of exactly one is a real move.
+    expect(toSize(1)).toBe("1.0");
+    expect(toSize(0.995)).toBe("1.0");
+    expect(toSize(0)).toBe("0");
+  });
+
   it("test_no_chevron_between_two_readings_that_print_the_same", () => {
     // Two figures is the whole of what this product shows, so a move smaller
     // than the second figure leaves the before and the after printing the same.
@@ -264,13 +309,14 @@ describe("a belief chip", () => {
     );
     expect(toMovement(0.456, 0.414, -0.0421, "down")).toBe(".46 ▼ .41");
 
-    // The size is printed by the same rule as every other number on screen, and
-    // that rule keeps two figures however small the number gets — so a tiny move
-    // reads as the tiny move it is. Only exactly nothing prints `<.01`, and a
-    // move of exactly nothing is not a move.
+    // A size keeps two figures however small, so a tiny move reads as the tiny
+    // move it is — where the likelihoods on either side of it would have been
+    // guarded down to `<.01`.
     expect(toMovement(0.4, 0.4, 0.000004, "up")).toBe(".40 · up by .0000040");
     // The sign is already said by the word, so only the size is printed.
     expect(toMovement(0.4, 0.4, -0.000004, "down")).toBe(".40 · down by .0000040");
+    // And nothing moved at all is not a direction: the reading stands alone.
+    expect(toMovement(0.19, 0.19, 0, "up")).toBe(".19");
   });
 
   it("test_a_chip_is_reachable_by_keyboard_and_opens_no_dialog", () => {

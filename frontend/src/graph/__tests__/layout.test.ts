@@ -220,7 +220,13 @@ describe("how tall a tile is", () => {
     ).toBeGreaterThan(tileHeight(claimOf(short, { beliefs: noMarket })));
   });
 
-  it("test_tile_height_is_content_fit_within_its_floor_and_ceiling", () => {
+  it("test_tile_height_is_content_fit_within_152_and_320", () => {
+    // The two numbers in this test's name are the two in the chapter, so they
+    // are checked rather than taken on trust: a floor and a ceiling that drifted
+    // from the words describing them would leave the name lying.
+    expect(TILE_MIN_HEIGHT).toBe(152);
+    expect(TILE_MAX_HEIGHT).toBe(320);
+
     const claims = [
       "A.",
       "A claim of about the length that takes two lines.",

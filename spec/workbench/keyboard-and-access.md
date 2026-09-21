@@ -135,12 +135,18 @@ The view model carries the number the world carries, at full precision. Only the
 
 ### The certainty guard
 
-**A chip never prints `1.0` and never prints `.0`.** In one sentence: *what two-figure rounding would print as `1.0` prints `>.99` instead, and what it would print as `.0` prints `<.01` instead* — and the same guard applies, unchanged, to each end of the range.
+**A chip never prints a certainty at either end, and the guard is read off the number as it would print.** In one sentence: *what two figures would print at `1.0` or above prints `>.99`, and what they would print below `.010` prints `<.01`* — and the same guard applies, unchanged, to each end of the range.
 
 Two things fall out of that, and both are worth saying plainly.
 
-- The `>.99` case catches **everything from .995 upward**, including 1 itself. A likelihood of 1 is a claim that something cannot fail, and this product does not make that claim about the world. (A *supposed* claim is different: it shows the word **Supposed**, not a number at all — `tiles-ports-wires.md`.)
-- The `<.01` case is **rarer than it looks**. Two significant figures keeps two digits however small the number gets, so `.0035` prints `.0035` and `.00012` prints `.00012`. The only value that two-figure rounding would print as `.0` is **exactly zero**. So `<.01` is the chip's way of saying "nothing here, but we are not calling it impossible", and nothing else reaches it.
+- The `>.99` case catches **everything from .995 upward**, including 1 itself. A likelihood of 1 is a claim that something cannot fail, and this product does not make that claim about the world. (A claim whose value an edit fixed is different: it shows the word **Supposed** or **Happened**, not a number at all — `tiles-ports-wires.md`.)
+- The `<.01` case catches **everything below a hundredth** *(Kent, 2026-09-20, G10; it previously caught only exactly zero)*. `.0099` reads `<.01`; `.010` reads `.010`; `.00996` rounds up onto the line and reads `.010`. The reason is the same as the top end's: a likelihood of three thousandths is a claim this product is not entitled to make about the world, and two figures on it would dress a guess as a measurement. `<.01` says "nothing here that we can see, and we are not calling it impossible".
+
+### A size is not a likelihood
+
+**How far a number moved, and how wide a band is, keep two significant figures however small they get** *(Kent, 2026-09-20, G10)*. They are measured on the likelihood scale and they are not likelihoods: a move of nine thousandths is a measurement rather than a claim about the world, and `<.01` would throw out the only thing the reader came for. So the delta rail's **how firm** column and every before-and-after reading print `.0090`, `.0035`, `.00012` — and a move of exactly one prints `1.0`, because a move of one is a real move.
+
+The two rules live in one file each and are checked against each other: `toTwoFigures` and `toSize` in `frontend/src/components/BeliefChip.tsx`, and the engine's `_two_figures` in `backend/src/katalyst/domain/diff.py`, which writes the same numbers into the one-line summary the world carries. **They are one rule written twice and must move together** — a screen and a sentence that round the same number differently are two answers to one question.
 
 ### Worked examples
 
@@ -151,12 +157,22 @@ Two things fall out of that, and both are worth saying plainly.
 | `.0712` | `.071` | The leading zero is not significant; 7 and 1 are |
 | `.4999` | `.50` | Two figures, and the trailing zero is one of them — `.5` would claim less precision than we have |
 | `.06` | `.060` | Trailing zeros stay. "Two figures except when the second is a zero" would be a second rule for one ugly case |
-| `.0035` | `.0035` | Two figures. Small is not the same as certain |
-| `.995` | `>.99` | Two figures would print `1.0`; the guard fires |
+| `.0104` | `.010` | Two figures, both printed, and on the near side of the line |
+| `.0099` | `<.01` | Two figures would print below `.010`; the lower guard fires |
+| `.0035` | `<.01` | Same. Small is not the same as certain, and it is not a measurement either |
+| `.995` | `>.99` | Two figures would print `1.0`; the upper guard fires |
 | `.9962` | `>.99` | Same |
-| `0` | `<.01` | The only value the lower guard ever sees |
+| `0` | `<.01` | The floor of the same rule |
 
-A range where the guard fires on one end only: `.9962 (.988–.9995)` prints **`>.99 (.99–>.99)`**. Where it fires on both: `.9962 (.9971–.9999)` prints **`>.99 (>.99–>.99)`**. That second one is ugly, and it is correct — it says every part of this estimate sits above .99 and none of it is being called certain.
+And the same values printed as a **size** — a move, or the width of a band — where no guard applies:
+
+| Value carried | Reads | Why |
+|---|---|---|
+| `.0089679…` | `.0090` | Two figures. This is the move observing the insurance premium makes to the strait |
+| `.0035` | `.0035` | Two figures, however small: a measurement, not a claim about the world |
+| `1` | `1.0` | A move of one is a real move, and no guard stands in its way |
+
+A range where the guard fires on one end only: `.9962 (.988–.9995)` prints **`>.99 (.99–>.99)`**. Where it fires on both: `.9962 (.9971–.9999)` prints **`>.99 (>.99–>.99)`**. That second one is ugly, and it is correct — it says every part of this estimate sits above .99 and none of it is being called certain. At the other end the same shape: `.006 (.0002–.030)` prints **`<.01 (<.01–.030)`**, which says the low end of this band is somewhere under a hundredth without pretending to know where.
 
 **One implementation note, because the obvious shortcut gets the decided answer wrong.** JavaScript stores .995 as 0.99499999999999999556, so `(0.995).toPrecision(2)` returns `"0.99"` — under the guard, and the chip would print `.99` where Kent's rule says `>.99`. The formatter must round the decimal value half-up rather than lean on the double. `test_chip_never_prints_a_certainty` uses .995 precisely because it is the case that catches this.
 
@@ -239,7 +255,7 @@ Each is *for all X, statement P holds*, and each names what checks it. "Visual r
 | **INV-workbench.33** | For every focused claim and every press of `h` or `l`, the claim focus lands on is joined to it by a wire; focus never moves to a claim that is merely nearby on screen | `test_h_and_l_land_only_on_a_wired_neighbour` in `frontend/src/keyboard/__tests__/focusMap.test.ts`; visual review checklist line 9 (does arrow movement follow the wires?) |
 | **INV-workbench.34** | For every overlay in the app, `Escape` closes it, the canvas stays live behind it, and nothing is left pending by closing it — there is no dialog anywhere that must be dismissed | visual review checklist line 2 (is there a spinner, a pop-up, or a dialog you must dismiss?) |
 | **INV-workbench.35** | For every animation, under `prefers-reduced-motion: reduce` the ordering is preserved and the tweening is absent | visual review checklist line 10 |
-| **INV-workbench.36** | For every belief rendered anywhere in the app, the chip shows two significant figures on the number and on both ends of its range, always shows the range, and never prints `1.0` or `.0` — those print `>.99` and `<.01` | `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range` and `test_chip_never_prints_a_certainty`, all in `frontend/src/components/__tests__/beliefChip.test.tsx`; visual review checklist line 4 |
+| **INV-workbench.36** | For every belief rendered anywhere in the app, the chip shows two significant figures on the number and on both ends of its range, always shows the range, and prints no likelihood that two figures would put at `1.0` or above or below `.010` — those print `>.99` and `<.01`. A **size** — how far a number moved, how wide a band is — takes two figures and no guard | `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range`, `test_chip_never_prints_a_certainty`, `test_the_lower_guard_begins_at_a_hundredth` and `test_a_size_is_not_a_likelihood_and_takes_no_guard`, all in `frontend/src/components/__tests__/beliefChip.test.tsx`; visual review checklist line 4 |
 | **INV-workbench.37** | For every belief, the view model carries the full precision the world carried, and rounding happens exactly once, in the chip, at paint | `test_the_view_model_keeps_full_precision` in `beliefChip.test.tsx` |
 | **INV-workbench.38** | For every piece of text and every glyph, in both themes, the contrast ratio against the surface behind it is at least 4.5 to 1 | visual review checklist line 7 |
 | **INV-workbench.39** | For every claim in the world there is exactly one outline item, its sentence names every incoming wire, and the announcement names no number the world does not carry | `frontend/e2e/hormuz.spec.ts`; visual review checklist line 5 (is there a number nobody computed?) |
