@@ -295,11 +295,18 @@ function RangeNote({ world, claim }: { world: WorldView; claim: ClaimView }) {
       {/* ---- The reserved band slot: "why is this band wide?" -------------
           Drawn only where the range above is a *computed* one, which is what
           the test just above asks. What goes in it is one sentence naming the
-          claim whose own prior explains most of the band — "92% of this band is
-          B's own prior; pin that down and the band goes from 29 points to 8" —
-          and it is worked out from `range_shares` on the world, which the
-          engine gets out of the same two thousand versions of the map it
+          claim whose own prior explains most of the band — on the stored
+          example, the Brent claim's band is mostly the Brent claim's own stated
+          prior — and it is worked out from `range_shares` on the world, which
+          the engine gets out of the same two thousand versions of the map it
           already runs, at no extra cost.
+
+          **No figure is written in this comment.** The two that used to be here
+          were the engine's answer copied by hand, and they were wrong within a
+          stack: the share is the `B · base · band from B` line of
+          `docs/worked-numbers.txt`, and the width is that line's claim read off
+          `B · base · reading`. One generated file owns them both, so there is
+          one place to look on the day they move again.
 
           **It ships in stack 06 and nothing draws it here.** Not a placeholder
           sentence, not a greyed-out example: a sentence naming a percentage

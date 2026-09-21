@@ -91,9 +91,13 @@ export async function waitForTheBranch(page: Page, branch: string, tiles: number
  * the edit, which is what makes waiting for it waiting rather than passing.
  *
  * @param page The page the map is on.
- * @param sentence The whole line, word for word.
+ * @param sentence The whole line — word for word, or the shape of it where one
+ *   of its counts is the engine's own and so is not written into a test. A
+ *   shape has to be narrow enough to be a real wait: it must not also fit the
+ *   line the map says before the engine has answered, or the wait passes on the
+ *   answer to the question before this one.
  */
-export async function waitForTheAnswer(page: Page, sentence: string): Promise<void> {
+export async function waitForTheAnswer(page: Page, sentence: string | RegExp): Promise<void> {
   await expect(page.locator(".map-live")).toHaveText(sentence);
 }
 

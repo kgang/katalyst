@@ -38,7 +38,7 @@ import type { ClaimDiff, Diff, World } from "../api/client";
 import { readConditional, readDiff, readExample, readWorld } from "../api/client";
 import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
-import { NO_CHANGE, noChangeReason } from "../graph/diff/noChange";
+import { NO_CHANGE, noChangeInAWord, noChangeReason } from "../graph/diff/noChange";
 import { inTheEnginesWords, noReadingAtAll } from "./absence";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
 import { NOT_ON_THIS_MAP } from "./naming";
@@ -349,6 +349,13 @@ function movement(row: ClaimDiff): Movement | undefined {
     // it does. **The browser never works this out for itself** — it is a fact
     // about how the engine read the numbers, and only the engine knows it.
     onlyReweighted: row.moved_only_by_reweighting,
+    // And which half of its test a claim the engine called unchanged failed:
+    // the move was too small, or the versions of the map disagreed which way.
+    // Carried across as the word it came as. The floor and the bar that decide
+    // it are constants inside the engine and are on no wire, so this is the
+    // only way the browser can know — which is what stops a second engine
+    // growing here and disagreeing with the first.
+    unchangedBecause: row.unchanged_because ?? undefined,
   };
 }
 
@@ -409,6 +416,7 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
             `cannot be mistaken for not being here.`,
         ),
       },
+      noChangeBecause: noChangeInAWord(changed.get(claim.id)?.moved),
       rangeWidth: {
         absence: noReadingAtAll(
           "How firm a number is only says something about a number that moved.",

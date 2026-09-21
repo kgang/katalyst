@@ -18,7 +18,19 @@
  * that moved; an ending missing from that list could mean either "it held still"
  * or "it is not on this map", and silence cannot be told from absence. So the
  * unmoved ones follow the ranked ones, reading *no change*, never mixed in among
- * them.
+ * them. On the stored example's strike branch that is the row worth reading: the
+ * talks make the biggest move on the map, the one arrow into them is the map's
+ * one bare assertion, and the versions of the map end up disagreeing which way
+ * the talks went — so the engine will not call it a move, and the row says so
+ * rather than disappearing.
+ *
+ * **There is one kind of quiet row and it carries its reason in words.** Every
+ * row has a half-line under the ending's own words: which way it went and the
+ * day the two maps were furthest apart where it moved, and why it held still
+ * where it did not — *barely moved*, or *the versions disagreed which way*, in
+ * the engine's own word for which half of its test the claim failed. Being a
+ * shade quieter than the rows above is not a reading: it says nothing once the
+ * screen is read in grey, and nothing at all read out loud.
  *
  * The two columns are never folded into any ordering. They answer different
  * questions and a trader weighs them separately; folding the width into a rank
@@ -131,6 +143,36 @@ function sameDirectionOf(row: DeltaRow): Known<string> {
     : { reading: toShare(row.agreement.reading) };
 }
 
+/**
+ * The half-line under an ending's own words — **one rule for every row, not one
+ * rule per kind of row.**
+ *
+ * A row that moved says which way it went and the day the two maps were
+ * furthest apart, because a row is read on that day rather than on the claim's
+ * own judging day and a number whose day is not said is a number nobody can
+ * check. A row that held still says why it held still, in the engine's own
+ * word: it barely moved, or the versions of the map disagreed which way.
+ *
+ * **This is what makes a greyed row readable in grey.** A row that held still is
+ * a shade quieter than the ones above it, and a shade is not a reading: convert
+ * the screen to grey, or read the list out loud, and being paler says nothing.
+ * Its own sentence is still one press away in the column beside it; this is the
+ * half-line that means a reader never has to press anything to learn that the
+ * ending is on the list and why.
+ *
+ * @param row One ending, as the engine handed it over.
+ * @returns The half-line, or nothing at all where there is nothing true to put
+ *   in it — a row before the engine has answered, and one the engine gave no
+ *   word for.
+ */
+function noteOn(row: DeltaRow): string | undefined {
+  const move = row.move.reading;
+  if (move !== undefined) {
+    return `${move.way} · largest on ${toDay(move.largestOn)}`;
+  }
+  return row.noChangeBecause;
+}
+
 /** The rail beside the map. */
 export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
   const [reason, setReason] = useState<string | null>(null);
@@ -184,33 +226,33 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
               <span>same direction</span>
             </div>
             <ul className="delta-rail__rows">
-              {rows.map((row, place) => (
-                <li
-                  className="delta-rail__row"
-                  key={row.claimId}
-                  data-moved={row.noChange === true ? "no" : "yes"}
-                >
-                  <p className="delta-rail__label">
-                    {/* Where this ending sits in the engine's own order, which is
-                        what the rail is for. It was the claim's identifier, and on
-                        a generated map that is twenty-six characters nobody reads
-                        (`world/naming.ts`). */}
-                    <span className="delta-rail__id">{place + 1}</span>
-                    {row.label}
-                    <span className="delta-rail__kind">{KIND_WORDS[row.kind] ?? row.kind}</span>
-                    {row.move.reading === undefined ? null : (
-                      <span className="delta-rail__day">
-                        {`${row.move.reading.way} · largest on ${toDay(row.move.reading.largestOn)}`}
-                      </span>
-                    )}
-                  </p>
-                  <div className="delta-rail__values">
-                    <Cell value={changeOf(row)} onReason={setReason} />
-                    <Cell value={firmnessOf(row)} onReason={setReason} />
-                    <Cell value={sameDirectionOf(row)} onReason={setReason} />
-                  </div>
-                </li>
-              ))}
+              {rows.map((row, place) => {
+                const note = noteOn(row);
+                return (
+                  <li
+                    className="delta-rail__row"
+                    key={row.claimId}
+                    data-about={row.claimId}
+                    data-moved={row.noChange === true ? "no" : "yes"}
+                  >
+                    <p className="delta-rail__label">
+                      {/* Where this ending sits in the engine's own order, which
+                          is what the rail is for. It was the claim's identifier,
+                          and on a generated map that is twenty-six characters
+                          nobody reads (`world/naming.ts`). */}
+                      <span className="delta-rail__id">{place + 1}</span>
+                      {row.label}
+                      <span className="delta-rail__kind">{KIND_WORDS[row.kind] ?? row.kind}</span>
+                      {note === undefined ? null : <span className="delta-rail__note">{note}</span>}
+                    </p>
+                    <div className="delta-rail__values">
+                      <Cell value={changeOf(row)} onReason={setReason} />
+                      <Cell value={firmnessOf(row)} onReason={setReason} />
+                      <Cell value={sameDirectionOf(row)} onReason={setReason} />
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 

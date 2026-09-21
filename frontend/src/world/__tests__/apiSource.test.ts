@@ -331,6 +331,71 @@ describe("asking the engine", () => {
     expect(readWorld).not.toHaveBeenCalled();
   });
 
+  it("test_the_engines_word_for_which_half_a_claim_failed_arrives_as_it_came", async () => {
+    // A claim the engine calls `unchanged` failed one of the two halves of its
+    // test, and the engine says which: the move was too small, or the versions
+    // of the map did not agree which way it went. The two numbers below are
+    // plainly made up; the words are what is under test.
+    vi.mocked(readDiff).mockResolvedValue({
+      ...DIFFERENCE,
+      claims: {
+        H: {
+          target: "H",
+          state: "unchanged",
+          before: 0.3,
+          after: 0.4,
+          delta: 0.1,
+          agreement: 0.5,
+          moved_only_by_reweighting: false,
+          unchanged_because: "versions_disagree",
+        },
+        S: {
+          target: "S",
+          state: "unchanged",
+          before: 0.3,
+          after: 0.3,
+          delta: 0.001,
+          agreement: 0.99,
+          moved_only_by_reweighting: false,
+          unchanged_because: "under_the_floor",
+        },
+      },
+    } as unknown as Diff);
+
+    const change = await new ApiWorldSource().readDiff({ baseId: "example", branch: BRANCH });
+    // Carried across as the word it came as. The floor and the bar that decide
+    // it are constants inside the engine and appear nowhere in its answer, so
+    // this is the only way the browser can know which half a claim failed —
+    // which is what stops a second engine growing here and disagreeing with
+    // the first about which claims held still.
+    expect(change.claims.get("H")?.moved?.unchangedBecause).toBe("versions_disagree");
+    expect(change.claims.get("S")?.moved?.unchangedBecause).toBe("under_the_floor");
+  });
+
+  it("test_a_claim_the_engine_gave_no_word_for_carries_none", async () => {
+    // The engine leaves the word out where there was no test to fail. The
+    // browser leaves it out too rather than picking the likelier of the two:
+    // an invented half would be a sentence nobody can trace to an answer.
+    vi.mocked(readDiff).mockResolvedValue({
+      ...DIFFERENCE,
+      claims: {
+        H: {
+          target: "H",
+          state: "unchanged",
+          before: 0.3,
+          after: 0.3,
+          delta: 0,
+          agreement: null,
+          moved_only_by_reweighting: false,
+          unchanged_because: null,
+        },
+      },
+    } as unknown as Diff);
+
+    const change = await new ApiWorldSource().readDiff({ baseId: "example", branch: BRANCH });
+    expect(change.claims.get("H")?.moved?.unchangedBecause).toBeUndefined();
+  });
+
   it("test_the_chain_product_stays_an_absence_that_says_why", async () => {
     const world = await new ApiWorldSource().readWorld({ baseId: "example" });
     for (const claim of world.claims) {

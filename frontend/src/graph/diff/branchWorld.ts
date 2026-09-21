@@ -46,7 +46,7 @@ import type {
 import { badgesByClaim, standingByClaim } from "./badges";
 import { toDay } from "./days";
 import { readDiff } from "./diffState";
-import { NO_CHANGE, noChangeReason } from "./noChange";
+import { NO_CHANGE, noChangeInAWord, noChangeReason } from "./noChange";
 import type { Arrow } from "./reach";
 
 /**
@@ -277,6 +277,10 @@ export function railRows(painted: WorldView, change: DiffView): readonly DeltaRo
             `still cannot be mistaken for not being here.`,
         ),
       },
+      // Why it did not move, in the handful of words the row says out loud —
+      // the engine's own word for which half of its test the claim failed,
+      // turned into words in the one module that owns them.
+      noChangeBecause: noChangeInAWord(change.claims.get(claim.id)?.moved),
       rangeWidth: {
         absence: noReadingAtAll(
           "How firm a number is only says something about a number that moved.",
