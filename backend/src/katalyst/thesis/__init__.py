@@ -121,11 +121,13 @@ __all__ = [
     "wilson",
 ]
 
-# --- The card -------------------------------------------------
+# --- The card and the export -------------------------------------------------
 # Added as one block at the end of this file rather than folded into the imports
 # above, so that two people building in this package at the same time never edit
-# the same line. `card.py` builds what the panel draws: the thesis a reader
-# carries away, with an owner on every number.
+# the same line. `card.py` builds what the panel draws; `export.py` writes the
+# document a program reads, the page a person reads, and owns the committed
+# description of the document beside it. The imports sit below a statement, which
+# is why each one says the layout rule does not apply to it.
 from katalyst.thesis.card import (
     Card,
     Carried,
@@ -159,12 +161,34 @@ from katalyst.thesis.card import (
     what_else_can_i_trade,
     where_the_numbers_came_from,
 )
+from katalyst.thesis.export import (
+    EXPORT_SCHEMA_FILE,
+    SCHEMA_NAME,
+    Conditions,
+    Export,
+    Hypothesis,
+    Leg,
+    RiskExit,
+    ShockExported,
+    Stamp,
+    as_json,
+    as_markdown,
+    export_of,
+    say,
+    schema_json,
+)
 
 __all__ += [
+    "EXPORT_SCHEMA_FILE",
+    "SCHEMA_NAME",
     "Card",
     "Carried",
     "CeilingShown",
+    "Conditions",
+    "Export",
     "Figure",
+    "Hypothesis",
+    "Leg",
     "MixtureShown",
     "NotPriced",
     "NotRanked",
@@ -172,9 +196,12 @@ __all__ += [
     "PricedIn",
     "QuotedPrices",
     "RankedEnding",
+    "RiskExit",
     "Shift",
+    "ShockExported",
     "ShockRow",
     "Shocked",
+    "Stamp",
     "Tail",
     "TailRow",
     "TakesYouOutRow",
@@ -189,7 +216,12 @@ __all__ += [
     "WhatThisDoesNotKnow",
     "WhatToWatch",
     "YourExit",
+    "as_json",
+    "as_markdown",
     "card_of",
+    "export_of",
+    "say",
+    "schema_json",
     "what_else_can_i_trade",
     "where_the_numbers_came_from",
 ]
