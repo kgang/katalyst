@@ -13,11 +13,18 @@
  * and that is deliberate: the branch is the audit trail, and an audit trail you
  * can edit is not one.
  *
- * **The buttons build a branch and show it. They do not move a number.** Moving
- * numbers means running the map again, which is the engine's work; this half
- * does none of it. So pressing a button appends an edit, the panel shows it
- * immediately, the map redraws what your edit can reach — and every likelihood
- * your edit would have moved reads its absence and says why.
+ * **The buttons build a branch, and the engine moves the numbers.** Pressing one
+ * appends an edit and the panel shows it immediately; the whole branch is then
+ * handed to the engine, which works the map's likelihoods through again and says
+ * what moved. Nothing on this side works out a number — appending an edit is the
+ * whole of what a button does.
+ *
+ * **Two of the six say what they cannot do rather than doing it quietly.**
+ * *Split this claim* is not built. *Add a claim* needs the part of this product
+ * that drafts a whole claim — the wording, the test that settles it, its judge
+ * and its date — and that is not connected. Neither is greyed out: a disabled
+ * control says "not for you" and nothing else, and cannot even be asked about
+ * with the keyboard.
  *
  * **Nothing here opens over the map.** No dialog, no scrim, nothing to dismiss:
  * the fields below appear inside this panel, beside the map, which stays live.
@@ -199,9 +206,18 @@ export function BranchPanel({
       )}
 
       {open === undefined ? (
+        // Where the numbers on the unedited map came from — and there are two
+        // answers, told apart by the one thing that says whether anything was
+        // worked out: whether the world reports how many versions of the map
+        // were run. The engine's answer and the stored example's own numbers are
+        // different claims about the world, and a screen that said the same
+        // sentence over both would be making the weaker one silently.
         <p className="branch-panel__none">
-          Nothing has been edited. The map above is exactly as it was written, and every number on
-          it is the one the stored example carries.
+          {world.versions === undefined
+            ? "Nothing has been edited. The map above is exactly as it was written, and every " +
+              "number on it is the one the stored example carries — nothing has worked one out."
+            : "Nothing has been edited. The map above is exactly as it was written, and every " +
+              "number on it was worked out by the engine from that map with nothing done to it."}
         </p>
       ) : (
         <ol className="branch-panel__edits">
@@ -250,8 +266,6 @@ export interface InterventionPanelProps {
  * closing it loses nothing because nothing is left half-done.
  */
 export function InterventionPanel({ world, selection, onEdit, onClose }: InterventionPanelProps) {
-  const [adding, setAdding] = useState(false);
-  const [newClaim, setNewClaim] = useState("");
   const [ownNumber, setOwnNumber] = useState(false);
   const [reading, setReading] = useState({ p: "", lo: "", hi: "" });
   const [pushing, setPushing] = useState(false);
@@ -339,18 +353,27 @@ export function InterventionPanel({ world, selection, onEdit, onClose }: Interve
         >
           {BUTTONS.happened}
         </button>
+        {/* **Add a claim** is the one edit this build cannot hand to the
+            engine, and it says so rather than half-doing it. A claim is not its
+            wording: it is the wording plus how it will be judged, by whom, by
+            when, and what it started from. Drafting those needs the part of
+            this product that writes a claim, and that is the next pull request.
+            A branch holding a half-written claim could not be folded onto the
+            map at all, so nothing is recorded. */}
         <button
           className="intervene__button"
           type="button"
-          onClick={() => {
-            if (needsAClaim()) {
-              return;
-            }
-            setAdding((was) => !was);
-          }}
+          data-live="no"
+          onClick={() =>
+            say(
+              "Adding a claim of your own needs the part of this product that drafts one — the " +
+                "wording, the test that settles it, who judges it and by when. That is not " +
+                "connected yet, so no edit was recorded and nothing on the map has changed.",
+            )
+          }
         >
           {BUTTONS.addClaim}
-          <span className="intervene__hint">…but this also happens</span>
+          <span className="intervene__hint">needs the part that drafts a claim</span>
         </button>
         <button
           className="intervene__button"
@@ -397,47 +420,6 @@ export function InterventionPanel({ world, selection, onEdit, onClose }: Interve
           <span className="intervene__hint">beside the model's, never averaged with it</span>
         </button>
       </div>
-
-      {adding && claim !== undefined ? (
-        <form
-          className="intervene__form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const words = newClaim.trim();
-            if (words === "") {
-              return;
-            }
-            const id = `your-claim-${Date.now()}`;
-            onEdit({
-              op: "insert",
-              claimId: id,
-              words,
-              arrows: [{ id: `${id}->${claim.id}`, source: id, target: claim.id }],
-            });
-            setNewClaim("");
-            setAdding(false);
-            say(
-              "Added, with one arrow into the claim you were on. The map now shows what that " +
-                "arrow can reach. The new claim is not drawn as a tile yet: a tile needs how and " +
-                "when the claim is judged, and the part of this product that checks that is not " +
-                "connected.",
-            );
-          }}
-        >
-          <label className="intervene__label" htmlFor="new-claim">
-            …but this also happens. Say it so that two people reading it would agree on the answer.
-          </label>
-          <input
-            className="intervene__field"
-            id="new-claim"
-            value={newClaim}
-            onChange={(event) => setNewClaim(event.target.value)}
-          />
-          <button className="intervene__go" type="submit">
-            Add it, pushing on this claim
-          </button>
-        </form>
-      ) : null}
 
       {pushing && wire !== undefined ? (
         <form
@@ -542,9 +524,9 @@ export function InterventionPanel({ world, selection, onEdit, onClose }: Interve
 
       <p className="intervene__said">
         {said ??
-          "Every button here appends an edit to a branch and shows it. None of them moves a " +
-            "likelihood: moving one means running the whole map again, which this half of the " +
-            "product does not do."}
+          "Every button here appends an edit to a branch and shows it. The branch then goes to " +
+            "the engine, which works the map's numbers through again and says what moved — " +
+            "nothing on this side of the screen works one out."}
       </p>
     </section>
   );

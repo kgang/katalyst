@@ -1,30 +1,30 @@
 /**
- * What the screen says out loud when a branch is made, and why it cannot yet say
- * the obvious thing.
+ * What the screen says out loud when a branch is made, and how it changes when
+ * the engine answers.
  *
- * Once the engine is connected the line is *"Branch created. Six claims changed,
- * one retracted."* **In this build nothing has changed, because nothing computed
- * a change** — and saying "six claims changed" would be inventing exactly the
- * state that the rule *every number can say why* exists to stop.
+ * A reader who is not looking at the picture needs the same two facts a reader
+ * who is gets from it: what the edit did to the shape of the map, and what it
+ * did to the numbers. Those arrive at different moments, so the line is said
+ * twice — once the instant the branch opens, from the branch alone, and again
+ * when the engine's answer lands, with the counts it worked out.
  *
- * What is real is structure: which claim arrived, which claims the edit can
- * reach, which supposition a later edit took back. Every count below comes from
- * somewhere nameable — the diff reducer for the first two, the derived badge for
- * the third — and **no numbers yet** is said out loud rather than left as a
- * silence, because a reader who is not looking at the screen has no other way to
- * know that the likelihoods are absent on purpose.
+ * **Every count comes from somewhere nameable.** What arrived and what was taken
+ * back are read off the world; how many claims moved is read off the engine's
+ * own difference, one word per claim, and never by the browser comparing two
+ * numbers. While the engine is still being asked the line says so, because a
+ * reader who cannot see the screen has no other way to know that the
+ * likelihoods are on their way rather than missing.
  *
- * On the stored example's strike branch that line is, word for word:
+ * On the stored example's strike branch the two lines are, word for word:
  *
  * > Branch created. One claim added, six claims your edit can reach, one
- * > supposition retracted. No numbers yet.
+ * > supposition retracted. The numbers are on their way from the engine.
  *
- * When the engine lands, "your edit can reach" becomes "changed" and the count
- * becomes a computed one. Nothing is deleted then, because nothing false was
- * said.
+ * > Branch created. One claim added, six claims moved, one supposition
+ * > retracted.
  */
 
-import type { WorldView } from "../world";
+import type { DiffView, WorldView } from "../world";
 import { inWords } from "./sentences";
 
 /** Make the first letter of a sentence a capital, and leave every other letter alone. */
@@ -37,16 +37,27 @@ function asSentence(line: string): string {
  *
  * @param world The world the branch made. On a world with no branch there is
  *   nothing to announce and the answer is an empty line.
+ * @param change What the engine says moved, once it has said it. Left out, the
+ *   line reports what the edit can reach and says the numbers are still coming.
  */
-export function branchAnnouncement(world: WorldView): string {
+export function branchAnnouncement(world: WorldView, change?: DiffView): string {
   if (world.branch === undefined) {
     return "";
   }
   const added = world.claims.filter((claim) => claim.diff === "added").length;
-  const reachable = world.claims.filter((claim) => claim.diff === "downstream").length;
   const supposedFalse = world.claims.filter((claim) => claim.diff === "killed").length;
   const retracted = world.claims.filter((claim) =>
     (claim.badges ?? []).some((badge) => badge.overrides === true),
+  ).length;
+  // How many claims moved is the engine's own word, one per claim, read off its
+  // difference. The browser never counts it by comparing two numbers: that would
+  // be a second answer to a question the engine has already answered.
+  const moved =
+    change === undefined
+      ? null
+      : [...change.claims.values()].filter((claim) => claim.state === "shifted").length;
+  const reachable = world.claims.filter(
+    (claim) => claim.diff === "downstream" || claim.diff === "shifted",
   ).length;
 
   const parts: string[] = [];
@@ -58,12 +69,17 @@ export function branchAnnouncement(world: WorldView): string {
       `${inWords(supposedFalse)} ${supposedFalse === 1 ? "claim" : "claims"} supposed false`,
     );
   }
-  parts.push(`${inWords(reachable)} ${reachable === 1 ? "claim" : "claims"} your edit can reach`);
+  parts.push(
+    moved === null
+      ? `${inWords(reachable)} ${reachable === 1 ? "claim" : "claims"} your edit can reach`
+      : `${inWords(moved)} ${moved === 1 ? "claim" : "claims"} moved`,
+  );
   if (retracted > 0) {
     parts.push(
       `${inWords(retracted)} ${retracted === 1 ? "supposition" : "suppositions"} retracted`,
     );
   }
 
-  return `Branch created. ${asSentence(parts.join(", "))}. No numbers yet.`;
+  const line = `Branch created. ${asSentence(parts.join(", "))}.`;
+  return moved === null ? `${line} The numbers are on their way from the engine.` : line;
 }

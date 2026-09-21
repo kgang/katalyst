@@ -51,14 +51,18 @@ computed is exactly the state a reader cannot trace.
 three different sentences, so an absence carries both its kind and its sentence:
 
 ```ts
-/** A value we may not have. Never a blank, never a zero, never a placeholder. */
+/** A value we may not have. Never a blank, never a zero, never a placeholder.
+    The two halves are written as a choice between two shapes, so the type itself
+    forbids an empty slot with no reason attached: there is no way to write one. */
 export type Known<T> =
-  | { known: true; value: T }
-  | { known: false; absence: Absence };
+  | { reading: T; absence?: undefined }
+  | { reading?: undefined; absence: Absence };
 
 export interface Absence {
   /** Which absence this is; it picks the words. */
   kind: "no_engine" | "no_market" | "not_said";
+  /** What is printed where the number would be. Never blank, never a zero. */
+  words: string;
   /** The sentence shown beside the words. Always present, never empty. */
   reason: string;
 }
@@ -266,7 +270,19 @@ The rail sits beside the canvas and lists what changed at the **endings** — th
 instrument, or name why there is none. **With the engine** it is the terminal changes, ranked, one
 line each, in the order the engine gave them:
 
-> the terminal's own words · `before → after` ▼ · largest on *day*
+```
+M1  A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.
+    tradeable
+    down · largest on 2026-10-04
+    .50 ▼ .42        .27        97%
+```
+
+The ending's own words and what kind of ending it is; then which way it went and
+the day the two worlds are furthest apart; then the three columns — the change,
+**how firm**, **same direction**. The chevron sits between the two readings
+rather than after them, so the row reads as one number becoming another, and the
+direction is a word as well as a glyph because a glyph read aloud is nothing at
+all.
 
 The engine writes every part of that row. On the Hormuz strike branch (seed 20261001) the three rows
 it gives are: the Polymarket Brent contract · `.50 → .42` ▼ · largest on Oct 4; the energy-shares
@@ -333,9 +349,13 @@ A claim the user supposed true, and that a later edit in the same branch pushed 
 
 > **Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"**
 
-**While a claim is supposed, its tile shows the word where a likelihood would go** — *Supposed ·
-Oct 1*, not `1.0` and not `.98`. A supposition is a hard fact in every simulated world while it
-holds, so there is no number to show, and inventing one answers a question nobody asked.
+**While an edit has fixed a claim's value, its tile shows the word where a likelihood would go** —
+*Supposed · Oct 1* where the user took it as given, *Happened · Oct 1* where they reported it as
+news, *Did not happen · Oct 1* where the news is that it did not (Kent, 2026-09-21, G12) — not
+`1.0`, not `.98` and not `>.99`. Either way the claim is settled in every simulated world
+while it holds, so there is no number to show, and inventing one answers a question nobody asked.
+**This is one rule, not a rule about suppositions**: it reaches the chip, the movement row, the rail
+row and the panel alike, and nothing but the path product reads the stored number underneath.
 
 After the retraction the claim passes through three named states. **Every part of the line and the
 series is data, never inference** — and this stack has some of it and not the rest:
@@ -398,7 +418,7 @@ Hormuz opens, then Iran is struck                        ● violet
 | Code name (never on screen) | The button | The badge afterwards |
 |---|---|---|
 | `do` | **Suppose this is true** (and **Suppose this is false**) | **Supposed · date** |
-| `observe` | **This happened** | **Happened · date** |
+| `observe` | **This happened** | **Happened · date**, and **Did not happen · date** where the news is that it did not |
 | `insert` | **Add a claim**, hinted as "…but this also happens" | **Added** |
 | `retune` | **Change this push** | **Retuned** |
 | `refine` | **Split this claim** | **Split** |
@@ -475,9 +495,11 @@ numbers in the browser. *Tests:* deltaRail › `test_lists_reachable_terminals_i
 row the two are rendered as their own columns, and no ordering function reads either. *Test:*
 deltaRail › `test_how_firm_and_same_direction_are_columns_not_factors`.
 
-**INV-workbench.48 — a supposed claim shows the word, and the retraction comes from the world.** For
-every claim under a live supposition, the tile renders **Supposed · date** where a likelihood would
-go and renders no likelihood for it at all; where a later edit undermined the supposition, both
+**INV-workbench.48 — a claim whose value an edit fixed shows the word, and the retraction comes from
+the world.** For every claim under a live supposition and every claim reported as news, the tile
+renders **Supposed · date**, **Happened · date** or — where the news is that it did not happen —
+**Did not happen · date** where a likelihood would go, and renders no
+likelihood for it at all; where a later edit undermined the supposition, both
 states render in order with the arrow between them. And for every world that carries `retractions`,
 every **Retracted · date · by "…"** badge on screen is read from that record — its day, its arrow and
 its quoted claim — with no code path deriving one from the branch; a claim the world reports no
@@ -516,9 +538,9 @@ review checklist line 11**.
    about which change matters most, and an invented one is a lie in the exact place the reader came
    for the truth. **Instead:** map order, visibly arbitrary, until the engine supplies its own.
 
-5. **Do not render a supposed claim as `1.0`, `.98`, `>.99` or a full bar.** *Because* a number
-   invites the reader to wonder about the missing two per cent, and there is no such uncertainty.
-   **Instead:** the word, and its date.
+5. **Do not render a claim whose value an edit fixed as `1.0`, `.98`, `>.99` or a full bar** —
+   supposed or reported as news alike. *Because* a number invites the reader to wonder about the
+   missing two per cent, and there is no such uncertainty. **Instead:** the word, and its date.
 
 6. **Do not let a button move a number in this stack, and do not rewrite an edit in place.**
    *Because* a canvas that computes its own likelihoods is a second engine, and two engines

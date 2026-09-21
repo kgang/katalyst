@@ -161,12 +161,19 @@ function toGrid(height: number): number {
 }
 
 /**
- * How tall this claim's tile is: as tall as its own content, on the grid, and
- * inside the floor and the ceiling.
+ * How tall this claim's tile wants to be, before the grid, the floor and the
+ * ceiling are put to it.
+ *
+ * Kept apart from the bounding below because a height that has been bounded is
+ * no longer a height you can do arithmetic with: two clamped numbers added
+ * together can land outside the very bounds each of them was clamped into.
  *
  * @param claim The claim the tile is for.
+ * @param badges How many lines the badges take. Passed in rather than read off
+ *   the claim so that a caller reserving a line of its own for one badge can
+ *   say so without building a second claim to say it with.
  */
-export function tileHeight(claim: ClaimView): number {
+function naturalHeight(claim: ClaimView, badges: number): number {
   const blocks: number[] = [HEADER, Math.ceil(CLAIM_LINE * claimLines(claim.claim)), BELIEF_RAIL];
 
   // The foot of the tile: the reason a slot has no number, and the evidence
@@ -180,7 +187,6 @@ export function tileHeight(claim: ClaimView): number {
   if (clippings > 0) {
     foot.push(CLIPPING * clippings + CLIPPING_GAP * (clippings - 1));
   }
-  const badges = badgeLines(claim);
   if (badges > 0) {
     foot.push(BADGE_LINE * badges + BADGE_PADDING);
   }
@@ -188,8 +194,59 @@ export function tileHeight(claim: ClaimView): number {
     blocks.push(foot.reduce((a, b) => a + b, 0) + GAP * (foot.length - 1));
   }
 
-  const natural = PADDING + blocks.reduce((a, b) => a + b, 0) + GAP * (blocks.length - 1);
+  return PADDING + blocks.reduce((a, b) => a + b, 0) + GAP * (blocks.length - 1);
+}
+
+/** Put a wanted height on the eight-pixel grid, inside the floor and the ceiling. */
+function bounded(natural: number): number {
   return Math.min(TILE_MAX_HEIGHT, Math.max(TILE_MIN_HEIGHT, toGrid(natural)));
+}
+
+/**
+ * How tall this claim's tile is: as tall as its own content, on the grid, and
+ * inside the floor and the ceiling.
+ *
+ * @param claim The claim the tile is for.
+ */
+export function tileHeight(claim: ClaimView): number {
+  return bounded(naturalHeight(claim, badgeLines(claim)));
+}
+
+/**
+ * How tall a box this claim's tile needs when how far its number moved gets a
+ * line of its own.
+ *
+ * A tile is as tall as its own content, and the layout has to know that before
+ * the browser has drawn one — so the height is a plain function of the claim.
+ * This adds one thing to it: **the movement line is not packed in with whatever
+ * the edits had to say.** On the busiest tile on the map, *Supposed · Oct 1 →
+ * Retracted · Oct 2 · by "…"* already runs to three lines, and stringing a
+ * reading on the end of that run pushes a line out of the box.
+ *
+ * The extra line is measured rather than written down — the words and the
+ * reading are each measured on their own — so if the badge line height ever
+ * changes, this changes with it.
+ *
+ * **The wanted height is worked out once and bounded once.** This was first
+ * written as three already-bounded heights added and subtracted — with the
+ * badges, with the reading, less the empty tile — and a bounded height is not a
+ * number to do arithmetic with. The floor is added twice and taken off once, so
+ * an ordinary tile is handed more room than its content needs (the busiest tile
+ * on the stored example: 296 pixels reserved against the 280 it wants), and
+ * nothing holds the total under the ceiling that each of the three was clamped
+ * into.
+ *
+ * @param claim The claim the tile is for.
+ */
+export function roomFor(claim: ClaimView): number {
+  const badges = claim.badges ?? [];
+  const said = badges.filter((badge) => badge.movement !== true);
+  const moved = badges.filter((badge) => badge.movement === true);
+  const lines =
+    said.length === 0 || moved.length === 0
+      ? badgeLines(claim)
+      : badgeLines({ ...claim, badges: said }) + badgeLines({ ...claim, badges: moved });
+  return bounded(naturalHeight(claim, lines));
 }
 
 /* ---- Zoom --------------------------------------------------------------- */

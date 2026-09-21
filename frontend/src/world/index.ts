@@ -8,7 +8,8 @@
 
 export { ApiWorldSource } from "./apiSource";
 export { appendEdit, forkBranch, openBranch, type Workshop, workshopOf } from "./branchReducer";
-export { branchesOf, FixtureWorldSource, monogramFor } from "./fixtureSource";
+export { branchesOf, FixtureWorldSource } from "./fixtureSource";
+export { monogramFor, seedFor } from "./fromTheServer";
 export type { FixtureBundle, WorldSource } from "./source";
 export type {
   Absence,
@@ -20,22 +21,29 @@ export type {
   BeliefSlots,
   BranchHue,
   BranchView,
+  ClaimChange,
   ClaimKind,
   ClaimView,
+  ConditionalRequest,
   DeltaRow,
+  DiffRequest,
   DiffState,
+  DiffView,
   Edit,
   EvidenceClipping,
   Known,
   LinkMode,
   LinkShape,
   LinkView,
+  Movement,
   Provenance,
   Ranged,
+  Reason,
   Selection,
-  Slot,
   SourceView,
   Standing,
+  WireBranch,
+  WireEdit,
   WorldRequest,
   WorldView,
 } from "./types";

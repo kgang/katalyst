@@ -15,10 +15,16 @@
  * where the edit ends up, then this. It takes whatever height is left and
  * scrolls on its own, so that reading a long rationale never scrolls the branch
  * list out of sight. */
+/* Why this number is what it is. It takes whatever room the other two leave, and
+ * never less than a screenful of reading — *never less* being the load-bearing
+ * half: the branch panel and the rail above both grow with what the engine has
+ * to say, and on a branch with three endings they would fill the column between
+ * them. A panel squeezed to nothing means selecting a claim shows the reader an
+ * empty strip, which is this product's central answer gone missing. */
 .inspector {
-  flex: 1 1 auto;
+  flex: 1 1 18rem;
   min-width: 0;
-  min-height: 0;
+  min-height: 18rem;
   overflow-y: auto;
   background: var(--surface-raised);
 }
@@ -145,6 +151,76 @@
   font-size: var(--text-md);
   font-weight: var(--weight-medium);
   color: var(--text);
+}
+
+/* ---- The decomposition: what it started at, what pushes on it, what it comes
+ * to.
+ *
+ * A stack of steps rather than a table, because the lines are of very different
+ * lengths and a table of them would leave the widest column mostly empty. The
+ * labels sit above their readings in the muted colour, the readings are in the
+ * number face, and the reasons under them wrap as far as they need. Nothing is
+ * drawn as a sum: there is no equals sign, no running total and no line under
+ * the last push, because the panel adds nothing up. */
+
+.inspector__decomposition {
+  display: grid;
+  row-gap: var(--space-1);
+  margin: 0;
+}
+
+.inspector__step-label {
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.inspector__step {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: 0 0 var(--space-1) 0;
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--hairline);
+  font-size: var(--text-md);
+  color: var(--text);
+}
+
+/* The one sentence a claim that moved only by reweighting gets, at the head of
+ * the decomposition. It is set in the body size rather than the muted reason
+ * size: it is the reading of the number, not a footnote about it. */
+.inspector__reweighted {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-md);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+/* ---- What your edit did: the two readings with a chevron between them ----- *
+ * No hue: the two colours this product keeps for a direction mean which way the
+ * money moves, and a likelihood going up is not that. The chevron is the glance
+ * and the word beside it is the reading. */
+
+.inspector__moved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+/* The reading stays whole. Broken across two lines — `.36 · up by` above
+   `.0090` — it stops being one number and starts looking like two. The word
+   beside it wraps instead, which costs nothing. */
+.inspector__moved .inspector__mono {
+  white-space: nowrap;
+}
+
+.inspector__moved-word {
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
 
 /* ---- Pairs: a label on the left, the value on the right ------------------ */

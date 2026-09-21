@@ -29,7 +29,8 @@
  * nobody able to say which is right.
  */
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
+import { NO_CHANGE, noChangeReason } from "../graph/diff/noChange";
 import {
   inDays,
   likelihoodStep,
@@ -43,12 +44,13 @@ import type {
   BeliefOwner,
   ClaimKind,
   ClaimView,
+  Known,
   LinkView,
+  Ranged,
   Selection,
-  Slot,
   WorldView,
 } from "../world";
-import { toReading, toTwoFigures } from "./BeliefChip";
+import { toMovement, toReading, toShare, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
 import "./inspector.css";
@@ -105,7 +107,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * The panel writes a belief on one line; the tile stacks it over three. Same
  * number, same rounding, same guard against printing a certainty; two shapes.
  */
-function BeliefRow({ owner, slot }: { owner: BeliefOwner; slot: Slot }) {
+function BeliefRow({ owner, slot }: { owner: BeliefOwner; slot: Known<Ranged> }) {
   const reading = slot.reading;
   if (reading === undefined) {
     return (
@@ -194,6 +196,234 @@ function RangeNote({ world, claim }: { world: WorldView; claim: ClaimView }) {
   );
 }
 
+/**
+ * The whole decomposition: what this claim started from, everything that pushes
+ * on it, and what the engine came to.
+ *
+ * **Every line of it is read, and not one is worked out.** The prior is on the
+ * claim, each arrow's push and its receipt are on the arrow, and the result is
+ * the engine's own answer for this claim on the day it is judged. The panel
+ * lays them out; it never adds them up, and the sentence at the foot says so on
+ * screen rather than only in this comment. The moment the canvas did its own
+ * arithmetic there would be two engines on the map, they would disagree about
+ * half a point, and nobody could say which was right.
+ *
+ * Before the engine has answered there is no result to print, and the block
+ * says that instead of drawing half of itself.
+ */
+function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView }) {
+  // Two kinds of arrow end here, and only one of them made this number.
+  //
+  // A *feedback arrow* is a market acting back on the world it measures, and
+  // `spec/multiverse/interventions.md` sets one rule over the whole product:
+  // the map the engine works through is the map with feedback arrows set
+  // aside. So a feedback arrow contributed nothing to the number at the foot of
+  // this block, and putting it among the pushes would hand the reader a cause
+  // the engine never gave. It is still on the map and still worth naming, so it
+  // is named below the pushes, in the words the outline already reads it in.
+  const into = world.links.filter((wire) => wire.target === claim.id);
+  const pushes = into.filter((wire) => !wire.reflexive);
+  const fedBackBy = into.filter((wire) => wire.reflexive);
+  const result = claim.beliefs.model;
+
+  return (
+    <Section title="Why this number">
+      {/* A claim that moved only because some versions started counting more
+          says so here, as the first line of this section and above the
+          decomposition — because it is a fact about the *reading* of the number,
+          and the decomposition is the reading.
+          
+          Observing one claim reweights the versions of the map: a version under
+          which the observation was likely counts for more than one under which
+          it was a fluke. A claim with no causes can move by that alone, because
+          inside every single version its answer is its own prior in both worlds
+          and the paired difference is exactly zero. Without a word about it the
+          reader opens the claim and finds a number that moved, a prior, and
+          nothing in between to explain it.
+          
+          It is rendered exactly when the engine's own difference says so, and by
+          no other route: no comparison of a share against zero, no check for
+          whether a claim has incoming arrows, no inference from an empty
+          decomposition. */}
+      {claim.moved?.onlyReweighted === true ? (
+        <p className="inspector__reweighted">
+          this claim moved only because the observation made some versions count more.
+        </p>
+      ) : null}
+
+      <dl className="inspector__decomposition">
+        <dt className="inspector__step-label">it started at</dt>
+        <dd className="inspector__step">
+          <span className="inspector__mono">
+            {toReading(claim.prior.p, claim.prior.lo, claim.prior.hi)}
+          </span>
+          <span className="inspector__reason">
+            the model's likelihood before anything on this map pushes on it
+          </span>
+        </dd>
+
+        {pushes.length === 0 ? (
+          <>
+            <dt className="inspector__step-label">pushed on by</dt>
+            <dd className="inspector__step">
+              <span className="inspector__words">—</span>
+              <span className="inspector__reason">
+                nothing on this map points at this claim, so its answer is its own starting number
+                in every version of the map
+              </span>
+            </dd>
+          </>
+        ) : (
+          pushes.map((wire) => (
+            <Fragment key={wire.id}>
+              <dt className="inspector__step-label">
+                <span className="inspector__mono">{wire.source}</span> pushes
+              </dt>
+              <dd className="inspector__step">
+                <span className="inspector__mono">{pushAsNumber(wire.strength)}</span>
+                <span className="inspector__reason">
+                  {`${pushInWords(wire.strength)} · ${modeInWords(wire.mode)} · ${
+                    wire.lag === 0 ? "the same day" : inDays(wire.lag)
+                  } · ${wire.provenance.replace("_", " ")}`}
+                </span>
+                {/* What this arrow's target comes to with its cause supposed
+                    true. It costs a whole extra run of the map, so it is asked
+                    for one arrow at a time — select the arrow on the map and it
+                    is fetched and kept. Until then the line is simply not here,
+                    because an empty one would look like a number that failed to
+                    arrive. */}
+                {wire.conditional.reading === undefined ? null : (
+                  <span className="inspector__reason">
+                    {`with ${wire.source} supposed true this claim reads ${toReading(
+                      wire.conditional.reading.p,
+                      wire.conditional.reading.lo,
+                      wire.conditional.reading.hi,
+                    )}`}
+                  </span>
+                )}
+              </dd>
+            </Fragment>
+          ))
+        )}
+
+        {/* Every feedback arrow into this claim, apart from the pushes and
+            below them, because the engine set them aside before it worked this
+            number out. The reader is told that in the line, not left to work it
+            out from the fact that the arrow is in a different place. */}
+        {fedBackBy.map((wire) => (
+          <Fragment key={wire.id}>
+            <dt className="inspector__step-label">fed back into by</dt>
+            <dd className="inspector__step">
+              <span className="inspector__mono">{wire.source}</span>
+              <span className="inspector__reason">
+                {`a market acting back on the world it measures, ${
+                  wire.lag === 0 ? "the same day" : `after ${inDays(wire.lag)}`
+                } — the engine works this map through with feedback arrows set aside, so this arrow has not pushed on this number`}
+              </span>
+            </dd>
+          </Fragment>
+        ))}
+
+        <dt className="inspector__step-label">it comes to</dt>
+        <dd className="inspector__step">
+          {result.reading === undefined ? (
+            <>
+              <span className="inspector__words">{result.absence.words}</span>
+              <span className="inspector__reason">{result.absence.reason}</span>
+            </>
+          ) : (
+            <>
+              <span className="inspector__mono">
+                {toReading(result.reading.p, result.reading.lo, result.reading.hi)}
+              </span>
+              <span className="inspector__reason">
+                {world.versions === undefined
+                  ? "the likelihood the map was written with, read on the day this claim is judged"
+                  : "the engine's own answer for this claim, read on the day this claim is judged"}
+              </span>
+            </>
+          )}
+        </dd>
+      </dl>
+
+      <p className="inspector__reason">
+        Every line above is a number something else worked out: the starting number and each push
+        are on the map, and the result is the engine's. Nothing on this panel adds them up — two
+        things that work out one number eventually disagree about it, and then nobody can say which
+        is right.
+      </p>
+    </Section>
+  );
+}
+
+/**
+ * What this edit did to this claim's number, when the engine says it did
+ * anything.
+ *
+ * Both readings are the engine's, and which way it went is the engine's word:
+ * this panel prints them and subtracts nothing. Beside them goes the share of
+ * the versions of the map that moved the same way, headed in the reader's own
+ * words rather than by the field's name.
+ */
+function WhatYourEditDid({ claim }: { claim: ClaimView }) {
+  const moved = claim.moved;
+  // A claim whose value an edit fixed has no move to report: it is true — or
+  // false — in every version of the map, and the badge that says so is the
+  // whole of what happened to it.
+  if (moved === undefined || claim.standing !== undefined) {
+    return null;
+  }
+  const agreed = moved.sameDirection.reading;
+  // The engine's verdict on the claim, which is not the same thing as the two
+  // numbers: a claim can move a hair and still come out unchanged.
+  const counted = claim.diff === "shifted";
+  // A claim that moved only by reweighting is a third case, and the two
+  // sentences below would both be false of it: the versions did not disagree
+  // about a direction, because not one version that counts moved at all. The
+  // sentence that *is* true of it is printed at the head of the decomposition,
+  // where the chapter puts it.
+  const reweighted = moved.onlyReweighted === true;
+
+  return (
+    <Section title="What your edit did">
+      <p className="inspector__moved">
+        <span className="inspector__mono">
+          {toMovement(moved.from, moved.to, moved.by, moved.way)}
+        </span>
+        <span className="inspector__moved-word">{counted ? moved.way : NO_CHANGE}</span>
+      </p>
+      {/* Why the engine says it did not move. The sentence is not written here:
+          the tile's line and the rail's greyed row say the same thing, and one
+          verdict said three ways is three chances to name a cause the engine
+          never gave. A claim that moved only by reweighting is the exception —
+          its sentence is at the head of the decomposition, where the chapter
+          puts it, and saying it twice on one screen is noise. */}
+      {counted || reweighted ? null : <p className="inspector__reason">{noChangeReason(moved)}</p>}
+      {reweighted ? null : (
+        <>
+          <dl className="inspector__pairs">
+            <dt>same direction</dt>
+            <dd>
+              {agreed === undefined ? (
+                moved.sameDirection.absence.words
+              ) : (
+                <span className="inspector__mono">{toShare(agreed)}</span>
+              )}
+            </dd>
+          </dl>
+          <p className="inspector__reason">
+            {agreed === undefined
+              ? moved.sameDirection.absence.reason
+              : "The share of the versions of the map — each one a set of numbers this model " +
+                "would have stood behind — in which this claim moved the same way. It is a " +
+                "column beside the move and never multiplied into it."}
+          </p>
+        </>
+      )}
+    </Section>
+  );
+}
+
 /** A claim, top to bottom. */
 function ClaimDetail({ world, claim }: { world: WorldView; claim: ClaimView }) {
   const baseRate = claim.baseRate;
@@ -268,6 +498,8 @@ function ClaimDetail({ world, claim }: { world: WorldView; claim: ClaimView }) {
         <BeliefRow owner="market" slot={claim.beliefs.market} />
       </Section>
 
+      <WhatYourEditDid claim={claim} />
+
       <Section title="Evidence">
         {claim.evidenceInFull.length === 0 ? (
           <>
@@ -297,17 +529,7 @@ function ClaimDetail({ world, claim }: { world: WorldView; claim: ClaimView }) {
         )}
       </Section>
 
-      {/* Where the decomposition goes: the prior, one line per incoming arrow
-          with its push and its reason, then the result. It is drawn only when
-          the world carries one, and no line of it is ever worked out here. */}
-      <Section title="Why this number">
-        <p className="inspector__words">no engine yet</p>
-        <p className="inspector__reason">
-          Nothing has worked this number through the map. When something has, this is where the
-          prior, one line for each arrow that pushes on this claim, and the result they come to are
-          printed — as the world carries them, never added up here.
-        </p>
-      </Section>
+      <WhyThisNumber world={world} claim={claim} />
 
       <PathBar world={world} claimId={claim.id} />
     </>
@@ -361,6 +583,37 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
         <dt>over time</dt>
         <dd>{shapeInWords(wire.shape, wire.halfLife)}</dd>
       </dl>
+
+      {/* The one number that turns an arrow into something you can argue about:
+          what the claim at its head comes to with the claim at its tail
+          **supposed** true. Supposed, never observed — "how often do these two
+          show up together" is a correlation, and an arrow claims a mechanism.
+          It costs a whole extra run of the map, so it is asked for when a reader
+          asks about this arrow and kept afterwards. */}
+      <Section title="With its cause supposed true">
+        {wire.conditional.reading === undefined ? (
+          <>
+            <p className="inspector__words">{wire.conditional.absence.words}</p>
+            <p className="inspector__reason">{wire.conditional.absence.reason}</p>
+          </>
+        ) : (
+          <>
+            <p className="inspector__mono inspector__prior">
+              {toReading(
+                wire.conditional.reading.p,
+                wire.conditional.reading.lo,
+                wire.conditional.reading.hi,
+              )}
+              <span className="inspector__owner"> model</span>
+            </p>
+            <p className="inspector__reason">
+              {`What ${wire.target} comes to when ${wire.source} is taken as given — supposed, ` +
+                `never observed, because an arrow claims a mechanism and how often two things ` +
+                `show up together is a different question.`}
+            </p>
+          </>
+        )}
+      </Section>
 
       <Section title="Sources">
         {wire.sources.length === 0 ? (

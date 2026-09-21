@@ -8,7 +8,7 @@
  * from, and that a failure is printed in the page rather than in a pop-up.
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { aClaim, aWire, aWorld } from "./test/aMap";
 import type { FixtureBundle, WorldSource, WorldView } from "./world";
@@ -21,10 +21,45 @@ vi.mock("./api/client", () => ({
 }));
 
 // The map draws on a canvas the simulated page cannot measure, and what it
-// draws has tests of its own. Here it stands in for itself.
+// draws has tests of its own. Here it stands in for itself — with one button per
+// arrow, because selecting an arrow is a thing the screen around the map has to
+// answer for: it is what asks the engine for that arrow's own number.
 vi.mock("./graph/Canvas", () => ({
-  MapCanvas: ({ world }: { world: WorldView }) => (
-    <div data-testid="the-map">{`${world.claims.length} claims, ${world.links.length} arrows`}</div>
+  MapCanvas: ({
+    world,
+    onSelect,
+    keys,
+  }: {
+    world: WorldView;
+    onSelect: (selection: { kind: "wire" | "claim"; id: string }) => void;
+    keys: { flipWorlds: () => void; intervene: () => void };
+  }) => (
+    <div data-testid="the-map">
+      {`${world.claims.length} claims, ${world.links.length} arrows`}
+      {world.links.map((link) => (
+        <button key={link.id} type="button" onClick={() => onSelect({ kind: "wire", id: link.id })}>
+          {`select ${link.id}`}
+        </button>
+      ))}
+      {world.claims.map((claim) => (
+        <button
+          key={claim.id}
+          type="button"
+          onClick={() => onSelect({ kind: "claim", id: claim.id })}
+        >
+          {`select claim ${claim.id}`}
+        </button>
+      ))}
+      {/* The two keys this screen's own behaviour hangs on: Space flips which of
+          the two worlds is in front, and E opens the six things you can do to a
+          claim. Both are the map's keys and both are answered outside it. */}
+      <button type="button" onClick={keys.flipWorlds}>
+        flip worlds
+      </button>
+      <button type="button" onClick={keys.intervene}>
+        change this claim
+      </button>
+    </div>
   ),
 }));
 
@@ -102,6 +137,24 @@ function sourceThatAnswers(): WorldSource {
   return {
     readBundle: vi.fn().mockResolvedValue(BUNDLE),
     readWorld: vi.fn().mockResolvedValue(WORLD),
+    readDiff: vi.fn().mockResolvedValue({
+      claims: new Map(),
+      rows: [],
+      summary: { reading: "Nothing moved." },
+      warnings: [],
+    }),
+    readConditional: vi.fn().mockResolvedValue({ reading: { p: 0.58, lo: 0.42, hi: 0.73 } }),
+  };
+}
+
+/** A source that cannot answer any of the three questions the engine answers. */
+function sourceThatCannot(reason: string): WorldSource {
+  const refuse = vi.fn().mockRejectedValue(new Error(reason));
+  return {
+    readBundle: refuse,
+    readWorld: refuse,
+    readDiff: refuse,
+    readConditional: refuse,
   };
 }
 
@@ -110,7 +163,7 @@ beforeEach(() => {
 });
 
 describe("the launchpad", () => {
-  it("offers the stored example the server has, and says the other three are not live", async () => {
+  it("test_the_launchpad_offers_the_one_example_that_opens_and_says_the_rest_are_not_live", async () => {
     serverAnswersNormally();
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
 
@@ -144,7 +197,7 @@ describe("the launchpad", () => {
 });
 
 describe("opening a map", () => {
-  it("swaps the screen for the map and says where its numbers came from", async () => {
+  it("test_opening_an_example_swaps_the_screen_and_says_where_its_numbers_came_from", async () => {
     serverAnswersNormally();
     const source = sourceThatAnswers();
     render(<App source={source} listExamples={async () => EXAMPLES} />);
@@ -160,13 +213,147 @@ describe("opening a map", () => {
     ).toBeInTheDocument();
   });
 
-  it("prints a failure on the page, in a sentence, and opens nothing", async () => {
+  it("test_the_conditional_is_fetched_once_and_cached", async () => {
     serverAnswersNormally();
-    const source: WorldSource = {
-      readBundle: vi.fn(),
-      readWorld: vi.fn().mockRejectedValue(new Error("Nothing answered at /api/fixtures/hormuz.")),
-    };
+    const source = sourceThatAnswers();
     render(<App source={source} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    // Nothing is asked for until somebody asks about an arrow: the number costs
+    // a whole extra run of the map, for something most readers never open.
+    expect(source.readConditional).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    await screen.findByText(".58 (.42–.73)");
+    expect(source.readConditional).toHaveBeenCalledTimes(1);
+    expect(source.readConditional).toHaveBeenCalledWith({
+      baseId: "hormuz",
+      branch: undefined,
+      linkId: "H->B",
+    });
+
+    // Asking about the same arrow again, on the same map with the same branch
+    // and the same seed, is the same question — so it is answered from what was
+    // kept rather than asked again.
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    await screen.findByText(".58 (.42–.73)");
+    expect(source.readConditional).toHaveBeenCalledTimes(1);
+  });
+
+  it("test_a_wires_number_is_asked_again_when_the_branch_changes", async () => {
+    serverAnswersNormally();
+    const source = sourceThatAnswers();
+    render(<App source={source} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    // A branch of the reader's own, and one arrow asked about.
+    fireEvent.click(screen.getByRole("button", { name: "Start a branch" }));
+    fireEvent.change(screen.getByLabelText(/What is this branch called/), {
+      target: { value: "Your own branch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start this branch" }));
+    fireEvent.click(await screen.findByRole("button", { name: "select H->B" }));
+    await screen.findByText(".58 (.42–.73)");
+    expect(source.readConditional).toHaveBeenCalledTimes(1);
+
+    // Now an edit. The branch is append-only, so this is a different branch
+    // with the same name — and the number worked out for the branch before the
+    // edit is a number for a map that no longer exists.
+    fireEvent.click(screen.getByRole("button", { name: "select claim B" }));
+    fireEvent.click(screen.getByRole("button", { name: "change this claim" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Suppose this is true/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(2));
+    // And the second question carries the branch as it now stands.
+    const asked = vi.mocked(source.readConditional).mock.calls.at(-1)?.[0];
+    expect(asked?.branch?.edits).toHaveLength(1);
+  });
+
+  it("test_an_ask_that_did_not_come_back_is_asked_again", async () => {
+    serverAnswersNormally();
+    const source = sourceThatAnswers();
+    vi.mocked(source.readConditional).mockRejectedValueOnce(
+      new Error("The server did not answer."),
+    );
+    render(<App source={source} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    // The first ask does not come back. What the panel says is what happened —
+    // the attempt failed — and not that nothing has worked the number out.
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    expect(await screen.findByText(/The server did not answer\./)).toBeInTheDocument();
+    expect(screen.queryByText("no engine yet")).toBeNull();
+
+    // Select it again and it is asked again. A failure kept in the cache would
+    // tell a reader for the rest of the session that a number the engine can
+    // work out cannot be worked out.
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(".58 (.42\u2013.73)")).toBeInTheDocument();
+  });
+
+  it("test_a_wires_number_belongs_to_the_map_that_is_showing", async () => {
+    serverAnswersNormally();
+    const source = sourceThatAnswers();
+    render(<App source={source} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a branch" }));
+    fireEvent.change(screen.getByLabelText(/What is this branch called/), {
+      target: { value: "Your own branch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start this branch" }));
+    fireEvent.click(await screen.findByRole("button", { name: "select H->B" }));
+    await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(source.readConditional).mock.calls[0]?.[0]?.branch).toBeDefined();
+
+    // Flip to the map as it was written. The number on screen was worked out for
+    // the other map, and a number that belongs to a map the reader is not
+    // looking at is the one thing this product must never draw.
+    fireEvent.click(screen.getByRole("button", { name: "flip worlds" }));
+    await screen.findByText("as it was written");
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(2));
+    // Asked for the map that is showing: no branch at all.
+    expect(vi.mocked(source.readConditional).mock.calls[1]?.[0]?.branch).toBeUndefined();
+  });
+
+  it("test_a_missing_world_falls_back_and_says_so", async () => {
+    serverAnswersNormally();
+    const engine = sourceThatCannot(
+      "Nothing answered at /api/worlds — the server may not be running.",
+    );
+    const stored = sourceThatAnswers();
+
+    render(<App source={engine} fallback={stored} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+
+    // A map you can still read beats a blank screen: the stored example draws.
+    expect(await screen.findByTestId("the-map")).toHaveTextContent("2 claims, 1 arrows");
+
+    // And the screen says, in the failure's own words, that these are not
+    // computed numbers — so nobody takes a hand-written likelihood for one the
+    // engine worked out.
+    const said = await screen.findByText(/the stored example exactly as it was written/);
+    expect(said).toHaveTextContent("Nothing answered at /api/worlds");
+    expect(said).toHaveTextContent("illustrative");
+
+    // Nothing pops up to tell you about it, here or anywhere.
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector("dialog")).toBeNull();
+  });
+
+  it("test_a_failure_is_printed_on_the_page_and_opens_nothing", async () => {
+    serverAnswersNormally();
+    // Neither the engine nor the stored example can answer, which is what it
+    // looks like when the server itself is not there.
+    const gone = sourceThatCannot("Nothing answered at /api/fixtures/hormuz.");
+    render(<App source={gone} fallback={gone} listExamples={async () => EXAMPLES} />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
 
@@ -182,7 +369,7 @@ describe("opening a map", () => {
 });
 
 describe("the strip at the foot of the launchpad", () => {
-  it("reports what the server said about itself", async () => {
+  it("test_the_strip_reports_what_the_server_said_about_itself", async () => {
     serverAnswersNormally();
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
 

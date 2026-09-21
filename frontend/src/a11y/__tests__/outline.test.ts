@@ -13,7 +13,7 @@
 import { describe, expect, it } from "vitest";
 import { branchWorld } from "../../graph/diff/branchWorld";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
-import type { BranchView } from "../../world";
+import type { BranchView, ClaimChange, DiffView } from "../../world";
 import { branchAnnouncement } from "../announcement";
 import { flatten, outlineOf } from "../sentences";
 
@@ -74,7 +74,7 @@ function strike(): BranchView {
 
 describe("the map as a list", () => {
   // test_every_claim_has_exactly_one_item
-  it("gives every claim exactly one item, however many causes it has", () => {
+  it("test_every_claim_has_exactly_one_item", () => {
     const world = base();
     const items = flatten(outlineOf(world));
     expect(items).toHaveLength(world.claims.length);
@@ -82,7 +82,7 @@ describe("the map as a list", () => {
   });
 
   // test_a_claims_sentence_names_every_wire_into_it
-  it("names every wire coming into a claim, in words rather than in a picture", () => {
+  it("test_every_incoming_wire_is_named_in_words", () => {
     const items = flatten(outlineOf(base()));
     const brent = items.find((item) => item.id === "B")?.sentence ?? "";
     // A trigger arrow reads "caused by", a sustain arrow "held up by", and a
@@ -94,7 +94,7 @@ describe("the map as a list", () => {
   });
 
   // test_the_feedback_arrow_is_read_as_one
-  it("reads the feedback arrow as one, and does not list a claim twice", () => {
+  it("test_the_feedback_arrow_is_read_as_one_and_no_claim_is_listed_twice", () => {
     const items = flatten(outlineOf(base()));
     const opec = items.find((item) => item.id === "R")?.sentence ?? "";
     expect(opec).toContain("Fed back into by: Brent crude settles below $68 for five sessions");
@@ -102,15 +102,14 @@ describe("the map as a list", () => {
   });
 
   // test_an_absent_number_is_read_as_its_absence
-  it("reads an absent number as the reason it is absent, never as a blank", () => {
+  it("test_every_absence_renders_words_and_a_reason", () => {
     const world = branchWorld(base(), strike());
     const brent = flatten(outlineOf(world)).find((item) => item.id === "B")?.sentence ?? "";
     expect(brent).toContain("Model — nothing has worked this number through the map yet.");
     expect(brent).toContain("Your edit can reach this claim.");
   });
 
-  // test_it_says_what_the_edit_cannot_reach
-  it("says out loud which claim the edit cannot reach", () => {
+  it("test_it_says_what_the_edit_cannot_reach", () => {
     const world = branchWorld(base(), strike());
     const opec = flatten(outlineOf(world)).find((item) => item.id === "R")?.sentence ?? "";
     expect(opec).toContain("Your edit cannot reach this claim.");
@@ -120,24 +119,47 @@ describe("the map as a list", () => {
 });
 
 describe("what a branch says out loud", () => {
-  // test_the_announcement_names_no_number_the_world_does_not_carry
-  it("says what arrived, what the edit can reach, what was retracted, and no numbers yet", () => {
+  it("test_the_announcement_names_no_number_the_world_does_not_carry", () => {
+    // Before the engine has answered there is no count of what moved, so the
+    // line says what is true — what arrived, what the edit can reach, what was
+    // taken back — and says the numbers are still coming rather than leaving a
+    // reader who cannot see the screen to guess.
     const world = branchWorld(base(), strike());
     expect(branchAnnouncement(world)).toBe(
       "Branch created. One claim added, six claims your edit can reach, one supposition " +
-        "retracted. No numbers yet.",
+        "retracted. The numbers are on their way from the engine.",
     );
   });
 
-  // test_it_never_says_a_claim_changed
-  it("never says a claim changed, because nothing computed a change", () => {
+  it("test_it_never_says_a_claim_changed_before_the_engine_has_said_so", () => {
     const line = branchAnnouncement(branchWorld(base(), strike()));
-    expect(line).not.toContain("changed");
-    expect(line).toContain("No numbers yet.");
+    expect(line).not.toContain("moved");
+    expect(line).toContain("on their way from the engine");
   });
 
-  // test_the_base_world_announces_nothing
-  it("has nothing to announce on a map nobody has edited", () => {
+  it("test_the_count_of_what_moved_is_the_engines_own", () => {
+    // Six claims moved, one arrived. The count is read off the engine's own word
+    // for each claim, never by the browser comparing two numbers — and once it
+    // is there the line stops saying the numbers are coming.
+    const change: DiffView = {
+      claims: new Map<string, ClaimChange>([
+        ...["H", "C", "B", "M1", "M2", "N1"].map((id): [string, ClaimChange] => [
+          id,
+          { state: "shifted" },
+        ]),
+        ["R", { state: "unchanged" }],
+        ["S", { state: "added" }],
+      ]),
+      rows: [],
+      summary: { reading: "It moves one ending." },
+      warnings: [],
+    };
+    expect(branchAnnouncement(branchWorld(base(), strike()), change)).toBe(
+      "Branch created. One claim added, six claims moved, one supposition retracted.",
+    );
+  });
+
+  it("test_the_base_world_announces_nothing", () => {
     expect(branchAnnouncement(base())).toBe("");
   });
 });

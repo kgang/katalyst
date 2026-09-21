@@ -28,6 +28,33 @@ export function toDay(isoDate: string): string {
 }
 
 /**
+ * How many whole days there are from one day to another.
+ *
+ * Used to find a claim's own resolve-by day among the days a world was worked
+ * through, so that the number on a tile and the word beside it are read on the
+ * same day. Both days are read in the map's own reckoning, never the reader's
+ * time zone, so the answer is the same wherever the page is open.
+ *
+ * This is arithmetic on days and never on likelihoods. Counting days is
+ * calendar work; a number on the map is only ever read, never combined.
+ *
+ * @param from The earlier day, as the server writes one: `2026-10-01`.
+ * @param to The later day, written the same way.
+ * @returns The count of days between them, or nothing at all when either day
+ *   cannot be read — because a guessed day would put a tile's number on the
+ *   wrong day, which is worse than saying there is none.
+ */
+export function daysApart(from: string, to: string): number | null {
+  const first = new Date(`${from}T00:00:00Z`).getTime();
+  const second = new Date(`${to}T00:00:00Z`).getTime();
+  if (Number.isNaN(first) || Number.isNaN(second)) {
+    return null;
+  }
+  const oneDay = 24 * 60 * 60 * 1000;
+  return Math.round((second - first) / oneDay);
+}
+
+/**
  * A claim's own words, ready to be quoted inside a sentence.
  *
  * Two changes and no others. The full stop at the end goes, because the quote

@@ -75,12 +75,14 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 | What | Value |
 |---|---|
 | Width | **280 px**, fixed, so the layout engine can place a tile before the browser has finished measuring its text |
-| Height | **Content-fit, clamped 152–272 px**, on the eight-pixel grid, and **computed from the content** — how many lines the claim takes, whether there are clippings, whether the tile carries its own reason. Never measured from the screen, so layout stays a pure function and one number sets the box, the claim's line clamp and the height handed to the layout engine |
+| Height | **Content-fit, clamped 152–320 px**, on the eight-pixel grid, and **computed from the content** — how many lines the claim takes, whether there are clippings, whether the tile carries its own reason, and what its badges have to say. Never measured from the screen, so layout stays a pure function and one number sets the box, the claim's line clamp and the height handed to the layout engine |
 | Internal padding | **12 px** — `--space-1` plus `--space-hair`, the one half-step the spacing scale allows |
 | Every other margin and gap | From the eight-pixel scale: `--space-1`, `--space-2`, `--space-3` |
 | Border | One hairline at `--hairline`, which is 10% of the text colour |
 | Shadow | **None.** Not a soft one, not a small one |
 | Corner | `--radius` (6 px), except where the kind silhouette changes the outline |
+
+**The ceiling is 320, and the reason is one badge** *(Kent, 2026-09-20, G11; K9's 152–272 read 272)*. Content-fit means the ceiling is whatever the densest tile the product can produce actually needs, and that tile turned out to be the hypothesis on the strike branch: a three-line claim, two evidence clippings, the overridden-assertion badge pair — which runs to three lines on a 280-pixel tile on its own — and a line saying how far its number moved. At 272 the last of those was cut off, which is the one thing the badge exists to say. Nothing else about K9 changes: the height is still content-fit, still on the eight-pixel grid, still computed from the claim and never measured off the screen.
 
 ### The six things a tile shows, and no more
 
@@ -165,7 +167,9 @@ Only the numerals are substituted — `2 000` is `versions`, and `.35`, `.20` an
 
 An absence is never silent, but *silent on the tile* and *silent* are different things: every absence carries its reason, on the tile or as the element's own accessible name, which is what a hover shows and what a screen reader reads.
 
-And one state that replaces the number entirely: **while a claim is supposed, the chip shows the word** — *Supposed · Oct 1* — never `1.0` and never `.98`. A supposition is treated as a hard fact in every simulated world, so there is no number to show, and inventing one would answer a question the user did not ask. (The engine does store `1.0` on such a claim so the path product has a factor to multiply; no surface but the path product ever reads it, and every other reader reads the claim's states and prints the word.)
+And one state that replaces the number entirely: **while an edit has fixed a claim's value, the chip shows the word** — *Supposed · Oct 1* where the user took it as given, *Happened · Oct 1* where they reported it as news, *Did not happen · Oct 1* where the news is that it did not (Kent, 2026-09-21, G12) — never `1.0`, never `.98` and never `>.99`. Either way the claim is settled in every simulated world, so there is no number to show, and inventing one would answer a question the user did not ask. (The engine stores `1.0` on such a claim — or `0.0` where the value fixed was false — so the path product has a factor to multiply; no surface but the path product ever reads it.)
+
+**The two are read from different places on the world, and that is the engine's shape rather than a quirk of ours.** A supposition can be undermined by a later edit, so whether it still holds is a fact about a *day*: the world's `states` carry it, and H reads *supposed* on the first of October and *pushed* by the day it is judged. News cannot be taken back — nothing undoes "this happened" — so it holds across the whole window and the world records it among the values its edits fixed.
 
 ### Typed ports
 
@@ -353,9 +357,9 @@ Local numbers in this part are `INV-workbench.<n>`. This chapter holds **1 – 1
 
 ### INV-workbench.1 — The tile's geometry
 
-For every tile rendered from any map: its width is exactly 280 px; its height is computed from its content, lands between 152 and 272 px, and is a multiple of 8; every margin and gap is a value from the spacing scale; its border is one hairline at `--hairline`; and it casts no shadow. The height is never read back from the rendered element, so the same input always gives the same number.
+For every tile rendered from any map: its width is exactly 280 px; its height is computed from its content, lands between 152 and 320 px, and is a multiple of 8; every margin and gap is a value from the spacing scale; its border is one hairline at `--hairline`; and it casts no shadow. The height is never read back from the rendered element, so the same input always gives the same number.
 
-- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_is_280_wide_and_on_the_eight_pixel_grid` and `test_tile_height_is_content_fit_within_152_and_272`.
+- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_is_280_wide_and_on_the_eight_pixel_grid` and `frontend/src/graph/__tests__/layout.test.ts` › `test_tile_height_is_content_fit_within_152_and_320`.
 - **Also:** visual review checklist line 8 — measure the tile, do not eyeball it.
 
 ### INV-workbench.2 — The claim is never cut mid-word
@@ -393,7 +397,7 @@ For every tile: exactly three chips are rendered, labelled model, user and marke
 
 - **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_draws_three_chips_and_never_a_fourth`.
 
-### INV-workbench.7 — A supposed claim shows the word
+### INV-workbench.7 — A claim whose value an edit fixed shows the word
 
 For every tile whose claim is supposed: the chip renders the word and the date, and renders no likelihood at all.
 
@@ -439,7 +443,7 @@ For every module under `frontend/src/graph/` and for the tile and chip component
 2. **Do not truncate a claim mid-word** to fit the clamp, because the half-word that is left reads as a rendering bug and costs the reader more than the missing line. **Instead:** wrap to three lines, ellipsize at a word boundary, and keep the full text in the Inspector.
 3. **Do not fetch a favicon for an evidence clipping**, because the packaged demo must draw its first frame with no outside request, and a missing favicon leaves a hole where a receipt should be. **Instead:** a letter monogram from the host name, drawn from data we already have.
 4. **Do not fill an empty slot with anything at all** — not `0.5`, not the model's number, not a blank, not a spinner. Because "no venue prices this" and "the engine has not run" are *findings*, and one of them is the finding that drives a chain to a not-tradeable ending. **Instead:** the words, and the reason beside them.
-5. **Do not show `1.0` or `.98` for a supposed claim.** A supposition is a hard fact in every simulated world, so there is no number, and a `.98` invites the reader to wonder about the other two per cent. **Instead:** the word and the date.
+5. **Do not show `1.0`, `.98` or `>.99` for a claim whose value an edit fixed.** Supposed or reported as news, it is settled in every simulated world, so there is no number — and a `.98` invites the reader to wonder about the other two per cent while a `>.99` is the stored certainty wearing the guard's clothes. **Instead:** the word and the date.
 6. **Do not put provenance back on the stroke**, because the stroke already says what kind of push the arrow is, and a wire that is dot-dash and dashed at once says neither. **Instead:** the three-step mark at the tail, and the exact word in the Inspector.
 7. **Do not compute the conditional likelihood in the browser**, because it is a whole extra propagation per arrow and the browser has no propagation engine. **Instead:** ask the engine for it lazily on hover, cache the answer, and read the push in words until it arrives.
 8. **Do not colour a wire**, because hue means "the money moves this way" and an arrow's sign does not — see *Strength, in two granularities*. **Instead:** the printed sign and the word.
@@ -457,5 +461,5 @@ For every module under `frontend/src/graph/` and for the tile and chip component
 2. **Two significant figures for an awkward number.** The table is in [`keyboard-and-access.md`](keyboard-and-access.md) B6; `.995` and `.06` are still open there.
 3. **The "no market" reason when the world carries none.**
    **Decided 2026-09-17 (Kent, K7):** the tile says **no market** and nothing else; the reason lives on the hover, in the accessible name and in the Inspector, is written once in [`../vocabulary.md`](../vocabulary.md), and is chosen by the claim's `kind` — except on a `not_tradeable` ending, which keeps its own stored reason on the tile because that one is a finding. In the body above.
-4. **How many badges fit.** The overridden-assertion badge is long — *Supposed · Oct 1 → Retracted · Oct 2 · by "…"* — and even at the 272-pixel clamp a tile with a three-line claim has room for about one such line. What happens to a tile carrying three badges is not settled.
+4. **How many badges fit.** *Settled by the ceiling above (Kent, 2026-09-20, G11), and kept here because the question was a real one.* The overridden-assertion badge is long — *Supposed · Oct 1 → Retracted · Oct 2 · by "…"* — and on a 280-pixel tile it runs to three lines on its own. At the old 272-pixel clamp a tile with a three-line claim had room for about one such line, and the hypothesis on the strike branch carries that badge pair **and** a line saying how far its number moved. So the ceiling is 320 and the badge is not cut off. A tile carrying more than that is still unsettled, and the clamp is what stops it growing without limit.
 5. **Two clippings from the same publisher** give the same monogram twice, and a host name that starts with a digit gives a monogram that reads as a number. A two-letter monogram fixes both and is harder to read at a glance.

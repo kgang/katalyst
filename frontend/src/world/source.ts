@@ -15,7 +15,15 @@
  */
 
 import type { components } from "../api/schema";
-import type { WorldRequest, WorldView } from "./types";
+import type {
+  ConditionalRequest,
+  DiffRequest,
+  DiffView,
+  Known,
+  Ranged,
+  WorldRequest,
+  WorldView,
+} from "./types";
 
 /**
  * One stored example in full: the base map and the branches that go with it.
@@ -25,7 +33,7 @@ import type { WorldRequest, WorldView } from "./types";
  */
 export type FixtureBundle = components["schemas"]["FixtureBundle"];
 
-/** Where the canvas gets a map and a world from. */
+/** Where the canvas gets a map, a world, a difference and one arrow's number from. */
 export interface WorldSource {
   /** The base map and its branches, as the stored-example route already serves them. */
   readBundle(id: string): Promise<FixtureBundle>;
@@ -36,4 +44,22 @@ export interface WorldSource {
    * hold an absence with the reason it is absent. See `types.ts`.
    */
   readWorld(request: WorldRequest): Promise<WorldView>;
+  /**
+   * What moved between the map as it was written and the map with this branch
+   * folded onto it.
+   *
+   * Asked for separately from the two worlds, because the comparison needs both
+   * at once and subtracting two worlds in the browser would be a second engine.
+   */
+  readDiff(request: DiffRequest): Promise<DiffView>;
+  /**
+   * The likelihood of one arrow's target with that arrow's cause **supposed**
+   * true — never how often the two happen to show up together.
+   *
+   * One arrow at a time: each one costs a whole extra run of the map, for a
+   * number most readers never open. The answer is a pure function of the map,
+   * the branch, the seed and the arrow, so one fetched when somebody asks is
+   * identical to one worked out in advance.
+   */
+  readConditional(request: ConditionalRequest): Promise<Known<Ranged>>;
 }

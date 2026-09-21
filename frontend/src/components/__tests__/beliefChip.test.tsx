@@ -12,8 +12,16 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Slot } from "../../world";
-import { BeliefChip, toReading, toTwoFigures } from "../BeliefChip";
+import type { Known, Ranged } from "../../world";
+import {
+  BeliefChip,
+  toMovement,
+  toRange,
+  toReading,
+  toShare,
+  toSize,
+  toTwoFigures,
+} from "../BeliefChip";
 
 /**
  * Count the significant figures in a printed number.
@@ -37,14 +45,13 @@ function underOf(container: HTMLElement): string {
 }
 
 /** A slot with a number in it. */
-function known(p: number, lo: number, hi: number): Slot {
+function known(p: number, lo: number, hi: number): Known<Ranged> {
   return { reading: { p, lo, hi } };
 }
 
 describe("a belief chip", () => {
-  // The test decision record 0005 promised by name:
-  // test_chip_never_shows_more_than_two_significant_figures
-  it("never shows more than two significant figures", () => {
+  // The test decision record 0005 promised by name.
+  it("test_chip_never_shows_more_than_two_significant_figures", () => {
     // Deliberately awkward numbers: ones that round up into a shorter string,
     // ones with a nought that has to be kept, one that rounds to a whole number,
     // and the two ends of the range.
@@ -66,7 +73,7 @@ describe("a belief chip", () => {
     }
   });
 
-  it("keeps the nought that carries information, rather than dropping it", () => {
+  it("test_the_nought_that_carries_information_is_kept", () => {
     // Two significant figures means two digits that say something. Printing
     // `.06` for either of the first two would claim less precision than we have.
     expect(toTwoFigures(0.06)).toBe(".060");
@@ -76,7 +83,7 @@ describe("a belief chip", () => {
     expect(toReading(0.35, 0.22, 0.5)).toBe(".35 (.22–.50)");
   });
 
-  it("never omits the range", () => {
+  it("test_chip_never_omits_the_range", () => {
     const { container } = render(<BeliefChip owner="model" slot={known(0.61, 0.45, 0.74)} />);
     expect(readingOf(container)).toBe(".61");
     expect(underOf(container)).toBe(".45–.74");
@@ -84,7 +91,7 @@ describe("a belief chip", () => {
     expect(screen.getByRole("button")).toHaveAttribute("aria-label", "model: .61 (.45–.74)");
   });
 
-  it("renders an absent number as an absence with its reason, never as a blank", () => {
+  it("test_an_absent_number_renders_its_reason_and_never_a_blank", () => {
     const { container } = render(
       <BeliefChip
         owner="market"
@@ -107,7 +114,7 @@ describe("a belief chip", () => {
     ).toBeInTheDocument();
   });
 
-  it("invites a number into the reader's own empty slot", () => {
+  it("test_your_own_empty_slot_invites_a_number", () => {
     const { container } = render(
       <BeliefChip
         owner="user"
@@ -124,7 +131,7 @@ describe("a belief chip", () => {
     expect(underOf(container)).toBe("add yours");
   });
 
-  it("renders the word, not a likelihood, while a claim is supposed", () => {
+  it("test_a_supposed_claim_renders_the_word_not_a_number", () => {
     const { container } = render(
       <BeliefChip
         owner="model"
@@ -142,9 +149,13 @@ describe("a belief chip", () => {
     expect(container.textContent).not.toContain("1.0");
   });
 
-  it("says in its label what the range means, and admits nothing is calibrated", () => {
+  it("test_a_computed_chip_says_it_is_uncalibrated", () => {
     render(<BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} versions={2000} />);
 
+    // No claim on any map has resolved, so the eight-in-ten below has never
+    // been checked against anything. The label says that in one word rather
+    // than letting a range that came out of two thousand runs pass for a range
+    // somebody has tested.
     expect(
       screen.getByText(
         "model interval, uncalibrated · how sure we are of .35 — not how much the world can move",
@@ -159,9 +170,8 @@ describe("a belief chip", () => {
     ).toBeInTheDocument();
   });
 
-  // The test the decisions of 2026-09-17 asked for by name:
-  // test_model_chip_says_computed_only_when_a_world_computed_it
-  it("only claims its range was computed when a world computed it", () => {
+  // The test the decisions of 2026-09-17 asked for by name.
+  it("test_model_chip_says_computed_only_when_a_world_computed_it", () => {
     // Nothing has run this number through a map, so the chip says the range is
     // the one whoever wrote the number down stated, and says nothing at all
     // about versions of the map.
@@ -190,9 +200,8 @@ describe("a belief chip", () => {
     expect(screen.getByText(/Across 16 versions of this map/)).toBeInTheDocument();
   });
 
-  // The certainty guard the decisions of 2026-09-17 asked for by name:
-  // test_chip_never_prints_a_certainty
-  it("never prints a certainty at either end", () => {
+  // The certainty guard the decisions of 2026-09-17 asked for by name.
+  it("test_chip_never_prints_a_certainty", () => {
     // Numbers that two-figure rounding would turn into `1.0` or `.0`, plus two
     // very small ones that it would not, to show the guard only fires where it
     // should. `.995` is here for a specific reason: a computer stores it a hair
@@ -221,8 +230,6 @@ describe("a belief chip", () => {
     expect(toTwoFigures(0.0712)).toBe(".071");
     expect(toTwoFigures(0.4999)).toBe(".50");
     expect(toTwoFigures(0.06)).toBe(".060");
-    expect(toTwoFigures(0.0035)).toBe(".0035");
-    expect(toTwoFigures(0.00012)).toBe(".00012");
     expect(toTwoFigures(0.995)).toBe(">.99");
     expect(toTwoFigures(0.9962)).toBe(">.99");
     expect(toTwoFigures(1)).toBe(">.99");
@@ -236,7 +243,83 @@ describe("a belief chip", () => {
     expect(toReading(0.9962, 0.9971, 0.9999)).toBe(">.99 (>.99–>.99)");
   });
 
-  it("can be reached by the keyboard, and opens nothing that has to be dismissed", () => {
+  it("test_a_share_is_a_whole_percentage_and_never_rounds_up_into_all_of_them", () => {
+    // A share of something counted is not a likelihood: a hundred per cent
+    // really can mean every one of them, so printing `>.99` over it would hide
+    // a fact the machine actually counted. The only guard is the one that stops
+    // rounding from inventing unanimity.
+    expect(toShare(0.9663)).toBe("97%");
+    expect(toShare(1)).toBe("100%");
+    expect(toShare(0.9995)).toBe(">99%");
+    expect(toShare(0)).toBe("0%");
+    expect(toShare(0.0004)).toBe("<1%");
+  });
+
+  it("test_the_lower_guard_begins_at_a_hundredth", () => {
+    // Kent, 2026-09-20, G10. The guard is applied to the number **as it would
+    // print**: what two figures would print below `.010` prints `<.01`, and
+    // what they would print at `.010` or above prints its figures. A likelihood
+    // of a thousandth is not a number this product is entitled to call anything
+    // more precise than "small".
+    expect(toTwoFigures(0.0099)).toBe("<.01");
+    expect(toTwoFigures(0.0035)).toBe("<.01");
+    expect(toTwoFigures(0.00012)).toBe("<.01");
+    // On the line, and just under it after rounding carries.
+    expect(toTwoFigures(0.01)).toBe(".010");
+    expect(toTwoFigures(0.00996)).toBe(".010");
+    expect(toTwoFigures(0.0104)).toBe(".010");
+    expect(toTwoFigures(0.011)).toBe(".011");
+
+    // A range end is a likelihood, so it takes the same guard — and a band
+    // whose bottom sits under a hundredth says so without being called
+    // impossible.
+    expect(toRange(0.004, 0.031)).toBe("<.01–.031");
+    expect(toReading(0.006, 0.0002, 0.03)).toBe("<.01 (<.01–.030)");
+  });
+
+  it("test_a_size_is_not_a_likelihood_and_takes_no_guard", () => {
+    // How far a number moved, and how wide a band is, are measured on the
+    // likelihood scale and are not likelihoods. `<.01` on a likelihood is a
+    // claim about the world — "small, but we are not calling it impossible".
+    // A move of nine thousandths is a measurement, and rounding it away would
+    // throw out the only thing the reader came for.
+    expect(toSize(0.008967961923746659)).toBe(".0090");
+    expect(toSize(0.0035)).toBe(".0035");
+    expect(toSize(0.00012)).toBe(".00012");
+    // The sign is said in words elsewhere, so only the size is printed.
+    expect(toSize(-0.0035)).toBe(".0035");
+    // And no guard at the top either: a move of exactly one is a real move.
+    expect(toSize(1)).toBe("1.0");
+    expect(toSize(0.995)).toBe("1.0");
+    expect(toSize(0)).toBe("0");
+  });
+
+  it("test_no_chevron_between_two_readings_that_print_the_same", () => {
+    // Two figures is the whole of what this product shows, so a move smaller
+    // than the second figure leaves the before and the after printing the same.
+    // A chevron between them says "it went up" and "it is where it was" in one
+    // breath, and reads as a fault in the tool. Where they print the same the
+    // row is the one reading and the size of the move in words.
+    //
+    // The numbers are the engine's own for observing the insurance premium,
+    // which moves the strait from .3557 to .3647 — nine thousandths, invisible
+    // at two figures.
+    expect(toMovement(0.3557703617587686, 0.36473832368251524, 0.008967961923746659, "up")).toBe(
+      ".36 · up by .0090",
+    );
+    expect(toMovement(0.456, 0.414, -0.0421, "down")).toBe(".46 ▼ .41");
+
+    // A size keeps two figures however small, so a tiny move reads as the tiny
+    // move it is — where the likelihoods on either side of it would have been
+    // guarded down to `<.01`.
+    expect(toMovement(0.4, 0.4, 0.000004, "up")).toBe(".40 · up by .0000040");
+    // The sign is already said by the word, so only the size is printed.
+    expect(toMovement(0.4, 0.4, -0.000004, "down")).toBe(".40 · down by .0000040");
+    // And nothing moved at all is not a direction: the reading stands alone.
+    expect(toMovement(0.19, 0.19, 0, "up")).toBe(".19");
+  });
+
+  it("test_a_chip_is_reachable_by_keyboard_and_opens_no_dialog", () => {
     render(<BeliefChip owner="model" slot={known(0.35, 0.22, 0.5)} />);
 
     const chip = screen.getByRole("button");

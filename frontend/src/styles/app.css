@@ -191,15 +191,32 @@ body {
  * as one. It is 336 pixels wide rather than 400, which is what leaves the map
  * enough room at a 1600-pixel window to draw full tiles on its first frame
  * instead of summaries. Press P and it goes, and the map has the whole width. */
+/* The column beside the map: your branches, where the edit ends up, and why this
+ * number is what it is. All three at once, and that is the rule.
+ *
+ * **Each one scrolls itself; the column never scrolls as a whole.** Two of the
+ * three grow with what the engine has to say — a branch gains edits, a rail
+ * gains a row per ending — and in one column of fixed height something has to
+ * give. What must not give is a section disappearing off the bottom: a panel you
+ * cannot see is a panel that is not there, and this product's answer to "why is
+ * this number what it is" is in the third of them. So each keeps a readable
+ * height of its own, shrinks no further than that, and scrolls inside itself.
+ * Nothing is ever hidden behind anything else. */
 .dock {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  /* One hairline between one section and the next, drawn by the column showing
+     through a one-pixel gap rather than by a border on each section. A section
+     that is scrolling cuts a line of its text in half at its own bottom edge —
+     every scrolling thing does — and without a line there the cut half and the
+     next section's first line read as one word printed over another. */
+  gap: 1px;
   width: 336px;
   min-width: 0;
-  overflow-y: auto;
+  overflow: hidden;
   border-left: 1px solid var(--hairline);
-  background: var(--surface-raised);
+  background: var(--hairline);
 }
 
 /* Which branch you are in, in the bar at the top. The hue is on the chip; the
@@ -263,11 +280,22 @@ body {
   color: var(--text);
 }
 
-/* Where every number on the map came from, in one sentence, under the map. A
- * map whose numbers cannot say where they came from is the state this product
- * refuses to show, so the sentence is part of the map rather than a footnote
- * somebody might have left off. */
+/* Where every number on the map came from, under the map — and whatever is
+ * still on its way. A map whose numbers cannot say where they came from is the
+ * state this product refuses to show, so the sentence is part of the map rather
+ * than a footnote somebody might have left off.
+ *
+ * One line each, stacked, in a strip of a fixed smallest height, so a line
+ * arriving or going does not move the map above it. There is no spinner in this
+ * strip and there is none anywhere: a line that says what was asked and at which
+ * address says the same thing and says it usefully. */
 .map-origin {
+  /* Never squashed. It is the line that says where every number on this screen
+     came from, and half of it is worth nothing at all. */
+  flex: 0 0 auto;
+  display: grid;
+  row-gap: var(--space-hair);
+  min-height: 2.6em;
   margin: 0;
   padding: var(--space-1) var(--space-3);
   border-top: 1px solid var(--hairline);
@@ -275,6 +303,10 @@ body {
   font-size: var(--text-sm);
   color: var(--text-muted);
   text-wrap: pretty;
+}
+
+.map-origin__line {
+  margin: 0;
 }
 
 /* What the screen says while the map is on its way, or when it could not be

@@ -11,11 +11,19 @@
  * will do rather than shouting.
  */
 
+/* Your branches and the edits in the one that is open. It takes the room its
+ * list needs and no more, gives up what it has to when the column is full, and
+ * scrolls inside itself rather than pushing anything off the bottom. */
 .branch-panel {
+  flex: 0 1 auto;
+  min-height: 8rem;
+  max-height: 28%;
+  overflow-y: auto;
   display: grid;
+  align-content: start;
   row-gap: var(--space-1);
   padding: var(--space-2);
-  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-raised);
 }
 
 .branch-panel__heading {
@@ -242,11 +250,17 @@
 
 /* ---- The six things you can do ------------------------------------------ */
 
+/* The six things you can do to a claim. It is opened on purpose and closed
+ * again, so it takes the room it needs first and scrolls itself if the column
+ * cannot spare it. */
 .intervene {
+  flex: 0 1 auto;
+  min-height: 11rem;
+  overflow-y: auto;
   display: grid;
+  align-content: start;
   row-gap: var(--space-1);
   padding: var(--space-2);
-  border-bottom: 1px solid var(--hairline);
   background: var(--surface);
 }
 

@@ -8,11 +8,22 @@
  * separation for a list this short.
  */
 
+/* Where the edit ends up. It grows a row per ending the edit can reach, so it
+ * is the section most likely to want more room than the column has — and it
+ * takes what it can, keeps enough to read two rows, and scrolls the rest. */
 .delta-rail {
+  /* A share of the column of its own, rather than whatever the panel below
+     leaves: the panel's content is far longer, so sharing by content would
+     squeeze the rail down to its heading and put its rows — the reason the rail
+     exists — below its own fold. */
+  flex: 1 1 20rem;
+  min-height: 15rem;
+  overflow-y: auto;
   display: grid;
+  align-content: start;
   row-gap: var(--space-1);
   padding: var(--space-2);
-  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-raised);
 }
 
 .delta-rail__heading {
@@ -115,6 +126,25 @@
 .delta-rail__kind {
   display: block;
   font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Which way it went, in a word, and the day the two worlds were furthest apart.
+ * The word is here because the chevron beside the number is a glyph and a glyph
+ * on its own is not a reading; the day is here because a row is read on the day
+ * of largest divergence rather than on the claim's own judging day, and a number
+ * whose day is not said is a number nobody can check. */
+.delta-rail__day {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* An ending that held still. It is quieter than the ones that moved and it is
+ * still fully readable — the whole reason it is on the rail at all is that
+ * silence cannot be told from absence, so a row nobody can read would be no
+ * better than no row. */
+.delta-rail__row[data-moved="no"] .delta-rail__label {
   color: var(--text-muted);
 }
 

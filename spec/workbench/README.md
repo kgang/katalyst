@@ -31,7 +31,9 @@ The last four belong to a map that is being generated and are defined, with the 
 | [`keyboard-and-access.md`](keyboard-and-access.md) | Keyboard map, outline view for screen readers, reduced motion, contrast | stack 03b — written, canvas built |
 | [`streaming-growth.md`](streaming-growth.md) | How the map draws itself during generation: the eight stream events, skeleton tiles, growth in causal order, the refusal strip, the receipt strip, the Verify door's two cards, the input bar, the replay badge | stack 04a — written; the growing canvas is 04a's last pull request |
 
-**"Built" here means drawn, not fed.** The canvas reads the stored example from `GET /api/fixtures/hormuz`; it does not yet ask the engine's world routes. So every chapter's *drawing* rules are built and tested, and every number a chapter says the engine would compute is on screen as an absence with its reason — "no engine yet". Joining the two is the first job of stack 04, and no component changes when it happens.
+**"Built" here now means fed as well as drawn.** The canvas reads the map from `GET /api/fixtures/hormuz` and asks the engine's three world routes for everything computed: `POST /api/worlds` for a world, `POST /api/worlds/diff` for what an edit moved, and `POST /api/worlds/conditional` for the number on one arrow, asked one arrow at a time. So the numbers on screen are the engine's own, worked out from the map, the branch and one seed.
+
+**What is still an absence, and why, is the part worth reading.** A number nobody has worked out is still never drawn: while the engine is being asked, while it is refusing a branch that does not fit the map, and where the engine carries nothing at all — a chain's multiplied-out likelihood (INV-8) is not on a world yet — the slot holds words and a reason, exactly as it did before. And when the engine cannot be reached the stored example stands in, with a line under the map saying so in the failure's own words. Joining the two was the first job of stack 04, and no component changed when it happened.
 
 ## The worked example
 

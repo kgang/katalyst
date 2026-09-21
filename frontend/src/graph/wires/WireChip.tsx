@@ -27,7 +27,7 @@
  */
 
 import { toRange, toTwoFigures } from "../../components/BeliefChip";
-import type { Slot } from "../../world";
+import type { Known, Ranged } from "../../world";
 import { lagInWords, likelihoodStep, pushAsNumber, pushInWords } from "./encodings";
 
 /** What the chip needs to draw itself. */
@@ -43,7 +43,7 @@ export interface WireChipProps {
    * parameter rather than an assumption so that the day the engine answers,
    * this component already knows what to do with it.
    */
-  readonly conditional: Slot;
+  readonly conditional: Known<Ranged>;
   /**
    * How much of the plate there is room for.
    *

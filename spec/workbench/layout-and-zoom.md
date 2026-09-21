@@ -46,9 +46,9 @@ Decision record 0007 measures ELK at 50–150 milliseconds on sixty tiles. On th
 /** What the page sends the layout worker. */
 interface LayoutRequest {
   /** Every tile to place. Width is always 280. Height varies per tile: content-fit,
-   *  clamped to 152–272 pixels, on the 8-pixel grid, **computed from the content** and
+   *  clamped to 152–320 pixels, on the 8-pixel grid, **computed from the content** and
    *  never measured off the screen — so layout stays a pure function of the map
-   *  (`tiles-ports-wires.md` owns the height rule). */
+   *  (`tiles-ports-wires.md` owns the height rule, and the ceiling's reason). */
   tiles: { id: string; width: 280; height: number; pinnedAt?: { x: number; y: number } }[];
   /** Every wire. `reflexive` wires are marked here and set aside before layering. */
   wires: { id: string; from: string; to: string; reflexive: boolean }[];

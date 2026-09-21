@@ -21,6 +21,7 @@ import {
   LAYOUT_OPTIONS,
   type LayoutEdge,
   type Position,
+  pinsFor,
   readPositions,
   toElkGraph,
 } from "../elkGraph";
@@ -28,6 +29,7 @@ import {
   claimLines,
   firstFrame,
   LARGEST_ZOOM,
+  roomFor,
   SMALLEST_ZOOM,
   SUMMARY_BELOW_ZOOM,
   smallestTextAt,
@@ -68,7 +70,7 @@ function arrow(source: string, target: string, extra: Partial<LinkView> = {}): L
 }
 
 describe("the map's layout", () => {
-  it("is laid out with the settings the decision record names", () => {
+  it("test_layout_options_are_the_five_named", () => {
     // Read as a list rather than poked at one key at a time, because the whole
     // point of the record is that these six are chosen together.
     expect(LAYOUT_OPTIONS).toMatchObject({
@@ -80,7 +82,7 @@ describe("the map's layout", () => {
     });
   });
 
-  it("keeps tiles that are already placed exactly where they are", async () => {
+  it("test_pinned_tiles_keep_their_positions", async () => {
     const first = await layout(
       [
         ["H", 272],
@@ -122,7 +124,7 @@ describe("the map's layout", () => {
     expect(second.size).toBe(4);
   });
 
-  it("runs left to right, so a cause is always left of what it causes", async () => {
+  it("test_a_cause_is_always_left_of_what_it_causes", async () => {
     const placed = await layout(
       [
         ["H", 272],
@@ -146,7 +148,7 @@ describe("the map's layout", () => {
     expect((c as Position).x).toBeLessThan((b as Position).x);
   });
 
-  it("gives each tile the height it will actually be drawn at", async () => {
+  it("test_the_layout_is_given_the_height_the_tile_is_drawn_at", async () => {
     const placed = await layout(
       [
         ["short", TILE_MIN_HEIGHT],
@@ -188,7 +190,7 @@ describe("how tall a tile is", () => {
     },
   } as const;
 
-  it("is decided by the content, not fixed for every tile", () => {
+  it("test_tile_height_is_decided_by_the_content", () => {
     const bare = tileHeight(claimOf("A short claim.", { beliefs: noMarket }));
     const deadEnd = tileHeight(
       claimOf("A short claim.", { kind: "not_tradeable", beliefs: noMarket }),
@@ -206,7 +208,7 @@ describe("how tall a tile is", () => {
     expect(deadEnd).toBeLessThan(withClippings);
   });
 
-  it("gives room for a reason only to the claim that prints one", () => {
+  it("test_only_a_claim_that_prints_a_reason_gets_room_for_one", () => {
     // Every claim without a market number says "no market" in two words on its
     // chip. Only the kind that ends the map without an instrument prints why on
     // the face of the tile, so only that one is given room for the sentence.
@@ -219,7 +221,43 @@ describe("how tall a tile is", () => {
     ).toBeGreaterThan(tileHeight(claimOf(short, { beliefs: noMarket })));
   });
 
-  it("stays on the eight-pixel grid and inside the floor and the ceiling", () => {
+  it("test_room_for_a_movement_line_stays_inside_the_ceiling", () => {
+    // The busiest tile on the map: the two badges the strike branch earns and a
+    // line saying how far the number moved. The height it needs is worked out
+    // once and bounded once — bounded heights added and subtracted count the
+    // floor twice and are held under no ceiling at all.
+    const busiest = claimOf(
+      "The Strait of Hormuz reopens to unrestricted commercial transit for shipping of every flag.",
+      {
+        badges: [
+          { words: "Supposed \u00b7 Oct 1", reason: "You supposed this is true, from Oct 1." },
+          {
+            words:
+              'Retracted \u00b7 Oct 2 \u00b7 by "a confirmed military strike on Iranian territory"',
+            reason: "What was holding this up was taken away on Oct 2.",
+          },
+          {
+            words: ".41 \u25b2 .62",
+            movement: true,
+            reason: "Your edit moved this claim up, from .41 to .62.",
+          },
+        ],
+      },
+    );
+    expect(roomFor(busiest)).toBeLessThanOrEqual(TILE_MAX_HEIGHT);
+    expect(roomFor(busiest) % 8).toBe(0);
+    // And it is still the taller of the two readings: the movement line is on a
+    // line of its own rather than packed in with the words.
+    expect(roomFor(busiest)).toBeGreaterThanOrEqual(tileHeight(busiest));
+  });
+
+  it("test_tile_height_is_content_fit_within_152_and_320", () => {
+    // The two numbers in this test's name are the two in the chapter, so they
+    // are checked rather than taken on trust: a floor and a ceiling that drifted
+    // from the words describing them would leave the name lying.
+    expect(TILE_MIN_HEIGHT).toBe(152);
+    expect(TILE_MAX_HEIGHT).toBe(320);
+
     const claims = [
       "A.",
       "A claim of about the length that takes two lines.",
@@ -233,7 +271,7 @@ describe("how tall a tile is", () => {
     }
   });
 
-  it("shows between one and three lines of the claim, and never more", () => {
+  it("test_claim_wraps_to_three_lines_and_never_cuts_mid_word", () => {
     expect(claimLines("Short.")).toBe(1);
     expect(claimLines("A".repeat(400))).toBe(3);
     // The number of lines the tile is built for is the number the claim is
@@ -243,7 +281,7 @@ describe("how tall a tile is", () => {
 });
 
 describe("the eleven-pixel floor", () => {
-  it("holds at every zoom the reader can reach", () => {
+  it("test_no_text_lands_under_eleven_pixels_at_any_zoom", () => {
     // Swept rather than spot-checked, because the whole point of the floor is
     // that there is no zoom at which it fails.
     for (let zoom = SMALLEST_ZOOM; zoom <= LARGEST_ZOOM + 0.0001; zoom += 0.005) {
@@ -252,7 +290,7 @@ describe("the eleven-pixel floor", () => {
     }
   });
 
-  it("switches to the summary exactly where the full tile would fall below it", () => {
+  it("test_the_summary_starts_exactly_where_a_full_tile_would_fall_below_the_floor", () => {
     // A hair under the threshold the summary is drawing; a hair over, the full
     // tile is — and both clear eleven pixels.
     expect(
@@ -264,7 +302,7 @@ describe("the eleven-pixel floor", () => {
 });
 
 describe("sorting a map into columns", () => {
-  it("puts each claim as far right as the longest chain reaching it", () => {
+  it("test_within_layer_order_is_stable", () => {
     // The stored example's shape: the strait opens, insurance repricing and
     // talks follow, the oil price follows both, and two tradeable endings hang
     // off the oil price.
@@ -289,7 +327,7 @@ describe("sorting a map into columns", () => {
     expect(layers.get("M2")).toBe(3);
   });
 
-  it("sets the feedback arrow aside, so the map still has a direction", () => {
+  it("test_reflexive_links_are_set_aside_for_layering", () => {
     // The oil price feeds back on an output decision, which feeds back on the
     // oil price: a loop, and the only kind of loop the map allows. Left in, there
     // would be no leftmost claim at all.
@@ -301,7 +339,7 @@ describe("sorting a map into columns", () => {
     expect(layers.get("B")).toBe(1);
   });
 
-  it("shows seven tiles in a column and collapses the rest into one", () => {
+  it("test_layer_cap_collapses_the_rest", () => {
     const wide = Array.from({ length: 10 }, (_, index) => `n${index}`);
     const { shown, overflows } = capLayers(assignLayers(wide, []));
 
@@ -313,7 +351,7 @@ describe("sorting a map into columns", () => {
     expect(overflows[0]?.hidden).toEqual(["n7", "n8", "n9"]);
   });
 
-  it("leaves a column alone when it fits", () => {
+  it("test_a_column_that_fits_is_left_alone", () => {
     const { shown, overflows } = capLayers(assignLayers(["a", "b", "c"], []));
     expect(shown.map((one) => one.id)).toEqual(["a", "b", "c"]);
     expect(overflows).toHaveLength(0);
@@ -321,16 +359,50 @@ describe("sorting a map into columns", () => {
 });
 
 describe("the union of two worlds", () => {
-  /** The stored example's shape, as a list of tiles and the arrows between them. */
-  const BASE: [string, number][] = [
-    ["H", 280],
-    ["C", 192],
-    ["B", 176],
-    ["R", 152],
-    ["M1", 192],
-    ["M2", 192],
-    ["N1", 216],
+  /**
+   * The stored example's eight claims, in the words the map serves them in.
+   *
+   * **Not one height below is written down.** Every tile is measured by the same
+   * function the page measures it with, from the claim itself — so a change to
+   * what a tile holds moves this test with it rather than leaving it asserting
+   * against numbers that were true once.
+   */
+  const HORMUZ: ClaimView[] = [
+    aClaim({
+      id: "H",
+      kind: "hypothesis",
+      claim: "The Strait of Hormuz reopens to unrestricted commercial transit.",
+    }),
+    aClaim({
+      id: "C",
+      claim: "War-risk insurance premia for Gulf transits fall by half.",
+    }),
+    aClaim({ id: "B", claim: "Brent crude settles below $68 for five sessions." }),
+    aClaim({ id: "R", claim: "OPEC+ announces output restraint." }),
+    aClaim({ id: "M1", kind: "market", claim: "The tanker-rate market settles lower." }),
+    aClaim({ id: "M2", kind: "market", claim: "The insurance market reprices Gulf hulls." }),
+    aClaim({
+      id: "N1",
+      kind: "not_tradeable",
+      claim: "Freight forwarders resume booking Gulf routes at pre-closure volumes.",
+    }),
+    aClaim({ id: "S", claim: "A confirmed military strike on Iranian territory." }),
   ];
+
+  /** One claim of the map, by its identifier. */
+  function claimAt(id: string): ClaimView {
+    const found = HORMUZ.find((claim) => claim.id === id);
+    if (found === undefined) {
+      throw new Error(`no claim ${id} on this map`);
+    }
+    return found;
+  }
+
+  /** The stored example's shape, as a list of tiles and the arrows between them. */
+  const BASE: [string, number][] = HORMUZ.filter((claim) => claim.id !== "S").map((claim) => [
+    claim.id,
+    tileHeight(claim),
+  ]);
   const BASE_ARROWS: LayoutEdge[] = [
     { id: "H->B", source: "H", target: "B" },
     { id: "H->C", source: "H", target: "C" },
@@ -341,14 +413,13 @@ describe("the union of two worlds", () => {
     { id: "R->B", source: "R", target: "B" },
   ];
 
-  // test_union_layout_is_stable
-  it("lays out the union once, and gives every claim in both worlds one coordinate", async () => {
+  it("test_union_layout_is_stable", async () => {
     // The strike adds S with three arrows, one of them into the hypothesis
     // itself — so every base claim moves one column right. That has to happen: a
     // cause cannot be drawn to the right of what it causes. What must **not**
     // happen is the two worlds being laid out separately, because then every
     // tile would appear to have moved and the diff would say nothing.
-    const union: [string, number][] = [...BASE, ["S", 208]];
+    const union: [string, number][] = [...BASE, ["S", tileHeight(claimAt("S"))]];
     const unionArrows: LayoutEdge[] = [
       ...BASE_ARROWS,
       { id: "S->B", source: "S", target: "B" },
@@ -370,8 +441,176 @@ describe("the union of two worlds", () => {
     expect(once.get("H")?.x ?? 0).toBeLessThan(once.get("B")?.x ?? 0);
   });
 
-  // test_the_first_frame_never_shows_a_summary_tile
-  it("frames the first view at a zoom that keeps full tiles, at 1600 by 1000", () => {
+  /**
+   * The gap the layout leaves between two tiles that sit straight under one
+   * another, as `LAYOUT_OPTIONS` sets it. Read back rather than written down
+   * twice, so changing the setting changes what this checks.
+   */
+  const GAP = Number(LAYOUT_OPTIONS["elk.spacing.nodeNode"]);
+
+  /**
+   * Every pair of tiles in one column that leave less room between them than
+   * they need.
+   *
+   * **Two different gaps, and only one of them is `nodeNode`.** Where nothing
+   * passes between two tiles the layout leaves the full gap. Where a wire has to
+   * cross that column on its way somewhere further right, the layout puts the
+   * wire's lane between them instead, and the tiles sit closer with the lane in
+   * the middle — on the stored example the wires from the hypothesis to Brent
+   * run between the talks and the insurance premium, and take that room. That is
+   * the layout doing its job, not two tiles crowding.
+   *
+   * So what is checked is the thing that is always wrong: **a pair that
+   * overlaps, or touches.** A tile drawn taller than the box the layout reserved
+   * for it shows up here and nowhere else.
+   *
+   * @param placed Where every tile ended up.
+   * @param heights How tall each one will actually be drawn.
+   */
+  function collide(
+    placed: ReadonlyMap<string, Position>,
+    heights: ReadonlyMap<string, number>,
+  ): string[] {
+    const found: string[] = [];
+    const tiles = [...placed].map(([id, at]) => ({ id, at, height: heights.get(id) ?? 0 }));
+    for (const one of tiles) {
+      for (const other of tiles) {
+        if (one.id >= other.id || one.at.x !== other.at.x) {
+          continue;
+        }
+        const [above, below] = one.at.y <= other.at.y ? [one, other] : [other, one];
+        const between = below.at.y - (above.at.y + above.height);
+        if (between <= 0) {
+          found.push(`${above.id} runs into ${below.id}: ${between} between them`);
+        }
+      }
+    }
+    return found;
+  }
+
+  /** The tiles in one column, top to bottom, with the gaps between them. */
+  function column(
+    placed: ReadonlyMap<string, Position>,
+    heights: ReadonlyMap<string, number>,
+    ids: readonly string[],
+  ): number[] {
+    const tiles = ids
+      .map((id) => ({ id, at: placed.get(id), height: heights.get(id) ?? 0 }))
+      .filter((tile): tile is { id: string; at: Position; height: number } => tile.at !== undefined)
+      .sort((a, b) => a.at.y - b.at.y);
+    return tiles.slice(1).map((tile, i) => {
+      const above = tiles[i] as { at: Position; height: number };
+      return tile.at.y - (above.at.y + above.height);
+    });
+  }
+
+  it("test_no_two_tiles_in_a_column_collide", async () => {
+    // The map as it was written. Its one crowded column holds the talks, the
+    // insurance premium and OPEC's announcement, and the whole gap is left
+    // between the two of them that have nothing passing between.
+    const heights = new Map(BASE);
+    const asWritten = await layout(BASE, BASE_ARROWS, new Map());
+    expect(collide(asWritten, heights)).toEqual([]);
+    expect(column(asWritten, heights, ["N1", "C", "R"]).at(-1)).toBe(GAP);
+
+    // And the strike branch, where six of the eight tiles are taller than they
+    // were on the base map: each one that the edit can reach carries a line
+    // saying how far its number moved. **That is the case this test exists for.**
+    // Those tiles are placed on the branch's own layout and never at coordinates
+    // worked out for the shorter boxes, so the gap survives the growth.
+    // The seven tiles the strike can reach each carry a line saying how far
+    // their number moved; OPEC's announcement is the one it cannot reach, so it
+    // keeps the box it had. Both heights are the ones the page reserves.
+    const reached = new Set(["H", "C", "B", "M1", "M2", "N1", "S"]);
+    const grown: [string, number][] = HORMUZ.map((claim) => [
+      claim.id,
+      reached.has(claim.id)
+        ? roomFor({
+            ...claim,
+            badges: [
+              {
+                words: ".41 \u25b2 .62",
+                movement: true,
+                reason: "Your edit moved this claim up, from .41 to .62.",
+              },
+            ],
+          })
+        : tileHeight(claim),
+    ]);
+    // The point of this case, asserted rather than assumed: a tile the edit can
+    // reach really is taller on the branch than it was on the base map. If the
+    // movement line ever stops taking room, this test stops testing anything
+    // and should say so here rather than passing quietly.
+    const before = new Map(BASE);
+    for (const [id, height] of grown) {
+      if (reached.has(id) && before.has(id)) {
+        expect(height).toBeGreaterThan(before.get(id) as number);
+      }
+    }
+
+    const branchArrows: LayoutEdge[] = [
+      ...BASE_ARROWS,
+      { id: "S->B", source: "S", target: "B" },
+      { id: "S->C", source: "S", target: "C" },
+      { id: "S->H", source: "S", target: "H" },
+    ];
+    const onTheBranch = await layout(grown, branchArrows, new Map());
+    expect(collide(onTheBranch, new Map(grown))).toEqual([]);
+    expect(column(onTheBranch, new Map(grown), ["N1", "C", "R"]).at(-1)).toBe(GAP);
+  });
+
+  it("test_a_pin_is_dropped_when_its_tile_changes_size", async () => {
+    // The failure this prevents, in one run: lay the map out, then grow two
+    // tiles and lay it out again with the old pins. A pin that survived the
+    // growth would hold each grown tile where its shorter self went, and the
+    // tile below it would be run into.
+    const first = await layout(BASE, BASE_ARROWS, new Map());
+    const placed = new Map(
+      [...first].map(([id, at]) => [id, { at, height: new Map(BASE).get(id) ?? 0 }]),
+    );
+
+    const grown: [string, number][] = BASE.map(([id, height]) =>
+      id === "C" || id === "M1" ? [id, height + 48] : [id, height],
+    );
+    const tiles = grown.map(([id, height]) => ({ id, height }));
+
+    // Every pin goes, not only the two that changed size. A tile's place in a
+    // column is decided by its neighbours as much as by itself, so keeping one
+    // neighbour pinned while the other is placed afresh is what puts the two of
+    // them in the same space.
+    expect([...pinsFor(placed, tiles).keys()]).toEqual([]);
+
+    const again = await layout(grown, BASE_ARROWS, pinsFor(placed, tiles));
+    expect(collide(again, new Map(grown))).toEqual([]);
+  });
+
+  it("test_a_tile_arriving_keeps_every_pin", async () => {
+    // The other half of the same rule, and the half the reader feels: a map that
+    // grows must not move what is already drawn.
+    const first = await layout(BASE, BASE_ARROWS, new Map());
+    const placed = new Map(
+      [...first].map(([id, at]) => [id, { at, height: new Map(BASE).get(id) ?? 0 }]),
+    );
+    const withOneMore: [string, number][] = [
+      ...BASE,
+      ["M3", tileHeight(aClaim({ id: "M3", kind: "market", claim: "One more market reprices." }))],
+    ];
+    const tiles = withOneMore.map(([id, height]) => ({ id, height }));
+
+    const holding = pinsFor(placed, tiles);
+    expect([...holding.keys()].sort()).toEqual([...BASE.map(([id]) => id)].sort());
+
+    const again = await layout(
+      withOneMore,
+      [...BASE_ARROWS, { id: "B->M3", source: "B", target: "M3" }],
+      holding,
+    );
+    for (const [id] of BASE) {
+      expect(again.get(id)).toEqual(first.get(id));
+    }
+  });
+
+  it("test_the_first_frame_never_shows_a_summary_tile", () => {
     // The map is four columns wide and about eight hundred tall; the panel
     // beside it takes 336 pixels, the bar at the top and the two lines at the
     // foot take about 150, and what is left is what the map gets. Fitting the
@@ -387,8 +626,7 @@ describe("the union of two worlds", () => {
     expect(firstFrame({ x: 0, y: 0, width: 300, height: 200 }, room).zoom).toBe(1);
   });
 
-  // test_a_map_too_big_to_fit_is_framed_from_its_beginning
-  it("frames a map too big to fit from its left edge rather than shrinking it", () => {
+  it("test_a_map_too_big_to_fit_is_framed_from_its_beginning", () => {
     // The union is five columns wide, which does not fit beside the panel at a
     // readable zoom. The answer is the same one a tile gives when it runs out of
     // room: change what is shown, never shrink it below eleven pixels. So the

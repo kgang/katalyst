@@ -284,6 +284,21 @@
   background: var(--accent);
 }
 
+/* A claim whose number moved: the same strip, drawn solid and thin. A claim
+   your edit can reach is dashed, a claim whose number actually moved is joined
+   up, and a claim it added is the thick one — three weights of one line, which
+   survives a grey print. The reading itself is on the tile beside the badges,
+   because the strip is a glance and never a number. */
+.tile[data-diff="shifted"]::after {
+  content: "";
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: 5px;
+  height: 0;
+  border-bottom: 1px solid var(--accent);
+}
+
 /* ---- Badges -------------------------------------------------------------- *
  * What the edits behind this claim did to it, in the order they were made:
  * *Supposed · Oct 1 → Retracted · Oct 2 · by "…"*. The arrow between two of them
@@ -329,6 +344,28 @@
 
 .tile__badge:hover {
   border-color: var(--text-muted);
+}
+
+/* A badge that is a reading rather than a word about an edit: the two numbers
+   with a chevron between them. It takes the number face and the tabular digits
+   every number in this product is set in, so that `.40 ▼ .30` reads as two
+   numbers and not as a label. It takes no colour of its own: which way a
+   likelihood went is said by the two numbers and by the chevron, and the two
+   hues this product keeps for a direction mean which way the money moves, which
+   is a different thing. */
+
+.tile__badge[data-badge="movement"] .tile__badge-words {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* The reading gets a line of its own under whatever the edits had to say. On
+   the busiest tile the badge run is already three lines, and a fourth thing
+   strung on the end of it pushes a line out of the box — so it starts a line,
+   and the layout reserves one for it. */
+.tile__badges--movement {
+  margin-top: var(--space-hair);
 }
 
 /* ---- The collapsed tile ------------------------------------------------- *

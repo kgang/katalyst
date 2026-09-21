@@ -83,6 +83,7 @@ const DIFF_WORDS: Record<string, string> = {
   killed: "supposed false by your edit",
   downstream: "your edit can reach this",
   untouched: "your edit cannot reach this",
+  shifted: "your edit moved this number",
 };
 
 /** One published item, as a clipping: a letter for the publication and one line. */
@@ -131,25 +132,47 @@ function Clipping({
  * a sentence saying what it means, and a reason you cannot reach is not a reason.
  */
 function Badges({ badges }: { badges: readonly Badge[] }) {
-  if (badges.length === 0) {
+  // How far the number moved is a reading, not a word about an edit, so it gets
+  // a line of its own under the run rather than being strung on the end of it.
+  // Two reasons, and the second is the load-bearing one: *Supposed · Oct 1 →
+  // Retracted · Oct 2 · by "…"* already runs to three lines on a 280-pixel tile,
+  // and a fourth thing on that run pushes a line out of the box. The layout
+  // reserves the extra line; see `App.tsx`, where the box is measured.
+  const said = badges.filter((badge) => badge.movement !== true);
+  const moved = badges.find((badge) => badge.movement === true);
+  if (said.length === 0 && moved === undefined) {
     return null;
   }
   return (
-    <p className="tile__badges">
-      {badges.map((badge, index) => (
-        <span className="tile__badge-run" key={badge.words}>
-          {index === 0 ? null : (
-            <span className="tile__badge-arrow" aria-hidden="true">
-              {" → "}
+    <>
+      {said.length === 0 ? null : (
+        <p className="tile__badges">
+          {said.map((badge, index) => (
+            <span className="tile__badge-run" key={badge.words}>
+              {index === 0 ? null : (
+                <span className="tile__badge-arrow" aria-hidden="true">
+                  {" → "}
+                </span>
+              )}
+              <button className="tile__badge" type="button" title={badge.reason} data-badge="words">
+                <span className="tile__hidden">{`${badge.reason} `}</span>
+                <span className="tile__badge-words">{badge.words}</span>
+              </button>
             </span>
-          )}
-          <button className="tile__badge" type="button" title={badge.reason}>
-            <span className="tile__hidden">{`${badge.reason} `}</span>
-            <span className="tile__badge-words">{badge.words}</span>
+          ))}
+        </p>
+      )}
+      {moved === undefined ? null : (
+        // Drawn in the number face, so that `.40 ▼ .30` reads as two numbers
+        // with a direction between them rather than as a label.
+        <p className="tile__badges tile__badges--movement">
+          <button className="tile__badge" type="button" title={moved.reason} data-badge="movement">
+            <span className="tile__hidden">{`${moved.reason} `}</span>
+            <span className="tile__badge-words">{moved.words}</span>
           </button>
-        </span>
-      ))}
-    </p>
+        </p>
+      )}
+    </>
   );
 }
 
