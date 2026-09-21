@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M32EC4XT1AEECFNNZ8S966DD",
+  "session_id": "b3719e32-fae2-4866-b0f9-fedf04e7fad7",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-21T16:56:48.879505Z",
+  "branch": "test/04-faster-browser-run",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "1201af7a264a",
+  "checkpoint_transcript_start": 388,
+  "transcript_lines_at_start": 388,
+  "compact_transcript_start": 73,
+  "token_usage": {
+    "input_tokens": 62,
+    "cache_creation_tokens": 34199,
+    "cache_read_tokens": 5965069,
+    "output_tokens": 17123,
+    "api_call_count": 30
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
