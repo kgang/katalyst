@@ -135,6 +135,26 @@ The three voices are stored and drawn separately and **never averaged** — INV-
 
 Stacked, because three numbers and three ranges strung along one line of a 280-pixel tile is a row of digits nobody parses. The one-line form `.61 (.45–.74)` is still the canonical spelling and is used everywhere the chip is not: in prose, in the outline view, and as the chip's own accessible name, so a screen reader hears one phrase rather than three fragments.
 
+#### The same chip, seen from far away *(added 2026-09-22)*
+
+Zoomed out past the threshold [`layout-and-zoom.md`](layout-and-zoom.md) owns, a tile drops its heading, its date and its foot, and sets everything it keeps in the largest of the three type sizes — 22 pixels, which at the furthest the map zooms out is 11 pixels on the reader's screen and may not be given up. Out there a belief stops being a stack of three and becomes **one line, read the way it would be said**: the owner, the number, the range.
+
+**A range is never dropped and never cut off, at any zoom — so out here it is allowed a line of its own.** At this size the longest line the engine can print does not fit: the owner *market*, a three-figure likelihood and a three-figure range come to about 281 pixels against the 256 a belief row has, and 244 on the two tiles whose outline cuts into one side. So the line wraps, and only when it has to — the range drops under the number, lined up with the number rather than with the owner, so it reads as the rest of that belief and not as a belief of its own.
+
+```
+ the line fits                             the line does not fit
+
+ ┌──────────────────────────────┐         ┌──────────────────────────────┐
+ │ model   .31  .16–.48         │         │ model   .074                 │
+ │                              │         │         .029–.13             │
+ └──────────────────────────────┘         └──────────────────────────────┘
+```
+
+**The tile does not grow to hold the second line.** Its box is reserved before anything is drawn, from what the near form needs, and the map measures nothing — so the room comes from inside the box the near form already had: out here there is no heading, the claim and the beliefs sit one step apart rather than two, and the belief lines are set a little tighter. **Where that does not stretch:** a tile reserved the smallest box that draws *two* beliefs whose ranges *both* need a second line. Neither map this product ships asks for that; the day one does, the claim's second line is what pays for it.
+
+- **Test:** `frontend/e2e/farTiles.spec.ts` › `test_a_tile_seen_from_far_away_prints_every_belief_line_whole` — a browser test, because whether a line fits is a fact about laid-out boxes and the tests with no layout all passed while two ranges ran off their tiles (2026-09-22). It reads the stored example both as it was written and with its branch open, because the branch is where the engine prints three-figure numbers.
+- **Also:** `frontend/src/components/__tests__/tile.test.tsx` › `test_the_far_away_form_sets_every_word_in_the_largest_size` and `test_the_far_away_form_puts_no_part_of_a_belief_out_of_sight` — the two wrong ways to make a line fit, ruled out in the stylesheet itself.
+
 #### A column with no number in it is not drawn *(amended 2026-09-21)*
 
 **One rule, and it takes no exception: the model's column is always drawn; the reader's and a venue's are drawn when they hold a number.** Kent, walking the app: *"In each of the nodes, the empty user specified values and the market values add visual clutter. The user and market values should only be viewable if they exist."*
