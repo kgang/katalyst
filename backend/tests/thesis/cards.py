@@ -2,9 +2,16 @@
 
 Nothing here computes anything. Every number in this file is one a test chose so
 that a rule can be stated about it — an ordering, an identity, a refusal — and no
-number an engine produced is typed anywhere. The shapes a card is handed are
-built directly rather than by calling the modules that will produce them, because
-those modules are being written beside this one.
+number an engine produced is typed anywhere.
+
+**What is built by hand, and why, now that the modules underneath are finished.**
+The edge comes from `priced`, the one function allowed to build one. First touch,
+the rail and the ceiling are still written down here, because reaching the real
+`first_touch` and `what_takes_you_out` means drawing a sample of worlds and
+walking price paths through it, and the shares that come back are then numbers no
+test chose — a card test about an ordering would be resting on arithmetic it is
+not about. One test does take that whole route, `test_the_card_names_the_market
+_chances_the_price_paths_actually_applied`, which is about exactly that.
 
 The map, the worlds and the quotes come from `test_edge.py`, which already builds
 them the way this repository builds them, so there is one set of these and not
@@ -53,6 +60,7 @@ from katalyst.thesis import (
 )
 from katalyst.thesis.ceiling import NEVER_SIZE_TO_THIS
 from katalyst.thesis.ceiling import TakenBy as TakenBy
+from katalyst.thesis.paths import ChanceUsed
 from katalyst.thesis.position import Side, Trades
 from tests.thesis.test_edge import VENUE, a_contract, an_arrow, world_of
 
@@ -191,7 +199,12 @@ def a_first_touch(
     neither: float = 0.25,
     sample: SampleFrom = "built_by_hand",
 ) -> FirstTouch:
-    """How often each end of the exit was reached first, on worlds the test chose."""
+    """How often each end of the exit was reached first, on worlds the test chose.
+
+    `through` is the day of the window the reader is out by — thirty, the length
+    of the window `a_position` types a horizon inside. It is an input this file
+    chose, like every other number here.
+    """
     return FirstTouch(
         stop_first=stop_first,
         target_first=target_first,
@@ -202,9 +215,19 @@ def a_first_touch(
         target_at=75.5,
         shift=0.5,
         effective_draws=940.0,
+        through=30,
         stop_first_on=days(3, -1, 7, -1),
         sample=sample,
     )
+
+
+def a_chance(came_from: MarketChanceFrom, value: float = 0.3) -> ChanceUsed:
+    """The market's chance the price paths applied to one claim, and where it came from.
+
+    The chance itself is an input this file chose; what a test is about here is
+    the source beside it, which is the thing the card has to say out loud.
+    """
+    return ChanceUsed(value=value, came_from=came_from)
 
 
 def a_lift_row(claim: PropositionId, lift: float) -> LiftRow:
@@ -284,12 +307,11 @@ def a_card(
     ceiling: Ceiling | None = None,
     touch: FirstTouch | Refusal | None = None,
     rail: WhatTakesYouOut | None = None,
-    market_chance_from: dict[PropositionId, MarketChanceFrom] | None = None,
+    market_chance: dict[PropositionId, ChanceUsed] | None = None,
     watch: tuple[Watched, ...] = (),
     unhedgeable: tuple[Unhedgeable, ...] = (),
     tails: tuple[Tail, ...] = (),
     shocks: tuple[Shocked, ...] = (),
-    implied_size: float = 0.33,
     costs: float | None = None,
 ) -> Card:
     """One card, with everything not under test left at a plain default."""
@@ -304,11 +326,10 @@ def a_card(
         ceiling=ceiling if ceiling is not None else a_ceiling(),
         touch=touch if touch is not None else a_first_touch(),
         takes_you_out=rail if rail is not None else a_rail(),
-        market_chance_from=market_chance_from if market_chance_from is not None else {},
+        market_chance=market_chance if market_chance is not None else {},
         watch=watch,
         unhedgeable=unhedgeable,
         tails=tails,
         shocks=shocks,
-        implied_size=implied_size,
         costs=costs,
     )

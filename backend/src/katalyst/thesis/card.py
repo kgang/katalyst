@@ -8,9 +8,10 @@ turns it into a document a program can read and a page a person can read.
 **The card assembles; it computes nothing another module owns.** Every number on
 it was worked out by the module whose subject it is — the edge by `edge.py`, the
 first-touch shares by `position.py`, the rail by `lift.py`, the greyed ceiling by
-`ceiling.py`, the shift by whatever owns the map's own verdict — and handed in.
-One rule, and it is what keeps a card from becoming a second place any of that
-arithmetic lives.
+`ceiling.py`, the shift by whatever owns the map's own verdict — and is either
+handed in or asked of that module by name. Asking it is not computing it: there
+is still one place the arithmetic lives. One rule, and it is what keeps a card
+from becoming a second place any of it lives.
 
 **Every number says who it belongs to.** A card holds no bare numbers at all: each
 one is a `Figure` carrying its value, its owner — the reader, the model, a venue,
@@ -76,8 +77,15 @@ from katalyst.thesis.ceiling import Ceiling
 from katalyst.thesis.draws import THE_SAMPLE_SAYS, SampleFrom
 from katalyst.thesis.edge import Edge, Mixture, NotComparable, NotComparableReason
 from katalyst.thesis.lift import WhatTakesYouOut
-from katalyst.thesis.paths import MarketChanceFrom
-from katalyst.thesis.position import FirstTouch, Position, Refusal, Side, Trades
+from katalyst.thesis.paths import ChanceUsed, MarketChanceFrom
+from katalyst.thesis.position import (
+    FirstTouch,
+    Position,
+    Refusal,
+    Side,
+    Trades,
+    what_your_risk_budget_implies,
+)
 
 Owner = Literal["reader", "model", "venue", "computed"]
 """Who a number on the card belongs to, as a closed list of four.
@@ -121,7 +129,11 @@ OWNER_SAYS: Mapping[Owner, str] = {
 
 THE_CHANCE_CAME_FROM: Mapping[MarketChanceFrom, str] = {
     "venue_quote": "a venue's quote on that claim",
-    "model": "the model's own number",
+    "sample_share": "the share of the drawn worlds where it comes true inside the window",
+    "base_world": (
+        "the model's printed number for that claim, read on the claim's own resolve-by day "
+        "rather than over the trade's window"
+    ),
     "reader": "a chance the reader typed",
 }
 """What each source of the market's chance of a claim is called, in plain words.
@@ -129,6 +141,16 @@ THE_CHANCE_CAME_FROM: Mapping[MarketChanceFrom, str] = {
 A first-touch number is read off a price path, and the path applies only what the
 market has not already priced. How much that is depends on where the market's
 chance came from, so the words appear in the same sentence as the number.
+
+**The two readings of the model's own number are two entries here and not one.**
+Where nobody quotes a claim the walk assumes the market believes what the model
+believes, and there are two numbers that could stand for *what the model
+believes*: the share of the drawn worlds where the claim comes true inside the
+trade's own window, which is the only reading under which the path carries no
+drift at all; and the claim's printed likelihood, read on its own resolve-by day,
+which answers a different question and whose gap from the first **is** drift. A
+card that could not tell them apart could not say whether the number beside it
+carries any.
 """
 
 NOT_ADVICE = "Educational, not investment advice, and not a recommendation."
@@ -256,7 +278,8 @@ is said rather than left as a gap in a list.
 """
 
 THE_BARRIER_SHIFT = (
-    "First touch is read by walking a daily path through each drawn world. A daily check "
+    "First touch is read by walking a daily path through each drawn world, from the day "
+    "after you entered to the day you expect to be out and no further. A daily check "
     "misses touches between closes, so each level is moved toward the entry price by the "
     "standard barrier shift, and a daily count then says what watching continuously would "
     "have found."
@@ -901,9 +924,20 @@ class YourExit(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     entry: Figure = Field(description="The price they entered at.")
-    stop: Figure = Field(description="The price at which they get out for a loss. Never derived.")
-    target: Figure = Field(description="The price at which they get out for a gain. Never derived.")
-    horizon: date = Field(description="The day by which they expect to be out.")
+    # The reader's three own numbers are **declared** here and never set. They are
+    # written as an annotation with no value beside it so that the check in
+    # `backend/tests/thesis/test_the_readers_own_numbers.py` — which reads this
+    # layer's own source and fails on anything that sets a name called `stop`,
+    # `target` or `horizon` — can tell a field a reader fills in from a number
+    # somebody in here worked out. Required all the same: a field with no default
+    # is one every caller has to pass.
+    stop: Annotated[
+        Figure, Field(description="The price at which they get out for a loss. Never derived.")
+    ]
+    target: Annotated[
+        Figure, Field(description="The price at which they get out for a gain. Never derived.")
+    ]
+    horizon: Annotated[date, Field(description="The day by which they expect to be out.")]
     risk_budget: Figure = Field(description="The share of capital they are prepared to lose here.")
     implied_size: Figure = Field(
         description=(
@@ -923,6 +957,14 @@ class YourExit(BaseModel):
         description="The level actually checked, after the barrier shift."
     )
     target_at: Figure | None = Field(description="The same, for the target.")
+    through: Figure | None = Field(
+        description=(
+            "How many days of the window the three shares above were read to: the reader's "
+            "own horizon, counted from the day the window opened. Two shares over a window "
+            "nobody named are two numbers nobody can check. Nothing at all where there is "
+            "no first touch to have read."
+        )
+    )
     first_touch_refused: str | None = Field(
         description=(
             "Why there is no first touch here: a contract is held to resolution and there is "
@@ -1106,7 +1148,7 @@ class Card(BaseModel):
 
 
 def where_the_numbers_came_from(
-    sample: SampleFrom, market_chance_from: Mapping[PropositionId, MarketChanceFrom]
+    sample: SampleFrom, market_chance: Mapping[PropositionId, ChanceUsed]
 ) -> str:
     """Name, in one sentence, the sample the days came from and where each market chance came from.
 
@@ -1114,24 +1156,31 @@ def where_the_numbers_came_from(
     claim came on are drawn from a sample of worlds, and which sample that is
     decides how much the number can be trusted. And the path applies only what the
     market has not already priced, so how much that is depends on where the
-    market's chance of each claim came from — a venue's quote, the model's own
-    number, or a chance the reader typed.
+    market's chance of each claim came from — a venue's quote, the share of the
+    drawn worlds the walk read for itself, the model's printed number for the
+    claim, or a chance the reader typed.
+
+    **The source is named and the number is not.** A chance written into this
+    sentence would be a number inside a string, with no owner attached and no way
+    for a rendering to know how to write it, which is the one thing a card holding
+    figures exists to prevent. The sources are words.
 
     Args:
         sample: Which sampler the drawn worlds came from.
-        market_chance_from: Where the market's chance of each claim that moves the
-            price came from.
+        market_chance: For each claim that moves the price, the chance the price
+            paths applied and where it came from — the record the walk itself
+            hands back, so that what is named here is what was actually used.
 
     Returns:
         One sentence naming both, with the claims in a fixed order so two runs
         produce the same words.
     """
     said = THE_SAMPLE_SAYS[sample]
-    if not market_chance_from:
+    if not market_chance:
         return f"{said}; no claim on this map moves the price, so no market chance was needed"
     each = ", ".join(
-        f"{claim} — {THE_CHANCE_CAME_FROM[market_chance_from[claim]]}"
-        for claim in sorted(market_chance_from)
+        f"{claim} — {THE_CHANCE_CAME_FROM[market_chance[claim].came_from]}"
+        for claim in sorted(market_chance)
     )
     return f"{said}, with the market's chance of each claim from: {each}"
 
@@ -1391,12 +1440,11 @@ def card_of(
     ceiling: Ceiling,
     touch: FirstTouch | Refusal,
     takes_you_out: WhatTakesYouOut,
-    market_chance_from: Mapping[PropositionId, MarketChanceFrom],
+    market_chance: Mapping[PropositionId, ChanceUsed],
     watch: Sequence[Watched],
     unhedgeable: Sequence[Unhedgeable],
     tails: Sequence[Tail],
     shocks: Sequence[Shocked],
-    implied_size: float,
     costs: float | None,
 ) -> Card:
     """Assemble one card out of what every other module worked out.
@@ -1421,15 +1469,17 @@ def card_of(
         touch: How often each end of the exit is reached first, or the refusal a
             contract gets.
         takes_you_out: The rail of claims over-represented where the stop went first.
-        market_chance_from: Where the market's chance of each claim that moves the
-            price came from, which every first-touch number names in its own
-            sentence.
+        market_chance: For each claim that moves the price, the chance the price
+            paths applied and where it came from — `Paths.market_chance`, exactly
+            as the walk hands it back. Every first-touch number names those
+            sources in its own sentence. Taken as the walk's own record rather
+            than as a list of source words, because a caller cannot then name a
+            source the paths did not use. A card on a contract ending, which has
+            no paths at all, passes nothing.
         watch: The adverse turns that resolve in time and can be seen.
         unhedgeable: The adverse turns that cannot be watched for, with reasons.
         tails: The claims that are unlikely and would hurt.
         shocks: The suppositions the reader placed, and what each did to the position.
-        implied_size: The share of capital the reader's own risk budget implies,
-            worked out by `position.py` and handed in rather than re-derived here.
         costs: What it costs to get in and out of the instrument, in its own price
             units, or nothing at all where nobody has stated them.
 
@@ -1438,9 +1488,11 @@ def card_of(
 
     Raises:
         ValueError: If the position's ending is not on the map, if no answer was
-            priced for it, or if any row names a claim the map does not carry. All
-            are broken promises between our own pieces of code rather than anything
-            a reader did.
+            priced for it, if any row names a claim the map does not carry, or if
+            the reader's stop sits at their entry price so their own risk budget
+            implies no size. All are broken promises between our own pieces of
+            code, or a form that should have been refused, rather than anything a
+            reader did here.
     """
     ending = _the_claim(base, position.ending)
     answer = priced.get(position.ending)
@@ -1460,10 +1512,10 @@ def card_of(
         the_trade=_the_trade(ending, position),
         carried_by=tuple(_carries(base, one) for one in carried_by),
         priced_in=_priced_in(answer, position, costs),
-        takes_you_out=_rail(base, takes_you_out, market_chance_from),
+        takes_you_out=_rail(base, takes_you_out, market_chance),
         watch=tuple(_watch(base, one) for one in watch),
         unhedgeable=tuple(_unhedgeable(base, one) for one in unhedgeable),
-        your_exit=_your_exit(position, ceiling, touch, market_chance_from, implied_size),
+        your_exit=_your_exit(position, ceiling, touch, market_chance),
         tails=_tails(base, tails),
         shocks=tuple(_shock(one) for one in shocks),
         what_else=what_else_can_i_trade(base, priced, shifts),
@@ -1712,7 +1764,7 @@ def _mixture(mixture: Mixture | None) -> MixtureShown | None:
 def _rail(
     base: World,
     rail: WhatTakesYouOut,
-    market_chance_from: Mapping[PropositionId, MarketChanceFrom],
+    market_chance: Mapping[PropositionId, ChanceUsed],
 ) -> WhatTakesYouOutShown:
     """Turn the lift rail into card rows, naming the sample every share was taken over.
 
@@ -1731,13 +1783,14 @@ def _rail(
     Args:
         base: The world whose map names each claim.
         rail: The rail as `lift.py` ranked it.
-        market_chance_from: Where each claim's market chance came from, for the
-            sentence that names it beside the sample.
+        market_chance: The chance the price paths applied to each claim and where
+            it came from, for the sentence that names those sources beside the
+            sample.
 
     Returns:
         The rail as the card shows it, with what was left off in full sentences.
     """
-    said = where_the_numbers_came_from(rail.sample, market_chance_from)
+    said = where_the_numbers_came_from(rail.sample, market_chance)
     drawn = THE_SAMPLE_SAYS[rail.sample]
     rows = tuple(
         TakesYouOutRow(
@@ -1877,8 +1930,7 @@ def _your_exit(
     position: Position,
     ceiling: Ceiling,
     touch: FirstTouch | Refusal,
-    market_chance_from: Mapping[PropositionId, MarketChanceFrom],
-    implied_size: float,
+    market_chance: Mapping[PropositionId, ChanceUsed],
 ) -> YourExit:
     """Arrange what the reader typed, what it implies, and how often each end is reached first.
 
@@ -1886,16 +1938,25 @@ def _your_exit(
     sentence — which sample, and where the market's chance of each claim came from
     — is said once for the section, for the same reason the rail says it once.
 
+    **The size the risk budget implies is asked for, not worked out here.**
+    `position.py` owns that arithmetic and this calls it by name, which is the same
+    rule as everywhere else on the card: one place the sum lives. It is also one
+    number fewer that a caller could hand in wrong.
+
     Args:
         position: What they typed.
         ceiling: The greyed ceiling, or the reason there is none.
         touch: The three shares, or the refusal a contract gets.
-        market_chance_from: Where each claim's market chance came from, for the
-            sentence naming it beside the sample.
-        implied_size: What their own risk budget implies, worked out elsewhere.
+        market_chance: The chance the price paths applied to each claim and where
+            it came from, for the sentence naming those sources beside the sample.
 
     Returns:
         The exit section.
+
+    Raises:
+        ValueError: If their stop sits at their entry price, where there is no loss
+            for a risk budget to imply a size against. The form refuses that before
+            a position is built, so reaching it means one was built another way.
     """
     typed = {
         "entry": readers(position.entry, "the price you entered at", kind="price"),
@@ -1909,7 +1970,9 @@ def _your_exit(
             kind="share",
         ),
         "implied_size": readers(
-            implied_size, "the share of capital your own risk budget implies", kind="size"
+            what_your_risk_budget_implies(position),
+            "the share of capital your own risk budget implies",
+            kind="size",
         ),
     }
     shown = _ceiling(ceiling)
@@ -1923,6 +1986,7 @@ def _your_exit(
             neither=None,
             stop_at=None,
             target_at=None,
+            through=None,
             first_touch_refused=touch.sentence,
             method=None,
             sample_says=None,
@@ -1956,9 +2020,15 @@ def _your_exit(
             drawn,
             kind="price",
         ),
+        through=computed(
+            float(touch.through),
+            "how many days of the window the three shares above were read to",
+            "your own horizon, counted from the day the window opened",
+            kind="days",
+        ),
         first_touch_refused=None,
         method=THE_BARRIER_SHIFT,
-        sample_says=where_the_numbers_came_from(touch.sample, market_chance_from),
+        sample_says=where_the_numbers_came_from(touch.sample, market_chance),
     )
 
 

@@ -899,6 +899,17 @@
             }
           ],
           "description": "How often the target is touched first."
+        },
+        "through": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many days of the window the shares were read to: the reader's own horizon, counted from the day the window opened. Shares over a window nobody named are numbers nobody can check."
         }
       },
       "required": [
@@ -912,6 +923,7 @@
         "neither",
         "stop_at",
         "target_at",
+        "through",
         "first_touch_refused",
         "method"
       ],

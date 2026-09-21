@@ -45,17 +45,11 @@ from collections.abc import Callable, Sequence
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from katalyst.domain import BranchId, PropositionId
-
-# The one rule for writing a likelihood. It is public as `katalyst.domain.two_figures`
-# on the trunk, beside the class that holds a likelihood; this branch is four commits
-# behind that move and still carries the rule under its old private name. **One line
-# changes when this branch is rebased**: `from katalyst.domain import two_figures`.
-from katalyst.domain.diff import _two_figures as two_figures
+from katalyst.domain import BranchId, PropositionId, two_figures
 from katalyst.thesis.card import (
     OWNER_SAYS,
     Card,
@@ -243,9 +237,15 @@ class RiskExit(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     entry: Figure = Field(description="The price they entered at.")
-    stop: Figure = Field(description="The price at which they get out for a loss. Never derived.")
-    target: Figure = Field(description="The price at which they get out for a gain. Never derived.")
-    horizon: date = Field(description="The day by which they expect to be out.")
+    # Declared, never set — see the same three fields on the card's own exit for
+    # why they are written as an annotation with no value beside it.
+    stop: Annotated[
+        Figure, Field(description="The price at which they get out for a loss. Never derived.")
+    ]
+    target: Annotated[
+        Figure, Field(description="The price at which they get out for a gain. Never derived.")
+    ]
+    horizon: Annotated[date, Field(description="The day by which they expect to be out.")]
     risk_budget: Figure = Field(description="The share of capital they are prepared to lose here.")
     stop_first: Figure | None = Field(
         description="How often the stop is touched before the target, over the drawn worlds."
@@ -258,6 +258,13 @@ class RiskExit(BaseModel):
         description="The level actually checked for the stop, after the barrier shift."
     )
     target_at: Figure | None = Field(description="The same, for the target.")
+    through: Figure | None = Field(
+        description=(
+            "How many days of the window the shares were read to: the reader's own horizon, "
+            "counted from the day the window opened. Shares over a window nobody named are "
+            "numbers nobody can check."
+        )
+    )
     first_touch_refused: str | None = Field(
         description="Why there is no first touch here. Nothing where the shares were worked out."
     )
@@ -353,6 +360,7 @@ def export_of(card: Card) -> Export:
             neither=exit_.neither,
             stop_at=exit_.stop_at,
             target_at=exit_.target_at,
+            through=exit_.through,
             first_touch_refused=exit_.first_touch_refused,
             method=exit_.method,
         ),
@@ -795,6 +803,7 @@ def _your_exit(card: Card) -> list[str]:
             exit_.neither,
             exit_.stop_at,
             exit_.target_at,
+            exit_.through,
         )
         if one is not None
     )

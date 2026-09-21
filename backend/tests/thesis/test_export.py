@@ -57,6 +57,7 @@ from tests.thesis.cards import (
     a_card,
     a_card_map,
     a_ceiling,
+    a_chance,
     a_first_touch,
     a_lift_row,
     a_position,
@@ -668,7 +669,7 @@ def test_a_page_names_the_sample_every_share_came_from(sample: str) -> None:
             world,
             touch=a_first_touch(sample=sample),  # type: ignore[arg-type]
             rail=a_rail(sample=sample),  # type: ignore[arg-type]
-            market_chance_from={"step": "venue_quote"},
+            market_chance={"step": a_chance("venue_quote")},
         )
     )
 

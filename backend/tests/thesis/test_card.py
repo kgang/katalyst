@@ -22,6 +22,7 @@ world the test built and compared with itself.
 """
 
 from datetime import date
+from inspect import signature
 
 import numpy
 import pytest
@@ -30,11 +31,14 @@ from pydantic import BaseModel
 from katalyst.domain import Belief, Branch, Do, PropositionId, World
 from katalyst.grounding import Quote
 from katalyst.thesis import (
+    NEVER,
     Card,
     Carried,
+    ClaimMove,
     Dropped,
     Edge,
     Figure,
+    FirstTouch,
     LiftRow,
     NotPriced,
     PricedIn,
@@ -43,8 +47,12 @@ from katalyst.thesis import (
     Tail,
     Unhedgeable,
     Watched,
+    card_of,
+    first_touch,
     priced,
+    walk,
     what_else_can_i_trade,
+    what_your_risk_budget_implies,
     where_the_numbers_came_from,
 )
 from katalyst.thesis.card import (
@@ -58,18 +66,21 @@ from katalyst.thesis.card import (
     NOTHING_WAS_PRICED,
     OWNER_SAYS,
     REFUSES,
+    THE_BARRIER_SHIFT,
     THE_CHANCE_CAME_FROM,
     ShockRow,
     models,
 )
 from katalyst.thesis.draws import THE_SAMPLE_SAYS
 from katalyst.thesis.edge import NO_CONTRACT_QUOTES_IT, NO_PRICE_READ
+from katalyst.thesis.paths import the_sample_s_own_chance
 from katalyst.thesis.position import REFUSALS
 from tests.thesis.cards import (
     OTHER_MARKET,
     a_card,
     a_card_map,
     a_ceiling,
+    a_chance,
     a_first_touch,
     a_lift_row,
     a_no_side_map,
@@ -79,6 +90,7 @@ from tests.thesis.cards import (
     a_world,
     what_was_priced,
 )
+from tests.thesis.synthetic import worlds_of
 from tests.thesis.test_edge import MARKET, agreeing_quote, pays_on, world_of
 
 SOME_DAY = date(2026, 10, 15)
@@ -154,7 +166,7 @@ def a_rich_card() -> Card:
         shifts={"instrument": a_shift("instrument", 0.2)},
         carried_by=(Carried(claim="step", points=0.12, share=0.7),),
         rail=a_rail(rows=(a_lift_row("step", 3.1),), too_few_draws=None),
-        market_chance_from={"step": "venue_quote", "instrument": "model"},
+        market_chance={"step": a_chance("venue_quote"), "instrument": a_chance("sample_share")},
         watch=(
             Watched(
                 claim="step",
@@ -715,7 +727,7 @@ def test_a_first_touch_number_names_its_sample_and_every_market_chance() -> None
     card = a_card(
         world,
         touch=a_first_touch(),
-        market_chance_from={"step": "venue_quote", "instrument": "model"},
+        market_chance={"step": a_chance("venue_quote"), "instrument": a_chance("sample_share")},
     )
 
     share = card.your_exit.stop_first
@@ -724,7 +736,7 @@ def test_a_first_touch_number_names_its_sample_and_every_market_chance() -> None
     assert said is not None
     assert THE_SAMPLE_SAYS["built_by_hand"] in said
     assert THE_CHANCE_CAME_FROM["venue_quote"] in said
-    assert THE_CHANCE_CAME_FROM["model"] in said
+    assert THE_CHANCE_CAME_FROM["sample_share"] in said
     assert "step" in said and "instrument" in said
 
 
@@ -734,6 +746,61 @@ def test_a_map_where_nothing_moves_the_price_says_that_instead() -> None:
 
     assert THE_SAMPLE_SAYS["built_by_hand"] in said
     assert "no market chance was needed" in said
+
+
+def test_the_card_names_the_market_chances_the_price_paths_actually_applied() -> None:
+    """The one promise about the market's chance is kept by the shape, not by a convention.
+
+    The card takes the record the **walk itself** hands back, so what it names
+    cannot be a list of sources somebody wrote out beside the paths. This test
+    takes the whole route rather than a hand-built first touch: it draws worlds,
+    walks paths through them, reads first touch off those paths, and builds a card
+    on the result.
+
+    The second move hands in **no** chance at all, so the walk works one out from
+    the drawn worlds and records it as the sample's own share. Nothing a caller
+    could have typed would produce that entry, which is the point: the sentence
+    beside the shares names what was used.
+    """
+    drawn = worlds_of(claims=["step", "contract"], on=[[2, 5], [NEVER, 9], [7, NEVER]])
+    typed = a_position()
+    moves = (
+        ClaimMove(claim="step", move=1.5, market_chance=0.3, market_chance_from="venue_quote"),
+        ClaimMove(
+            claim="contract", move=-0.8, market_chance=None, market_chance_from="sample_share"
+        ),
+    )
+    paths = walk(drawn, moves, entry=typed.entry, daily_move=typed.daily_move, seed=11)
+    touch = first_touch(paths, typed)
+    assert isinstance(touch, FirstTouch)
+
+    card = a_card(a_world(), position=typed, touch=touch, market_chance=paths.market_chance)
+
+    said = card.your_exit.sample_says
+    assert said is not None
+    assert {claim: one.came_from for claim, one in paths.market_chance.items()} == {
+        "step": "venue_quote",
+        "contract": "sample_share",
+    }
+    for claim, one in paths.market_chance.items():
+        assert claim in said and THE_CHANCE_CAME_FROM[one.came_from] in said
+    assert moves[1].market_chance is None
+    assert paths.market_chance["contract"].value == the_sample_s_own_chance(drawn, "contract")
+
+
+def test_the_shares_name_the_window_they_were_read_to() -> None:
+    """Two shares over a window nobody named are two numbers nobody can check."""
+    typed = a_position()
+    touch = a_first_touch()
+
+    card = a_card(a_world(), position=typed, touch=touch)
+
+    through = card.your_exit.through
+    assert through is not None
+    assert through.value == float(touch.through)
+    assert through.kind == "days"
+    assert card.your_exit.horizon == typed.horizon
+    assert "you expect to be out" in THE_BARRIER_SHIFT
 
 
 def test_the_rail_says_what_every_share_rests_on_and_what_it_left_off() -> None:
@@ -748,7 +815,7 @@ def test_the_rail_says_what_every_share_rests_on_and_what_it_left_off() -> None:
     card = a_card(
         world,
         rail=a_rail(rows=(a_lift_row("step", 3.1),), dropped=(dropped,)),
-        market_chance_from={"step": "model"},
+        market_chance={"step": a_chance("base_world")},
     )
 
     row = card.takes_you_out.rows[0]
@@ -792,6 +859,7 @@ def test_a_contract_refuses_first_touch_by_name() -> None:
     assert card.your_exit.target_first is None
     assert card.your_exit.neither is None
     assert card.your_exit.stop_at is None and card.your_exit.target_at is None
+    assert card.your_exit.through is None, "no shares were read, so there is no window to name"
     assert card.your_exit.first_touch_refused == REFUSALS["first_touch_on_a_contract"]
     assert card.your_exit.method is None
 
@@ -815,6 +883,23 @@ def test_the_exit_is_the_readers_and_the_shares_are_not() -> None:
     assert card.your_exit.horizon == typed.horizon
     assert card.your_exit.stop_first is not None
     assert card.your_exit.stop_first.owner == "computed"
+
+
+def test_the_size_on_the_card_is_the_one_the_risk_budget_implies_and_not_a_number_handed_in() -> (
+    None
+):
+    """The card asks the module that owns the arithmetic; it is not a number a caller passes.
+
+    There is no argument for it, so a caller cannot put a size on the card that
+    the reader's own two numbers do not imply. The card still computes nothing:
+    asking `position.py` for the answer leaves the sum in one place.
+    """
+    typed = a_position()
+
+    card = a_card(a_world(), position=typed)
+
+    assert card.your_exit.implied_size.value == what_your_risk_budget_implies(typed)
+    assert "implied_size" not in signature(card_of).parameters
 
 
 def test_the_ceiling_keeps_zero_and_absent_apart() -> None:
