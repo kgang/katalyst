@@ -33,7 +33,7 @@
  * something the other does not.
  */
 
-import { expect, test } from "@playwright/test";
+import { aDroppedFrameIsExpectedHere, expect, test } from "./theSuite.js";
 import { whereTheTileSits } from "./waiting.js";
 import {
   A_WHOLE_RUN,
@@ -47,6 +47,26 @@ import {
 } from "./watching.js";
 
 test.describe.configure({ timeout: A_WHOLE_RUN + 60_000 });
+
+// **Every test here watches a map arrive, and a map arriving drops frames.**
+// Said once for the file rather than in each test, with the whole reason, so
+// that a reader who meets the browser's complaint finds the argument rather
+// than a silenced warning.
+test.beforeEach(() => {
+  aDroppedFrameIsExpectedHere(
+    "A map arriving draws its boxes in bursts, and the drawing library measures " +
+      "every box it draws. When a burst is big enough the browser abandons the rest " +
+      "of that frame's size notifications and says so. Measured on 2026-09-21, on " +
+      "this file and with the layout thread held back and not: it comes and goes " +
+      "with the size of the burst and not with anything this test injects, and at " +
+      "the moment it fires the stage's and the panel's edge readings are both true " +
+      "of where the boxes actually are, with no box left unpainted and no wire " +
+      "missing. It is harmless here because nothing on this map waits to be " +
+      "measured: `graph/toFlow.ts` declares every tile's box and both ends of every " +
+      "wire, and `test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification` " +
+      "drops every tile's notification on purpose and the map still draws.",
+  );
+});
 
 /**
  * How long the layout engine's worker script is held back, in milliseconds.
