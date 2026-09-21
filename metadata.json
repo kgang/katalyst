@@ -3,7 +3,7 @@
   "checkpoint_id": "01M32YGHSN7C1A36APKZTJS4TY",
   "strategy": "manual-commit",
   "branch": "feat/05-exact-core",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "backend/tests/oracles/by_summing.py",
     "backend/tests/oracles/test_the_two_enumerators_agree.py"
@@ -22,13 +22,27 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 306,
-    "cache_creation_tokens": 311646,
-    "cache_read_tokens": 31567620,
-    "output_tokens": 109546,
-    "api_call_count": 142
+    "input_tokens": 312,
+    "cache_creation_tokens": 314520,
+    "cache_read_tokens": 32024370,
+    "output_tokens": 110622,
+    "api_call_count": 144,
+    "subagent_tokens": {
+      "input_tokens": 36,
+      "cache_creation_tokens": 36345,
+      "cache_read_tokens": 3922648,
+      "output_tokens": 26202,
+      "api_call_count": 18
+    }
   }
 }
