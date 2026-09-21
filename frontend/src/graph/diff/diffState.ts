@@ -41,10 +41,57 @@
  * | **Change this push** | The claim at the arrow's head, and everything that claim causes |
  * | **Split this claim** | The target's own internals — not built |
  * | **My own number** | One slot on one claim: your own number on the target |
+ *
+ * **And one rule that reaches further than any row can say** *(amended
+ * 2026-09-21)*, which is the same principle applied twice rather than an
+ * exception to it:
+ *
+ * > An edit that can move a claim some observation was made about can move
+ * > everything that observation is evidence about — and that applies again to
+ * > any further observation whose own claim has just been brought in.
+ *
+ * An observation is not a number stored once. It is a filter re-read through the
+ * map every time the map changes: which versions of the map survive is decided
+ * by the reported claim's value, and every number the report touches is read off
+ * the survivors. So changing anything that can move the reported claim changes
+ * what the report says about all of them. The case that found it, in the engine:
+ * report that a claim did not happen, then change how hard its one cause pushes
+ * it, and **the cause** moves — how much news about an effect says about a cause
+ * depends on how hard that cause was pushing. The row for **Change this push**
+ * used to permit only the arrow's head and what that claim causes.
+ *
+ * **What that case does to this file was measured before this was written, and
+ * it is not what it looks like.** This file reads a whole branch and unions what
+ * its edits reach, and the report's own row already reaches the causes — so on a
+ * branch holding both the report and the change of push, the arrow's source was
+ * already in reach here. What was *not* in reach is a claim the map gains later:
+ * attach a claim to the one that was reported and the new arrows carry the
+ * evidence further, and everything joined only through them was read as out of
+ * reach while the engine moved it. That is the case
+ * `test_an_edit_that_can_move_a_reported_claim_can_move_what_the_report_is_about`
+ * builds, and it is the one whose answer this changed.
+ *
+ * Two things about it are easy to get wrong, and both are load-bearing:
+ *
+ * - **A standing observation's reach is read off the map the edit STARTED
+ *   from**, not the one it leaves behind. Suppose the very claim that was
+ *   reported and the report stops holding, so everything it was evidence about
+ *   moves again — but a supposition cuts the arrows into its target, so on the
+ *   map afterwards the causes it has just stopped speaking about are no longer
+ *   even connected to it.
+ * - **My own number never triggers it.** Your number is not pushed through the
+ *   map, so it cannot change which versions survive and cannot change what a
+ *   report says about anything.
+ *
+ * **This rule is written twice and the two copies must move together**: here,
+ * and in `affected_set` in `backend/src/katalyst/domain/patch.py`. The engine is
+ * the authority and this is the browser's structural copy of it; where they
+ * disagree, a tile says a claim cannot move while the engine moves it, which is
+ * the traceability veto wearing a disguise.
  */
 
 import type { DiffState, Edit } from "../../world/types";
-import { type Arrow, ancestors, descendants, forward } from "./reach";
+import { type Arrow, descendants, evidenceAbout, forward } from "./reach";
 
 /** What reading a branch against its base map tells you. */
 export interface DiffReading {
@@ -118,7 +165,59 @@ export function readDiff(
     return reached;
   };
 
+  // Which claims are on the map at this point in the branch. A claim an **Add a
+  // claim** edit brings is in `claimIds` from the start — that list is the union
+  // of the two maps — but it is not on the map until its own edit runs, and an
+  // earlier edit cannot reach a claim that is not there yet.
+  const inserted = new Set(edits.flatMap((edit) => (edit.op === "insert" ? [edit.claimId] : [])));
+  const present = new Set(claimIds.filter((id) => !inserted.has(id)));
+
+  // The last word on each claim whose value an edit has fixed, over the edits
+  // **before** the one being read. A later edit on the same claim overrides an
+  // earlier one, so "this happened" followed by "suppose it did not" is a
+  // supposition and the report throws no version of the map away any more.
+  const lastWordOn = new Map<string, "do" | "observe">();
+
+  /**
+   * Grow a reach through every report still in force, until it stops growing.
+   *
+   * The trigger is the report's own claim being in the set already: an edit that
+   * can move a reported claim changes what that report says about everything it
+   * is evidence about. Bringing one report's claim in can bring in a claim a
+   * **further** report was made about, so this is grown to a standstill rather
+   * than swept once.
+   *
+   * @param reached The set to grow, in place.
+   * @param startedFrom The map this edit started from, which is where a standing
+   *   report's reach is read — see the note at the head of this file.
+   */
+  const widenThroughTheNews = (reached: Set<string>, startedFrom: readonly Arrow[]): void => {
+    const standing = [...lastWordOn]
+      .flatMap(([claim, word]) => (word === "observe" && present.has(claim) ? [claim] : []))
+      .sort();
+    let growing = true;
+    while (growing) {
+      growing = false;
+      for (const observed of standing) {
+        if (!reached.has(observed)) {
+          continue;
+        }
+        for (const one of evidenceAbout(observed, startedFrom)) {
+          if (present.has(one) && !reached.has(one)) {
+            reached.add(one);
+            growing = true;
+          }
+        }
+      }
+    }
+  };
+
   for (const edit of edits) {
+    // The map this edit started from. It is the same map it leaves behind for
+    // five of the six — only a supposition cuts an arrow — and the difference is
+    // what lets withdrawing the news move the causes it has stopped speaking
+    // about.
+    const startedFrom = working;
     switch (edit.op) {
       case "do": {
         // "Take this as given, and do not tell me what caused it": the arrows
@@ -131,6 +230,7 @@ export function readDiff(
         }
         working = working.filter((arrow) => arrow.target !== edit.target);
         const reached = fromHere(edit.target);
+        widenThroughTheNews(reached, startedFrom);
         addAll(affected, reached);
         addAll(canMove, reached);
         if (!edit.value) {
@@ -141,10 +241,8 @@ export function readDiff(
       case "observe": {
         // "This is news": nothing is cut, so what is learned travels back up the
         // arrows into the causes and out again along everything they lead to.
-        const reached = fromHere(edit.target);
-        for (const cause of ancestors(edit.target, working)) {
-          addAll(reached, fromHere(cause));
-        }
+        const reached = evidenceAbout(edit.target, working);
+        widenThroughTheNews(reached, startedFrom);
         addAll(affected, reached);
         addAll(canMove, reached);
         break;
@@ -157,18 +255,23 @@ export function readDiff(
           working.push({ ...arrow, reflexive: false });
         }
         added.add(edit.claimId);
+        present.add(edit.claimId);
         const reached = fromHere(edit.claimId);
+        widenThroughTheNews(reached, startedFrom);
         addAll(affected, reached);
         addAll(canMove, reached);
         break;
       }
       case "retune": {
         // One number on one arrow. The earliest thing that can move is the claim
-        // that arrow points at.
+        // that arrow points at — **and, where a report is in force, everything
+        // that report is evidence about**, which is how changing how hard a
+        // cause pushes moves the cause itself.
         const arrow = working.find((one) => one.id === edit.link);
         retunedLinks.add(edit.link);
         if (arrow !== undefined) {
           const reached = fromHere(arrow.target);
+          widenThroughTheNews(reached, startedFrom);
           addAll(affected, reached);
           addAll(canMove, reached);
         }
@@ -182,9 +285,14 @@ export function readDiff(
       case "believe":
         // Your own number sits beside the model's and the market's and is never
         // averaged with either. It is not pushed through the map, so it reaches
-        // this claim and moves nothing the map computes.
+        // this claim and moves nothing the map computes — and it is the one edit
+        // a standing report never widens, for the same reason: a number that is
+        // not pushed through the map cannot change which versions of it survive.
         affected.add(edit.target);
         break;
+    }
+    if (edit.op === "do" || edit.op === "observe") {
+      lastWordOn.set(edit.target, edit.op);
     }
   }
 

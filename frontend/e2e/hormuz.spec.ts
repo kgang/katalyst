@@ -283,6 +283,80 @@ async function tabOntoTheMap(page: Page): Promise<string> {
 }
 
 /**
+ * Point at one arrow and open the six things you can do to it.
+ *
+ * **Two ways in, both retried, and the failure says which one got how far.** An
+ * arrow is a curve: the middle of the box around it is usually a tile, and part
+ * of the curve itself runs under one, so the spot to point at has to be looked
+ * for rather than worked out. And the keyboard's way in — stand on the arrow
+ * and press Enter — needs the standing to have taken, which a rebuild of the
+ * arrow's element undoes. Either alone left this step failing about once in a
+ * hundred and sixty runs; what is retried is the asking, and what is waited for
+ * is the panel naming the arrow.
+ *
+ * @param page The page the map is on.
+ * @param id The arrow, by the identifier it carries on the glass.
+ */
+async function openThePanelOnTheArrow(page: Page, id: string): Promise<void> {
+  const arrow = page.locator(`.react-flow__edge[data-id="${id}"]`);
+  const panel = page.locator(".intervene");
+  const wanted = `The arrow from ${id.replace("->", " to ")}.`;
+  const tried: string[] = [];
+  const until = Date.now() + 45_000;
+  while (Date.now() < until) {
+    // The arrow has to be on the glass before it can be pointed at. It is not
+    // always: under load the map has been seen without it for long enough to
+    // matter, and blocking on the locator here spends the whole test's time in
+    // one call and reports nothing useful. So this asks, and waits, and says so.
+    if ((await arrow.count()) === 0) {
+      tried.push("the arrow was not on the glass at all");
+      await page.waitForTimeout(250);
+      continue;
+    }
+    const on = await arrow.evaluate((group, which) => {
+      const line = group.querySelector("path") as SVGPathElement | null;
+      const toTheScreen = line?.getScreenCTM();
+      if (line === null || toTheScreen === null || toTheScreen === undefined) {
+        return null;
+      }
+      const total = line.getTotalLength();
+      for (let step = 1; step < 40; step += 1) {
+        const along = line.getPointAtLength((total * step) / 40);
+        const point = new DOMPoint(along.x, along.y).matrixTransform(toTheScreen);
+        const under = document.elementFromPoint(point.x, point.y);
+        if (under?.closest(".react-flow__edge")?.getAttribute("data-id") === which) {
+          return { x: point.x, y: point.y };
+        }
+      }
+      return null;
+    }, id);
+    if (on !== null) {
+      await page.mouse.click(on.x, on.y);
+    }
+    await arrow.focus();
+    const standingOnIt = await page.evaluate(
+      () => document.activeElement?.closest<HTMLElement>(".react-flow__edge")?.dataset.id,
+    );
+    if (standingOnIt === id) {
+      await page.keyboard.press("Enter");
+    }
+    await page.keyboard.press("e");
+    const said = ((await panel.textContent()) ?? "").trim();
+    if (said.includes(wanted)) {
+      return;
+    }
+    tried.push(
+      `point ${on === null ? "none on the glass" : `${Math.round(on.x)},${Math.round(on.y)}`}` +
+        ` · keyboard ${standingOnIt ?? "off the map"} · panel "${said.slice(0, 70)}"`,
+    );
+    await page.waitForTimeout(250);
+  }
+  throw new Error(
+    `the panel never opened on ${id}. What each attempt got:\n${tried.slice(-6).join("\n")}`,
+  );
+}
+
+/**
  * What the hypothesis's tile must read, word for word, once the strike lands.
  *
  * Two badges with an arrow drawn between them, which is what makes the rule read
@@ -719,4 +793,108 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
     // It names no half of the engine's test, because the engine names none.
     await expect(talks).not.toHaveAttribute("title", /did not move by enough/);
   });
+});
+
+/**
+ * A branch that reports a claim and then changes how hard one of its causes
+ * pushes it — against the real engine, with the answer held in flight.
+ *
+ * **What it pins is the rule the engine amended on 2026-09-21**: an edit that
+ * can move a claim some report was made about can move everything that report
+ * is evidence about. The arrow's **source** is one of those: how much news about
+ * an effect says about a cause depends on how hard that cause was pushing. A
+ * browser that called the source *untouched* would be drawing the map as it was
+ * written over a number the engine had moved — the quietest lie there is.
+ *
+ * **And it pins that nothing jumps.** The line saying how far a number moved is
+ * reserved the moment the edit is made, not when the answer lands: a tile that
+ * grows on arrival either shoves its neighbours or sits on top of them. The
+ * engine's answer is held in flight here so that both moments can be looked at,
+ * and the tile is measured in each.
+ *
+ * Not one number below is written into this file. The two readings are the
+ * engine's, read off the screen, and the height is compared with itself.
+ */
+test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) => {
+  // Two engine answers, one of them deliberately held, and a branch built a
+  // button at a time — longer than the walk the other tests take.
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: /Strait of Hormuz/ })
+    .first()
+    .click();
+  await waitForTheLayout(page, 7);
+
+  // A branch, and the news: the premium fell.
+  await page.locator('.react-flow__node[data-id="C"]').click();
+  await page.keyboard.press("b");
+  await page
+    .getByLabel(/What is this branch called/)
+    .fill("The premium fell, then the push changed");
+  await page.getByRole("button", { name: "Start this branch" }).click();
+  await waitForTheBranch(page, "The premium fell, then the push changed", 7);
+  await waitForTheAnswer(page, "Branch created. No claims moved.");
+
+  await page.locator('.react-flow__node[data-id="C"]').click();
+  await page.keyboard.press("e");
+  await expect(page.locator(".intervene")).toContainText(
+    "Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.",
+  );
+  await page.getByRole("button", { name: /^This happened/ }).click();
+  await waitForTheAnswer(page, "Branch created. Two claims moved.");
+  await waitForTheLayout(page, 7);
+
+  // The strait causes the premium, so it is a claim the report is evidence
+  // about. It must already be a claim the edit can reach.
+  const strait = page.locator('.react-flow__node[data-id="H"]');
+  await expect(strait.locator(".tile")).not.toHaveAttribute("data-diff", "untouched");
+
+  // Hold the engine's next answer in flight, so the moment before it lands can
+  // be looked at rather than guessed at.
+  let holding = true;
+  await page.route("**/api/worlds/diff", async (route) => {
+    while (holding) {
+      await new Promise((tick) => setTimeout(tick, 50));
+    }
+    await route.continue();
+  });
+
+  // Now change how hard the strait's opening pushes the premium.
+  await openThePanelOnTheArrow(page, "H->C");
+  await page.getByRole("button", { name: /^Change this push/ }).click();
+  await page.getByLabel(/How hard does this arrow push/).fill("3");
+  await page.getByRole("button", { name: "Change it to that" }).click();
+
+  // **Before the answer.** The line is already there, saying what it is waiting
+  // for, and the tile is the size it will keep.
+  const movement = strait.locator('.tile__badge[data-badge="movement"]');
+  await expect(movement).toBeVisible();
+  // Word for word the sentence the engine's own absence carries while it is
+  // being asked — not merely a sentence with "engine" in it, which the answer
+  // has too. This is what makes the two moments below two moments.
+  await expect(movement.locator(".tile__badge-words")).toHaveText("no engine yet");
+  await expect(movement).toHaveAttribute(
+    "title",
+    /has been asked at \/api\/worlds .* and has not answered/,
+  );
+  const tile = strait.locator(".tile");
+  const whileWaiting = await tile.evaluate((el) => (el as HTMLElement).offsetHeight);
+
+  holding = false;
+
+  // **After the answer.** The line reads the engine's own two numbers, and the
+  // tile is the same size it was: nothing grew when the answer landed.
+  await expect(movement).toHaveAttribute("title", /\.\d+.*\.\d+/);
+  await expect(strait).not.toContainText("no engine yet");
+  const said = (await movement.getAttribute("title")) ?? "";
+  const readings = [...said.matchAll(/(?<![\d.])\.\d+/g)].map((one) => one[0]);
+  expect(readings.length).toBeGreaterThanOrEqual(2);
+  // The two are the engine's readings of this claim, and they are not the same
+  // number — which is the whole point: the source moved.
+  expect(readings[0]).not.toBe(readings[1]);
+
+  await expect
+    .poll(() => tile.evaluate((el) => (el as HTMLElement).offsetHeight))
+    .toBe(whileWaiting);
 });
