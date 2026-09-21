@@ -58,8 +58,9 @@ class DeltaRow(BaseModel):
     target: PropositionId
     before: float          # at at_day
     after: float           # at at_day
-    peak_delta: float      # signed; the largest divergence over the window
-    at_day: date           # the day that divergence is largest
+    peak_delta: float      # signed; the largest divergence over the days the series
+                           # carries — not necessarily over every day (see B4's second wart)
+    at_day: date           # the day that divergence is largest, among those days
     range_width: float     # a column in the delta rail; never multiplied into rank
     agreement: float       # share of the versions that count which moved the same way;
                            # a column, never a factor
@@ -250,6 +251,12 @@ Two surfaces want two different days, and saying so out loud is cheaper than a r
 **Why the second row is not pedantry**, measured on the fixture as it stands. The two worlds are furthest apart soon after the edit and then drift back together: all three endings peak within ten days of the strike. M1 is the clean case. Its row reads `−.079` on day 3, while the same claim's headline move on its own resolve-by day, 2026-10-31, is only `−.05` — read the row there and you show about two thirds of the move and call it the answer. So M1's row names 2026-10-04.
 
 Fading pushes are part of why. A claim's clock starts on the day it is *settled* — for B that is day 2, the earliest day a live arrow reaches it, through `H → B`'s two-day lag ([`propagation.md`](propagation.md) B1) — and a spike is measured in elapsed days from there. B is now judged on day 14, close enough to the strike that `H → B` is still at 0.76 of full size when the tile reads; M1 is judged on day 30, by which time `B → M1` has fallen to 0.54. Tuning B's window down from forty-five days to fourteen is exactly what moved the tile's number back inside the interesting part of the story — and it changed nothing about how the rail picks its day.
+
+**A second known wart: a row's day and its rank are read off the *drawn* series, and an unrelated edit can move them** *(added 2026-09-21)*. `at_day` is the largest divergence over the days **both worlds drew**, and past 180 days those days are spread evenly over the window ([`propagation.md`](propagation.md) B5). The window runs to the last day anything is judged, so an `insert` anywhere on the map — in a piece nothing connects to this claim — re-spaces them. Measured on a two-piece map: a push on `cause` moves its ending by `+.27` on **day 3** on a 31-day window, drawn day by day; add an unrelated claim judged a year out and the same push, on the same map with the same seed, reports `+.21` on **day 4**, because the 365-day window is drawn every other day and day 3 is not among them. `rank` is `|peak_delta|` times a weight, so the rank moves with it.
+
+Nothing about the arithmetic moved: on every day the two windows share, every version's answer for that claim is identical bit for bit, and the tile's headline — read on the claim's own resolve-by day, which is **always** drawn — is the same number either way. What moved is which day the rail is looking at.
+
+**And it cannot be fixed by choosing better days.** The divergence between two worlds is a continuous curve; its peak can fall anywhere between two drawn days, so finding it truly would mean working out **every** day of the window, which is the 5.9-gigabyte ceiling `propagation.md` B5 exists to avoid. Days could be *added* — every arrow's firing day, `settled(source) + lag`, is a property of the map and not of the window — which would catch the common case of a spike, and that is now safe in a way it once was not, since the arithmetic no longer depends on which days are worked out. It would still be a heuristic and not a guarantee, and it changes what a reader is sent, so it is recorded here as an option and not taken. **What the rail promises is the largest divergence among the days it drew, not the largest there is.**
 
 **A known wart, written down rather than hidden.** INV-8 — the rule that any displayed path shows the product of its likelihoods beside the headline, so a chain cannot be sold as more certain than the product of its steps — multiplies numbers each read on that claim's own resolve-by day, so it is a product across different days and not a joint likelihood at one instant. (`PRODUCT_REQUIREMENTS.md` §9 writes INV-8 as the product of the path's link probabilities; the number actually shown is the product of the claims' likelihoods on the path, each read on its own resolve-by day — decision record 0014.) It is still the most honest single number available for a chain, and the interface says this beside it rather than letting a reader assume otherwise.
 

@@ -237,13 +237,18 @@ class DeltaRow(BaseModel):
     before: float = Field(description="The first world's likelihood on the day below.")
     after: float = Field(description="The second world's likelihood on the day below.")
     peak_delta: float = Field(
-        description="The move on that day, signed: the largest the two worlds ever differ."
+        description=(
+            "The move on that day, signed: the largest the two worlds differ on any day "
+            "the series carries — which past 180 days is not every day there is."
+        )
     )
     at_day: date = Field(
         description=(
             "The day the two worlds are furthest apart. Always one of the days the series "
             "actually carries, which matters once a window longer than 180 days has been "
-            "drawn at fewer points."
+            "drawn at fewer points: the peak of a continuous curve can fall between two "
+            "drawn days, so an edit that lengthens the window can move this date and the "
+            "rank with it, without moving the claim's numbers at all. `diff.md` B4."
         )
     )
     range_width: float = Field(
