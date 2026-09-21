@@ -46,6 +46,17 @@ import {
   whatItSaw,
 } from "./watching.js";
 
+/**
+ * The row on the first screen that plays the committed recording of the one
+ * sentence this file watches.
+ *
+ * **Two rows carry that sentence now**, since the first screen offers four ways
+ * to start: *Watch the recording* plays it back for nothing, and *Run it live*
+ * calls a model. So a row is named by its sentence **and** by what pressing it
+ * does, which is how a reader tells the two apart as well.
+ */
+const THE_RECORDING_ROW = new RegExp(`${THE_SENTENCE}[\\s\\S]*Watch the recording`);
+
 test.describe.configure({ timeout: A_WHOLE_RUN + 60_000 });
 
 // **Every test here watches a map arrive, and a map arriving drops frames.**
@@ -146,7 +157,7 @@ test("test_the_growing_edge_holds_when_the_layout_thread_starts_late", async ({ 
   );
 
   await startWatching(page);
-  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
 
   // Where the first tile came to rest. Read before the run is over, so that
   // "nothing already placed moved" is a statement about a map that went on

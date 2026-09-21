@@ -49,6 +49,17 @@ import {
   whatItSaw,
 } from "./watching.js";
 
+/**
+ * The row on the first screen that plays the committed recording of the one
+ * sentence this file watches.
+ *
+ * **Two rows carry that sentence now**, since the first screen offers four ways
+ * to start: *Watch the recording* plays it back for nothing, and *Run it live*
+ * calls a model. So a row is named by its sentence **and** by what pressing it
+ * does, which is how a reader tells the two apart as well.
+ */
+const THE_RECORDING_ROW = new RegExp(`${THE_SENTENCE}[\\s\\S]*Watch the recording`);
+
 // Every test here plays a recording from beginning to end, so each needs room
 // for one. It is set on the file rather than in the configuration because it is
 // a fact about these tests: the stored example's tests next door are right to
@@ -84,19 +95,33 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
     "This server has no committed recording to play, so there is no generation to watch.",
   );
 
-  // The first screen says what this copy is, and says only what is true. Record
-  // 0012's sentence — *these four run from recordings made on <day>* — is
-  // printed word for word when all four can be played and all four were made on
-  // one day; anything else says how many there really are, in the same voice.
-  // Either way it names a day from the server's own readiness answer, and either
-  // way the field for a sentence of your own is disabled with it, because a
-  // field that takes typing and then does nothing reads as a broken tool.
-  const keyless = page.locator(".launchpad__keyless").first();
-  await expect(keyless).toBeVisible();
-  await expect(keyless).toHaveText(/^No model key configured — .*\d{4}-\d{2}-\d{2}/);
-  const said = ((await keyless.textContent()) ?? "").trim();
-  expect(said.includes("these four run from recordings")).toBe(replayable.length === 4);
+  // **The four ways to start are all four, on a copy with no key.** Nothing has
+  // gone missing and nothing is silently inert: the two that call a model are
+  // drawn, cannot be pressed, and carry the reason beside them, while the two
+  // free ones are untouched. The field for a sentence of your own is disabled
+  // with the same sentence, because a field that takes typing and then does
+  // nothing reads as a broken tool.
+  await expect(page.locator(".way__name")).toHaveText([
+    "Open the map",
+    "Watch the recording",
+    "Run it live",
+    "Build the map",
+  ]);
+  const whyNotLive = page.locator(".way--live .launchpad__why");
+  await expect(whyNotLive).toBeVisible();
+  await expect(whyNotLive).toHaveText(
+    /^No model key is configured, so this copy cannot call a model\./,
+  );
+  await expect(page.locator(".way--live button.example").first()).toBeDisabled();
   await expect(page.getByLabel("An event you think will happen")).toBeDisabled();
+
+  // **And what a live run would cost is on screen before any press**, read from
+  // the recorded run's own receipt and dated — never a figure typed into the
+  // page. A recording with no receipt this engine can read prints none, so what
+  // is asserted here is the shape and the date, not a number.
+  await expect(page.locator(".way--live .way__measure-line").first()).toHaveText(
+    /^The recorded run of .+ made \d+ model calls?, took about \d+ (seconds?|minutes?) and cost (\$[\d.]+|<\$0\.01), on \d{4}-\d{2}-\d{2}\.$/,
+  );
 
   // From here the page watches itself, because what follows is a screen that is
   // moving and four of the claims made about it are about moments, not about the
@@ -107,7 +132,7 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // The card that has a recording. It sends its sentence, exactly as a reader
   // would type it — the same request a live run sends — and it is opened with
   // the keyboard, because every way into this product is usable without a mouse.
-  const card = page.getByRole("button", { name: new RegExp(THE_SENTENCE) });
+  const card = page.getByRole("button", { name: THE_RECORDING_ROW });
   await card.focus();
   await expect(card).toBeFocused();
   await page.keyboard.press("Enter");
@@ -371,7 +396,7 @@ test("the edges of the stage and the panel stay true when the window changes", a
     "This server has no committed recording to play, so there is no map to resize around.",
   );
 
-  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
   await waitUntilItStops(page);
 
   /**
@@ -479,7 +504,7 @@ test("a run that was cut still offers its working", async ({ page }) => {
   });
 
   await page.reload();
-  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
 
   // It says the stream ended, and it offers to run it again with the price on
   // the control — this copy has no key, so playing it again spends nothing.
@@ -513,7 +538,7 @@ test("add a claim on a generated map declines in the server's own words", async 
     "This server has no committed recording to play, so there is no map to add a claim to.",
   );
 
-  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
   await waitUntilItStops(page);
 
   // A sentence no recording scripted. With no key there is nothing that could

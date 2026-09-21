@@ -1,9 +1,10 @@
 /**
  * The whole screen: the launchpad, and the map you open from it.
  *
- * Two states and nothing in between. The launchpad names the two ways into the
- * tool and offers the four examples from the brief; opening the one that is
- * built swaps the page for the map. Everything on the map came over the wire
+ * Two states and nothing in between. The launchpad offers four ways to start —
+ * the stored map, the committed recording, a live run of one of the four
+ * sentences from the brief, and a sentence of the reader's own; taking any of
+ * them swaps the page for the map. Everything on the map came over the wire
  * from the server, and the line under it says which address it came from — this
  * product does not put a number on screen that a reader cannot trace to an
  * input, a rule or a source, and that includes numbers a stored example happens
@@ -338,19 +339,17 @@ export function App({
    * from an effect: an effect runs twice in development by design, and this is
    * the one request in the product where running twice means paying twice.
    */
-  // **The press says how the run starts; the route no longer reads the key to
-  // decide** (record 0012, amended 2026-09-21). This is the expression the route
-  // used to work out for itself, said here instead, so what happens with a key
-  // and without one is exactly what happened before. The first screen replaces it
-  // with what the reader chose, which is the whole point of moving it.
-  const hasKey = readiness.state === "answered" && readiness.value.model_key_present;
-  const build = useCallback(
-    (asked: Asked) => {
-      const run = askForAMap({ ...asked, start: hasKey ? "live" : "replay" });
-      setScreen({ at: "growing", run });
-    },
-    [hasKey],
-  );
+  // **The reader says how the run starts, and this passes it on untouched**
+  // (record 0012, amended 2026-09-21). The route used to read the key and
+  // decide; then this expression stood in for it here. Now the first screen
+  // offers the choice — *watch the recording* or *run it live* — and every press
+  // that reaches this arrives with the start already named. Nothing between the
+  // press and the request may change it: a screen that asked for a recording and
+  // a request that called a model would be the one lie this product cannot
+  // afford.
+  const build = useCallback((asked: Asked) => {
+    setScreen({ at: "growing", run: askForAMap(asked) });
+  }, []);
 
   /**
    * Leave a generation: let go of it first, then go back.
@@ -394,9 +393,12 @@ export function App({
         key={screen.run.press}
         run={screen.run}
         // Known before the stream has said anything, which is the whole reason
-        // the badge can be on screen from the first frame. When the receipt
-        // arrives it is the authority, and the badge takes its word.
-        replaying={readiness.state === "answered" && !readiness.value.model_key_present}
+        // the badge can be on screen from the first frame. **It is what was
+        // asked for**, not what a key implies: with a key, a reader can still
+        // ask for the recording, and the badge has to say so from the first
+        // frame. When the receipt arrives it is the authority, and the badge
+        // takes its word.
+        replaying={screen.run.asked.start === "replay"}
         onRunAgain={runAgain(screen.run)}
         onLeave={leaveTheRun(screen.run)}
       />
@@ -439,17 +441,16 @@ export function App({
 
   return (
     <main className="page">
-      {/* The first screen is the one wide column in this product: it holds the
-          two doors, a map that is already drawn, the four sentences from the
-          brief and the field you type your own into, and stacking all of that
-          in the 660-pixel measure the rest of the page reads at pushes the
-          field below the fold. `launchpad.css` owns the width. */}
+      {/* The first screen is the one wide column in this product: it holds four
+          ways to start, one of them a form, and stacking all of that in the
+          660-pixel measure the rest of the page reads at pushes the form below
+          the fold. `launchpad.css` owns the width. */}
       <div className="column column--launchpad">
         <header className="masthead">
           <h1 className="wordmark">Katalyst</h1>
           <p className="purpose">
-            Type an event you think will happen. See what it would cause, step by step, ending in
-            trades.
+            Type an event you think will happen. Katalyst builds a map of what it would cause, step
+            by step, out to things you could trade.
           </p>
         </header>
 
