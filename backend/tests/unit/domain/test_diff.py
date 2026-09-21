@@ -55,6 +55,7 @@ from katalyst.domain import (
     Link,
     Observe,
     Proposition,
+    PropositionId,
     Refine,
     Resolution,
     Retune,
@@ -76,6 +77,7 @@ from katalyst.domain.diff import (
     SWEEP_WORLDS,
     _agreement_on,
     _counting_for,
+    _ordinary_arrows,
     _read_on,
     _two_figures,
     best_backed_routes,
@@ -1479,29 +1481,20 @@ def test_a_routes_width_is_always_the_weakest_arrow_on_that_very_route() -> None
         assert route.width == (min(along) if along else NO_ARROW_TO_WEAKEN)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Open defect, found 2026-09-20 and reported rather than fixed in that round. "
-        "The walk keeps one route per claim — the widest — so a narrower route that "
-        "would have given an equally wide but SHORTER route onward is thrown away "
-        "before it can. The width it hands back is right; the path can be the longer "
-        "of two equally wide ones. Fixing it means a second pass: once every claim's "
-        "width is known, find the shortest route to it over the arrows worth at least "
-        "that much, ties broken by the map's own order. That is a rewrite of this "
-        "function rather than a guard inside it, so it wants its own round."
-    ),
-)
 def test_two_equally_backed_routes_are_separated_by_the_shorter_one() -> None:
-    """The rule's own second clause, which the walk does not yet keep.
+    """The rule's own second clause, and the reproducer that found it missing.
 
     Three routes reach C. `S -> C` is asserted and worth 0.3. `S -> B -> C` and
     `S -> A -> B -> C` are both worth 0.5, because both run through the same
     weakest arrow, so the shorter of the two wins under the rule this function's
-    own docstring states. The walk hands back the longer one: B is reached by
-    `S -> B` worth 0.5 and then improved to `S -> A -> B` worth 0.9, and the
-    narrower route to B — the one that would have given the shorter route to C —
-    is gone by the time C is reached.
+    own docstring states.
+
+    A one-pass walk hands back the longer one: B is reached by `S -> B` worth 0.5
+    and then improved to `S -> A -> B` worth 0.9, and the narrower route to B —
+    the one that would have given the *shorter* route to C — is gone by the time
+    C is reached. Keeping one best state per claim cannot work, because a claim
+    reached by a wider route can be a worse place to continue from than the same
+    claim reached by a narrower one. Fixed 2026-09-21 with the two-pass walk.
     """
     graph = a_route_map(
         [
@@ -1536,3 +1529,127 @@ def test_two_equally_backed_routes_of_one_length_take_the_earlier_arrow() -> Non
 
     assert routes["A"].width == 1.0
     assert routes["A"].path == ("S", "X", "A")
+
+
+# --- The route rule, read literally, as the oracle -------------------------
+#
+# The fast walk is two passes and a proof; the rule itself is one sentence.
+# These check the first against the second over maps the strategies build, which
+# is the only way to know the proof was right. Designed by the domain's owner
+# with a reference implementation and a brute-force oracle; brought in here and
+# applied to `best_backed_routes` on 2026-09-21.
+
+
+def every_route_from(
+    graph: Graph, subject: PropositionId, climbing: bool
+) -> list[tuple[tuple[PropositionId, ...], tuple[int, ...], float]]:
+    """Walk every route out of one claim, with no cleverness at all.
+
+    A route is a walk over **states** — a claim together with whether it is still
+    climbing against the arrows — and no state is visited twice, which is what
+    stops a route going round in circles. A claim can appear twice only by being
+    climbed through and then descended through, which is the one shape an
+    observation's two halves allow.
+
+    Args:
+        graph: The map to walk.
+        subject: Where every route starts.
+        climbing: Whether it starts by climbing against the arrows.
+
+    Returns:
+        One entry per route: the claims it passes through, the arrows it walks
+        along in order, and what its weakest arrow is worth.
+    """
+    at = {arrow.id: position for position, arrow in enumerate(graph.links)}
+    arrows = [
+        (one.source, one.target, PROVENANCE_WEIGHT[one.provenance], at[one.id])
+        for one in _ordinary_arrows(graph)
+    ]
+    found: list[tuple[tuple[PropositionId, ...], tuple[int, ...], float]] = []
+
+    def walk(
+        here: PropositionId,
+        still_climbing: bool,
+        seen: frozenset[tuple[PropositionId, bool]],
+        claims: tuple[PropositionId, ...],
+        used: tuple[int, ...],
+        narrowest: float,
+    ) -> None:
+        found.append((claims, used, narrowest))
+        if still_climbing and (here, False) not in seen:
+            walk(here, False, seen | {(here, False)}, claims, used, narrowest)
+        for source, target, worth, position in arrows:
+            if still_climbing and target == here:
+                there = source
+            elif not still_climbing and source == here:
+                there = target
+            else:
+                continue
+            if (there, still_climbing) in seen:
+                continue
+            walk(
+                there,
+                still_climbing,
+                seen | {(there, still_climbing)},
+                (*claims, there),
+                (*used, position),
+                min(narrowest, worth),
+            )
+
+    walk(subject, climbing, frozenset({(subject, climbing)}), (subject,), (), NO_ARROW_TO_WEAKEN)
+    return found
+
+
+def the_rule_read_literally(
+    graph: Graph,
+    subjects: frozenset[PropositionId],
+    observed: frozenset[PropositionId] = frozenset(),
+) -> dict[PropositionId, tuple[float, tuple[PropositionId, ...]]]:
+    """The documented rule over every route there is: widest, then shortest, then earliest.
+
+    Written as one sort key so that the three clauses are unmistakably in that
+    order and nothing else is in it.
+    """
+    on_the_map = {one.id for one in graph.propositions}
+    best: dict[PropositionId, tuple[float, int, tuple[int, ...], tuple[PropositionId, ...]]] = {}
+    for subject in sorted(subjects):
+        if subject not in on_the_map:
+            continue
+        for walked, used, narrowest in every_route_from(graph, subject, subject in observed):
+            here = walked[-1]
+            offered = (min(NO_ARROW_TO_WEAKEN, narrowest), len(used), used, walked)
+            standing = best.get(here)
+            if standing is None or (-offered[0], offered[1], offered[2]) < (
+                -standing[0],
+                standing[1],
+                standing[2],
+            ):
+                best[here] = offered
+    return {here: (one[0], one[3]) for here, one in best.items()}
+
+
+@given(graphs(), st.data())
+@many
+def test_the_fast_walk_agrees_with_the_rule_read_literally(
+    graph: Graph, data: st.DataObject
+) -> None:
+    """Two passes and a proof against one sentence and no cleverness.
+
+    The proof: a route reaches a claim with bottleneck `W` if and only if every
+    arrow on it is worth at least `W`, so the best routes are exactly the routes
+    of the map with every thinner arrow set aside. This is what says the proof
+    was right — and the same maps catch the one-pass walk that was here before.
+    """
+    subject = data.draw(st.sampled_from([one.id for one in graph.propositions]))
+    climbing = data.draw(st.booleans())
+    subjects = frozenset({subject})
+    observed = subjects if climbing else frozenset()
+
+    fast = best_backed_routes(graph, subjects, observed)
+    slow = the_rule_read_literally(graph, subjects, observed)
+
+    assert set(fast) == set(slow)
+    for claim_id, route in fast.items():
+        width, path = slow[claim_id]
+        assert route.width == pytest.approx(width), claim_id
+        assert route.path == path, claim_id
