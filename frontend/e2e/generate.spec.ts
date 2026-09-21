@@ -76,11 +76,14 @@ interface WhatItSaw {
    */
   readonly everStacked: boolean;
   /**
-   * True when, at some moment, a rectangle stood at every step before the last
-   * claim arrived — the growing edge saying where the map is going, all the way
-   * through rather than only at the start.
+   * How many rectangles stood at the moment each claim arrived, in order.
+   *
+   * The growing edge saying where the map is going, step by step, rather than
+   * only at the start. **The last entry is allowed to be none**: the frontier
+   * empties when the last claim closes, and no rectangle may stand where
+   * nothing is coming.
    */
-  readonly rectanglesAllTheWay: boolean;
+  readonly heldWhenEachClaimArrived: readonly number[];
   /**
    * How many claims were on the map, every time that number changed.
    *
@@ -140,7 +143,7 @@ async function startWatching(page: Page): Promise<void> {
       firstRectangleSaid: "",
       mostRectangles: 0,
       everStacked: false,
-      rectanglesAllTheWay: true,
+      heldWhenEachClaimArrived: [] as number[],
       claimsWentOn: [] as number[],
       whenTheNumbersCame: { claims: 0, numbers: 0 },
     };
@@ -166,12 +169,9 @@ async function startWatching(page: Page): Promise<void> {
       }
       record.mostRectangles = Math.max(record.mostRectangles, held);
       if (record.claimsWentOn[record.claimsWentOn.length - 1] !== claims) {
-        // **A rectangle stood at every step, not merely at some of them.** The
-        // growing edge is what says where the map is going; a step with no
-        // rectangle is a map that has stopped saying. The last claim is the
-        // exception and the only one: after it the frontier is empty.
-        if (claims > 0 && held === 0) {
-          record.rectanglesAllTheWay = false;
+        // What the growing edge was saying at the moment this claim arrived.
+        if (claims > 0) {
+          record.heldWhenEachClaimArrived.push(held);
         }
         record.claimsWentOn.push(claims);
       }
@@ -465,10 +465,17 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // waiting in general.
   expect(saw.rectangleBeforeAnyClaim).toBe(true);
   expect(saw.firstRectangleSaid).toContain(THE_SENTENCE);
-  // Rectangles stood at the growing edge all the way through — which is what
-  // this now says, rather than "at some point there was one".
+  // **Rectangles stood at the growing edge all the way through** — which is
+  // what this now says, rather than "at some point there was one". A step with
+  // no rectangle is a map that has stopped saying where it is going.
+  //
+  // The last claim is the exception and the only one: the frontier empties when
+  // it closes, and no rectangle may stand where nothing is coming.
   expect(saw.mostRectangles).toBeGreaterThan(0);
-  expect(saw.rectanglesAllTheWay).toBe(true);
+  expect(saw.heldWhenEachClaimArrived.length).toBe(claims);
+  for (const [step, held] of saw.heldWhenEachClaimArrived.slice(0, -1).entries()) {
+    expect(held, `no rectangle stood when claim ${step + 1} arrived`).toBeGreaterThan(0);
+  }
   // **And no box was ever drawn in another box's place.** A box the layout has
   // not placed is not drawn at all: it used to be drawn at the map's origin, on
   // top of the hypothesis, for as long as the layout took to answer.
@@ -492,6 +499,147 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
 
   // Nothing anywhere on this screen is a pop-up.
   await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("the edges of the stage and the panel stay true when the window changes", async ({ page }) => {
+  await page.goto("/");
+  const replayable = await whatCanBeReplayed(page);
+  test.skip(
+    replayable.length === 0,
+    "This server has no committed recording to play, so there is no map to resize around.",
+  );
+
+  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await waitUntilItStops(page);
+
+  /**
+   * What the two boxes say about their edges, and what is actually beyond them.
+   *
+   * Both are read off the page in the same breath, so the comparison is about
+   * one moment rather than about two.
+   */
+  const bothReadings = () =>
+    page.evaluate(() => {
+      const stage = document.querySelector(".canvas") as HTMLElement;
+      const room = stage.getBoundingClientRect();
+      const boxes = [...document.querySelectorAll(".react-flow__node")].map((one) =>
+        one.getBoundingClientRect(),
+      );
+      const yes = (it: boolean) => (it ? "yes" : "no");
+      const frame = document.querySelector(".dock-frame") as HTMLElement;
+      const dock = document.querySelector(".dock") as HTMLElement;
+      return {
+        stageSaid: {
+          left: stage.dataset.moreLeft,
+          right: stage.dataset.moreRight,
+          above: stage.dataset.moreAbove,
+          below: stage.dataset.moreBelow,
+        },
+        stageTruly: {
+          left: yes(boxes.some((at) => at.left < room.left - 1)),
+          right: yes(boxes.some((at) => at.right > room.right + 1)),
+          above: yes(boxes.some((at) => at.top < room.top - 1)),
+          below: yes(boxes.some((at) => at.bottom > room.bottom + 1)),
+        },
+        panelSaid: { above: frame.dataset.moreAbove, below: frame.dataset.moreBelow },
+        panelTruly: {
+          above: yes(dock.scrollTop > 1),
+          below: yes(dock.scrollTop + dock.clientHeight < dock.scrollHeight - 1),
+        },
+      };
+    });
+
+  // **Five windows, including the one everything was designed against.** The
+  // rule is *at each edge that has content beyond it and at no edge that has
+  // not* (INV-workbench.77), and a window is neither a pan nor a layout — so
+  // nothing but the stage watching its own size would ever hear about one.
+  // Bigger: the whole map comes onto the glass and the rule below must go.
+  // Smaller: tiles go off the right and a rule must appear.
+  for (const size of [
+    { width: 1600, height: 1000 },
+    { width: 2000, height: 1400 },
+    { width: 900, height: 620 },
+    { width: 1200, height: 700 },
+    { width: 700, height: 500 },
+    { width: 1600, height: 1000 },
+  ]) {
+    await page.setViewportSize(size);
+    // **Waited for, not slept through, and the wait is the statement.** The
+    // edges are settled exactly when what the two boxes say is what is so; a
+    // fixed pause would be a guess about how long a resize takes on whatever
+    // machine this runs on.
+    await expect
+      .poll(
+        async () => {
+          const now = await bothReadings();
+          return (
+            JSON.stringify(now.stageSaid) === JSON.stringify(now.stageTruly) &&
+            JSON.stringify(now.panelSaid) === JSON.stringify(now.panelTruly)
+          );
+        },
+        {
+          timeout: 15_000,
+          message: `the edges never came true at ${size.width}x${size.height}: ${JSON.stringify(
+            await bothReadings(),
+          )}`,
+        },
+      )
+      .toBe(true);
+  }
+});
+
+test("a run that was cut still offers its working", async ({ page }) => {
+  await page.goto("/");
+  const replayable = await whatCanBeReplayed(page);
+  test.skip(replayable.length === 0, "This server has no committed recording to cut short.");
+
+  // The first six events of the real run, and then the body simply ends: no
+  // `done`, no `failed`, no receipt — which is a restarted server, a proxy
+  // giving up on an idle connection, a laptop asleep in a ten-minute run.
+  const whole = await (
+    await page.request.post("/api/generate", {
+      headers: { "content-type": "application/json" },
+      data: { hypothesis: THE_SENTENCE },
+    })
+  ).text();
+  const cut = whole
+    .split(/\r?\n\r?\n/)
+    .filter((block) => block.trim() !== "")
+    .slice(0, 6)
+    .map((block) => `${block}\n\n`)
+    .join("");
+  await page.route("**/api/generate", async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+      body: cut,
+    });
+  });
+
+  await page.reload();
+  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+
+  // It says the stream ended, and it offers to run it again with the price on
+  // the control — this copy has no key, so playing it again spends nothing.
+  await expect(page.locator('.done-line[data-kind="ended_early"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: /Play it again/ })).toBeVisible();
+  // No rectangle stands where nothing is coming.
+  await expect(page.locator(".skeleton-tile")).toHaveCount(0);
+  // And the claims that did arrive are on the map — waited for rather than
+  // counted on the spot, because a box is drawn when the layout has placed it
+  // and the layout answers on a thread of its own.
+  await expect(page.locator(".tile").first()).toBeVisible();
+
+  // **The working is reachable**, which is the whole point: a cut run has no
+  // receipt and no refusal, so before this there was no way in at all — while
+  // the screen had already fetched the one document that says how far it got.
+  const read = page.getByRole("button", { name: /Read the working of this run/ });
+  await expect(read).toBeVisible();
+  await read.click();
+  await expect(page.locator(".inspector__claim")).toHaveText("This generation");
+
+  // No box was ever drawn in another box's place while all that happened.
+  expect(await boxesRunningIntoEachOther(page)).toEqual([]);
 });
 
 test("add a claim on a generated map declines in the server's own words", async ({ page }) => {
