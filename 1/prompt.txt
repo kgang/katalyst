@@ -190,3 +190,154 @@ Greyscale, recommended hue: `grey-stored-dark-full.png`, `grey-stored-dark-far.p
 **What is deliberately not here** — No third or fourth coloured kind; a step and a dead end stay neutral, which is what makes the two ends findable. No hue on any number, chip, badge, wire or port, and a walk that keeps it that way. No fourth teal: the wash is derived from the accent. No change to the outline's one-pixel weight, so the tile's geometry invariant and `VR8` are untouched. The Inspector's kind row does not echo the hue — it is the panel lane's file, and the report says so.</result>
 <usage><subagent_tokens>293913</subagent_tokens><tool_uses>126</tool_uses><duration_ms>1540786</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a28e36aceed98fd3e</task-id>
+<tool-use-id>toolu_01SSnGGWE3JMdqpMLagGYZKL</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b0c894cc-4ecb-4c15-9930-d321fce0a448/tasks/a28e36aceed98fd3e.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane 5: the settle" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Both servers are stopped and the worktree is clean.
+
+---
+
+## What the coordinator must run to check me
+
+```bash
+# 1. The browser suite, through the queue (this is what I ran; 4.1 s)
+cd /Users/kentgang/git3/katalyst-wt/feat-04-the-settle
+/Users/kentgang/git3/katalyst/plans/scripts/heavy.sh "the settle: check" -- \
+  bash -lc 'cd /Users/kentgang/git3/katalyst-wt/feat-04-the-settle/frontend &amp;&amp; npm run check'
+
+# 2. The end-to-end run — MINE TO NAME, YOURS TO RUN. I edited two spec files.
+cd /Users/kentgang/git3/katalyst-wt/feat-04-the-settle/frontend
+KATALYST_E2E_BACKEND_PORT=8035 KATALYST_E2E_FRONTEND_PORT=5135 \
+KATALYST_E2E_SLOW_BACKEND_PORT=8036 KATALYST_E2E_SLOW_FRONTEND_PORT=5136 \
+  npx playwright test
+```
+
+`generate.spec.ts` and `lateLayout.spec.ts` are the two that changed. Record 0008 tier 2 applies (timing-sensitive), and the no-browser twin it asks for is `src/graph/__tests__/theSettle.test.ts`.
+
+## What I built
+
+**The rule (record 0024, R37).** `readPositions` in `graph/elkGraph.ts` now keeps a tile's **row** and takes its **column** from each pass's answer; `pinsFor` gained a third argument that drops every pin on the one pass where the run has just stopped. `useLayout` is handed the very word the canvas re-frames on (`frameAgainOn`, passed straight through in `Canvas.tsx`), so the settle and the re-frame are one moment by construction — I needed **zero lines** in `GenerationScreen.tsx`. It is a cut; `motionBudget` untouched.
+
+**The fixture.** `frontend/src/graph/__tests__/fixtures/aLiveVerifyRun.ts` — the `events` array of `hormuz-2026-09-21T18-24-54Z-…json` and nothing else, 16 events, **29.7 kB** (under your 40 kB bar). Nothing inside an event was stripped; the only thing added is each event's own name, which the kept file does not repeat. A sibling `README.md` says what it is, the date, that it was already paid for, that it is a test input nothing replays, and what was left out. It type-checks as `readonly StreamEvent[]`, which is free proof that nothing was mangled.
+
+**Watched go red first** (`plans/logs/04c/settle/red-before-the-fix.log`): on the base, `test_no_arrow_points_backwards_at_any_moment` fails from event 4 onward and `…_once_the_run_has_stopped` fails with **four** arrows drawn backwards. Four, not three — my rule is *strictly right*, so B-layout's "3 backwards + 1 same-column" both count. Same evidence, one stricter statement.
+
+**Tests.** `theSettle.test.ts` folds both real streams (the fixture and `backend/recordings/hormuz.jsonl`) through the real `growth` → `toFlow` → `pinsFor` → ELK → `readPositions`, and holds five statements: no arrow points backwards at any moment; nor once it has stopped; the Verify run really is a map where a claim changes column (so the first two are not vacuous); a tile keeps its row; and no two boxes are drawn on top of each other. `growth.test.ts`'s *nothing already placed moves* is split into `test_nothing_moves_except_a_column_until_the_run_stops` and `test_every_pin_goes_when_the_run_stops`.
+
+**Tile-moves, measured** (`plans/logs/04c/settle/what-moves-and-how-far.log`) — **well under** the 5 Kent accepted: while the map grows, **2 moves on 2 arrivals** on the live Verify run (furthest 891 px) and **3 on 2** on the recording (557 px). At the settle, 4 tiles on the Verify run and 18 on the recording. Both mid-run movers are the Brent destination tile.
+
+**The margin.** `EDGE_GAP` was 16 — the very inset the zoom buttons use — so a map that did not fit started exactly where they float. It is now the buttons' own column plus one gap, read off their geometry; the top keeps the old plain gap (one constant for both pushed 50 px of map off the bottom). Measured on the page, stored map, before → after: 1280×800 left gap 16 → 66, **hypothesis tile no longer under the zoom buttons**; 1600×1000 **identical in every number**.
+
+## What is rough
+
+1. **The code cannot do what record 0024 clause 1 literally says.** The record says a tile never changes row while the map grows. A tile the arrows send into a column where its row is already taken **slides to the first free row below**. It happens **twice on the Verify run** (the Brent tile, 392 px and 28 px) and **once on the recording** (388 px). I did try the literal version and measured it: it draws one claim **140 px on top of another** on the committed recording, twice over. So the slide stays and the record is the thing that is slightly wrong. **Your call, not mine.** The obvious refinement I did *not* build: slide to the *nearest* free row rather than the first one below — on the Verify run that would be 48 px up instead of 392 px down, because the only thing in the way is a reserved rectangle.
+2. **The second framing fault is not fixed and cannot be by a margin.** At 1600×1000 the stored map *fits*, centred with **6 px** a side, so its last column all but touches the panel. At the readable zoom that map is 1252 px wide in a 1264 px stage — twelve pixels in the whole stage. Any real gap makes it stop fitting and be cut instead, which I measured (54 px off the right) and backed out of. The fix is a narrower panel or a lower zoom floor. `firstFrame`'s docstring says this where the next person will look.
+3. **VR13's last line I could not check.** It asks for a picture of a live **Verify** run. I have no key and the fixture is deliberately unreplayable, so my pictures are of the recording (an Explore run). The layout half of VR13 is pinned by the no-browser test on the real Verify stream instead.
+4. `test_the_verify_run_is_the_map_this_rule_was_written_for` is a guard against the other tests going vacuous, not a product statement. It will need deleting if the fixture ever changes.
+5. The e2e assertion `expect(…).not.toBe(wasAt)` after the stop rests on the measured fact that the settle moves **all 18** tiles of the recording. True today; if ELK ever settles the first tile where it already was, it fails loudly and honestly ("the map stopped settling").
+
+## Where I deviated
+
+- **No `GenerationScreen.tsx` change at all.** The brief allowed one prop; the settle rides `frameAgainOn`, which `Canvas` already receives.
+- **`pinsFor` gained a parameter** rather than `useLayout` clearing its own map, so the settle is production code a no-browser test can call — which is what let me watch it go red.
+- **The margin is two constants, not one** (`EDGE_GAP` for the left, `TOP_GAP` for the top). One constant for both shifted the map down 50 px and pushed more off the bottom.
+
+## What outside my files must change
+
+- **`docs/adr/0024-…md` clause 1** should gain the row-slide exception, with my measurement beside it (2 / 1 occurrences; the alternative is a 140 px overlap). Yours or the ADR lane's.
+- **`frontend/src/keyboard/keys.ts:59`** — the key sheet prints *"Tiles do not move. The layout is automatic, left to right."* On a stored map that means *you cannot drag them* and stays true; on a generating map it now reads as a promise the product breaks. `spec/workbench/keyboard-and-access.md` owns the copy, `layout-and-zoom.md` B8 owns the rule. Not my files; one sentence.
+- **`ARCHITECTURE.md`** has no `[planned]` row for 0024 on my base (#51 holds it), so I wrote a fresh `[built]` passage beside 0023's. On rebase, keep mine and drop #51's `[planned]` line 51 clause and line 309 bullet.
+- Records **0023/0024** are not in my tree; their `§10` table rows are the ADR lane's.
+
+## Files touched (`git diff --stat` against `674acfd`)
+
+```
+ ARCHITECTURE.md                                    |   2 +
+ frontend/e2e/generate.spec.ts                      |  26 +-
+ frontend/e2e/lateLayout.spec.ts                    |  17 +-
+ frontend/e2e/waiting.ts                            |   4 +-
+ frontend/src/graph/Canvas.tsx                      |  27 +-
+ frontend/src/graph/__tests__/fixtures/README.md    |  42 ++
+ .../src/graph/__tests__/fixtures/aLiveVerifyRun.ts | 666 +++++++++++++++++++++
+ frontend/src/graph/__tests__/layout.test.ts        |  10 +-
+ frontend/src/graph/__tests__/theSettle.test.ts     | 309 ++++++++++
+ frontend/src/graph/elkGraph.ts                     | 121 ++--
+ frontend/src/graph/geometry.ts                     |  75 ++-
+ frontend/src/graph/layoutRunner.ts                 |  23 +-
+ frontend/src/graph/onTheGlass.ts                   |   6 +-
+ frontend/src/stream/__tests__/growth.test.ts       | 108 +++-
+ 14 files changed, 1338 insertions(+), 98 deletions(-)
+```
+
+Five commits: the fixture · the rule · the two e2e readings · the margin · ARCHITECTURE. Nothing pushed. `layers.ts` needed no change — it already sets feedback arrows aside before columns are assigned.
+
+## Verification output tails
+
+```
+# npm run check, through heavy.sh
+ Test Files  44 passed (44)
+      Tests  374 passed (374)
+   Duration  4.14s
+[exited with code 0]
+```
+```
+# the red check, on the base, before anything was fixed
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)
+AssertionError: the live Verify run of 2026-09-21, after event 4: expected [ Array(1) ] to deeply equal []
+AssertionError: the live Verify run of 2026-09-21: expected [ …(4) ] to deeply equal []
+```
+```
+# what moves, and how far
+verify:    tile-moves while growing 2 on 2 arrivals, furthest 891px; row changes 2 (row-only 0); at the settle 4 tiles moved, furthest 738px
+recording: tile-moves while growing 3 on 2 arrivals, furthest 557px; row changes 1 (row-only 0); at the settle 18 tiles moved, furthest 1728px
+```
+```
+# the stored map, measured on the page — clear space left/right/top/bottom, and what the zoom buttons cover
+before  1600x1000  6  6  87 66   | under the zoom buttons: []
+before  1280x800  16 -324 70 -117 | under the zoom buttons: ["hypothesisresolves Nov 1The "]
+after   1600x1000  6  6  87 66   | under the zoom buttons: []
+after   1280x800  66 -374 70 -117 | under the zoom buttons: []
+```
+
+Pictures: `plans/logs/04c/settle/final/` (recording, mid-run and after the stop, both sizes), `plans/logs/04c/settle/stored-before|stored-after4/` (the margin). Throwaway scripts `look.mjs` and `theStoredMap.mjs` are in the same directory.
+
+---
+
+## Draft pull request body
+
+### What
+
+A tile moves only when an arrow would otherwise point backwards, and once when the run stops — record 0024, Kent's R37.
+
+The pin held a tile's column as well as its row, and was never dropped, so a claim drawn before anything pointed at it stayed where it landed and every later arrow into it was drawn doubling back. On the Verify door that is every run: the destination arrives second with no causes at all. On one kept live run, **four of nine arrows** were drawn the wrong way.
+
+Now the pin holds the **row**; the **column** is re-read from the arrows on every pass; and the one word the canvas is already asked to re-frame on is handed to the layout too, so the map settles — every pin dropped, the whole thing laid out as one — in the same frame the view re-frames. It is a cut, not a fourth animation.
+
+Pinned by `theSettle.test.ts`, which folds two real streams event by event through the app's own layering, layout engine and reading-back, and asserts after **every** event that no arrow points backwards. It fails on `main`. The evidence is a new fixture: the `events` array of one live Verify run already paid for on 2026-09-21, 16 events, ~30 kB, an input to a test that nothing replays to a reader — because the one stream this repository already held is an Explore run on which the defect cannot occur.
+
+Also here: the zoom buttons no longer sit over the bottom-left tile. The frame's edge gap was the same sixteen pixels the buttons are inset by; it is now their own column.
+
+### Which invariant it satisfies
+
+- **INV-workbench.64**, rewritten — a tile keeps its row while the map grows, its column is re-read every pass, and the map settles once when the run stops.
+- **INV-workbench.23**, unchanged and now load-bearing — keeping the row *is* keeping the order within the column.
+- **INV-workbench.22**, **.79** and **diff-view.md .40** untouched, by design.
+- Visual review **VR13**, as record 0024 rewords it. Checked on pictures of a replay at 1600×1000 and 1280×800, mid-run and after the stop.
+
+### What is deliberately not here
+
+- **No live Verify picture.** There is no key and the fixture is deliberately unreplayable. The layout half of VR13 is pinned by the no-browser test on the real stream instead.
+- **No fourth animation, no new event, no server change.** R5's freeze is untouched.
+- **No fix for the map touching the panel's edge at 1600×1000.** Measured: at the readable zoom the map is 1252 px wide in a 1264 px stage. That is not a forgotten margin, and giving it one makes the map be cut instead. `firstFrame` says so.
+- **The record's clause 1 is not held to the letter.** A tile sent into a column where its row is taken takes the first free row below — twice on the Verify run, once on the recording. The alternative was measured and draws one claim 140 px on top of another.
+- **No change to `GenerationScreen.tsx`, `Tile.tsx`, the Inspector, any decision record, or either spec chapter.**</result>
+<usage><subagent_tokens>383695</subagent_tokens><tool_uses>178</tool_uses><duration_ms>1950209</duration_ms></usage>
+</task-notification>
