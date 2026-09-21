@@ -22,8 +22,10 @@
  * construction.
  *
  * Source: `backend/.runs/hormuz-2026-09-17T15-20-12Z.json`, which that run wrote
- * and which nobody has edited. It became no recording, because it refused
- * nothing and every recording must show a refusal.
+ * and which nobody has edited. **It refused nothing, and that is allowed**
+ * (Kent, 2026-09-20): a recording is a picture of a run that happened, and a run
+ * that happened to break no rule is one of the runs that happen. What the screen
+ * owes is that a refusal, when there is one, is on it — never that there is one.
  */
 
 import type { StreamEvent } from "../events";

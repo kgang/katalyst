@@ -101,13 +101,16 @@ describe("the rectangles are the frontier, drawn", () => {
 
     const broke = fold(grown, {
       event: "failed",
-      message: "The model did not answer this call, and the run stopped where it was.",
+      // One of the sentences the server actually sends, word for word
+      // (`engine/client.py`). A sentence invented here would be a test checking
+      // that the screen prints prose this test wrote.
+      message: "The model is busy and turned this question away, twice over.",
     });
     expect(broke.skeletons).toEqual([]);
     expect(broke.world.claims).toEqual(grown.world.claims);
     expect(broke.world.links).toEqual(grown.world.links);
     expect(broke.refusals).toEqual(grown.refusals);
-    expect(broke.failure).toContain("stopped where it was");
+    expect(broke.failure).toContain("turned this question away");
   });
 
   it("test_every_skeleton_goes_when_the_beliefs_arrive", () => {
@@ -124,10 +127,18 @@ describe("nothing already placed moves", () => {
     // The real machinery, over the real run: at every step the map is laid out
     // again, and the rule the layout obeys — a tile that had a position keeps it,
     // to the pixel — is checked against what came out.
+    //
+    // **The whole run, `beliefs_propagated` included.** It used to stop at the
+    // last growth event, which left out the one event that replaces the world
+    // wholesale: every claim comes back with its likelihood on it, so every tile
+    // gains a chip, so every tile can change height — and a box whose height
+    // changed drops its pin, and a dropped pin moves a tile a reader is already
+    // looking at. That is precisely the moment INV-workbench.64 is about, and it
+    // was the one moment the walk did not reach.
     let placed = new Map<string, PinnedTile>();
     let seen = new Map<string, Position>();
 
-    for (const state of everyStateOf(THE_GROWTH)) {
+    for (const state of everyStateOf([...THE_GROWTH, BELIEFS])) {
       const drawing = toFlow(state.world, undefined, state.skeletons);
       const pins = pinsFor(placed, drawing.tiles);
 

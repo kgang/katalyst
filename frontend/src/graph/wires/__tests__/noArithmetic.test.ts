@@ -24,12 +24,6 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
- * Every file that touches one of the map's numbers and draws it.
- *
- * Deliberately not the whole tree: the file that works out where a wire goes
- * does nothing but pixel geometry, and pixel geometry is arithmetic on pixels.
- */
-/**
  * Every module in the tree, read as text by the build tool rather than off the
  * disk — so this test needs nothing but the browser types the rest of the app is
  * written against.
@@ -40,6 +34,12 @@ const SOURCE = import.meta.glob("/src/**/*.{ts,tsx}", {
   eager: true,
 }) as Record<string, string>;
 
+/**
+ * Every file that touches one of the map's numbers and draws it.
+ *
+ * Deliberately not the whole tree: the file that works out where a wire goes
+ * does nothing but pixel geometry, and pixel geometry is arithmetic on pixels.
+ */
 const DRAWS_THE_MAPS_NUMBERS = [
   "/src/graph/wires/encodings.ts",
   "/src/graph/wires/WireChip.tsx",
@@ -66,6 +66,18 @@ const DRAWS_THE_MAPS_NUMBERS = [
  * taken into account; `weight` is how much a piece of evidence counts. If an
  * expression combines two of anything, and either side reads one of these, the
  * canvas has started doing the engine's job.
+ *
+ * **The second group is the stream's own**, and it is the reason this list grew
+ * when the walk did. Adding `frontend/src/stream/` to the files walked, and
+ * leaving the names alone, checked those files for arithmetic on fields none of
+ * them has: `receipt.input_tokens + receipt.output_tokens` — the exact sum the
+ * receipt strip exists to refuse — would have walked straight past. A guard
+ * pointed at the right files and the wrong names is a guard that always passes,
+ * and INV-workbench.68 names this test by name.
+ *
+ * `product` is a route's multiplied-out likelihood; `versions` is how many
+ * versions of the map the engine ran; `at` is a place in a transcript, and two
+ * of those added together would be a place in nothing.
  */
 const A_NUMBER_OFF_THE_MAP = new Set([
   "p",
@@ -77,6 +89,18 @@ const A_NUMBER_OFF_THE_MAP = new Set([
   "pathProduct",
   "conditional",
   "reading",
+  // The receipt's nine readings, by the names they travel under.
+  "dollars",
+  "seconds",
+  "input_tokens",
+  "output_tokens",
+  "cache_read_tokens",
+  "calls",
+  "searches",
+  // And the three other numbers a generation puts on the wire.
+  "product",
+  "versions",
+  "at",
 ]);
 
 /** The four operators that would combine two numbers into a third. */

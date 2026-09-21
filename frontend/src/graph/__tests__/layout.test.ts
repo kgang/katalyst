@@ -16,7 +16,7 @@
 import ELK from "elkjs/lib/elk.bundled.js";
 import { describe, expect, it } from "vitest";
 import { A_REAL_RUN } from "../../stream/__tests__/aRealRun";
-import { THE_GROWTH } from "../../stream/__tests__/aStream";
+import { BELIEFS, THE_GROWTH } from "../../stream/__tests__/aStream";
 import type { StreamEvent } from "../../stream/events";
 import { fold, waitingFor } from "../../stream/growth";
 import { aClaim, aWire } from "../../test/aMap";
@@ -606,7 +606,16 @@ describe("the union of two worlds", () => {
     // real ten-claim run four columns deep — and the reserved rectangles are
     // counted as boxes, because a rectangle a tile is drawn on top of is the
     // same mistake as two tiles on top of each other.
-    for (const events of [THE_GROWTH, A_REAL_RUN]) {
+    //
+    // **The chapter's run is walked to the end, likelihoods included.** That
+    // last event is the only one that replaces the world wholesale: every claim
+    // comes back carrying its number, so every tile gains a chip, so every tile
+    // can change height — and a box whose height changed drops its pin. It is
+    // the one event that could move a tile a reader is already looking at, and
+    // it was the one event the walk stopped short of. The real run is walked to
+    // the end of its own events, which is where its recording ends: it closed on
+    // its width cap, and nothing here invents a world it did not send.
+    for (const events of [[...THE_GROWTH, BELIEFS], A_REAL_RUN]) {
       for (const [step, boxes] of (await everyStepOf(events)).entries()) {
         expect(collide(boxes.placed, boxes.heights), `after event ${step}`).toEqual([]);
       }
