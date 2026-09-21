@@ -29,6 +29,7 @@ can use it to highlight the right tile or wire.
 """
 
 from collections import deque
+from collections.abc import Mapping
 from typing import Literal
 
 import networkx
@@ -199,7 +200,7 @@ def _quoted(text: str) -> str:
     return f'"{tidied}"'
 
 
-def _name_of(claims: dict[PropositionId, Proposition], identifier: PropositionId) -> str:
+def _name_of(claims: Mapping[PropositionId, Proposition], identifier: PropositionId) -> str:
     """Name a claim by its words, or say plainly that it is not on this map.
 
     Args:

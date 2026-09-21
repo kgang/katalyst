@@ -296,20 +296,25 @@ class Versions:
     days: tuple[int, ...]
     """Which day of the window each column is."""
 
-    weights: Numbers
-    """How much each version counts, one per version.
+    weights: Mapping[PropositionId, Numbers]
+    """How much each version counts, **per claim**: one vector of one number per version.
 
     Every version counts the same unless something was observed, in which case a
-    version counts by the share of its worlds that survived the observation — and
-    then only for the claims in `reweighted`.
+    version counts by the share of its worlds that survived — and it survives the
+    observations that are evidence about **that claim**, never every observation on
+    the branch. Two observations in pieces of the map that share no arrow and no
+    cause are independent under the model the engine draws from, so one pooled
+    share would let an observation weigh a claim it says nothing about.
     """
 
     reweighted: frozenset[PropositionId]
-    """The claims the weights above apply to: the ones an observation is evidence about.
+    """The claims some observation is evidence about, and so counts the versions of.
 
     Every other claim is read with every version counting the same, because an
     observation joined to it by no chain of arrows and sharing no cause with it
-    changes nothing about it at all.
+    changes nothing about it at all. Which observations reach which claim is what
+    `weights` above is worked out from; this is the set of claims any of them
+    reaches, for a reader who only wants to know whether a claim was weighed.
     """
 
     priors: Mapping[PropositionId, Numbers]
@@ -334,7 +339,8 @@ class Versions:
         its direction has to obey the same one.** Every version counts the same,
         unless what was observed is evidence about this claim — the claims in
         `reweighted` — and then each version counts by the share of its worlds that
-        survived. The likelihood, the band, the width a change list reports on
+        survived **the observations that are evidence about this claim**, and no
+        others. The likelihood, the band, the width a change list reports on
         another day and the direction of a move are all read with the vector this
         gives back, so none of them can be counted one way and another of them
         another way.
@@ -353,10 +359,11 @@ class Versions:
             How much each version counts, one number per version. Never all
             zeroes, so anything dividing by its total is safe.
         """
-        evenly: Numbers = numpy.ones_like(self.weights)
+        counting = self.weights[claim_id]
+        evenly: Numbers = numpy.ones_like(counting)
         if claim_id not in self.reweighted:
             return evenly
-        return self.weights if self.weights.sum() > 0.0 else evenly
+        return counting if counting.sum() > 0.0 else evenly
 
 
 def propagate(
@@ -478,7 +485,9 @@ def _versions_from(setup: "_Setup", sample: "_Sample") -> Versions:
     return Versions(
         days=tuple(int(setup.points[one]) for one in sent),
         weights=sample.weights,
-        reweighted=setup.observation_reach,
+        reweighted=frozenset().union(*setup.observation_reach.values())
+        if setup.observation_reach
+        else frozenset(),
         priors=sample.priors,
         likelihood={one: row[:, sent] for one, row in sample.likelihood.items()},
         inner_spread={one: row[:, sent] for one, row in sample.inner_spread.items()},
@@ -524,7 +533,7 @@ class _Setup:
     points: NDArray[numpy.int64]
     read_at: Mapping[PropositionId, int]
     shape_rows: Mapping[LinkId, Numbers]
-    observation_reach: frozenset[PropositionId]
+    observation_reach: Mapping[PropositionId, frozenset[PropositionId]]
     states: Mapping[PropositionId, tuple[SeriesState, ...]]
     warnings: tuple[str, ...]
 
@@ -977,14 +986,14 @@ def _observation_reach(
     claims: Mapping[PropositionId, Proposition],
     arrows: Sequence[Link],
     spells: Mapping[PropositionId, Sequence[_Spell]],
-) -> frozenset[PropositionId]:
-    """List the claims an observation is evidence about.
+) -> Mapping[PropositionId, frozenset[PropositionId]]:
+    """List, for **each** observed claim, the claims that one observation is evidence about.
 
     Observing something is done by throwing away the worlds it did not happen in,
     and that changes what the survivors say about the claim's **causes** as much as
     about what it causes — which is why observing reaches upstream and supposing
-    does not. It reaches the observed claim, everything it leads to, everything
-    that leads to it, and everything those causes lead to.
+    does not. One observation reaches the observed claim, everything it leads to,
+    everything that leads to it, and everything those causes lead to.
 
     **And nothing else, on purpose.** A claim joined to the observed one by no
     chain of arrows in either direction, and sharing no cause with it, is
@@ -994,32 +1003,51 @@ def _observation_reach(
     failing by sampling noise rather than by intent — so those claims are read off
     every world instead.
 
+    **One reach per observation, never the pool of them all.** Two observations in
+    pieces of the map that share no arrow and no cause are independent under the
+    very model the engine draws from — nothing in the map ties a draw for one piece
+    to a draw for the other — so conditioning on one of them says nothing whatever
+    about the other's piece. Pooling the reaches would say otherwise: a claim that
+    *some* observation is evidence about would be read through *every*
+    observation's surviving worlds, and an observation at one end of a map would
+    move a claim at the other end that nothing connects it to, by a wash of
+    sampling noise. Measured before this was separated: on a map in two pieces,
+    observing a claim in one piece moved a claim in the other by **`.083`**.
+
     Args:
         claims: Every claim on the map, by identifier.
         arrows: The ordinary arrows.
         spells: Which stretch of days each fixed value holds over, per claim.
 
     Returns:
-        The claims an observation is evidence about. Empty when nothing was
-        observed.
+        For each observed claim, the claims that observation is evidence about.
+        Empty when nothing was observed.
     """
     observed = [
         claim_id
         for claim_id, stretches in spells.items()
-        if any(one.kind == "observe" for one in stretches)
+        if any(one.kind == "observe" and _still_holds(one) for one in stretches)
     ]
     if not observed:
-        return frozenset()
+        return MappingProxyType({})
     walkable: networkx.DiGraph[PropositionId] = networkx.DiGraph()
     walkable.add_nodes_from(sorted(claims))
     walkable.add_edges_from((one.source, one.target) for one in arrows)
-    reached: set[PropositionId] = set()
+    each: dict[PropositionId, frozenset[PropositionId]] = {}
     for claim_id in sorted(observed):
         causes = networkx.ancestors(walkable, claim_id)
-        reached |= {claim_id} | networkx.descendants(walkable, claim_id) | causes
+        reached = {claim_id} | networkx.descendants(walkable, claim_id) | causes
         for cause in causes:
             reached |= networkx.descendants(walkable, cause)
-    return frozenset(reached)
+        each[claim_id] = frozenset(reached)
+    return MappingProxyType(each)
+
+
+def _evidence_about(
+    reach: Mapping[PropositionId, frozenset[PropositionId]], claim_id: PropositionId
+) -> tuple[PropositionId, ...]:
+    """Name the observations that are evidence about one claim, in a settled order."""
+    return tuple(observed for observed in sorted(reach) if claim_id in reach[observed])
 
 
 def _warnings_about(
@@ -1064,7 +1092,7 @@ class _Sample:
     priors: Mapping[PropositionId, Numbers]
     likelihood: Mapping[PropositionId, Numbers]
     inner_spread: Mapping[PropositionId, Numbers]
-    weights: Numbers
+    weights: Mapping[PropositionId, Numbers]
     survival: float
 
 
@@ -1256,19 +1284,28 @@ def _draw(setup: _Setup, *, seed: int, versions: int, worlds: int) -> _Sample:
         for claim_id in setup.order
     }
 
-    alive = numpy.ones((versions, worlds), dtype=bool)
+    alive: Mapping[PropositionId, Flags] = {}
     if setup.observation_reach:
         _, _, alive = _one_pass(setup, priors, coins, versions, worlds, alive, reduce=False)
     likelihood, inner, _ = _one_pass(setup, priors, coins, versions, worlds, alive, reduce=True)
 
-    kept = alive.sum(axis=1)
-    weights = kept.astype(numpy.float64) / worlds
+    # How much each version counts, **per claim**: the share of its worlds that
+    # survived the observations that are evidence about that claim, and no others.
+    # One pooled share would let an observation weigh a claim it says nothing about.
+    counting: dict[PropositionId, Numbers] = {}
+    survived_all = numpy.ones((versions, worlds), dtype=bool)
+    for observed in sorted(alive):
+        survived_all = survived_all & alive[observed]
+    for claim_id in setup.order:
+        about = _evidence_about(setup.observation_reach, claim_id)
+        kept = _surviving_both(alive, about, versions, worlds).sum(axis=1)
+        counting[claim_id] = kept.astype(numpy.float64) / worlds
     return _Sample(
         priors=priors,
         likelihood=likelihood,
         inner_spread=inner,
-        weights=weights,
-        survival=float(kept.sum()) / float(versions * worlds),
+        weights=MappingProxyType(counting),
+        survival=float(survived_all.sum()) / float(versions * worlds),
     )
 
 
@@ -1278,10 +1315,10 @@ def _one_pass(
     coins: Mapping[PropositionId, Draws],
     versions: int,
     worlds: int,
-    alive: Flags,
+    alive: Mapping[PropositionId, Flags],
     *,
     reduce: bool,
-) -> tuple[dict[PropositionId, Numbers], dict[PropositionId, Numbers], Flags]:
+) -> tuple[dict[PropositionId, Numbers], dict[PropositionId, Numbers], dict[PropositionId, Flags]]:
     """Walk every claim once, causes first, working out its likelihood in every draw.
 
     Args:
@@ -1307,7 +1344,7 @@ def _one_pass(
     fired: dict[PropositionId, Flags] = {}
     answered: dict[PropositionId, Numbers] = {}
     spread: dict[PropositionId, Numbers] = {}
-    surviving = alive.copy()
+    surviving: dict[PropositionId, Flags] = dict(alive)
 
     for claim_id in setup.order:
         baseline = _log_odds(priors[claim_id]).astype(DRAWING)
@@ -1331,9 +1368,15 @@ def _one_pass(
 
         starts = _point_of(setup.points, setup.settled[claim_id])
         for spell in setup.spells[claim_id]:
-            if spell.kind == "observe":
+            if spell.kind == "observe" and _still_holds(spell):
                 at = _point_of(setup.points, spell.starts)
-                surviving &= came_true[:, :, at] == spell.value
+                # This observation's own worlds, kept apart from every other
+                # observation's. Pooling them is what let an observation in one
+                # piece of a map move a claim in another.
+                kept = came_true[:, :, at] == spell.value
+                surviving[claim_id] = (
+                    kept if claim_id not in surviving else surviving[claim_id] & kept
+                )
         held, word = _fixed_days(setup, claim_id)
         if held.any():
             answer = numpy.where(held[None, None, :], word[None, None, :], answer)
@@ -1342,10 +1385,59 @@ def _one_pass(
         truth[claim_id] = came_true
         fired[claim_id] = came_true[:, :, starts]
         if reduce:
-            weighted = claim_id in setup.observation_reach
-            answered[claim_id], spread[claim_id] = _per_version(answer, surviving, weighted)
+            # Read through the worlds that survived **the observations this claim
+            # is evidence of**, and no others. A claim no observation is evidence
+            # about is read off every world, which is both exact and what keeps a
+            # coin flip somewhere else from moving a number nobody touched.
+            about = _evidence_about(setup.observation_reach, claim_id)
+            answered[claim_id], spread[claim_id] = _per_version(
+                answer, _surviving_both(surviving, about, versions, worlds), bool(about)
+            )
 
     return answered, spread, surviving
+
+
+def _still_holds(spell: _Spell) -> bool:
+    """Say whether a stretch of days is one this edit's word actually covers.
+
+    A later edit on the same claim ends an earlier one's stretch, and where the
+    later edit lands on the very same day the earlier stretch covers no day at all.
+    **An observation no longer in force throws no world away**: the user said "this
+    happened" and then said "suppose it did not", and the second word is the one in
+    force. Discarding worlds for the first would be reading news the user has
+    withdrawn — and it leaked, because the worlds an observation discards are how
+    much every version it is evidence about counts.
+    """
+    return spell.ends is None or spell.ends > spell.starts
+
+
+def _surviving_both(
+    surviving: Mapping[PropositionId, Flags],
+    about: Sequence[PropositionId],
+    versions: int,
+    worlds: int,
+) -> Flags:
+    """Which worlds survived **every** observation that is evidence about one claim.
+
+    A claim two observations are both evidence about is read through the worlds
+    that survived both of them: each one really is news about it, and a world that
+    contradicts either is not a world this claim can be read in. A claim only one
+    of them reaches is read through that one alone. A claim neither reaches is read
+    through every world there is.
+
+    Args:
+        surviving: Which worlds survived each observation, by the claim observed.
+        about: The observations that are evidence about the claim being read.
+        versions: The outer loop.
+        worlds: The inner loop.
+
+    Returns:
+        One flag per version per world.
+    """
+    kept = numpy.ones((versions, worlds), dtype=bool)
+    for observed in about:
+        kept = kept & surviving[observed]
+    return kept
 
 
 def _point_of(points: NDArray[numpy.int64], day: int) -> int:
@@ -1600,11 +1692,32 @@ def _world_from(
         drawn[claim_id] = tuple(setup.states[claim_id][one] for one in sent)
 
     said = list(setup.warnings)
-    if setup.observation_reach and sample.survival < LOWEST_SURVIVAL:
+    # **The warning is about a claim's reading, not about the map.** Each claim is
+    # read through the worlds that survived the observations that are evidence
+    # about *it*, so how thin that reading is differs from claim to claim: two
+    # observations can each keep plenty of worlds while almost none survive both,
+    # and a claim in a piece of the map neither of them touches is read off every
+    # world and is perfectly well supported. Saying "x per cent of the worlds
+    # survived" about the whole map would be true of no claim in particular.
+    starved = sorted(
+        (float(sample.weights[claim_id].mean()), claim_id)
+        for claim_id in setup.order
+        if _evidence_about(setup.observation_reach, claim_id)
+        and float(sample.weights[claim_id].mean()) < LOWEST_SURVIVAL
+    )
+    if starved:
+        thinnest, claim_id = starved[0]
+        others = (
+            ""
+            if len(starved) == 1
+            else f", and {len(starved) - 1} other claim{'' if len(starved) == 2 else 's'} "
+            "{is_are} as thinly supported".format(is_are="is" if len(starved) == 2 else "are")
+        )
+        numbers = "that number" if len(starved) == 1 else "those numbers"
         said.append(
-            f"Only {sample.survival * 100:.1f} per cent of the simulated worlds match what was "
-            "observed, so the range on every number here is unreliable — not just the number "
-            "itself."
+            f"Only {thinnest * 100:.1f} per cent of the simulated worlds match everything "
+            f"observed about {_name_of(setup.claims, claim_id)}{others}, so the range on "
+            f"{numbers} is unreliable — not just the number itself."
         )
 
     return World(

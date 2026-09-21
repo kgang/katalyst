@@ -566,6 +566,176 @@ def test_an_observation_moves_a_cause_even_when_no_arrow_pushes(data: st.DataObj
     assert any(learned.beliefs[one] != base.beliefs[one] for one in causes)
 
 
+def _two_pieces() -> Graph:
+    """A map in two halves with nothing joining them: `near -> far`, and `other -> beyond`.
+
+    Nothing here is typed for effect: every arrow pushes nothing at all, so the
+    only thing that can move a claim is how the versions are counted.
+    """
+    return _map(
+        (
+            _claim("near", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("far", kind="market", prior=(0.4, 0.2, 0.6)),
+            _claim("other", kind="event", prior=(0.5, 0.25, 0.75)),
+            _claim("beyond", kind="market", prior=(0.4, 0.2, 0.6)),
+        ),
+        (_arrow("near", "far", strength=0.0), _arrow("other", "beyond", strength=0.0)),
+    )
+
+
+def test_an_observation_in_one_piece_moves_nothing_in_another() -> None:
+    """Observing something in one half of a map moves nothing in the other half.
+
+    Two halves, no arrow and no cause between them. Observing `near` is evidence
+    about `near` and `far` and about nothing else; observing `other` is evidence
+    about `other` and `beyond`. Under the model the engine draws from those two
+    halves are independent — no arrow ties a draw for one to a draw for the other —
+    so conditioning on one of them says nothing whatever about the other's piece.
+
+    It used to say something. The worlds thrown away were pooled across **every**
+    observation on the branch, so a claim that *some* observation was evidence
+    about was read through *all* of them: observing `other` threw away worlds, that
+    changed how much each version counted, and `far` — which only the first
+    observation reaches — moved with it. Measured before the fix, on the sequence a
+    state machine shrank to: a claim in the far piece moved by **`.083`**, sixteen
+    times the floor at which this product calls anything a move.
+
+    The order the two observations are made in must not matter either, and the test
+    says so: an edit that changes nothing cannot change something by being made
+    second.
+    """
+    graph = _two_pieces()
+    alone = _folded(graph, Observe(target="near", value=True))
+    with_the_other = _folded(
+        graph, Observe(target="near", value=True), Observe(target="other", value=True)
+    )
+    other_first = _folded(
+        graph, Observe(target="other", value=True), Observe(target="near", value=True)
+    )
+
+    for claim_id in ("near", "far"):
+        assert with_the_other.beliefs[claim_id] == alone.beliefs[claim_id], claim_id
+        assert other_first.beliefs[claim_id] == alone.beliefs[claim_id], claim_id
+    # And the other way round, so neither half is special.
+    only_other = _folded(graph, Observe(target="other", value=True))
+    for claim_id in ("other", "beyond"):
+        assert with_the_other.beliefs[claim_id] == only_other.beliefs[claim_id], claim_id
+
+
+def test_two_observations_in_one_piece_are_both_evidence_about_it() -> None:
+    """A claim both observations reach is read through the worlds that survived both.
+
+    The mirror of the test above, and the reason it is not merely convenient to
+    keep observations apart: where two observations really are both evidence about
+    a claim, both must still count. Here they are on one chain, so the claim
+    downstream of both is read through the worlds that survived both — and adding
+    the second observation moves it, as it should.
+    """
+    graph = _map(
+        (
+            _claim("top", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("middle", prior=(0.5, 0.25, 0.75)),
+            _claim("ending", kind="market", prior=(0.4, 0.2, 0.6)),
+        ),
+        (_arrow("top", "middle", strength=1.5), _arrow("middle", "ending", strength=1.5)),
+    )
+    one = _folded(graph, Observe(target="top", value=True))
+    both = _folded(graph, Observe(target="top", value=True), Observe(target="middle", value=True))
+
+    assert both.beliefs["ending"] != one.beliefs["ending"], "the second observation is evidence too"
+    assert 0.0 <= both.beliefs["ending"].p <= 1.0
+
+
+def test_an_observation_a_later_supposition_cuts_off_stops_being_evidence() -> None:
+    """Supposing a claim cuts its causes off, and an observation upstream stops reaching past it.
+
+    A `do` cuts every arrow into its target, so what was upstream of the observed
+    claim is no longer joined to it — and an observation's reach is read off the map
+    the edits leave behind, not off the map as written. So the claim above the
+    supposition goes back to being read off every world.
+    """
+    graph = _map(
+        (
+            _claim("cause", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("seen", prior=(0.5, 0.25, 0.75)),
+            _claim("ending", kind="market", prior=(0.4, 0.2, 0.6)),
+        ),
+        (_arrow("cause", "seen", strength=1.5), _arrow("seen", "ending", strength=1.5)),
+    )
+    reaching = _folded(graph, Observe(target="seen", value=True))
+    cut = _folded(graph, Observe(target="seen", value=True), Do(target="seen", value=True, at=None))
+
+    assert "cause" in versions_of(reaching).reweighted
+    assert "cause" not in versions_of(cut).reweighted
+    assert cut.beliefs["cause"] == _folded(graph).beliefs["cause"]
+
+
+def test_a_claim_one_observation_reaches_is_read_through_that_one_alone() -> None:
+    """A claim downstream of a claim two observations reach, but reached by only one.
+
+    The case that looks like it should be pooled and must not be. `shared` is
+    reached by both observations — it is upstream of `seen` and upstream of the
+    other piece's `also_seen` is not, so read carefully: here `only_a` hangs off
+    `seen` alone, so only the first observation is evidence about it, while `seen`
+    itself is reached by the first only and `shared` by the first only. The claim
+    to watch is `only_a`: adding an observation in the other piece must leave it
+    exactly where it was, even though the branch now carries two observations.
+    """
+    graph = _map(
+        (
+            _claim("shared", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("seen", prior=(0.5, 0.25, 0.75)),
+            _claim("only_a", kind="market", prior=(0.4, 0.2, 0.6)),
+            _claim("apart", prior=(0.5, 0.25, 0.75)),
+            _claim("also_seen", kind="market", prior=(0.4, 0.2, 0.6)),
+        ),
+        (
+            _arrow("shared", "seen", strength=1.5),
+            _arrow("seen", "only_a", strength=1.5),
+            _arrow("apart", "also_seen", strength=1.5),
+        ),
+    )
+    one = _folded(graph, Observe(target="seen", value=True))
+    two = _folded(
+        graph, Observe(target="seen", value=True), Observe(target="also_seen", value=True)
+    )
+
+    for claim_id in ("shared", "seen", "only_a"):
+        assert two.beliefs[claim_id] == one.beliefs[claim_id], claim_id
+    # And the second observation did reach its own piece.
+    assert two.beliefs["also_seen"] != one.beliefs["also_seen"]
+
+
+def test_an_observation_a_later_supposition_overrode_throws_no_world_away() -> None:
+    """ "This happened", then "suppose it did not": the second word is the one in force.
+
+    A later edit on the same claim ends an earlier one's stretch, and where it lands
+    on the same day the earlier stretch covers no day at all. An observation in that
+    position must discard nothing — the user withdrew the news — and it used to
+    discard worlds anyway, which leaked: the worlds an observation throws away are
+    how much every version it is evidence about counts, so a withdrawn observation
+    was still moving claims in a piece of the map nothing connected it to.
+
+    The check is the sharp one: every number the world reports is byte-identical
+    to the one the supposition alone produces. The two differ in `assignments`
+    alone, and rightly — that is the record of what the user did, and they did make
+    two edits.
+    """
+    graph = _two_pieces()
+    withdrawn = _folded(
+        graph,
+        Observe(target="near", value=True),
+        Do(target="near", value=False, at=None),
+    )
+    only_supposed = _folded(graph, Do(target="near", value=False, at=None))
+
+    answers = {"exclude": {"assignments"}}
+    assert withdrawn.model_dump_json(**answers) == only_supposed.model_dump_json(**answers)
+    # And in particular the far piece, which the observation never had business with.
+    for claim_id in ("other", "beyond"):
+        assert withdrawn.beliefs[claim_id] == _folded(graph).beliefs[claim_id], claim_id
+
+
 def test_observe_warns_below_two_percent_survival() -> None:
     """When almost no world survives an observation, the world says the *range* is unreliable.
 

@@ -301,8 +301,8 @@ def _weights_the_number_was_read_with(behind: Versions, claim_id: str) -> Number
     the share of its worlds that survived what was observed.
     """
     if claim_id in behind.reweighted:
-        return behind.weights
-    return numpy.ones_like(behind.weights)
+        return behind.weights[claim_id]
+    return numpy.ones_like(behind.weights[claim_id])
 
 
 def _one_number(per_version: Numbers, counting: Numbers) -> float:
@@ -312,8 +312,8 @@ def _one_number(per_version: Numbers, counting: Numbers) -> float:
 
 def _count_every_version_the_same(behind_a: Versions, behind_b: Versions, claim_id: str) -> Numbers:
     """Stand in for the weights so that every version counts 1, whatever was observed."""
-    del behind_b, claim_id
-    return numpy.ones_like(behind_a.weights)
+    del behind_b
+    return numpy.ones_like(behind_a.weights[claim_id])
 
 
 def _weakest_on_the_best_route(graph: Graph, subjects: set[str], target: str) -> float:
@@ -712,7 +712,7 @@ def test_an_observation_puts_a_row_on_the_rail() -> None:
     assert not isinstance(answer, list), answer
 
     behind = versions_of(learned)
-    assert bool((behind.weights == 0.0).any()), "this observation empties some versions"
+    assert bool((behind.weights["M1"] == 0.0).any()), "this observation empties some versions"
 
     assert [one.target for one in answer.rows] == ["M1", "M2"]
     for row in answer.rows:
@@ -734,7 +734,7 @@ def test_a_dead_version_does_not_vote() -> None:
     base = _hormuz_world(None)
     learned = _hormuz_world(_observing("B"))
     behind_a, behind_b = versions_of(base), versions_of(learned)
-    dead = behind_b.weights == 0.0
+    dead = behind_b.weights["M1"] == 0.0
     assert bool(dead.any()), "this observation empties some versions"
 
     for claim in learned.graph.propositions:
@@ -824,7 +824,7 @@ def test_an_edit_that_is_not_an_observation_is_unchanged_by_the_weights(
         second = _hormuz_world(branch)
         behind = versions_of(second)
         assert not behind.reweighted, "nothing on this branch was observed"
-        assert bool((behind.weights == 1.0).all())
+        assert all(bool((one == 1.0).all()) for one in behind.weights.values())
 
         as_built = diff(base, second, edit_in_words=branch.label)
         assert not isinstance(as_built, list), as_built
@@ -908,9 +908,9 @@ def test_a_world_that_kept_nothing_does_not_erase_the_other_worlds_weights() -> 
 
     # The corner is only the corner if one world really kept nothing, the other
     # really is weighted, and the claim is one both observations are evidence about.
-    assert behind_b.weights.sum() == 0.0, "this observation was meant to keep nothing"
-    assert behind_a.weights.sum() > 0.0
-    assert not bool((behind_a.weights == 1.0).all()), "this observation was meant to weigh"
+    assert behind_b.weights["top"].sum() == 0.0, "this observation was meant to keep nothing"
+    assert behind_a.weights["top"].sum() > 0.0
+    assert not bool((behind_a.weights["top"] == 1.0).all()), "this observation was meant to weigh"
     assert "top" in behind_a.reweighted and "top" in behind_b.reweighted
 
     # The starved world counts every version the same — on its own, which is what
