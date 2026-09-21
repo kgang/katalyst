@@ -6,7 +6,7 @@ Someone from the Catalyst team clones this repository, runs `docker compose up`,
 
 **Replay puts all of it in front of them.** With no key, the four example hypotheses from `ASSIGNMENT.md` play from committed recordings, through the same route, the same stream and the same canvas the live path uses. The only substitution anywhere is where the bytes came from, and the screen says so.
 
-This is decision record 0012, accepted by Kent on 2026-09-17, made concrete: the file format, what is stored and what is deliberately not, how a recording is written, the one scripted intervention each one carries, the refusal every one of them must show, and the build check that keeps them from going stale in silence.
+This is decision record 0012, accepted by Kent on 2026-09-17, made concrete: the file format, what is stored and what is deliberately not, how a recording is written, the one scripted intervention each one carries, how a run's refusals are shown honestly whether there were any or none, and the build check that keeps them from going stale in silence.
 
 Record 0012 names four event types. **This chapter names all eight** — and one of those four is the single event a recording never stores.
 
@@ -40,7 +40,7 @@ class RecordingHeader(BaseModel):
     """
     base_id: str              # the identifier of the map this recording builds
     seed: int                 # the one number domain/ re-propagates with
-    recording_date: date      # the day `make record-demo` wrote this file
+    recording_date: date      # the day the run behind this file was made
     prompt_hash: str          # a hash of the prompt the run was made against
     insert: RecordedInsert    # the one "…but X happens" this recording can answer
 
@@ -61,7 +61,7 @@ class RecordedInsert(BaseModel):
 |---|---|---|
 | `generation_started` | yes | The identifier, the seed, the sentence, the destination |
 | `proposal_accepted` | yes | The claim and its arrows, with the identifiers minted at record time |
-| `proposal_rejected` | yes | The refusal and the validator's own sentences. **At least one per file** |
+| `proposal_rejected` | yes | Every refusal the run produced, in order. **Zero is a legal count** (Kent, G9, 2026-09-20) |
 | `beliefs_propagated` | **no** | Recomputed. See below |
 | `verdict` | yes, on a Verify example | Reached, or `no_path` with the nearest claim |
 | `receipt` | yes | The original run's tally, which the replay rebuilds from |
@@ -118,7 +118,7 @@ The first screen asks `GET /api/readyz` — the one route it reads, and the one 
 class RecordingSummary(BaseModel):
     """One recording the first screen can offer, and when it was made."""
     example: str              # the short name of the example, matching its file name
-    recording_date: date      # the day `make record-demo` wrote it
+    recording_date: date      # the day the run behind it was made
 
 
 class Readiness(BaseModel):
@@ -179,27 +179,38 @@ The reviewer types a sentence of their own. The route answers, plainly:
 
 Not an error, not a stack trace, not a disabled button with no explanation. It is the one thing in the whole replayed flow that genuinely needs a key, and saying so is more honest than hiding the button.
 
-### B6 — `make record-demo`, the only writer
+### B6 — Two commands: one spends, one promotes. **A paid run is never discarded**
+
+The first live runs taught this the expensive way: a run costs real money and takes about a tile a minute, so throwing one away because it failed a check afterwards throws away the measurement as well as the map.
 
 ```
-make record-demo            # every example, at the cap written in code
-make record-demo CAP=…      # the same, with a lower ceiling
-make record-demo ONLY=hormuz
+make run-demo    ONLY=hormuz CAP=…   # spends money, measures, keeps everything. Writes NO recording
+make record-demo ONLY=hormuz CAP=…   # runs the above, then promotes the result if it passes the checks
 ```
 
-* It runs the examples **live, against a real key**, and writes one file each. **Nothing else ever writes a recording** — not a test, not a fixture script, not a person with an editor.
+* **`make run-demo` always keeps the whole run**, whatever becomes of it, under **`backend/.runs/<example>-<when>.jsonl`** — the same file format as a recording, git-ignored, never shipped. Every paid call is on disk before anything decides whether it was any good. This is where the first measured run lives, and it is where the next one's receipt is read from for `STATUS.md`.
+* **`make record-demo` is still the only way a file lands in `backend/recordings/`.** It runs `make run-demo` and then promotes the result — copying it across **only if it passes every check in B9**. A run that fails a check stays in `.runs/`, legible and re-readable, and the person decides what to do next.
 * `CAP` is the run's spending ceiling in dollars (Kent, G5). The default is the **$15 hard stop written in code**, checked against the running receipt after every call; a run that reaches it stops with `done.reason = "spend_cap"` and a plain sentence naming what was spent and what was got. **The argument can only lower the ceiling, never raise it above the figure in code** — a cap a caller can raise is not a cap. The cross-run total for the stack, about $500, is a working agreement kept in `STATUS.md`; nothing is stored between runs until stack 05.
-* With no key it refuses to start and says so. **Only the coordinator runs it**; no sub-agent holds a key.
+* `ONLY` names one example, because G6 records Hormuz well before the other three.
+* With no key both refuse to start and say so. **Only the coordinator runs either**; no sub-agent holds a key.
 * **A recording is re-made whenever a prompt changes.** This is the rule the cassettes already carry (decision record 0008), on the same pull-request checklist line: *"prompt changed? cassettes re-recorded, demo recordings re-recorded"*.
-* **A run that produced no refusal is re-run, never edited.** See B7.
+* **Nothing else ever writes a recording** — not a test, not a fixture script, not a person with an editor.
 
-### B7 — Every recording shows a miss
+### B7 — A recording shows what happened, refusals and all
 
-Each of the four holds **at least one `proposal_rejected`** — a proposal that would close a loop, a claim with no resolution criteria, an arrow marked `documented` that cites nothing. The reviewer watches the validator refuse the model, not only the happy path, and that is half of what the product is.
+**Every refusal that occurred is in the file, in the order it occurred. A recording with no refusals in it is a valid recording** (Kent, G9, 2026-09-20; decision record 0012 carries the dated amendment).
 
-It is also a fence against a real temptation: recording only the runs that went beautifully. The rule takes the choice away, and the build checks it.
+The rule used to be that every recording had to hold at least one `proposal_rejected`. It was written before anything had been run, and the first two full live runs settled it: **26 proposals, none refused.** Keeping the old rule would have meant one of two things, and both are the thing this product exists not to do — re-running until the model happened to err, or opening a file and writing a refusal into it by hand.
 
-If a run happens to produce no refusal, the answer is to **run it again**, not to open the file and add one. A hand-written line in a recording is a piece of state that traces to nobody — which is one of the two things Kent vetoes on sight.
+So the screen says what is true. When a recording holds no refusal, the refusal strip beside the map carries one line:
+
+> **The rules refused nothing in this run.**
+
+Not an empty panel, which reads as *not built*, and not a hidden panel, which reads as *nothing to see*. The wording is shared with the workbench chapter that draws the strip (`spec/workbench/streaming-growth.md`), so the live path and the replayed path say the same sentence.
+
+**The validator is still visibly at work with no key**, and through a better door than a staged refusal: **a refused user edit.** Every intervention on a replayed map goes through `domain.validate` live (B3), so a reviewer who supposes something the map cannot carry — an arrow that touches neither end of a new claim, a branch that names a claim that is not there — sees every violation at once, with the validator's own sentences, on a machine with no key at all. That path is built in the join (stack 04a) and it is exercised by a person rather than waited for.
+
+What is lost, said honestly: the reviewer no longer sees the model being refused on the happy path. What is gained is that nothing on screen was arranged.
 
 ### B8 — The prompt hash, and the check that uses it
 
@@ -211,19 +222,39 @@ The consequence, said plainly so nobody is surprised by it: **change a prompt an
 
 ### B9 — The `recordings` build job
 
-A sixth job beside `backend`, `frontend`, `types-fresh`, `docker` and `e2e`. **It has no key and needs none** (INV-13: continuous integration runs with no model API key, and the model boundary is exercised only through recorded responses). It checks, for every file under `backend/recordings/`:
+A sixth job beside `backend`, `frontend`, `types-fresh`, `docker` and `e2e`. **It has no key and needs none** (INV-13: continuous integration runs with no model API key, and the model boundary is exercised only through recorded responses). `engine/check_recordings.py` holds the checks, so `make record-demo` can run exactly the same ones before promoting a file. For every file in the recordings folder:
 
 1. every line parses as JSON, and line 1 is a header with all its fields;
 2. every line after the first is one of the eight events, with a payload that validates against it;
 3. the sequence obeys the grammar in [`streaming.md`](streaming.md), ends in `done`, and holds no `beliefs_propagated`;
-4. at least one line is a `proposal_rejected`;
+4. **every refusal the run produced is present, in order** — checked as fidelity to the run it came from, not as a quota. Zero is a legal count;
 5. the header carries one recorded intervention, and its `Insert` validates;
 6. the header's `prompt_hash` equals the current prompt's;
-7. no two files carry the same `generation_started.hypothesis` after trimming, so the match in B2 can never be ambiguous.
+7. no two files carry the same `generation_started.hypothesis` after trimming, so the match in B2 can never be ambiguous;
+8. the file's name is one of the four example names below.
 
 **It passes on an empty folder**, so it is green from the commit that adds it and stays green until the first recording lands. `gitleaks`, the secret scanner that already runs before every commit, scans this folder too (NFR-8: no key in a committed file).
 
-### B10 — The order the four are recorded in
+### B10 — The recordings folder is one setting
+
+Which folder is read is **`RECORDINGS_DIR`**, a setting like everything else the environment says, read once by `katalyst.settings`. The default is `backend/recordings/`.
+
+It is a setting for one reason that is not configurability: **the tests and the browser's end-to-end run need to point at a small recording of their own.** The end-to-end test drives the real launchpad through the real stream with no key, and it should not depend on whichever of the four real recordings happens to be committed today, nor take a real recording's minute of paced playback. One setting gives it a fixture-sized file of its own, through exactly the same code path. Without it the choice is a test that is slow and coupled to real recordings, or a second loading path built only for tests — and a second path is the one that rots.
+
+### B11 — The four examples, named
+
+| File | The sentence, from `ASSIGNMENT.md` |
+|---|---|
+| `hormuz.jsonl` | *The Strait of Hormuz is going to open next week.* |
+| `midterms.jsonl` | *Republicans win the House but Democrats take the Senate during the Midterm.* |
+| `export-controls.jsonl` | *Models more capable than Fable get export restricted by the United States.* |
+| `photonics.jsonl` | *Photonic chips get adopted faster than expected.* |
+
+The four short names — `hormuz`, `midterms`, `export-controls`, `photonics` — are the launchpad's four cards, the four recording files, and the four eval case identifiers in [`evaluation.md`](evaluation.md). **One name per example, in all three places**, so a person reading a red build knows which card is broken without a lookup table. They name the example, never the map: the map inside carries a minted identifier (see the header above).
+
+**Each example's one scripted insert is drafted live, by the ordinary machinery.** There is no special shape for it and no hand-written claim: when a recording is made, the scripted "…but X happens" sentence goes through the same route a reviewer's insert would — the starting-claim shape drafts the claim, the ordinary walk proposes its arrows — and the validated result is stored in the header. So the thing a keyless reviewer gets is a thing the live pipeline actually produced, on the day the recording was made, and not something anybody typed.
+
+### B12 — The order the four are recorded in
 
 Kent settled this on 2026-09-17 (G6), and it is an order chosen to spend the least money on a prompt that is still moving:
 
@@ -241,19 +272,19 @@ Each statement holds for every input a named generator can produce, and each nam
 
 The generator here is **a finite corpus, not a Hypothesis strategy**, and it has to be: a recording is made by a model, so nothing can conjure one. It is `recordings()` — every file under `backend/recordings/`, the same set the `recordings` build job walks. Tests live in `backend/tests/unit/test_replay.py` and `backend/tests/api/test_generate.py`.
 
-**This chapter holds `INV-generation.20` through `INV-generation.25`**; the split across all five chapters is on the [landing page](README.md).
+**This chapter holds `INV-generation.22` through `INV-generation.27`**; the split across all five chapters is on the [landing page](README.md).
 
-**INV-generation.20 — a replay emits the recording, line for line.** For all files from `recordings()`: the events a replayed generation emits are, name for name and payload for payload, the events in the file — except the rebuilt `receipt` and the recomputed `beliefs_propagated`, which the file does not hold. Test: `test_replay_stream_matches_recording`.
+**INV-generation.22 — a replay emits the recording, line for line.** For all files from `recordings()`: the events a replayed generation emits are, name for name and payload for payload, the events in the file — except the rebuilt `receipt` and the recomputed `beliefs_propagated`, which the file does not hold. Test: `test_replay_stream_matches_recording`.
 
-**INV-generation.21 — a replay gives the same world every time.** For all files from `recordings()`: two independent replays of one file produce worlds that serialize to identical bytes (NFR-2 — the same base map, branch and seed give byte-identical worlds). Test: `test_replay_is_byte_identical_across_runs`.
+**INV-generation.23 — a replay gives the same world every time.** For all files from `recordings()`: two independent replays of one file produce worlds that serialize to identical bytes (NFR-2 — the same base map, branch and seed give byte-identical worlds). Test: `test_replay_is_byte_identical_across_runs`.
 
-**INV-generation.22 — a replay says it is a replay.** For all files from `recordings()`: the receipt the replay emits carries `mode: "replay"`, `dollars` of zero, zero calls and zero tokens, and the header's `recording_date` and `prompt_hash`. Test: `test_replay_is_labelled_in_receipt`.
+**INV-generation.24 — a replay says it is a replay.** For all files from `recordings()`: the receipt the replay emits carries `mode: "replay"`, `dollars` of zero, zero calls and zero tokens, and the header's `recording_date` and `prompt_hash`. Test: `test_replay_is_labelled_in_receipt`.
 
-**INV-generation.23 — no recording holds a number the engine did not just compute.** For all files from `recordings()`: no line is a `beliefs_propagated` event, and no line anywhere in the file contains a serialized `World`. Checked by the `recordings` build job, step 3 above, and by `test_replay_stream_matches_recording`, which would have nothing to recompute if one were there.
+**INV-generation.25 — no recording holds a number the engine did not just compute.** For all files from `recordings()`: no line is a `beliefs_propagated` event, and no line anywhere in the file contains a serialized `World`. Checked by the `recordings` build job, step 3 above, and by `test_replay_stream_matches_recording`, which would have nothing to recompute if one were there.
 
-**INV-generation.24 — every recording shows a miss.** For all files from `recordings()`: at least one line is a `proposal_rejected` event, carrying at least one violation with the validator's own code and sentence. Test: `test_every_recording_shows_a_miss`, and the `recordings` build job, step 4.
+**INV-generation.26 — a recording holds every refusal that happened, and no others.** For all files from `recordings()`: the `proposal_rejected` lines are exactly the refusals the run that made the file produced, in the order it produced them, each carrying every violation with the validator's own code and sentence. **The count may be zero** — that is a fact about the run, not a fault in the file (Kent, G9, 2026-09-20). Test: `test_a_recording_holds_every_refusal_that_happened`, and the `recordings` build job, step 4. *(Replaces `test_every_recording_shows_a_miss`, which demanded at least one and was never satisfied in 26 live proposals.)*
 
-**INV-generation.25 — every recording matches the prompt that is shipping.** For all files from `recordings()`: the header's `prompt_hash` equals the hash `engine/prompt.py` computes for the current prompt. Test: `test_every_recording_carries_the_current_prompt_hash`, and the `recordings` build job, step 6.
+**INV-generation.27 — every recording matches the prompt that is shipping.** For all files from `recordings()`: the header's `prompt_hash` equals the hash `engine/prompt.py` computes for the current prompt. Test: `test_every_recording_carries_the_current_prompt_hash`, and the `recordings` build job, step 6.
 
 **Two more, stated where the behaviour lives but checked here.** `test_generate_needs_no_key_in_replay_mode` — the whole stream route answers with nothing configured (INV-13). `test_intervention_on_replayed_world_needs_no_model` — *Suppose this is true*, *This happened*, *Change this push* and *My own number* resolve inside `domain/` on a replayed map.
 
@@ -263,7 +294,7 @@ The generator here is **a finite corpus, not a Hypothesis strategy**, and it has
 
 **1. Do not store a `World`, a likelihood or a range in a recording.** *Because* the moment propagation changes, the demo shows numbers the engine no longer produces, and nothing in the build notices. **Do** store the seed and let `domain/` recompute — which also makes replay and live agree by construction rather than by care.
 
-**2. Do not record only the runs that went well.** *Because* a demo with no refusals in it has deleted the half of the product where the validator refuses the model, and it quietly misrepresents how often that happens. **Do** require at least one `proposal_rejected` in every file, check it in the build, and **re-run** a clean run rather than editing one.
+**2. Do not arrange what a recording shows — in either direction.** *Because* re-running until the model finally errs, or quietly keeping only the runs that went beautifully, both make the screen a claim about how often something happens rather than a record of what did. **Do** keep every refusal the run produced, in order, keep none it did not, and say *"The rules refused nothing in this run."* when that is the truth. The validator is shown at work through a refused user edit, which a reviewer can trigger on purpose.
 
 **3. Do not hand-edit a recording, ever — not to fix a typo, not to trim a long rationale.** *Because* an edited file is a piece of state that traces to no input, no rule and no source, and it is indistinguishable from a real one afterwards. **Do** treat `make record-demo` as the only writer, and re-record.
 

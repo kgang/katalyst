@@ -137,10 +137,12 @@ The hypothesis and the Verify destination arrive as **sentences a person typed**
 class StartingClaim(BaseModel):
     """One sentence a person typed, turned into a claim that can be checked.
 
-    Used twice at most per generation: for the hypothesis, and for the Verify
-    door's destination. It carries no cause and no arrow, because neither
-    claim has anything before it yet; and it carries no `claim_kind`, because
-    neither is an ending — see the paragraph below.
+    Used wherever a person's own words become a claim: the hypothesis, the
+    Verify door's destination, and the claim a person adds to a finished map
+    with **Add a claim** (B8). It carries no cause and no arrow, because in
+    all three the arrows are somebody else's question; and it carries no
+    `claim_kind`, because none of the three is an ending — see the paragraph
+    below.
 
     It must never carry an identifier, a provenance or an owner, for the same
     reasons a proposal must not.
@@ -232,10 +234,14 @@ Every cap is an argument with a default. Nothing here is a constant buried in a 
 | claims | 30 | How large the map may get |
 | refusals in a row | 3 | How many proposals for **one** frontier claim may be refused before that claim is closed |
 | frontier claims at once | 3 | How many lines are expanded concurrently |
-| searches per generation | 30 | How many web searches the whole run may make ([`grounding.md`](grounding.md)) |
+| searches per call | 25 | How much research one claim may do — the reference class first, then the mechanism (Kent, 2026-09-20) |
+| research rounds per call | 5 | How many times the model may search, read and decide to search again |
+| searches per generation | at least 30 × 25 | The floor, not a guess: the two above over a full map. The pipeline agent picks the default at or above it ([`grounding.md`](grounding.md) B6) |
 | spending per run | $15 | What one generation may cost before it stops (Kent, 2026-09-17) |
 
-The searches cap is set to the claims cap — **one search's worth of budget for each claim the map is allowed to hold** — so it adds no new number to the product. Its reasoning and its behaviour at the limit are in [`grounding.md`](grounding.md). Decision record 0006 *estimates* a 30-claim map at about 40 calls; the first real measurement is taken in stack 04 and written into the pull request and `STATUS.md`, never guessed here.
+The searches cap adds no new number to the product: its floor is the claims cap times one call's research budget, and set any lower it would bind before the research caps do and starve the base rates it exists to pay for. It is deliberately loose, because **the spending cap is what protects the bill** — and with research inside a call, that cap is checked between rounds as well as between calls. The two research caps and what happens when they bind are [`grounding.md`](grounding.md)'s.
+
+Decision record 0006 *estimates* a 30-claim map at about 40 calls. The first real measurement, quoted in B5, is smaller and slower than the estimate; the rest go in the pull request and `STATUS.md`, never guessed here.
 
 ### What a prompt may and may not contain
 
@@ -250,6 +256,15 @@ A prompt is product text. The coordinator reads `engine/prompt.py` end to end be
 - **The text of a violation.** Never, on any call (see B3). Violation text never enters a prompt.
 - **An instruction asking the model to do what our code should do.** No *"do not create a loop"*, no *"do not reuse an identifier"*, no *"mark the arrow documented if you cite a source"*. An instruction that duplicates a check teaches the model to aim at passing the check instead of being right, and when the two disagree nobody can tell which was obeyed.
 - **Anything that changes between calls, in the cached block.** The stable first block is marked for caching (decision record 0006), so the map so far, the frontier claim and the date belong *after* it. A run whose cache reads stay at zero is a bug, not a slow day (`test_generation_receipt_records_cache_reads`).
+- **An example drawn from the map being built.** The first live run's schema descriptions used Hormuz phrasing, on a Hormuz run; an example that echoes the question is an answer handed over in advance.
+
+### Three rules the prompt must carry, because the first live run broke all three
+
+These are not house style. Each is a fault that was **measured** on 2026-09-17, in the first live Hormuz run; each rule was settled on 2026-09-20 on principles this spec already carried; and each is stated in the prompt in the plain words this spec uses.
+
+1. **A claim is one standalone checkable statement, not a narrative.** The run wrote claims like *"With the strait open again, the war premium comes out of crude…"* — a sentence that carries its own cause inside it. A `claim` is what a tile can hold and a person can score on its own: *"Brent crude settles below $68 for five sessions."* **The *because* belongs on the arrow**, in its `rationale`, which is the field that exists for it. A claim that argues for itself cannot be reused by a second arrow, and it double-counts its cause — the cause is drawn on the canvas and written in the box as well.
+2. **`market` means the claim's own resolution is a price or a contract outcome somebody could trade.** A step on the way to one is an `event`, however tradeable the thing at the end is. The test is mechanical: *would a venue settle this exact sentence, or would you have to translate it first?* A `market` claim carries a payoff naming what you would trade; an `event` carries none. Getting this wrong puts a payoff on a step and leaves the real ending unmarked, which is how a map stops ending anywhere you can act on.
+3. **The hypothesis is a claim like any other and gets the same test, judge and date.** The run's own hypothesis came back with resolution criteria of `"Res "` and a judge of `"x "`. Both are the kind of fault nothing downstream can catch: they fit the shape, and `validate`'s rule only asks that the two are not blank — *"Res"* is not blank. Deciding that a sentence is a real test and not a placeholder is grading prose, which is the one thing we refuse to ask code to do. **So the prompt is the only place this can be got right**, and the starting call asks the same three questions, in the same words, as every other call. It is also why this rule is written down here rather than left to whoever writes the prompt.
 
 ---
 
@@ -376,9 +391,13 @@ The generated map is not the shipped fixture and does not pretend to be: it has 
 
 ### B5 — the spending cap stops the run and says what it bought
 
-`engine/receipt.py` folds every `Outcome`'s counters into the run's one receipt, and **the running receipt is checked against the spending cap after every call.** Over the cap, the generation stops where it is: `done.reason = "spend_cap"`, and one plain sentence naming what was spent and what was got — *"This run reached its spending limit of <cap>. It spent <spent> and built <n> claims and <n> arrows."* No figure is written into that sentence, because every one of its slots is filled from the receipt at run time.
+`engine/receipt.py` folds every `Outcome`'s counters into the run's one receipt, and **the running receipt is checked against the spending cap after every call — and, once a call can research, between the rounds inside a call too** ([`grounding.md`](grounding.md)). Over the cap, the generation stops where it is: `done.reason = "spend_cap"`, and one plain sentence naming what was spent and what was got — *"This run reached its spending limit of <cap>. It spent <spent> and built <n> claims and <n> arrows."* No figure is written into that sentence, because every one of its slots is filled from the receipt at run time.
 
-What was built is kept, not thrown away: a partial map with a visible reason beats a blank screen with a silent one. The price table lives in `engine/pricing.py` and nothing else, with the day it was read beside it and the `claude-api` skill named — prices change, and memory is unreliable (`test_a_run_stops_at_its_spending_cap_and_says_so`).
+What was built is kept, not thrown away: a partial map with a visible reason beats a blank screen with a silent one. The price table lives in `engine/pricing.py` and nothing else, per model, with the day it was read beside it and the `claude-api` skill named — prices change, and memory is unreliable (`test_a_run_stops_at_its_spending_cap_and_says_so`).
+
+**The model is one setting** (Kent, 2026-09-20). The prototype runs on `claude-sonnet-5`; `claude-opus-5` is one setting away for a final recording if quality asks for it. **Nothing else in the pipeline knows which model it is** — not `expand`, not the caps, not the provenance rule — and **`Receipt.model` names the one that actually ran**, so no reader has to guess what a map came from.
+
+**One measurement, and it is a fact rather than an estimate.** The first live Hormuz run, 2026-09-17, on `claude-opus-5` at the default effort: **10 calls, 9 searches, $1.32, 10 minutes 54 seconds, 61% of the written tokens spent on thinking, 10 claims, 0 refused.** About one tile a minute, and sequential by nature — every call has to see the map as it stands. No figure is quoted here for `claude-sonnet-5`, on cost or on time, because none has been measured yet; both go in the pull request when they are.
 
 The ceiling *across* runs is a working agreement kept in `STATUS.md`; nothing is stored between requests until stack 05. **Only the coordinator runs a command that spends money.**
 
@@ -400,7 +419,30 @@ A Verify run carries a destination in the person's own words. It is turned into 
 
 **A bridge is never invented.** There is no code path that adds an arrow to make a path exist. The temptation is real and the answer is structural: the engine only ever mints what a proposal contained, and no proposal was made for that arrow. The eval case whose destination is deliberately unreachable is what proves it (`test_verify_returns_no_path_rather_than_a_bridge`).
 
-### B8 — the stated range ships as stated, and is labelled
+### B8 — **Add a claim** needs no new shape *(settled 2026-09-20)*
+
+A person looking at a finished map types *"…but Iran is struck the next day."* That claim is not like the hypothesis or the Verify destination: **its arrows point outwards**. A strike *causes* things — it pushes the oil price, it pushes the insurance premium, it withdraws what was holding the strait open — and `ClaimProposal` cannot say that, because its one arrow points *into* the claim being proposed.
+
+The answer is not a fourth proposal shape. It is the two shapes we have, used in the order the map itself is built in:
+
+1. **One call drafts the sentence into a claim**, with the existing `StartingClaim` shape. The person's words in, a claim with a test, a judge, a date and a likelihood out. Nothing about arrows is asked, because nothing about arrows is known yet. It is stamped `kind="event"` and its identifier is minted here.
+2. **Then the ordinary machinery proposes its arrows, one per call**, as `LinkProposal`s with the new claim as one end — both ends already on the map, which is exactly what a `LinkProposal` is for. Each is validated like any other proposal: a loop is refused, a `documented` arrow with nothing kept is impossible, every arrow needs a rationale.
+3. **It stops the way everything stops**: on `Stop`, on the width cap, or on three refusals in a row. No new stop rule, no new cap.
+4. **The answer is one `Insert` intervention** — the claim and its arrows together — for the browser to append to its branch. A map is never left holding a claim that causes nothing.
+
+**One proposal per call still holds.** Nothing here asks for a list; a person's one sentence simply takes one drafting call plus one call per arrow.
+
+Worked, Hormuz. The person types *"…but Iran is struck the next day"* on the finished map.
+
+- The drafting call returns `S`: *"A confirmed military strike on Iranian territory"*, judged by the AP, Reuters and AFP newswires, with a date and a likelihood.
+- `S → B` is proposed and accepted: a `trigger`, an `impulse`, against the oil price — a strike puts the war-risk premium back into crude faster than transit data takes it out.
+- `S → C` is proposed and accepted: a `sustain`, a `step`, against the insurance premium — underwriters price the threat they can see, not the transit counts.
+- `S → H` is proposed and accepted: a `sustain` against the strait being open. **This is the arrow the whole product exists to draw**, and it is an ordinary `LinkProposal` like the other two.
+- The next call answers `Stop`. Three arrows, at the width cap anyway.
+
+The result is one `Insert` carrying `S` and its three arrows, and from there it is arithmetic: the browser appends it to the branch and `domain/` works the change through. **This is the single exception to "never re-prompt after an edit"** (anti-pattern 2) — one claim, its own arrows, and nothing else re-asked. The route that carries it and the field names on its request belong to [`streaming.md`](streaming.md); `test_an_insert_is_validated_like_any_other_proposal` is where it is pinned.
+
+### B9 — the stated range ships as stated, and is labelled
 
 `ClaimProposal.prior` is three numbers the model wrote. They are stamped `owner="model"` and stored **unchanged**. There is no ensemble: no second, third or fourth generation, no re-asking the same question to see how far the answers spread, no run-to-run number anywhere in this stack (Kent, 2026-09-17; decision record 0015).
 
@@ -442,6 +484,9 @@ Two more tests belong to this pull request and are stated where they are owned: 
 7. **Do not ask for a list** — no *"give me the next three claims"*, no *"return the whole subtree"* — *because* a list cannot be streamed one refusal at a time, one bad member invalidates the whole answer, and it records as one large cassette instead of several small stable ones. **Instead:** one call, one proposal, composed by our pipeline.
 8. **Do not put a number in a prompt** — not an example strength, not an example likelihood — *because* the model will copy it and the copy cannot say where it came from. **Instead:** describe the scale in words and let the answer be the model's.
 9. **Do not widen the stated range because the research says stated ranges are too narrow** — *because* the field would then hold a number nobody stated and nobody measured, and record 0014 defines it as the model's own 10th and 90th percentiles. **Instead:** ship what was stated, label it *uncalibrated*, and quote the coverage figure with its source.
+10. **Do not let a claim narrate its own cause** — *"With the strait open again, the war premium comes out of crude…"* — *because* the cause is already drawn as an arrow and written in that arrow's rationale, so the box says it twice; because a claim that argues for itself cannot be reused by a second arrow; and because nobody can score it. Measured in the first live run. **Instead:** one standalone statement in `claim`, and the *because* on the arrow, where the field for it already exists.
+11. **Do not mark a step `market` because the chain ends in something tradeable** — *because* a payoff on a step names a trade the claim cannot settle, and it leaves the real ending unmarked, so the map stops ending anywhere a person can act. **Instead:** ask whether a venue would settle this exact sentence. If it would not, it is an `event` and carries no payoff.
+12. **Do not add a proposal shape for a claim whose arrows point outwards** — the temptation is real the first time **Add a claim** is built. *Because* a fourth shape means a fourth thing to validate, a fourth thing to record, and a second way to say what `LinkProposal` already says. **Instead:** draft the claim once with the starting shape, then propose its arrows one call at a time (B8).
 
 ---
 
@@ -452,7 +497,7 @@ Two more tests belong to this pull request and are stated where they are owned: 
 1. **Should `done.reason` carry `search_cap`?** As first asked: the shapes sheet listed the value, and under [`grounding.md`](grounding.md)'s rule nothing could ever choose it — reaching the searches cap turns searching off and the generation carries on.
    **Decided 2026-09-17, in the cross-chapter review: no. The value is gone**, and `Done.reason` has seven. A reason nobody can produce is a reason a reader will one day trust. [`streaming.md`](streaming.md) carries the seven.
 2. **Does the vendor's structured-output call take a discriminated union directly?**
-   **Answered 2026-09-17, when the pipeline was built: yes.** The client library's `messages.parse` takes the union of three shapes as it stands, so there is no one-field envelope and no field was renamed.
+   **Answered 2026-09-17, by the first live call: no.** The service refuses a union at the top of a schema — *"For 'anyOf', '$defs' is not supported"* — so the union travels inside a **one-field envelope, on the wire only**. The envelope is built and unwrapped in `engine/client.py`; **the pipeline still asks for and receives a plain `Proposal`**, and no shape in this chapter changed. A reader of `expand` never meets the envelope, which is the point of putting it at the boundary.
 3. **Should a vendor refusal and a malformed answer carry codes of their own?** Today both arrive as a `Refused` with an empty violation list and a plain sentence, so a reader cannot tell *the model declined* from *the answer did not parse* except by reading the sentence. Such a code would live in `engine/`, not in `domain/validity.py`, because neither is a fault in a map — the nineteen codes there stay nineteen.
 4. **A generated map can hold no feedback arrow.** `LinkDraft` has no `reflexive` field, so the one kind of arrow allowed to close a loop cannot be proposed, and a proposal that closes a loop is always refused. The shipped example has one such arrow, hand-written. Add the field in stack 06, when unrolling a feedback arrow over time actually does something?
 5. **Which day a generated claim's resolve-by date is checked against.** `validate` reads no clock, so a model that writes a date already past is not caught by the map's rules. `engine/` can see today. Is a stale date a violation, a warning on the world, or nothing? This is [`../graph/proposition.md`](../graph/proposition.md) Open questions 4, still open, and generation is the first caller that could answer it.

@@ -144,7 +144,7 @@ Priority: **P0** — the hero flow does not exist without it. **P1** — the too
 - **FR-27 (P1)** Strategy export: a declarative JSON document (schema in `spec/thesis/`) with legs, conditions, and the graph references that justify each — the shape a downstream trading agent could ingest.
 
 ### 6.8 Grounding
-- **FR-28 (P1)** Evidence retrieval at generation time (server-side web search); sources attach to links with direction and weight.
+- **FR-28 (P1)** Retrieval at generation time (server-side web search). **A search result becomes a `Source` on an arrow and nothing else** — an address that opens, the page's own title, and the day it was fetched; a source carries **no direction and no weight** (amended 2026-09-20: the old wording, "sources attach to links with direction and weight", named two different things at once). Direction and weight belong to an **`Evidence`** item on a *claim* — what the Inspector draws as bars for and against — and **generation writes none**, because both of those numbers would have to be invented; a generated claim's evidence list is empty and the panel says so. A base rate is kept only when it cites a page the search returned, on the same rule.
 - **FR-29 (P2)** Historical-analog panel: for a link, past instances and how prices moved around them, with an uncertainty band (an event study).
 - **FR-30 (P2)** Pastcast self-test: run a chain on a resolved 2024–25 event with a date-frozen corpus and show the Brier score (the standard accuracy score for probability forecasts; lower is better), including when it is bad.
 
@@ -176,13 +176,13 @@ The direction is D3. The research's "Instrument" craft rules (typography, color,
 
 ## 8. Non-functional requirements
 
-- **NFR-1 Honesty.** Beliefs render at two significant figures — the number and both ends of its range — with their interval (`.35 (.22–.50)`), never `.347`, and never as a certainty: what would round to `1.0` prints `>.99`, and what would round to `.0` prints `<.01`. Every number is one click from rationale, sources, base rate.
+- **NFR-1 Honesty.** Beliefs render at two significant figures — the number and both ends of its range — with their interval (`.35 (.22–.50)`), never `.347`, and never as a certainty: **a likelihood below `.01` prints `<.01`, and one above `.99` prints `>.99`** (amended 2026-09-20: that is where the guard begins, rather than wherever rounding happens to reach `.0` or `1.0`). **A move is not a likelihood**: the size of a change keeps two significant figures however small — `.36 · up by .0090` — because a move rounded away reads as no move at all, and the engine and the browser round by the same rule, pinned by a test that compares them. Every number is one click from rationale, sources, base rate.
 - **NFR-2 Determinism.** Propagation is pure and seeded; the same `(graph, branch, seed)` yields byte-identical worlds.
 - **NFR-3 Tests.** The core graph code is property-tested (the Hypothesis library generates thousands of random graphs and shrinks any failure to a minimal example) against the invariants in §9; the model boundary is tested with recorded API responses ("cassettes") committed to the repo; evals run out-of-band on the four assignment examples. CI is green with no API key (INV-13).
 - **NFR-4 Docker.** `docker compose up` yields a working app; `docker compose watch` gives hot reload for both halves; a production-ish compose builds slim images with healthchecks. No database service in v1.
 - **NFR-5 Legibility.** Every architectural decision is a numbered decision record; every feature with invariants has a spec; every PR names the invariant it satisfies; conventional commits with `spec:` and `adr:` types.
 - **NFR-6 Cost visibility.** Each generation records model, tokens, cache hits, and dollars; shown in the Inspector's transcript view.
-- **NFR-7 Performance.** 60 tiles render and re-layout in <100ms on a laptop; streaming first-paint within 1s of the first token.
+- **NFR-7 Performance.** 60 tiles render and re-layout in <100ms on a laptop; **streaming first paint within 1 s of the request being accepted — a reserved rectangle at its column; this pipeline returns whole proposals, not tokens** (amended 2026-09-20: the old wording read "within 1s of the first token", and there are no tokens to paint — a call comes back with a finished proposal, seconds later, so what must appear inside the second is the space the first claim will land in).
 - **NFR-8 Secrets.** One `.env.example`; keys read once via settings; a secret scanner (`gitleaks`) runs before every commit; recorded API responses are scrubbed of keys.
 
 ---

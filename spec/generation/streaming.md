@@ -124,7 +124,7 @@ class Failed(BaseModel):                # event: failed
 
 **There is deliberately no `search_cap`.** The searches-per-generation cap (Kent, S2) stops the *searching*, not the generation: past the cap, calls stop declaring the search tool and later arrows come back `argued` instead of `documented`, and the run carries on to a proper ending. A complete map with some unbacked arrows is a better answer than a truncated one, and the origin marks on the wires say which arrows are which. [`grounding.md`](grounding.md) holds the rule. A reason nobody can choose is a reason a reader would one day trust, so the value is not in the literal at all.
 
-**One reason is reported, not a list**, and [`proposals.md`](proposals.md) B4 fixes the order they are tested in — the spending cap first, then no ending, then the three size caps, then the model stopping, with `reached_terminal` last as the only one left when nothing went short. This chapter owns the seven names; that chapter owns which one a given run gets.
+**One reason is reported, not a list**, and there is one rule rather than a precedence list to memorise: the reason names **what closed the last claim that was still open**, with `spend_cap` and `no_terminal` as the two overrides above it. [`proposals.md`](proposals.md) B4 owns that rule and works it on the Hormuz map. This chapter owns the seven names; that chapter owns which one a given run gets.
 
 ### Where the first tile comes from
 
@@ -222,16 +222,31 @@ All under `/api/`, like everything else, in `backend/src/katalyst/api/generate.p
 | Route | Body | Answer |
 |---|---|---|
 | `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed` |
-| `POST /api/generate/insert` | `{base_id, branch, claim_in_words, position}` | One `Insert` intervention — a claim and its arrows, drafted and already validated — for the browser to append to its branch |
+| `POST /api/generate/insert` | `{base_id, branch, claim_in_words, position}` | A `DraftedInsert`: one `Insert` intervention — a claim and its arrows, drafted and already validated — **and its own small receipt** |
 | `GET /api/generate/{generation_id}/transcript` | — | The transcript of a generation this process still holds; `404` with a plain sentence when it does not |
 
 **`seed` is the one optional field with a rule behind it.** Left out, `engine/ids.py` mints one and `generation_started` says which; sent, it reproduces a run the browser was handed. **The browser never invents a seed** — the three world routes still *require* one, because by then the run has a seed and asking for a world under a different one is asking a different question. On replay the recording's header seed wins over anything in the request.
 
+**A seed is bounded to the whole numbers a browser can hold exactly: at most 2^53 − 1** (coordinator, 2026-09-20). JavaScript has one number type and it stops counting in ones above that, so a larger seed would arrive back at the server as a *different* seed and the run would not replay — silently, and only sometimes. The bound goes on every route that takes a seed, here and on the three world routes, and **`engine/ids.py` mints inside it**: the first live run minted `4803646386380448080`, which is about a thousand times too large. As with the loop sizes, a seed outside the range is refused with a `422`, never reduced to fit.
+
 **`position` is the place in the branch the new edit goes — and it is `position`, not `at`.** `at` is already two things: a transcript position on a stream event, and a date on an edit. A third meaning on a third shape is how a field stops meaning what it says.
+
+**`base_id` here is the generated map's own identifier, exactly as `World.base_id` carries it.** Not the generation's identifier, and not the short name of a stored example: the map a generation produced *is* the base map every branch on it is computed against, so the word means on this route what it means on the three world routes, and the browser passes through the value it already has.
 
 **`insert` is the one intervention that calls the model.** Anti-pattern 2 in `PRODUCT_REQUIREMENTS.md` §10 forbids re-prompting for a whole map after an edit, and names one exception: `insert`, over the affected subtree only. The other five edits — *Suppose this is true*, *This happened*, *Change this push*, *Split this claim*, *My own number* — are pure arithmetic in `domain/`, which is why a reviewer with no key still gets the whole multiverse at full fidelity.
 
 The drafted claim is validated exactly like any other proposal, by the same `domain.validate`, with the same refusal codes. A draft that does not fit comes back `422` with **every** reason at once — the shape `backend/src/katalyst/api/worlds.py` already uses for a refused branch. Test: `test_an_insert_is_validated_like_any_other_proposal`.
+
+**An insert answers with its own receipt** (settled 2026-09-20; the open question below records how). An insert is not one call: [`proposals.md`](proposals.md) drafts the user's claim with the same starting-claim shape the hypothesis uses, and then the ordinary walk proposes its arrows one per call. So it spends real money, and NFR-6 (every generation records model, tokens, cache reads, searches and dollars) has no exception for money spent outside a stream.
+
+```python
+class DraftedInsert(BaseModel):
+    """What the insert route answers with: the edit, and what drafting it cost."""
+    insert: Insert       # the claim and its arrows, already validated
+    receipt: Receipt     # the same shape the stream's receipt event carries
+```
+
+One shape for a cost, used twice — a second, smaller "insert cost" shape would be the same fact with a second set of field names. On replay the receipt is rebuilt exactly as a replayed stream's is: `mode: "replay"`, zeros, and the recording's date and hash ([`replay.md`](replay.md)).
 
 With no key, this route declines in plain words rather than failing: *"drafting a new claim needs a model key."* The one exception is the scripted intervention each recording carries — [`replay.md`](replay.md).
 
@@ -249,9 +264,11 @@ The values are **measured, not invented**, and the ceiling is never below the sh
 
 ### Where a transcript lives
 
-**In memory, keyed by generation identifier, for the life of the process** — and streamed to the browser as it is produced, so the stream and the store are filled from one pass, never from two. Nothing is written to disk except by `make record-demo` ([`replay.md`](replay.md)).
+**In memory, keyed by the `generation_id` the stream announced, for the life of the process** — and streamed to the browser as it is produced, so the stream and the store are filled from one pass, never from two. Nothing is written to disk except by the recording commands ([`replay.md`](replay.md)).
 
-The map a generation produced is held the same way, under the same key, because a reviewer who has just watched a map draw itself then wants to *suppose* something on it, and the world routes need a map to fold a branch onto. So `engine/worlds.py`'s lookup answers from two places — the stored examples first, then the generations this process is holding — and `(base map identifier, branch, seed)` keeps meaning exactly what it means everywhere else (INV-5: every world replays from those three).
+**The key is the generation's identifier and nothing else — on a replayed run exactly as on a live one.** The first build filed a replayed run's transcript under the *map's* identifier, so the browser asked for the transcript with the identifier `generation_started` had just handed it and got a `404`. The only identifier a client has ever seen for a run is the one the stream announced; anything else is a second way to name one thing, and the second way is the one that breaks.
+
+The map a generation produced is held alongside it, because a reviewer who has just watched a map draw itself then wants to *suppose* something on it, and the world routes need a map to fold a branch onto. That map is found by **its own** identifier — `World.base_id` — so `engine/worlds.py`'s lookup answers from two places, the stored examples first and then the generations this process is holding, and `(base map identifier, branch, seed)` keeps meaning exactly what it means everywhere else (INV-5: every world replays from those three). Two identifiers, two questions: *which run was that* and *which map is this*.
 
 Two things bound it. A process holds the most recent generations and drops the oldest; how many is an argument with a default the builder picks. And a restart empties it, at which point the transcript route answers `404` with a sentence saying the generation is no longer held, rather than an empty transcript that reads like a generation which proposed nothing.
 
@@ -321,19 +338,19 @@ Each statement holds for every input a named generator can produce, and each nam
 
 Two of the generators here are **finite corpora rather than Hypothesis strategies**, and deliberately: a stream needs either a model or a recording to exist at all, so there is no way to conjure one from nothing. They are `recordings()` — every file under `backend/recordings/` — and `cassettes()` — every recorded exchange under `backend/tests/cassettes/`. The third, `event_streams()`, is an ordinary Hypothesis strategy in `backend/tests/strategies.py`: it **builds** sequences by the grammar above rather than generating noise and discarding most of it, and `broken_streams(rule)` builds the same sequences with exactly one grammar rule broken — the shape `broken_graphs(rule)` already uses in [`../graph/validity.md`](../graph/validity.md).
 
-Local numbers in `spec/generation/` come from one shared pool. **This chapter holds `INV-generation.14` through `INV-generation.19`**; the split across all five chapters is on the [landing page](README.md).
+Local numbers in `spec/generation/` come from one shared pool. **This chapter holds `INV-generation.16` through `INV-generation.21`**; the split across all five chapters is on the [landing page](README.md).
 
-**INV-generation.14 — the grammar holds.** For all streams from `event_streams()` and all generations replayed from `recordings()`: the sequence of event names matches the grammar, `generation_started` is first and appears once, `beliefs_propagated` appears at most once and never before the last growth event, `verdict` appears exactly when the request named a target, and `receipt` is the second-to-last event. For all streams from `broken_streams(rule)`, the reader rejects the stream and names that rule. Test: `test_generate_streams_events_in_order`.
+**INV-generation.16 — the grammar holds.** For all streams from `event_streams()` and all generations replayed from `recordings()`: the sequence of event names matches the grammar, `generation_started` is first and appears once, `beliefs_propagated` appears at most once and never before the last growth event, `verdict` appears exactly when the request named a target, and `receipt` is the second-to-last event. For all streams from `broken_streams(rule)`, the reader rejects the stream and names that rule. Test: `test_generate_streams_events_in_order`.
 
-**INV-generation.15 — one terminator, and it is last.** For all generations replayed from `recordings()` and all streams from `event_streams()`: exactly one `done` or `failed` appears, it is the final event, and nothing follows it. A stream abandoned by its client has none, which is the one legal exception and is tested as itself. Test: `test_the_stream_ends_with_done_or_failed`.
+**INV-generation.17 — one terminator, and it is last.** For all generations replayed from `recordings()` and all streams from `event_streams()`: exactly one `done` or `failed` appears, it is the final event, and nothing follows it. A stream abandoned by its client has none, which is the one legal exception and is tested as itself. Test: `test_the_stream_ends_with_done_or_failed`.
 
-**INV-generation.16 — a refusal never becomes an error.** For all cassettes from `cassettes()` that hold a proposal the rules layer refuses: the request's status stays `200`, the refusal arrives as a `proposal_rejected` event carrying every violation the validator returned, and the stream continues. Test: `test_a_rejected_proposal_is_an_event_not_an_error`.
+**INV-generation.18 — a refusal never becomes an error.** For all cassettes from `cassettes()` that hold a proposal the rules layer refuses: the request's status stays `200`, the refusal arrives as a `proposal_rejected` event carrying every violation the validator returned, and the stream continues. Test: `test_a_rejected_proposal_is_an_event_not_an_error`.
 
-**INV-generation.17 — beliefs resolve once, at the end.** For all generations replayed from `recordings()`: exactly one `beliefs_propagated` event appears, and no `proposal_accepted` or `proposal_rejected` follows it. Test: `test_beliefs_arrive_once_after_the_map_is_built`.
+**INV-generation.19 — beliefs resolve once, at the end.** For all generations replayed from `recordings()`: exactly one `beliefs_propagated` event appears, and no `proposal_accepted` or `proposal_rejected` follows it. Test: `test_beliefs_arrive_once_after_the_map_is_built`.
 
-**INV-generation.18 — the client going away stops the spending.** For a generation whose client disconnects after the *n*th event: no model call is made after the disconnection, and the receipt held in memory names exactly the calls made before it. Test: `test_the_stream_stops_calling_the_model_when_the_client_goes_away`.
+**INV-generation.20 — the client going away stops the spending.** For a generation whose client disconnects after the *n*th event: no model call is made after the disconnection, and the receipt held in memory names exactly the calls made before it. Test: `test_the_stream_stops_calling_the_model_when_the_client_goes_away`.
 
-**INV-generation.19 — the loop sizes are bounded at both ends.** For all integers outside `[1, MOST_VERSIONS]` given as `versions`, and outside `[2, MOST_WORLDS]` given as `worlds`, on `POST /api/generate` and on the three world routes: the answer is `422` naming the field and the bound, and no run starts. No value is silently reduced to fit. Test: `test_a_run_above_the_loop_ceilings_is_refused_not_clamped`.
+**INV-generation.21 — every number a request can give is bounded at both ends.** For all integers outside `[1, MOST_VERSIONS]` given as `versions`, outside `[2, MOST_WORLDS]` given as `worlds`, and outside `[0, 2^53 − 1]` given as `seed`, on `POST /api/generate` and on the three world routes: the answer is `422` naming the field and the bound, and no run starts. No value is silently reduced to fit. And for all seeds `engine/ids.py` mints: the value is inside that same range, so a minted seed can always be sent back. Test: `test_a_run_above_the_loop_ceilings_is_refused_not_clamped`.
 
 **Checked in the browser, listed here so the two halves agree.** `test_an_unknown_event_name_is_ignored_and_reported` (an unknown name is skipped and counted, never thrown) and `test_there_is_no_spinner_anywhere`, both in stack 04a's `../workbench/streaming-growth.md`.
 
@@ -363,7 +380,8 @@ Local numbers in `spec/generation/` come from one shared pool. **This chapter ho
 
 Raised 2026-09-17.
 
-1. **What an `insert` costs, and where that cost shows.** NFR-6 says every generation records model, tokens, cache reads, searches and dollars — and an insert is a model call that this route answers **once, with an `Insert` and no `receipt` event**, because it is not a stream. So the money it spends has nowhere to be seen today. Three candidates, none obviously right: the route returns the intervention and a small receipt beside it; the cost is folded into the transcript of the generation that produced the map, which is the map the insert is editing; or the browser's receipt strip grows a running total for the session. The third is the only one that survives a page reload badly. Raised by the workbench chapter and assigned here; decide before the insert route is written, because the answer changes the route's answer shape.
+1. **What an `insert` costs, and where that cost shows.** NFR-6 says every generation records model, tokens, cache reads, searches and dollars — and the insert route answers once, with no `receipt` event, because it is not a stream. So the money it spends had nowhere to be seen. Raised by the workbench chapter and assigned here.
+   **Decided 2026-09-20: the route answers with a `DraftedInsert` — the edit and its own `Receipt`.** What made it answerable was learning that an insert is *several* calls, not one ([`proposals.md`](proposals.md): the starting-claim shape drafts the user's claim, then the ordinary walk proposes its arrows one per call). A single cheap call might have been fair to fold into the map's own transcript; several are not, and the person pressing the button is the person who should see the bill. The alternatives both lost on the same ground: folding it into the generation's transcript files this run's cost under a different run, and a running total in the browser is a number that vanishes on a page reload.
 2. **How many generations a process should hold before it drops the oldest.** It is an argument with a default, and the default wants one measurement: the size of a finished thirty-claim map and its transcript in memory. Measure it with the first Hormuz generation, alongside the cost measurement that is already going into `STATUS.md`.
 3. **Should `Failed` carry a stable code beside its sentence?** Every other refusal in this codebase does — `Violation` has a code the browser switches on and a sentence the person reads. `Failed` has only the sentence today, which is enough for "say something honest" and not enough for "offer the right next step". Decide when there is a second thing the browser would do differently.
 4. **Whether a generation should be resumable once stack 05's store exists.** FR-31 puts transcripts in SQLite; at that point the events so far are on disk and resumption becomes cheap. It is still not obviously *wanted*: a reviewer whose connection dropped would rather start again than join a run half-finished. Ask on top of stack 05, not before.

@@ -8,7 +8,9 @@ Generation is small calls composed into a pipeline, not one giant prompt: one pr
 
 Evidence is attached at generation time from search, and **provenance is written by us from what actually happened**: an address the search tool itself returned in that call makes an arrow `documented`; a mechanism stated with no such address makes it `argued`. An address the model typed that no search returned is not a source — it is dropped, with a note in the transcript. Because a rationale is required on every arrow, generation produces only those two words; `asserted` survives on hand-written maps, where a person judged their own sentence to be a story rather than a mechanism.
 
-Every generation records what it cost. And with no model key, the four example hypotheses play from committed recordings through the same route, the same stream and the same canvas — so a reviewer who has spent nothing still sees the whole thing.
+Every generation records what it cost. **Which model wrote it is one named setting** — `ANTHROPIC_MODEL`, defaulting to `claude-sonnet-5` while this is a prototype (Kent, 2026-09-20) — and nothing else in the pipeline knows which model it is; the price table is per model, and a scorecard compares runs of the same one unless it says otherwise.
+
+And with no model key, the four example hypotheses — `hormuz`, `midterms`, `export-controls`, `photonics` — play from committed recordings through the same route, the same stream and the same canvas, so a reviewer who has spent nothing still sees the whole thing. **A recording shows every refusal the run produced and no others**: the first live runs refused none in 26 proposals, and a screen that said otherwise would have been arranged.
 
 ## Terms this part owns
 
@@ -27,10 +29,10 @@ Proposal · Rejection · Generation receipt · Grounding · Streaming · Transcr
 | Chapter | Holds |
 |---|---|
 | `proposals.md` | `INV-generation.1` – `.8` |
-| `grounding.md` | `.9` – `.13` |
-| `streaming.md` | `.14` – `.19` |
-| `replay.md` | `.20` – `.25` |
-| `evaluation.md` | `.26` – `.30` |
+| `grounding.md` | `.9` – `.15` |
+| `streaming.md` | `.16` – `.21` |
+| `replay.md` | `.22` – `.27` |
+| `evaluation.md` | `.28` – `.32` |
 
 ## Chapters
 
@@ -39,8 +41,8 @@ Proposal · Rejection · Generation receipt · Grounding · Streaming · Transcr
 | [`proposals.md`](proposals.md) | The proposal schema; one proposal per call; what the model may and may not name; accept and mint, or reject with every reason; the caps and the stop rules; the Verify door and `no_path` | stack 04 — written; `engine/` built later in the same stack |
 | [`grounding.md`](grounding.md) | Search at generation time; how a search result becomes a source; **how provenance is written by us from what was found**; base rates before the inside view | stack 04 — written; `engine/` and `grounding/` built later in the same stack |
 | [`streaming.md`](streaming.md) | The eight events, their order as a grammar, the transport, the three routes, what a client does with an event name it does not know | stack 04 — written; `api/generate.py` built later in the same stack |
-| [`replay.md`](replay.md) | The recording format; what replay rebuilds and what it recomputes; `make record-demo`; the one recorded intervention; the required refusal; the prompt hash; the `recordings` build job | stack 04 — written; `engine/replay.py` and the recordings built later in the same stack |
-| [`evaluation.md`](evaluation.md) | The cassette layer; the four eval cases and their structure-only checks; the scorecard's columns; what is deliberately not measured | stack 04 — written; cassettes land with the pipeline, `evals/` with the last pull request |
+| [`replay.md`](replay.md) | The recording format; what replay rebuilds and what it recomputes; the two recording commands and why a paid run is never discarded; the one recorded intervention; how refusals are shown honestly; the prompt hash; the `recordings` build job | stack 04 — written; `engine/replay.py` and the recordings built later in the same stack |
+| [`evaluation.md`](evaluation.md) | The cassette layer; the four eval cases and their structure-only checks; the scorecard's columns and the one measured run they came from; what is deliberately not measured | stack 04 — written; cassettes land with the pipeline, `evals/` with the last pull request |
 
 **Three things this part deliberately does not cover.** FR-9's adversarial critique pass is **out of stack 04** (Kent, 2026-09-17): it roughly doubles the calls and its value cannot be read without a scorecard to compare against, so it is revisited in stack 07. There is **no ensemble and no reconciliation of two maps** (decision record 0015): the range a proposal states ships as stated, labelled *uncalibrated*. And **the stream cannot be resumed** — the transport decision rules it out, and there is nothing to resume from until stack 05 stores a transcript. The pastcast self-test (FR-30) is stack 07's, and [`evaluation.md`](evaluation.md) carries the dated question.
 

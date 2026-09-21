@@ -42,10 +42,12 @@ class Source(BaseModel):
 Decision record 0006 settled the tool, and the specifics were re-verified against the `claude-api` skill on 2026-09-17:
 
 ```python
-{"type": "web_search_20260209", "name": "web_search", "max_uses": 1}
+{"type": "web_search_20260209", "name": "web_search", "max_uses": 25}
 ```
 
-- **`max_uses` is 1**, by the same rule that sets the run's budget: one proposal per call, one search per proposal. It is fixed for a whole run — a value that counted down call by call would rewrite the front of every request and lose the cache — it lives in one place, and it is raised only once a measurement says it should be.
+- **`max_uses` is 25** — the research budget for one call (Kent, 2026-09-20). It was 1, and 1 starved the base rate: in the first measured live run the single search always went to the arrow's mechanism, and **8 of the 10 claims came back with a count like "12 of 15" and no source at all**. A count nobody can check is exactly the state this product refuses to show, so the budget is now large enough to look the class up. It is fixed for a whole run — a value that counted down call by call would rewrite the front of every request and lose the cache — and it lives in one place.
+- **At most five rounds in a call.** A *round* is one pass in which the model searches, reads what came back, and decides whether to search again. The searches are capped by the tool's own `max_uses`; the rounds are counted by us, and a call that reaches its fifth is answered with whatever it has by then (`test_research_stops_at_five_rounds`). How a round is counted at the boundary belongs to `engine/client.py` and is verified against the `claude-api` skill, not written from memory here.
+- **The spending cap is checked between rounds, not only between calls.** Twenty-five searches and five rounds is a lot of room, and the run's spending cap is the safety net under it ([`proposals.md`](proposals.md) B5): a research loop cannot spend past the cap while a single call is still running.
 - **`code_execution` is not declared beside it.** This variant of the search tool already runs code for dynamic filtering; a second execution environment confuses the model (decision record 0006, and the skill's own note).
 - **The web fetch tool is not declared at all.** Fetching a page ourselves would produce a document the search never offered, which is exactly the thing this chapter refuses to call a source.
 - **A search error does not raise.** The answer comes back with a normal status and a result block whose content is a single error object — `max_uses_exceeded` is the one we expect. It is read as *no results*, never as a crash.
@@ -66,11 +68,16 @@ def found_in(answer: Message, *, on: date) -> tuple[Source, ...]:
     """
 
 
-def keep_cited(draft: LinkDraft, found: tuple[Source, ...]) -> tuple[tuple[Source, ...], tuple[str, ...]]:
-    """Split what the arrow cites into what we can stand behind, and what we drop.
+def keep_cited(cited: tuple[str, ...], found: tuple[Source, ...]) -> tuple[tuple[Source, ...], tuple[str, ...]]:
+    """Split what was cited into what we can stand behind, and what we drop.
 
-    Returns the sources the search actually returned, in the order the model
-    cited them, and the addresses it cited that the search never returned.
+    Returns the sources the search actually returned, in the order they were
+    cited, and the addresses cited that the search never returned.
+
+    It takes bare addresses rather than a draft, because **one rule serves
+    both places a citation can appear**: an arrow's sources and a base rate's.
+    A base rate keeps the addresses of what survives; an arrow keeps the
+    `Source` records.
 
     Matching is an exact comparison of the address, after trimming surrounding
     whitespace and one trailing slash. Nothing cleverer: deciding that two
@@ -107,7 +114,7 @@ def provenance_of(draft: LinkDraft, kept: tuple[Source, ...]) -> Provenance:
 
 **Provenance is written before the map is validated**, because it is one of the four things we stamp on the way in, beside the two identifiers and the owner. That ordering has a visible consequence, and B4 below is it.
 
-### What the model may say about a base rate
+### How a base rate is researched, and when it is shown
 
 `BaseRate` is a domain shape ([`../graph/proposition.md`](../graph/proposition.md)), and `ClaimProposal` carries it optionally:
 
@@ -118,9 +125,15 @@ def provenance_of(draft: LinkDraft, kept: tuple[Source, ...]) -> Provenance:
 | `n` | How many cases are in the set. `k` may never exceed `n`, checked when the shape is built |
 | `sources` | Addresses where the count can be checked |
 
-`sources` on a base rate is filled by the same rule as an arrow's: only addresses the search tool returned in that call survive. **An empty `sources` means the count is the model's own recollection, and nothing downstream of it may claim to be documented** — that sentence is already on the field, and this chapter is what enforces it.
+**A base rate is researched, not recalled** (Kent, 2026-09-20). The prompt sends the model to look the reference class up **first**, before it thinks about the arrow's mechanism, and tells it to stop as soon as it has a class it can count and a page that gives the count — so the budget is spent where the claim actually needs it and no further.
 
-`base_rate` is `None` when there is no honest reference class. Absent is better than invented, and the Inspector shows *no reference class* rather than a blank.
+**A base rate is kept only when at least one of its sources is a page the search tool returned in that call.** That is the same one rule as an arrow's sources — `keep_cited`, above, serves both — and it has the same reason: an address the tool never returned is the model reporting what it remembers reading.
+
+**When nothing survives, the base rate is dropped and the claim is still accepted.** The count goes; the claim, its resolution and its likelihood stay; the transcript notes that a count was offered without a page behind it. The tile then shows *no reference class*, which is true, rather than a count nobody can check, which is the state this product refuses to show (`test_a_base_rate_nobody_sourced_is_dropped_and_noted`).
+
+Dropping is not repair. Repair would be *rewriting* what the model said to make it pass; this removes an unbacked claim and says out loud that it did so, in the one place a reader can go and look.
+
+`base_rate` is `None` when there is no honest reference class, and `None` again when the count had nothing behind it. Absent is better than invented.
 
 ---
 
@@ -171,19 +184,27 @@ Two consequences worth writing down. First, a **`documented` arrow that cites no
 
 Second, the **provenance-derived spread** on arrow strengths (stack 04's top pull request) meets only two of its seven widths on a generated map: `documented` and `argued`. The widest entries in that table are reached by hand-written and probe-produced arrows, not by generation.
 
-### B5 — the outside view before the inside view
+### B5 — the outside view before the inside view, and it is looked up
 
-Before asking what the model thinks, ask what usually happens. The prompt asks, in plain words and in this order: *what set of past cases is this claim one of, how many of them came out true, and out of how many* — and only then *how likely is this one*.
+Before asking what the model thinks, ask what usually happens — and make it go and find out. The prompt asks, in plain words and in this order: *what set of past cases is this claim one of, how many of them came out true, out of how many, and where can that count be read* — and only then *how likely is this one*.
 
-Worked on `H`: the reference class is *"closure or disruption episodes in the Strait of Hormuz since 1980 that ended within 90 days"*, and the count is 7 out of 9. The likelihood the model then states sits well below 7-in-9, because this claim asks for 14 *consecutive* days inside one month, which is a harder test than an episode merely ending. The Inspector shows the class, the count and the sources, so a person who disputes the number can dispute the **class** instead of arguing with a feeling. That is the whole value of asking in this order.
+Worked on `H`. Round one: the model searches for how often the Strait of Hormuz has been closed or disrupted since 1980 and how those episodes ended. The tool returns pages; one of them carries counts. The model reads them and has what it needs, so it stops researching the class — it does not spend the other rounds — and turns to the arrow's mechanism with the budget that is left. The reference class comes back as *"closure or disruption episodes in the Strait of Hormuz since 1980 that ended within 90 days"*, the count as 7 out of 9, and one address.
 
-If the search returned an address where the count can be checked, it lands in `sources` by the rule in B2. If it did not, `sources` is empty and the count is the model's recollection — visibly so, and nothing downstream of it may call itself documented.
+`keep_cited` finds that address among the pages the tool returned. It survives, so the base rate is kept with its source. The likelihood the model then states sits well below 7-in-9, because this claim asks for 14 *consecutive* days inside one month, which is a harder test than an episode merely ending. The Inspector shows the class, the count and the source, so a person who disputes the number disputes the **class** instead of arguing with a feeling. That is the whole value of asking in this order.
 
-**An honest caveat about the ordering.** The order the prompt asks in is not the order the answer's fields are written in: in the shape, `prior` sits above `base_rate`. Adaptive thinking means the model reasons before it writes anything at all (decision record 0006), so the field order may not matter — but nobody has measured it here, and Open questions 3 says how it would be measured.
+**Now the failing case, which is the one that was actually measured.** In the first live run — Hormuz, 2026-09-17, on `claude-opus-5`, ten calls — **eight of the ten claims came back with a count such as "12 of 15" and an empty source list**, because there was one search per call and it always went to the mechanism. Under the rule above each of those eight counts is dropped: the claim is accepted, the tile says *no reference class*, and the transcript carries the count that was offered and the note that nothing backed it. Nobody is shown "12 of 15" as though somebody had counted.
+
+**An honest caveat about the ordering.** The order the prompt asks in is not the order the answer's fields are written in: in the shape, `prior` sits above `base_rate`. Adaptive thinking means the model reasons before it writes anything at all (decision record 0006), and the research now happens before any field is written at all, so the field order matters less than it did — but nobody has measured it, and Open questions 3 says how it would be measured.
 
 ### B6 — the searches cap is reached, and the map keeps building
 
-The run's searches cap is the claims cap: thirty. Every call that declares the tool and uses it spends one, including the calls that follow a refusal — a retry costs what the first attempt cost, because it is a fresh question with a fresh search.
+The searches cap for a whole run is an argument like the others, and the rule is what it must be **at least**: **the claims cap times one call's research budget** — thirty claims at twenty-five searches each. Set below that, it binds before the two research caps do, and a run would start starving its base rates again halfway through the map, which is the fault this whole round was fixing. The pipeline agent picks the default at or above that floor and records it beside the other caps.
+
+*(It was thirty, one search per claim, until 2026-09-20, when base rates became something the model looks up rather than recalls.)*
+
+The cap is deliberately loose, because **it is no longer the thing that protects the bill — the run's spending cap is** ([`proposals.md`](proposals.md) B5), and that one is checked between rounds as well as between calls. The searches cap is what stops a runaway loop when the spending cap has been set high.
+
+Every search spends one, including the searches in a call that follows a refusal — a retry costs what the first attempt cost, because it is a fresh question with fresh research.
 
 When the budget is gone, **searching stops and the generation carries on.** Later calls **may not search**: the tool stays declared, because the list of tools sits at the very front of the cached prompt and removing it would throw the whole cache away at full price, and each call is told the tool is not to be used (`tool_choice` set to none), so there is nothing for the model to try and nothing to half-use. *(Changed 2026-09-17 when the pipeline was built: the first draft took the tool off the list, which has the identical effect on the map and costs a full-price call.)* Those calls still propose claims and arrows; their arrows come back **`argued`**, and an arrow whose rationale is empty is refused as it always is.
 
@@ -191,13 +212,15 @@ This is said out loud rather than hidden, because it is visible on screen anyway
 
 Each call's search count travels on its `Outcome` and is folded into **`Receipt.searches`**, beside the three token counts, so a reader can see which runs hit the ceiling. It is a field on the receipt rather than a number this chapter keeps to itself for a hard reason: **a web search is billed apart from tokens**, so `Receipt.dollars` cannot be re-derived from the token counts alone (cross-chapter review, 2026-09-17).
 
+**Which model did the searching is a setting, and the receipt says which** (Kent, 2026-09-20). The prototype runs on `claude-sonnet-5`; the measured run quoted in B5 was on `claude-opus-5`, which is one setting away. Nothing in this chapter depends on which: the rule that decides provenance reads the search tool's results, and those look the same whoever asked for them. `Receipt.model` names the model that actually ran, so a reader never has to guess which one a map came from.
+
 Reaching the cap is **not** a reason for a generation to end. A complete map with some unbacked arrows is a better answer than a truncated map, and the origin marks say which arrows are which (`test_a_run_stops_searching_at_its_search_cap`).
 
 ### B7 — what a search result can and cannot become
 
 A search result becomes **a `Source` on an arrow**, and nothing else.
 
-It does not become an `Evidence` item on a claim. `Evidence` — a sentence, an address, a direction for or against, and a weight — is what the Inspector draws as two bars under a claim, and two of its four fields are numbers nobody has elicited: `ClaimProposal` has no `evidence` field, so generation writes none, and a generated claim carries an empty evidence list. The shipped example's two evidence items on `H` were typed by a person. Turning search results into evidence needs a direction and a weight from somewhere, and inventing either is the one thing this product refuses to do. Open questions 2 carries the wording repair this implies.
+It does not become an `Evidence` item on a claim. `Evidence` — a sentence, an address, a direction for or against, and a weight — is what the Inspector draws as two bars under a claim, and two of its four fields are numbers nobody has elicited: `ClaimProposal` has no `evidence` field, so generation writes none, and a generated claim carries an empty evidence list. The shipped example's two evidence items on `H` were typed by a person. Turning search results into evidence needs a direction and a weight from somewhere, and inventing either is the one thing this product refuses to do. **FR-28 is amended to say exactly this** (Open questions 2, closed 2026-09-20).
 
 It does not become a market number. `market_implied` is read off a live price by stack 05's adapters, with a venue, a moment and a link; `historical` comes from a study of past cases. **Neither ever comes from a proposal**, and no code path in `engine/` writes either word.
 
@@ -207,7 +230,7 @@ It does not become a market number. `market_implied` is read off a live price by
 
 Each is written *for all inputs drawn from generator S, statement P holds*, and names the test that checks it. These run in `backend/tests/boundary/test_expand_cassettes.py`, against **cassettes** — real exchanges with the vendor recorded to disk and replayed, so the suite needs no key (INV-13).
 
-Local numbers come from one pool shared by the five chapters of this part. **This chapter holds `INV-generation.9` through `INV-generation.13`**; [`proposals.md`](proposals.md) holds `.1` through `.8`.
+Local numbers come from one pool shared by the five chapters of this part. **This chapter holds `INV-generation.9` through `INV-generation.15`**; [`proposals.md`](proposals.md) holds `.1` through `.8`.
 
 | ID | Statement | Test |
 |---|---|---|
@@ -216,6 +239,8 @@ Local numbers come from one pool shared by the five chapters of this part. **Thi
 | **INV-generation.11** | For a recorded call whose every citation the search never returned, the accepted arrow reads `argued`. For any map holding an arrow marked `documented`, `historical` or `market_implied` with an empty source list, `validate` returns exactly one `documented_without_source` | `test_expand_rejects_a_documented_arrow_that_cites_nothing` |
 | **INV-generation.12** | For every recorded run, the number of searches counted across its outcomes is at most the run's searches cap; every call made after the cap is reached is forbidden to search and makes no search; and the run still ends on one of the reasons in [`proposals.md`](proposals.md) B4, never on the cap itself | `test_a_run_stops_searching_at_its_search_cap` |
 | **INV-generation.13** | Read over our own source: no code path under `backend/src/katalyst/engine/` writes `historical` or `market_implied`. The companion check — that `engine/proposal.py` contains no field named `provenance` — is a line on the pull request's own done-list, run as a plain search | `test_provenance_is_written_from_what_was_found` (its source-reading half) |
+| **INV-generation.14** | For every recorded call, every accepted claim that carries a `base_rate` has at least one source the search tool returned in that same call. For a recorded call offering a count with no such source, the claim is accepted, its `base_rate` is `None`, and the transcript holds the count that was offered and a note that nothing backed it | `test_a_base_rate_nobody_sourced_is_dropped_and_noted` |
+| **INV-generation.15** | For every recorded call, the number of research rounds is at most five and the number of searches at most the call's `max_uses`; a call that reaches its fifth round returns the proposal it has rather than raising or looping again | `test_research_stops_at_five_rounds` |
 
 ---
 
@@ -226,8 +251,9 @@ Local numbers come from one pool shared by the five chapters of this part. **Thi
 3. **Do not downgrade or upgrade a provenance after the fact** — no marking a `documented` arrow down to `argued` because its sources came back empty, no marking an `argued` arrow up because the rationale reads well — *because* that is repair wearing a different hat, and it makes the word describe our tidying rather than our retrieval. **Instead:** write the word once, from the facts, before the map is checked.
 4. **Do not fetch a page yourself and call it a source** — *because* a document the search never offered is a document we went looking for to support a conclusion we already had. **Instead:** declare the search tool, keep what it returns, and declare nothing else.
 5. **Do not ask for a likelihood before a reference class** — *because* a number stated first becomes the anchor and the class is then written to justify it, which is the opposite of the outside view. **Instead:** ask what usually happens, then ask about this case.
-6. **Do not invent a direction or a weight to turn a search result into evidence** — *because* both are elicited numbers, and a number nobody gave is a number nobody can argue with. **Instead:** leave the claim's evidence list empty, which is honest, and say so in the Inspector.
-7. **Do not treat a spent search budget as a reason to soften a word** — not `documented` "because it would have found something", not a silent stop — *because* the cap is a fact about the bill, not about the world. **Instead:** let the later arrows say `argued`, and let the origin marks show where the evidence thins out.
+6. **Do not show a count the model recalled** — "12 of 15" with nothing behind it — *because* a count looks like the most checkable thing on a tile and is the least checkable thing on it when nobody looked it up, and a reader who trusts one has been misled by precision. This was measured, not imagined: eight of ten claims in the first live run. **Instead:** send the model to look the class up first, keep the count only when a page the search returned carries it, and drop it with a note when none does.
+7. **Do not invent a direction or a weight to turn a search result into evidence** — *because* both are elicited numbers, and a number nobody gave is a number nobody can argue with. **Instead:** leave the claim's evidence list empty, which is honest, and say so in the Inspector.
+8. **Do not treat a spent search budget as a reason to soften a word** — not `documented` "because it would have found something", not a silent stop — *because* the cap is a fact about the bill, not about the world. **Instead:** let the later arrows say `argued`, and let the origin marks show where the evidence thins out.
 
 ---
 
@@ -236,7 +262,8 @@ Local numbers come from one pool shared by the five chapters of this part. **Thi
 *Raised 2026-09-17, when this chapter was written.*
 
 1. **FR-9's critique pass is out of stack 04, and Kent has been told why** (decided 2026-09-17). An adversarial pass over the map before the numbers are final would roughly **double the calls**, and its value cannot be read without something to read it against: until the evaluation scorecard exists there is no baseline that would show whether a critique pass made the maps better or merely more expensive. It is revisited in stack 07, with the scorecard from [`evaluation.md`](evaluation.md) as the comparison. Nothing about the proposal shape changes when it arrives — a critique is another question asked over the same call shape.
-2. **FR-28 says sources attach to links "with direction and weight", and two different things are being named.** A `Source` on an arrow has no direction and no weight; an `Evidence` item on a claim has both, and generation produces none (B7). The requirement's wording should say which it means. The repair belongs in `PRODUCT_REQUIREMENTS.md`, not here.
+2. **FR-28 said sources attach to links "with direction and weight", and two different things were being named.** A `Source` on an arrow has no direction and no weight; an `Evidence` item on a claim has both.
+   **Closed 2026-09-20: FR-28 is amended, and B7 above is the rule.** A search result becomes **a `Source` on an arrow and nothing else**. Direction and weight belong to `Evidence` on a claim, which generation never writes, because both are elicited numbers and inventing either is the one thing this product refuses to do. When a later stack earns those two numbers honestly, it can write `Evidence`; until then the list is empty and the Inspector says so.
 3. **Does the field order in the answer change the number?** The prompt asks for the reference class before the likelihood, but the shape writes `prior` above `base_rate`. Moving `base_rate` above `prior` is a one-line change that renames nothing. Measurable with the evaluation harness: run the four examples both ways and compare how often a stated likelihood falls outside its own base rate's range. Worth one round of measurement in stack 07, not a guess now.
 4. **Should `BaseRate.sources` become `Source` records rather than plain addresses?** A base rate's sources are bare strings, while an arrow's are records with a title and a retrieval day — so the same search result is kept in two shapes depending on where it lands. This is [`../graph/proposition.md`](../graph/proposition.md) Open questions 3, and generation is the first caller that has felt it.
 5. **What counts as the same address?** Matching is exact, after trimming whitespace and one trailing slash. A model that writes the same page with a tracking parameter on the end loses the citation and the arrow falls back to `argued`. That is the safe direction to be wrong in, and it may still be too strict; the cassettes will show how often it happens.

@@ -72,18 +72,20 @@ The seed is written into the case file rather than drawn, so two runs differ onl
 
 They are the four hypotheses in `ASSIGNMENT.md`, and they are two of each door, because the assignment names two use cases and both have to work.
 
-| # | Hypothesis | Door | Destination | What it is for |
-|---|---|---|---|---|
-| 1 | *The Strait of Hormuz is going to open next week.* | **Verify** | *Brent crude settles below $68 for five sessions.* | The assignment's own first use case, word for word: does the opening logically lead to oil prices falling? A path should exist, and the eval asserts only that a graded path or an honest refusal comes back — never which path |
-| 2 | *Republicans win the House but Democrats take the Senate during the Midterm.* | **Explore** | — | A hypothesis in a different domain entirely, with no oil in it. It is here to catch a prompt that has quietly learned one subject |
-| 3 | *Models more capable than Fable get export restricted by the United States.* | **Verify** | *Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.* | **Deliberately unreachable.** Export controls on frontier models have no mechanism that reaches Gulf shipping insurance. This case exists to prove that no code path invents a bridge (FR-7) |
-| 4 | *Photonic chips get adopted faster than expected.* | **Explore** | — | A slow, diffuse, long-horizon hypothesis — the kind that tempts a model into vague claims. Every claim it produces still has to be checkable (INV-1) |
+The case identifiers are the four example names — the same strings the launchpad's cards and the recording files use ([`replay.md`](replay.md)), so one name follows an example through all three.
+
+| # | Case | Hypothesis | Door | Destination | What it is for |
+|---|---|---|---|---|---|
+| 1 | `hormuz` | *The Strait of Hormuz is going to open next week.* | **Verify** | *Brent crude settles below $68 for five sessions.* | The assignment's own first use case, word for word: does the opening logically lead to oil prices falling? A path should exist, and the eval asserts only that a graded path or an honest refusal comes back — never which path |
+| 2 | `midterms` | *Republicans win the House but Democrats take the Senate during the Midterm.* | **Explore** | — | A hypothesis in a different domain entirely, with no oil in it. It is here to catch a prompt that has quietly learned one subject |
+| 3 | `export-controls` | *Models more capable than Fable get export restricted by the United States.* | **Verify** | *Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.* | **Deliberately unreachable.** Export controls on frontier models have no mechanism that reaches Gulf shipping insurance. This case exists to prove that no code path invents a bridge (FR-7) |
+| 4 | `photonics` | *Photonic chips get adopted faster than expected.* | **Explore** | — | A slow, diffuse, long-horizon hypothesis — the kind that tempts a model into vague claims. Every claim it produces still has to be checkable (INV-1) |
 
 Case 3 is the load-bearing one. It is the answer to "how do you know it is not just making the chain up?": we ask it for a chain that cannot exist, and the honest answer — `no_path`, with the nearest claim it actually reached — is the one the harness demands. `test_verify_returns_no_path_rather_than_a_bridge` pins the same behaviour in the build, against a cassette.
 
 ### What the harness asserts — structure, never wording
 
-Seven checks. Every one is a count or a shape; not one is a judgement about a sentence.
+Eight checks. Every one is a count or a shape; not one is a judgement about a sentence.
 
 | # | Check | Why |
 |---|---|---|
@@ -94,6 +96,7 @@ Seven checks. Every one is a count or a shape; not one is a judgement about a se
 | 5 | A Verify case answers with a graded **path** or an explicit `no_path` naming the nearest claim reached; case 3 answers `no_path` | FR-7 — never a fabricated bridge |
 | 6 | Non-zero cache reads on a run's second call | Decision record 0006 caches the system prompt. **A run whose cache reads stay at zero is a bug, not a slow day** |
 | 7 | The run stopped for a named reason, and the receipt's dollars are under the run's cap | NFR-6 and Kent's G5 — a run that cannot say what it cost is a run nobody can budget |
+| 8 | Every base rate on the finished map cites a page the research actually returned; `base_rates_dropped` counts the ones that did not, and each carries its note in the transcript | Kent's G7, 2026-09-20 — 8 of 10 claims in the first live run came with a recalled count like "12 of 15" and no source at all. A count with no page behind it is a number nobody computed |
 
 Checks 1 to 4 are `domain.validate` run on the finished map, which is the same rules layer the pipeline already refuses proposals with. The harness adds nothing new to the rules; what it adds is the question *does the model's own output satisfy them, on a map nobody hand-wrote?*
 
@@ -110,9 +113,13 @@ class CaseScore(BaseModel):
 
     claims: int                     # claims on the finished map
     links: int                      # arrows on it
-    rejected: int                   # proposals the validator refused
+    rejected: int                   # proposals the validator refused. May be zero (G9)
     endings: int                    # claims of kind market or not_tradeable (INV-9)
     deepest_layer: int              # how far the map got from the hypothesis
+
+    base_rates_kept: int            # claims whose base rate cites a page research returned
+    base_rates_dropped: int         # counts the model recalled with no such page, dropped
+                                    # with a note in the transcript (G7, same rule as S1)
 
     documented_links: int           # arrows backed by an address the search tool returned
     argued_links: int               # arrows with a mechanism and no such address
@@ -129,11 +136,17 @@ class CaseScore(BaseModel):
     input_tokens: int
     output_tokens: int
     cache_read_tokens: int
+    thinking_tokens: int            # the part of the written tokens that was thinking
     searches: int                   # web searches this run made — off the receipt,
                                     # which carries it because search is billed apart
                                     # from tokens
+    searches_per_claim: float       # searches ÷ claims. The column G7's per-claim
+                                    # research moves, read without doing arithmetic
     dollars: float
     seconds: float
+    seconds_per_call: float         # seconds ÷ calls. Generation is sequential by
+                                    # nature, so this is the number that sets how long
+                                    # a person waits for a map
 
 
 class Scorecard(BaseModel):
@@ -147,6 +160,14 @@ class Scorecard(BaseModel):
 ```
 
 **Why these columns and no others.** Each is either a count of something on the finished map or a number the receipt already holds. There is no column that requires an opinion, because a column that requires an opinion moves with whoever is holding it.
+
+**Two columns are derived, and say so:** `searches_per_claim` and `seconds_per_call` are the two columns above them divided. They earn their place because they are what a person actually compares between two runs, and putting the division in one place stops two readers doing it two ways. They are never a *source*: if either disagrees with the columns it came from, it is the derived one that is wrong.
+
+**One column has no home yet.** `thinking_tokens` is not on `Receipt` and not on `Outcome` — the shapes carry input, output and cache-read tokens and nothing finer. It matters now because the first measured run spent **61% of its written tokens thinking**, so a prompt change that halves the thinking halves most of the bill and no existing column would show it. Adding it is one counter on `Outcome` and one field on `Receipt`; flagged to whoever writes `engine/receipt.py`, and until it lands this column reads whatever the harness can see.
+
+**A scorecard compares runs of the same model** (Kent, G8, 2026-09-20). The model is one named setting, `ANTHROPIC_MODEL`, defaulting to `claude-sonnet-5` for the prototype; nothing else in the pipeline knows which model it is, and the price table is per model. `Scorecard.model` is on every run for exactly this reason: **two rows from two models are not a comparison**, they are two measurements, and reading them as a before-and-after would credit a prompt change with a model change or the reverse. When a run deliberately crosses models — a final recording on a larger model, say — the comparison says so in words beside it.
+
+**The one dated measurement this baseline starts from.** Hormuz, live, on `claude-opus-5` at default effort, 2026-09-17: **10 calls, 9 searches, $1.32, 10 minutes 54 seconds, 61% of written tokens thinking**, 10 claims, 9 arrows of which 8 `documented`, **0 refused**, stopped at `width_cap`. It is quoted here because it is the measurement that named these columns — the searches, the thinking share and the seconds per call were all invisible until somebody paid for a run and looked. No Sonnet number is quoted anywhere in this chapter, because none has been measured yet.
 
 **Two columns are expected to read zero, and that is what they are for.** `violations` reads zero because the pipeline only ever mints what passed the rules. `asserted_links` reads zero because [`grounding.md`](grounding.md)'s rule leaves a generated arrow with only two possible words — `documented` when the search returned an address it cites, `argued` otherwise — and a rationale is required on every arrow (INV-2). A non-zero reading in either column is not a worse map; it is evidence that an arrow or a claim reached the map without going through the accept step, which is a bug of a different order.
 
@@ -237,17 +258,17 @@ Each statement holds for every input a named generator can produce, and each nam
 
 The generators here are **finite corpora, not Hypothesis strategies**: `cassettes()` is every file under `backend/tests/cassettes/`, `cases()` is the four files under `evals/cases/`, and `sources()` is this repository's own Python under `backend/src/`. Nothing can conjure a model's answer, so nothing here pretends to.
 
-**The invariants a proposal must satisfy are numbered in [`proposals.md`](proposals.md), and the ones a recording must satisfy in [`replay.md`](replay.md).** This chapter numbers only what the two testing layers themselves have to guarantee, and **holds `INV-generation.26` through `INV-generation.30`**; the split across all five chapters is on the [landing page](README.md).
+**The invariants a proposal must satisfy are numbered in [`proposals.md`](proposals.md), and the ones a recording must satisfy in [`replay.md`](replay.md).** This chapter numbers only what the two testing layers themselves have to guarantee, and **holds `INV-generation.28` through `INV-generation.32`**; the split across all five chapters is on the [landing page](README.md).
 
-**INV-generation.26 — no recorded exchange contains a key.** For all files from `cassettes()`: no header, body or URL in the file contains the value of `ANTHROPIC_API_KEY` or anything matching a key's shape. Enforced twice, because this one is unrecoverable if it fails: `filter_headers` strips the credentials before a file is ever written, and `gitleaks` scans the directory before every commit (NFR-8). Test: `test_no_cassette_contains_a_key`.
+**INV-generation.28 — no recorded exchange contains a key.** For all files from `cassettes()`: no header, body or URL in the file contains the value of `ANTHROPIC_API_KEY` or anything matching a key's shape. Enforced twice, because this one is unrecoverable if it fails: `filter_headers` strips the credentials before a file is ever written, and `gitleaks` scans the directory before every commit (NFR-8). Test: `test_no_cassette_contains_a_key`.
 
-**INV-generation.27 — the build never calls anything.** For every test in `backend/tests/boundary/`: with `--record-mode=none` and no key in the environment, a call with no matching recording fails the test rather than reaching the network — the recorder raises rather than dialling out. Checked by the `backend` job itself, which is given no key and needs none (INV-13).
+**INV-generation.29 — the build never calls anything.** For every test in `backend/tests/boundary/`: with `--record-mode=none` and no key in the environment, a call with no matching recording fails the test rather than reaching the network — the recorder raises rather than dialling out. Checked by the `backend` job itself, which is given no key and needs none (INV-13).
 
-**INV-generation.28 — two calls in flight are never handed each other's answers.** For all files from `cassettes()` recorded from a run that expanded more than one frontier claim at once: each request is matched on its body as well as its method and URL, so a recording replays only to the request that produced it. Enforced by `vcr_config`'s `match_on` in `backend/tests/conftest.py`; a boundary test that wants a legible failure may also expand one claim at a time.
+**INV-generation.30 — two calls in flight are never handed each other's answers.** For all files from `cassettes()` recorded from a run that expanded more than one frontier claim at once: each request is matched on its body as well as its method and URL, so a recording replays only to the request that produced it. Enforced by `vcr_config`'s `match_on` in `backend/tests/conftest.py`; a boundary test that wants a legible failure may also expand one claim at a time.
 
-**INV-generation.29 — one word, one meaning.** For all modules from `sources()`: the only field named `agreement` is the diff's same-direction share, and no user-facing string contains the words *runs agree*. Test: `test_the_word_agreement_means_same_direction_and_nothing_else`, which reads the source rather than trusting anybody to remember.
+**INV-generation.31 — one word, one meaning.** For all modules from `sources()`: the only field named `agreement` is the diff's same-direction share, and no user-facing string contains the words *runs agree*. Test: `test_the_word_agreement_means_same_direction_and_nothing_else`, which reads the source rather than trusting anybody to remember.
 
-**INV-generation.30 — a finished map from the model is a valid map.** For all cases from `cases()`: `domain.validate` on the map the run finished with returns an empty list, which is the scorecard's `violations` column reading zero. **Checked out of the build, by `make eval`**, and that is deliberate: it needs live calls, and a flaky check in the build is a check people learn to ignore. The in-build counterpart is the boundary layer, where the same rules layer refuses the same recorded proposals.
+**INV-generation.32 — a finished map from the model is a valid map.** For all cases from `cases()`: `domain.validate` on the map the run finished with returns an empty list, which is the scorecard's `violations` column reading zero. **Checked out of the build, by `make eval`**, and that is deliberate: it needs live calls, and a flaky check in the build is a check people learn to ignore. The in-build counterpart is the boundary layer, where the same rules layer refuses the same recorded proposals.
 
 ---
 

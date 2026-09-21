@@ -41,7 +41,7 @@ Rules:
 * **Branches.** `<type>/<NN>-<slug>`, where `NN` is the stack number from `PRODUCT_REQUIREMENTS.md` §12. The names used so far: `docs/00-kickoff`; then stack 01 as `docs/01-readme`, `feat/01-backend-skeleton`, `feat/01-frontend-skeleton`, `chore/01-docker-ci`; then stack 02 as `spec/02-graph-and-multiverse`, `feat/02-domain-models`, `feat/02-validity`, `feat/02-hormuz-fixture`, `adr/02-replay-mode`. Next are `feat/03-engine` and `feat/03-canvas`. `git branch --list '*03*'` lists a stack. Parallel stacks (03a, 03b) share `NN` and differ by slug. One stack is several branches, so the stack number, not the slug, is what ties them together.
 * **Stacks.** One stack per roadmap row. The bottom pull request is docs-only (spec + decision record) and merges first; then domain types, then pure algorithms with their property tests, then the API surface, then the UI. Never deeper than four. Each pull-request body carries three headings: *What*, *Which invariant(s) this satisfies*, *Deliberately not here*. Agent-authored descriptions end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 * **Stacking tool.** Division of labour (owner decision, 2026-09-16): agents keep branches *stack-compatible* — each pull request's base is its parent branch, never `main` unless it is the bottom of a stack — and Kent assembles the stack in the GitHub web interface. The `gh` command-line tool (2.101.0) has no stack commands, so pull requests are opened with `gh pr create --base <parent-branch>`. `git-spice` remains the fallback if web-assembled stacks prove too thin at three or more deep.
-* **Continuous integration** (the checks that run on every push). One workflow, four jobs: `backend`, `frontend`, `types-fresh`, `docker`. *(Amended 2026-09-17: five — stack 03b added `e2e`, one keyboard-only browser test that starts both halves itself. Still no key in any of them.)* No API key in any of them (ADR-0008).
+* **Continuous integration** (the checks that run on every push). One workflow, four jobs: `backend`, `frontend`, `types-fresh`, `docker`. *(Amended 2026-09-17: five — stack 03b added `e2e`, one keyboard-only browser test that starts both halves itself. Still no key in any of them.)* *(Amended again 2026-09-20: six — stack 04b adds `recordings`, which reads every committed recording and needs no key. See the amendment at the foot of this record.)* No API key in any of them (ADR-0008).
 * **Before every commit.** `ruff` and `ruff-format` (Python linting and formatting), `biome` (the same for the frontend), `gitleaks` (a secret scanner), plus `end-of-file-fixer`, `check-yaml`, and `check-added-large-files`. Type checking runs in the build, not in the hook.
 * **Merging.** Squash-merge each pull request — its commits collapse into a single commit on `main` — keeping the conventional prefix in the squashed message. `main` is always green.
 
@@ -55,7 +55,7 @@ Rules:
 
 ### Confirmation
 
-* The `types-fresh` job fails if regenerating the schema produces a diff; `backend`, `frontend` and `docker` are required checks on `main`.
+* The `types-fresh` job fails if regenerating the schema produces a diff; `backend`, `frontend` and `docker` are required checks on `main`. *(Amended 2026-09-20: `recordings` joins that list — see the amendment at the foot of this record.)*
 * `.github/pull_request_template.md` contains the three headings.
 * `commitizen check`, a linter for commit messages, runs as a `commit-msg` hook.
 * Stack 01's first pair of pull requests is the native-stack verification described above; its outcome is recorded under More Information.
@@ -102,3 +102,13 @@ Rules:
   That call hands back a job identifier rather than a result. Poll `GET repos/<owner>/<repo>/pulls/<n>/merge-async/<uuid>` until its `status` field reads `merged`, and only then start the next one. Merge bottom-up, one at a time. GitHub re-stacks the remaining children itself after each merge, but a child that had carried a merge of a *sibling* stack may still refuse until `git merge origin/main` is run in its own worktree and pushed. The asynchronous merge does not delete the head branch either, so branches are deleted afterwards by hand.
 
   **The trap, learned the hard way.** `gh pr merge` on the *top* pull request of a stack does not refuse — it succeeds, and merges that pull request into its parent branch rather than into `main`. That is how #11 (Docker, continuous integration, pre-commit, the Makefile) reached `main` folded inside #6's squashed commit rather than as a commit of its own: nothing was lost, but `git log` on `main` shows no #11. Use the asynchronous route for every pull request in a stack, the top one included.
+
+## Amendment (2026-09-20) — a sixth build job, `recordings`
+
+Stack 04b adds a sixth continuous-integration job, **`recordings`**. It reads every committed recording under `backend/recordings/` — the files a keyless reviewer's replay plays back (ADR-0012) — and checks that each one parses and that each carries a prompt hash equal to the current prompt's. **It needs no model key**, so INV-13 still holds: not one job in the workflow has one. It **passes on an empty folder**, so it is green from the commit that adds it.
+
+The jobs are therefore `backend`, `frontend`, `types-fresh`, `docker`, `e2e` and `recordings`, and **`recordings` joins `backend`, `frontend` and `docker` as a required check on `main`.** It earns that place because a stale recording is the one failure no other job can see: nothing crashes, the demo simply plays old wording at a reviewer.
+
+**The job itself lands in stack 04b's stream pull request**, beside the recordings it reads. This record only names it and puts it on the required list.
+
+Nothing else changes: one workflow, no key anywhere in it, and the standing rule that a pull request which changes a prompt re-records whatever depended on it.
