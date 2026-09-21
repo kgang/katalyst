@@ -3,7 +3,7 @@
   "checkpoint_id": "01M32FNZRH9K3PBPCWBZRJ5FP9",
   "strategy": "manual-commit",
   "branch": "test/04-faster-browser-run",
-  "checkpoints_count": 1,
+  "checkpoints_count": 3,
   "files_touched": null,
   "sessions": [
     {
@@ -12,13 +12,27 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 6,
-    "cache_creation_tokens": 5636,
-    "cache_read_tokens": 470141,
-    "output_tokens": 1314,
-    "api_call_count": 2
+    "input_tokens": 26,
+    "cache_creation_tokens": 29254,
+    "cache_read_tokens": 3838524,
+    "output_tokens": 21483,
+    "api_call_count": 11,
+    "subagent_tokens": {
+      "input_tokens": 84,
+      "cache_creation_tokens": 220680,
+      "cache_read_tokens": 17425473,
+      "output_tokens": 120044,
+      "api_call_count": 42
+    }
   }
 }
