@@ -1450,3 +1450,308 @@ I found no must-fix and no should-fix. Four nits below.
 - The commit's "worst move is 0.0056 px" is the worst over the sampled heights and the probe simulates the browser as `quantize(declared)`; the bound from the same argument is 1/128 px. Honest as written, just sample-specific.</result>
 <usage><subagent_tokens>191922</subagent_tokens><tool_uses>81</tool_uses><duration_ms>835517</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a9dd150c52a22354d</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a9dd150c52a22354d.output</output-file>
+<status>completed</status>
+<summary>Agent "Build the worked-numbers file" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>**What the coordinator must run to check me**, in order, from `/Users/kentgang/git3/katalyst-wt/chore-04-worked-numbers`:
+
+```sh
+make numbers &amp;&amp; git diff --exit-code -- docs/worked-numbers.txt   # must print nothing
+cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check .
+uv run mypy src &amp;&amp; uv run mypy --strict src/katalyst/domain
+uv run pytest tests/unit/engine/test_worked_numbers_as_a_program.py -q
+```
+Plus the one queued whole server suite (below) — **still waiting in the queue behind `growth: 20 cold runs of all nine e2e tests`**; its output lands in `/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/btkeanf6e.output`.
+
+## What I built
+
+`make numbers` → `python -m katalyst.engine.worked_numbers` → **`docs/worked-numbers.txt`** (376 lines, 294 named facts). **2.0 s**, three runs timed at 2.03/2.02/2.02. No key, no network.
+
+**Why `docs/worked-numbers.txt` and not `spec/graph/hormuz-numbers.md`.** `spec/README.md` makes `spec/` a book whose every file is a chapter listed on its part's landing page; a generated table would have to be listed as a chapter (untrue) or left unlisted (drift). The numbers are quoted from `spec/graph/`, `spec/multiverse/`, `ARCHITECTURE.md` and `README.md`, so the owning file belongs to no single part — and a `.txt` in `docs/` tempts nobody to hand-edit it.
+
+**Why `engine/` and not `fixtures/`.** It is a program that runs the engine over committed data, exactly the shape of `engine/check_recordings.py`, which the build already runs the same way. `fixtures/` holds the stored examples themselves.
+
+**Contents, labelled apart by one checkable rule** — *a computed number's name says which world it was read from; an input's name names no world*:
+- INPUTS: each claim's kind, prior chip, resolve-by date (and day), the user's and market's beliefs, the base rate; each arrow's ends, mode, shape, strength, delay, half-life, provenance, reflexivity; the three branches and every edit in order; the seed and loop sizes.
+- COMPUTED: each claim's reading in four worlds (base, strike, observed B, observed C); per claim per edit the state, `was → is`, move, same-direction share, reweighting-only flag; the change list with place/day/before→after/biggest move/band width/share/rank; the sentence beside each list and its warnings; the retraction; the number on all 11 arrows; all 49 band shares.
+
+**The supposition trap, caught.** `S`'s resolve-by day *is* the day the branch supposes it true, so its belief is exactly 1. `S · strike · reading` prints `supposed`, not `&gt;.99`, and a test pins it. Same rule applied to the diff's `after`.
+
+**One formatter, not two.** `_two_figures` is imported from `domain/diff.py` rather than copied. `domain/` is untouched; making the name public is a one-line change for whoever next touches that file. Moves and shares print no screen form (`—`) because the product has no text form for a move yet (R17 gives it one).
+
+## How I made it deterministic across machines
+
+- Every block sorted by its own lines; no set ever iterated; no mapping iterated unsorted.
+- Nothing about the run is written down: no date, no host, no package version.
+- **Full precision stops at 6 decimal places.** numpy's `exp`/`log` are accurate to well under 1 ULP but are not promised identical on Linux/Intel (CI) and macOS/Arm (here). Six places is 4 orders finer than anything shown and 10 coarser than those machines can disagree by. Sixteen digits would fail the build for a reason nobody changed — and would promise a reader a seventeenth digit that does not exist, which is exactly what `README.md` was doing.
+- **Measured:** four runs — twice plain, once `PYTHONHASHSEED=7919`, once `PYTHONHASHSEED=0` — byte-identical (`cmp`), then three more after the final edits, still identical. The suite test runs the program as a subprocess under `PYTHONHASHSEED=7919` and with both API keys stripped.
+- I could not test Linux/x86-64 directly (Docker here is arm64; qemu would exercise different SIMD paths than CI anyway), so the 6-place rounding is the guarantee rather than a hope.
+
+## First twenty lines of the file
+
+```
+Every number the Strait of Hormuz example quotes
+================================================
+
+Generated. Do not edit this file by hand — `make numbers` writes it, and the
+build fails when what is committed differs from what the program prints. The
+program is `backend/src/katalyst/engine/worked_numbers.py`; it runs the shipped
+engine on the stored example at the example's own seed and the shipped loop
+sizes, and reads nothing but what comes back.
+
+**A chapter quotes a number only where this file is one link away.** Cite a line
+by the name at its start — `B · base · reading` — rather than restating the
+figure, so that the day the arithmetic changes there is one place to look and one
+diff to review.
+
+Two parts, and the difference between them matters:
+
+  INPUTS     numbers a person typed, in backend/src/katalyst/fixtures/hormuz.py.
+             Stable. Safe to quote. A sweep that rewrites these is touching
+             numbers that never needed touching.
+  COMPUTED   numbers the engine worked out from those. Nobody typed one. These
+```
+
+## Where I deviated from the plan, and why
+
+- **The analysts proposed `katalyst.domain.worked`.** Impossible — `domain/` imports nothing from other layers and a test enforces it. It is `engine/worked_numbers.py`.
+- **One line per *number*, not one line per claim-day row.** The diff of this file is the deliverable, so a diff that is literally a list of numbers beats a diff of re-flowed rows. The change list's rank is part of the name (`M1 · strike · change list place`) rather than the line order, so a ranking that moves shows up as a number instead of shuffling a block.
+- **Four worlds, not two.** The brief asked for the two observations; I print their readings too, so every world is reported the same way rather than three ways.
+- **Conditionals: each arrow once, on the world where it exists** (8 on base, the 3 strike arrows on the branch). Every arrow in every world would be 44 numbers no chapter asks for.
+- **`README.md`'s `curl` JSON prints no digits at all** — it shows the shape and points at `M1 · base · reading`, because there is no honest screen form for a 16-digit route response. The diff summary *is* quoted (its numbers are already two-figure screen form) with the link and the line name, which is the quote-and-link rule R14 chose.
+- **Two extra small commits** after the main one: a guard that refuses if the program cannot find the checkout it is meant to write into (otherwise it writes somewhere nobody looks and the build calls the file stale for ever), and moving the test's output to `tmp_path` (it was one typo from rewriting the file it checks).
+
+## Which chapter numbers my change made stale
+
+**None.** I rewrote no quoted number anywhere — `feat/04b-evals` does that after rebasing onto this. Two passages *became* citations rather than bare figures, both in `README.md`.
+
+## Open questions
+
+1. `_two_figures` is imported privately from `domain/diff.py`. Making it public is right, but that is a `domain/` edit I was told not to make. Recommend it rides the R17 formatter move in stack 06.
+2. `B · observed B · reading` prints `&gt;.99 (&gt;.99–&gt;.99)` — true and the guard working as designed, but if the product ever shows an observed claim it may want the word *observed* there, the way *supposed* works now. Not decided by anyone; nothing on screen reads it yet.
+3. If 04b finds a quoted number with no line in the file, adding one is a few lines in one function — say so rather than hand-typing it.
+
+## Files touched (`git diff --stat 48eb562..HEAD`)
+
+```
+ .github/workflows/ci.yml                                  |  12 +
+ ARCHITECTURE.md                                           |  10 +-
+ Makefile                                                  |   9 +-
+ README.md                                                 |  13 +-
+ backend/src/katalyst/engine/worked_numbers.py             | 847 +++++++++++++++
+ backend/tests/unit/engine/test_worked_numbers_as_a_program.py | 178 +++
+ docs/worked-numbers.txt                                   | 376 +++++++
+ spec/README.md                                            |   4 +-
+ spec/probes/README.md                                     |  21 +-
+ 9 files changed, 1451 insertions(+), 19 deletions(-)
+```
+`domain/`, `frontend/` and `test_hormuz_golden.py` are untouched (verified by name against the diff). No decimal-scanning lint added. Five commits on `chore/04-worked-numbers`; nothing pushed.
+
+## Verification output tails
+
+```
+### ruff check           All checks passed!
+### ruff format --check  93 files already formatted
+### mypy src             Success: no issues found in 45 source files
+### mypy --strict domain Success: no issues found in 12 source files
+### my test file         4 passed in 2.29s
+### engine + fixtures + api + import boundary   291 passed, 1 warning in 13.61s
+### make numbers; git diff --exit-code -- docs/worked-numbers.txt   (silent, exit 0)
+### determinism          cmp a/b/c/d → ALL FOUR RUNS BYTE-IDENTICAL
+### the check bites      Failed: worked-numbers.txt is stale: the engine no longer prints
+                         what is committed. Run `make numbers` and commit the result …
+                         (proved by perturbing one digit, then restoring)
+```
+
+**Whole server suite: queued, not yet run.** `heavy.sh "N: server suite"` has been waiting since 17:44 behind `growth: 20 cold runs of all nine e2e tests`. My change adds one `engine/` module and one test file, touches no `domain/` code and no coverage source, and 291 tests across `unit/engine`, `unit/fixtures`, `api` and the import boundary pass directly — but the full run has not reported. Its tail will appear in `/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/btkeanf6e.output`.
+
+Pull-request body: `/Users/kentgang/git3/katalyst/plans/notes/msgs/pr-numbers-body.md` · squash message: `/Users/kentgang/git3/katalyst/plans/notes/msgs/merge-numbers.txt`.</result>
+<usage><subagent_tokens>275808</subagent_tokens><tool_uses>156</tool_uses><duration_ms>1446487</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b7r6gzd4p</task-id>
+<tool-use-id>toolu_01F7Xr7gq2Qfc27jWtoNyP6D</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/b7r6gzd4p.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the growth branch's 20 cold end-to-end runs through the queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a9dd150c52a22354d</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a9dd150c52a22354d.output</output-file>
+<status>completed</status>
+<summary>Agent "Build the worked-numbers file" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>The suite is running now. I'll report the result as soon as it lands.</result>
+<usage><subagent_tokens>278847</subagent_tokens><tool_uses>166</tool_uses><duration_ms>1825584</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a9dd150c52a22354d</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a9dd150c52a22354d.output</output-file>
+<status>completed</status>
+<summary>Agent "Build the worked-numbers file" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>The queued suite landed green. Here is the completed report.
+
+**What the coordinator must run to check me**, in order, from `/Users/kentgang/git3/katalyst-wt/chore-04-worked-numbers`:
+
+```sh
+make numbers &amp;&amp; git diff --exit-code -- docs/worked-numbers.txt   # must print nothing
+cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check .
+uv run mypy src &amp;&amp; uv run mypy --strict src/katalyst/domain
+uv run pytest tests/unit/engine/test_worked_numbers_as_a_program.py -q
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest -q      # already run: 562 passed
+```
+
+## What I built
+
+`make numbers` → `python -m katalyst.engine.worked_numbers` → **`docs/worked-numbers.txt`** (376 lines, 294 named facts). **`make numbers` takes 2.0 s** — three timed runs at 2.03 / 2.02 / 2.02 s. No key, no network.
+
+**Why `docs/worked-numbers.txt`, not `spec/graph/hormuz-numbers.md`.** `spec/README.md` makes `spec/` a book whose every file is a chapter listed on its part's landing page; a generated table would have to be listed as a chapter (untrue) or left unlisted (drift). The numbers are quoted from `spec/graph/`, `spec/multiverse/`, `ARCHITECTURE.md` and `README.md`, so the owning file belongs to no single part — and a `.txt` under `docs/` tempts nobody to hand-edit it.
+
+**Why `engine/`, not `fixtures/`.** It is a program that runs the engine over committed data — the exact shape of `engine/check_recordings.py`, which the build already runs the same way. `fixtures/` holds the stored examples themselves.
+
+**Contents, labelled apart by one checkable rule** — *a computed number's name says which world it was read from; an input's name names no world.* The test enforces that in both directions.
+- INPUTS: each claim's kind, prior chip, resolve-by date and day, the user's and market's beliefs, the base rate; each arrow's ends, mode, shape, strength, delay, half-life, provenance, reflexivity; the three branches and every edit in order; the seed and loop sizes.
+- COMPUTED: each claim's reading in four worlds (base, strike, observed B, observed C); per claim per edit the state, `was → is`, move, same-direction share, reweighting-only flag; the change list with place, day, before→after, biggest move, band width, share, rank; the sentence beside each list and its warnings; the retraction; the number on all eleven arrows; all forty-nine band shares.
+
+**The supposition trap, caught.** `S`'s resolve-by day *is* the day the branch supposes it true, so its belief is exactly 1. `S · strike · reading` prints `supposed`, never `&gt;.99`, and a test pins it — same rule applied to the diff's `after`.
+
+**One formatter, not two.** `_two_figures` is imported from `domain/diff.py`, not copied. Moves and shares print no screen form (`—`) because the product has no text form for a move yet (R17 gives it one).
+
+## How I made it deterministic across machines
+
+- Every block sorted by its own lines; no set ever iterated; no mapping iterated unsorted.
+- Nothing about the run is written down: no date, no host, no package version.
+- **Full precision stops at six decimal places.** numpy's `exp`/`log` are accurate to well under one unit in the last place but are not promised identical on Linux/Intel (CI) and macOS/Arm (here). Six places is four orders finer than anything shown and ten coarser than those machines can disagree by. Sixteen digits would fail the build for a reason nobody changed — and would promise a reader a seventeenth digit that does not exist, which is exactly what `README.md` was doing.
+- **Measured:** four runs — twice plain, once `PYTHONHASHSEED=7919`, once `PYTHONHASHSEED=0` — byte-identical by `cmp`; three more after the final edits, still identical. The suite's test runs the program as a subprocess under `PYTHONHASHSEED=7919` with both API keys stripped.
+- I could not test Linux/x86-64 directly (Docker here is arm64; qemu would exercise different SIMD paths than CI anyway), so the six-place rounding is the guarantee rather than a hope.
+
+## First twenty lines of the file
+
+```
+Every number the Strait of Hormuz example quotes
+================================================
+
+Generated. Do not edit this file by hand — `make numbers` writes it, and the
+build fails when what is committed differs from what the program prints. The
+program is `backend/src/katalyst/engine/worked_numbers.py`; it runs the shipped
+engine on the stored example at the example's own seed and the shipped loop
+sizes, and reads nothing but what comes back.
+
+**A chapter quotes a number only where this file is one link away.** Cite a line
+by the name at its start — `B · base · reading` — rather than restating the
+figure, so that the day the arithmetic changes there is one place to look and one
+diff to review.
+
+Two parts, and the difference between them matters:
+
+  INPUTS     numbers a person typed, in backend/src/katalyst/fixtures/hormuz.py.
+             Stable. Safe to quote. A sweep that rewrites these is touching
+             numbers that never needed touching.
+  COMPUTED   numbers the engine worked out from those. Nobody typed one. These
+```
+
+## Where I deviated from the plan, and why
+
+- **The analysts proposed `katalyst.domain.worked`.** Impossible — `domain/` imports nothing from other layers and a test enforces it. It is `engine/worked_numbers.py`.
+- **One line per *number*, not per claim-day row.** The diff of this file is the deliverable, so a diff that is literally a list of numbers beats a diff of re-flowed rows. The change list's rank is part of the name (`M1 · strike · change list place`), so a ranking that moves shows up as a number instead of shuffling a block.
+- **Four worlds, not two.** The brief asked for the two observations; I report readings for all four worlds so every world is reported one way rather than three.
+- **Conditionals: each arrow once, on the world where it exists** (eight on base, the three strike arrows on the branch). Every arrow in every world would be forty-four numbers no chapter asks for.
+- **`README.md`'s `curl` JSON prints no digits at all** — it shows the shape and points at `M1 · base · reading`, because there is no honest screen form for a sixteen-digit route response. The diff summary *is* quoted (its numbers are already two-figure screen form) with the link and the line name: that is the quote-and-link rule R14 chose.
+- **Three small follow-up commits:** a guard that refuses if the program cannot find the checkout it writes into; moving the test's output to `tmp_path` (it was one typo from rewriting the file it checks); and `558 → 562` in ARCHITECTURE.md, because my four tests made that dated figure stale and it is measured from the run below.
+
+## Which chapter numbers my change made stale
+
+**None.** I rewrote no quoted number anywhere — `feat/04b-evals` does that after rebasing onto this. Two passages in `README.md` *became* citations rather than bare figures.
+
+## Open questions
+
+1. `_two_figures` is imported privately from `domain/diff.py`. Making it public is right, but that is a `domain/` edit I was told not to make. Recommend it rides the R17 formatter move in stack 06.
+2. `B · observed B · reading` prints `&gt;.99 (&gt;.99–&gt;.99)` — true, and the guard working as designed. If the product ever shows an observed claim it may want the word *observed* there, the way *supposed* works now. Nothing on screen reads it yet.
+3. If 04b finds a quoted number with no line in the file, adding one is a few lines in one function — say so rather than hand-typing it.
+
+## Files touched (`git diff --stat 48eb562..HEAD`)
+
+```
+ .github/workflows/ci.yml                                      |  12 +
+ ARCHITECTURE.md                                               |  10 +-
+ Makefile                                                      |   9 +-
+ README.md                                                     |  13 +-
+ backend/src/katalyst/engine/worked_numbers.py                 | 847 +++++++++++
+ backend/tests/unit/engine/test_worked_numbers_as_a_program.py | 178 +++
+ docs/worked-numbers.txt                                       | 376 +++++
+ spec/README.md                                                |   4 +-
+ spec/probes/README.md                                         |  21 +-
+ 9 files changed, 1451 insertions(+), 19 deletions(-)
+```
+`domain/`, `frontend/` and `test_hormuz_golden.py` are untouched (checked by name against the diff). No decimal-scanning lint added. Six commits on `chore/04-worked-numbers`; worktree clean; nothing pushed.
+
+## Verification output tails
+
+```
+### ruff check                  All checks passed!
+### ruff format --check         93 files already formatted
+### mypy src                    Success: no issues found in 45 source files
+### mypy --strict src/katalyst/domain   Success: no issues found in 12 source files
+### my test file                4 passed in 2.29s
+### engine+fixtures+api+import boundary  291 passed, 1 warning in 13.61s
+### make numbers; git diff --exit-code -- docs/worked-numbers.txt   (silent, exit 0)
+### determinism   cmp a/b/c/d → ALL FOUR RUNS BYTE-IDENTICAL
+### the check bites (one digit perturbed, then restored):
+    Failed: worked-numbers.txt is stale: the engine no longer prints what is
+    committed. Run `make numbers` and commit the result — the diff of that one
+    file is the whole list of numbers that moved, and it is meant to be reviewed.
+
+### WHOLE SERVER SUITE, through the queue — 18:09:00 END N: server suite exit=0 took=119s
+    TOTAL  1304 stmts, 0 miss, 348 branch, 0 partial, 100% (domain coverage)
+    562 passed, 1 warning in 117.27s (0:01:57)
+```
+
+Pull-request body: `/Users/kentgang/git3/katalyst/plans/notes/msgs/pr-numbers-body.md` · squash message: `/Users/kentgang/git3/katalyst/plans/notes/msgs/merge-numbers.txt`.</result>
+<usage><subagent_tokens>287674</subagent_tokens><tool_uses>169</tool_uses><duration_ms>1954480</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bk27q5zhf</task-id>
+<tool-use-id>toolu_017VUNE79oJYZS67f6GtUyVG</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/bk27q5zhf.output</output-file>
+<status>completed</status>
+<summary>Background command "Queue the wire fix's suite, then push, open its PR and land it" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a9dd150c52a22354d</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a9dd150c52a22354d.output</output-file>
+<status>completed</status>
+<summary>Agent "Build the worked-numbers file" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>That was the last leftover queue waiter exiting — no action needed. Nothing changed since my report.
+
+Final state, unchanged and confirmed:
+
+- Branch `chore/04-worked-numbers`, six commits on `48eb562`, worktree clean, nothing pushed.
+- `make numbers` writes `docs/worked-numbers.txt` in 2.0 s; regenerating it produces no diff.
+- Whole server suite through the queue: `exit=0 took=119s`, **562 passed**, 100% domain coverage.
+- Both linters, both mypy runs, and the four new program tests green.</result>
+<usage><subagent_tokens>287926</subagent_tokens><tool_uses>170</tool_uses><duration_ms>1970510</duration_ms></usage>
+</task-notification>
