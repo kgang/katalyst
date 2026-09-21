@@ -75,6 +75,8 @@ function serverAnswersNormally() {
     // What a keyless server can replay. Empty here: this stand-in is a server
     // with nothing recorded, which is what "not ready" means on this screen.
     replayable: [],
+    // And nothing in its recordings folder that it could not read.
+    unreadable: [],
   });
   vi.mocked(readAbout).mockResolvedValue({ name: "Katalyst", version: "0.1.0" });
 }

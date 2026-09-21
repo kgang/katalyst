@@ -892,6 +892,22 @@ export interface components {
             at?: string | null;
         };
         /**
+         * DraftedInsert
+         * @description What the insert route answers with: the edit, and what drafting it cost.
+         *
+         *     An insert is not one call — a drafting call, then one call per arrow — so it
+         *     spends real money, and NFR-6 (every generation records model, tokens, cache
+         *     reads, searches and dollars) has no exception for money spent outside a
+         *     stream. The route used to answer a bare `Insert` and drop what it cost on the
+         *     floor (`streaming.md`, settled 2026-09-20).
+         */
+        DraftedInsert: {
+            /** @description The claim and its arrows, already validated. */
+            insert: components["schemas"]["Insert"];
+            /** @description What drafting it cost, in the shape the stream's receipt event carries. */
+            receipt: components["schemas"]["katalyst__engine__events__Receipt"];
+        };
+        /**
          * Evidence
          * @description One published item that supports or undercuts a claim.
          *
@@ -1322,66 +1338,12 @@ export interface components {
              * @default []
              */
             replayable: components["schemas"]["RecordingSummary"][];
-        };
-        /**
-         * Receipt
-         * @description What one run has spent so far, and on what.
-         *
-         *     Frozen, like everything else on this map: folding a call in returns a new
-         *     receipt rather than changing this one, so a receipt handed to somebody cannot
-         *     quietly grow behind their back.
-         *
-         *     `dollars` is worked out from the counters and the price table every time the
-         *     receipt changes, so it can never drift away from the numbers beside it.
-         */
-        Receipt: {
             /**
-             * Model
-             * @description Which model the run asked. Priced by `pricing.py`.
+             * Unreadable
+             * @description One plain sentence per file in the recordings folder that this engine could not read. **A bad file never hides the good ones**: it is named here and the others still play, because a recording is a committed file that outlives the code that wrote it and meeting an old one is ordinary rather than exceptional (Kent, 2026-09-20).
+             * @default []
              */
-            model: string;
-            /**
-             * Calls
-             * @description How many round trips this run has made. A question whose answer came back part finished and was sent back to be continued counts each trip, because each trip is on the bill.
-             * @default 0
-             */
-            calls: number;
-            /**
-             * Searches
-             * @description How many web searches the model ran across the whole run.
-             * @default 0
-             */
-            searches: number;
-            /**
-             * Input Tokens
-             * @description Tokens of question read fresh. It is the remainder only: the ones read back out of the cache are counted separately below.
-             * @default 0
-             */
-            input_tokens: number;
-            /**
-             * Output Tokens
-             * @description Tokens of answer written, the model's thinking included.
-             * @default 0
-             */
-            output_tokens: number;
-            /**
-             * Cache Read Tokens
-             * @description Tokens the service recognised from an earlier call and charged a tenth of the usual price for. A run where this stays at nothing is a bug in how the request is put together, not a slow day.
-             * @default 0
-             */
-            cache_read_tokens: number;
-            /**
-             * Cache Write Tokens
-             * @description Tokens written into the cache as they were read, charged at more than a fresh one. A run pays these on its first call and rarely again.
-             * @default 0
-             */
-            cache_write_tokens: number;
-            /**
-             * Dollars
-             * @description What all of the above comes to, at the prices in `pricing.py`.
-             * @default 0
-             */
-            dollars: number;
+            unreadable: string[];
         };
         /**
          * RecordingSummary
@@ -1612,7 +1574,7 @@ export interface components {
              */
             lines: components["schemas"]["TranscriptLine"][];
             /** @description What the run spent. Absent until the run has finished. */
-            receipt?: components["schemas"]["Receipt"] | null;
+            receipt?: components["schemas"]["katalyst__engine__receipt__Receipt"] | null;
             /**
              * Reason
              * @description Why the run stopped. Absent until it has.
@@ -1662,6 +1624,17 @@ export interface components {
              * @default []
              */
             violations: components["schemas"]["Violation"][];
+            /**
+             * Dropped
+             * @description Every address this call's answer cited that the search never returned. The reader is told which one rather than left to notice that an arrow says it argued where it might have said it documented.
+             * @default []
+             */
+            dropped: string[];
+            /**
+             * No Reference Class
+             * @description The reference class of a count that was offered with nothing behind it, when one was. The count itself is not kept: a figure with no page behind it reads as measured however it is marked, so the transcript says a class was offered and that nothing backed it, and shows no number (Kent, 2026-09-20).
+             */
+            no_reference_class?: string | null;
             /**
              * Calls
              * @description How many round trips this question took.
@@ -1900,6 +1873,138 @@ export interface components {
              * @default 8
              */
             worlds: number;
+        };
+        /**
+         * Receipt
+         * @description What this run cost. The second-to-last event of every stream.
+         *
+         *     Second-to-last in both endings — before the run finished and before it broke.
+         *     A run that broke after ten calls still cost ten calls, and a run that broke
+         *     before its first emits a receipt of zeroes, which is also true.
+         *
+         *     It is not the same shape as the running total `engine/receipt.py` keeps. That
+         *     one counts what the bill is made of, cache writes included; this one is what a
+         *     person is shown, and it carries the three facts about the run that live here
+         *     and nowhere else: whether it was live or played back, the day the recording
+         *     was made, and the fingerprint of the prompt behind it.
+         */
+        katalyst__engine__events__Receipt: {
+            /**
+             * Model
+             * @description Which model wrote this map.
+             */
+            model: string;
+            /**
+             * Calls
+             * @description How many round trips the run made.
+             */
+            calls: number;
+            /**
+             * Input Tokens
+             * @description Tokens of question read fresh.
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @description Tokens of answer written, thinking included.
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @description Tokens the service recognised from an earlier call. A run where this stays at nothing is a bug in how the request is put together.
+             */
+            cache_read_tokens: number;
+            /**
+             * Searches
+             * @description Web searches this run made. Billed apart from tokens, so the dollars below cannot be worked out again without it.
+             */
+            searches: number;
+            /**
+             * Dollars
+             * @description What all of that came to, at the shipped price table.
+             */
+            dollars: number;
+            /**
+             * Seconds
+             * @description How long the run took, wall clock.
+             */
+            seconds: number;
+            /**
+             * Mode
+             * @description Whether this run called a model or played a recording back.
+             * @enum {string}
+             */
+            mode: "live" | "replay";
+            /**
+             * Recording Date
+             * @description The day the recording was made. Nothing at all when live.
+             */
+            recording_date?: string | null;
+            /**
+             * Prompt Hash
+             * @description The fingerprint of the prompt this run was made against.
+             */
+            prompt_hash: string;
+        };
+        /**
+         * Receipt
+         * @description What one run has spent so far, and on what.
+         *
+         *     Frozen, like everything else on this map: folding a call in returns a new
+         *     receipt rather than changing this one, so a receipt handed to somebody cannot
+         *     quietly grow behind their back.
+         *
+         *     `dollars` is worked out from the counters and the price table every time the
+         *     receipt changes, so it can never drift away from the numbers beside it.
+         */
+        katalyst__engine__receipt__Receipt: {
+            /**
+             * Model
+             * @description Which model the run asked. Priced by `pricing.py`.
+             */
+            model: string;
+            /**
+             * Calls
+             * @description How many round trips this run has made. A question whose answer came back part finished and was sent back to be continued counts each trip, because each trip is on the bill.
+             * @default 0
+             */
+            calls: number;
+            /**
+             * Searches
+             * @description How many web searches the model ran across the whole run.
+             * @default 0
+             */
+            searches: number;
+            /**
+             * Input Tokens
+             * @description Tokens of question read fresh. It is the remainder only: the ones read back out of the cache are counted separately below.
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @description Tokens of answer written, the model's thinking included.
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @description Tokens the service recognised from an earlier call and charged a tenth of the usual price for. A run where this stays at nothing is a bug in how the request is put together, not a slow day.
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @description Tokens written into the cache as they were read, charged at more than a fresh one. A run pays these on its first call and rarely again.
+             * @default 0
+             */
+            cache_write_tokens: number;
+            /**
+             * Dollars
+             * @description What all of the above comes to, at the prices in `pricing.py`.
+             * @default 0
+             */
+            dollars: number;
         };
     };
     responses: never;
@@ -2172,7 +2277,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Insert"];
+                    "application/json": components["schemas"]["DraftedInsert"];
                 };
             };
             /** @description Validation Error */

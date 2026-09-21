@@ -56,7 +56,7 @@ from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from katalyst.domain import Graph, Proposition, PropositionId
+from katalyst.domain import Belief, Graph, Proposition, PropositionId
 from katalyst.domain.validity import TERMINAL_KINDS
 from katalyst.engine.client import SEARCHES_INSIDE_ONE_CALL, Answerer
 from katalyst.engine.expand import expand, map_with, start_the_map, still_legal_on
@@ -138,6 +138,7 @@ def grow(
     answerer: Answerer,
     on: date,
     caps: Caps | None = None,
+    user_belief: Belief | None = None,
     never_seen: Callable[[Outcome], None] | None = None,
 ) -> Generator[Outcome | Finished, None, None]:
     """Walk the frontier, one round at a time, until every line has closed.
@@ -159,6 +160,11 @@ def grow(
         on: The day this run is happening. Passed in rather than read, which is
             what lets a recorded run and a live one be compared.
         caps: Every limit this run has. The defaults are in `Caps`.
+        user_belief: How likely the person said their own sentence is, when they
+            said. Stamped on the claim the map starts from as **theirs**, beside
+            the model's and never merged with it (FR-2). Saying nothing stamps
+            nothing: "I don't know" is an answer, and it is not a likelihood of
+            one half.
         never_seen: Told about an answer that was paid for and that nobody will
             ever be handed, because the reader went away while its round was in
             flight. The money was spent and the working is still owed
@@ -204,6 +210,10 @@ def grow(
         )
         return
     first, opening = started
+    if user_belief is not None:
+        first = first.model_copy(
+            update={"beliefs": first.beliefs.model_copy(update={"user": user_belief})}
+        )
     graph = Graph(id=mint_id(), propositions=(first,), links=(), hypothesis_id=first.id)
     walk.open_a_line(first.id, layer=0)
     yield opening.model_copy(update={"frontier": tuple(walk.frontier)})

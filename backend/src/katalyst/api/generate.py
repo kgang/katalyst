@@ -35,6 +35,7 @@ What this file must never do
 """
 
 import asyncio
+import logging
 import time
 from collections.abc import AsyncIterator, Generator
 from datetime import UTC, date, datetime
@@ -42,7 +43,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from katalyst.domain import Belief, Branch, Graph, Insert, Violation, apply, validate
@@ -63,12 +64,14 @@ from katalyst.engine.expand import add_a_claim
 from katalyst.engine.following import WENT_WRONG, Following, receipt_event
 from katalyst.engine.grow import grow
 from katalyst.engine.ids import BIGGEST_SEED, mint_id, mint_seed
-from katalyst.engine.outcome import Caps
-from katalyst.engine.receipt import nothing_spent_yet
+from katalyst.engine.outcome import Caps, Outcome
+from katalyst.engine.receipt import Receipt as Spent
+from katalyst.engine.receipt import fold, nothing_spent_yet
 from katalyst.engine.transcript import (
     Transcript,
     TranscriptLine,
     held,
+    line_for,
 )
 from katalyst.engine.verify import Verdict, verdict
 from katalyst.settings import Settings, get_settings
@@ -143,6 +146,24 @@ class GenerateRequest(BaseModel):
     )
 
 
+class DraftedInsert(BaseModel):
+    """What the insert route answers with: the edit, and what drafting it cost.
+
+    An insert is not one call — a drafting call, then one call per arrow — so it
+    spends real money, and NFR-6 (every generation records model, tokens, cache
+    reads, searches and dollars) has no exception for money spent outside a
+    stream. The route used to answer a bare `Insert` and drop what it cost on the
+    floor (`streaming.md`, settled 2026-09-20).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    insert: Insert = Field(description="The claim and its arrows, already validated.")
+    receipt: Receipt = Field(
+        description="What drafting it cost, in the shape the stream's receipt event carries."
+    )
+
+
 class InsertRequest(BaseModel):
     """What it takes to draft one claim a person asked for."""
 
@@ -211,7 +232,7 @@ async def generate(
 
 
 @router.post("/generate/insert")
-def draft_a_claim(asked: InsertRequest) -> Insert:
+def draft_a_claim(asked: InsertRequest) -> DraftedInsert:
     """Draft one claim a person asked for, and check it like any other proposal.
 
     The one edit that needs a model. The other five — *Suppose this is true*,
@@ -233,23 +254,36 @@ def draft_a_claim(asked: InsertRequest) -> Insert:
             at once when the draft does not fit the map; 501 with one plain
             sentence when there is no key and no recording holds that sentence.
     """
-    onto = engine.example_named(asked.base_id)
-    if onto is None:
+    stored = engine.example_named(asked.base_id)
+    if stored is None:
         raise HTTPException(status_code=404, detail=_no_such_map(asked.base_id))
 
+    # **The map the reader is looking at**, which is the base with their branch
+    # folded onto it — not the bare base. Drafting against the base let the same
+    # claim be added twice, and the reader first heard of it when a world route
+    # refused the branch with `duplicate_id` (Kent, 2026-09-20).
+    onto = _as_the_reader_sees_it(stored.graph, asked.branch)
+    if isinstance(onto, list):
+        raise HTTPException(status_code=422, detail=[one.model_dump() for one in onto])
+
+    spent = nothing_spent_yet()
     answerer = live_answerer()
     if answerer is None:
         drafted = _scripted_insert(asked.claim_in_words)
         if drafted is None:
             raise HTTPException(status_code=501, detail=NO_KEY_FOR_A_NEW_CLAIM)
     else:
-        drafted, _ = add_a_claim(
-            onto.graph,
+        started = time.monotonic()
+        drafted, its_calls = add_a_claim(
+            onto,
             asked.claim_in_words,
             answerer=answerer,
             on=_today(),
             width=Caps().width,
         )
+        for one in its_calls:
+            spent = fold(spent, one)
+        _remember_what_the_insert_cost(asked, spent, its_calls, time.monotonic() - started)
         if drafted is None:
             raise HTTPException(
                 status_code=422,
@@ -265,10 +299,55 @@ def draft_a_claim(asked: InsertRequest) -> Insert:
                 ],
             )
 
-    refused = _what_it_would_break(onto.graph, drafted)
+    refused = _what_it_would_break(onto, drafted)
     if refused:
         raise HTTPException(status_code=422, detail=[one.model_dump() for one in refused])
-    return drafted
+    return DraftedInsert(
+        insert=drafted,
+        receipt=receipt_event(
+            spent, seconds=0.0, mode="live" if answerer is not None else "replay"
+        ),
+    )
+
+
+def _as_the_reader_sees_it(base: Graph, branch: Branch | None) -> Graph | list[Violation]:
+    """Fold the reader's branch onto the stored map, or say why it will not fold.
+
+    Args:
+        base: The stored map, untouched.
+        branch: What the reader has done to it so far, or nothing at all.
+
+    Returns:
+        The map as the reader is looking at it, or every reason the branch does
+        not fit the map it names.
+    """
+    if branch is None:
+        return base
+    folded = apply(base, branch)
+    if isinstance(folded, list):
+        return folded
+    return folded[0]
+
+
+def _remember_what_the_insert_cost(
+    asked: InsertRequest, spent: Spent, its_calls: tuple[Outcome, ...], seconds: float
+) -> None:
+    """Put an insert's calls on a transcript of their own, so the money is readable.
+
+    NFR-6 has no exception for money spent outside a stream, and an insert is not
+    one call: a drafting call, then one call per arrow (Kent, 2026-09-20).
+    """
+    working = Transcript(
+        generation_id=mint_id(),
+        hypothesis=asked.claim_in_words,
+        target=None,
+        seed=0,
+        on=_today(),
+        mode="live",
+    )
+    for at, one in enumerate(its_calls):
+        working = working.plus(line_for(one, at))
+    held.remember(working.model_copy(update={"receipt": spent, "why": None}), None)
 
 
 @router.get("/generate/{generation_id}/transcript")
@@ -378,6 +457,7 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         answerer=answerer,
         on=today,
         caps=Caps(),
+        user_belief=asked.user_belief,
         never_seen=watching.never_seen,
     )
     try:

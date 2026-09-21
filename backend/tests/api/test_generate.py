@@ -296,7 +296,7 @@ def test_the_scripted_intervention_is_answered_and_anything_else_is_declined() -
     )
 
     assert scripted.status_code == 200
-    assert scripted.json()["proposition"]["claim"]
+    assert scripted.json()["insert"]["proposition"]["claim"]
     assert anything_else.status_code in (404, 501)
     assert (
         client()
@@ -795,3 +795,98 @@ def test_a_recording_that_stops_being_readable_ends_the_stream_honestly(
     assert "does not know" in read[-1][1]["message"]
     assert "weather_changed" in read[-1][1]["message"]
     assert "Error" not in read[-1][1]["message"]
+
+
+# --- The insert route reads the map the reader is looking at --------------
+
+
+def insert_of(**asked: Any) -> Any:
+    """Ask the insert route for a drafted claim."""
+    return client().post("/api/generate/insert", json=asked)
+
+
+def test_an_insert_is_judged_against_the_branch_the_reader_is_looking_at() -> None:
+    """The reader is looking at the base map **with their branch folded onto it**.
+
+    It was judged against the bare base map, so the same insert could be added
+    twice: 200, then 200 again with the branch that already held it — and then
+    `POST /api/worlds` refused the branch with `duplicate_id`, which is the first
+    the reader heard of it and much too late (2026-09-20).
+    """
+    stream()
+    first = insert_of(base_id=A_MAP, claim_in_words=THE_SCRIPTED_INSERT, position=0)
+    assert first.status_code == 200
+    already = first.json()["insert"]
+
+    again = insert_of(
+        base_id=A_MAP,
+        branch={
+            "id": "br-1",
+            "label": "the branch the reader has built",
+            "parent": None,
+            "interventions": [already],
+        },
+        claim_in_words=THE_SCRIPTED_INSERT,
+        position=1,
+    )
+
+    assert again.status_code == 422
+    assert any(one["code"] == "duplicate_id" for one in again.json()["detail"])
+
+
+def test_an_insert_answers_with_its_own_receipt() -> None:
+    """`streaming.md`, settled 2026-09-20: an `Insert` **and** its own small receipt.
+
+    An insert is not one call — a drafting call, then one call per arrow — so it
+    spends real money, and NFR-6 has no exception for money spent outside a
+    stream. The route answered a bare `Insert` and dropped what it cost on the
+    floor.
+    """
+    stream()
+
+    answered = insert_of(base_id=A_MAP, claim_in_words=THE_SCRIPTED_INSERT, position=0)
+
+    assert answered.status_code == 200
+    said = answered.json()
+    assert "insert" in said
+    assert said["receipt"]["mode"] in ("live", "replay")
+    assert said["receipt"]["prompt_hash"]
+
+
+# --- The reader's own likelihood is carried, or nothing is stamped --------
+
+
+def test_the_readers_own_likelihood_is_stamped_on_the_hypothesis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FR-2: it is theirs, never overwritten and never merged with the model's.
+
+    The field was accepted by the route, documented on the request, and thrown
+    away: `grep -rn user_belief backend/src` found only its declaration
+    (2026-09-20).
+    """
+    monkeypatch.setattr(generate, "live_answerer", lambda: a_story())
+
+    read = stream(
+        hypothesis=STARTED_AT,
+        user_belief={"p": 0.7, "lo": 0.5, "hi": 0.9, "owner": "user"},
+    )
+
+    world = next(payload for name, payload in read if name == "beliefs_propagated")
+    started = world["world"]["graph"]["hypothesis_id"]
+    its = next(one for one in world["world"]["graph"]["propositions"] if one["id"] == started)
+    assert its["beliefs"]["user"] == {"p": 0.7, "lo": 0.5, "hi": 0.9, "owner": "user"}
+    # Never overwritten and never merged: the model's own is still beside it.
+    assert its["beliefs"]["model"]["owner"] == "model"
+
+
+def test_saying_nothing_stamps_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ "I don't know" is an answer, and it is not a likelihood of one half."""
+    monkeypatch.setattr(generate, "live_answerer", lambda: a_story())
+
+    read = stream(hypothesis=STARTED_AT)
+
+    world = next(payload for name, payload in read if name == "beliefs_propagated")
+    started = world["world"]["graph"]["hypothesis_id"]
+    its = next(one for one in world["world"]["graph"]["propositions"] if one["id"] == started)
+    assert its["beliefs"]["user"] is None
