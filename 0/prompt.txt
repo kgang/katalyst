@@ -1,0 +1,33 @@
+Help me do a critical review of this project from first principles with the purposes of re-aligning with the stated objectives of the assignment brief and balancing common sense ideas on practicality, scope, and design within this context. Furthermore, I'd like to find opportunities to add additional rigor and groundedness regarding the applications of statistics, probability, ontology/epistemology, and quantitative finance. The aim is to find an 80/20 balance on finding the highest leverage adjustments to the course of this project and also providing an independent mid-point review on the design, structure, and assumptions that have guided this project so far.
+
+Start by looking at the assignment brief. Do your own creative brainstorming supplementing your ideas by doing internet research, and surveying select pieces of literature, or developing and articulating ideas you come up with independently.
+
+Only after doing your own first pass at ideation look at my brainstorming at /Users/kentgang/git3/katalyst/docs/initial-brainstorming.md
+
+Then look at the specs
+/Users/kentgang/git3/katalyst/spec
+and holistic implementation so far, such as the ADRs, code, and git history.
+
+Document your ideas and analysis at /Users/kentgang/git3/katalyst/plans/review. Produce a final proposal on the adjustments you'd recommend to one or more documents in that folder. The scope of the changes you recommends are expansive and can include ci, backend, frontend, or anything else. Please balance everything with feasibility, value, and leveraged impact.
+
+You may ask me questions to align with my values, taste, and decision making. In general, aim for a principled, enlightened, and simple as possible design of code and architecture to understand and maintain. Aim for excellence at the level of a senior or staff engineer.
+
+Use gpt-5-sol sub-agents to help with deconstructing and parallelizing this work.
+
+---
+
+> How much implementation time should the final recommendations assume before you submit the assignment?
+
+No fixed deadline yet
+
+---
+
+> Which outcome should carry the most weight when scope decisions conflict?
+
+A compelling, complete demo with defensible assumptions
+
+---
+
+> If the review finds that a quantitative feature adds more apparent certainty than useful information, how would you prefer to handle it?
+
+Reconsider the quantitative design from the ground up
