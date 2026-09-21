@@ -98,8 +98,38 @@ export function useMapKeys(needs: MapKeysNeeds) {
 
   const { wires, positions, focused, onFocused, onStatus, keys, words } = needs;
 
+  /**
+   * Where the keyboard is **now**, which is not always where the last render
+   * said it was.
+   *
+   * This handler moves the keyboard itself, synchronously: by the time it
+   * returns, the tile it moved to already has focus. The value it was handed,
+   * `focused`, is state, and state lands a render later. So two keys pressed
+   * inside one frame — a reader typing quickly, or a machine slow enough to
+   * deliver two keydowns in a single task — were **both** worked out from the
+   * claim the reader was on before the first one. The second key then did
+   * nothing at all, and the map said *"nothing causes this claim on this map"*
+   * about a claim with three causes.
+   *
+   * So the handler keeps its own note of where it put the keyboard, and follows
+   * `focused` whenever that changes for a reason other than its own move: Tab,
+   * a click, a branch opening on the claim it added.
+   */
+  const at = useRef(focused);
+  const lastSaid = useRef(focused);
+  if (lastSaid.current !== focused) {
+    lastSaid.current = focused;
+    at.current = focused;
+  }
+
   return useCallback(
     (event: KeyboardEvent): void => {
+      /** Move the keyboard, and remember it now rather than a render from now. */
+      const moveTo = (id: string): void => {
+        at.current = id;
+        onFocused(id);
+      };
+
       const target = event.target as HTMLElement;
       const typing =
         target.tagName === "INPUT" ||
@@ -110,27 +140,29 @@ export function useMapKeys(needs: MapKeysNeeds) {
       }
 
       const upDown = (way: 1 | -1): void => {
-        if (focused === null) {
+        const from = at.current;
+        if (from === null) {
           return;
         }
         const set =
-          leftOver.current?.at === focused && leftOver.current.others.length > 0
-            ? [focused, ...leftOver.current.others]
-            : inColumn(focused, positions);
-        const landed = stepThrough(focused, set, positions, way);
+          leftOver.current?.at === from && leftOver.current.others.length > 0
+            ? [from, ...leftOver.current.others]
+            : inColumn(from, positions);
+        const landed = stepThrough(from, set, positions, way);
         if (landed === null) {
           onStatus(way === 1 ? "last claim in this column" : "first claim in this column");
           return;
         }
-        onFocused(landed);
+        moveTo(landed);
         onStatus(`${way === 1 ? "down" : "up"} the column · ${words(landed)}`);
       };
 
       const sideways = (way: "in" | "out"): void => {
-        if (focused === null) {
+        const from = at.current;
+        if (from === null) {
           return;
         }
-        const step = alongWire(focused, way, wires, positions);
+        const step = alongWire(from, way, wires, positions);
         if (step === null) {
           onStatus(
             way === "out"
@@ -140,7 +172,7 @@ export function useMapKeys(needs: MapKeysNeeds) {
           return;
         }
         leftOver.current = { at: step.to, others: step.others };
-        onFocused(step.to);
+        moveTo(step.to);
         onStatus(`${wireInWords(step.wire)} · ${words(step.to)}`);
       };
 
@@ -207,6 +239,10 @@ export function useMapKeys(needs: MapKeysNeeds) {
           return;
       }
     },
-    [wires, positions, focused, onFocused, onStatus, keys, words],
+    // `focused` is not here on purpose: where the keyboard is is read from the
+    // note above, which is right as of this keystroke rather than as of the last
+    // render. Leaving it in would rebuild this handler — and rebind the listener
+    // carrying it — on every step across the map, for nothing.
+    [wires, positions, onFocused, onStatus, keys, words],
   );
 }
