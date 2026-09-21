@@ -235,6 +235,19 @@ button.example:disabled {
   margin-top: var(--space-hair);
 }
 
+/* A row whose whole content is one sentence and what pressing it does. The
+ * action sits beside the sentence rather than under it, so four of them read as
+ * a list rather than as four paragraphs of the same paragraph. */
+.example--terse {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-2);
+  align-items: baseline;
+}
+
+.example--terse .example__foot {
+  margin-top: 0;
+}
+
 .example__action {
   display: inline-flex;
   align-items: baseline;

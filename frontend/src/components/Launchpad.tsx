@@ -435,8 +435,13 @@ export function Launchpad({
         <ul className="examples">
           {STARTING_SENTENCES.map((one) => (
             <li key={one.example}>
+              {/* **One line each.** Four sentences, and the same thing happens
+                  to each of them, so a paragraph under every one would be the
+                  same paragraph four times. What the row does is said beside the
+                  sentence rather than under it — which is also what keeps the
+                  list short enough to be read as a list. */}
               <button
-                className="example"
+                className="example example--terse"
                 type="button"
                 data-start="live"
                 disabled={noModel !== null}
