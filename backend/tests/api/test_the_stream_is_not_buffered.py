@@ -41,26 +41,30 @@ MUST_BE_TOLD_NOT_TO_COLLECT = (
 """What the `/api/` location must say, or the packaged build delivers a dump."""
 
 
+A_QUICK_PACE = 0.05
+"""A pace short enough for a test, since what is under test is *whether* it paces."""
+
+
 @pytest.fixture
 def a_paced_replay(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """A copy with one recording, no key, and the pacing left on."""
+    """A copy with one recording, no key, and the pacing left on but hurried.
+
+    **Short rather than none**: what is under test is whether the route waits
+    between events at all, so a replay set to no pause would pass this by
+    proving nothing. The pace is one setting — `KATALYST_REPLAY_PACE`, in seconds
+    — so hurrying it is saying a smaller number, not reaching into the module.
+    """
     folder = tmp_path / "recordings"
     written_to(folder)
     monkeypatch.setattr(replay, "RECORDINGS", folder)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("KATALYST_REPLAY_INSTANT", raising=False)
+    monkeypatch.setenv("KATALYST_REPLAY_PACE", str(A_QUICK_PACE))
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
 
 
-A_QUICK_PACE = 0.05
-"""A pace short enough for a test, since what is under test is *whether* it paces."""
-
-
-def test_the_events_of_a_replay_are_let_go_of_one_at_a_time(
-    a_paced_replay: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_the_events_of_a_replay_are_let_go_of_one_at_a_time(a_paced_replay: None) -> None:
     """The route hands events over as they come, rather than building the whole body.
 
     **What this can and cannot see.** The test client collects a response before
@@ -74,7 +78,6 @@ def test_the_events_of_a_replay_are_let_go_of_one_at_a_time(
     a browser collects the body, is what the proxy configuration below is for.
     """
     del a_paced_replay
-    monkeypatch.setattr(replay, "A_COMFORTABLE_PACE", A_QUICK_PACE)
     seen: list[tuple[float, str]] = []
     started = time.monotonic()
     with TestClient(app).stream(

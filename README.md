@@ -134,7 +134,7 @@ make run-demo MODEL=claude-opus-5  # the same run, on the other model
 
 Re-run `make record-demo` whenever a prompt changes: a recording made against different words shows wording this program no longer uses, and the build says so rather than letting it pass unnoticed.
 
-**Four settings you may want**, all optional, and read in exactly one place (`backend/src/katalyst/settings.py`); the first three are in `.env.example` with a paragraph each:
+**Five settings you may want**, all optional, and read in exactly one place (`backend/src/katalyst/settings.py`); each is in `.env.example` with a paragraph of its own:
 
 | Setting | What it does |
 |---|---|
@@ -142,6 +142,7 @@ Re-run `make record-demo` whenever a prompt changes: a recording made against di
 | `KATALYST_EFFORT` | How hard the model tries — `low`, `medium`, `high`, `xhigh` or `max`. Empty by default, and then each path takes its own: **the recorder sends nothing**, so the service's own default stands and a recording is the richest map; **a live run asks for `medium`**, so a map arrives in minutes rather than the best part of an hour (Kent, 2026-09-21; the measured runs are in `docs/measurements.md`). Set it to override both. The receipt and a recording's first line say which effort made the map |
 | `KATALYST_RECORDINGS` | Where recorded generations are read from. Empty means the folder that ships here. Point it elsewhere to play a recording back through the real route before committing it |
 | `KATALYST_RUNS` | Where a paid run is written. Empty means `backend/.runs/` |
+| `KATALYST_REPLAY_PACE` | How long a replay waits between two of its events, in seconds. `0.6` unless you say otherwise, which is the speed a person watches a map arrive at; `0` means no pause at all. One number rather than a length and a switch beside it, and never something a request can ask for — a client that could skip the pacing could skip the thing a recording exists to show |
 
 The end-to-end tests are not in `make test`, because they want a browser downloaded first. They start both halves themselves, so there is nothing to have running:
 
@@ -150,6 +151,8 @@ cd frontend
 npx playwright install chromium   # once
 npm run e2e
 ```
+
+They run side by side, five browsers at a time here and two on the build machine, and they start the server at a **shortened** replay pace rather than none — `playwright.config.ts` carries both numbers and the reasoning behind each. Shortened rather than off because what they are about is a map *arriving*: with no pause at all every event lands in one tick, and there is no moment at which that is true.
 
 **They never attach to a server that is already up.** If you have two worktrees of this repository open, the second run stops at once and names the port it wanted rather than quietly testing the branch checked out in the first — which has happened, in both directions, with neither side able to tell from the output. Give it ports of its own with `KATALYST_E2E_BACKEND_PORT` and `KATALYST_E2E_FRONTEND_PORT`; the defaults are the two numbers continuous integration uses.
 

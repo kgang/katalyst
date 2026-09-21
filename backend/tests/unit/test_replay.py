@@ -11,11 +11,12 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from katalyst.engine import events, replay
 from katalyst.engine.events import BeliefsPropagated, Done, ProposalRejected, Receipt
 from katalyst.engine.prompt import prompt_hash
-from katalyst.settings import get_settings
+from katalyst.settings import A_COMFORTABLE_PACE, THE_SLOWEST_PACE, get_settings
 from tests.unit.engine.a_recording import MADE_ON, THE_SENTENCE, written_to
 
 SMALL = (16, 4)
@@ -168,10 +169,50 @@ def test_an_empty_folder_gives_nothing_and_complains_about_nothing(tmp_path: Pat
     assert replay.summaries(tmp_path) == ()
 
 
-def test_pacing_is_a_setting_and_never_a_field_on_a_request() -> None:
-    """A client that could ask for an instant replay could skip what a recording is for."""
-    assert replay.seconds_between(instant=True) == 0.0
-    assert replay.seconds_between(instant=False) > 0.0
+def test_pacing_is_one_setting_and_never_a_field_on_a_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The pause is a number of seconds, read from the environment and nowhere else.
+
+    A client that could ask for a replay with no pause could skip what a
+    recording exists to show, so there is no way to ask. And there is **one**
+    way to say it, not a length and a switch beside it: no pause at all is a
+    pace of zero.
+    """
+    assert replay.seconds_between() == A_COMFORTABLE_PACE
+
+    monkeypatch.setenv("KATALYST_REPLAY_PACE", "0")
+    get_settings.cache_clear()
+    assert replay.seconds_between() == 0.0
+
+    monkeypatch.setenv("KATALYST_REPLAY_PACE", "0.15")
+    get_settings.cache_clear()
+    assert replay.seconds_between() == 0.15
+
+
+@pytest.mark.parametrize("refused", ["-0.1", str(THE_SLOWEST_PACE + 1), "nan", "inf", "-inf"])
+def test_a_pace_nobody_could_watch_stops_the_program_with_a_sentence(
+    refused: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every value that is not a length of time somebody could watch is a refusal.
+
+    What is checked is that the program stops and says what the setting is — a
+    program that quietly took a negative pause, or one that sat for a minute
+    between two claims, would look broken with nothing anywhere saying why.
+
+    **Not a number and infinity are here on purpose.** A float can be either, and
+    neither is less than zero or greater than ten, so a check written as *is it
+    out of range* waves both through — to a program that would then wait for ever
+    between two events, or not at all, with nothing anywhere saying why.
+    """
+    monkeypatch.setenv("KATALYST_REPLAY_PACE", refused)
+    get_settings.cache_clear()
+
+    with pytest.raises(ValidationError) as stopped:
+        get_settings()
+
+    assert "KATALYST_REPLAY_PACE is how many seconds a replay waits" in str(stopped.value)
+    get_settings.cache_clear()
 
 
 def test_a_recording_ends_where_a_generation_ends(recorded: replay.Recording) -> None:

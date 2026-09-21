@@ -103,9 +103,11 @@ Three things follow, and the third is the reason:
 
 A fixed delay between events, so the map grows at a speed a person can watch. It is **cosmetic and nothing else**: it never changes an event, an order, or a number.
 
-The delay is an argument with a default the builder picks, and the default is picked against a measurement rather than taste — a live proposal takes a few seconds to come back (decision record 0006), so a replay that races is teaching the reviewer that the product is faster than it is.
+The delay's default is picked against a measurement rather than taste — a live proposal takes a few seconds to come back (decision record 0006), so a replay that races is teaching the reviewer that the product is faster than it is.
 
-**`instant` drops the delay to nothing.** It is a setting, read by `katalyst.settings` like everything else the environment says, and it is **not** a field on the request: pacing is presentation, and a client that could ask for instant replay would let anyone who opened the network tab skip the thing the recording exists to show. The test suite sets it; so does the `recordings` build job; `engine/replay.py` takes it as a keyword argument whose default is the setting.
+**It is one setting and nothing beside it: `KATALYST_REPLAY_PACE`, the pause between two events in seconds** *(2026-09-21; until then it was a length in the code and an `instant` flag over the top of it, which is two ways of answering one question)*. The default is the comfortable 0.6 a person watches at, and **zero means no pause at all**. It is a setting, read by `katalyst.settings` like everything else the environment says, and it is **not** a field on the request: pacing is presentation, and a client that could ask for a replay with no pause would let anyone who opened the network tab skip the thing the recording exists to show. `engine/replay.py` reads it in `seconds_between()` and takes no argument beside it. A negative pause, or one longer than ten seconds, stops the program with a sentence saying what the setting is and what it was given.
+
+**Who sets it to something else.** The server's own route tests set `0`, because what they are about is what the stream says and not how long it takes to say it. The end-to-end browser run sets a *short pace rather than none*, because its whole subject is a map arriving: `frontend/playwright.config.ts` carries the number and the measurement behind it.
 
 ---
 
@@ -310,7 +312,7 @@ The generator here is **a finite corpus, not a Hypothesis strategy**, and it has
 
 **6. Do not reuse the test cassettes as the demo source.** *Because* cassettes are raw exchanges matched on the request, so a whitespace change in a prompt breaks the demo as a crash rather than as a stale date, they are shaped for assertions rather than for four runs worth watching, and the running app would have to load a test-only library. Record 0012 weighed this as option B and rejected it; **do** keep the two stores apart and pay the second re-recording chore knowingly.
 
-**7. Do not let `instant` be a request field.** *Because* pacing is presentation, and a client that can ask for instant replay lets anyone skip the thing the recording exists to show. **Do** make it a setting, read once by `katalyst.settings`.
+**7. Do not let the pace be a request field.** *Because* pacing is presentation, and a client that can ask for a replay with no pause lets anyone skip the thing the recording exists to show. **Do** make it a setting, read once by `katalyst.settings` — and **one** setting: a length plus a switch that means *none* is two answers to "how long do we wait", and the second one always ends up disagreeing with the first.
 
 ---
 

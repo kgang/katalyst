@@ -73,7 +73,9 @@ def a_copy_with_recordings_and_no_key(
     folder = tmp_path / "recordings"
     written_to(folder)
     monkeypatch.setattr(replay, "RECORDINGS", folder)
-    monkeypatch.setenv("KATALYST_REPLAY_INSTANT", "true")
+    # No pause between events: these tests are about what the stream says, not
+    # about how long it takes to say it.
+    monkeypatch.setenv("KATALYST_REPLAY_PACE", "0")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     get_settings.cache_clear()
     held.forget_everything()

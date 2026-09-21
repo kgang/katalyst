@@ -89,18 +89,6 @@ def where_they_live() -> Path:
     return Path(said) if said else RECORDINGS
 
 
-A_COMFORTABLE_PACE = 0.6
-"""Seconds between events when a recording is played at human speed.
-
-Cosmetic and nothing else: it never changes an event, an order or a number. The
-figure is chosen against a measurement rather than taste — a live proposal took
-about a minute to come back on the first five recorded calls, so a replay that
-raced would teach a reviewer that the product is faster than it is, and one that
-matched would be unwatchable. This is the slowest speed somebody will sit through
-and the fastest that still reads as *arriving* rather than *appearing*.
-"""
-
-
 class RecordedInsert(BaseModel):
     """The single scripted "…but X happens" a keyless reviewer can make on this map."""
 
@@ -423,24 +411,20 @@ def play(recording: Recording) -> Iterator[Event]:
             ) from did_not_fit
 
 
-def seconds_between(instant: bool | None = None) -> float:
+def seconds_between() -> float:
     """How long to wait between two events of a replay.
 
-    Pacing is presentation and nothing else, which is why it is **not** a field on
-    the request: a client that could ask for an instant replay would let anybody
-    who opened the network tab skip the thing the recording exists to show. It is
-    a setting, read here, and a caller may say so plainly instead.
-
-    Args:
-        instant: True to drop the delay to nothing, or nothing at all to let the
-            program's own settings decide.
+    **One setting and no argument beside it.** Pacing is presentation and nothing
+    else, which is why it is not a field on the request: a client that could ask
+    for an instant replay would let anybody who opened the network tab skip the
+    thing the recording exists to show. It is `KATALYST_REPLAY_PACE`, in seconds,
+    read here — and a caller who wants no pause at all asks for a pace of zero,
+    which is the same question with the same answer rather than a second switch.
 
     Returns:
-        The seconds to wait between events.
+        The seconds to wait between events. Zero means no wait at all.
     """
-    if instant is None:
-        instant = get_settings().KATALYST_REPLAY_INSTANT
-    return 0.0 if instant else A_COMFORTABLE_PACE
+    return get_settings().KATALYST_REPLAY_PACE
 
 
 def beliefs_of(
