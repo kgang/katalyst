@@ -273,14 +273,13 @@ describe("the panel, on a claim", () => {
   });
 
   it("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", () => {
-    // **Waiting on the engine fix.** Nothing sets `onlyReweighted` today: the
-    // engine's difference gains the field that says a claim moved purely
-    // because an observation made some versions of the map count for more, in
-    // the pull request that fixes how a direction is read. The browser must
-    // never work it out for itself, so the panel is driven here with the field
-    // set by hand — which checks the one thing this side owns: that the
-    // sentence is printed, word for word, exactly when the engine says so, and
-    // never otherwise.
+    // The engine's difference carries `moved_only_by_reweighting` on the claim's
+    // own row, and the browser must never work it out for itself — whether a
+    // claim moved for that reason is a fact about how the engine read the
+    // numbers. So the panel is driven here with the field set by hand, which
+    // checks the one thing this side owns: that the sentence is printed, word
+    // for word, exactly when the engine says so and never otherwise. The
+    // end-to-end test drives the real engine into the same state.
     const moved = {
       from: 0.356,
       to: 0.365,

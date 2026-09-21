@@ -38,7 +38,6 @@ import {
   appendEdit,
   type BranchView,
   branchesOf,
-  type ClaimView,
   type DiffView,
   type Edit,
   FixtureWorldSource,

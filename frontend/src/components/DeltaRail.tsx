@@ -26,6 +26,7 @@
  */
 
 import { useId, useState } from "react";
+import { toDay } from "../graph/diff/days";
 import type { DeltaRow, Known } from "../world";
 import { toMovement, toShare, toSize } from "./BeliefChip";
 import "./deltaRail.css";
@@ -177,7 +178,7 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
                     <span className="delta-rail__kind">{KIND_WORDS[row.kind] ?? row.kind}</span>
                     {row.move.reading === undefined ? null : (
                       <span className="delta-rail__day">
-                        {`${row.move.reading.way} · largest on ${row.move.reading.largestOn}`}
+                        {`${row.move.reading.way} · largest on ${toDay(row.move.reading.largestOn)}`}
                       </span>
                     )}
                   </p>

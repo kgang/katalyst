@@ -203,9 +203,11 @@ describe("the rail beside the map", () => {
     render(<DeltaRail rows={RANKED} ranked={true} summary={SUMMARY} />);
     // A row is read on the day of largest divergence rather than on the claim's
     // own judging day, so the row says which day that was. A number whose day is
-    // not said is a number nobody can check.
-    expect(screen.getByText(/down · largest on 2026-10-04/)).toBeInTheDocument();
-    expect(screen.getByText(/up · largest on 2026-10-11/)).toBeInTheDocument();
+    // not said is a number nobody can check. The day is written the way every
+    // other day on this canvas is written, rather than in the format the wire
+    // carries it in.
+    expect(screen.getByText(/down · largest on Oct 4/)).toBeInTheDocument();
+    expect(screen.getByText(/up · largest on Oct 11/)).toBeInTheDocument();
     // And which way it went is a chevron between the two readings as well as a
     // word, so neither carries it alone.
     expect(screen.getByText(".50 ▼ .42")).toBeInTheDocument();

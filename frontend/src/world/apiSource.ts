@@ -496,9 +496,7 @@ export class ApiWorldSource implements WorldSource {
     const difference = await readDiff(request.baseId, sendable(request.branch), seedFor(bundle));
     // The claims are needed only for their words and their kinds, so the rail
     // can name an ending rather than print its identifier.
-    const claims = bundle.graph.propositions
-      .map(toClaim)
-      .concat(request.branch.claims.map((claim) => claim));
+    const claims = bundle.graph.propositions.map(toClaim).concat(request.branch.claims);
     return toDiffView(difference, claims);
   }
 

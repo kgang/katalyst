@@ -21,15 +21,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { aClaim, aWire, aWorld } from "../../test/aMap";
 import { toShare } from "../../components/BeliefChip";
+import { aClaim, aWire, aWorld } from "../../test/aMap";
 import type { BranchView, DiffView, Edit, Movement } from "../../world";
 import { disagreements, type EngineState } from "../diff/agreement";
 import { badgesByClaim, standingByClaim } from "../diff/badges";
 import { bothPaintings, branchWorld, railRows } from "../diff/branchWorld";
-import { noChangeReason } from "../diff/noChange";
 import { readDiff } from "../diff/diffState";
 import { endings } from "../diff/endings";
+import { noChangeReason } from "../diff/noChange";
 import type { Arrow } from "../diff/reach";
 
 /** The seven claims of the stored example, in the order the map serves them. */

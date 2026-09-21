@@ -143,10 +143,19 @@ export function toTwoFigures(value: number): string {
  * The other end takes no guard either: a move of exactly one is a real move, and
  * it prints `1.0`.
  *
+ * **Nought and not-a-number are two different things.** A move of exactly
+ * nothing prints `0` — two significant figures of nothing is still nothing, and
+ * `.00` would claim a precision the measurement has not got. Anything that is
+ * not a number at all prints the dash this product prints for a value that is
+ * not there, rather than being rounded down to nought and read as a measurement.
+ *
  * @param value A distance between two likelihoods, at full precision. Its sign
  *   is said in words elsewhere, so pass its size.
  */
 export function toSize(value: number): string {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
   const rounded = twoFigures(Math.abs(value));
   return rounded === null ? "0" : written(rounded);
 }

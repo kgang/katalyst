@@ -206,15 +206,13 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // worlds is in front.
   await expect(page.locator(".map-bar__where")).toContainText("Hormuz opens, then Iran is struck");
   // What the branch did, said out loud for a reader who is not looking at the
-  // picture. The claim it added and the supposition it took back are both named.
-  //
-  // **Not the whole sentence, and that is a drift this pull request could not
-  // fix.** `src/a11y/announcement.ts` still ends the line "No numbers yet." and
-  // still counts the claims an edit can reach by a word the engine's answer
-  // replaces. Both are now untrue, and that file is owned by nobody on this
-  // branch; it is listed for the sweep.
-  await expect(page.locator(".map-live")).toContainText("One claim added");
-  await expect(page.locator(".map-live")).toContainText("one supposition retracted");
+  // picture — the whole sentence, against the real engine. How many claims moved
+  // is the engine's own count of the claims it called shifted, which is the same
+  // six the tiles are checked for below; a reader who cannot see the map and a
+  // reader who can are told the same thing.
+  await expect(page.locator(".map-live")).toHaveText(
+    "Branch created. One claim added, six claims moved, one supposition retracted.",
+  );
 
   // The claim the branch added is on the map, with the two badges its edits
   // earned, in the order they were made.

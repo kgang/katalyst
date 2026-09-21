@@ -230,12 +230,17 @@ describe("how tall a tile is", () => {
       "The Strait of Hormuz reopens to unrestricted commercial transit for shipping of every flag.",
       {
         badges: [
-          { words: "Supposed \u00b7 Oct 1" },
+          { words: "Supposed \u00b7 Oct 1", reason: "You supposed this is true, from Oct 1." },
           {
             words:
               'Retracted \u00b7 Oct 2 \u00b7 by "a confirmed military strike on Iranian territory"',
+            reason: "What was holding this up was taken away on Oct 2.",
           },
-          { words: ".41 \u25b2 .62", movement: true },
+          {
+            words: ".41 \u25b2 .62",
+            movement: true,
+            reason: "Your edit moved this claim up, from .41 to .62.",
+          },
         ],
       },
     );
@@ -520,7 +525,16 @@ describe("the union of two worlds", () => {
     const grown: [string, number][] = HORMUZ.map((claim) => [
       claim.id,
       reached.has(claim.id)
-        ? roomFor({ ...claim, badges: [{ words: ".41 \u25b2 .62", movement: true }] })
+        ? roomFor({
+            ...claim,
+            badges: [
+              {
+                words: ".41 \u25b2 .62",
+                movement: true,
+                reason: "Your edit moved this claim up, from .41 to .62.",
+              },
+            ],
+          })
         : tileHeight(claim),
     ]);
     // The point of this case, asserted rather than assumed: a tile the edit can

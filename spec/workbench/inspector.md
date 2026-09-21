@@ -55,7 +55,10 @@ interface ClaimDetail {
   baseRate: Known<{ referenceClass: string; k: number; n: number; sources: SourceView[] }>;
   beliefs: { model: Known<BeliefView>; user: Known<BeliefView>; market: Known<BeliefView> };
   evidence: readonly EvidenceView[];   // claim, address, direction, weight
-  decomposition: Known<Decomposition>; // prior, a line per incoming arrow, the result
+  // No `decomposition` field: there is none on the world and none on the wire. The block is
+  // assembled from fields that are each read — `prior` here, `strength`/`mode`/`lag`/`provenance`
+  // and the fetched `conditional` on each incoming arrow, `beliefs.model` as the result — and not
+  // one line of it is arithmetic. See B2.
   rangeShares?: Record<string, number>;// the reserved band slot; stack 06, nothing reads it here
   pathProduct: Known<PathProduct>;     // INV-8; arrives on the world, never multiplied here
 }
@@ -156,29 +159,43 @@ Five things to read off that:
 
 ### B2 — The decomposition: a number that can say why
 
-When the world carries one, the panel replaces *"no engine yet"* under **WHY THIS NUMBER** with the
-decomposition. The layout is the one [`../graph/belief.md`](../graph/belief.md) §B4 draws — prior,
-one line per incoming arrow with its push and its reason, then the result — and this panel copies it
-rather than inventing a second. §B4's numbers are its own illustration and are not B's: B's prior is
-`.28 (.15–.42)`, it has no base rate, and it has three incoming arrows, not two. This stack renders
-no such block, because no engine has computed one.
+Under **WHY THIS NUMBER** the panel lays out the argument for the claim's number. The layout is the
+one [`../graph/belief.md`](../graph/belief.md) §B4 draws — prior, one line per incoming arrow with
+its push and its reason, then the result — and this panel copies it rather than inventing a second.
+§B4's numbers are its own illustration and are not B's: B's prior is `.28 (.15–.42)`, it has no base
+rate, and it has three incoming arrows, not two.
 
-Three rules about it:
+**There is no `decomposition` field, and the block is not one thing the world hands over**
+*(corrected 2026-09-20, stack 04a, on building it)*. This chapter said the world carried the block
+whole and the panel rendered it or rendered nothing. It does not: the engine's world has no such
+field, and the wire has none. What the panel does instead is put together lines it each reads —
+`prior` from the claim, the push and its reason from each incoming arrow, the arrow's conditional
+where one has been fetched, and `beliefs.model` as the result — and the rule the old wording was
+protecting survives untouched, because not one of those lines is arithmetic done here.
+
+Four rules about it:
 
 1. **One line per incoming arrow the world carries** — not a selection. B's real block has three,
    the third being R → B at −1.2.
-2. **No line may be a number whose owner cannot be named** — `belief.md`'s rule, inherited here.
-3. **This panel never computes the block.** A canvas that added up its own pushes would be a second
-   engine, and two engines disagree.
+2. **Feedback arrows are not lines of the block.** A market acting back on the world it measures is
+   set aside before the engine works the map through ([`../multiverse/interventions.md`](../multiverse/interventions.md)),
+   so it contributed nothing to the number at the foot, and listing it among the pushes would hand
+   the reader a cause the engine never gave. It is listed below them under the outline's own words,
+   **fed back into by**, with a sentence saying it has not pushed on this number and why. A claim
+   whose only incoming arrow is a feedback one says nothing points at it — which is what the engine
+   did. *(Added 2026-09-20, stack 04a, on building it.)*
+3. **No line may be a number whose owner cannot be named** — `belief.md`'s rule, inherited here.
+4. **This panel never computes the block.** A canvas that added up its own pushes would be a second
+   engine, and two engines disagree. Each line is a field read and printed; the line at the foot
+   says on screen that nothing here was added up.
 
-**The whole block, or none of it** *(decided 2026-09-17, stack 04a; this closes open question 3
-below)*. The question was whether the panel might draw an arrow's pushes before the engine existed,
-leaving out the prior-plus-pushes-equals-result line it could not compute. It is closed by the engine
-arriving rather than by an argument: the world now carries the decomposition whole, so there is
-nothing a half block would be for, and it is not built. The rule that survives is the one already
-here — the panel renders the block the world carries, and renders *"no engine yet"* when there is
-none. A block missing its last line reads as a sum somebody forgot to finish, and the reader cannot
-tell that from a sum that went wrong.
+**No line of it is ever merely missing** *(decided 2026-09-17 as "the whole block, or none of it";
+restated 2026-09-20 to match what was built)*. The question was whether the panel might draw an
+arrow's pushes while leaving out the result line. The answer is that every line is always drawn and
+a line with no number says its absence and why, which is the rule the whole panel runs on — so the
+result line reads *"no engine yet"*, with its reason, rather than being left off. A block missing
+its last line reads as a sum somebody forgot to finish, and the reader cannot tell that from a sum
+that went wrong; a last line that says why it is empty cannot be mistaken for either.
 
 **A claim that moved only because some versions started counting more says so, here.** Observing one
 claim reweights the versions of the map — a version under which the observation was likely counts
@@ -445,9 +462,10 @@ inviting a number — the one absence that is an offer rather than a finding. *T
 
 **INV-workbench.54 — the panel never computes a number, and never infers a reading.** For every
 claim, every arrow and every generation, no number displayed is derived by arithmetic in the browser;
-each is a field on the world, on the map or on the `receipt` event. In particular the decomposition
-renders only when `decomposition` is present and no line of it is computed here — whole block or
-none — and the receipt's counts are printed one by one and never added together. And for every claim
+each is a field on the world, on the map or on the `receipt` event. In particular every line of the
+decomposition is a field printed as it was read — the claim's prior, each arrow's push and its
+fetched conditional, the model's belief as the result — with no line computed here and none left off
+when its number is absent, and the receipt's counts are printed one by one and never added together. And for every claim
 in a world being compared, the sentence *"this claim moved only because the observation made some
 versions count more."* is rendered exactly when the engine's diff row for that claim carries the
 field saying so, and by no other route: no comparison of a same-direction share against zero, no
@@ -497,8 +515,8 @@ source with no retrieval day is never rendered as though it had one. *Test:* ins
 2. **Do not compute the decomposition in the browser from the pushes on the arrows.** *Because* the
    pieces are all there and the temptation is real — prior, three pushes, a result — and the moment
    the canvas does its own arithmetic there are two engines that disagree about half a point, with
-   nobody able to say which is right. **Instead:** render the block the world carries, and an
-   absence with its reason until it does.
+   nobody able to say which is right. **Instead:** print the prior, the pushes and the result as
+   the fields they each are, and an absence with its reason wherever one of them is not there.
 
 3. **Do not put a plausible sentence in the reserved band slot to show what it will look like, and
    do not print the uncalibrated label over a number nothing computed.** *Because* a sentence naming
@@ -546,10 +564,10 @@ comes from (B1).*
    [`streaming-growth.md`](streaming-growth.md).
 
 3. **May the panel show an arrow's pushes before the engine, without the result line?**
-   **Decided 2026-09-17 (stack 04a): no, and the question closes rather than being answered.** The
-   world now carries the whole decomposition, so a half block would be for nothing; the rule already
-   in B2 — render the block the world carries, render *"no engine yet"* when there is none — is the
-   whole of it, and no half block is built. In B2.
+   **Decided 2026-09-17 (stack 04a), restated 2026-09-20 on building it: the question does not
+   arise.** Every line of the block is always drawn, and a line with no number says its absence and
+   why — so the result line reads *"no engine yet"* rather than being left off, and there is no
+   half block to build. In B2.
 
 4. **"no reference class recorded for this claim"** *(proposed here)* is wording the interface wrote
    rather than a field it read, exactly as the "no market" sentences were before Kent settled them.

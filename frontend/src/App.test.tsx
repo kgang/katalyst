@@ -275,7 +275,9 @@ describe("opening a map", () => {
   it("test_an_ask_that_did_not_come_back_is_asked_again", async () => {
     serverAnswersNormally();
     const source = sourceThatAnswers();
-    vi.mocked(source.readConditional).mockRejectedValueOnce(new Error("The server did not answer."));
+    vi.mocked(source.readConditional).mockRejectedValueOnce(
+      new Error("The server did not answer."),
+    );
     render(<App source={source} listExamples={async () => EXAMPLES} />);
     fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
     await screen.findByTestId("the-map");

@@ -159,7 +159,7 @@ export function useLayout(
   // Held across runs, because that is what pinning means: this is the memory
   // that stops a late arrival moving an early one. The height is kept with the
   // place because a pin is only good for the size it was made at — see
-  // `pinsThatStillHold`.
+  // `pinsFor`.
   const placed = useRef(new Map<string, PinnedTile>());
   const laidOutFor = useRef(mapKey);
   const [layout, setLayout] = useState<Layout>({
