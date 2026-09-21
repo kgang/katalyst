@@ -8,7 +8,7 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 |---|-------|--------|------|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions in MADR 4.x, no tooling, ADR-gated cadence | accepted | 2026-09-16 |
 | [0002](0002-python-backend-react-frontend.md) | Python/FastAPI backend with a React/TypeScript frontend; OpenAPI-generated types | accepted | 2026-09-16 |
-| [0003](0003-domain-owns-the-graph.md) | The domain layer owns graph validity; the LLM only proposes (rule 2 amended 2026-09-17: up to three fresh proposals, none told why the last was refused) | accepted | 2026-09-16 |
+| [0003](0003-domain-owns-the-graph.md) | The domain layer owns graph validity; the LLM only proposes (rule 2 amended 2026-09-17: up to three fresh proposals, none told why the last was refused; amended again 2026-09-21: a twentieth code, `duplicate_link` — one ordered pair of claims takes one arrow) | accepted | 2026-09-16 |
 | [0004](0004-branches-are-patches.md) | Branches are ordered patch lists over an immutable base; `do` ≠ `observe`; beliefs never merged | accepted | 2026-09-16 |
 | [0005](0005-link-semantics-and-propagation.md) | Typed links (trigger/sustain, log-odds, lag, shape) propagated by seeded forward Monte Carlo | accepted | 2026-09-16 |
 | [0006](0006-llm-boundary-structured-outputs.md) | LLM boundary: Anthropic SDK, `claude-opus-5`, structured outputs, one proposal per call, SSE (amended 2026-09-17: `documented` only from a source the search itself returned, an arrow that finds nothing is `argued`; amended again 2026-09-20: the model is a setting whose default is `claude-sonnet-5`, and base rates are researched) | accepted | 2026-09-16 |
