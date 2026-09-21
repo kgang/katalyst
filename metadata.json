@@ -3,7 +3,7 @@
   "checkpoint_id": "01M32D2NKWJFMG0WTW8PE370WT",
   "strategy": "manual-commit",
   "branch": "adr/06-the-trade",
-  "checkpoints_count": 1,
+  "checkpoints_count": 7,
   "files_touched": [
     "spec/graph/belief.md",
     "spec/thesis/README.md",
@@ -20,6 +20,13 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
