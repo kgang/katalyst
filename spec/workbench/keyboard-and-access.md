@@ -13,7 +13,19 @@ Three chapters sit beside this one: `color-motion-type.md` carries the colour la
 ### The key map
 
 ```ts
-/** UX-9, the whole of it. Bound on the canvas root, not on individual tiles. */
+/**
+ * UX-9, the whole of it. The keys that walk the map are bound on the canvas
+ * root, not on individual tiles.
+ *
+ * The three at the ends of this list — ⌘K, `?` and Escape — are bound on the
+ * window instead, in one module every screen calls
+ * (`frontend/src/keyboard/everyKey.ts`): the first screen, the map building
+ * itself, and the stored map. Two of them are how a reader finds out what the
+ * others do, so a screen where they do nothing teaches nobody anything — and
+ * the screen a map builds on prints *Press ? for every key* under it. The
+ * first screen has no commands to offer, so ⌘K does nothing there rather than
+ * opening an empty list.
+ */
 const KEYS = {
   "Meta+k": "openPalette",   // ⌘K — the command palette
   j: "nextSibling",          // down the column you are in
