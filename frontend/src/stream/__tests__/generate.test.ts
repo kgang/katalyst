@@ -83,6 +83,44 @@ describe("joining a name to a payload", () => {
     expect(blocks).toEqual([]);
     expect(wholeBlocks(rest + whole.slice(20)).blocks).toHaveLength(1);
   });
+
+  it("test_a_block_split_across_two_reads_reaches_the_reducer_whole", async () => {
+    // The same case, driven through `generate` itself rather than through the
+    // splitting alone — because the joining is only right if the generator is
+    // the thing doing it, and a test of the helper leaves the generator free to
+    // hand the halves on separately and draw a map from half a claim.
+    const whole =
+      block("generation_started", {
+        generation_id: "g",
+        seed: 3,
+        hypothesis: THE_SENTENCE,
+        target: null,
+      }) + block("done", { reason: "reached_terminal", claims: 0, links: 0, rejected: 0 });
+    // A cut in the middle of the first payload, which is where a real read cuts.
+    const cut = 30;
+    const read = await everything([whole.slice(0, cut), whole.slice(cut)]);
+
+    expect(read.map((one) => one.event)).toEqual(["generation_started", "done"]);
+    expect(read[0]).toMatchObject({ hypothesis: THE_SENTENCE, generation_id: "g" });
+  });
+
+  it("test_a_wire_that_ends_its_lines_the_other_way_is_read_the_same", async () => {
+    // Our own server writes `\n`; the format allows `\r\n`, and a proxy that
+    // rewrites line endings on the way past is not something this browser gets
+    // to rule out. A reader that knew one spelling would find no blocks at all
+    // and draw an empty map from a stream that was perfectly correct.
+    const written = (
+      block("generation_started", {
+        generation_id: "g",
+        seed: 3,
+        hypothesis: THE_SENTENCE,
+        target: null,
+      }) + block("done", { reason: "reached_terminal", claims: 0, links: 0, rejected: 0 })
+    ).replaceAll("\n", "\r\n");
+
+    const read = await everything([written]);
+    expect(read.map((one) => one.event)).toEqual(["generation_started", "done"]);
+  });
 });
 
 describe("an event name this build does not know", () => {

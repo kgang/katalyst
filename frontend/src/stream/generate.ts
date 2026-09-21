@@ -126,11 +126,17 @@ export function joined(name: string, data: string): ReadEvent {
  * from the network stops wherever it stops — often halfway through a line. So
  * whatever is left after the last blank line is kept and joined to the next read.
  *
+ * **A blank line is two of them, or two of the other kind.** Our own server
+ * writes `\n`, and the format allows `\r\n`; a proxy or a tunnel that rewrites
+ * line endings on the way past is not a thing this browser gets to rule out, and
+ * a reader that only knew one spelling would hand back no blocks at all and draw
+ * an empty map from a stream that was perfectly correct.
+ *
  * @param buffer Everything read and not yet handed on.
  * @returns The whole blocks, and what is left over.
  */
 export function wholeBlocks(buffer: string): { blocks: string[]; rest: string } {
-  const parts = buffer.split("\n\n");
+  const parts = buffer.split(/\r?\n\r?\n/);
   const rest = parts.pop() ?? "";
   return { blocks: parts.filter((block) => block.trim() !== ""), rest };
 }
@@ -143,7 +149,7 @@ export function wholeBlocks(buffer: string): { blocks: string[]; rest: string } 
 export function eventIn(block: string): ReadEvent | null {
   let name: string | null = null;
   const payload: string[] = [];
-  for (const line of block.split("\n")) {
+  for (const line of block.split(/\r?\n/)) {
     if (line.startsWith("event:")) {
       name = line.slice("event:".length).trim();
     } else if (line.startsWith("data:")) {
