@@ -50,12 +50,35 @@ import { DeltaRail } from "./DeltaRail";
 import { Inspector } from "./Inspector";
 import { MapFrame } from "./MapFrame";
 import { Outline } from "./Outline";
+import { type PanelChoice, PanelSwitch, theLabelFor } from "./PanelSwitch";
 import { Refusal } from "./Refusal";
 import { RunStrip } from "./RunStrip";
 import { ShortcutsSheet } from "./ShortcutsSheet";
 
 /** How long the wires take to arrive, column by column, before the map settles. */
 const WAVE_SETTLES_AFTER = 1200;
+
+/**
+ * The three panels this screen has, by the name it keeps them under.
+ *
+ * **Three, because there are three things beside this map to read**: whatever
+ * the reader has pointed at and the six things they can do to it, their
+ * branches with everything the open one moved, and the map as a list. There is
+ * no run here — nobody generated a stored map — so no panel offers one.
+ *
+ * All three used to be one column, with the branches and the change list
+ * stacked above the answer to *why is this number what it is*. That is the
+ * clutter Kent read as *"the side bar is pretty cluttered"*, and it is why a
+ * click on a tile filled a box below the fold.
+ */
+type PanelName = "subject" | "branches" | "outline";
+
+/** What the line under the map says when the reader turns to each panel. */
+const PANEL_IN_WORDS: Record<PanelName, string> = {
+  subject: "the claim or arrow you are on, in the panel beside the map",
+  branches: "your branches and what the open one moved",
+  outline: "the map as a list",
+};
 
 /**
  * What stands where a likelihood would go while the engine is being asked for
@@ -177,7 +200,14 @@ export function MapScreen({
   const [showing, setShowing] = useState<"now" | "before">("now");
   const [selection, setSelection] = useState<Selection>(null);
   const [focused, setFocused] = useState<string | null>(null);
-  const [dock, setDock] = useState<"panel" | "outline" | "away">("panel");
+  // Which of this screen's three panels is on the glass. It opens on the one
+  // that says what to do next — *choose a claim or an arrow on the map* — which
+  // is the sentence a reader who has never seen this screen needs first.
+  const [dock, setDock] = useState<PanelName>("subject");
+  // And whether the panel is there at all. `P` puts it away and gives the map
+  // the whole width; it is a fact about the panel rather than about which of
+  // them is showing, so it is kept apart from the three.
+  const [away, setAway] = useState(false);
   const [onlyColumn, setOnlyColumn] = useState<{
     layer: number;
     claims: readonly string[];
@@ -477,11 +507,15 @@ export function MapScreen({
     () => ({
       intervene: () => {
         cameFrom.current = document.activeElement as HTMLElement | null;
-        setDock("panel");
+        // The six things you can do are about the claim you are on, so they open
+        // on the panel that claim is read out on.
+        setAway(false);
+        setDock("subject");
         setIntervening(true);
       },
       branch: () => {
-        setDock("panel");
+        setAway(false);
+        setDock("branches");
         setNaming(true);
       },
       flipWorlds: () => {
@@ -499,12 +533,24 @@ export function MapScreen({
           return next;
         });
       },
-      outline: () =>
+      outline: () => {
+        setAway(false);
         setDock((was) => {
           setOnlyColumn(null);
-          return was === "outline" ? "panel" : "outline";
+          const next: PanelName = was === "outline" ? "subject" : "outline";
+          setStatus(PANEL_IN_WORDS[next]);
+          return next;
+        });
+      },
+      panel: () =>
+        setAway((was) => {
+          setStatus(
+            was
+              ? "the panel is beside the map · press N for the next one"
+              : "the panel is away · press P to bring it back",
+          );
+          return !was;
         }),
-      panel: () => setDock((was) => (was === "away" ? "panel" : "away")),
       palette: () => setOverlay("palette"),
     }),
     [paintings],
@@ -556,7 +602,16 @@ export function MapScreen({
         does: "The same as pressing O. Every claim, one sentence each.",
         run: () => {
           setOnlyColumn(null);
+          setAway(false);
           setDock("outline");
+        },
+      },
+      {
+        name: "Read your branches and what they moved",
+        does: "Every branch, the open one's edits, and the endings it reaches. Also a name at the head of the panel.",
+        run: () => {
+          setAway(false);
+          setDock("branches");
         },
       },
       {
@@ -583,6 +638,58 @@ export function MapScreen({
     setSelection({ kind: "claim", id });
   }, []);
 
+  // **Choosing something is the one thing that moves the panel on its own.**
+  //
+  // Pointing at a tile or an arrow, or reaching one with the keyboard, puts what
+  // you chose at the top of the panel at once. It follows the selection
+  // **object** rather than what is in it, because a second press on the same
+  // tile is a second act of the reader's and must land them back on what they
+  // asked for. Nothing else calls for a panel: an engine answer landing and a
+  // branch gaining an edit both change a panel the reader may not be looking at,
+  // and each says so on that panel's own label and in the strip at the foot.
+  const lastChosen = useRef(selection);
+  useEffect(() => {
+    if (selection === lastChosen.current) {
+      return;
+    }
+    lastChosen.current = selection;
+    if (selection === null) {
+      return;
+    }
+    setDock("subject");
+  }, [selection]);
+
+  /**
+   * The three panels, and what each one's name carries beside it.
+   *
+   * **The name follows the subject** — *This claim* or *This arrow* — because
+   * the name says what the panel is about, and an arrow is not a claim.
+   *
+   * **The count is the engine's own list of reasons**, read off the answer the
+   * panel itself prints. A branch the engine turned down is the one thing that
+   * happens on this screen while the reader is elsewhere and that they must not
+   * miss: nothing on the map changed, and the reason it did not is on that
+   * panel.
+   */
+  const panels: readonly PanelChoice[] = useMemo(
+    () => [
+      { name: "subject", label: selection?.kind === "wire" ? "This arrow" : "This claim" },
+      {
+        name: "branches",
+        label: "Branches and changes",
+        ...(answer.at === "refused" ? { mark: `refused ${answer.reasons.length}` } : {}),
+      },
+      { name: "outline", label: "Outline" },
+    ],
+    [selection, answer],
+  );
+
+  const turnTo = useCallback((name: string) => {
+    const to = name as PanelName;
+    setDock(to);
+    setStatus(PANEL_IN_WORDS[to]);
+  }, []);
+
   const THE_PANEL = (
     <>
       {dock === "outline" ? (
@@ -599,7 +706,12 @@ export function MapScreen({
                   `collapsed tile on the map stands for. Press O for all of them.`,
               })}
         />
-      ) : (
+      ) : dock === "subject" ? (
+        /* Whatever the reader pointed at, and the six things they can do to it.
+           **The operations moved here from the head of the column**, where they
+           opened above the branches, the change list and the answer they were
+           about. They are about the claim you are on, so they belong on the
+           panel that claim is read out on — and pressing `E` turns to it. */
         <>
           {intervening ? (
             <InterventionPanel
@@ -616,6 +728,24 @@ export function MapScreen({
               onClose={() => setIntervening(false)}
             />
           ) : null}
+          {/* The mouse's way to the six things you can do. The keyboard has
+              `E` and the palette has a command; without this a reader working
+              the screen with a mouse could click every tile, read the whole
+              argument and never find a verb on it.
+
+              **It is handed over only while the panel is shut.** A way in that
+              is already in is not a control, and on an arrow it would put two
+              buttons reading *Change this push* on one screen — this one, and
+              the one inside the panel that changes the number. */}
+          <Inspector
+            world={world}
+            selection={selection}
+            changeRef={theWayIn}
+            {...(intervening ? {} : { onChangeThis: keys.intervene })}
+          />
+        </>
+      ) : (
+        <>
           <BranchPanel
             branches={shop.branches}
             openId={shop.openId}
@@ -633,21 +763,6 @@ export function MapScreen({
               summary={computed === undefined ? NO_SUMMARY_YET : computed.change.summary}
             />
           )}
-          {/* The mouse's way to the six things you can do. The keyboard has
-              `E` and the palette has a command; without this a reader working
-              the screen with a mouse could click every tile, read the whole
-              argument and never find a verb on it.
-
-              **It is handed over only while the panel is shut.** A way in that
-              is already in is not a control, and on an arrow it would put two
-              buttons reading *Change this push* on one screen — this one, and
-              the one inside the panel that changes the number. */}
-          <Inspector
-            world={world}
-            selection={selection}
-            changeRef={theWayIn}
-            {...(intervening ? {} : { onChangeThis: keys.intervene })}
-          />
         </>
       )}
     </>
@@ -687,7 +802,12 @@ export function MapScreen({
           onStatus={setStatus}
           onOverflow={(column) => {
             setOnlyColumn(column);
+            // Pressing a collapsed tile is the reader asking for the claims
+            // behind it, so the panel comes back if it was put away and turns
+            // to the list those claims are on.
+            setAway(false);
             setDock("outline");
+            setStatus(PANEL_IN_WORDS.outline);
           }}
           arriving={arriving}
         />
@@ -727,7 +847,12 @@ export function MapScreen({
           />
         )
       }
-      panel={dock === "away" ? null : THE_PANEL}
+      // The names of the three panels, at the head of the panel and outside the
+      // part of it that scrolls, so the way to the other two is always on the
+      // glass. This is the whole answer to *how do I know what panels exist*.
+      panelHead={<PanelSwitch panels={panels} showing={dock} onShow={turnTo} />}
+      panelNamedBy={theLabelFor(dock)}
+      panel={away ? null : THE_PANEL}
       origin={
         <>
           <p className="map-origin__line">{world.origin}</p>

@@ -35,10 +35,15 @@ const KEYS = {
   E: "intervene",            // open the intervention panel on the focused claim
   B: "branch",               // fork a branch from here
   " ": "toggleWorlds",       // Space — A ⇄ A′, a hard switch
+  O: "readAsAList",          // the map as a nested list instead of a picture
+  P: "showOrHideThePanel",   // give the map the whole width, and take it back
+  N: "theNextPanel",         // step to the next panel beside the map
   "?": "openShortcutsSheet",
   Escape: "closeTopOverlay",
 } as const;
 ```
+
+`N` is bound by the switcher at the head of the panel (`frontend/src/components/PanelSwitch.tsx`) rather than by the map, because it means nothing on a screen with no panels to step between — the first screen has none, and there the key does nothing rather than doing something else. Like the map's own keys it is left alone while the keyboard is in a field: **typing is never a shortcut**, and in a field an `n` is an `n`.
 
 ### The two overlays
 
@@ -107,11 +112,12 @@ Moving the keyboard asks what you can walk to, so `l` from B reaches R. Working 
 
 When there is no wire in that direction, focus does not move and the status line says so. M1 and M2 cause nothing, so `l` from either is a quiet no-op, not a jump.
 
-### B3 — `E`, `B`, `Space`, `?`
+### B3 — `E`, `B`, `Space`, `N`, `?`
 
 - **`E`** opens the intervention panel on the focused claim: every operation this build has, word for word from `spec/vocabulary.md`'s Interface words table — **Suppose this is true** · **Suppose this is false** · **This happened** · **Add a claim** · **Change this push** · **My own number**. A panel beside the canvas, never a pop-up. **Split this claim** is not among them: it is not built, so it is not offered — the words are settled and the control arrives with the operation. The mouse reaches the same panel from the head of the Inspector, through the control [`../vocabulary.md`](../vocabulary.md) settles as **Change this claim**. Opening it puts the keyboard inside it, which is the reader's own act rather than a theft (B4 below).
 - **`B`** forks a branch from the focused claim and names it.
 - **`Space`** flips A ⇄ A′ — the base world and the branch — as a **hard switch**, not a crossfade. What is painted in each is `diff-view.md`.
+- **`N`** steps to the next panel beside the map *(Kent, 2026-09-22)*. Which panels a screen has is `inspector.md`; what this key adds is that they are one press apart from wherever the reader is standing, including on the map. The names at the head of the panel are also a row of labels in their own right: Tab reaches the row once, and the left and right arrow keys walk it, which is the pattern a screen reader announces as a set of panels. Both of them, and a click, are the same act — and they are the only acts other than selecting a claim or an arrow that change which panel is on the glass.
 - **`?`** opens the shortcuts sheet, which lists every key above and carries the line about dragging:
 
   > **Tiles do not move.** The layout is automatic, left to right. Drag the background to pan, scroll to zoom. Pinning, grouping and annotating arrive as buttons, not as dragging.

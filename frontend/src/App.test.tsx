@@ -178,6 +178,20 @@ function sourceThatCannot(reason: string): WorldSource {
   };
 }
 
+/**
+ * Turn the panel beside the map to one of the panels its head names.
+ *
+ * The panel used to be one column holding everything at once; it is a few
+ * panels with their names at the head of it now, and a reader reaches one by
+ * name. A test that wants the branches has to ask for them the way a reader
+ * does.
+ *
+ * @param label The name at the head of the panel, as it is written there.
+ */
+function turnThePanelTo(label: string): void {
+  fireEvent.click(screen.getByRole("tab", { name: new RegExp(label) }));
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
 });
@@ -299,7 +313,9 @@ describe("opening a map", () => {
     fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
     await screen.findByTestId("the-map");
 
-    // A branch of the reader's own, and one arrow asked about.
+    // A branch of the reader's own, and one arrow asked about. The branches are
+    // a panel of their own now, reached by the name at the head of the panel.
+    turnThePanelTo("Branches");
     fireEvent.click(screen.getByRole("button", { name: "Start a branch" }));
     fireEvent.change(screen.getByLabelText(/What is this branch called/), {
       target: { value: "Your own branch" },
@@ -386,6 +402,7 @@ describe("opening a map", () => {
     fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
     await screen.findByTestId("the-map");
 
+    turnThePanelTo("Branches");
     fireEvent.click(screen.getByRole("button", { name: "Start a branch" }));
     fireEvent.change(screen.getByLabelText(/What is this branch called/), {
       target: { value: "Your own branch" },

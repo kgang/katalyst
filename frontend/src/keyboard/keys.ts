@@ -47,6 +47,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
     key: "P",
     does: "Show or hide the panel beside the map, when you want the whole width for the map.",
   },
+  {
+    key: "N",
+    does:
+      "The next panel beside the map. Their names are at the head of the panel, and clicking a " +
+      "claim or an arrow turns to the one that reads it out.",
+  },
   { key: "?", does: "This sheet." },
   { key: "Escape", does: "Close whatever is open. Nothing is ever left half-done by closing it." },
 ];

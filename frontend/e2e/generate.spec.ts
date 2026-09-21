@@ -183,6 +183,36 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   const firstTile = page.locator(".react-flow__node.react-flow__node-claim").first();
   const wasAt = await whereTheTileSits(firstTile);
 
+  // **A click on a tile while the recording is still arriving**, which is the
+  // press Kent made and watched do nothing. It did select the tile and it did
+  // fill the panel — at the bottom of a column that also held the refusals, the
+  // receipt and *Run details*, and nothing scrolled. The claim's own words are
+  // read off the tile rather than written down here, so this is a test of the
+  // panel and never of the recording's copy.
+  await page.locator(".react-flow__node.react-flow__node-claim").first().click();
+
+  // The panel on the glass is the one that reads that claim out, and it says so
+  // at its own head. **Which claim is read off the map's own ring** rather than
+  // off the tile this test pointed at: the map pans as claims arrive, so the
+  // honest question is whether the claim the map says is chosen is the claim the
+  // panel is showing.
+  const panel = page.locator(".dock");
+  await expect(page.getByRole("tab", { name: /This claim/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const chosen = page.locator(".react-flow__node.selected").first();
+  const itsWords = ((await chosen.locator(".tile__claim").textContent()) ?? "").trim();
+  expect(itsWords, "the map drew a ring round a tile with no claim on it").not.toBe("");
+  await expect(panel.locator(".inspector__claim")).toHaveText(itsWords);
+  // And nothing about the run is stacked in front of it.
+  await expect(panel).not.toContainText("Run details");
+
+  // Back to the run, which is where the rest of this test reads. One press of
+  // the name at the head of the panel, exactly as a reader does it.
+  await page.getByRole("tab", { name: /The run/ }).click();
+  await expect(panel).toContainText("Run details");
+
   // **`?` while the map is still arriving** — the one press no browser test had
   // ever made. This screen prints *Press ? for every key* under the map, and the
   // key was bound on the stored map alone, so every press in the suite was made

@@ -94,6 +94,29 @@ Worked on the Hormuz map (the cast is in [`README.md`](README.md)). This chapter
 crude settles below $68 for five sessions* — the busiest claim on the map, three arrows in (**H**,
 **C**, **R**) and three out (**M1**, **M2**, and back to R) — and the arrow **H → B**.
 
+### B0 — What is beside the map, and what is allowed to change it
+
+*Kent, 2026-09-22, of the replay: "could you have it so that clicking on a card will expand its details on the right hand side panel? In general, it's a little hard to find/navigate to/know what right hand side panels exist and how to navigate to them."*
+
+**What was wrong.** A click already selected the tile and the panel already read it out — at the bottom of one column that also held, above it, the Verify door's answer, every proposal the rules refused printed in full, the receipt, the way into the working and *Run details*. Nothing scrolled on its own, so the answer arrived off the screen and the click looked dead. The stored map stacked its own sections the same way.
+
+**The panel is a few panels now, and their names are at the head of it.** The names sit above the part that scrolls, so the way to the others can never scroll away, and they are the whole answer to *what is over there*.
+
+| Screen | The panels it has |
+|---|---|
+| A map building itself | **This claim** / **This arrow** — whatever the reader chose · **The run** — the verdict, every refusal, the receipt, *Run details*, and every call the run made · **Outline** — the map as a list |
+| A stored map | **This claim** / **This arrow** — whatever the reader chose, and the six things you can do to it · **Branches and changes** — your branches, the open one's edits, the engine's refusals, and the endings the edit reaches · **Outline** |
+
+**A panel a screen does not have is not offered.** A generated map has no branches to open; nobody generated a stored map, so there is no run to read out. Three each, never seven. A panel that exists and is empty says so in a sentence, as everything else in this product does — *Nothing selected. Choose a claim or an arrow on the map…*
+
+**The name follows the subject.** *This claim* becomes *This arrow* when an arrow is what is selected, because the name is what says what the panel is about.
+
+**One rule about when the panel changes by itself, and it has one clause.** Choosing a tile or an arrow — by mouse, by Tab, or by walking the wires with `h`, `l`, `j` and `k` — turns to the panel that reads it out, at once, at the top, with nothing scrolled. **Nothing else ever does.** A refusal arriving, the verdict landing, the receipt coming back, the engine answering about a branch: each of those changes a panel the reader may not be looking at, and each says so on that panel's own name — a count in the product's own word, *refused 3*, read off state the screen already holds — and in the strip at the foot, which says the same thing in a sentence. Nothing pulses, nothing fades and nothing grows; the motion budget has three movements in it and a panel asking to be looked at is not one of them (`color-motion-type.md`).
+
+**Every name is a word.** Kent asked for *buttons or icons*; an icon with no word beside it is a thing a reader has to learn before they can use it, and this product has no icon set to learn from. Which name is chosen is said three ways — the word goes from the quiet colour to the text colour, a two-pixel rule of the accent runs under it, and `aria-selected` carries it for a reader who hears the screen. Two of the three survive greyscale, which is `VR3`.
+
+**And the panel is still always here.** It is inside the frame beside the map, it is 336 pixels wide whichever panel is chosen, and the map's stage does not change width when the reader turns to another one. *Nothing in this product opens over the map.*
+
 ### B1 — A claim, top to bottom
 
 Select B's tile. The panel fills, in this order, and nothing opens over the canvas:
@@ -600,6 +623,18 @@ arrow, the panel renders the day our retrieval step fetched it, or the reason th
 source with no retrieval day is never rendered as though it had one. *Test:* inspector ›
 `test_renders_a_fetch_day_or_its_reason`.
 
+**INV-workbench.84 — the only thing that changes which panel is on the glass is the reader** *(2026-09-22; numbered 84 because 60 to 79 are `streaming-growth.md`'s — 60 is *there is no spinner* — 80 and 81 are its two of 2026-09-21, and 82 and 83 are `first-screen.md`'s; a number is never reused, so a citation can never quietly come to mean another statement)*. For every map screen, choosing a claim or an arrow — by pointer or by keyboard — puts that subject's panel on the glass, and no event arriving from the run or from the engine ever changes which panel is showing. What an arrival may do is add a count to a panel's own name. Every name offered is a panel that screen has, and every one of them is a word. *Tests:* `frontend/src/components/__tests__/panelSwitch.test.tsx` ›
+`test_a_click_on_a_tile_during_a_replay_shows_that_claim_in_the_panel`,
+`test_a_click_on_an_arrow_shows_that_arrow_in_the_panel`,
+`test_a_refusal_arriving_does_not_pull_the_reader_off_what_they_are_reading`,
+`test_the_switcher_offers_only_the_panels_this_context_has`,
+`test_the_stored_map_offers_its_own_panels_and_not_the_runs`,
+`test_every_panel_label_is_a_word`,
+`test_the_arrow_keys_move_between_the_labels`,
+`test_the_one_key_steps_to_the_next_panel_from_anywhere_on_the_screen`,
+`test_typing_is_never_a_shortcut`,
+`test_the_panel_is_named_by_the_label_that_chose_it`; **visual review checklist `VR1`** (it is not a row of tabs from a component kit) and `VR9`.
+
 ---
 
 ## ANTI-PATTERNS
@@ -638,6 +673,13 @@ source with no retrieval day is never rendered as though it had one. *Test:* ins
 7. **Do not truncate the claim's wording here.** *Because* the tile already ellipsizes to three
    lines and this is where the full text lives; a claim you cannot read in full cannot be argued
    with. **Instead:** the whole sentence, wrapping as far as it needs.
+
+8. **Do not let anything but the reader change which panel is on the glass, and do not draw a name
+   that only an icon says.** *Because* a panel that jumps when a refusal lands takes a reader off
+   the sentence they were halfway through, and a row of unlabelled pictures is a thing to learn
+   before it can be used — and a row of filled, rounded pills is the component-library look that is
+   a veto condition. **Instead:** the reader's own selection turns the panel, an arrival adds a
+   count to a name, and every name is a word.
 
 ---
 

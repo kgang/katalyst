@@ -30,6 +30,7 @@
 
 import type { ReactNode } from "react";
 import { IfTheScreenBreaks } from "./IfTheScreenBreaks";
+import { THE_PANEL_BESIDE_THE_MAP } from "./PanelSwitch";
 import { edgeMarks, useTheEdgesOfThePanel } from "./useTheEdges";
 
 /** What the frame needs. Every slot is a thing one of the two screens fills. */
@@ -60,6 +61,27 @@ export interface MapFrameProps {
   /** The panel beside the map, or nothing when the reader has put it away. */
   readonly panel: ReactNode;
   /**
+   * What stands at the head of the panel and never scrolls: the row of names
+   * saying which panels this screen has and which one is on the glass.
+   *
+   * It is **outside** the box that scrolls, and that is the whole point of it
+   * being a slot of its own: a way back to the other panels that scrolls off the
+   * top is a way back a reader cannot find. It is also outside the frame that
+   * draws the *there is more this way* rules, so the rule that says *more above*
+   * still marks the top of what scrolls rather than the top of the names.
+   */
+  readonly panelHead?: ReactNode;
+  /**
+   * The thing on screen that names what is in the panel right now, by its
+   * identifier.
+   *
+   * Given, the panel is one of several and says so: it takes the part a screen
+   * reader reads as the panel of a chosen name, and the name is read from that
+   * label rather than written twice. Left out, the panel is the only one there
+   * is and carries its own plain name.
+   */
+  readonly panelNamedBy?: string;
+  /**
    * The one strip that says what is happening to this map, or nothing when
    * there is nothing to say.
    *
@@ -83,6 +105,8 @@ export function MapFrame({
   overlay,
   status,
   panel,
+  panelHead,
+  panelNamedBy,
   strip,
   origin,
 }: MapFrameProps) {
@@ -119,14 +143,28 @@ export function MapFrame({
           </div>
 
           {panel === null ? null : (
-            // The frame holds the two rules that say there is more above or
-            // more below. They are drawn on it rather than inside the panel so
-            // that turning one on cannot change the scroll height it was worked
-            // out from — see `useTheEdges.ts`.
-            <div className="dock-frame" {...edgeMarks(edges)}>
-              <aside className="dock" ref={scroller} aria-label="The panel beside the map">
-                {panel}
-              </aside>
+            // The names at the head, then the panel itself. The head is a box
+            // of its own outside the scroller so that it cannot scroll away,
+            // and outside the frame below so that the frame's rules still mark
+            // the edges of the thing that scrolls.
+            <div className="dock-column">
+              {panelHead}
+              {/* The frame holds the two rules that say there is more above or
+                  more below. They are drawn on it rather than inside the panel
+                  so that turning one on cannot change the scroll height it was
+                  worked out from — see `useTheEdges.ts`. */}
+              <div className="dock-frame" {...edgeMarks(edges)}>
+                <aside
+                  className="dock"
+                  id={THE_PANEL_BESIDE_THE_MAP}
+                  ref={scroller}
+                  {...(panelNamedBy === undefined
+                    ? { "aria-label": "The panel beside the map" }
+                    : { role: "tabpanel", "aria-labelledby": panelNamedBy })}
+                >
+                  {panel}
+                </aside>
+              </div>
             </div>
           )}
         </div>
