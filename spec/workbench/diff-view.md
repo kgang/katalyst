@@ -13,6 +13,8 @@ Before the engine exists that answer is **structural** — *here is what your ed
 is what it cannot* — and where a number will later sit, this stack draws **an absence with its
 reason**: never a blank, never a zero, never a stand-in.
 
+**Every engine-computed figure quoted below is read from one generated file.** [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) is written by `make numbers` from the shipped engine on the Strait of Hormuz map, at that example's own seed and the shipped loop sizes, and the build fails when it goes stale. Every line in it starts with a name a passage can cite — `B · base · reading` — and the numbers a person typed into the example are kept in a part of their own, apart from the numbers the engine worked out. A figure is quoted here only where it teaches something; the file is where it is kept true, so the day the arithmetic changes, the diff of that one file is the whole list of what moved.
+
 This chapter owns the ghost overlay, the delta rail, the A ⇄ A′ toggle and the branch panel — and,
 because every number slot on the world uses them, the `Known<T>` and `Absence` shapes the whole of
 `spec/workbench/` reads.
@@ -474,8 +476,8 @@ Three rules in this stack:
 ## INVARIANTS
 
 Each is *for all X, statement P holds*, and each names what checks it: a component test, or a
-numbered line of the **visual review checklist** in [`README.md`](README.md). Frontend test names
-are `test_snake_case`. Short file names below: **diffState** is
+named line of the **visual review checklist** in [`README.md`](README.md), `VR1` to `VR13`.
+Frontend test names are `test_snake_case`. Short file names below: **diffState** is
 `frontend/src/graph/__tests__/diffState.test.ts`, **deltaRail**
 `frontend/src/components/__tests__/deltaRail.test.tsx`, **ghostOverlay**
 `frontend/src/components/__tests__/ghostOverlay.test.tsx`. This chapter uses `INV-workbench.40` …
@@ -511,8 +513,8 @@ which either side's likelihood is absent, no claim is `shifted`. *Test:* diffSta
 **INV-workbench.45 — no number slot is ever blank.** For every claim and every delta row in this
 view, a slot without a value renders its `Absence.reason` as words — no empty string, no zero, no
 dash-without-meaning (the one dash with a meaning is the empty user belief, absence kind
-`not_said`). *Test:* deltaRail › `test_renders_a_reason_for_every_absent_number`; **visual review
-checklist line 5**.
+`not_said`). *Test:* deltaRail › `test_renders_a_reason_for_every_absent_number`;
+**visual review checklist `VR5`**.
 
 **INV-workbench.46 — the rail invents no order, and silence is never absence.** Two statements, one
 subject: the rail neither ranks what nothing has ranked nor leaves out what nothing said was
@@ -543,15 +545,15 @@ retraction for carries no such badge. *Tests:*
 `frontend/src/components/__tests__/beliefChip.test.tsx` ›
 `test_a_supposed_claim_renders_the_word_not_a_number`;
 `frontend/src/components/__tests__/tile.test.tsx` › `test_the_retraction_badge_comes_from_the_world`;
-**visual review checklist line 12**.
+**visual review checklist `VR12`**.
 
 **INV-workbench.49 — the branch is append-only and reads in vocabulary words.** For every sequence
 of button presses, the branch is the edits in the order they were made with no earlier edit altered,
 and every badge on screen is one of the six — the five in the *Interface words* table plus the
 derived **Retracted · date · by "…"** — with no code name anywhere. *Tests:*
 `frontend/src/world/__tests__/branchReducer.test.ts` ›
-`test_appends_edits_in_order_and_never_rewrites_one`, `test_renders_only_interface_words`; **visual
-review checklist line 11**.
+`test_appends_edits_in_order_and_never_rewrites_one`, `test_renders_only_interface_words`;
+**visual review checklist `VR11`**.
 
 ---
 

@@ -4,6 +4,8 @@
 
 A branch is a list of edits; a world is what those edits do to the numbers. This chapter is the arithmetic in between. After it, the user can suppose the strait opens, insert a strike the next day, and watch one claim after another move on the days they actually move — and click any number to see the prior it started from and the pushes that were added to it. It settles four things the rest of the product has been deferring: **when** each claim's clock starts, **how** a likelihood is computed on a given day, **how a supposition ends** when a later edit undermines it, and **what the range under a computed number means**. The last one is the reason the range stopped being decoration: it says *how sure we are of the number*, not how much the world can move, and it no longer shrinks when the machine is given more computer time.
 
+**Every engine-computed figure quoted below is read from one generated file.** [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) is written by `make numbers` from the shipped engine on the Strait of Hormuz map, at that example's own seed and the shipped loop sizes, and the build fails when it goes stale. Every line in it starts with a name a passage can cite — `B · base · reading` — and the numbers a person typed into the example are kept in a part of their own, apart from the numbers the engine worked out. A figure is quoted here only where it teaches something; the file is where it is kept true, so the day the arithmetic changes, the diff of that one file is the whole list of what moved.
+
 Everything here rests on decision record **0014** (accepted 2026-09-17) — *a supposition ends when something pushes back; a range says how sure we are of the number, not how the dice fall* — and on record 0005 (log-odds pushes, trigger and sustain, seeded simulation), which 0014 amends in three places without superseding.
 
 ---
@@ -140,11 +142,11 @@ Worked on the Strait of Hormuz map. Its claims, quoted from the fixture word for
 | **H** | *The Strait of Hormuz reopens to unrestricted commercial transit.* — the hypothesis | `.35 (.22–.50)` | day 31 |
 | **C** | *Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.* | `.30 (.18–.45)` | day 30 |
 | **B** | *Brent crude settles below $68 for five sessions.* | `.28 (.15–.42)` | day 14 |
-| **R** | *OPEC+ announces output restraint.* — the tail | `.18 (.08–.32)` | day 60 |
+| **R** | *OPEC+ announces output restraint.* — the tail | `.18 (.080–.32)` | day 60 |
 | **M1** | *A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.* — tradeable | `.40 (.28–.55)` | day 30 |
 | **M2** | *The energy fund XLE underperforms the S&P 500 fund SPY by more than 3% over 20 trading days.* — tradeable | `.35 (.22–.50)` | day 45 |
 | **N1** | *Omani-mediated United States-Iran talks resume publicly.* — real, and no venue prices it | `.22 (.12–.36)` | day 60 |
-| **S** | *A confirmed military strike on Iranian territory.* — on the branch only | `.06 (.02–.14)` | day 1 |
+| **S** | *A confirmed military strike on Iranian territory.* — on the branch only | `.060 (.020–.14)` | day 1 |
 
 "Judged on" is the claim's own `resolution.by`, counted from day zero — the day the claim is settled by, and therefore the day its tile's headline is read on. B's is a **fortnight**: five settlements below $68 is about a fortnight of sessions, and the fixture was tuned to say so (it used to read day 45, by which time both pushes on B had faded to nothing much and the tile read almost exactly B's own prior).
 
@@ -214,6 +216,8 @@ ramp(u)    = 1                          for u ≥ L        full size, held — t
 **`lag` is the ramp's rise time**, and there is no `rise_time` field in version 1. That settles [`../graph/link.md`](../graph/link.md)'s open question 5. A `half_life` on a `step` or a `ramp` is a **violation**, not an ignored field — `half_life_without_impulse`, already on `main`; this stack cites it and does not add it again.
 
 **A warning above ±5.** `validate` is untouched and puts no ceiling on `strength`; an unbounded number is the honest type. But ±5 is roughly 1% to 99% on a coin flip, so `propagate` adds a plain sentence to `warnings` naming any arrow beyond it. A warning, not a rejection: the map is still legal, and the user should be told.
+
+**The push in that sentence is written to one place after the point, always with its sign** *(2026-09-21)* — `+5.2` for a push toward the claim at the arrow's head, `-6.1` for one against it, written with the ordinary hyphen the sentence itself uses. It used to be written at whatever precision the computer happened to hold it at, so a push arithmetic worked out rather than a person typed reached a reader as `5.199999999999999`. **This is a second rule, not the likelihood rule**, and the difference is the point: a likelihood runs from 0 to 1 and is written `.40` or `>.99`, while a push runs from minus infinity to plus infinity on the log-odds scale. Sending a push through the likelihood rule would print `>.99` for a push of `5.2` — the opposite of what the sentence means. The two rules are `_push_as_written` in `domain/propagation.py` and `_two_figures` in `domain/diff.py`, each named once and shared by everything that writes that kind of number.
 
 > **On the Hormuz map.** B's prior is `.28`, whose log-odds is `−0.94`. On the strike branch, day 1: `S → B` is an impulse with `lag=0.0`, so it is already at full size — `−2.4`. `H → B` has not arrived (two-day lag); `C → B` has not arrived (seven-day lag); `R → B` has not arrived (five days from R's day zero). Total `−0.94 − 2.4 = −3.34`, about **`.03`** by hand. Day 2: `H → B` arrives at full size, `+1.6`, and `S → B` has faded by one day of its ten-day half-life to `−2.24`. Total `−1.58`, about **`.17`** by hand. **The engine reports `.039` and `.19`**, seed `20261001` — a hair above the hand sums, for the same reason as in B4: each is an average across two thousand versions, and that average sits above the middle whenever the likelihood is below `.5`. B *rises* between day 1 and day 2 either way, and that rise is golden assertion 4.
 
@@ -369,7 +373,7 @@ The delta method is kept — not as the engine, but as a **cross-check in a test
 
 **The shares do not add up to the whole band, and should not be read as though they did** *(added 2026-09-21)*. They answer *whose **prior*** explains this width, and a version now draws the arrows' pushes as well; what the pushes explain is in no entry here. On B in the base world the seven shares total **72%**, and the missing 28% is the arrows. Asking the same question of the arrows would be the same six lines over the drawn pushes, and nothing needs the answer yet.
 
-On the shipped fixture, B in the base world read on its own resolve-by day: **58% of B's band is B's own prior**, then H at 5.0% and C at 3.8%. Pin B's prior down — freeze it at a point — and the band goes from `.24–.56` to `.32–.48`: **from 31 points wide to 16**. That is the ranking FR-21 asks for, in one number per claim. (FR-21 and record 0014 say "its own base rate"; the thing that varies between versions is the claim's `prior`, which is the word used here.)
+On the shipped fixture, B in the base world read on its own resolve-by day: **most of B's band is B's own prior**, and H and C, the next two, are an order of magnitude behind it. The three shares are the lines named `B · base · band from B`, `B · base · band from H` and `B · base · band from C` in the generated numbers file; the band they are shares of is `B · base · reading`. Pin B's prior down — freeze it at a point — and most of that width goes with it. That is the ranking FR-21 asks for, in one number per claim. (FR-21 and record 0014 say "its own base rate"; the thing that varies between versions is the claim's `prior`, which is the word used here.)
 
 **Two counter-intuitive warnings, both measured.**
 

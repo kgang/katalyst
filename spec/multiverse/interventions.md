@@ -4,6 +4,8 @@
 
 A user reads the map, gets to the third box, and disagrees with it. *"Fine, but Iran is struck the next day."* Before this chapter, the only honest answer was to start over and lose the comparison. After it, the disagreement is a **typed edit**: one of exactly six operations, recorded in a branch (a named, ordered list of edits over an untouched original — see [`branches-and-worlds.md`](branches-and-worlds.md)), each saying up front which part of the map it is allowed to touch. Six operations, each with a stated blast radius, is what makes the rest of the product possible: only what is downstream can move, the change can be replayed later, and every number that shifted can name the edit that shifted it.
 
+**Every engine-computed figure quoted below is read from one generated file.** [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) is written by `make numbers` from the shipped engine on the Strait of Hormuz map, at that example's own seed and the shipped loop sizes, and the build fails when it goes stale. Every line in it starts with a name a passage can cite — `B · base · reading` — and the numbers a person typed into the example are kept in a part of their own, apart from the numbers the engine worked out. A figure is quoted here only where it teaches something; the file is where it is kept true, so the day the arithmetic changes, the diff of that one file is the whole list of what moved.
+
 ---
 
 ## Data model
@@ -275,7 +277,7 @@ The precondition holds: S is not already on the map, each arrow has S at one end
 |---|---|---|---|
 | **supposed** | 2026-10-01 | true in every simulated world; the tile shows the words, not a number | The user pulled a lever and nothing live pushes back |
 | **withdrawn** | 2026-10-02 to 10-04 | `.36` — its own prior, `.35`, read back — labelled *withdrawn — no live push yet* | The **cause** of the opposing arrow became true on the 2nd, so we stop taking the user's word. S → H carries a three-day delay, so nothing has pushed yet |
-| **pushed** | from 2026-10-05 | about `.08` | The delay has run and S → H's −1.9 push lands on the prior |
+| **pushed** | from 2026-10-05 | `.086` — the line named `H · strike · reading` | The delay has run and S → H's −1.9 push lands on the prior |
 
 A supposition ends on the day its undermining **cause** becomes true, not on the day that arrow's push arrives. Tying it to the arrival would tie *do I still take your word for this* to a delay parameter — change the lag from three days to thirty and the supposition would silently outlive the news.
 
@@ -283,7 +285,7 @@ A supposition ends on the day its undermining **cause** becomes true, not on the
 
 **INV-3 is untouched by this.** `do(H)` still moves nothing upstream of H; its own reach is H and what H causes. H's movement on the 2nd is not attributed to `do(H)` at all. It belongs to the two edits that produced it — `Insert(S, …)` and `Do(S, …)` — whose affected set includes H, because the insert made H a descendant of S. Every claim that moved can still name the edit that moved it, which is the property the whole branch mechanism exists to keep.
 
-**And the override is visible (UX-14).** A claim that was supposed true and has since been pushed back down is never drawn as plainly true. H's tile reads **Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"**, naming the edit responsible, and the branch panel lists the three edits in the order they were made. On the 2nd to the 4th the badge sits beside `.36` and the words *withdrawn — no live push yet*; from the 5th it sits beside `.08`. (Those are the engine's own numbers at the fixture's seed. H's prior is `.35`; a reported likelihood sits a hair above its prior below `.5`, for the reason [`propagation.md`](propagation.md) gives.) The rule above is surprising if you meet it in a number and obvious if you can read the sequence, so the sequence is on the screen.
+**And the override is visible (UX-14).** A claim that was supposed true and has since been pushed back down is never drawn as plainly true. H's tile reads **Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"**, naming the edit responsible, and the branch panel lists the three edits in the order they were made. On the 2nd to the 4th the badge sits beside `.36` and the words *withdrawn — no live push yet*; from the 5th it sits beside `.086`. (Those are the engine's own numbers at the fixture's seed, on the lines named `H · base · reading` and `H · strike · reading`. H's prior is `.35`; a reported likelihood sits a hair above its prior below `.5`, for the reason [`propagation.md`](propagation.md) gives.) The rule above is surprising if you meet it in a number and obvious if you can read the sequence, so the sequence is on the screen.
 
 **The other half of the showcase — H → B.** H → B is a **trigger**: on 2026-10-01 it fired, B fell, and that domino stays fallen. Retracting H on 2026-10-02 does not un-fall B; the spike simply fades on its own half-life from then on, while S → B pushes B back the other way. One branch, both kinds of causality — the sustaining kind and the sequential kind — which is exactly the distinction in `docs/initial-brainstorming.md`.
 

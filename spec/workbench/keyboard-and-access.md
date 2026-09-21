@@ -164,11 +164,11 @@ The two rules live in one file each and are checked against each other: `toTwoFi
 | `.9962` | `>.99` | Same |
 | `0` | `<.01` | The floor of the same rule |
 
-And the same values printed as a **size** — a move, or the width of a band — where no guard applies:
+And the same values printed as a **size** — a move, or the width of a band — where no guard applies. These three are chosen to exercise the rule and are nobody's reading of anything; the moves the engine actually works out on the stored example are in [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt), each on its own named line:
 
 | Value carried | Reads | Why |
 |---|---|---|
-| `.0089679…` | `.0090` | Two figures. This is the move observing the insurance premium makes to the strait |
+| `.0089679…` | `.0090` | Two figures, and rounding up carries into a trailing zero that is printed: `.009` would claim less precision than we have |
 | `.0035` | `.0035` | Two figures, however small: a measurement, not a claim about the world |
 | `1` | `1.0` | A move of one is a real move, and no guard stands in its way |
 
@@ -206,7 +206,7 @@ The Hormuz map, spoken:
 > - **B** — *"Brent crude settles below $68 for five sessions. Model .28, range .15 to .42. Caused by the strait reopening, two days later. Held up by the war-risk premium falling. Pushed the other way by OPEC+ restraint. Three claims follow."*
 >   - **M1** — *"A Polymarket contract, Brent below $70 on the 31st of October, resolves yes. Model .40, range .28 to .55. Market .48, range .45 to .52. A tradeable ending. Caused by Brent settling below $68, one day later."*
 >   - **M2** — *"The energy fund XLE underperforms the S&P 500 fund SPY by more than 3 per cent over 20 trading days. Model .35, range .22 to .50. No market — no venue quotes this claim; what you would trade is on the payoff. A tradeable ending. Caused by Brent settling below $68, three days later."*
->   - **R** — *"OPEC+ announces output restraint. Model .18, range .08 to .32. Fed back into by Brent settling below $68, fourteen days later. It pushes back on Brent, already listed above."*
+>   - **R** — *"OPEC+ announces output restraint. Model .18, range .080 to .32. Fed back into by Brent settling below $68, fourteen days later. It pushes back on Brent, already listed above."*
 > - **C** — *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4 per cent. Model .30, range .18 to .45. Held up by the strait reopening, the same day. It reaches Brent crude, already listed above."*
 > - **N1** — *"Omani-mediated United States–Iran talks resume publicly. Model .22, range .12 to .36. Not tradeable — no venue quotes a contract on a diplomatic round. Caused by the strait reopening, ten days later."*
 
@@ -244,19 +244,19 @@ The build grows a fifth job, **`e2e`**, running the single Playwright test `fron
 
 ## INVARIANTS
 
-Each is *for all X, statement P holds*, and each names what checks it. "Visual review checklist line *n*" is line *n* of the visual review checklist in [`README.md`](README.md) — a checklist line is a checkable thing; it is checked by a person.
+Each is *for all X, statement P holds*, and each names what checks it. "Visual review checklist `VRn`" is the line named `VRn` in the visual review checklist in [`README.md`](README.md) — a checklist line is a checkable thing; it is checked by a person.
 
 | ID | Statement | Checked by |
 |---|---|---|
-| **INV-workbench.31** | For every interactive element in the app, it is reachable and operable with the keyboard alone | `frontend/e2e/hormuz.spec.ts`; visual review checklist line 9 (tab through the whole screen) |
-| **INV-workbench.32** | For every focused element, a focus ring drawn with `--focus` is visible against the surface behind it, in both themes | visual review checklist line 9; `frontend/e2e/hormuz.spec.ts` |
-| **INV-workbench.33** | For every focused claim and every press of `h` or `l`, the claim focus lands on is joined to it by a wire; focus never moves to a claim that is merely nearby on screen | `test_h_and_l_land_only_on_a_wired_neighbour` in `frontend/src/keyboard/__tests__/focusMap.test.ts`; visual review checklist line 9 (does arrow movement follow the wires?) |
-| **INV-workbench.34** | For every overlay in the app, `Escape` closes it, the canvas stays live behind it, and nothing is left pending by closing it — there is no dialog anywhere that must be dismissed | visual review checklist line 2 (is there a spinner, a pop-up, or a dialog you must dismiss?) |
-| **INV-workbench.35** | For every animation, under `prefers-reduced-motion: reduce` the ordering is preserved and the tweening is absent | visual review checklist line 10 |
-| **INV-workbench.36** | For every belief rendered anywhere in the app, the chip shows two significant figures on the number and on both ends of its range, always shows the range, and prints no likelihood that two figures would put at `1.0` or above or below `.010` — those print `>.99` and `<.01`. A **size** — how far a number moved, how wide a band is — takes two figures and no guard | `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range`, `test_chip_never_prints_a_certainty`, `test_the_lower_guard_begins_at_a_hundredth` and `test_a_size_is_not_a_likelihood_and_takes_no_guard`, all in `frontend/src/components/__tests__/beliefChip.test.tsx`; visual review checklist line 4 |
+| **INV-workbench.31** | For every interactive element in the app, it is reachable and operable with the keyboard alone | `frontend/e2e/hormuz.spec.ts`; visual review checklist `VR9` (tab through the whole screen) |
+| **INV-workbench.32** | For every focused element, a focus ring drawn with `--focus` is visible against the surface behind it, in both themes | visual review checklist `VR9`; `frontend/e2e/hormuz.spec.ts` |
+| **INV-workbench.33** | For every focused claim and every press of `h` or `l`, the claim focus lands on is joined to it by a wire; focus never moves to a claim that is merely nearby on screen | `test_h_and_l_land_only_on_a_wired_neighbour` in `frontend/src/keyboard/__tests__/focusMap.test.ts`; visual review checklist `VR9` (does arrow movement follow the wires?) |
+| **INV-workbench.34** | For every overlay in the app, `Escape` closes it, the canvas stays live behind it, and nothing is left pending by closing it — there is no dialog anywhere that must be dismissed | visual review checklist `VR2` (is there a spinner, a pop-up, or a dialog you must dismiss?) |
+| **INV-workbench.35** | For every animation, under `prefers-reduced-motion: reduce` the ordering is preserved and the tweening is absent | visual review checklist `VR10` |
+| **INV-workbench.36** | For every belief rendered anywhere in the app, the chip shows two significant figures on the number and on both ends of its range, always shows the range, and prints no likelihood that two figures would put at `1.0` or above or below `.010` — those print `>.99` and `<.01`. A **size** — how far a number moved, how wide a band is — takes two figures and no guard | `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range`, `test_chip_never_prints_a_certainty`, `test_the_lower_guard_begins_at_a_hundredth` and `test_a_size_is_not_a_likelihood_and_takes_no_guard`, all in `frontend/src/components/__tests__/beliefChip.test.tsx`; visual review checklist `VR4` |
 | **INV-workbench.37** | For every belief, the view model carries the full precision the world carried, and rounding happens exactly once, in the chip, at paint | `test_the_view_model_keeps_full_precision` in `beliefChip.test.tsx` |
-| **INV-workbench.38** | For every piece of text and every glyph, in both themes, the contrast ratio against the surface behind it is at least 4.5 to 1 | visual review checklist line 7 |
-| **INV-workbench.39** | For every claim in the world there is exactly one outline item, its sentence names every incoming wire, and the announcement names no number the world does not carry | `frontend/e2e/hormuz.spec.ts`; visual review checklist line 5 (is there a number nobody computed?) |
+| **INV-workbench.38** | For every piece of text and every glyph, in both themes, the contrast ratio against the surface behind it is at least 4.5 to 1 | visual review checklist `VR7` |
+| **INV-workbench.39** | For every claim in the world there is exactly one outline item, its sentence names every incoming wire, and the announcement names no number the world does not carry | `frontend/e2e/hormuz.spec.ts`; visual review checklist `VR5` (is there a number nobody computed?) |
 
 ## ANTI-PATTERNS
 
@@ -268,7 +268,7 @@ Each is *for all X, statement P holds*, and each names what checks it. "Visual r
 6. **Do not print `1.0` or `.0` on a chip**, because a likelihood of one is a claim that something cannot fail and this product does not make that claim. Print `>.99` and `<.01`, on the range's ends as well as on the number.
 7. **Do not say a claim changed before the engine has said it did, and do not count the ones that did by comparing two numbers**, because a count nobody computed is a state nobody can trace, and a second count is a second answer. While the engine is being asked, say what is true — added, reachable, retracted — and say out loud that the numbers are coming. Afterwards, count the claims the engine itself called moved.
 8. **Do not build the outline from the tiles on screen**, because a claim behind a "+n more" tile would silently vanish for the reader who needs the outline most. Build it from the world.
-9. **Do not lean on hue for anything**, because roughly one reader in twelve will not see the difference and a greyscale screenshot is line 3 of the visual review checklist. Every direction gets a glyph, every tail a texture, every provenance a mark.
+9. **Do not lean on hue for anything**, because roughly one reader in twelve will not see the difference and a greyscale screenshot is `VR3` of the visual review checklist. Every direction gets a glyph, every tail a texture, every provenance a mark.
 10. **Do not write `outline: none`**, anywhere, for any reason. A focus ring you cannot see is a keyboard interface you cannot use. Restyle the ring with `--focus`; never remove it.
 
 ## Open questions

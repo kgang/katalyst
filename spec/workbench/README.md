@@ -56,24 +56,26 @@ Every chapter in this part works its examples on one map: the Strait of Hormuz, 
 
 ## Visual review checklist
 
-Kent vetoes a template-looking interface on sight, so every screenshot is checked for the template first. The chapters cite these lines by number; decision record 0007 promises this list lives here. A "no" on any line sends the work back.
+Kent vetoes a template-looking interface on sight, so every screenshot is checked for the template first. Decision record 0007 promises this list lives here. A "no" on any line sends the work back.
 
-1. Nothing looks like a component library's defaults — no rounded blue button, no drop shadow, no system font stack, no default focus ring.
-2. There is no spinner, no pop-up, and no dialog that has to be dismissed.
-3. Converted to greyscale, the screenshot still reads: every arrow still says what kind of push it is and where it came from, every direction still reads up or down, every tail still shows as texture (INV-12 — nothing is carried by hue alone).
-4. No number shows more than two significant figures, and none is missing its range.
-5. Every number's origin can be named in one click, and no empty slot has been filled in — a number nobody computed is an absence with a reason.
-6. The map is layered left to right; it is not a hairball of crossings.
-7. No text is below 11 pixels, and none is under 4.5 to 1 contrast, in either theme.
-8. The tile is 280 pixels wide and on the 8-pixel grid — measured, not eyeballed.
-9. Tabbing through the whole screen with the keyboard only, focus is always visible and arrow movement follows the wires.
-10. With reduced motion on, the ordering is still there and the tweening is gone.
-11. The six buttons and their badges are word for word the Interface words table in [`../vocabulary.md`](../vocabulary.md).
-12. A claim that was supposed and then overridden says so on its tile (UX-14).
-13. The map grew rather than appeared: a reserved rectangle stood where the next claim would go, no tile that was already placed moved when a later one arrived, every proposal the rules refused is on screen in the validator's own words, and the receipt says what the run cost.
+**Each line has a name — `VR1` to `VR13`, for *visual review* — and that name is how a chapter cites it.** A name survives the list growing: insert a fourteenth check between two of these and every citation still points at the check it meant, where a position would quietly slide by one. The names are in the list's own order, so `VR8` is the eighth line and an older citation reading *"visual review checklist line 8"* means the same check. Those older citations are renamed as each chapter is next edited for another reason, never as a sweep of its own.
+
+1. **VR1** — Nothing looks like a component library's defaults — no rounded blue button, no drop shadow, no system font stack, no default focus ring.
+2. **VR2** — There is no spinner, no pop-up, and no dialog that has to be dismissed.
+3. **VR3** — Converted to greyscale, the screenshot still reads: every arrow still says what kind of push it is and where it came from, every direction still reads up or down, every tail still shows as texture (INV-12 — nothing is carried by hue alone).
+4. **VR4** — No number shows more than two significant figures, and none is missing its range.
+5. **VR5** — Every number's origin can be named in one click, and no empty slot has been filled in — a number nobody computed is an absence with a reason.
+6. **VR6** — The map is layered left to right; it is not a hairball of crossings.
+7. **VR7** — No text is below 11 pixels, and none is under 4.5 to 1 contrast, in either theme.
+8. **VR8** — The tile is 280 pixels wide and on the 8-pixel grid — measured, not eyeballed.
+9. **VR9** — Tabbing through the whole screen with the keyboard only, focus is always visible and arrow movement follows the wires.
+10. **VR10** — With reduced motion on, the ordering is still there and the tweening is gone.
+11. **VR11** — The six buttons and their badges are word for word the Interface words table in [`../vocabulary.md`](../vocabulary.md).
+12. **VR12** — A claim that was supposed and then overridden says so on its tile (UX-14).
+13. **VR13** — The map grew rather than appeared: a reserved rectangle stood where the next claim would go, no tile that was already placed moved when a later one arrived, every proposal the rules refused is on screen in the validator's own words, and the receipt says what the run cost.
 
 **Part of this list is now checked by a machine, at three windows, and none of it by a stored picture.** `frontend/e2e/hormuz.spec.ts` opens the stored map at 1600 × 1000, 1440 × 900 and 1280 × 800 with a branch open and the operations open, and asks three questions of **every button, link and field in the panel beside the map**: it is drawn at a size at all; scrolled to, it lies inside the part of the panel that is on the glass; and **at its own centre the topmost thing on the screen is that control** — which is the one of the three that catches a sibling drawn over a button. Scrolled out of view is fine and is why each control is scrolled to first: the panel scrolls as one and marks its edges. **A fourth question is asked of the panel itself: its content is no wider than the panel is on the glass.** The first three cannot see a field that runs past the right edge, because a box that scrolls up and down also scrolls sideways unless told not to, and scrolling to the field slides the whole panel left until the field measures as inside. It also asserts that the page never scrolls sideways, which is the only measurement here that changes with the window, since the panel is a fixed 336 pixels and the stage beside it takes the rest. And it asserts that an item in the map-read-as-a-list is wider than a third of the list, which is the collapse that made the no-picture route unusable below 1600.
 
-**What that does and does not cover.** It covers *the second half of line 2* — no control in the panel is hidden behind anything — and the readability of the list. It does not cover the map: tiles, wires and plates overlapping each other are checked by the layout's own tests and by eye. It does not touch the line about the template, the line about greyscale, the line about contrast or the line about the eight-pixel grid, all of which still need a person and a picture. **A stored screenshot is deliberately not used**: a pixel baseline over a canvas with a background-threaded layout engine, two variable fonts and an arrival animation fails for reasons that are not faults, and this project has already paid for chasing those.
+**What that does and does not cover.** It covers *the second half of `VR2`* — no control in the panel is hidden behind anything — and the readability of the list. It does not cover the map: tiles, wires and plates overlapping each other are checked by the layout's own tests and by eye. It does not touch `VR1` (the template), `VR3` (greyscale), `VR7` (contrast) or `VR8` (the eight-pixel grid), all of which still need a person and a picture. **A stored screenshot is deliberately not used**: a pixel baseline over a canvas with a background-threaded layout engine, two variable fonts and an arrival animation fails for reasons that are not faults, and this project has already paid for chasing those.
 
 Decision records behind this part: ADR-0007 (canvas technology), ADR-0012 (replay mode — with no model key an example runs from a committed recording, through the same stream and the same canvas; one is committed, and a card with nothing recorded says so), ADR-0014 (what the range under a number means, how a supposition ends, and how wide an arrow's push is drawn — the words the chips, badges and origin marks use).

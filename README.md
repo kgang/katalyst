@@ -63,11 +63,12 @@ curl -s localhost:8000/api/fixtures/hormuz \
 ```
 
 ```text
-"Hormuz opens, then Iran is struck" moves A Polymarket contract "Brent below $70 on
-2026-10-31" resolves YES from .50 to .42 by 2026-10-04 and leaves 1 claim untouched.
+the shape of the answer:  "<the branch>" moves <the ending, in its own words> from
+                          <what it read> to <what it reads now> by <the day it
+                          moved> and leaves <how many> claims untouched.
 ```
 
-That sentence is quoted here word for word from [`docs/worked-numbers.txt`](docs/worked-numbers.txt), where it is the line named `strike · the sentence beside the list`. Its two numbers are written the way every likelihood in this product is written — two significant figures, with `<.01` and `>.99` standing in for the two claims nobody here is entitled to make.
+**The sentence with its numbers in it is not printed here**, for the same reason the four figures above are not: it is worked out, so it moves the day the arithmetic does, and a copy in a second place is a copy that goes stale. It is in [`docs/worked-numbers.txt`](docs/worked-numbers.txt) on the line named `strike · the sentence beside the list`, word for word. Its two likelihoods are written the way every likelihood in this product is written — two significant figures, with `<.01` and `>.99` standing in for the two claims nobody here is entitled to make.
 
 The whole answer also carries a word per claim (`unchanged`, `shifted`, `added`, `killed`) and the endings that moved in ranked order. A third route, `POST /api/worlds/conditional`, gives the number on one arrow: its target, with its source **supposed** true — never how often the two happen to show up together.
 

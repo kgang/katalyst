@@ -491,7 +491,7 @@ which is the honest reading of what UX-8 promises anyway. **NFR-7 now reads that
 **There is no spinner anywhere in this product** — not here, not on the launchpad, not on the
 `insert` route, not while a lazily fetched midpoint chip is in flight. Waiting is always shown as the
 shape of the thing being waited for: a reserved rectangle where a claim will go, an absence with its
-reason where a number will go. Checklist line 2 is the standing check and
+reason where a number will go. Checklist `VR2` is the standing check and
 `test_there_is_no_spinner_anywhere` is the automated one.
 
 ### B2 — What a skeleton is, and what it never becomes
@@ -785,7 +785,7 @@ THIS GENERATION
 ```
 
 **Money has two places** *(coordinator, 2026-09-21)*. It printed up to four — `$0.6132` — which is
-the same fake precision checklist line 4 exists to stop, in the place a reader is most likely to
+the same fake precision checklist `VR4` exists to stop, in the place a reader is most likely to
 compare two runs: the fourth place is a rounding of a price table, and four places read as a
 measurement. **And a guard word exactly when it is true** (K2): a run that spent nothing prints
 `$0.00`, which is a computed zero and reads as one, and a run that spent something and less than a
@@ -816,7 +816,7 @@ Four things about it.
   and the dollars on this strip came from there. **Searches are a row of their own** because they are
   billed apart from tokens: without that row, `dollars` is a number a reader could check against the
   token counts and find wrong.
-* **Checklist line 4 is about likelihoods.** *"No number shows more than two significant figures, and
+* **Checklist `VR4` is about likelihoods.** *"No number shows more than two significant figures, and
   none is missing its range"* is the rule that stops a fake-precise `.347` reaching the screen
   (NFR-1). A token count, a call count, a duration and a dollar figure are counts and measurements:
   they are printed whole, in `--font-mono` with fixed-width digits, and they have no range because
@@ -1149,8 +1149,8 @@ followed by a finished list.
 
 Each is *for all X, statement P holds*, and each names what checks it: a **component test** under
 `frontend/src/**/__tests__/`, the end-to-end browser test `frontend/e2e/generate.spec.ts`, or a
-numbered line of the **visual review checklist** in [`README.md`](README.md) — a checklist line is a
-checkable thing; it is checked by a person. Frontend test names are `test_snake_case`. Short file
+named line of the **visual review checklist** in [`README.md`](README.md), `VR1` to `VR13` — a
+checklist line is a checkable thing; it is checked by a person. Frontend test names are `test_snake_case`. Short file
 names below: **growth** is `frontend/src/stream/__tests__/growth.test.ts`, **reader**
 `frontend/src/stream/__tests__/generate.test.ts`, **noSpinner**
 `frontend/src/stream/__tests__/noSpinner.test.ts`, **strip**
@@ -1167,19 +1167,19 @@ state of the app, no element is rendered whose only content is an indeterminate 
 no `role="progressbar"` without a value, no spinning or pulsing element, no stylesheet rule that
 rotates or sweeps anything. Waiting is rendered as the shape of the thing waited for. *Test:*
 noSpinner › `test_there_is_no_spinner_anywhere` — a walk over every component and every stylesheet,
-the same technique `colourLaw.test.ts` uses. **Also: visual review checklist line 2.**
+the same technique `colourLaw.test.ts` uses. **Also: visual review checklist `VR2`.**
 
 **INV-workbench.61 — something is on screen before the first proposal returns.** For every
 generation, a skeleton tile is rendered on the `generation_started` event, before any
 `proposal_accepted` has arrived, and it carries the hypothesis as the reader typed it. *Tests:*
 growth › `test_a_skeleton_tile_appears_before_the_first_claim`; `frontend/e2e/generate.spec.ts`.
-**Also: visual review checklist line 13.**
+**Also: visual review checklist `VR13`.**
 
 **INV-workbench.62 — a skeleton is a box, never a claim.** For every skeleton rendered: it carries no
 digit anywhere, has no belief chip, is absent from `WorldView.claims`, is absent from the outline
 view, cannot be selected, and its identifier appears in no request the browser makes. *Test:*
-growth › `test_a_skeleton_carries_no_number_and_no_identifier`. **Also: visual review checklist line
-5** (is there a number nobody computed?).
+growth › `test_a_skeleton_carries_no_number_and_no_identifier`. **Also: visual review checklist
+`VR5`** (is there a number nobody computed?).
 
 **INV-workbench.63 — the skeletons are the frontier, and nothing else.** For every stream and after
 every event in it, the set of skeletons on screen is exactly the set named by the most recent
@@ -1202,7 +1202,7 @@ changed drops its pin. It is the one event that could move a tile a reader is al
 it was the one event the walks stopped short of. *Tests:* growth ›
 `test_a_tile_keeps_its_place_when_a_later_tile_arrives`; layout ›
 `test_no_two_tiles_in_a_column_collide`; `frontend/e2e/generate.spec.ts`. **Also: visual review
-checklist line 13.**
+checklist `VR13`.**
 
 **INV-workbench.65 — a wire draws only after both ends exist.** For every stream, including one built
 so that an arrow arrives before one of its ends, no wire is rendered unless both of the claims it
@@ -1222,8 +1222,8 @@ one or rolled through a value in between. *Test:* growth › `test_chips_resolve
 per entry in `violations`, each line being that violation's own `message` with no text added, and no
 refusal is dropped, merged or summarised. No rendered element derives its text from a `Violation`'s
 `code`. *Tests:* strip › `test_a_rejected_proposal_is_shown_not_hidden`;
-`frontend/e2e/generate.spec.ts`, which requires at least one refusal on screen. **Also: visual review
-checklist line 13.**
+`frontend/e2e/generate.spec.ts`, which requires at least one refusal on screen. **Also: visual
+review checklist `VR13`.**
 
 **INV-workbench.68 — the reducer computes nothing.** For every module under `frontend/src/stream/`,
 no expression combines two values read from an event with `+`, `−`, `×` or `÷`, and every number
@@ -1231,8 +1231,8 @@ rendered from a generation is a field on an event. Counting the rows in a list t
 comparing a value with a fixed threshold, are excluded by name. *Tests:*
 `frontend/src/graph/__tests__/noArithmetic.test.ts` › `test_canvas_never_combines_two_model_numbers`,
 extended to `frontend/src/stream/`; strip ›
-`test_the_receipt_strip_prints_every_field_and_adds_nothing_up`. **Also: visual review checklist line
-5.**
+`test_the_receipt_strip_prints_every_field_and_adds_nothing_up`. **Also: visual review checklist
+`VR5`.**
 
 **INV-workbench.69 — an unknown event is ignored and reported.** For every event name the build does
 not know, the reducer leaves its state otherwise unchanged, counts the name, and the Inspector's
@@ -1280,8 +1280,8 @@ under `prefers-reduced-motion: reduce` every tween is `0ms` while the 60-millise
 columns remains. This is [`color-motion-type.md`](color-motion-type.md)'s INV-workbench.18 with
 nothing added to it. *Test:* `frontend/src/styles/__tests__/motionBudget.test.ts` ›
 `test_no_duration_above_120ms_outside_the_three_budgeted_moves`,
-`test_reduced_motion_zeroes_every_tween_and_keeps_the_stagger`. **Also: visual review checklist line
-10.**
+`test_reduced_motion_zeroes_every_tween_and_keeps_the_stagger`. **Also: visual review checklist
+`VR10`.**
 
 **INV-workbench.74 — nothing is silently inert without a key.** For every control a generation needs
 — the hypothesis field, the destination field, the likelihood slider, **Add a claim** — whenever the
