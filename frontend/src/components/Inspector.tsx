@@ -211,7 +211,18 @@ function RangeNote({ world, claim }: { world: WorldView; claim: ClaimView }) {
  * says that instead of drawing half of itself.
  */
 function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView }) {
+  // Two kinds of arrow end here, and only one of them made this number.
+  //
+  // A *feedback arrow* is a market acting back on the world it measures, and
+  // `spec/multiverse/interventions.md` sets one rule over the whole product:
+  // the map the engine works through is the map with feedback arrows set
+  // aside. So a feedback arrow contributed nothing to the number at the foot of
+  // this block, and putting it among the pushes would hand the reader a cause
+  // the engine never gave. It is still on the map and still worth naming, so it
+  // is named below the pushes, in the words the outline already reads it in.
   const into = world.links.filter((wire) => wire.target === claim.id);
+  const pushes = into.filter((wire) => !wire.reflexive);
+  const fedBackBy = into.filter((wire) => wire.reflexive);
   const result = claim.beliefs.model;
 
   return (
@@ -250,7 +261,7 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
           </span>
         </dd>
 
-        {into.length === 0 ? (
+        {pushes.length === 0 ? (
           <>
             <dt className="inspector__step-label">pushed on by</dt>
             <dd className="inspector__step">
@@ -262,7 +273,7 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
             </dd>
           </>
         ) : (
-          into.map((wire) => (
+          pushes.map((wire) => (
             <Fragment key={wire.id}>
               <dt className="inspector__step-label">
                 <span className="inspector__mono">{wire.source}</span> pushes
@@ -293,6 +304,24 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
             </Fragment>
           ))
         )}
+
+        {/* Every feedback arrow into this claim, apart from the pushes and
+            below them, because the engine set them aside before it worked this
+            number out. The reader is told that in the line, not left to work it
+            out from the fact that the arrow is in a different place. */}
+        {fedBackBy.map((wire) => (
+          <Fragment key={wire.id}>
+            <dt className="inspector__step-label">fed back into by</dt>
+            <dd className="inspector__step">
+              <span className="inspector__mono">{wire.source}</span>
+              <span className="inspector__reason">
+                {`a market acting back on the world it measures, ${
+                  wire.lag === 0 ? "the same day" : `after ${inDays(wire.lag)}`
+                } — the engine works this map through with feedback arrows set aside, so this arrow has not pushed on this number`}
+              </span>
+            </dd>
+          </Fragment>
+        ))}
 
         <dt className="inspector__step-label">it comes to</dt>
         <dd className="inspector__step">

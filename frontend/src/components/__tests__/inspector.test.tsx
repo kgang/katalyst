@@ -238,6 +238,40 @@ describe("the panel, on a claim", () => {
     expect(screen.getByText(/nothing on this map points at this claim/)).toBeInTheDocument();
   });
 
+  it("test_a_feedback_arrow_is_not_one_of_the_pushes_on_this_number", () => {
+    // A market acting back on the world it measures is the one arrow allowed to
+    // point backwards, and the engine works the map through with those set
+    // aside (spec/multiverse/interventions.md). So it is not one of the things
+    // that made this number, and listing it among the pushes tells the reader
+    // this number has a cause the engine never gave it. It is still on the map
+    // and still worth naming, so it is named apart, in the outline's words.
+    const world = hormuzish({
+      claims: [aClaim({ id: "H", kind: "hypothesis" }), aClaim({ id: "B" }), aClaim({ id: "O" })],
+      links: [
+        aWire({ id: "B->O", source: "B", target: "O", reflexive: true }),
+        aWire({ id: "H->B", source: "H", target: "B" }),
+      ],
+    });
+    render(<Inspector world={world} selection={{ kind: "claim", id: "O" }} />);
+
+    const why = document.querySelector(".inspector__decomposition") as HTMLElement;
+    // Not among the pushes, and named apart in the words the outline already
+    // reads it in. The only arrow into O is the feedback one, so the
+    // decomposition also says outright that nothing pushes on this claim.
+    const labels = [...why.querySelectorAll(".inspector__step-label")].map((step) =>
+      step.textContent?.trim(),
+    );
+    expect(labels).toEqual(["it started at", "pushed on by", "fed back into by", "it comes to"]);
+    expect(within(why).getByText(/nothing on this map points at this claim/)).toBeInTheDocument();
+    // And told why it is apart, in a whole sentence rather than by its position.
+    expect(
+      within(why).getByText(
+        "a market acting back on the world it measures, after 2 days — the engine works this map " +
+          "through with feedback arrows set aside, so this arrow has not pushed on this number",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", () => {
     // **Waiting on the engine fix.** Nothing sets `onlyReweighted` today: the
     // engine's difference gains the field that says a claim moved purely
