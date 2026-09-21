@@ -772,3 +772,43 @@ All four are option (C) of the old *Open for Kent* item 1, which R24 removes; `6
 ---
 
 All these ADRs written are accepted!
+
+---
+
+<task-notification>
+<task-id>a68fdcfa6d5cf7270</task-id>
+<tool-use-id>toolu_012hMMqGhxwJ85R8i1bdCoNF</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a68fdcfa6d5cf7270.output</output-file>
+<status>completed</status>
+<summary>Agent "Fold Kent's trade decisions into 0019, 0020" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Acceptance pass complete.
+
+**`git diff --stat`** (worktree `adr-06-the-trade`, on top of `0925d67`):
+
+```
+ docs/adr/0018-an-edge-is-computed-from-the-unsupposed-world.md |  7 ++++---
+ docs/adr/0019-a-stop-is-a-price-the-reader-owns.md             | 17 ++++++------
+ docs/adr/0020-a-quote-is-recorded-first-and-fetched-second.md  |  8 +++++---
+ 3 files changed, 17 insertions(+), 15 deletions(-)
+```
+
+No chapter or `belief.md` change was needed — they already cited records without a `proposed`/`forthcoming` qualifier and already read as describing decided things (checked with the report grep plus a second sweep for *Kent's choice · on Kent's list · to be decided · if accepted · pending · provisional*: nothing).
+
+**Rewritten sentences, per file**
+
+*0018* — front matter `status: accepted`; top line → "**Accepted by Kent on 2026-09-21** (decisions note, row R32). The one question it held open he answered the same day (R20)."; new first *More Information* bullet in 0012's house style; "Records 0016 and 0017 are forthcoming — … not written" → "**Records 0016 and 0017** belong to stack 05 and are accepted too; nothing here depends on a number either of them states."
+
+*0019* — `status: accepted`; top line → accepted, naming R10 and the two rows written in; *In short* → "**Open for Kent.** Nothing — R10, R28 and R29 are all written in, and he accepted the record with them."; the R28 closing sentence → "**Kent asked for this in R28; it was worked out and measured here, and he accepted it with the record (R32).** Acceptance softens none of the three conditions above — the level gap, additive moves in price units, and a named decay shape."; "**What this record still waits for.** It stays `proposed` until **proposed record 0016 is accepted**…" → "**Where these numbers come from.** **Record 0016**, accepted the same day, owns the sampler they are drawn from…"; *Open for Kent* collapsed to one paragraph ending on R32 and the declined option; *Related* now lists 0016 and 0017 as ordinary records; acceptance bullet added.
+
+*0020* — `status: accepted`; top line → accepted, naming R11, R23, R30; acceptance bullet above the ADR-0010 amendment list; "**Records 0016 and 0017 are forthcoming.**" → "…, **0016** and **0017**."
+
+**Owed note** — new line under the byline: all seven records accepted 2026-09-21 (R32, quoting Kent), and Part 2 *06-1, ready to build* is being built now in `feat-06-quote`, so it reads as work in flight. §1.4's three index rows flipped `proposed` → `accepted`.
+
+**Verification grep** — one hit, justified:
+
+- `0019:176` — "`…digest-finance.md` §2.3 (the ceiling **as first proposed**)" — describes what that analysis document proposed, not this record's status. No other hit for *proposed · forthcoming · awaits · until Kent · coordinator's proposal* across the three records, the six `spec/thesis/` files, or `spec/graph/belief.md`.
+
+**No numbers changed.** Counts: 0018 2617 · 0019 3978 · 0020 3089. No git commands run; main checkout untouched.</result>
+<usage><subagent_tokens>277110</subagent_tokens><tool_uses>32</tool_uses><duration_ms>187550</duration_ms></usage>
+</task-notification>
