@@ -63,6 +63,7 @@ ViolationCode = Literal[
     "no_hypothesis",
     "multiple_hypotheses",
     "dangling_link",
+    "duplicate_link",
     "market_without_payoff",
     "not_tradeable_without_reason",
     # Four refused edits — what `apply` finds. See *Refusing an edit* below.
@@ -73,7 +74,7 @@ ViolationCode = Literal[
     # One refused comparison — what `diff` finds. See *Refusing an edit* below.
     "worlds_not_comparable",
 ]
-"""Nineteen stable strings: fourteen things that can be wrong with a **map**,
+"""Twenty stable strings: fifteen things that can be wrong with a **map**,
 four reasons an **edit** cannot be folded onto one, and one reason two **worlds**
 cannot be compared. The browser switches on them,
 tests assert on them, and they are never renamed without a migration."""
@@ -92,7 +93,7 @@ class Violation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     code: ViolationCode = Field(
-        description="Which rule was broken. One of nineteen stable strings."
+        description="Which rule was broken. One of twenty stable strings."
     )
     subject: str = Field(
         description=(
@@ -136,7 +137,7 @@ Rules for messages: name the claim by its words, never by its identifier; say wh
 
 ### The rules
 
-Thirteen rules, fourteen codes — "exactly one hypothesis" fails in two different directions. The table is split in two so it fits on a screen; the `code` column joins them. These are the faults in a **map**; the four reasons an **edit** is refused are a separate list, below.
+Fourteen rules, fifteen codes — "exactly one hypothesis" fails in two different directions. The table is split in two so it fits on a screen; the `code` column joins them. These are the faults in a **map**; the four reasons an **edit** is refused are a separate list, below.
 
 | # | Rule, in plain words | Serves | Code | Test |
 |---|---|---|---|---|
@@ -148,11 +149,12 @@ Thirteen rules, fourteen codes — "exactly one hypothesis" fails in two differe
 | 6 | Every arrow says why one claim moves the other | INV-2 | `missing_rationale` | `test_validate_rejects_link_without_rationale` |
 | 7 | An arrow whose provenance claims evidence — `documented`, `historical` or `market_implied` — cites at least one source | INV-2 | `documented_without_source` | `test_validate_rejects_unsourced_documented_link` |
 | 8 | Both ends of every arrow name a claim that is on this map | INV-graph.1 | `dangling_link` | `test_validate_rejects_dangling_link` | 02 |
-| 9 | Once the reflexive arrows are set aside, there are no loops | INV-6 | `cycle` | `test_validate_rejects_cycles`, `test_apply_preserves_dag` |
-| 10 | Every reflexive arrow takes time: `lag > 0` | INV-6 | `reflexive_without_lag` | `test_reflexive_links_have_positive_lag` |
-| 11 | A half-life appears only on an arrow whose push fades: `shape` is `impulse` | INV-graph.15 | `half_life_without_impulse` | `test_validate_rejects_half_life_without_impulse` | 02 |
-| 12 | Every likelihood sits between 0 and 1 with low ≤ p ≤ high | INV-7 | `belief_out_of_range` | `test_validate_rejects_belief_out_of_range` | 02 |
-| 13 | A push that fades says how fast: `shape` is `impulse` only with a `half_life` | INV-graph.16 | `impulse_without_half_life` | `test_validate_rejects_impulse_without_half_life` | 03a |
+| 9 | One ordered pair of claims takes one arrow: nothing is joined twice the same way round | INV-graph.1 | `duplicate_link` | `test_validate_rejects_a_second_arrow_between_the_same_two_claims` | 04 |
+| 10 | Once the reflexive arrows are set aside, there are no loops | INV-6 | `cycle` | `test_validate_rejects_cycles`, `test_apply_preserves_dag` |
+| 11 | Every reflexive arrow takes time: `lag > 0` | INV-6 | `reflexive_without_lag` | `test_reflexive_links_have_positive_lag` |
+| 12 | A half-life appears only on an arrow whose push fades: `shape` is `impulse` | INV-graph.15 | `half_life_without_impulse` | `test_validate_rejects_half_life_without_impulse` | 02 |
+| 13 | Every likelihood sits between 0 and 1 with low ≤ p ≤ high | INV-7 | `belief_out_of_range` | `test_validate_rejects_belief_out_of_range` | 02 |
+| 14 | A push that fades says how fast: `shape` is `impulse` only with a `half_life` | INV-graph.16 | `impulse_without_half_life` | `test_validate_rejects_impulse_without_half_life` | 03a |
 
 | Code | Message pattern |
 |---|---|
@@ -165,6 +167,7 @@ Thirteen rules, fourteen codes — "exactly one hypothesis" fails in two differe
 | `missing_rationale` | The arrow from "…" to "…" does not say why one causes the other. |
 | `documented_without_source` | The arrow from "…" to "…" is marked as `<provenance>` but cites no source. |
 | `dangling_link` | The arrow out of "…" points at a claim that is not on this map. (Or: the arrow into "…" comes from a claim that is not on this map.) |
+| `duplicate_link` | "…" and "…" are already joined by an arrow in that direction. Two arrows the same way round add their pushes together, so a second one says the cause is stronger than either arrow claims. |
 | `cycle` | These claims form a loop with no delay in it: "…" → "…" → "…". Mark the arrow where a market feeds back on the world as reflexive and give it a delay, or remove one arrow. |
 | `reflexive_without_lag` | The feedback arrow from "…" to "…" has no delay. A market cannot change the world it is measuring in zero time. |
 | `half_life_without_impulse` | The arrow from "…" to "…" gives a half-life, but only a spike fades; a step or a ramp has nothing to fade. |
@@ -175,13 +178,15 @@ Thirteen rules, fourteen codes — "exactly one hypothesis" fails in two differe
 
 #### Notes on three of the rules
 
-**Rule 9, loops.** The check builds a directed graph with `networkx` — a standard Python library for graph algorithms — from every link whose `reflexive` flag is false, and asks it for the cycles. A self-link (an arrow from a claim to itself) is a cycle of length one and is caught by the same pass, which is why there is no separate code for it. A map that passes this rule is what the literature calls a *directed acyclic graph* — a graph whose arrows all point one way and never come back round. The abbreviation *DAG* survives in this repo only inside the test name `test_apply_preserves_dag`. Reflexive arrows are excluded because a market feeding back on the world is a real loop in reality, made honest by taking time; how it unrolls over that time is stack 06's work. See [`link.md`](link.md), section *`reflexive` — a market feeding back on the world*.
+**Rule 9, one arrow to a pair** *(decided 2026-09-20)*. `propagate` adds every arrow coming into a claim, so two arrows from the same cause to the same effect push it twice as hard as either of them says, and the canvas draws two wires where a reader sees one relationship. Nothing in these shapes can say *two separate channels*: `strength`, `lag` and `shape` are per arrow and they simply add up. Two genuinely different mechanisms want the claim that sits between them, which is a third claim rather than a second arrow. **The two directions of a pair stay legal** — `B → R` alongside `R → B` is the feedback loop rule 11 exists for — which is why the pair is read in order rather than as a set. The **first** arrow between a pair is never the fault; the ones after it are, which is what lets a map be built one arrow at a time. Found by a review of the generation pipeline: a concurrent round could propose the same arrow twice and the map carried both.
 
-**Rule 12, likelihoods, is checked twice on purpose.** `Belief` already refuses to be built with `lo > p` or `hi > 1` — that is a field check on the model itself, so a `Graph` assembled through our own models can never contain a bad one, and `belief_out_of_range` will never fire from that direction. The rule exists here anyway as the net under maps that arrive some other way: a hand-edited fixture file, a stored map read back after the shapes have changed, a future path that builds beliefs from raw numbers. Belief construction is [`belief.md`](belief.md); the after-any-intervention version of the same guarantee is `test_belief_bounds_after_any_sequence`, owned by [`belief.md`](belief.md). Whether a code that is currently unreachable from inside the models should exist at all is under Open questions.
+**Rule 10, loops.** The check builds a directed graph with `networkx` — a standard Python library for graph algorithms — from every link whose `reflexive` flag is false, and asks it for the cycles. A self-link (an arrow from a claim to itself) is a cycle of length one and is caught by the same pass, which is why there is no separate code for it. A map that passes this rule is what the literature calls a *directed acyclic graph* — a graph whose arrows all point one way and never come back round. The abbreviation *DAG* survives in this repo only inside the test name `test_apply_preserves_dag`. Reflexive arrows are excluded because a market feeding back on the world is a real loop in reality, made honest by taking time; how it unrolls over that time is stack 06's work. See [`link.md`](link.md), section *`reflexive` — a market feeding back on the world*.
 
-**Rules 11 and 13 reject rather than ignore — the same rule, checked both ways.** A half-life is how many days a spike takes to fall to half its size, so it says something only about an `impulse`; a `step` switches on and holds and a `ramp` climbs and then holds, and neither has anything to fade. The field could have been quietly ignored on those two shapes, and for a while it was. It is refused instead, because a number we accept and then ignore forever is a number the user cannot account for — the same argument as *Reject; never repair* below. Decided 2026-09-17; see [`link.md`](link.md), Open questions 4.
+**Rule 13, likelihoods, is checked twice on purpose.** `Belief` already refuses to be built with `lo > p` or `hi > 1` — that is a field check on the model itself, so a `Graph` assembled through our own models can never contain a bad one, and `belief_out_of_range` will never fire from that direction. The rule exists here anyway as the net under maps that arrive some other way: a hand-edited fixture file, a stored map read back after the shapes have changed, a future path that builds beliefs from raw numbers. Belief construction is [`belief.md`](belief.md); the after-any-intervention version of the same guarantee is `test_belief_bounds_after_any_sequence`, owned by [`belief.md`](belief.md). Whether a code that is currently unreachable from inside the models should exist at all is under Open questions.
 
-**Decided 2026-09-17, the other direction too.** An `impulse` with no half-life used to be legal, on the reasoning that it wanted a sensible default and that choosing one belonged to propagation. It is now rule 13 and code `impulse_without_half_life`. Propagation has no honest default to choose: reading a missing half-life as "no decay" turns the arrow into a `step` and silently overrides the author's choice of shape, and any other number would be invented by us and attributed to the model. So the shape and its parameters must **agree, checked both ways** — a spike says how fast it fades, and only a spike says it. Reject, never repair. The consequence for `propagate` is that it never meets one: [`../multiverse/propagation.md`](../multiverse/propagation.md) evaluates `impulse` with the half-life it is guaranteed to have. Every `impulse` in the Hormuz fixture already names one, so nothing shipped changes.
+**Rules 12 and 14 reject rather than ignore — the same rule, checked both ways.** A half-life is how many days a spike takes to fall to half its size, so it says something only about an `impulse`; a `step` switches on and holds and a `ramp` climbs and then holds, and neither has anything to fade. The field could have been quietly ignored on those two shapes, and for a while it was. It is refused instead, because a number we accept and then ignore forever is a number the user cannot account for — the same argument as *Reject; never repair* below. Decided 2026-09-17; see [`link.md`](link.md), Open questions 4.
+
+**Decided 2026-09-17, the other direction too.** An `impulse` with no half-life used to be legal, on the reasoning that it wanted a sensible default and that choosing one belonged to propagation. It is now rule 14 and code `impulse_without_half_life`. Propagation has no honest default to choose: reading a missing half-life as "no decay" turns the arrow into a `step` and silently overrides the author's choice of shape, and any other number would be invented by us and attributed to the model. So the shape and its parameters must **agree, checked both ways** — a spike says how fast it fades, and only a spike says it. Reject, never repair. The consequence for `propagate` is that it never meets one: [`../multiverse/propagation.md`](../multiverse/propagation.md) evaluates `impulse` with the half-life it is guaranteed to have. Every `impulse` in the Hormuz fixture already names one, so nothing shipped changes.
 
 **Rules 4 and 5 are validity rules, not field rules.** `Proposition.payoff` and `Proposition.not_tradeable_reason` are optional fields on one class, so a `market` claim with no payoff can be *built*. It just cannot be *valid*. That is deliberate: a model proposal with the wrong combination comes back as a `Violation` carrying a sentence the user can read, not as a pydantic exception carrying a stack trace.
 
@@ -202,7 +207,7 @@ The fourteen rules above describe a **map**. An **edit** can fail for reasons th
 
 `edit_not_applicable` is the one that covers more than one case, and it is deliberately not a bin for everything: it means *the edit is well-formed and names things that exist, and still cannot be applied*. Keeping it separate is what lets `unknown_target` go on meaning exactly what it says.
 
-**A fifth refusal is not about an edit at all.** `worlds_not_comparable` is what `diff` answers when it is handed two worlds that were not built from the same base map, seed and loop sizes — each world is perfectly good on its own; what cannot be done is setting them side by side, because a difference across two seeds is the user's change plus a wash of sampling noise ([`../multiverse/diff.md`](../multiverse/diff.md) B1). It has its own code for the same reason `edit_not_applicable` does: a code must mean what it says. The three routes cannot produce it — they build both worlds of a comparison themselves — so it guards callers inside our own code. Nineteen codes in all: fourteen faults in a map, four refused edits, one refused comparison.
+**A fifth refusal is not about an edit at all.** `worlds_not_comparable` is what `diff` answers when it is handed two worlds that were not built from the same base map, seed and loop sizes — each world is perfectly good on its own; what cannot be done is setting them side by side, because a difference across two seeds is the user's change plus a wash of sampling noise ([`../multiverse/diff.md`](../multiverse/diff.md) B1). It has its own code for the same reason `edit_not_applicable` does: a code must mean what it says. The three routes cannot produce it — they build both worlds of a comparison themselves — so it guards callers inside our own code. Twenty codes in all: fifteen faults in a map, four refused edits, one refused comparison.
 
 **`apply` stops at the first edit that does not fit**, and reports every violation *that edit* produced. That is different from `validate`, which walks every rule over the whole map. The reason is ordering: a branch's edits build on each other, so an edit after the failure may name a claim or arrow the failed edit would have added, and reporting its faults would blame the user for an artefact of the stop. One broken edit, all of its reasons.
 

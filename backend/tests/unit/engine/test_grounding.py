@@ -131,8 +131,11 @@ def test_a_documented_arrow_that_cites_nothing_is_refused_whoever_wrote_it() -> 
     """The pipeline cannot produce one, and the map's own rules refuse one anyway."""
     unbacked = Link(
         id="an-arrow",
-        source="H",
-        target="C",
+        # A pair the stored map does not already join: since 2026-09-20 a second
+        # arrow the same way round is a fault of its own, and this test is about
+        # a different one.
+        source="C",
+        target="M1",
         mode="sustain",
         strength=0.5,
         lag=1.0,
