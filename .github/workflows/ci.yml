@@ -71,10 +71,21 @@ jobs:
         run: uv run mypy src
 
       # The worked example's numbers are generated from the engine and committed,
-      # exactly as the browser's types are. This works them out again and fails if
-      # the result differs, which is what stops a chapter quoting a figure the
-      # engine stopped producing. It needs no key: it reads a stored map and does
-      # arithmetic.
+      # exactly as the browser's types are. These two steps work them out again and
+      # fail if the result differs, which is what stops a chapter quoting a figure
+      # the engine stopped producing. Neither needs a key: they read a stored map
+      # and do arithmetic.
+      #
+      # **These two steps must stay in this order and stay ahead of the tests.**
+      # The first overwrites the file in the working tree, so the second is the
+      # only thing that can still see whether what was committed was stale. Move
+      # the pair after `Run the tests` and the suite's own check compares the
+      # program with the file the first step has just rewritten, agrees with
+      # itself, and passes on a stale commit.
+      #
+      # The `working-directory` override on the second step is load-bearing too:
+      # this job runs from `backend/`, where the path below matches nothing at all
+      # and `git diff` cheerfully exits 0 without looking at anything.
       - name: Work out every number the worked example quotes
         run: uv run python -m katalyst.engine.worked_numbers
 

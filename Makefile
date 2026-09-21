@@ -53,7 +53,8 @@ types: frontend/node_modules ## Rewrite the browser app's types from the server'
 # Same bargain as `types` above: the output is committed, and the build fails when
 # regenerating it produces something different. Needs no key and no network.
 numbers: ## Rewrite the one file that owns every number the worked example quotes
-	cd backend && uv run python -m katalyst.engine.worked_numbers
+	cd backend && env -u ANTHROPIC_API_KEY -u FRED_API_KEY \
+		uv run python -m katalyst.engine.worked_numbers
 
 eval: ## Score what the language model proposes against saved examples
 	@echo "make eval arrives in the next pull request of this stack: the four saved"

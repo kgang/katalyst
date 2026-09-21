@@ -30,13 +30,15 @@ Two parts, labelled apart, and the distinction is the point:
 Every line starts with a stable name — `B · base · reading` — so a chapter can
 cite one line rather than restating a figure. A line holds one thing somebody
 would quote: a whole arrow, or a whole belief chip, or one number. Computed
-numbers print twice, once as the screen prints them and once at six decimal
-places, and the section preamble says why six.
+numbers print twice, once as the screen prints them and once at five decimal
+places, and the section preamble says why five.
 
 What this program must never do
 -------------------------------
-- Never write a number of its own. Every figure here is read off a world, a
-  difference or the fixture; none is worked out in this file.
+- Never work out an engine number of its own. Every likelihood, move, share and
+  rank here is read off a world, a difference or the fixture. What this file does
+  work out is bookkeeping a reader could do with a calendar: how many days after
+  day zero a date falls, and what position a row sits at in a list.
 - Never write its own copy of the two-figures rule. It imports the one the rules
   layer uses, so a number cannot read one way here and another way on screen.
 - Never print a supposition's 1. A claim the branch supposed true reads exactly 1
@@ -48,6 +50,7 @@ What this program must never do
 - Never reach the network, and never need a key.
 """
 
+import math
 import sys
 from collections.abc import Sequence
 from datetime import date
@@ -101,20 +104,51 @@ regenerating it changes nothing.
 WHERE = CHECKOUT / "docs" / "worked-numbers.txt"
 """The one file this writes: `docs/worked-numbers.txt`."""
 
-DIGITS = 6
+DIGITS = 5
 """How many decimal places the full-precision column prints.
 
 **Not sixteen, and that is a decision rather than a shortcut.** The engine's
 arithmetic runs through `numpy`, whose exponential and logarithm are accurate to
 well under one unit in the last place but are *not* promised to be identical
-across processor families — and the build runs on Linux on Intel while this is
+across processor families — and the build runs on Linux on x86-64 while this is
 often written on a Mac on Arm. Sixteen digits would therefore make the build fail
-for a reason nobody changed. Six decimal places is finer than anything this
-product shows by four orders of magnitude, and it is coarser than any difference
-those two machines can produce by ten, so it is both useful and stable.
+for a reason nobody changed, and would promise a reader that the seventeenth
+digit matched too, which it would not.
 
-It is also the honest answer to what `README.md` used to print. Sixteen digits is
-a promise to a reader that the seventeenth would match too, and it would not.
+**Why five rather than six, which is the part that is easy to get wrong.** What
+decides whether a printed number is stable is not how big the disagreement
+between two machines is. It is how close that number sits to a **rounding
+boundary** — the halfway point where one more hair of movement tips the last
+printed digit. A number a whole tenth away from a boundary survives a large
+disagreement; a number a hundred-millionth away from one does not survive a tiny
+one. Six places looked safe by the first measure and was not safe by the second:
+forty of this file's computed numbers sat within one step of the engine's own
+float32 grid of a six-place boundary, and perturbing `numpy.exp` by one step in
+that grid moved three lines of the file. At five places, none of them does, and
+the same perturbation moves nothing at all.
+
+**Measured, not guaranteed, and that distinction is the reason for the check
+below.** The margin is a property of today's numbers, not a theorem about the
+arithmetic. A future engine will produce different numbers, and one of them could
+land on a five-place boundary. `margin_of` and
+`test_no_computed_number_sits_on_a_rounding_boundary` are what turn that hope
+into something that goes red and says so.
+"""
+
+HOW_CLOSE_IS_TOO_CLOSE = 2.0**-24
+"""How near a rounding boundary a computed number may not sit: about 6.0e-08.
+
+One step of the grid the engine samples on. `propagation.py` draws in float32,
+whose steps just below 1 are this wide, and one step of it is the largest
+movement a different maths library has been seen to produce here — measured, by
+replacing `numpy.exp` with one that returns the next representable number up and
+regenerating the whole file.
+
+So a number further than this from a boundary of the digits printed cannot have
+its last digit tipped by that class of disagreement, and a number nearer than it
+might. The closest any of this file's computed numbers comes is about 6.5e-08,
+which is one step and a bit: **real headroom, but thin**, which is exactly why it
+is checked on every run of the suite rather than believed.
 """
 
 NAME_WIDTH = 46
@@ -154,7 +188,7 @@ def _line(name: str, screen: str, full: str = "") -> str:
         name: The stable name a chapter cites, such as `B · base · reading`.
         screen: The value as a reader would see it, or a word, or `—` when the
             product has no way of printing this kind of number yet.
-        full: The same value to six decimal places, where it is a number.
+        full: The same value at full precision, where it is a number.
 
     Returns:
         One line, with no trailing spaces so that no editor can produce a diff by
@@ -182,31 +216,65 @@ def _block(heading: str, lines: Sequence[str]) -> list[str]:
     return [heading, "", *sorted(lines), ""]
 
 
-def _digits(value: float | None) -> str:
+def margin_of(value: float) -> float:
+    """Say how far a number sits from the nearest rounding boundary of the digits printed.
+
+    A boundary is a halfway point: the place where one more hair of movement tips
+    the last printed digit. `0.53875251` printed to five places is `0.53875`, and
+    the nearest boundary is `0.538755`, so its margin is about 5e-06 — comfortable.
+    The same number printed to *six* places sits a hundred-millionth from the
+    boundary `0.5387525`, and a machine that disagrees in the last bit prints a
+    different file.
+
+    Args:
+        value: The number, as the engine produced it.
+
+    Returns:
+        How far it is from the nearest boundary, in the number's own units. Never
+        negative.
+    """
+    scaled = value * 10.0**DIGITS
+    return abs(scaled - (math.floor(scaled) + 0.5)) / 10.0**DIGITS
+
+
+def _digits(value: float | None, noted: list[float] | None = None) -> str:
     """Write a number at the file's own precision, or say there is none.
+
+    This is the one place a computed number turns into text, which is why it is
+    also the one place they are counted. Nothing has to remember to add a number
+    to the list: a number that reaches the file reaches it through here.
 
     Args:
         value: The number, or nothing at all.
+        noted: Where to note the number down so the reproducibility check can see
+            exactly what was printed — or nothing at all when a person typed this
+            number rather than the engine working it out.
 
     Returns:
-        The number to six decimal places, or `—`.
+        The number to `DIGITS` decimal places, or `—`.
     """
-    return NOTHING if value is None else f"{value:.{DIGITS}f}"
+    if value is None:
+        return NOTHING
+    if noted is not None:
+        noted.append(value)
+    return f"{value:.{DIGITS}f}"
 
 
-def _chip(belief: Belief) -> tuple[str, str]:
+def _chip(belief: Belief, noted: list[float] | None) -> tuple[str, str]:
     """Write a belief both ways: as the tile shows it, and at full precision.
 
     Args:
         belief: The likelihood with the range around it.
+        noted: Where to note its three numbers down, or nothing at all when a
+            person typed them.
 
     Returns:
-        The chip as a reader sees it, and its three numbers at six decimal places.
+        The chip as a reader sees it, and its three numbers at full precision.
     """
     band = f"{_two_figures(belief.lo)}{BETWEEN}{_two_figures(belief.hi)}"
     return (
         f"{_two_figures(belief.p)} ({band})",
-        f"{_digits(belief.p)} {_digits(belief.lo)} {_digits(belief.hi)}",
+        f"{_digits(belief.p, noted)} {_digits(belief.lo, noted)} {_digits(belief.hi, noted)}",
     )
 
 
@@ -279,38 +347,52 @@ def _supposed(world: World, claim: Proposition) -> bool:
     return world.states[claim.id][_reading_day(world, claim)] == "supposed"
 
 
-def _reading(world: World, claim: Proposition) -> tuple[str, str]:
+def _reading(world: World, claim: Proposition, noted: list[float]) -> tuple[str, str]:
     """Write what a claim reads in one world, on the day that claim is judged.
 
     Args:
         world: The world.
         claim: The claim.
+        noted: Where to note the numbers down.
 
     Returns:
         The chip and its digits — or the word *supposed* and no digits at all.
     """
     if _supposed(world, claim):
         return "supposed", NOTHING
-    return _chip(world.beliefs[claim.id])
+    return _chip(world.beliefs[claim.id], noted)
 
 
-def _likelihood(world: World, claim_id: str, value: float | None) -> tuple[str, str]:
+def _likelihood(
+    world: World, claim_id: str, value: float | None, noted: list[float]
+) -> tuple[str, str]:
     """Write one likelihood a difference reported, honouring the supposition rule.
 
     Args:
         world: The world the number was read from.
         claim_id: Which claim.
         value: The likelihood, or nothing at all when there is none to report.
+        noted: Where to note the number down.
 
     Returns:
         How it prints and its digits.
+
+    Raises:
+        ValueError: If that claim is not on that world's map. A difference only
+            reports claims from the two worlds it compared, so this is a broken
+            promise between two pieces of our own code rather than a possibility.
     """
     if value is None:
         return NOTHING, NOTHING
-    claim = next(one for one in world.graph.propositions if one.id == claim_id)
+    claim = next((one for one in world.graph.propositions if one.id == claim_id), None)
+    if claim is None:
+        raise ValueError(
+            f"a difference reported a number for {claim_id}, which is not a claim on the "
+            f"{world.branch_id or 'base'} world it was read from, so there is no day to read it on"
+        )
     if _supposed(world, claim):
         return "supposed", NOTHING
-    return _two_figures(value), _digits(value)
+    return _two_figures(value), _digits(value, noted)
 
 
 # --- The worlds this file is about -----------------------------------------
@@ -471,7 +553,7 @@ def _input_lines(claims: Sequence[Proposition], arrows: Sequence[Link]) -> list[
     stated: list[str] = []
     for claim in claims:
         stated.append(_line(f"{claim.id} · kind", claim.kind))
-        stated.append(_line(f"{claim.id} · prior", *_chip(claim.prior)))
+        stated.append(_line(f"{claim.id} · prior", *_chip(claim.prior, None)))
         stated.append(
             _line(
                 f"{claim.id} · resolve by",
@@ -480,10 +562,12 @@ def _input_lines(claims: Sequence[Proposition], arrows: Sequence[Link]) -> list[
             )
         )
         if claim.beliefs.user is not None:
-            stated.append(_line(f"{claim.id} · what the user thinks", *_chip(claim.beliefs.user)))
+            stated.append(
+                _line(f"{claim.id} · what the user thinks", *_chip(claim.beliefs.user, None))
+            )
         if claim.beliefs.market is not None:
             stated.append(
-                _line(f"{claim.id} · what the market prices", *_chip(claim.beliefs.market))
+                _line(f"{claim.id} · what the market prices", *_chip(claim.beliefs.market, None))
             )
         if claim.base_rate is not None:
             stated.append(
@@ -543,23 +627,26 @@ def _input_lines(claims: Sequence[Proposition], arrows: Sequence[Link]) -> list[
 # --- The computed numbers ---------------------------------------------------
 
 
-def _reading_lines(worlds: Sequence[tuple[str, World]]) -> list[str]:
+def _reading_lines(worlds: Sequence[tuple[str, World]], noted: list[float]) -> list[str]:
     """Write every claim's reading in every world, on the day that claim is judged.
 
     Args:
         worlds: Each world with the short name its lines are filed under.
+        noted: Where to note every number down.
 
     Returns:
         One line per claim per world.
     """
     return [
-        _line(f"{claim.id} · {name} · reading", *_reading(world, claim))
+        _line(f"{claim.id} · {name} · reading", *_reading(world, claim, noted))
         for name, world in worlds
         for claim in sorted(world.graph.propositions, key=lambda one: one.id)
     ]
 
 
-def _change_lines(name: str, answer: Diff, before: World, after: World) -> list[str]:
+def _change_lines(
+    name: str, answer: Diff, before: World, after: World, noted: list[float]
+) -> list[str]:
     """Write what one edit did to each claim: the word for it, the move, and how sure.
 
     Args:
@@ -567,6 +654,7 @@ def _change_lines(name: str, answer: Diff, before: World, after: World) -> list[
         answer: The difference between the untouched map and this branch.
         before: The untouched world, for the supposition rule.
         after: This branch's world, for the same.
+        noted: Where to note every number down.
 
     Returns:
         Five lines per claim.
@@ -574,8 +662,8 @@ def _change_lines(name: str, answer: Diff, before: World, after: World) -> list[
     lines: list[str] = []
     for claim_id in sorted(answer.claims):
         row: ClaimDiff = answer.claims[claim_id]
-        was_screen, was_full = _likelihood(before, claim_id, row.before)
-        now_screen, now_full = _likelihood(after, claim_id, row.after)
+        was_screen, was_full = _likelihood(before, claim_id, row.before, noted)
+        now_screen, now_full = _likelihood(after, claim_id, row.after, noted)
         lines.append(_line(f"{claim_id} · {name} · what happened", row.state))
         lines.append(
             _line(
@@ -584,9 +672,9 @@ def _change_lines(name: str, answer: Diff, before: World, after: World) -> list[
                 f"{was_full} → {now_full}",
             )
         )
-        lines.append(_line(f"{claim_id} · {name} · move", NOTHING, _digits(row.delta)))
+        lines.append(_line(f"{claim_id} · {name} · move", NOTHING, _digits(row.delta, noted)))
         lines.append(
-            _line(f"{claim_id} · {name} · same direction", NOTHING, _digits(row.agreement))
+            _line(f"{claim_id} · {name} · same direction", NOTHING, _digits(row.agreement, noted))
         )
         lines.append(
             _line(
@@ -597,7 +685,7 @@ def _change_lines(name: str, answer: Diff, before: World, after: World) -> list[
     return lines
 
 
-def _change_list_lines(name: str, rows: Sequence[DeltaRow]) -> list[str]:
+def _change_list_lines(name: str, rows: Sequence[DeltaRow], noted: list[float]) -> list[str]:
     """Write the ranked list of endings the edit reached, keeping its order in the names.
 
     The place is part of each line's name rather than being the order the lines sit
@@ -607,6 +695,7 @@ def _change_list_lines(name: str, rows: Sequence[DeltaRow]) -> list[str]:
     Args:
         name: The short name this world's lines are filed under.
         rows: The change list, already in the order the product shows it.
+        noted: Where to note every number down.
 
     Returns:
         Seven lines per row.
@@ -620,13 +709,13 @@ def _change_list_lines(name: str, rows: Sequence[DeltaRow]) -> list[str]:
             _line(
                 f"{under} was → is",
                 f"{_two_figures(row.before)} → {_two_figures(row.after)}",
-                f"{_digits(row.before)} → {_digits(row.after)}",
+                f"{_digits(row.before, noted)} → {_digits(row.after, noted)}",
             )
         )
-        lines.append(_line(f"{under} biggest move", NOTHING, _digits(row.peak_delta)))
-        lines.append(_line(f"{under} band width", NOTHING, _digits(row.range_width)))
-        lines.append(_line(f"{under} same direction", NOTHING, _digits(row.agreement)))
-        lines.append(_line(f"{under} rank", NOTHING, _digits(row.rank)))
+        lines.append(_line(f"{under} biggest move", NOTHING, _digits(row.peak_delta, noted)))
+        lines.append(_line(f"{under} band width", NOTHING, _digits(row.range_width, noted)))
+        lines.append(_line(f"{under} same direction", NOTHING, _digits(row.agreement, noted)))
+        lines.append(_line(f"{under} rank", NOTHING, _digits(row.rank, noted)))
     return lines
 
 
@@ -638,17 +727,21 @@ def _retraction_lines(name: str, world: World) -> list[str]:
         world: The world.
 
     Returns:
-        One line per retraction, or one line saying there were none.
+        A line saying how many there were, always, and then one line per
+        retraction. The counting line is there even when the count is none, so
+        that a chapter citing it keeps its link whichever way the number goes —
+        a name that exists only in one of two cases is a name that breaks.
     """
-    if not world.retractions:
-        return [_line(f"{name} · suppositions that ended", "none")]
     return [
-        _line(
-            f"{one.target} · {name} · supposition ended",
-            str(one.at),
-            f"by {one.by_claim} · along {one.by_link} · edit {one.by + 1}",
-        )
-        for one in world.retractions
+        _line(f"{name} · suppositions that ended", str(len(world.retractions))),
+        *(
+            _line(
+                f"{one.target} · {name} · supposition ended",
+                str(one.at),
+                f"by {one.by_claim} · along {one.by_link} · edit {one.by + 1}",
+            )
+            for one in world.retractions
+        ),
     ]
 
 
@@ -657,6 +750,7 @@ def _computed_lines(
     answers: Sequence[tuple[str, Diff, World]],
     conditionals: Sequence[tuple[str, Link, Belief]],
     base: World,
+    noted: list[float],
 ) -> list[str]:
     """Write down every number the engine worked out from the inputs above.
 
@@ -665,6 +759,8 @@ def _computed_lines(
         answers: Each difference from the untouched map, with its name and its world.
         conditionals: Each arrow with the world it lives on and its own number.
         base: The untouched world, whose bands the last block takes apart.
+        noted: Where every number this writes is noted down, so the
+            reproducibility check sees exactly what reached the file.
 
     Returns:
         The whole COMPUTED part of the file.
@@ -677,17 +773,17 @@ def _computed_lines(
         summaries.append(_line(f"{name} · the sentence beside the list", answer.summary))
         said = " ".join(answer.warnings) if answer.warnings else "none"
         summaries.append(_line(f"{name} · warnings", said))
-        changes += _change_lines(name, answer, base, after)
-        ranked += _change_list_lines(name, answer.rows)
+        changes += _change_lines(name, answer, base, after, noted)
+        ranked += _change_list_lines(name, answer.rows, noted)
         ended += _retraction_lines(name, after)
 
     arrows = [
-        _line(f"{arrow.id} · {name} · conditional", *_chip(belief))
+        _line(f"{arrow.id} · {name} · conditional", *_chip(belief, noted))
         for name, arrow, belief in conditionals
     ]
 
     bands = [
-        _line(f"{target} · base · band from {source}", NOTHING, _digits(share))
+        _line(f"{target} · base · band from {source}", NOTHING, _digits(share, noted))
         for target in sorted(base.range_shares)
         for source, share in sorted(base.range_shares[target].items())
     ]
@@ -696,7 +792,7 @@ def _computed_lines(
         *_block(
             "What each claim reads, in each world, on the day that claim is judged. A\n"
             "claim a branch supposed true reads the word, never the 1 behind it.",
-            _reading_lines(worlds),
+            _reading_lines(worlds, noted),
         ),
         *_block("What each edit did to each claim, against the untouched map.", changes),
         *_block(
@@ -719,7 +815,9 @@ def _computed_lines(
         ),
         *_block(
             "Where each claim's band comes from, on the untouched map: the share of it\n"
-            "owed to not being sure of each claim's own stated prior.",
+            "owed to not being sure of each claim's own stated prior. A claim's shares\n"
+            "do not add up to one, and are not meant to — they are the engine's own\n"
+            "quantity, and it reports them near one rather than at it.",
             bands,
         ),
     ]
@@ -754,12 +852,22 @@ Two parts, and the difference between them matters:
 Each line is one thing somebody would quote: a whole arrow, a whole belief chip,
 or one number. A computed number is written twice — first as the product prints
 it (two significant figures, with `<.01` and `>.99` standing in for the two claims
-nobody here is entitled to make), then at six decimal places. Six, not sixteen,
-because the arithmetic runs through numpy, whose exponential is accurate to well
-under one unit in the last place but is not promised to be identical on an Intel
-build machine and an Arm laptop. Sixteen digits would fail the build for a reason
-nobody changed, and would promise a reader a seventeenth digit that does not
-exist.
+nobody here is entitled to make), then at five decimal places.
+
+Five, not sixteen, and not six. The arithmetic runs through numpy, whose
+exponential is accurate to well under one unit in the last place but is not
+promised to be identical on an x86-64 build machine and an Arm laptop. What
+decides whether a printed digit survives that is not how big the disagreement
+is — it is how close the number sits to a rounding boundary, the halfway point
+where one more hair of movement tips the last digit printed. Forty of the numbers
+below sat within one step of the engine's own float32 grid of a six-place
+boundary; at five places none of them does, and perturbing numpy's exponential by
+one step of that grid changes not a character of this file.
+
+That margin was measured on these numbers. It is not a promise about arithmetic,
+and a future engine could land a number on a five-place boundary, so the test
+`test_no_computed_number_sits_on_a_rounding_boundary` fails and says so if one
+ever does.
 
 A `—` in the printed column means the product has no way of writing that kind of
 number yet: a move, a share of a band, and how often the versions agreed are all
@@ -772,6 +880,29 @@ def text() -> str:
 
     Returns:
         The file, ending in a newline.
+    """
+    return _worked_out()[0]
+
+
+def computed_numbers() -> list[float]:
+    """Give every number the engine worked out that reaches the file, unrounded.
+
+    What the reproducibility check reads. It comes from the same run that lays the
+    file out rather than from a second list kept beside it, so a number added to
+    the file is checked from the moment it is added and nobody has to remember.
+
+    Returns:
+        Every computed number, as the engine produced it, in the order it was
+        written down.
+    """
+    return _worked_out()[1]
+
+
+def _worked_out() -> tuple[str, list[float]]:
+    """Run the engine over the worked example and lay out everything it said.
+
+    Returns:
+        The whole file, and every computed number that went into it.
     """
     base = _world(None)
     built = [(WORLD_NAMES[branch.id], _world(branch)) for branch in BRANCHES]
@@ -799,6 +930,7 @@ def text() -> str:
     claims = _claims_in([world for _, world in worlds])
     arrows = [one for _, one, _ in conditionals]
 
+    noted: list[float] = []
     lines = [
         HEADER,
         "--- INPUTS: typed by a person, in backend/src/katalyst/fixtures/hormuz.py ---",
@@ -806,9 +938,9 @@ def text() -> str:
         *_input_lines(claims, arrows),
         "--- COMPUTED: worked out by the engine. Nobody typed one. ---",
         "",
-        *_computed_lines(worlds, answers, conditionals, base),
+        *_computed_lines(worlds, answers, conditionals, base, noted),
     ]
-    return "\n".join(lines).rstrip("\n") + "\n"
+    return "\n".join(lines).rstrip("\n") + "\n", noted
 
 
 def main(arguments: Sequence[str]) -> int:

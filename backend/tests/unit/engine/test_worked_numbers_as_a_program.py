@@ -24,7 +24,15 @@ from pathlib import Path
 
 import pytest
 
-from katalyst.engine.worked_numbers import BRANCHES, WHERE, WORLD_NAMES
+from katalyst.engine.worked_numbers import (
+    BRANCHES,
+    DIGITS,
+    HOW_CLOSE_IS_TOO_CLOSE,
+    WHERE,
+    WORLD_NAMES,
+    computed_numbers,
+    margin_of,
+)
 from katalyst.fixtures.hormuz import HORMUZ
 
 BACKEND = Path(__file__).resolve().parents[3]
@@ -176,3 +184,44 @@ def test_a_supposed_claim_reads_the_word_and_never_the_one_behind_it() -> None:
     assert "supposed" in reading
     assert "1.0" not in reading
     assert ".99" not in reading
+
+
+def test_no_computed_number_sits_on_a_rounding_boundary() -> None:
+    """Every number the file prints is far enough from a boundary to survive another machine.
+
+    **What this is really checking.** The file has to come out byte-identical on
+    the build machine and on the machine it was written on, or the staleness check
+    is noise. What decides that is not how big the disagreement between two
+    maths libraries is — it is how close each printed number sits to a **rounding
+    boundary**, the halfway point where one more hair of movement tips the last
+    digit printed. A number a tenth away from a boundary survives anything; a
+    number a hundred-millionth away survives nothing.
+
+    The bar is one step of the float32 grid the engine samples on, because
+    replacing `numpy.exp` with one returning the next representable number up —
+    a worst case stand-in for a different maths library — moved no number here
+    further than exactly that.
+
+    **This is measured, not proved.** It passes today with about a step and a bit
+    to spare. A future engine will produce different numbers and one of them may
+    land on a boundary, which is the day this test is supposed to go red.
+    """
+    close = [(one, margin_of(one)) for one in computed_numbers()]
+    offending = sorted(
+        ((room, one) for one, room in close if room < HOW_CLOSE_IS_TOO_CLOSE),
+    )
+
+    if offending:
+        listed = "\n".join(f"    {one!r} is {room:.3g} from a boundary" for room, one in offending)
+        pytest.fail(
+            f"{len(offending)} of {len(close)} computed numbers sit closer than "
+            f"{HOW_CLOSE_IS_TOO_CLOSE:.3g} to a {DIGITS}-place rounding boundary:\n{listed}\n\n"
+            "That means docs/worked-numbers.txt is no longer reproducible: a machine whose "
+            "exponential differs in the last bit will print a different file, and the build "
+            "will go red for a reason nobody changed.\n"
+            "Do one of two things. Print fewer places — lower DIGITS in "
+            "backend/src/katalyst/engine/worked_numbers.py and run `make numbers` — which "
+            "is what was done when six places had this problem. Or decide the risk is "
+            "acceptable for these particular numbers, widen HOW_CLOSE_IS_TOO_CLOSE, and "
+            "write down in its docstring why."
+        )
