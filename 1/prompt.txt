@@ -963,3 +963,45 @@ Nothing changed since my report. Restating the essentials:
 **Commit:** `feat(engine): a claim's number becomes the chance it happens by its deadline — the new core, assembled behind its flag`</result>
 <usage><subagent_tokens>427600</subagent_tokens><tool_uses>141</tool_uses><duration_ms>2392877</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a787c1c11149d4b12</task-id>
+<tool-use-id>toolu_011aVEVn8tzqrKgWTAVkVeyn</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a787c1c11149d4b12.output</output-file>
+<status>completed</status>
+<summary>Agent "Perf: forward pass with states" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Report:
+
+**To check me, in order** (from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`):
+1. `uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy --strict src/katalyst/domain &amp;&amp; uv run mypy src`
+2. `uv run python -m pytest tests/unit/domain/test_{rates,states,forward}.py -q --cov=src/katalyst/domain/states.py --cov-report=term-missing` (100% each from its own file)
+3. `uv run python /Users/kentgang/git3/katalyst/plans/analysis/scripts/stack-05-core/perf/same_answers.py check`
+4. `plans/analysis/scripts/stack-05-core/perf/` — `profile_the_pass.{before,after}.log`, `the_table.log`, `the_strike_branch_at_two_thousand.log`, `anatomy.log`, `whole-suite.log`
+
+**The hot spot.** `states.py:329 _still_on_at_each_slice` and `states.py:385 _holding_without_the_square` (17.7 s and 20.1 s own time of 50.6 s, `profile_the_pass.before.log`). Two causes, one shared root: an ending arrow out of a state is a `sustain` arrow, so it carries `(slices+1)² = 625` arrival readings, and both built `exp(−rate × stretch[reading, on-slice, end-slice])` at `(versions, readings, slices, slices)` — 5.76 GB an arrow. The exponent is an on-slice term plus an end-slice term, so it splits into two `(versions, readings, slices)` arrays and one batched matrix multiply. Third cause: `forward._a_states_table` re-ran the **whole** state pass once per combination of its causes' truths (23 runs) when it needed only the deadline number, and every exponential in it is truth-independent — now `states.holding_under_each_truth`, one pass per arrow. Ruled out: the `wants_pairs` `or` clause — all five states source `sustain` arrows, so `needs_the_joint` is already true (`anatomy.log`), and the clause is load-bearing for `_told_twice`.
+
+**Timings, both conditions in one run.** Writer C's twenty-claim map, 30 arrows, 24 slices, 2 000 versions, seed 20260922, clock = `forward_pass` alone: **before** five states 58 539.7 ms against every-claim-an-event 228.0 ms (load avg 8.8); **after** 6 007.7 ms against 220.7 ms (load avg 3.7). I did **not** reach ~1 s. The prototype's 508.92 ms used *trigger* enders (24 readings); this map's are `sustain` (625). The 25× collapse exists — a sustain push is the trigger push gated by the off-day, so the average factorises into a running total over the off-slice (`cost2.py:119-139`) — but it lives in `ClaimShapes.carried`'s shape and every reader including `sampling.py`.
+
+**Memory (second remit).** `AddedUp.helps` is now `rates.Spread`: one version-free block per subset term plus one number per version, materialised at most `MOST_NUMBERS_AT_ONCE` (16 M) at a time. `sampling.py` untouched — `Spread.__getitem__(version)` replaces `total[version]` exactly.
+
+| case (2 000 versions, 24 slices, seed 7) | before e1548eb | after | peak GB |
+|---|---|---|---|
+| 0 states, 0 holding back | 483.7 ms | 510.2 ms | 0.21 |
+| 0 states, 3 holding back | 978.2 ms | 980.4 ms | 0.79 |
+| 5 states, 3 holding back | 7 490.8 ms / 8.03 GB | **5 927.4 ms** | **0.96** |
+| hormuz base, end to end | 380.1 ms | 390.1 ms | 0.68 |
+| hormuz **strike branch** | **did not run** (12.53 GB) | **10.35 s** | **3.78** |
+| strike branch at 200 versions | 1.28 s / 6.00 GB | 1.03 s | 1.15 |
+
+Before figures are the assembler's (`E/bench-*.log`, `E/the-strike-branch.log`); after are mine via `/usr/bin/time -l` on the interpreter. 10.35 s is far over the 240 ms target for eight claims, but the branch runs.
+
+**Equality.** `same_answers.py`, three seeded maps (events only; states on the cheap path with a holding-back arrow; five states with `sustain` children), 7 versions, 225 arrays: worst gaps 2.220e-16 / 2.671e-16 / 9.992e-16 against a 1e-12 bar; 116 of 225 bit-identical.
+
+**For other authors.** `AddedUp.helps[p]` is a `Spread`, not an array — `whole()`, `between(first,last)`, `over_the_window()`, `[version]`. `states.on_and_off` keeps its signature; `_a_states_table` is gone. `solving._can_reach` left private: nothing outside `solving.py` calls it. Whole suite: **743 passed, 4 xfailed**, domain 100% statement and branch.
+
+**Suggested commit:** `perf(domain): a state's pass stops redoing itself, and the added-up rates stop holding every version`</result>
+<usage><subagent_tokens>310725</subagent_tokens><tool_uses>123</tool_uses><duration_ms>2421382</duration_ms></usage>
+</task-notification>
