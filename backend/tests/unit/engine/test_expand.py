@@ -9,8 +9,13 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from katalyst.domain import validate
-from katalyst.engine.client import AnswerWeCouldNotRead, _did_not_fit_the_shape, what_it_said
-from katalyst.engine.expand import add_a_claim, expand
+from katalyst.engine.client import (
+    AnswerWeCouldNotRead,
+    TheModelDidNotAnswer,
+    _did_not_fit_the_shape,
+    what_it_said,
+)
+from katalyst.engine.expand import add_a_claim, expand, start_the_map
 from katalyst.engine.outcome import Accepted, Refused, Stopped
 from katalyst.engine.proposal import Proposal
 from katalyst.fixtures import HORMUZ
@@ -313,3 +318,50 @@ def test_adding_a_claim_re_prompts_nothing_but_the_claim_it_touches() -> None:
     for asked in answerer.asked[1:]:
         assert THE_ADDED in asked
         assert "rewrite" not in asked.lower()
+
+
+def test_a_service_that_would_not_answer_is_a_refusal_and_not_a_crash() -> None:
+    """Kent, 2026-09-20: a 429 on call twenty of forty is ordinary.
+
+    It used to escape `expand`, escape `grow` and take the run with it — no
+    partial map, no receipt, and the round's other two paid answers dropped
+    unread. It is an outcome now, like everything else that is not an accepted
+    proposal: shown, counted toward the three in a row, never repaired.
+    """
+    outcome = ask(Scripted(raises=TheModelDidNotAnswer("The model is busy and turned this away.")))
+
+    refused = outcome.result  # type: ignore[union-attr]
+    assert isinstance(refused, Refused)
+    assert refused.violations == ()
+    assert refused.claim_in_words == "The model is busy and turned this away."
+    # Nothing was said, so nothing is billed for it beyond the attempt itself.
+    assert outcome.calls == 1  # type: ignore[union-attr]
+
+
+def test_a_service_that_would_not_answer_the_first_question_is_a_refusal_too() -> None:
+    """The starting call goes through the same seam and gets the same treatment."""
+    outcome = start_the_map(
+        "Something somebody typed.",
+        is_the_hypothesis=True,
+        answerer=Scripted(raises=TheModelDidNotAnswer("The connection failed, twice over.")),  # type: ignore[arg-type]
+        on=THE_DAY_THE_RUN_HAPPENED,
+    )
+
+    refused = outcome.result
+    assert isinstance(refused, Refused)
+    assert refused.claim_in_words == "The connection failed, twice over."
+
+
+def test_a_service_that_would_not_answer_an_added_claim_is_a_refusal_too() -> None:
+    """And so does the one edit that needs a model."""
+    insert, spent = add_a_claim(
+        HORMUZ,
+        "…but something else happens.",
+        answerer=Scripted(raises=TheModelDidNotAnswer("The model did not answer in time.")),  # type: ignore[arg-type]
+        on=THE_DAY_THE_RUN_HAPPENED,
+        width=3,
+    )
+
+    assert insert is None
+    assert isinstance(spent[0].result, Refused)
+    assert spent[0].result.claim_in_words == "The model did not answer in time."

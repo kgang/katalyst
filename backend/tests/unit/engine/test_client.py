@@ -15,6 +15,8 @@ is ours, and this is the only way to look at it without spending money.
 
 from typing import Any
 
+import anthropic
+import httpx
 import pytest
 
 from katalyst.engine.client import (
@@ -23,6 +25,8 @@ from katalyst.engine.client import (
     SEARCH_TOOL,
     AnswerWeCouldNotRead,
     Model,
+    TheModelDidNotAnswer,
+    live_answerer,
 )
 from katalyst.engine.prompt import STANDING_TEXT
 from katalyst.engine.receipt import nothing_spent_yet
@@ -202,3 +206,94 @@ def test_an_answer_that_did_not_fit_the_shape_crosses_the_seam_as_one_of_ours() 
 
     assert "did not fit the shape" in caught.value.why
     assert not isinstance(caught.value, ValidationError)
+
+
+# --- When the vendor does not answer at all --------------------------------
+#
+# Found by the read-only review, 2026-09-20. A 429 or a 529 on call twenty of
+# forty is ordinary, and it used to take the whole run with it: no partial map,
+# no receipt, no `Finished`, and the round's other two paid answers dropped
+# unread. The seam turns it into a plain sentence of ours, like everything else
+# that crosses this boundary.
+
+
+def a_request() -> httpx.Request:
+    """One request object, for building the library's own errors in a test."""
+    return httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+
+
+class Broken(Wire):
+    """A stand-in that fails the way the service fails."""
+
+    def __init__(self, raising: Exception) -> None:
+        """Set out which failure to raise."""
+        super().__init__()
+        self._raising = raising
+
+    def parse(self, **request: Any) -> Any:
+        """Fail instead of answering."""
+        self.sent.append(request)
+        raise self._raising
+
+
+OVERLOADED = anthropic.InternalServerError(
+    "Overloaded",
+    response=httpx.Response(
+        529,
+        request=a_request(),
+        json={"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}},
+    ),
+    body=None,
+)
+RATE_LIMITED = anthropic.RateLimitError(
+    "Too many requests",
+    response=httpx.Response(429, request=a_request(), json={"type": "error", "error": {}}),
+    body=None,
+)
+TIMED_OUT = anthropic.APITimeoutError(request=a_request())
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [(OVERLOADED, "busy"), (RATE_LIMITED, "asked too much"), (TIMED_OUT, "did not answer in time")],
+    ids=["529", "429", "timeout"],
+)
+def test_a_failure_of_the_service_crosses_the_seam_as_one_of_ours(
+    failure: Exception, expected: str
+) -> None:
+    """Nothing past this file knows the vendor's exception classes, and nothing should."""
+    with pytest.raises(TheModelDidNotAnswer) as caught:
+        Model(Broken(failure)).proposal("q", may_search=True)  # type: ignore[arg-type]
+
+    assert expected in caught.value.why
+    assert not isinstance(caught.value, anthropic.APIError)
+    # A plain sentence a person could read, never a class name or a stack trace.
+    assert "Error" not in caught.value.why
+    assert "anthropic" not in caught.value.why
+
+
+def test_the_live_answerer_pins_how_long_it_waits_and_how_often_it_tries_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both were the library's defaults, which is a decision nobody had written down.
+
+    Read from the `claude-api` reference bundle on 2026-09-20: the default wait is
+    ten minutes and the default number of retries is two, covering 408, 409, 429,
+    every 5xx and connection failures. Ten minutes is far longer than anything
+    this program has measured, and a request that hangs that long three times
+    over is half an hour of a person watching a stream that will never move.
+    """
+    from katalyst.engine.client import HOW_LONG_TO_WAIT, HOW_OFTEN_TO_TRY_AGAIN
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    get_settings.cache_clear()
+    try:
+        asking = live_answerer()
+    finally:
+        get_settings.cache_clear()
+
+    assert asking is not None
+    assert asking.waits_for == HOW_LONG_TO_WAIT
+    assert asking.tries_again == HOW_OFTEN_TO_TRY_AGAIN
+    # A whole question, retries and all, is bounded by something a person would sit through.
+    assert HOW_LONG_TO_WAIT * (HOW_OFTEN_TO_TRY_AGAIN + 1) <= 15 * 60

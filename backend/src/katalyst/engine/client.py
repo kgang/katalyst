@@ -46,6 +46,19 @@ between rounds this file prices the rounds so far against that. Over the line,
 the answer is taken as it stands: what has been paid for is kept, and nothing is
 thrown away for being interrupted (Kent, 2026-09-20).
 
+When the service does not answer at all
+---------------------------------------
+A 429 or a 529 on call twenty of forty is ordinary, and it used to take the whole
+run with it — no partial map, no receipt, and the round's other two paid answers
+dropped unread. Every failure the library raises is turned into one of ours here,
+with a plain sentence a person could read, so the pipeline can fold it like any
+other thing that is not an accepted proposal (Kent, 2026-09-20).
+
+How long a call waits, and how often it tries again, are decisions rather than
+inherited defaults. Both read from the `claude-api` reference bundle on
+2026-09-20: the library waits ten minutes and tries twice more by itself, on 408,
+409, 429, every 5xx and every connection failure.
+
 What this file must never do
 ----------------------------
 - Never decide anything about a map. It asks, it translates, it hands back.
@@ -226,6 +239,70 @@ class AnswerWeCouldNotRead(Exception):
         self.why = why
 
 
+HOW_LONG_TO_WAIT = 300.0
+"""How long one request may take before it is given up on, in seconds.
+
+The library's own default is ten minutes. Measured on 2026-09-17 and again on
+2026-09-20, a whole question — every round of research it takes — runs about two
+hundred seconds, and one round of it is well inside that. Ten minutes is
+therefore not a timeout, it is a hang: three attempts of it is half an hour of
+somebody watching a stream that will never move. Five minutes is comfortably
+above anything measured and bounds a whole question, retries and all, at fifteen.
+"""
+
+HOW_OFTEN_TO_TRY_AGAIN = 2
+"""How many times the library tries a failed request again by itself.
+
+The library's own default, written down rather than inherited. It retries 408,
+409, 429, every 5xx and every connection failure, with a wait between — which is
+exactly the set of failures that go away on their own, and exactly the set this
+program has no better answer to. A failed request is not billed, so trying again
+is free; what it costs is time, which the figure above bounds.
+"""
+
+
+class TheModelDidNotAnswer(Exception):
+    """The service could not be reached, or would not answer, after the library gave up.
+
+    The vendor's own exception classes stop here, as `AnswerWeCouldNotRead` stops
+    the library's validation errors here: nothing past this file knows whose
+    complaint it was. Carries one plain sentence a person could read.
+    """
+
+    def __init__(self, why: str) -> None:
+        """Hold the plain sentence of what went wrong."""
+        super().__init__(why)
+        self.why = why
+
+
+def _in_plain_words(failure: anthropic.APIError) -> str:
+    """Say what went wrong with a call, in words a person reads.
+
+    Never the exception's class, never a status code, never a stack trace: those
+    belong in the server's own log. What a reader needs is whether to wait, to
+    try a smaller run, or to tell somebody.
+
+    Args:
+        failure: Whatever the library raised.
+
+    Returns:
+        One plain sentence.
+    """
+    if isinstance(failure, anthropic.APITimeoutError):
+        return "The model did not answer in time, twice over, so this question was given up on."
+    if isinstance(failure, anthropic.APIConnectionError):
+        return "The model could not be reached. The connection failed, twice over."
+    if isinstance(failure, anthropic.RateLimitError):
+        return "This run has asked too much of the model too quickly, and was turned away."
+    if isinstance(failure, anthropic.APIStatusError) and failure.status_code >= 500:
+        return "The model is busy and turned this question away, twice over."
+    if isinstance(failure, anthropic.APIStatusError) and failure.status_code in (401, 403):
+        return "The key this run was started with is not allowed to ask this model."
+    if isinstance(failure, anthropic.APIStatusError) and failure.status_code == 402:
+        return "This account cannot pay for another question."
+    return "The model would not answer this question, and did not say why in words we can pass on."
+
+
 class Answerer(Protocol):
     """Whatever the pipeline asks its questions of.
 
@@ -302,6 +379,8 @@ class Model:
         )
         self._spent = nothing_spent_yet(self._model)
         self._cap = float("inf")
+        self.waits_for = getattr(client, "timeout", None)
+        self.tries_again = getattr(client, "max_retries", None)
 
     def watching(self, spent: Receipt, cap: float) -> None:
         """Take note of what the run has spent and what it may spend.
@@ -368,6 +447,8 @@ class Model:
 
         Raises:
             AnswerWeCouldNotRead: If what came back did not fit the shape.
+            TheModelDidNotAnswer: If the service could not be reached, or would
+                not answer, after the library had tried again as often as it may.
         """
         conversation: list[MessageParam] = [{"role": "user", "content": question}]
         rounds: list[ParsedMessage[Any]] = []
@@ -391,6 +472,10 @@ class Model:
                 )
             except ValidationError as did_not_fit:
                 raise AnswerWeCouldNotRead(_did_not_fit_the_shape(did_not_fit)) from did_not_fit
+            except anthropic.APIError as did_not_answer:
+                # Everything the library raises stops here. The pipeline folds a
+                # sentence, never an exception class (Kent, 2026-09-20).
+                raise TheModelDidNotAnswer(_in_plain_words(did_not_answer)) from did_not_answer
             rounds.append(answer)
             if answer.stop_reason != "pause_turn":
                 return what_it_said(rounds, seconds=time.monotonic() - started)
@@ -568,4 +653,11 @@ def live_answerer(*, effort: str | None = None) -> Model | None:
     key = get_settings().ANTHROPIC_API_KEY
     if not key:
         return None
-    return Model(anthropic.Anthropic(api_key=key), effort=effort)
+    return Model(
+        anthropic.Anthropic(
+            api_key=key,
+            timeout=HOW_LONG_TO_WAIT,
+            max_retries=HOW_OFTEN_TO_TRY_AGAIN,
+        ),
+        effort=effort,
+    )

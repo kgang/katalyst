@@ -6,7 +6,7 @@ run gives for stopping.
 """
 
 from katalyst.domain import validate
-from katalyst.engine.client import SEARCHES_INSIDE_ONE_CALL
+from katalyst.engine.client import SEARCHES_INSIDE_ONE_CALL, TheModelDidNotAnswer
 from katalyst.engine.grow import Finished, grow
 from katalyst.engine.outcome import Accepted, Caps, Outcome, Refused
 from katalyst.engine.receipt import dollars_for
@@ -747,3 +747,53 @@ def test_a_run_that_runs_out_of_money_on_the_first_question_says_so() -> None:
     assert finished.reason == "spend_cap"
     assert finished.graph is None
     assert "spending limit" in finished.why
+
+
+def test_a_service_that_would_not_answer_one_call_never_takes_the_round_with_it() -> None:
+    """The other two answers of that round were paid for and are still folded.
+
+    Before this, a 429 escaped `expand`, escaped `grow`, and left no partial map,
+    no receipt and no `Finished` at all (2026-09-20).
+    """
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [
+                # Asked in the same round as the starting claim's second answer.
+                TheModelDidNotAnswer("The model is busy and turned this question away."),
+                an_answer(a_stop()),
+            ],
+        }
+    )
+
+    steps = walk(told, at_once=3)
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    assert len(finished.graph.propositions) == 3
+    refused = refusals_in(steps[:-1])
+    assert [one.result.claim_in_words for one in refused] == [  # type: ignore[union-attr]
+        "The model is busy and turned this question away."
+    ]
+    assert finished.refused == 1
+    assert finished.reason == "reached_terminal"
+
+
+def test_a_service_that_never_answers_ends_the_run_saying_which_it_was() -> None:
+    """Three failures in a row on the first question is a run that cannot start.
+
+    It must not say "the sentence could not be written as a claim anybody could
+    settle" — the sentence was never the problem, and a person reading that would
+    go and rewrite a perfectly good one (2026-09-20).
+    """
+    told = Scripted(raises=TheModelDidNotAnswer("The model could not be reached."))
+
+    finished = ending(walk(told))
+
+    assert finished.reason == "refusal_cap"
+    assert finished.graph is None
+    assert "could not be reached" in finished.why

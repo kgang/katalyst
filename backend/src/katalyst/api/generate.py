@@ -35,6 +35,7 @@ What this file must never do
 """
 
 import asyncio
+import logging
 import time
 from collections.abc import AsyncIterator, Generator
 from datetime import UTC, date, datetime
@@ -355,6 +356,17 @@ async def _pause(replaying: bool) -> None:
         await asyncio.sleep(waiting)
 
 
+WENT_WRONG = (
+    "This run stopped before it finished, and not for a reason anybody chose. "
+    "Nothing was lost that had already been drawn; try it again."
+)
+"""What a person is told when a bug of ours ends a generation.
+
+One plain sentence. The exception's name, its message and its stack go to the
+server's own log, where somebody can act on them, and nowhere near the screen.
+"""
+
+
 def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None, None]:
     """Run a generation against a model, writing the transcript as it goes."""
     generation_id = mint_id()
@@ -383,6 +395,7 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         caps=Caps(),
     )
     finished: Finished | None = None
+    broke: str | None = None
     try:
         for step in walking:
             if isinstance(step, Finished):
@@ -394,6 +407,13 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
                 continue
             yield growth_event(step, at)
             at += 1
+    except Exception:
+        # Everything the model can do to a run is already an outcome by the time
+        # it reaches here, so this is for a bug of our own. A bug is not a reason
+        # to hang up on somebody mid-map: the stream ends where it is, with a
+        # plain sentence and whatever the run had spent (Kent, 2026-09-20).
+        logging.getLogger(__name__).exception("a generation stopped where it should not have")
+        broke = WENT_WRONG
     finally:
         walking.close()
 
@@ -403,12 +423,10 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         )
         held.remember(working, None)
         yield _receipt_for(finished, "live", time.monotonic() - started)
-        yield Failed(
-            message=(
-                "This run never got started: the sentence could not be written as a "
-                "claim anybody could settle."
-            )
-        )
+        # The walk's own sentence, because it knows what happened and this does
+        # not: a run the model never answered must not tell a person to go and
+        # rewrite a sentence that was never the problem (Kent, 2026-09-20).
+        yield Failed(message=broke or (finished.why if finished is not None else WENT_WRONG))
         return
 
     working = working.model_copy(

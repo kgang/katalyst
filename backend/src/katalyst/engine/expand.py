@@ -52,7 +52,7 @@ from katalyst.domain import (
     Violation,
     validate,
 )
-from katalyst.engine.client import Answerer, AnswerWeCouldNotRead
+from katalyst.engine.client import Answerer, AnswerWeCouldNotRead, TheModelDidNotAnswer
 from katalyst.engine.grounding import found_in, keep_cited, keep_returned, provenance_of
 from katalyst.engine.ids import mint_id
 from katalyst.engine.outcome import Accepted, Caps, Outcome, Refused, Stopped, costing
@@ -107,12 +107,16 @@ def expand(
     question = expanding_question(graph, frontier, target=target, ending_only=ending_only, today=on)
     try:
         said = answerer.proposal(question, may_search=may_search)
-    except AnswerWeCouldNotRead as did_not_fit:
+    except (AnswerWeCouldNotRead, TheModelDidNotAnswer) as did_not_fit:
+        # Two failures, one treatment: an answer we could not read and an answer
+        # that never came are the same thing to a walk — a sentence to show and
+        # count, never an exception to escape with (Kent, 2026-09-20).
+        #
         # The answer never got as far as being read, so its counters never
-        # reached us. The round trip is counted because it happened and it was
-        # charged; its tokens are left at nothing, because nothing is what we
-        # know. This is the one place the receipt is knowingly short, and it is
-        # short by one call in a run of dozens.
+        # reached us. The round trip is counted because it happened and it may
+        # have been charged; its tokens are left at nothing, because nothing is
+        # what we know. This is the one place the receipt is knowingly short, and
+        # it is short by one call in a run of dozens.
         return Outcome(result=Refused(claim_in_words=did_not_fit.why), about=frontier, calls=1)
 
     if said.declined is not None:
@@ -168,7 +172,7 @@ def start_the_map(
     question = starting_question(sentence, is_the_hypothesis=is_the_hypothesis, today=on)
     try:
         said = answerer.starting_claim(question, may_search=may_search)
-    except AnswerWeCouldNotRead as did_not_fit:
+    except (AnswerWeCouldNotRead, TheModelDidNotAnswer) as did_not_fit:
         return Outcome(result=Refused(claim_in_words=did_not_fit.why), calls=1)
 
     if said.declined is not None:
@@ -540,7 +544,7 @@ def expand_toward(
     question = joining_question(graph, added, today=on)
     try:
         said = answerer.proposal(question, may_search=may_search)
-    except AnswerWeCouldNotRead as did_not_fit:
+    except (AnswerWeCouldNotRead, TheModelDidNotAnswer) as did_not_fit:
         return Outcome(result=Refused(claim_in_words=did_not_fit.why), about=added, calls=1)
     if said.declined is not None:
         return costing(Refused(claim_in_words=said.declined), added, said)
@@ -579,7 +583,7 @@ def _drafted(
     question = adding_question(graph, sentence, today=on)
     try:
         said = answerer.starting_claim(question, may_search=may_search)
-    except AnswerWeCouldNotRead as did_not_fit:
+    except (AnswerWeCouldNotRead, TheModelDidNotAnswer) as did_not_fit:
         return Outcome(result=Refused(claim_in_words=did_not_fit.why), calls=1)
     if said.declined is not None:
         return costing(Refused(claim_in_words=said.declined), None, said)

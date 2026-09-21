@@ -26,6 +26,7 @@ from katalyst.settings import get_settings
 from tests.unit.engine.a_recording import A_MAP, THE_SCRIPTED_INSERT, THE_SENTENCE, written_to
 from tests.unit.engine.answers import (
     FROM_THE_QUESTION,
+    Scripted,
     Storyteller,
     a_claim,
     a_starting_claim,
@@ -490,3 +491,64 @@ def test_the_stream_stops_calling_the_model_when_the_client_goes_away(
 
     assert len(told.asked) == asked_before_it_went
     assert asked_before_it_went > 0
+
+
+# --- A live run that breaks still ends in one plain sentence ---------------
+
+
+def a_live_run(monkeypatch: pytest.MonkeyPatch, answerer: object) -> list[tuple[str, Any]]:
+    """Stream one generation against a stand-in answerer rather than a recording."""
+    monkeypatch.setattr(generate, "live_answerer", lambda: answerer)
+    return stream(hypothesis="A sentence with no recording behind it.")
+
+
+def test_a_live_run_the_model_never_answers_ends_with_one_plain_sentence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Kent, 2026-09-20: never a stack trace, and never a lie about whose fault it was.
+
+    The stream used to die where the exception was raised: no receipt, no last
+    event, and a browser left waiting on a connection that had already gone.
+    """
+    from katalyst.engine.client import TheModelDidNotAnswer
+
+    read = a_live_run(
+        monkeypatch,
+        Scripted(raises=TheModelDidNotAnswer("The model is busy and turned this question away.")),
+    )
+
+    names = [name for name, _ in read]
+    assert names[-1] == "failed"
+    assert "receipt" in names
+    said = read[-1][1]["message"]
+    assert "busy" in said
+    assert "Traceback" not in said
+    assert "Error" not in said
+
+
+def test_a_live_run_that_breaks_some_other_way_still_ends_the_stream(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bug of our own is not a reason to hang up on somebody mid-map."""
+
+    class Exploding:
+        """An answerer that fails in a way nobody planned for."""
+
+        def watching(self, spent: object, cap: float) -> None:
+            """Take note of nothing."""
+
+        def starting_claim(self, question: str, *, may_search: bool = True) -> object:
+            """Fail in a way the seam does not know about."""
+            raise RuntimeError("a bug nobody wrote a sentence for")
+
+        def proposal(self, question: str, *, may_search: bool) -> object:
+            """Fail in a way the seam does not know about."""
+            raise RuntimeError("a bug nobody wrote a sentence for")
+
+    read = a_live_run(monkeypatch, Exploding())
+
+    names = [name for name, _ in read]
+    assert names[-1] == "failed"
+    said = read[-1][1]["message"]
+    assert "a bug nobody wrote a sentence for" not in said
+    assert "RuntimeError" not in said

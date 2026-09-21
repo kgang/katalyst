@@ -455,6 +455,9 @@ class Storyteller:
             self.searched.append(may_search)
             waiting = self._story.get(about)
             said = waiting.pop(0) if waiting else self._otherwise
+            if isinstance(said, Exception):
+                # A story may say that one call simply did not come back.
+                raise said
             return _only_if_allowed(what_it_said([_pointing_at(said, question, about)]), may_search)
 
 

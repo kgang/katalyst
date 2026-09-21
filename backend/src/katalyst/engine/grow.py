@@ -191,10 +191,7 @@ def grow(
             why=(
                 _in_one_sentence(why_it_ended, walk.receipt, caps, None)
                 if walk.spent
-                else (
-                    "This run never got started: the sentence could not be written "
-                    "as a claim anybody could settle."
-                )
+                else _never_got_started(walk.last_refusal)
             ),
             receipt=walk.receipt,
             refused=walk.refused,
@@ -303,6 +300,7 @@ class _Walk:
         self.closed_last: str | None = None
         self.spent = False
         self.filled_up = False
+        self.last_refusal: str | None = None
 
     def watch(self, answerer: Answerer) -> None:
         """Say what has been spent and what may be, before a question is put.
@@ -380,6 +378,7 @@ class _Walk:
             if growing:
                 self.close_a_line(claim_id, CLOSED_BY_HAVING_NOTHING_MORE_TO_SAY)
         elif isinstance(result, Refused):
+            self.last_refusal = result.claim_in_words
             # Anything that is not an accepted proposal counts toward the three:
             # a rejection by the map's rules, a refusal by the vendor, an answer
             # that did not fit the shape. One rule, not three — what has run out
@@ -525,11 +524,35 @@ def _keep_asking(
         result = outcome.result
         if isinstance(result, Accepted) and result.proposition is not None:
             return result.proposition, outcome
+        if isinstance(result, Refused):
+            walk.last_refusal = result.claim_in_words
         yield outcome
         walk.refused += 1
         if walk.spent:
             return None
     return None
+
+
+def _never_got_started(last_refusal: str | None) -> str:
+    """Say why the very first question never came back with a claim.
+
+    It used to say the sentence could not be written as a claim anybody could
+    settle, whatever had actually happened — so a run the model never answered at
+    all told the person to go and rewrite a perfectly good sentence. The last
+    refusal's own words are carried instead (Kent, 2026-09-20).
+
+    Args:
+        last_refusal: What the last attempt said, if anything did.
+
+    Returns:
+        One plain sentence.
+    """
+    if last_refusal:
+        return f"This run never got started. {last_refusal}"
+    return (
+        "This run never got started: the sentence could not be written as a claim "
+        "anybody could settle."
+    )
 
 
 def _what_arrived(accepted: Accepted) -> str:
