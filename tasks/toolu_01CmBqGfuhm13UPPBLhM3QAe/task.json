@@ -1,0 +1,14 @@
+{
+  "tool_use_id": "toolu_01CmBqGfuhm13UPPBLhM3QAe",
+  "agent_id": "a16f221fbc09e0e79",
+  "subagent_type": "general-purpose",
+  "task_description": "Digest reviews: probability engine",
+  "files": [
+    "plans/STATUS.md",
+    "plans/briefs/04-resume-common.md",
+    "plans/briefs/05-review-digest-common.md",
+    "plans/scripts/heavy.sh"
+  ],
+  "started_at": "2026-09-21T16:32:13.559625+03:00",
+  "completed_at": "2026-09-21T16:32:13.559778+03:00"
+}
