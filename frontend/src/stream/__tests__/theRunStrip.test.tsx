@@ -159,7 +159,7 @@ describe("the foot of the screen says what a live run is doing", () => {
     expect(document.querySelector(".run-strip__waited")?.getAttribute("aria-hidden")).toBeNull();
   });
 
-  it("test_an_arrival_starts_the_count_again_and_names_the_next_thing", () => {
+  it("test_an_arrival_resets_the_count", () => {
     const run = aRunWeDrive();
     render(
       <GenerationScreen run={run} replaying={false} onRunAgain={() => {}} onLeave={() => {}} />,
