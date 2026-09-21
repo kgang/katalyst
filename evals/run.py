@@ -20,10 +20,19 @@ thinking tokens it took, the receipt, the reason it stopped and the map it built
 A run that cost money and left nothing behind is an afternoon nobody can account
 for.
 
+**The spending ceiling bounds the round.** `--cap` is what the whole round may
+spend across every case it runs, never what each one may spend on its own: a
+running total is carried from case to case, each is handed what is left of the
+ceiling, and a case there is nothing left for is not started. Anything else would
+let a four-case round spend four times the figure on the command line, and a word
+must mean what it says (Kent, G5: a hard stop per run in code at $15).
+
 What this program will not do
 -----------------------------
 - It will not start with no key, and it will not raise the spending ceiling: the
   argument may lower the figure written in code, never lift it.
+- It will not start a case it cannot pay for, and it will not leave that quiet:
+  the scorecard says which cases ran, which did not, and what was spent.
 - It will not write a scorecard for a run answered by a stand-in. A row in
   `runs/` is a measurement of a model, and a run answered from a list in a test
   file is not one, whatever else it is.
@@ -341,7 +350,8 @@ def run_one(
     Args:
         case: The case to run.
         answerer: Whatever the run asks its questions of.
-        cap: What this run may spend. Never above the figure in code.
+        cap: What this case may spend — **what is left of the round's ceiling**,
+            which `main` works out and hands in. Never above the figure in code.
         on: The day to run as. Today when not said.
         keep_in: Where to write what the run produced. `backend/.runs/` when not
             said, or wherever `KATALYST_RUNS` says.
@@ -996,6 +1006,39 @@ def _trimmed(claim: str) -> str:
     return tidied[: ENOUGH_OF_A_CLAIM - 1].rstrip() + "…"
 
 
+def what_the_round_spent(
+    ceiling: float, spent: float, ran: Sequence[Scored], not_started: Sequence[Case]
+) -> str:
+    """Say in one plain sentence what the round cost and which cases it got to.
+
+    **The ceiling bounds the round, not each case** (Kent, G5: a hard stop per run
+    in code at $15). Each case may spend only what is left of it, and when there
+    is nothing left the cases still waiting are not started — so the scorecard has
+    to say which ones those were, or a reader would take four columns of silence
+    for four cases that had nothing to report.
+
+    Args:
+        ceiling: What the whole round was allowed to spend.
+        spent: What it actually spent, added up across the cases that ran.
+        ran: What each case that ran produced, in the order they ran.
+        not_started: The cases there was no money left for, in the order they
+            would have run.
+
+    Returns:
+        One sentence for the terminal, beneath the table.
+    """
+    names = ", ".join(one.score.case for one in ran) or "no case at all"
+    if not not_started:
+        return f"The round spent ${spent:.2f} of its ${ceiling:.2f} ceiling, over {names}."
+    left_out = ", ".join(one.id for one in not_started)
+    one_of_them = len(not_started) == 1
+    return (
+        f"The round spent ${spent:.2f} of its ${ceiling:.2f} ceiling on {names} and stopped "
+        f"there: {left_out} {'was' if one_of_them else 'were'} never started, so "
+        f"{'it is' if one_of_them else 'they are'} on no row of this scorecard."
+    )
+
+
 def _how_it_went(scored: Sequence[Scored]) -> list[str]:
     """Name every check that did not hold, case by case, in plain sentences.
 
@@ -1024,9 +1067,16 @@ def _how_it_went(scored: Sequence[Scored]) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     """Run the cases, print the scorecard, write the day's file, and say what failed.
 
+    **The spending ceiling is the round's, not each case's.** One running total is
+    carried across the cases; each is handed what is left of the ceiling, and the
+    cases there is nothing left for are never started. The sentence beneath the
+    table names them.
+
     Returns:
-        0 when every check held on every case, 1 otherwise — so this is usable
-        from a script even though nothing schedules it.
+        0 when every check held on every case **and** every case ran, 1 otherwise
+        — so this is usable from a script even though nothing schedules it. A
+        round that stopped short has not scored what it did not run, and a zero
+        there would say it had.
     """
     asking = argparse.ArgumentParser(
         prog="eval",
@@ -1043,7 +1093,10 @@ def main(argv: list[str] | None = None) -> int:
         "--cap",
         type=float,
         default=Caps().dollars,
-        help="What one case may spend, in dollars. Can only lower the figure in code.",
+        help=(
+            "What the whole round may spend, in dollars, across every case it runs. "
+            "Can only lower the figure in code."
+        ),
     )
     asking.add_argument(
         "--effort",
@@ -1073,7 +1126,22 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     run_at = datetime.now(tz=UTC)
-    scored = [run_one(one, answerer=answerer, cap=said.cap) for one in wanted]
+    # **The ceiling bounds the round, not each case.** One running total across
+    # the cases: each may spend only what is left of it, and when nothing is left
+    # the rest are not started. Handing every case the whole figure would let a
+    # four-case round spend four times what the argument says, which is the one
+    # word this argument has to mean.
+    ceiling = min(said.cap, Caps().dollars)
+    scored: list[Scored] = []
+    spent = 0.0
+    for one in wanted:
+        left = ceiling - spent
+        if left <= 0.0:
+            break
+        scored.append(run_one(one, answerer=answerer, cap=left))
+        spent += scored[-1].score.dollars
+    not_started = wanted[len(scored) :]
+
     # The same setting the bill was priced against, so the row's dollars and the
     # model beside them can never name two different models.
     card = scorecard_of(run_at, scored, model=get_settings().KATALYST_MODEL)
@@ -1081,6 +1149,7 @@ def main(argv: list[str] | None = None) -> int:
     for line in as_a_table(card):
         print(line)
     print(f"\n{card.passed} of {len(card.cases)} cases held all eight checks.")
+    print(what_the_round_spent(ceiling, spent, scored, not_started))
     for line in _how_it_went(scored):
         print(line, file=sys.stderr)
 
@@ -1089,7 +1158,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     written = write_tsv(card)
     print(f"wrote the scorecard at {written}", file=sys.stderr)
-    return 0 if card.failed == 0 else 1
+    # A round that ran out of money before it reached every case has not scored
+    # them, so it never comes back saying all is well.
+    return 0 if card.failed == 0 and not not_started else 1
 
 
 # **The guard is the last thing in this file, and must stay there.** Started as a

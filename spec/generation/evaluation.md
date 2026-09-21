@@ -198,20 +198,20 @@ That second row is worth reading twice. An ensemble cannot be justified against 
 ### `make eval`
 
 ```
-make eval                 # all four cases, at the cap written in code
+make eval                 # all four cases, for the cap written in code between them
 make eval ONLY=hormuz     # one of them
-make eval CAP=5           # the same, with a lower ceiling
+make eval CAP=5           # the same, with a lower ceiling over the whole round
 make eval EFFORT=medium   # the same, thinking less hard
 ```
 
 The same three flags as `make record-demo`, meaning the same three things: one name, one ceiling, one effort. There is deliberately **no flag naming a model** — `KATALYST_MODEL` is what the bill is priced against and what the scorecard's own column reports, so a flag could name a third model and nobody would know which one the dollars belonged to.
 
-* Runs **live**, against a real key. `CAP` is the run's spending ceiling in dollars; the default is the **$15 hard stop written in code** (Kent, G5), and the argument can only lower it. The running receipt is checked after every call, and between the rounds of research inside one.
+* Runs **live**, against a real key. **`CAP` is the ceiling on the whole round, across every case it runs — not on each case** *(stated plainly here 2026-09-21; the harness gave every case the whole figure, so a default four-case round could spend four times it)*. The default is the **$15 hard stop written in code** (Kent, G5), and the argument can only lower it. One running total is carried from case to case: each is handed what is left of the ceiling, the running receipt is checked after every call and between the rounds of research inside one, and **a case there is nothing left for is never started**. The scorecard then says in one plain sentence what the round spent, which cases ran and which were left out — four silent columns would otherwise read as four cases with nothing to report — and the program exits non-zero, because a round that stopped short has scored nothing about what it never ran. `test_the_cap_bounds_the_round_and_not_each_case` starts the program with a stand-in whose every answer is dear and holds all of that.
 * **Drives the one walk that already exists** — `engine/grow.py` followed by `engine/following.py`, the same loop the stream route and the recorder use. A harness with a walk of its own would eventually score a pipeline nobody ships.
 * **Keeps every run under `backend/.runs/`, whatever it scores**, through the recorder's own keeper: every proposal with the seconds and the thinking tokens it took, the receipt, the reason it stopped and the map it built. A run that cost money and left nothing behind is an afternoon nobody can account for. Those files are not committed; the scorecard is.
 * Prints the scorecard to the terminal, **turned on its side** — one line per field, one column per case — because a row per case is twenty-five columns wide and nobody reads that. A person comparing two runs reads down a column.
 * Writes `evals/runs/<date>.tsv` — tab-separated, one header row, one row per case, `run_at` first, then `model` and `prompt_hash`, then the row. Those three read the same on every row rather than sitting once at the top, because a second run on the same day **appends** to that same file and a heading would then be a heading over somebody else's rows. Tab-separated because it opens in a spreadsheet and still diffs as text in git.
-* Exits non-zero if any case failed a check, so it is usable from a script even though nothing schedules it.
+* Exits non-zero if any case failed a check, or if the round ran out of money before it reached every case, so it is usable from a script even though nothing schedules it.
 * **Writes no row for a run it did not pay for.** A run answered by the stand-in named in `KATALYST_ANSWERER` prints its table, says in one line that it measured nothing, and writes no file — the same rule the recorder keeps for recordings, for the same reason: a file the repository commits as evidence has to be evidence.
 * Is **committed**, results and all. It holds counts and dollars, no prompt text and no model output, so it can neither leak a key nor embarrass anybody. `gitleaks` scans it like everything else.
 * **Only the coordinator runs it.** No sub-agent holds a key.
@@ -266,9 +266,11 @@ If this case ever comes back `reached`, one of two things is true: a mechanism g
 
 ### B3 — A run that reaches its cap
 
-Case 4 is a diffuse hypothesis and the map keeps growing. The running receipt reaches the ceiling. The generation stops, the stream's `done` carries `reason: "spend_cap"`, and the `Failed` event is **not** used — stopping on budget is a decision, not a fault.
+Case 4 is a diffuse hypothesis and the map keeps growing. The running receipt reaches what is left of the round's ceiling. The generation stops, the stream's `done` carries `reason: "spend_cap"`, and the `Failed` event is **not** used — stopping on budget is a decision, not a fault.
 
-The scorecard row is still written. `stopped_for` reads `spend_cap`, `dollars` reads the cap, and the structural checks still run against the partial map — a map that stopped early can still be free of loops, still carry resolution criteria on every claim, and still fail check 2 by having no ending yet. That failure is informative, and losing it by refusing to score the row would be the wrong trade.
+The scorecard row is still written. `stopped_for` reads `spend_cap`, `dollars` reads what that case was allowed, and the structural checks still run against the partial map — a map that stopped early can still be free of loops, still carry resolution criteria on every claim, and still fail check 2 by having no ending yet. That failure is informative, and losing it by refusing to score the row would be the wrong trade.
+
+**A case with nothing left to spend is a different thing and reads differently.** It is never started, so it has no row, no kept run and no checks — there is nothing to score. The sentence beneath the table names it, and that is the only place it appears. Writing an empty row for it would put a case on the scorecard that no model ever answered, which is the same mistake as writing a row for a run a stand-in answered.
 
 ---
 

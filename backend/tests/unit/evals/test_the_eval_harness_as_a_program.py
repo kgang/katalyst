@@ -190,6 +190,46 @@ def test_a_run_that_has_spent_its_cap_stops_and_says_so(tmp_path: Path) -> None:
     assert kept[0].done.reason == "spend_cap"
 
 
+def test_the_cap_bounds_the_round_and_not_each_case(tmp_path: Path) -> None:
+    """A four-case round may spend the figure on the command line, and not four times it.
+
+    **This is the bug it was written for.** The ceiling used to be worked out
+    inside the run of one case, so every case got the whole of it: `CAP=15` over
+    the four shipped cases bought a round of up to sixty dollars, and the word
+    `cap` meant a quarter of what a reader would take it to mean.
+
+    Every answer this stand-in gives costs about a dollar, so a ceiling of two
+    is reached inside the first case. What the test asks is not how many cases
+    ran — that depends on what a call costs — but the two things that are true
+    however the arithmetic lands: **the round spent no more than a case's worth
+    past its ceiling**, and **it did not run all four**. And, because a round
+    that stopped short has scored nothing about what it never started, it says
+    which cases those were and it does not come back saying all is well.
+    """
+    finished = run_the_evals(
+        tmp_path, "--cap", "2.0", answerer="tests.unit.engine.dear_stand_in:dear"
+    )
+
+    assert "Traceback" not in finished.stderr, finished.stderr
+    ran = [one.example for one in the_kept_runs(tmp_path)]
+    every_case = ["export-controls", "hormuz", "midterms", "photonics"]
+    assert ran, "the round was meant to afford at least one case"
+    assert sorted(ran) != every_case, "the round paid for every case out of one case's ceiling"
+
+    # What the round really spent, added up off the receipts the runs kept — not
+    # off the sentence, which is the thing being checked.
+    spent = sum(one.receipt.dollars for one in the_kept_runs(tmp_path) if one.receipt is not None)
+    assert spent > 2.0, "this stand-in was meant to be dear enough to reach the ceiling"
+    assert spent < 2.0 * len(every_case), "a four-case round spent four ceilings"
+
+    # And the scorecard says so, in one sentence, naming both halves.
+    assert "The round spent" in finished.stdout
+    assert "never started" in finished.stdout
+    for missed in set(every_case) - set(ran):
+        assert missed in finished.stdout
+    assert finished.returncode != 0
+
+
 @pytest.mark.parametrize("named", ["nonesuch", "hormuz,midterms"])
 def test_a_case_nobody_ships_is_refused_by_name(tmp_path: Path, named: str) -> None:
     """The argument parsing is part of the program, so it is tested as one."""

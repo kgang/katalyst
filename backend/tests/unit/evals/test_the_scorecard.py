@@ -15,6 +15,7 @@ story changes.
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+import pytest
 from evals.run import (
     COLUMNS,
     Case,
@@ -123,11 +124,21 @@ def test_a_derived_column_never_disagrees_with_what_it_came_from(tmp_path: Path)
     If either ever disagreed with the two columns above it, it would be the
     derived one that was wrong — so this pins them to each other rather than to a
     number.
+
+    **The tolerance is the last bits of a float and is not a fudge.** Dividing and
+    multiplying back does not round-trip: `seconds / calls * calls` differs from
+    `seconds` in its last bit for about a fifth of the wall-clock values this test
+    can produce, so an exact comparison here fails about one run in five on the
+    arithmetic alone. Measured 2026-09-21, over 200 000 drawn durations at two to
+    eleven calls: 44 446 of them do not round-trip. A relative tolerance of a
+    million-millionth is far tighter than any disagreement worth catching — a
+    column read off the wrong field, or divided by the wrong one — and far looser
+    than the one bit the division costs.
     """
     score = quietly(A_VERIFY_CASE, an_eval_that_holds_every_check(), tmp_path).score
 
-    assert score.searches_per_claim * score.claims == score.searches
-    assert score.seconds_per_call * score.calls == score.seconds
+    assert score.searches_per_claim * score.claims == pytest.approx(score.searches, rel=1e-12)
+    assert score.seconds_per_call * score.calls == pytest.approx(score.seconds, rel=1e-12)
 
 
 def test_a_count_of_past_cases_is_kept_only_when_the_search_returned_its_page(

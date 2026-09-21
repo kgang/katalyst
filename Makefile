@@ -74,19 +74,23 @@ numbers-check: ## Check that file still says what the engine says. Changes no fi
 # sentence, because a test that judges a sentence fails when somebody improves
 # the prompt.
 #
-#   make eval                     every case, at the ceiling written in code
+#   make eval                     every case, for the ceiling written in code
 #   make eval ONLY=hormuz         one of them
-#   make eval CAP=5               the same, with a lower ceiling
+#   make eval CAP=5               the same, with a lower ceiling over the round
 #   make eval EFFORT=medium       the same, thinking less hard
 #
 # The same three flags as `record-demo`, meaning the same three things. CAP can
-# only lower the $15 hard stop written in code, never lift it. Which model
-# answers is the KATALYST_MODEL setting and nothing else, so the bill and the
-# scorecard's own column can never name two different models.
+# only lower the $15 hard stop written in code, never lift it — and it bounds the
+# WHOLE ROUND, not each case: one running total is carried from case to case, each
+# is handed what is left, and a case there is nothing left for is not started. The
+# scorecard says which ones those were. Which model answers is the KATALYST_MODEL
+# setting and nothing else, so the bill and the scorecard's own column can never
+# name two different models.
 #
 # It prints a scorecard, writes one row per case into `evals/runs/<date>.tsv`, and
-# exits non-zero if any check did not hold. **Every run is kept under
-# `backend/.runs/` whatever it scores**, exactly as a recorded run is.
+# exits non-zero if any check did not hold or if the round ran out of money before
+# it reached every case. **Every run is kept under `backend/.runs/` whatever it
+# scores**, exactly as a recorded run is.
 #
 # It is deliberately **not** in the build: it costs money, it needs a key, and
 # the same prompt scores slightly differently twice — so a merge would be blocked
