@@ -230,6 +230,23 @@ async function openThePanelOnTheArrow(page: Page, id: string): Promise<void> {
 }
 
 /**
+ * Turn the panel beside the map to one of the panels its head names.
+ *
+ * **The panel is a few panels now, one at a time** (2026-09-22). It used to be
+ * one column holding the branches, the change list and the answer to *why is
+ * this number what it is* all at once, so a click on a tile filled the bottom of
+ * a box nothing scrolled. A reader reaches a panel by its name; so does a test.
+ *
+ * @param page The page the map is on.
+ * @param name The name at the head of the panel, as it is written there.
+ */
+async function turnThePanelTo(page: Page, name: RegExp): Promise<void> {
+  const label = page.getByRole("tab", { name });
+  await label.click();
+  await expect(label).toHaveAttribute("aria-selected", "true");
+}
+
+/**
  * Every window this interface is held to.
  *
  * The whole of it was measured against the first; the other two are the two
@@ -285,9 +302,14 @@ const WINDOWS = [
  * @param page The page the map is on.
  */
 async function everyControlInThePanelIsWhole(page: Page): Promise<void> {
+  // **The column, not the scrolling box.** The names at the head of the panel
+  // are controls a reader has to reach too, and they sit above the part that
+  // scrolls so that they cannot scroll away — which puts them outside `.dock`
+  // and outside the reach of a walk that started there.
+  const column = page.locator(".dock-column");
   const dock = page.locator(".dock");
   await expect(dock).toBeVisible();
-  const controls = dock.locator("button, a, input");
+  const controls = column.locator("button, a, input");
   const many = await controls.count();
   expect(many, "the panel beside the map holds no controls at all").toBeGreaterThan(0);
 
@@ -298,7 +320,10 @@ async function everyControlInThePanelIsWhole(page: Page): Promise<void> {
     // can reach and a reader scrolls. The panel is the only thing that moves.
     await control.scrollIntoViewIfNeeded();
     const verdict = await control.evaluate((element) => {
-      const panel = element.closest<HTMLElement>(".dock");
+      // Each control is measured against the box it actually lives in: the part
+      // of the panel that scrolls, or the row of names above it.
+      const panel =
+        element.closest<HTMLElement>(".dock") ?? element.closest<HTMLElement>(".panel-switch");
       if (panel === null) {
         return "a control left the panel between being counted and being measured";
       }
@@ -358,6 +383,17 @@ async function everyControlInThePanelIsWhole(page: Page): Promise<void> {
   expect(
     sideways,
     "the panel beside the map is wider inside than it is on the glass, so something in it runs past its edge",
+  ).toBeLessThanOrEqual(1);
+
+  // And of the names at its head, which wrap onto a second row rather than
+  // scrolling: a name too long for the panel would run off its edge with
+  // nothing saying so.
+  const namesRunOver = await page
+    .locator(".panel-switch")
+    .evaluate((row) => row.scrollWidth - row.clientWidth);
+  expect(
+    namesRunOver,
+    "a name at the head of the panel runs past the panel's own edge",
   ).toBeLessThanOrEqual(1);
 }
 
@@ -547,13 +583,18 @@ async function theStoredMapWithTheStrikeBranch(page: Page): Promise<void> {
  * The panel holds everything it holds, at every window this interface is held
  * to, with a branch open and the operations open — which is the panel at its
  * fullest.
+ *
+ * **Every panel the head of it names, not merely the one that happens to be
+ * showing** (2026-09-22). The panel used to be one column, so asking about it
+ * once asked about all of it; now a control a reader cannot reach could sit on a
+ * panel this test never turned to.
  */
 for (const window of WINDOWS) {
   test(`test_nothing_in_the_panel_is_cut_off_at_${window.width}_by_${window.height}`, async ({
     page,
   }) => {
-    // Three window sizes, a branch, an engine answer and two states of the
-    // panel: longer than the walk the other tests take.
+    // Three window sizes, a branch, an engine answer and every panel the head
+    // of the panel names: longer than the walk the other tests take.
     test.setTimeout(120_000);
     await page.setViewportSize({ width: window.width, height: window.height });
     await theStoredMapWithTheStrikeBranch(page);
@@ -563,9 +604,15 @@ for (const window of WINDOWS) {
     // cannot.
     await theScreenFitsItsWindow(page);
 
-    // Five sections, and the panel at its fullest: your branches, the change
-    // list, the panel that says why a number is what it is — and, opened from
-    // the Inspector's own head with the mouse, the things you can do to a claim.
+    // **The names at the head of the panel are themselves controls**, and they
+    // are the first thing asked about: a name drawn past the panel's own edge
+    // would be a panel a reader cannot reach at all.
+    const names = page.getByRole("tab");
+    expect(await names.count(), "the panel offers no panels at all").toBeGreaterThan(1);
+    await everyControlInThePanelIsWhole(page);
+
+    // The claim panel at its fullest: whatever is selected, and — opened from
+    // the Inspector's own head with the mouse — the things you can do to it.
     await page.locator('.react-flow__node[data-id="B"]').click();
     const wayIn = page.getByRole("button", { name: "Change this claim" });
     await expect(wayIn).toBeVisible();
@@ -580,19 +627,27 @@ for (const window of WINDOWS) {
     await page.getByRole("button", { name: /^My own number/ }).click();
     await expect(page.getByLabel(/Your likelihood/)).toBeVisible();
     await everyControlInThePanelIsWhole(page);
-
-    // Then the same map read as a list, which is the panel's other state and
-    // the one the no-picture route depends on. `O` is a map key, so the
-    // keyboard goes back on the map first — the press is otherwise the
-    // button's, which is the product's rule rather than this test's
-    // convenience.
     await theScreenFitsItsWindow(page);
 
+    // Your branches and the change list, which is the panel the strike branch
+    // fills: every branch, every edit on the open one, and a row per ending the
+    // edit reaches.
+    await turnThePanelTo(page, /Branches and changes/);
+    await expect(page.locator(".branch-panel")).toBeVisible();
+    await expect(page.locator(".delta-rail")).toBeVisible();
+    await everyControlInThePanelIsWhole(page);
+    await theScreenFitsItsWindow(page);
+
+    // Then the same map read as a list, which is the panel the no-picture route
+    // depends on. `O` is a map key, so the keyboard goes back on the map first —
+    // the press is otherwise the button's, which is the product's rule rather
+    // than this test's convenience.
     await standOn(page, "B");
     await page.keyboard.press("O");
     await expect(page.getByRole("tree")).toBeVisible();
     await everyOutlineItemIsASentenceWide(page);
     await everyControlInThePanelIsWhole(page);
+    await theScreenFitsItsWindow(page);
   });
 }
 
@@ -641,7 +696,10 @@ test("test_the_mouse_alone_reaches_the_six_things_you_can_do", async ({ page }) 
 
   // **The branch gained the edit.** It is listed by the button that made it,
   // with the badge that button earns, on a branch that did not exist a moment
-  // ago — read off the panel rather than out of this file.
+  // ago — read off the panel rather than out of this file. Your branches are a
+  // panel of their own since 2026-09-22, one name away, and the name is pressed
+  // here because this whole test is the mouse's walk and nothing else.
+  await turnThePanelTo(page, /Branches and changes/);
   const branches = page.locator(".branch-panel");
   await expect(branches).toContainText("Your own branch");
   await expect(branches).toContainText("1 edit");
@@ -927,6 +985,17 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     );
   }
 
+  // **The panel, turned with one key.** Opening the branch added a claim and
+  // chose it, so the panel is on that claim — which is the one thing that moves
+  // the panel by itself, and is what a reader wants when a branch adds
+  // something. The change list is the next panel along, and `N` is how a reader
+  // who never touches the mouse gets to it (2026-09-22).
+  await page.keyboard.press("N");
+  await expect(page.getByRole("tab", { name: /Branches and changes/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
   // The rail beside the map lists the endings, in the engine's own order, with
   // the two columns that are never folded into it.
   const rail = page.locator(".delta-rail");
@@ -1092,7 +1161,10 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
 
   // Both contracts hang off that claim, so both of them move — and the rail is
   // where a move turns into something a reader can act on. A rail that stayed
-  // empty here would make **This happened** a button that does nothing.
+  // empty here would make **This happened** a button that does nothing. It is on
+  // the panel your branches are on, which the edit above did not turn to: an
+  // arrival never moves the panel, only the reader does (2026-09-22).
+  await turnThePanelTo(page, /Branches and changes/);
   const rail = page.locator(".delta-rail");
   await expect(rail.locator('.delta-rail__row[data-ranked="yes"]')).toHaveCount(2);
   await expect(rail).toContainText("In the order the engine put them in");
