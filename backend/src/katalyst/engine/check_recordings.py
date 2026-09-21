@@ -19,7 +19,7 @@ struck, taken knowingly.
 import sys
 
 from katalyst.engine.prompt import prompt_hash
-from katalyst.engine.replay import every_recording, faults_in, where_they_live
+from katalyst.engine.replay import faults_in, readable, where_they_live
 
 
 def main() -> int:
@@ -28,15 +28,18 @@ def main() -> int:
     Returns:
         0 when every file is sound, or when there are none yet. 1 otherwise.
     """
-    recordings = every_recording()
-    if not recordings:
+    recordings, unreadable = readable()
+    if not recordings and not unreadable:
         print(
             f"No recordings in {where_they_live()}. Nothing to check, and nothing wrong with that."
         )
         return 0
 
     shipping = prompt_hash()
-    faults = [
+    # A file this engine cannot read is a fault and not a crash: it is named,
+    # with the others still checked beside it (`replay.md` B9, 2026-09-20).
+    faults = [*unreadable]
+    faults += [
         one
         for recording in recordings
         for one in faults_in(recording, current_prompt_hash=shipping)

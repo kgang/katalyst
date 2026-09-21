@@ -48,16 +48,35 @@ def a_paced_replay(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[
     written_to(folder)
     monkeypatch.setattr(replay, "RECORDINGS", folder)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("REPLAY_INSTANT", raising=False)
+    monkeypatch.delenv("KATALYST_REPLAY_INSTANT", raising=False)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
 
 
-def test_the_first_event_arrives_before_the_last_one_is_written(a_paced_replay: None) -> None:
-    """The ordering claim, read with the clock off the route itself."""
+A_QUICK_PACE = 0.05
+"""A pace short enough for a test, since what is under test is *whether* it paces."""
+
+
+def test_the_events_of_a_replay_are_let_go_of_one_at_a_time(
+    a_paced_replay: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The route hands events over as they come, rather than building the whole body.
+
+    **What this can and cannot see.** The test client collects a response before
+    handing it back, so the arrival times of the lines are all the same instant
+    however the server behaved; the old assertion here — that the first of them
+    was read before the last — is true of any two clock readings in sequence and
+    could not fail however thoroughly anything buffered (2026-09-20). What *is*
+    visible is the server's own clock: a paced replay waits between events, so a
+    request that returns without having waited is a request whose events were
+    never let go of one at a time. The other half, that nothing between here and
+    a browser collects the body, is what the proxy configuration below is for.
+    """
     del a_paced_replay
+    monkeypatch.setattr(replay, "A_COMFORTABLE_PACE", A_QUICK_PACE)
     seen: list[tuple[float, str]] = []
+    started = time.monotonic()
     with TestClient(app).stream(
         "POST",
         "/api/generate",
@@ -66,10 +85,15 @@ def test_the_first_event_arrives_before_the_last_one_is_written(a_paced_replay: 
         for line in answer.iter_lines():
             if line.startswith("event: "):
                 seen.append((time.monotonic(), line.removeprefix("event: ")))
+    took = time.monotonic() - started
 
     assert len(seen) > 2
-    first, last = seen[0][0], seen[-1][0]
-    assert first < last, "every event arrived at the same moment, which means something buffered"
+    paced = A_QUICK_PACE * (len(seen) - 1)
+    assert took > paced / 2, (
+        f"{len(seen)} events came back inside {took:.3f}s, which is far less than "
+        f"the {paced:.3f}s a paced replay spends waiting between them — so they "
+        "were never let go of one at a time."
+    )
     assert seen[0][1] == "generation_started"
     assert seen[-1][1] in ("done", "failed")
 

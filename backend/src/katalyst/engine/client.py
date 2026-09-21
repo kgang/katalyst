@@ -412,8 +412,6 @@ class Model:
         )
         self._spent = nothing_spent_yet(self._model)
         self._cap = float("inf")
-        self.waits_for = getattr(client, "timeout", None)
-        self.tries_again = getattr(client, "max_retries", None)
 
     def watching(self, spent: Receipt, cap: float) -> None:
         """Take note of what the run has spent and what it may spend.

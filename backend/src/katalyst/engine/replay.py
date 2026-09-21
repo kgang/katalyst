@@ -67,8 +67,10 @@ from katalyst.engine.events import (
     Event,
     GenerationStarted,
     ProposalAccepted,
+    ProposalRejected,
     Receipt,
 )
+from katalyst.engine.verify import Verdict
 from katalyst.settings import get_settings
 
 RECORDINGS = Path(__file__).resolve().parents[3] / "recordings"
@@ -361,7 +363,7 @@ def seconds_between(instant: bool | None = None) -> float:
         The seconds to wait between events.
     """
     if instant is None:
-        instant = get_settings().REPLAY_INSTANT
+        instant = get_settings().KATALYST_REPLAY_INSTANT
     return 0.0 if instant else A_COMFORTABLE_PACE
 
 
@@ -454,6 +456,56 @@ def _rebuilt(recorded: dict[str, Any], recording: Recording) -> Receipt:
     )
 
 
+THE_FOUR_EXAMPLES = ("export-controls", "hormuz", "midterms", "photonics")
+"""The four names a recording may be called, which are the four cards' own.
+
+A file called anything else is a file no card would ever play, so it is a fault
+and not a mystery. `record.py` holds the same four beside the sentences they are
+run from; this is the reading end of that list (2026-09-20).
+"""
+
+
+def _grammar_faults(recording: Recording, names: list[str]) -> list[str]:
+    """Check the three things about a recording's shape that B9 asks for.
+
+    The receipt second to last, the verdict where the grammar puts it, and the
+    growth events numbered in a rising line. All three were written down in
+    `replay.md` and checked by nothing (2026-09-20).
+
+    Args:
+        recording: The recording to check.
+        names: Its event names, in order.
+
+    Returns:
+        One sentence per fault, or nothing at all.
+    """
+    found: list[str] = []
+    if len(names) >= 2 and names[-2] != events.NAMES[Receipt]:
+        found.append(
+            f"{recording.example} does not put its receipt second to last, so a "
+            "reader could reach the end without being told what it cost."
+        )
+    growth = (events.NAMES[ProposalAccepted], events.NAMES[ProposalRejected])
+    if events.NAMES[Verdict] in names:
+        where = names.index(events.NAMES[Verdict])
+        if any(one in growth for one in names[where:]):
+            found.append(
+                f"{recording.example} goes on growing after its verdict, which "
+                "grades a map that has stopped changing."
+            )
+    numbered = [
+        int(payload["at"])
+        for name, payload in recording.lines
+        if name in growth and "at" in payload
+    ]
+    if numbered != sorted(numbered) or len(set(numbered)) != len(numbered):
+        found.append(
+            f"{recording.example} numbers its proposals {numbered}, which is not a "
+            "rising line, so a reader cannot tell what order they arrived in."
+        )
+    return found
+
+
 def faults_in(recording: Recording, *, current_prompt_hash: str) -> list[str]:
     """List everything wrong with one recording, in plain sentences.
 
@@ -479,8 +531,9 @@ def faults_in(recording: Recording, *, current_prompt_hash: str) -> list[str]:
         try:
             shape.model_validate(payload)
         except ValidationError:
+            # Every reason at once, never the first: this function's own
+            # docstring says so, and it used to stop here (2026-09-20).
             found.append(f"{recording.example} holds a {name} whose payload does not fit it.")
-            break
 
     if not names or names[0] != events.NAMES[GenerationStarted]:
         found.append(f"{recording.example} does not start where a generation starts.")
@@ -490,6 +543,15 @@ def faults_in(recording: Recording, *, current_prompt_hash: str) -> list[str]:
         found.append(
             f"{recording.example} stores likelihoods. They are recomputed from the seed, "
             "so a stored one could disagree with the engine that is running."
+        )
+    found += _grammar_faults(recording, names)
+    # The header's intervention is checked when the file is read, and a file
+    # whose header does not fit comes back as unreadable with a sentence of its
+    # own rather than as a crash here — which is what B9 asks for (2026-09-20).
+    if recording.example not in THE_FOUR_EXAMPLES:
+        found.append(
+            f"{recording.example} is not one of the four examples this program "
+            f"ships with ({', '.join(THE_FOUR_EXAMPLES)}), so no card would ever play it."
         )
     if recording.header.prompt_hash != current_prompt_hash:
         found.append(

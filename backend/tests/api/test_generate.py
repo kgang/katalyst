@@ -72,7 +72,7 @@ def a_copy_with_recordings_and_no_key(
     folder = tmp_path / "recordings"
     written_to(folder)
     monkeypatch.setattr(replay, "RECORDINGS", folder)
-    monkeypatch.setenv("REPLAY_INSTANT", "true")
+    monkeypatch.setenv("KATALYST_REPLAY_INSTANT", "true")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     get_settings.cache_clear()
     held.forget_everything()

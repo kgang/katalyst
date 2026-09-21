@@ -205,3 +205,62 @@ def test_with_no_setting_the_folder_is_the_one_that_ships() -> None:
     get_settings.cache_clear()
 
     assert replay.where_they_live() == replay.RECORDINGS
+
+
+# --- The three checks `replay.md` B9 names and nothing ran ---------------
+
+
+def broken_into(tmp_path: Path, mend: object) -> replay.Recording:
+    """Write the good recording with one line changed, and read it back."""
+    written = written_to(tmp_path / "recordings")
+    lines = written.read_text(encoding="utf-8").splitlines()
+    written.write_text("\n".join(mend(lines)) + "\n", encoding="utf-8")  # type: ignore[operator]
+    return replay.read(written)
+
+
+def test_a_recording_that_hides_its_receipt_at_the_end_is_named(tmp_path: Path) -> None:
+    """Grammar rule 2: the receipt is second to last, so nobody reaches the end untold."""
+    moved = broken_into(tmp_path, lambda lines: [*lines[:-2], lines[-1], lines[-2]])
+
+    faults = replay.faults_in(moved, current_prompt_hash=prompt_hash())
+
+    assert any("second to last" in one for one in faults)
+
+
+def test_a_recording_that_numbers_its_proposals_out_of_order_is_named(
+    tmp_path: Path,
+) -> None:
+    """A reader cannot tell what order they arrived in, which is what `at` is for."""
+    jumbled = broken_into(
+        tmp_path, lambda lines: [one.replace('"at": 0', '"at": 9') for one in lines]
+    )
+
+    faults = replay.faults_in(jumbled, current_prompt_hash=prompt_hash())
+
+    assert any("rising line" in one for one in faults)
+
+
+def test_a_recording_no_card_would_ever_play_is_named(tmp_path: Path) -> None:
+    """The file's name is one of the four, or no card reaches it."""
+    written = written_to(tmp_path / "recordings")
+    renamed = written.rename(written.with_name("something-else.jsonl"))
+
+    faults = replay.faults_in(replay.read(renamed), current_prompt_hash=prompt_hash())
+
+    assert any("no card would ever play it" in one for one in faults)
+
+
+def test_every_reason_at_once_and_never_the_first(tmp_path: Path) -> None:
+    """The docstring has always said so, and a `break` in the middle said otherwise."""
+    wrong = broken_into(
+        tmp_path,
+        lambda lines: [
+            lines[0],
+            *[one.replace('"reason"', '"nonsense"') for one in lines[1:]],
+        ],
+    )
+
+    faults = replay.faults_in(wrong, current_prompt_hash="a-different-prompt")
+
+    assert len(faults) > 1
+    assert any("Record it again" in one for one in faults)

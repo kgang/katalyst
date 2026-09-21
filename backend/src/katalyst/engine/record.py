@@ -60,6 +60,7 @@ from katalyst.engine.following import Following, receipt_event
 from katalyst.engine.grow import Finished, grow
 from katalyst.engine.ids import mint_id, mint_seed
 from katalyst.engine.outcome import Caps, Outcome
+from katalyst.engine.pricing import PRICES_READ_ON
 from katalyst.engine.prompt import prompt_hash
 from katalyst.engine.receipt import Receipt as RunningTotal
 from katalyst.engine.receipt import fold, nothing_spent_yet
@@ -694,6 +695,7 @@ def what_it_cost(run: Run) -> list[str]:
             f"  seconds          {receipt.seconds:.1f} "
             f"({int(receipt.seconds // 60)}m{int(receipt.seconds % 60):02d}s)",
         ]
+    lines.append(f"  priced at        what {PRICES_READ_ON} said, per `engine/pricing.py`")
     thinking = sum(one.thinking_tokens for one in run.transcript.lines)
     written = sum(one.output_tokens for one in run.transcript.lines)
     if written:

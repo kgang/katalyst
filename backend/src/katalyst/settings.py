@@ -55,7 +55,7 @@ class Settings(BaseSettings):
             two paid runs have been lost to bugs that only exist when a module is
             started rather than imported. A run answered this way is never written
             as a recording, whatever else it produces.
-        REPLAY_INSTANT: Whether a recorded generation plays back with no pause
+        KATALYST_REPLAY_INSTANT: Whether a recorded generation plays back with no pause
             between its events. Off by default, because the pause is what makes a
             replay read as a map arriving rather than appearing. The test suite
             and the build's own check turn it on; it is deliberately not
@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     KATALYST_RECORDINGS: str = ""
     KATALYST_RUNS: str = ""
     KATALYST_ANSWERER: str = ""
-    REPLAY_INSTANT: bool = False
+    KATALYST_REPLAY_INSTANT: bool = False
 
 
 @lru_cache

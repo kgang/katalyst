@@ -294,8 +294,10 @@ def test_the_live_answerer_pins_how_long_it_waits_and_how_often_it_tries_again(
         get_settings.cache_clear()
 
     assert asking is not None
-    assert asking.waits_for == HOW_LONG_TO_WAIT
-    assert asking.tries_again == HOW_OFTEN_TO_TRY_AGAIN
+    # Read off the library's own client, not off a field this program keeps so
+    # that a test has something to read (2026-09-20).
+    assert asking._client.timeout == HOW_LONG_TO_WAIT
+    assert asking._client.max_retries == HOW_OFTEN_TO_TRY_AGAIN
     # A whole question, retries and all, is bounded by something a person would sit through.
     assert HOW_LONG_TO_WAIT * (HOW_OFTEN_TO_TRY_AGAIN + 1) <= 15 * 60
 

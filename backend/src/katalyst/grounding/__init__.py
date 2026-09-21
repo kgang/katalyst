@@ -16,6 +16,10 @@ What this layer must never do
 - Never read an environment variable directly; ask `katalyst.settings` instead.
 - Never import from `katalyst.api`.
 
-Nothing lives here yet. Stack 04 adds search behind generation; stack 05 adds
-the market and economic-data adapters.
+Nothing lives here yet, and stack 04 did not change that: the web search behind
+generation is part of the model boundary, so it lives in `engine/client.py`,
+which declares the tool, and `engine/grounding.py`, which turns what the tool
+returned into sources. This package waits for stack 05's market and
+economic-data adapters, which reach outside this process on their own account
+rather than through a model's answer.
 """

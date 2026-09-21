@@ -49,7 +49,8 @@ types: frontend/node_modules ## Rewrite the browser app's types from the server'
 	./scripts/gen-types.sh
 
 eval: ## Score what the language model proposes against saved examples
-	@echo "make eval arrives in stack 04, the stack that first asks a language model for anything."
+	@echo "make eval arrives in the next pull request of this stack: the four saved"
+	@echo "examples, scored on structure and never on wording."
 
 # --- the two tasks that spend money -----------------------------------------
 #
