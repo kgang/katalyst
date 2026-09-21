@@ -585,35 +585,34 @@ def test_a_run_that_empties_the_purse_before_it_has_a_map_still_says_done(
 
 
 class AnswersThenBreaks:
-    """A stand-in that answers a few questions for real money and then fails.
+    """A stand-in that answers a few questions for real money and then the walk breaks.
 
-    What a bug of ours looks like from the far side of the seam: everything up
-    to the break was asked, answered and billed.
+    What a bug of ours looks like: everything up to the break was asked,
+    answered and billed. It breaks where the walk asks what is left in the
+    purse, which is outside the part of a round that turns a failure into a
+    refusal — so the whole walk stops, which is the case finding 1 is about.
     """
 
     def __init__(self, *, after: int) -> None:
-        """Set out how many questions to answer before failing."""
+        """Set out how many questions to answer before the walk breaks."""
         self._story = a_story()
         self._after = after
         self.calls = 0
 
     def watching(self, spent: object, cap: float) -> None:
-        """Take note of nothing."""
+        """Take note of the purse, or break once enough has been spent on it."""
+        if self.calls >= self._after:
+            raise RuntimeError("a bug nobody wrote a sentence for")
 
     def starting_claim(self, question: str, *, may_search: bool = True) -> Any:
-        """Answer, or break."""
-        return self._maybe(lambda: self._story.starting_claim(question, may_search=may_search))
+        """Answer, and count the call."""
+        self.calls += 1
+        return self._story.starting_claim(question, may_search=may_search)
 
     def proposal(self, question: str, *, may_search: bool) -> Any:
-        """Answer, or break."""
-        return self._maybe(lambda: self._story.proposal(question, may_search=may_search))
-
-    def _maybe(self, answering: Any) -> Any:
-        """Count the call, break on the one after the last it may answer."""
+        """Answer, and count the call."""
         self.calls += 1
-        if self.calls > self._after:
-            raise RuntimeError("a bug nobody wrote a sentence for")
-        return answering()
+        return self._story.proposal(question, may_search=may_search)
 
 
 def test_a_run_that_breaks_still_says_what_it_spent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -624,15 +623,16 @@ def test_a_run_that_breaks_still_says_what_it_spent(monkeypatch: pytest.MonkeyPa
     the one the walk hands back at the end — and a walk that breaks hands nothing
     back. The running total has to leave the walk as it goes (2026-09-20).
     """
-    answerer = AnswersThenBreaks(after=4)
+    answerer = AnswersThenBreaks(after=2)
     monkeypatch.setattr(generate, "live_answerer", lambda: answerer)
 
     read = stream(hypothesis="A sentence with no recording behind it.")
 
     names = [name for name, _ in read]
     assert names[-1] == "failed"
-    paid = next(payload for name, payload in read if name == "receipt")
-    assert paid["calls"] == 4
+    assert names[-2] == "receipt"
+    paid = read[-2][1]
+    assert paid["calls"] == answerer.calls > 0
     assert paid["dollars"] > 0
     assert paid["model"]
 
@@ -641,7 +641,7 @@ def test_a_run_that_breaks_leaves_its_working_behind_too(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The transcript is a product artifact and it is read after the fact."""
-    answerer = AnswersThenBreaks(after=4)
+    answerer = AnswersThenBreaks(after=2)
     monkeypatch.setattr(generate, "live_answerer", lambda: answerer)
 
     read = stream(hypothesis="A sentence with no recording behind it.")
@@ -652,7 +652,7 @@ def test_a_run_that_breaks_leaves_its_working_behind_too(
     working = client().get(f"/api/generate/{announced}/transcript").json()
 
     assert working["receipt"] is not None
-    assert working["receipt"]["calls"] == 4
+    assert working["receipt"]["calls"] == answerer.calls > 0
     assert working["lines"]
 
 
