@@ -132,6 +132,7 @@ make run-demo EFFORT=medium      # the same run, thinking less hard
 make run-demo MODEL=claude-opus-5  # the same run, on the other model
 make eval ONLY=hormuz            # the one to run today: score the recorded example on structure
 make eval ONLY=hormuz CAP=5      # the same, with a lower spending ceiling
+make eval ONLY=hormuz EFFORT=as-recorded  # the same, at the effort the recordings are made at
 make eval                        # all four examples — once the prompt is frozen
 ```
 
@@ -148,7 +149,7 @@ Re-run `make record-demo` whenever a prompt changes: a recording made against di
 | Setting | What it does |
 |---|---|
 | `KATALYST_MODEL` | Which model proposes the claims and the arrows. `claude-sonnet-5` unless you say otherwise, which is what the measured runs and the recorded answers were made on; `claude-opus-5` is the only other name a price has been read for, and asking for anything else stops the run rather than billing against a guess |
-| `KATALYST_EFFORT` | How hard the model tries — `low`, `medium`, `high`, `xhigh` or `max`. Empty by default, and then each path takes its own: **the recorder sends nothing**, so the service's own default stands and a recording is the richest map; **a live run asks for `medium`**, so a map arrives in minutes rather than the best part of an hour (Kent, 2026-09-21; the measured runs are in `docs/measurements.md`). Set it to override both. The receipt and a recording's first line say which effort made the map |
+| `KATALYST_EFFORT` | How hard the model tries — `low`, `medium`, `high`, `xhigh` or `max`. Empty by default, and then each path takes its own: **the recorder sends nothing**, so the service's own default stands and a recording is the richest map; **everything else asks for `medium`** — a live run in the browser, and `make eval`, the scorecard you run while working on a prompt — so a map arrives in minutes rather than the best part of an hour (Kent, 2026-09-21; the measured runs are in `docs/measurements.md`). `make eval EFFORT=as-recorded` scores the recorder's effort by name. Set it to override both. The receipt and a recording's first line say which effort made the map |
 | `KATALYST_RECORDINGS` | Where recorded generations are read from. Empty means the folder that ships here. Point it elsewhere to play a recording back through the real route before committing it |
 | `KATALYST_RUNS` | Where a paid run is written. Empty means `backend/.runs/` |
 | `KATALYST_REPLAY_PACE` | How long a replay waits between two of its events, in seconds. `0.6` unless you say otherwise, which is the speed a person watches a map arrive at; `0` means no pause at all. One number rather than a length and a switch beside it, and never something a request can ask for — a client that could skip the pacing could skip the thing a recording exists to show |
@@ -171,7 +172,7 @@ They run side by side, five browsers at a time here and two on the build machine
 make test
 ```
 
-No network, no key, and the same checks a pull request runs. On 2026-09-21 that was **635 tests on the server and 358 in the browser app**, plus 13 end-to-end tests. The figures are dated because they move with every round; what does not move is that all of them run with no key and no network:
+No network, no key, and the same checks a pull request runs. On 2026-09-21 that was **637 tests on the server and 358 in the browser app**, plus 13 end-to-end tests. The figures are dated because they move with every round; what does not move is that all of them run with no key and no network:
 
 - **The rules, checked against maps nobody wrote by hand.** Hundreds of random maps per test, built by the generators in `backend/tests/strategies.py` — some correct by construction, some damaged on exactly one rule — and when one fails, the `hypothesis` library shrinks it to the smallest map that still breaks. Every line and every branch of `backend/src/katalyst/domain/` is run.
 - **The engine.** Folding a branch onto a map, working every likelihood through time, and saying what moved — including a state machine that re-checks *only what is still connected to the edit may move* after every step of a generated sequence of edits.

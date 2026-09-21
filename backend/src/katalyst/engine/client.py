@@ -245,11 +245,18 @@ request is byte for byte what it was before anybody had an opinion.
 """
 
 EFFORT_WHEN_LIVE = "medium"
-"""What a live run through the stream route sends when nothing says otherwise.
+"""What every run but a recording sends when nothing says otherwise.
 
 **Run live fast** (Kent, G13, 2026-09-21). Somebody watching a map arrive is
 waiting; the measured difference is 27 seconds a call against 79, for a map of
 nine claims against twenty. `KATALYST_EFFORT` overrides this and the line above.
+
+**And develop at the same effort** (Kent, 2026-09-21, later the same day): the
+scorecard, `make eval`, asks for this too. It used to take the recorder's
+effort, and one case took the best part of an hour — long enough that nobody
+would run it while working on a prompt. So the rule is one rule: **only the
+recorder sends nothing.** `make eval EFFORT=as-recorded` still scores the effort
+the recordings are made at.
 """
 
 HOW_LONG_TO_WAIT = 300.0
@@ -703,8 +710,9 @@ def live_answerer(
             decide when it has not.
         when_nothing_is_said: The effort to use when neither the caller nor the
             settings name one. One setting, two pinned defaults: the recorder
-            sends nothing and takes the service's own, a live run asks for
-            `medium` (Kent, G13, 2026-09-21).
+            sends nothing and takes the service's own; a live run and the
+            scorecard ask for `medium` (Kent, G13 and its extension,
+            2026-09-21).
 
     Returns:
         A live answerer, or nothing at all when no key is configured.

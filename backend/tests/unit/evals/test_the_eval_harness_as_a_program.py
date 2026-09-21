@@ -18,8 +18,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from evals.run import ANSWERED_BY_A_STAND_IN, CAP_IS_NOT_MONEY
+from evals.run import ANSWERED_BY_A_STAND_IN, AS_RECORDED, CAP_IS_NOT_MONEY, effort_asked_for
 
+from katalyst.engine.client import EFFORT_WHEN_LIVE, EFFORT_WHEN_RECORDING
 from katalyst.engine.record import KeptRun
 
 BACKEND = Path(__file__).resolve().parents[3]
@@ -293,3 +294,35 @@ def test_the_harness_refuses_to_start_with_no_key_and_no_stand_in(tmp_path: Path
     assert finished.returncode == 1
     assert "no key is configured" in finished.stderr
     assert not list((tmp_path / "runs").glob("*.json"))
+
+
+def test_only_the_recorder_sends_no_effort_and_a_round_asks_for_the_live_runs() -> None:
+    """A round left to itself asks for what a live run asks for, never for nothing.
+
+    Kent, 2026-09-21: at the service's own default one case took the best part of
+    an hour, which is long enough that nobody runs a scorecard while working on a
+    prompt. The rule is one rule — only the recorder sends nothing — and the
+    effort the recordings are made at stays reachable by name, because a scorecard
+    of the maps a keyless reviewer is shown is still worth having.
+    """
+    # Nothing said: nothing is named outright, and the fallback is the live run's.
+    assert effort_asked_for("") == (None, EFFORT_WHEN_LIVE)
+    # A level said: exactly that, whatever the fallback would have been.
+    assert effort_asked_for("high")[0] == "high"
+    # The recordings' effort, by name: nothing named, and the fallback sends nothing.
+    assert effort_asked_for(AS_RECORDED) == (None, EFFORT_WHEN_RECORDING)
+    # And the two pinned defaults really are two: if they ever met, `as-recorded`
+    # would be a word for nothing.
+    assert EFFORT_WHEN_LIVE != EFFORT_WHEN_RECORDING
+    assert EFFORT_WHEN_RECORDING == ""
+
+
+def test_the_program_offers_as_recorded_by_name(tmp_path: Path) -> None:
+    """`--help` names the word, so nobody has to read the source to find it."""
+    helped = run_the_evals(
+        tmp_path,
+        "--help",
+        answerer="tests.unit.engine.stand_ins:an_eval_that_holds_every_check",
+    )
+    assert helped.returncode == 0
+    assert AS_RECORDED in helped.stdout

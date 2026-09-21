@@ -65,7 +65,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from katalyst.domain import Graph, Link, PropositionId, Violation, validate
 from katalyst.domain.validity import TERMINAL_KINDS
-from katalyst.engine.client import Answerer, a_stand_in_answerer, live_answerer
+from katalyst.engine.client import (
+    EFFORT_WHEN_LIVE,
+    EFFORT_WHEN_RECORDING,
+    Answerer,
+    a_stand_in_answerer,
+    live_answerer,
+)
 from katalyst.engine.events import (
     Done,
     Event,
@@ -282,6 +288,14 @@ class Scorecard(BaseModel):
         description="When the run started. Two runs in one day are told apart by it."
     )
     model: str = Field(description="Which model answered.")
+    effort: str = Field(
+        description=(
+            "How hard the model was asked to try, as the receipt's plain word: "
+            "`default` when nothing was sent. On every run for the reason `model` "
+            "is: a round at `medium` and a round at the recorder's effort are two "
+            "measurements, not a before-and-after."
+        )
+    )
     prompt_hash: str = Field(description="The fingerprint of the prompt that produced these rows.")
     cases: tuple[CaseScore, ...] = Field(description="One row per case, in the order they ran.")
     passed: int = Field(description="Cases where all eight checks held.")
@@ -861,7 +875,7 @@ def _every_count_has_a_page(graph: Graph) -> Check:
 # --- Printing and writing the scorecard --------------------------------------
 
 
-def scorecard_of(run_at: datetime, scored: Sequence[Scored], model: str) -> Scorecard:
+def scorecard_of(run_at: datetime, scored: Sequence[Scored], model: str, effort: str) -> Scorecard:
     """Gather the cases that ran into one scorecard.
 
     Args:
@@ -869,6 +883,8 @@ def scorecard_of(run_at: datetime, scored: Sequence[Scored], model: str) -> Scor
         scored: What each case produced, in the order they ran.
         model: Which model answered. On every scorecard because two rows from two
             models are two measurements rather than a before-and-after.
+        effort: How hard it was asked to try, as the receipt's plain word. On every
+            scorecard for the same reason.
 
     Returns:
         The scorecard.
@@ -876,6 +892,7 @@ def scorecard_of(run_at: datetime, scored: Sequence[Scored], model: str) -> Scor
     return Scorecard(
         run_at=run_at,
         model=model,
+        effort=effort,
         prompt_hash=prompt_hash(),
         cases=tuple(one.score for one in scored),
         passed=sum(1 for one in scored if one.passed),
@@ -883,8 +900,8 @@ def scorecard_of(run_at: datetime, scored: Sequence[Scored], model: str) -> Scor
     )
 
 
-ABOUT_THE_WHOLE_RUN: tuple[str, ...] = ("run_at", "model", "prompt_hash")
-"""The three columns that read the same on every row: when, which model, which prompt.
+ABOUT_THE_WHOLE_RUN: tuple[str, ...] = ("run_at", "model", "effort", "prompt_hash")
+"""The four columns that read the same on every row: when, which model, how hard, which prompt.
 
 Repeated on each row rather than written once at the top of the file, because a
 second run on the same day appends to that same file and a heading would then be
@@ -1086,6 +1103,47 @@ def _how_it_went(scored: Sequence[Scored]) -> list[str]:
 # --- The command line --------------------------------------------------------
 
 
+AS_RECORDED = "as-recorded"
+"""The word for *try as hard as the committed recordings were made*.
+
+It is a word rather than an empty flag because the empty flag now means something
+else — the development default below — and an effort nobody can name is an effort
+nobody can ask for.
+"""
+
+
+def effort_asked_for(said: str) -> tuple[str | None, str]:
+    """Turn what `--effort` said into what the answerer is built with.
+
+    **Only the recorder sends nothing; everything a developer runs asks for
+    `medium`** (Kent, 2026-09-21). A recording is made once and played back by
+    everybody, so it is worth the service's own default. A scorecard is run again
+    and again while a prompt is being worked on, and at the service's default one
+    case takes the best part of an hour, which is long enough that nobody runs
+    it. `medium` is what a live run in the browser already asks for, so the
+    round also measures the maps a person typing a sentence actually gets.
+
+    Three things can be said, and each means one thing:
+
+    - nothing: ask for the live run's effort;
+    - a level (`low` … `max`): ask for exactly that;
+    - `as-recorded`: send no effort at all, which is how the recordings are made.
+
+    `KATALYST_EFFORT` in the settings still outranks the first and the third, as
+    it outranks every pinned default — one setting, read in one place.
+
+    Args:
+        said: The flag's value, already checked against its choices.
+
+    Returns:
+        The effort to ask for outright, if one was named, and the effort to fall
+        back on when neither the flag nor the settings name one.
+    """
+    if said == AS_RECORDED:
+        return None, EFFORT_WHEN_RECORDING
+    return said or None, EFFORT_WHEN_LIVE
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the cases, print the scorecard, write the day's file, and say what failed.
 
@@ -1125,12 +1183,15 @@ def main(argv: list[str] | None = None) -> int:
     asking.add_argument(
         "--effort",
         default="",
-        choices=["", "low", "medium", "high", "xhigh", "max"],
+        choices=["", AS_RECORDED, "low", "medium", "high", "xhigh", "max"],
         help=(
-            "How hard the model tries, pinned for the whole of this run. Empty "
-            "leaves the service's own default and sends nothing — the same effort "
-            "the recordings are made at, so a scorecard measures the maps a "
-            "reviewer actually sees."
+            "How hard the model tries, pinned for the whole of this run. Left out, "
+            f"a round asks for `{EFFORT_WHEN_LIVE}` — what a live run in the browser "
+            "asks for, so the scorecard measures the maps a person typing a "
+            "sentence actually gets, in minutes rather than the best part of an "
+            f"hour. `{AS_RECORDED}` sends nothing and takes the service's own "
+            "default, which is the effort the committed recordings are made at: "
+            "use it to score the maps a reviewer with no key is shown."
         ),
     )
     said = asking.parse_args(argv)
@@ -1151,7 +1212,8 @@ def main(argv: list[str] | None = None) -> int:
     # The stand-in is asked for here and nowhere else, exactly as the recorder
     # asks for it: a seam that answered a reader from a test file would be a map
     # that looked generated.
-    answerer = a_stand_in_answerer() or live_answerer(effort=said.effort or None)
+    named, otherwise = effort_asked_for(said.effort)
+    answerer = a_stand_in_answerer() or live_answerer(effort=named, when_nothing_is_said=otherwise)
     if answerer is None:
         print(NO_KEY, file=sys.stderr)
         return 1
@@ -1175,7 +1237,12 @@ def main(argv: list[str] | None = None) -> int:
 
     # The same setting the bill was priced against, so the row's dollars and the
     # model beside them can never name two different models.
-    card = scorecard_of(run_at, scored, model=get_settings().KATALYST_MODEL)
+    card = scorecard_of(
+        run_at,
+        scored,
+        model=get_settings().KATALYST_MODEL,
+        effort=answerer.effort_used,
+    )
 
     for line in as_a_table(card):
         print(line)

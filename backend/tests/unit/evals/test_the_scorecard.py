@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 from evals.run import (
+    ABOUT_THE_WHOLE_RUN,
     COLUMNS,
     Case,
     Scored,
@@ -234,7 +235,7 @@ def test_the_scorecard_writes_one_row_per_case_under_one_heading(tmp_path: Path)
         quietly(A_VERIFY_CASE, an_eval_that_holds_every_check(), tmp_path / "one"),
         quietly(AN_EXPLORE_CASE, an_eval_whose_map_ends_nowhere(), tmp_path / "two"),
     ]
-    card = scorecard_of(_at_noon(), scored, model="a-model")
+    card = scorecard_of(_at_noon(), scored, model="a-model", effort="medium")
 
     written = write_tsv(card, folder=tmp_path)
     rows = written.read_text(encoding="utf-8").splitlines()
@@ -251,7 +252,7 @@ def test_a_second_run_on_the_same_day_appends_rather_than_overwrites(tmp_path: P
     the only reason the file exists.
     """
     scored = [quietly(A_VERIFY_CASE, an_eval_that_holds_every_check(), tmp_path / "one")]
-    card = scorecard_of(_at_noon(), scored, model="a-model")
+    card = scorecard_of(_at_noon(), scored, model="a-model", effort="medium")
 
     first = write_tsv(card, folder=tmp_path)
     second = write_tsv(card, folder=tmp_path)
@@ -269,13 +270,13 @@ def test_the_terminal_table_shows_every_column_the_file_does(tmp_path: Path) -> 
     field and one column per case — and no field may be missing from it.
     """
     scored = [quietly(A_VERIFY_CASE, an_eval_that_holds_every_check(), tmp_path)]
-    card = scorecard_of(_at_noon(), scored, model="a-model")
+    card = scorecard_of(_at_noon(), scored, model="a-model", effort="medium")
 
     table = as_a_table(card)
     named = [one.split("  ")[0].strip() for one in table[2:]]
 
     assert table[0].strip() == "hormuz"
-    assert named == [one for one in COLUMNS if one not in ("run_at", "model", "prompt_hash")]
+    assert named == [one for one in COLUMNS if one not in ABOUT_THE_WHOLE_RUN]
 
 
 def test_the_scorecard_counts_the_cases_that_held_every_check(tmp_path: Path) -> None:
@@ -284,7 +285,7 @@ def test_the_scorecard_counts_the_cases_that_held_every_check(tmp_path: Path) ->
         quietly(A_VERIFY_CASE, an_eval_that_holds_every_check(), tmp_path / "one"),
         quietly(AN_EXPLORE_CASE, an_eval_whose_map_ends_nowhere(), tmp_path / "two"),
     ]
-    card = scorecard_of(_at_noon(), scored, model="a-model")
+    card = scorecard_of(_at_noon(), scored, model="a-model", effort="medium")
 
     assert card.passed == sum(1 for one in scored if one.passed)
     assert card.passed + card.failed == len(card.cases)

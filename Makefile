@@ -76,7 +76,8 @@ numbers-check: ## Check that file still says what the engine says. Changes no fi
 #
 #   make eval ONLY=hormuz         THE ONE TO RUN TODAY - see the paragraph below
 #   make eval ONLY=hormuz CAP=5   the same, with a lower ceiling over the round
-#   make eval ONLY=hormuz EFFORT=medium   the same, thinking less hard
+#   make eval ONLY=hormuz EFFORT=high     the same, thinking harder than the default
+#   make eval ONLY=hormuz EFFORT=as-recorded   the same, at the effort the recordings are made at
 #   make eval                     all four cases, for the ceiling written in code
 #
 # **Run it as `ONLY=hormuz` until the prompt is frozen** (Kent, 2026-09-21). Only
@@ -88,6 +89,15 @@ numbers-check: ## Check that file still says what the engine says. Changes no fi
 # default is still all four** - this is a standing instruction about what to run
 # now, not a change to what the command means, so nothing here silently scores
 # less than it says it did.
+#
+# **A round asks the model for `medium` effort unless told otherwise** (Kent,
+# 2026-09-21). At the service's own default one case took the best part of an
+# hour, and a scorecard nobody has the patience to run measures nothing. `medium`
+# is what a live run in the browser already asks for, so the round also scores the
+# maps a person typing a sentence actually gets. The rule is one rule: ONLY THE
+# RECORDER SENDS NOTHING. `EFFORT=as-recorded` sends nothing too, for the day you
+# want the scorecard of the maps a reviewer with no key is shown. Which model
+# answers is unchanged: KATALYST_MODEL, `claude-sonnet-5` unless you say otherwise.
 #
 # The same three flags as `record-demo`, meaning the same three things. CAP can
 # only lower the $15 hard stop written in code, never lift it — and it bounds the

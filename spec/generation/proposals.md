@@ -414,7 +414,13 @@ behind it. The recorder sends nothing and takes the service's own: a recording i
 made once and played back by everybody, so it is worth the model's best, and the
 request stays byte for byte what it was before anybody had an opinion. A live run
 through the stream route asks for **`medium`**: somebody watching a map arrive is
-waiting, and the measurement is 27 seconds a call against 79. The setting
+waiting, and the measurement is 27 seconds a call against 79. **So does the
+scorecard, `make eval`** *(Kent, 2026-09-21, later the same day)*: it is run while
+a prompt is being worked on, and at the recorder's effort one case took the best
+part of an hour. The rule is therefore one rule — **only the recorder sends
+nothing; everything a developer runs asks for `medium`, on `claude-sonnet-5`** —
+and `make eval EFFORT=as-recorded` reaches the recorder's effort by name
+([`evaluation.md`](evaluation.md) says what that gives up). The setting
 overrides either. It is pinned for a whole run and never varied between its
 calls, because it sits in the part of a request the service remembers.
 
@@ -422,7 +428,6 @@ calls, because it sits in the part of a request the service remembers.
 nothing was sent — and so does a recording's header, so a reader of a replay
 knows which of the two they are looking at.
 
-**Record rich, run live fast** (Kent, G13, 2026-09-21). How hard the model is asked to try is one setting, `KATALYST_EFFORT`, with **two pinned defaults** behind it. The recorder sends nothing and takes the service's own: a recording is made once and played back by everybody, so it is worth the model's best, and the request stays byte for byte what it was before anybody had an opinion. A live run through the stream route asks for **`medium`**: somebody watching a map arrive is waiting, and the measurement is 27 seconds a call against 79. The setting overrides either. It is pinned for a whole run and never varied between its calls, because it sits in the part of a request the service remembers.
 
 **The receipt says which effort made the map**, as a plain word — `default` when nothing was sent — and so does a recording's header, so a reader of a replay knows which of the two they are looking at.
 

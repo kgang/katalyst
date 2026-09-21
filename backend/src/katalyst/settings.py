@@ -61,8 +61,10 @@ class Settings(BaseSettings):
             setting away for a final recording.
         KATALYST_EFFORT: How hard the model tries, pinned for a whole run and
             never varied between calls — varying it would throw away the
-            remembered prefix the run is reading back cheaply. Left empty, the
-            service's own default applies and the setting is not sent at all.
+            remembered prefix the run is reading back cheaply. Left empty, each
+            path takes its own pinned default (`engine/client.py`): the recorder
+            sends nothing at all and the service's own default applies; a live
+            run and the scorecard, `make eval`, ask for `medium`.
         KATALYST_RECORDINGS: Where the committed recordings are read from. Left
             empty, `backend/recordings/`. A test or an end-to-end browser run
             points it at a folder of its own.
