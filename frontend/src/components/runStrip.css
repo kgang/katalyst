@@ -5,25 +5,37 @@
  * mono box the line above it already uses, the run's own sentence, and — only
  * while a live run is open — how long it has been since anything arrived.
  *
+ * Under that row, on a live run only, two quiet lines saying what the model is
+ * doing this second. **Their room is held open whether or not there is anything
+ * in them**, and each is exactly one line high whatever arrives, so the strip is
+ * one height for the whole of a live run and the map above it never jumps.
+ *
  * **There is no animation in this file and there will not be one.** The seconds
  * change because a number in JavaScript changed, which spends no duration here
- * and costs the motion budget nothing. A spinner, a pulse, a shimmer or a bar
- * sliding across itself would all be motion standing in for a sentence, and the
- * sentence is right there.
+ * and costs the motion budget nothing, and the quiet lines change because words
+ * arrived. A spinner, a pulse, a shimmer or a bar sliding across itself would
+ * all be motion standing in for a sentence, and the sentence is right there.
  */
 
 .run-strip {
   /* Never squashed. This is the line that says whether the tool is alive. */
   flex: 0 0 auto;
   display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-hair);
   margin: 0;
   padding: var(--space-1) var(--space-3);
   border-top: 1px solid var(--hairline);
   background: var(--surface-raised);
   font-size: var(--text-sm);
   color: var(--text);
+}
+
+/* The row that was the whole strip: the word, the sentence, the reading. */
+.run-strip__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   min-height: 1.9em;
 }
 
@@ -57,4 +69,32 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* What the model is doing this second: two lines, always both, on a live run
+ * only. They are indented to the sentence above rather than to the edge, so
+ * they read as being under it — which is what they are about. */
+.run-strip__doing {
+  display: flex;
+  flex-direction: column;
+  /* The width of the state box and the gap after it, so the quiet lines start
+   * where the sentence above them starts. */
+  padding-inline-start: calc(var(--space-2) + var(--space-hair));
+}
+
+/* One line, one line high, whatever arrives.
+ *
+ * The height is fixed rather than a minimum: the words are already cut at a
+ * word before they get here, and this is the promise that a line that slipped
+ * through long still cannot wrap and push the map up the page. The ellipsis is
+ * the backstop for the last few characters at a narrow window; the cut at a
+ * word is what a reader normally sees. */
+.run-strip__doing-line {
+  display: block;
+  line-height: 1.45;
+  height: 1.45em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
 }

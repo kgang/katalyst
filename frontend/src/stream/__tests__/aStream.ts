@@ -22,6 +22,7 @@
 
 import type { components } from "../../api/schema";
 import type {
+  Activity,
   BeliefsPropagated,
   Done,
   GenerationStarted,
@@ -310,6 +311,63 @@ export const DONE: Done = {
 
 /** The whole run, from the first event to the last. */
 export const THE_WHOLE_RUN: readonly StreamEvent[] = [...THE_GROWTH, BELIEFS, RECEIPT, DONE];
+
+/**
+ * One line of what the model is doing right now, built from the shapes sheet.
+ *
+ * **Built from the sheet, never guessed from the server's code.** The sheet is
+ * the one thing the server half and this half share: an `about` naming the open
+ * claim the call is working on or nothing at all, a `kind` that is one of three
+ * words, and the model's own `text`.
+ *
+ * @param kind Which of the three kinds of line this is.
+ * @param text The model's own words, verbatim.
+ * @param about The open claim the call is working on, or nothing for the
+ *   opening call, which is about no one claim.
+ */
+export function activity(
+  kind: Activity["kind"],
+  text: string,
+  about: string | null = null,
+): Activity {
+  return { event: "activity", about, kind, text };
+}
+
+/** The search the model ran while it was working on the war-risk premium. */
+export const SEARCHING: Activity = activity(
+  "searching",
+  "Lloyd's Joint War Committee Hormuz listed areas 2026",
+  "C",
+);
+
+/** One thing that search turned up, as the sheet writes one: a title, then a host. */
+export const FOUND: Activity = activity(
+  "found",
+  "Joint War Committee narrows Gulf listed areas · lloydslist.com",
+  "C",
+);
+
+/** The model's own summarised thinking, in its own words. */
+export const THINKING: Activity = activity(
+  "thinking",
+  "Premiums fell after the 2024 reopening, so the question is whether underwriters move first.",
+  "C",
+);
+
+/**
+ * A thinking line far longer than a strip can hold, so a test can watch it cut.
+ *
+ * It is one sentence rather than repeated filler, because what is being checked
+ * is that the cut lands at a word.
+ */
+export const A_VERY_LONG_THOUGHT: Activity = activity(
+  "thinking",
+  "The Joint War Committee has narrowed its listed areas twice before without the underwriters " +
+    "following within a quarter, so a fourteen-day reopening is necessary but very probably not " +
+    "sufficient for the premium to fall below the level this claim names, and the tanker " +
+    "charterers' own quoted rates are the earlier signal to watch.",
+  "C",
+);
 
 /** The Verify door's answer when the destination was reached. */
 export const REACHED: Verdict = {

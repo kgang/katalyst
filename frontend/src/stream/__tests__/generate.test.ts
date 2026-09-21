@@ -165,6 +165,57 @@ describe("an event name this build does not know", () => {
   });
 });
 
+describe("the ninth name, which only a live run sends", () => {
+  it("test_an_activity_line_is_read_as_itself_and_a_tenth_name_still_is_not", async () => {
+    const read = await everything([
+      block("generation_started", {
+        generation_id: "g",
+        seed: 7,
+        hypothesis: THE_SENTENCE,
+        target: null,
+      }),
+      // The shapes sheet's own shape, written out as the wire carries it.
+      block("activity", { about: "H", kind: "searching", text: "who insures Gulf transits" }),
+      block("a_tenth_kind_of_line", { about: "H" }),
+      block("done", { reason: "reached_terminal", claims: 0, links: 0, rejected: 0 }),
+    ]);
+
+    // The ninth is a name this build knows, so it is not counted as one it does
+    // not — which matters, because an unknown name is shown to the reader as a
+    // divergence between this browser and its server.
+    expect(read.map((one) => one.event)).toEqual([
+      "generation_started",
+      "activity",
+      "unknown",
+      "done",
+    ]);
+    expect(read[1]).toEqual({
+      event: "activity",
+      about: "H",
+      kind: "searching",
+      text: "who insures Gulf transits",
+    });
+
+    // And a tenth name is still ignored without error, exactly as the ninth was
+    // before it existed. That rule is what made adding a ninth possible.
+    expect(read[2]).toEqual({ event: "unknown", name: "a_tenth_kind_of_line" });
+    const folded = read.reduce(fold, waitingFor(THE_SENTENCE, null));
+    expect(folded.unknown.get("a_tenth_kind_of_line")).toEqual({ howMany: 1, unreadable: false });
+    expect(folded.unknown.get("activity")).toBeUndefined();
+    expect(folded.done?.reason).toBe("reached_terminal");
+  });
+
+  it("test_an_activity_line_that_cannot_be_read_is_a_broken_line_like_any_other", () => {
+    // It is a name this build knows, so a payload it cannot read is a broken
+    // line rather than a server that has learned a word.
+    expect(joined("activity", "{not json")).toEqual({
+      event: "unknown",
+      name: "activity",
+      unreadable: true,
+    });
+  });
+});
+
 describe("what the browser asks for", () => {
   it("test_i_dont_know_sends_no_likelihood_at_all", async () => {
     sent.length = 0;

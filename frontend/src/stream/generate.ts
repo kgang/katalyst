@@ -11,9 +11,10 @@
  *
  * **The `event` field is put there by this reader, not by the server.** On the
  * wire the name is the `event:` line and the payload is the `data:` line, so the
- * payload itself carries no name. Joining them is what makes the eight a union a
- * `switch` can walk, and it is the one place a name this build does not know can
- * be caught.
+ * payload itself carries no name. Joining them is what makes the nine a live run
+ * may send — the eight a recording holds and the ephemeral `activity` — a union
+ * a `switch` can walk, and it is the one place a name this build does not know
+ * can be caught.
  *
  * **No component talks to the network.** Everything on screen is fed by the
  * reducer this generator hands events to.
@@ -26,8 +27,8 @@
  * - Never throw on an event name it does not know, and never drop one either.
  */
 
-import type { GenerateRequest, ReadEvent, StreamEvent } from "./events";
-import { EVENT_NAMES } from "./events";
+import type { Activity, GenerateRequest, ReadEvent, StreamEvent } from "./events";
+import { NAMES_A_LIVE_RUN_MAY_SEND } from "./events";
 
 /** Where a generation is asked for. Relative, like every other address in this app. */
 export const GENERATE_ADDRESS = "/api/generate";
@@ -83,9 +84,12 @@ function bodyOf(request: GenerateRequest): Record<string, unknown> {
   return body;
 }
 
-/** Is this a name one of the eight travels under? */
-function isKnown(name: string): name is StreamEvent["event"] {
-  return (EVENT_NAMES as readonly string[]).includes(name);
+/**
+ * Is this a name this build knows — one of the eight a recording holds, or the
+ * ephemeral ninth a live run may send?
+ */
+function isKnown(name: string): name is (StreamEvent | Activity)["event"] {
+  return (NAMES_A_LIVE_RUN_MAY_SEND as readonly string[]).includes(name);
 }
 
 /**
