@@ -1,0 +1,165 @@
+<pasted_content id="afdb">
+Help me do a⡀critical review of this project from first principles with the purposes of re-aligning with the
+  stated objectives of the assignment brief and⢀balancing common sense ideas on⠄practicality, scope, and design
+  within this context. Furthermore, I'd like to find opportunities to add additional rigor and groundedness
+ ⠈regarding the applications of statistics, probability, ontology/epistemology, and quantitative finance. The aim is
+  to find an 80/20 balance on finding the highest leverage adjustments to the course of this project and also       ⠐
+  providing an independent mid-point review on the⡀design, structure,⢀and assumptions that have guided this project
+  so far.
+
+  Start by looking at the assignment brief. Do your own creative⠁brainstorming supplementing your ideas by doing
+  internet research, and surveying select pieces of literature, or developing and articulating ideas you come up
+  with independently.
+
+  Only after doing your⡀own first pass at ideation look at my brainstorming at⠈/Users/kentgang/git3/katalyst/docs/
+  initial-brainstorming.md
+
+  Then look at the specs 
+⠈ /Users/kentgang/git3/katalyst/spec
+
+  and holistic implementation so far, such as the ADRs, code, and git history.
+
+
+  Document your ideas and analysis at /Users/kentgang/git3/katalyst/plans/review2. Produce a final proposal on the
+  adjustments you'd recommend to one or more documents in that folder. The scope of the changes you recommends are
+  expansive and can include ci, backend, frontend, or anything else. Please balance⠄everything with feasibility,
+ ⠠value, and leveraged impact.
+
+  You may ask me questions to align with my values, taste, and decision making. In general, aim for a principled,
+  enlightened, and simple as possible design of code and architecture to understand and maintain. Aim for excellence
+  at the level of a senior or staff engineer. 
+
+
+  Use opus sub-agents to help with deconstructing and parallelizing this work.
+</pasted_content id="afdb">
+
+---
+
+<task-notification>
+<task-id>aced4929357d88d3e</task-id>
+<tool-use-id>toolu_01KmmUPJN2VoJ1LuPYra9rNP</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/e67b8794-4b80-4089-b123-fa56cf9e1b66/tasks/aced4929357d88d3e.output</output-file>
+<status>completed</status>
+<summary>Agent "Independent quant finance research" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git3/katalyst/plans/review2/research-B-quant-finance.md` (2,449 words, ~35 cited sources). I did not read any existing repo file.
+
+## Summary
+
+**The central claim:** the finance layer lives or dies on one identity — `Edge = Σ(pₛ − qₛ)·Sₛ`. The conditional move is not the edge; disagreement with the market is. Set your probabilities equal to the market's and edge must read zero no matter how violent the event. A tool without a "what's already priced in" column is a narrative generator in a finance costume.
+
+**Getting *q* cheaply:** Polymarket/Kalshi public keyless endpoints (Brier ~0.19, superforecaster-class); call-spread arithmetic instead of spline-fitted Breeden-Litzenberger (`e^{rT}(C(K₁)−C(K₂))/(K₂−K₁)` brackets the digital probability); ATM straddle/spot as the market's expected absolute move (1σ ≈ 1.25× that); FedWatch-style day-weighted futures arithmetic. Always badge option-derived numbers as risk-neutral.
+
+**Magnitudes from literature, not vibes:** oil elasticities ~0.08 supply / −0.08 demand (Caldara-Cavallo-Iacoviello) means a 1% supply loss ≈ 10% price move; Kilian's finding that flow-supply shocks historically moved price *less* than demand shocks; free GPR index; a ~50-line event-study function over free bars.
+
+**Biggest technical trap:** P(terminal below stop) ≠ P(stop hit) — ~2× apart for a driftless process. Gave the closed-form barrier formula plus a 1k-path MC for the two-barrier case.
+
+**Sizing:** full Kelly on LLM probabilities is reckless (MacLean-Thorp-Ziemba); make risk-budget sizing primary, Kelly secondary, capped at ¼, computed at *p_low*.
+
+**Best-fit feature:** reverse stress testing — the brief literally describes the regulatory definition. Enumerate paths hitting the stop, rank by probability, extract the node common to the worst ones.
+
+Deliverables: a 6-formula minimal core with concrete data fields, 8 rigor traps each with a falsifiable test (a reviewer can run all 8 in 20 minutes), and a don't-build list (no optimizer, no backtester, no covariance model, no SVI fitting).</result>
+<usage><subagent_tokens>78959</subagent_tokens><tool_uses>30</tool_uses><duration_ms>299967</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a5163c617b3edf23d</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/e67b8794-4b80-4089-b123-fa56cf9e1b66/tasks/a5163c617b3edf23d.output</output-file>
+<status>completed</status>
+<summary>Agent "Independent probability/causal research" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git3/katalyst/plans/review2/research-A-probability-epistemics.md` (~2,700 words + a cited sources appendix). I read no repository files.
+
+**Summary**
+
+**Representation.** A causal Bayesian network over time-ordered, resolvable binary propositions is the right core: it factorises, so local edits are cheap. Scenario/event trees are exponential and unfactored — use them only as a derived "top-k paths" view. Argument maps belong as evidence annotations, never as probability carriers. Add one decision + utility node at the very end (a minimal influence diagram) to produce the tradeable thesis. Pearl's ladder must be visible in the UI: `observe` (conditioning, propagates upstream and explains away), `do` (edge-cut, no upstream revision), and structural edit are three different numbers. True rung-3 counterfactuals about resolved history need a latent-threshold parameterisation, and should be labelled "model-dependent". With LLM-elicited structure you can honestly claim rungs 1–2 *relative to the asserted model* only; both the optimistic (Kıcıman) and pessimistic (Zečević, "causal parrots") literature agree the model recalls causal claims rather than discovering them.
+
+**Parameterisation.** Signed log-odds links as default, not noisy-OR — noisy-OR cannot express inhibition ("already priced in", "OPEC offsets"), which is ubiquitous in finance. Keep noisy-AND for conjunctive chains and noisy-MAX for ordered quantity nodes.
+
+**Elicitation.** Base rate before narrative, conditionals never joints, k≥5 samples aggregated by geometric mean of odds, no extremizing (chain errors compound), sample dispersion retained as free parameter uncertainty. ForecastBench still shows superforecasters at Brier 0.068 vs 0.119 for the best LLM.
+
+**Cheap high-value rigor.** Parameter-level Monte Carlo band, one-way tornado, per-edge "load-bearing" ablation badges, and VOI-ranked tripwires. Skip imprecise probability entirely.
+
+**Inference.** Variable elimination for numbers, forward sampling for the multiverse narrative, plus a test asserting they agree.
+
+The report ends with a 10-item minimal core, 8 rigor traps each with a concrete reproducible test (conditioning-as-intervention, path multiplication, zero leak, LLM-stated joints, base-rate swamping, among others), and an explicit do-not-build list.</result>
+<usage><subagent_tokens>86903</subagent_tokens><tool_uses>38</tool_uses><duration_ms>495094</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a44246a73ed75f897</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/e67b8794-4b80-4089-b123-fa56cf9e1b66/tasks/a44246a73ed75f897.output</output-file>
+<status>completed</status>
+<summary>Agent "Independent product/landscape research" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Written to `/Users/kentgang/git3/katalyst/plans/review2/research-C-product-landscape.md` (~3,000 words, 29 unique cited sources, 7 sections + 15-item checklist). No repository files were read.
+
+**Summary of findings**
+
+*Inspiration sources.* Metaculus's signal is that an event is a **resolvable proposition** — resolution criteria supersede background, and questions pass an approval checklist. Its Conditional Pair is the key primitive: both branches asked together, rendered as a fork glyph (arrow per Parent outcome, bar per conditional probability), built because "two forecasters could have the same forecasts while having very different mental models." **The gap between branches is the causal claim.** The losing branch is *annulled, not scored* — counterfactual worlds should be retired, never deleted. FutureSearch is a ReAct research agent; its docs draw an explicit **conditional (correlational) vs. decision (causal)** line and forecast both branches together for coherence. ACX: 212 sources in 5 minutes for $8, near-elite parity, strongest in finance — but agents "extrapolate base rates without checking whether the generating mechanism is still active."
+
+*Highest-value prior art.* Vensim SyntheSim (slider per parameter, sparkline on the node, baseline ghosted behind), BN GUIs (distribution bars inside nodes, clamp-a-state repropagation, GeNIe's red/grey whole-graph sensitivity shading), Guesstimate's `5 to 9` literal, Loopy's animated propagation, the Minneapolis Fed stress-test tool, and Nicky Case's "Place Your Bets!" — elicit the user's guess before revealing the model's.
+
+*Two traps I'd flag hardest.* (1) The **multiple-stage fallacy** — naive edge multiplication will demo a 3% answer to the Hormuz question and lose the room; anchor to a base rate and show the chain as a shift. (2) **Conditioning vs. intervening** — "Iran struck next day" is a `do()`; conditioning yields backward inference that reads as a bug. Offering both modes is a 30-second demo moment no competitor will have.
+
+*Audit pattern.* Port AuditForecast's base-rate → per-factor likelihood-ratio → odds-space aggregation onto each edge, plus typed transmission channel, stance-flagged evidence, red team, and "what would change my mind" (which doubles as the stop-loss trigger).
+
+*Scope call.* 30% generation/schema, 30% canvas, 15% engine, 15% thesis, 10% infra. The single highest-leverage decision: **separate slow LLM generation from fast local evaluation** — if edits re-prompt, the multiverse collapses into "ask again." Top over-engineering risk is an engine never joined to the UI.</result>
+<usage><subagent_tokens>119503</subagent_tokens><tool_uses>41</tool_uses><duration_ms>626417</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a6d23d959864f78de</task-id>
+<tool-use-id>toolu_01EhUC8eR4SkkuuPBu3fUr39</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/e67b8794-4b80-4089-b123-fa56cf9e1b66/tasks/a6d23d959864f78de.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit finance and thesis layer" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Audit written to `/Users/kentgang/git3/katalyst/plans/review2/audit-E-finance-thesis.md` (one file, as instructed; `plans/` is gitignored so no repo noise). Scratch scripts stayed in the scratchpad.
+
+## Summary
+
+**The financial half of Katalyst does not exist yet.** No price, position, horizon, P&amp;L, expected value, edge, or market data — not on `main`, not on the `feat-04b-stream` generation branch. `spec/thesis/README.md` is a landing page whose five chapters all say "written in stack 05"; stack 05 is `not started` behind two unmerged stacks. The frontend admits it: *"There is no thesis card, no strip of world state, no live price."*
+
+**Three blockers.** (1) A price is a binary threshold claim, never a distribution — grep for `volatil`/`spot` returns zero. (2) `PricePayoff.move ≥ 0` encodes only the winning leg, so EV is monotone in `p` and can never say *don't trade this*. (3) `ContractPayoff` carries no price by design (ADR-0013) and nothing above supplies one — `grounding/` is 21 lines of docstring.
+
+**Two things I found by running the engine.** `do(C=True)` moves Brent `.393→.476` yet moves both tradeable terminals by **exactly 0.000000**; same for `do(R=True)`. Cause: a `trigger` fires on its source's *earliest*-arriving push day (`propagation.py:670,1256`), so M1/M2 are deaf to two of B's four causes, and the flagship strike branch reads B on a different day than the base. Separately, the fixture's prose advertises a `+13pt` edge; the engine computes M1 `.456` vs market `.48` — the demo trade has silently flipped to a *sell*.
+
+**Numbers audit:** the XLE/SPY prior `.35` checks out (theory gives 0.27–0.30); the OPEC+ prior `.18` is badly wrong (criteria accept cut *extensions*, base rate ~0.6–0.9); the Hormuz base-rate reference class is wrong for its claim; there is no spot anchor, so the Brent prior is unfalsifiable.
+
+**The bridge is ~650 LOC.** The engine already builds joint boolean samples in `_one_pass` and throws them away — retain them (20 lines) and the inverse query is 40 lines. Zero compliance disclaimers exist anywhere.</result>
+<usage><subagent_tokens>200012</subagent_tokens><tool_uses>44</tool_uses><duration_ms>604243</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a1660caea0fb36f40</task-id>
+<tool-use-id>toolu_019Q9oPmmFjsuMF82KGRYam8</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/e67b8794-4b80-4089-b123-fa56cf9e1b66/tasks/a1660caea0fb36f40.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit LLM generation and grounding" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Audit written to `/Users/kentgang/git3/katalyst/plans/review2/audit-G-generation.md`. No other file touched; worktrees undisturbed.
+
+## Summary (~300 words)
+
+**Algorithm.** Frontier expansion, one structured call per unit (`grow.py:126`, `expand.py:76`). Caps: depth 5, width 3, 30 claims, 3 concurrent, $15 (`outcome.py:280`). Use case 2 (fan-out) is native. Use case 1 is **not** a search: the destination is drafted, parked off-frontier, and every prompt just nudges "work towards it" — expansion stays forward-only, and `verify.py` reads reachability afterwards.
+
+**The one real run is the most damaging evidence.** `.runs/hormuz-…json`: 10 calls, 10 m 54 s, $1.32, 61% thinking. Asked the brief's own question, it made **Brent a terminal at depth 1** and spent 7 of 10 claims on a European-gas digression. The graph is a **pure tree** — 9 links / 10 claims, every claim one parent, **zero negative strengths**, no common cause, no confounder, no red team, no "what would change my mind". 6 terminals but only ~3 distinct risk complexes. The hypothesis' resolution was literally `"Res "` / judge `"x "`. Eight of ten base rates were recalled with no source (since fixed).
+
+**Latency.** ~65 s/call, effectively sequential (`at_once=3` buys nothing — a node's siblings must be seen). G7's 25-searches/5-rounds will push this to 20–35 min, unmeasured. Proposed: streamed skeleton call (first tile 8–15 s, complete 45–75 s) + parallel per-edge/per-node enrichment + one red-team call ≈ **2.5–3.5 min, ~$0.7**. Skeleton-first wins on *quality* first: `ClaimProposal` structurally carries one parent, so today's design **cannot** draw a common cause.
+
+**Cheapest rigor.** Replace abstract `strength` with P(B|A), P(B|¬A); derive the log-odds weight and the child's prior. Zero engine change — `propagation.py:1226` already reads exactly that quantity — and it kills the ambiguous `prior`, the "+1 triples the odds" anchor, and gives a computable coherence residual.
+
+**Absent:** `evals/`, all four recordings, every market adapter. Three ADRs defer to a scorecard nobody has run.</result>
+<usage><subagent_tokens>253632</subagent_tokens><tool_uses>55</tool_uses><duration_ms>553760</duration_ms></usage>
+</task-notification>
