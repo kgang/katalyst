@@ -324,3 +324,58 @@ Then read `spec/thesis/card-and-export.md` against `card.py`. Long material: `pl
 **Not checked:** any route or browser file, T2a's bodies, a card over the real Hormuz recording, and the half of INV-thesis.15 that needs a route to rebuild a world.</result>
 <usage><subagent_tokens>367930</subagent_tokens><tool_uses>118</tool_uses><duration_ms>2077178</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a4449f7e273b096ee</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a4449f7e273b096ee.output</output-file>
+<status>completed</status>
+<summary>Agent "Core stubs: shapes as code" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me, from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`:** `uv run ruff check src benchmarks tests/unit` · `uv run ruff format --check src benchmarks tests/unit` · `uv run mypy --strict src/katalyst/domain` · `uv run mypy src` · `uv run pytest tests/unit/domain tests/unit/engine -x -q --no-cov` · `uv run pytest -q tests/unit/domain tests/unit/engine` (read the missing-branch column) · then `make numbers-check` from the worktree root.
+
+**Deviations** (file · plan said · I wrote · why)
+
+1. `rates.py` `shapes_of` · `(claim, arrows, source_persistence, window)` · adds `*, persistence: Persistence` · **the first open point, decided yes.** `ClaimShapes` must split `holds_back` from `ends`, and only the *target's* persistence tells them apart. `Proposition.persistence` does not exist until the flip, so it is passed, exactly as `rates_of` already does. `carried` stays **two** cases: the half-gated array an ending arrow needs is `ender_slices`, writer D's named lift into `states.py`, derivable from `points` and `carried`.
+2. `states.py` `needs_the_joint` · `(graph, claim)` with a body · adds `persistence`, body raises · same missing field; a real body would not type-check.
+3. All five modules · `NDArray`, `Mapping[...]`, `Literal["event","state"]` inline, `pinned = {}` · parameterised arrays, spelled-out returns, a `Persistence` alias, `NOTHING_PINNED = MappingProxyType({})` · `disallow_any_generics`, and ruff's mutable-default trap. House style: `NOTHING_ADDED`.
+4. `diff.py:481` · untouched · `**budget` expanded to `versions=`/`worlds=` at both call sites · `dict[str, int]` no longer type-checks against the `engine` literal. Two lines, no behaviour.
+5. `pyproject.toml` · new `[tool.coverage.report] exclude_also = ["raise NotImplementedError"]`, commented dated and temporary.
+6. `engine/worlds.py` · "three pass-throughs" · `ENGINE` passed once, at the single `propagate` call in `_worked_through`, which all three of `build_world`, `difference`, `conditional` reach. One place, named in the docstring.
+
+Second open point kept as the plan says.
+
+**Owed outside my files:** `ARCHITECTURE.md` (hot) needs `domain/` listing the five new modules.
+
+**Tails**
+
+```
+All checks passed!
+96 files already formatted
+Success: no issues found in 17 source files   (mypy --strict domain)
+Success: no issues found in 50 source files   (mypy src)
+428 passed in 76.40s (0:01:16)
+TOTAL   1556   0   356   0   100%             (rates/states/forward/solving/sampling all 100%)
+worked-numbers: worked-numbers.txt still says what the engine says.
+```
+
+Remaining 4 ruff errors and 1 format diff repo-wide are all in `tests/oracles/**` — the oracle agent's, untouched.
+
+**Suggested commit**
+
+```
+feat(engine): the shapes of the by-deadline core, behind a flag that still says "today"
+
+Five new modules under domain/ — rates, states, forward, solving, sampling —
+with every constant, frozen dataclass and signature record 0016 asks for, full
+docstrings, and bodies that raise. propagate gains engine/slices/sampled_worlds
+and dispatches to _by_deadline; the "today" path is untouched and make
+numbers-check is green. Six test files name the tests their writers owe.
+raise NotImplementedError is excluded from coverage, dated and temporary.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+```</result>
+<usage><subagent_tokens>167545</subagent_tokens><tool_uses>78</tool_uses><duration_ms>982331</duration_ms></usage>
+</task-notification>
