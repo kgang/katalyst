@@ -759,6 +759,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Run it as a measurement: keep everything, write no recording.",
     )
     asking.add_argument(
+        "--model",
+        default="",
+        help=(
+            "Which model to ask, pinned for this whole run. The one the settings "
+            "name when left out, which is claude-sonnet-5."
+        ),
+    )
+    asking.add_argument(
         "--effort",
         default="",
         choices=["", "low", "medium", "high", "xhigh", "max"],
@@ -782,7 +790,9 @@ def main(argv: list[str] | None = None) -> int:
     # The stand-in is asked for **here and nowhere else**: the stream route calls
     # `live_answerer`, and a seam that answered a reader from a test file would
     # be a map that looked generated (Kent, 2026-09-20).
-    answerer = a_stand_in_answerer() or live_answerer(effort=said.effort or None)
+    answerer = a_stand_in_answerer() or live_answerer(
+        effort=said.effort or None, model=said.model or None
+    )
     if answerer is None:
         print(NO_KEY, file=sys.stderr)
         return 1

@@ -556,7 +556,9 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
         generation_id=announced,
         played_from=played_from,
         hypothesis=recording.hypothesis,
-        target=None,
+        # A Verify recording knows where it was asked to get to, and the
+        # transcript used to say it had no destination at all (2026-09-20).
+        target=recording.target,
         seed=recording.header.seed,
         on=recording.header.recording_date,
         mode="replay",

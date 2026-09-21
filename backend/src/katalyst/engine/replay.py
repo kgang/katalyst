@@ -169,9 +169,19 @@ class Recording(BaseModel):
     @property
     def hypothesis(self) -> str:
         """The sentence this recording was made from, read off its own first event."""
+        return self._started("hypothesis")
+
+    @property
+    def target(self) -> str | None:
+        """The place the run was asked whether it gets to, when it was asked one."""
+        return self._started("target") or None
+
+    def _started(self, field: str) -> str:
+        """Read one field off this recording's own first event."""
         for name, payload in self.lines:
             if name == events.NAMES[GenerationStarted]:
-                return str(payload.get("hypothesis", ""))
+                said = payload.get(field)
+                return "" if said is None else str(said)
         return ""
 
 

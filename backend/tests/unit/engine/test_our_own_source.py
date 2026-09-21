@@ -208,3 +208,62 @@ def test_nothing_follows_the_guard_that_runs_a_module_as_a_program() -> None:
             offenders.append(f"{module.name}: {', '.join(ast.unparse(one)[:40] for one in after)}")
 
     assert offenders == []
+
+
+# --- The word *agreement* stays free ---------------------------------------
+
+
+AGREEMENT_LIVES_HERE = "katalyst/domain/diff.py"
+"""The one file allowed a field called `agreement`: the diff's same-direction share.
+
+`ClaimDiff.agreement` and `Ranked.agreement` answer one question — of the worlds
+that were run, what share moved the same way as the headline. It is a column,
+never a factor, and it is about worlds inside one run.
+"""
+
+
+def every_field_called_agreement() -> list[str]:
+    """Find every field named `agreement` in our own source, with the file it is in."""
+    found: list[str] = []
+    for module in every_module_of_ours():
+        written = ast.parse(module.read_text(encoding="utf-8"))
+        for node in ast.walk(written):
+            named = (
+                node.target.id
+                if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+                else None
+            )
+            if named == "agreement":
+                found.append(f"{module}:{node.lineno}")
+    return found
+
+
+def test_the_word_agreement_means_same_direction_and_nothing_else() -> None:
+    """Decision record 0015 said *not yet* to an ensemble, and this keeps that door shut.
+
+    There is no `engine/ensemble.py`, no run-to-run number anywhere in the code
+    and no screen that says *runs agree* — so a field called `agreement` may
+    exist in exactly one place, where it means the share of worlds that moved the
+    same way as the headline **inside one run**. Anywhere else the same word
+    would quietly come to mean two models agreeing, which is a claim this product
+    has not earned and a reader would believe.
+
+    Read over our own source rather than trusted to memory, for the same reason
+    `test_beliefs_never_merged` is: an invariant that depends on good intentions
+    is a wish (`evaluation.md`, INV-generation.31).
+    """
+    elsewhere = [one for one in every_field_called_agreement() if AGREEMENT_LIVES_HERE not in one]
+
+    assert elsewhere == []
+
+
+def test_nothing_in_the_engine_runs_the_model_twice_to_compare_answers() -> None:
+    """The other half of the same door: record 0015 said *not yet* to an ensemble.
+
+    No module anywhere in this package is one, by name — and a module is where
+    one would have to live, because running the model twice and comparing needs
+    somewhere to hold both answers.
+    """
+    named = sorted(one.name for one in every_module_of_ours() if "ensemble" in one.name)
+
+    assert named == []

@@ -623,7 +623,12 @@ def test_the_width_cap_counts_the_room_beside_the_arrows_own_cause() -> None:
     assert sum(1 for one in finished.graph.links if one.source == started) == 2
     refused = refusals_in(steps[:-1])
     assert len(refused) == 1
-    assert "room beside" in refused[0].result.claim_in_words  # type: ignore[union-attr]
+    said = refused[0].result.claim_in_words  # type: ignore[union-attr]
+    assert "room beside" in said
+    # A reader sees this sentence drawn as a tile, so it names the claim by its
+    # own words and never by a minted identifier (2026-09-20).
+    assert STARTED_AT in said
+    assert finished.graph.hypothesis_id not in said
 
 
 # --- Caps that were checked in the wrong place -----------------------------

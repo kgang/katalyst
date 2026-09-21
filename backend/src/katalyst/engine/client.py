@@ -707,7 +707,7 @@ def _named(path: str) -> Any:
     return getattr(import_module(module), name)()
 
 
-def live_answerer(*, effort: str | None = None) -> Model | None:
+def live_answerer(*, effort: str | None = None, model: str | None = None) -> Model | None:
     """Build the live answerer, or say plainly that there is no key for one.
 
     The one function that knows whether this program can call a model at all.
@@ -717,6 +717,8 @@ def live_answerer(*, effort: str | None = None) -> Model | None:
     Args:
         effort: How hard the model should try on this run, when a measurement run
             has said. The settings decide when it has not.
+        model: Which model to ask, when a measurement run has said. The settings
+            decide when it has not.
 
     Returns:
         A live answerer, or nothing at all when no key is configured.
@@ -731,4 +733,5 @@ def live_answerer(*, effort: str | None = None) -> Model | None:
             max_retries=HOW_OFTEN_TO_TRY_AGAIN,
         ),
         effort=effort,
+        model=model,
     )

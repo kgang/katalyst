@@ -244,7 +244,7 @@ The searches cap adds no new number to the product: its floor is the claims cap 
 
 **A round holds back one call's worth of searches so the generation cap is never passed** (*decided here*, 2026-09-20). A call is told once whether it may search and can then spend up to its own budget; nothing can stop it at search twelve. So the calls of a round are allowed the tool one at a time, in frontier order, and a call is allowed only while a whole call's budget still fits in what is left. The last call's worth therefore goes unspent — the price of never passing a ceiling, and a cheap one against a number that is a floor rather than a target. The same shape of reservation is why the claims cap sizes a round to the room the map has left, rather than being read once a round and stepped over by the three answers already in flight.
 
-Decision record 0006 *estimates* a 30-claim map at about 40 calls. The first real measurement, quoted in B5, is smaller and slower than the estimate; the rest go in the pull request and `STATUS.md`, never guessed here.
+Decision record 0006 *estimates* a 30-claim map at about 40 calls. The first real measurement, quoted in B5, is smaller and slower than the estimate; the rest go in the pull request and [`../../docs/measurements.md`](../../docs/measurements.md), never guessed here.
 
 ### What a prompt may and may not contain
 
@@ -412,7 +412,7 @@ What was built is kept, not thrown away: a partial map with a visible reason bea
 
 **One measurement, and it is a fact rather than an estimate.** The first live Hormuz run, 2026-09-17, on `claude-opus-5` at the default effort: **10 calls, 9 searches, $1.32, 10 minutes 54 seconds, 61% of the written tokens spent on thinking, 10 claims, 0 refused.** About one tile a minute, and sequential by nature — every call has to see the map as it stands. No figure is quoted here for `claude-sonnet-5`, on cost or on time, because none has been measured yet; both go in the pull request when they are.
 
-The ceiling *across* runs is a working agreement kept in `STATUS.md`; nothing is stored between requests until stack 05. **Only the coordinator runs a command that spends money.**
+The ceiling *across* runs is a working agreement kept in [`../../docs/measurements.md`](../../docs/measurements.md); nothing is stored between requests until stack 05. **Only the coordinator runs a command that spends money.**
 
 ### B6 — no ending reached: one last call, then an honest card
 

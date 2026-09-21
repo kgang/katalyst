@@ -317,10 +317,14 @@ def growth_event(outcome: Outcome, at: int) -> ProposalAccepted | ProposalReject
         return ProposalAccepted(
             at=at, proposition=result.proposition, links=result.links, frontier=outcome.frontier
         )
-    refused = result if isinstance(result, Refused) else None
+    if not isinstance(result, Refused):  # pragma: no cover - `makes_an_event` decided this
+        raise TypeError(
+            "growth_event was handed an answer that makes no event. `makes_an_event` "
+            "says which do, and the caller asks it first."
+        )
     return ProposalRejected(
         at=at,
-        claim_in_words="" if refused is None else refused.claim_in_words,
-        violations=() if refused is None else refused.violations,
+        claim_in_words=result.claim_in_words,
+        violations=result.violations,
         frontier=outcome.frontier,
     )

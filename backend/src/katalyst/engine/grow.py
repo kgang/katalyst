@@ -475,8 +475,9 @@ class _Walk:
                 update={
                     "result": Refused(
                         claim_in_words=(
-                            f"There is no room beside {crowded} for another arrow: it "
-                            f"already has the {self.caps.width} this run allows it."
+                            f"There is no room beside {_named(graph, crowded)} for "
+                            f"another arrow: it already has the {self.caps.width} "
+                            "this run allows it."
                         )
                     )
                 }
@@ -582,6 +583,28 @@ def _never_got_started(last_refusal: str | None) -> str:
         "This run never got started: the sentence could not be written as a claim "
         "anybody could settle."
     )
+
+
+def _named(graph: Graph, claim_id: PropositionId) -> str:
+    """Quote a claim by its own words, because a reader reads this on the screen.
+
+    A refusal's sentence is drawn as a tile. It carried a twenty-six-character
+    minted identifier, which means nothing to anybody outside this process
+    (2026-09-20).
+
+    Args:
+        graph: The map the claim is on.
+        claim_id: The claim to name.
+
+    Returns:
+        Its words, trimmed if they run long, or its identifier when it is not on
+        the map after all.
+    """
+    for one in graph.propositions:
+        if one.id == claim_id:
+            words = " ".join(one.claim.split())
+            return f'"{words}"' if len(words) <= 80 else f'"{words[:79].rstrip()}…"'
+    return claim_id
 
 
 def _what_arrived(accepted: Accepted) -> str:
