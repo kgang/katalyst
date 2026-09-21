@@ -119,7 +119,17 @@ export function receiptLines(receipt: Receipt): readonly Line[] {
     // above nothing and below a cent — a guard word used exactly when it is
     // true, and never in place of a figure that exists.
     { label: "cost", reading: asMoney(receipt.dollars), field: "dollars" },
-    { label: "took", reading: `${asMeasurement(receipt.seconds, 1, 1)}s`, field: "seconds" },
+    // **How long, and whose clock.** On a live run this is how long the run
+    // took. On a replay it is how long the *replay* took — a few seconds of
+    // paced playback beside a map that took eleven minutes to make — and a
+    // reader comparing the two would otherwise conclude this product is two
+    // hundred times faster than it is. The recorded run's own duration is not
+    // on the wire; when it is, this row can carry it and say which.
+    {
+      label: receipt.mode === "replay" ? "the replay took" : "took",
+      reading: `${asMeasurement(receipt.seconds, 1, 1)}s`,
+      field: "seconds",
+    },
     // How hard the model was asked to try, in the word the service takes.
     // **Two maps of the same sentence can differ because of this and for no
     // other reason**, so it is a reading rather than a footnote: a recording is

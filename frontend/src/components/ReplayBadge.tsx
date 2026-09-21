@@ -14,13 +14,26 @@
  * explains it goes in the line under the map where every other sentence about
  * where this map came from already lives.
  *
- * **Two sources, and the receipt is the authority.** The badge is set from
- * whether a key is configured; the receipt, when it lands, carries the mode and
- * the day the recording was made. The receipt names the day here, and if it ever
- * says *live* where this badge says *replay*, the badge takes the receipt's word
- * and says out loud that the two disagreed. Two derivations of one line are
- * normally the thing this product refuses; this is the one place both are needed,
- * so the rule is written down rather than left to luck.
+ * **Two sources, and they are never merged.** The badge is set from whether a
+ * key is configured — the browser knows that before the stream says anything,
+ * which is the whole reason the badge can be on screen from the first frame.
+ * The receipt, when it lands, carries the mode and the day the recording was
+ * made, and it names the day here, because a day is a fact only the receipt
+ * has.
+ *
+ * **And when the two disagree, neither wins: the disagreement is the finding.**
+ * A session with no key that gets a receipt saying `live` is a copy that has
+ * done something nobody can account for, and the honest screen is the one that
+ * shows both readings and says they differ — under the map, in the line where
+ * every other sentence about where this map came from already lives. The badge
+ * stays, marked as disagreed, because it is still true that this session had no
+ * key; the receipt stays, because it is still true that the run reported
+ * itself live. Resolving it in favour of either would be this screen deciding
+ * which of two things it was told to believe, which is the one decision it must
+ * not make on a reader's behalf.
+ *
+ * *(The chapter used to say the badge takes the receipt's word. It does not, and
+ * should not — settled here, 2026-09-21, and B9 now says what this does.)*
  */
 
 import "./replayBadge.css";

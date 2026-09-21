@@ -351,7 +351,9 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
     "read from cache",
     "web searches",
     "cost",
-    "took",
+    // A replay's clock is the replay's, and the row says so: a few seconds of
+    // paced playback beside a map that took eleven minutes to make.
+    "the replay took",
     "how hard the model tried",
     "mode",
   ]);

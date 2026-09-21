@@ -98,6 +98,9 @@ describe("the receipt", () => {
     "mode",
   ];
 
+  /** The same ten on a replay, where the clock is the replay's own. */
+  const REPLAY_LABELS = LABELS.map((one) => (one === "took" ? "the replay took" : one));
+
   it("test_the_receipt_strip_prints_every_field_and_adds_nothing_up", () => {
     const { container } = render(<ReceiptStrip receipt={RECEIPT} />);
 
@@ -203,6 +206,22 @@ describe("the receipt", () => {
       (one) => one.textContent,
     );
     expect(waiting).toEqual(["—", "—"]);
+  });
+
+  it("test_a_replayed_run_says_whose_clock_the_duration_is", () => {
+    // A replay takes a few seconds of paced playback; the map it plays took
+    // eleven minutes to make. A row reading `took 7.4s` beside that map would
+    // have a reader conclude this product is two hundred times faster than it
+    // is, so the row says whose seconds these are.
+    const { container } = render(<ReceiptStrip receipt={REPLAY_RECEIPT} />);
+    expect(
+      [...container.querySelectorAll(".receipt-strip__label")].map((o) => o.textContent),
+    ).toEqual(REPLAY_LABELS);
+    // And a live run's row is the plain one, because there is only one clock.
+    const live = render(<ReceiptStrip receipt={RECEIPT} />);
+    expect(
+      live.container.querySelector('[data-field="seconds"] .receipt-strip__label')?.textContent,
+    ).toBe("took");
   });
 
   it("test_a_replayed_run_prints_its_zero_rather_than_hiding_it", () => {

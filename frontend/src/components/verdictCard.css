@@ -42,11 +42,16 @@
 
 /* The route as a line of identifiers, in the number face, so the shape of the
  * chain is readable before any of its words are. */
+/* The label over the route, drawn exactly as the label over the likelihood two
+ * rows below it is drawn. Two labels doing the same job in two styles — one
+ * lower-case and in the number face, one upper-case and quiet — made the card
+ * read as two cards that happened to be next to each other. */
 .verdict-card__route {
   margin: 0;
-  font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--text);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .verdict-card__steps {

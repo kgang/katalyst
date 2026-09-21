@@ -73,8 +73,26 @@ export interface GenerationStarted {
    * reads it: the one the request sent, or the one `engine/ids.py` minted when it
    * sent none, or, on a replay, the one in the recording's header, which wins over
    * both. The browser prints what this says and never works out which case it was.
+   *
+   * **And by the time it is a number here it may already be wrong.** A seed is
+   * up to nineteen digits and a browser holds a whole number exactly only up to
+   * sixteen, so `JSON.parse` has rounded it before any of our code sees it.
+   * Nothing computes with a seed — it is printed under the map so a reader can
+   * ask for the same one again — and a rounded seed printed there is a number
+   * on screen that is simply wrong, in the one place that exists so an answer
+   * can be had twice.
    */
   readonly seed: number;
+  /**
+   * The same seed, exactly as it was written on the wire: its digits, not a
+   * number.
+   *
+   * Read off the raw text of the `data:` line by the reader, because that is
+   * the last moment the digits exist. Absent only when a caller handed the
+   * events over by hand, and then the parsed number is the whole of what is
+   * known.
+   */
+  readonly seed_as_written?: string;
   /** The sentence the reader typed, in their own words. */
   readonly hypothesis: string;
   /** The Verify door's destination, in their words. Null when they used the Explore door. */
@@ -149,6 +167,14 @@ export interface Receipt {
   readonly seconds: number;
   /** Live, or played from a recording. The only place in the stream this is said. */
   readonly mode: "live" | "replay";
+  /**
+   * How hard the model was asked to try, as a plain word: `default` when
+   * nothing was asked for and the service's own applied, otherwise `low`,
+   * `medium`, `high`, `xhigh` or `max`. A recording is made rich and a live run
+   * is made fast (Kent, G13), so two maps of the same sentence at the same seed
+   * can differ for a reason that has nothing to do with the sentence.
+   */
+  readonly effort: string;
   /** The day the recording was made, as the map writes a day: `2026-09-18`. Null when live. */
   readonly recording_date: string | null;
   /** A hash of the prompt this run was made against. Null never; it is always known. */
@@ -227,10 +253,14 @@ export interface GenerateRequest {
   readonly user_belief?: Ranged;
   /** Only when reproducing a run we were given a seed for. See below. */
   readonly seed?: number;
-  /** Upper-bounded on the route. Left out, the engine uses its own. */
-  readonly versions?: number;
-  readonly worlds?: number;
 }
+
+// The route takes `versions` and `worlds` too, both upper-bounded on it, and the
+// browser sends neither: the engine's own are what every map in this product is
+// worked out with, and a screen that could ask for fewer would be a screen that
+// could quietly make one answer cheaper and less certain than the one beside it.
+// If a reason to send them ever appears it will be a control a reader can see,
+// not a default they cannot.
 
 /** One async generator over the stream. No component talks to the network. */
 export async function* generate(request: GenerateRequest): AsyncGenerator<StreamEvent>;
@@ -286,12 +316,21 @@ export interface Skeleton {
 }
 
 /** Where a generation is. Each is a different thing on screen, and none is a spinner. */
-export type Phase = "waiting" | "growing" | "settled" | "stopped" | "failed";
+export type Phase = "waiting" | "growing" | "settled" | "stopped" | "failed" | "ended_early";
 
 export interface Growth {
   readonly phase: Phase;
   /** The engine's name for this run. Null until `generation_started`. */
   readonly generationId: string | null;
+  /**
+   * The seed every likelihood in this run was worked out from, as its digits.
+   * Null until the run has started, and never worked out here.
+   */
+  readonly seed: string | null;
+  /** The sentence the reader typed, as the run's first event repeated it back. */
+  readonly hypothesis: string;
+  /** The destination the reader named, or null on the Explore door. */
+  readonly target: string | null;
   /**
    * The map as far as it has been built, in the same view model the canvas already
    * draws. Every number slot the engine has not spoken about reads its absence, so
@@ -708,12 +747,27 @@ THIS GENERATION
   tokens out       <Receipt.output_tokens>
   read from cache  <Receipt.cache_read_tokens>
   web searches     <Receipt.searches>
-  cost             <Receipt.dollars>
-  took             <Receipt.seconds>
+  cost             <Receipt.dollars>, in the two places money has
+  took             <Receipt.seconds> — "the replay took", on a replay
   how hard the
     model tried    <Receipt.effort>
   mode             live
 ```
+
+**Money has two places** *(coordinator, 2026-09-21)*. It printed up to four — `$0.6132` — which is
+the same fake precision checklist line 4 exists to stop, in the place a reader is most likely to
+compare two runs: the fourth place is a rounding of a price table, and four places read as a
+measurement. **And a guard word exactly when it is true** (K2): a run that spent nothing prints
+`$0.00`, which is a computed zero and reads as one, and a run that spent something and less than a
+cent prints `<$0.01`, because `$0.00` there would say a run was free when it was not. One function,
+used by the generation's strip and the insert's alike, so the two cannot come to write a cost two
+ways.
+
+**And `took` says whose clock it is.** On a live run it is how long the run took. On a replay it is
+how long the **replay** took — a few seconds of paced playback beside a map that took eleven minutes
+to make — so the row reads *the replay took*. A reader comparing the two figures without that word
+would conclude this product is two hundred times faster than it is. The recorded run's own duration
+is not on the wire; when it is, this row can carry it and say which is which.
 
 **Amended 2026-09-21 — there are ten readings, and the tenth is how hard the model tried.** A plain
 word: `default` when nothing was asked for and the service's own applied, otherwise `low`, `medium`,
@@ -988,13 +1042,22 @@ its own beneath, so the sentence is never more current than the oldest thing it 
 key but four recordings can do everything a reviewer came to see, and a card greyed out because the
 whole server called itself `not_ready` would be the most misleading screen in the product.
 
-**A replay says it is a replay, twice, from two sources that must agree.** The badge is on the canvas
-for the whole session, from the moment the run starts, set from `model_key_present` — the browser
-knows before the stream does. When `receipt` arrives it carries `mode` and the recording's date, and
-**the receipt is the authority**: it names the day on the badge, and if it ever says `live` where the
-badge says replay, the badge takes the receipt's word and the strip says that the two disagreed. Two
-derivations again, and this is the one place both are needed — the badge has to be there before the
-receipt exists — so the rule is written down rather than left to luck.
+**A replay says it is a replay, twice, from two sources.** The badge is in the bar for the whole
+session, from the moment the run starts, set from `model_key_present` — the browser knows before the
+stream does. When `receipt` arrives it carries `mode` and the recording's date, and it **names the
+day**, because the day is a fact only the receipt has. Two derivations again, and this is the one
+place both are needed — the badge has to be there before the receipt exists — so the rule is written
+down rather than left to luck.
+
+**When the two disagree, neither wins: the disagreement is the finding** *(corrected 2026-09-21;
+this said the badge takes the receipt's word, and the code has never done that — rightly)*. A
+session with no key that gets a receipt saying `live` is a copy that has done something nobody can
+account for, and the honest screen shows both readings and says they differ, in the line under the
+map where every other sentence about where this map came from lives. The badge stays, marked as
+disagreed, because it is still true that this session had no key; the receipt stays, because it is
+still true that the run reported itself live. Resolving it in favour of either would be the screen
+deciding which of two things it was told to believe, which is the one decision it must not make on a
+reader's behalf. The reasoning lives beside the code that does it, in `ReplayBadge.tsx`.
 
 **One recorded intervention per recording.** Each file carries the scripted *"…but Iran is struck
 the next day"* its card offers, so **Add a claim** works once on a replayed map — the route matches
@@ -1139,9 +1202,14 @@ receipt's mode and the badge's source disagree, the receipt wins and the disagre
 `cache_read_tokens`, `searches`, `dollars`, `seconds`, `effort` and `mode` — **ten** fields *(amended
 2026-09-21: `effort` is the tenth)*, each labelled, none omitted and **none derived, which includes
 none shortened** — and before the event arrives no cost, token count, search count or elapsed time is
-rendered anywhere. The same ten are drawn for an insert's own receipt, by the same strip. **The ten
-are rendered in exactly one place on any screen** *(amended 2026-09-21)*: the Inspector's view of the generation holds the
-working and points at the strip, and renders no copy of them. *Tests:* strip ›
+rendered anywhere. **None derived** means none worked out from the others and none shortened to
+something a reader cannot check: a fingerprint is printed whole. The two roundings that do happen
+are roundings of one field for the page — dollars to the two places money has, seconds to one — with
+the value itself untouched and nothing downstream reading the string; and an amount above nothing
+and below a cent prints `<$0.01`, a bound stated where there is a bound to state and never in place
+of a figure that exists. The same ten are drawn for an insert's own receipt, by the same strip.
+**The ten are rendered in exactly one place on any screen** *(amended 2026-09-21)*: the Inspector's
+view of the generation holds the working and points at the strip, and renders no copy of them. *Tests:* strip ›
 `test_the_receipt_strip_prints_every_field_and_adds_nothing_up`,
 `test_the_cost_is_drawn_in_one_place_and_the_panel_points_at_it`,
 `test_the_mode_row_says_the_mode_and_the_day_and_nothing_else`,
