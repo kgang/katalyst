@@ -56,6 +56,9 @@ test("test_a_tile_seen_from_far_away_prints_every_belief_line_whole", async ({ p
   // The stored branch, opened the way a reader opens it: by pressing its name in
   // the panel. The map re-frames to full zoom when it opens, so it has to be
   // zoomed out again before there is anything far away to read.
+  // The list of branches is one of the panels beside the map, so the panel is
+  // turned to it first — nothing but the reader ever turns it (INV-workbench.84).
+  await page.getByRole("tab", { name: /Branches and changes/ }).click();
   await page
     .getByRole("button", { name: new RegExp(THE_STRIKE_BRANCH) })
     .first()
