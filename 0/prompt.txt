@@ -1,0 +1,50 @@
+<pasted_content id="9d5b">
+ start from plans/RESUME-stack-04.md.
+
+What is on disk now
+
+File: plans/RESUME-stack-04.md
+What it holds: Rewritten from scratch. It opens with a check of git and the queue before anything else. It gives the
+state of each branch and the exact commands to land it. It lists the evals branch's twelve remaining steps in
+order. It records what was found today so nobody re-finds it. It says what to look at on the polish screens, and
+it has the new working rules.
+────────────────────────────────────────
+File: plans/PLAN.md
+What it holds: The NOW table is updated to match the resume note. The three-tier browser-testing rule is added to
+the working rules.
+────────────────────────────────────────
+File: plans/STATUS.md
+What it holds: New entries record your words, the merges, where my handling slipped, and the questions waiting on
+you.
+────────────────────────────────────────
+File: plans/HANDOFF.md
+What it holds: Lessons 22–23 are added: a green bar here is not a green bar on CI, and the whole suite runs before
+every push.
+────────────────────────────────────────
+File: plans/README.md
+What it holds: Now points at the resume note first. The old note is archived under history/.
+────────────────────────────────────────
+File: plans/analysis/scripts/, scripts/bars/, notes/msgs/, logs/
+What it holds: Analysts' scripts, bar scripts, PR bodies and merge messages, and logs. All are outside the
+scratchpad, which vanished mid-session.
+
+State left behind
+- Four of the tail's pull requests are merged: #41, #42, #44 and #43. main is 90001b1. #43, the growing map, merged while I was writing the handoff.
+- No pull request is open, no agent is running, and the queue is free. Nothing was spent this session.
+- I rebased Polish onto the new main and verified it: 350 browser tests pass, and lint is clean apart from two warnings. It still needs:
+  - one cold run of all the end-to-end tests, which includes its four new, never-run browser tests
+  - a look at its nine screens
+  - a short re-review, then its pull request
+- Evals is the last big piece. Its twelve steps are in the resume note and end with make eval ONLY=hormuz, which will be the first spend.
+- After that comes M4. You look at the strike branch with the spread on.
+</pasted_content id="9d5b">
+
+---
+
+<task-notification>
+<task-id>bnaa8pvxa</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/bnaa8pvxa.output</output-file>
+<status>completed</status>
+<summary>Background command "Run all end-to-end tests once, cold, on the polish branch through the queue" completed (exit code 0)</summary>
+</task-notification>
