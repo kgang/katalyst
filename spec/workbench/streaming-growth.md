@@ -1045,9 +1045,9 @@ good ones** — the cards with recordings still run, because a recording is a co
 outlives the code that wrote it and meeting an old one is ordinary rather than exceptional. And **it
 never hides itself either**: a reviewer who put a file in the recordings folder and then counts three
 cards where they expected four is owed the reason rather than left to wonder whether they put it in
-the wrong place. The sentence is the server's own, printed word for word, in the quiet type the
-*not yet live* explanation uses — it is a fact about this copy rather than about any map, so it sits
-under the cards and touches none of them.
+the wrong place. The sentence is the server's own, printed word for word, quieter than the line
+above it that says what this copy can play — it is a fact about one file rather than about any map,
+so it sits under the cards and touches none of them.
 
 **Where the date comes from.** Not from the stream: S3 put the recording's date on `Receipt`, and the
 receipt arrives at the *end* of a run, long after the launchpad needs to print this sentence. So the
@@ -1272,14 +1272,15 @@ nothing added to it. *Test:* `frontend/src/styles/__tests__/motionBudget.test.ts
 10.**
 
 **INV-workbench.74 — nothing is silently inert without a key.** For every control a generation needs
-— the hypothesis field, the destination field, the likelihood slider, the launchpad's cards, **Add a
-claim** — whenever the thing it would do cannot be done (no key, for anything the reader typed; no
-key and no recorded intervention, for **Add a claim**) the
+— the hypothesis field, the destination field, the likelihood slider, **Add a claim** — whenever the
+thing it would do cannot be done (no key, for anything the reader typed; no key and no recorded
+intervention, for **Add a claim**) the
 control is visibly disabled and carries a sentence saying why. There is no control anywhere that
-accepts an interaction and does nothing. **A launchpad card satisfies this by not being drawn**
-*(amended 2026-09-21)*: no key **and** no recording means there is nothing the card could do, so
-there is no card, and one line under the ones that remain says how many there are and why. A
-control a reader counted and cannot use is the same fault as one that does nothing when pressed. **A control that has been pressed and whose request comes
+accepts an interaction and does nothing. **A launchpad card is not on that list, because it is never
+disabled** *(amended 2026-09-21)*: no key **and** no recording means there is nothing the card could
+do, so there is no card at all, and one line under the ones that remain names the examples it stands
+for. A control a reader counted and cannot use is the same fault as one that does nothing when
+pressed. **A control that has been pressed and whose request comes
 back a rejection comes back to life and says so** *(added 2026-09-21)*: **Add a claim** leaving its
 button disabled and reading *Drafting the claim* for as long as the tab is open is the same fault
 with a different first frame. *Tests:*

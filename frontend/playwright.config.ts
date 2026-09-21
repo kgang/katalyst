@@ -70,10 +70,14 @@ export default defineConfig({
      * reproduced before it can be read, and reproducing a rare one is the
      * expensive half of chasing it.
      *
-     * `on` would record every run, which on a green build is a few megabytes an
-     * hour uploaded and never opened. `retain-on-failure` costs nothing on a
-     * pass, because the trace is thrown away, and it is the whole of the
-     * evidence on a failure. The build uploads whatever is left behind.
+     * **What it costs, said plainly**: a trace is recorded for every test,
+     * pass or fail — the recording is the only way to have one if it fails —
+     * and the ones that passed are deleted at the end. So a green run pays the
+     * recording (a few per cent of the wall clock, and disk that is freed
+     * again) and uploads nothing, and a red one keeps the whole of the
+     * evidence. `on` would keep the green ones too: megabytes uploaded on every
+     * build and opened by nobody. Worth it either way — two failures were lost
+     * last week for want of this line.
      */
     trace: "retain-on-failure",
   },

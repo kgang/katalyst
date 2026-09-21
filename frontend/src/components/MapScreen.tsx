@@ -433,9 +433,41 @@ export function MapScreen({
     );
   }, []);
 
+  /**
+   * Where the keyboard was when the operations were opened, so it can be put
+   * back when they close.
+   *
+   * **The way in from the panel's head is the case this exists for.** That
+   * control unmounts the instant it is pressed — a way in that is already in is
+   * not a control — so a reader who tabbed to it and pressed Enter would be
+   * left standing on nothing, and the next Tab would start again at the top of
+   * the page. The panel takes the keyboard when it opens, which is the reader's
+   * own act rather than a theft (`graph/theKeyboard.ts` is about who decided,
+   * and here the reader did), and this is the other half of it.
+   *
+   * Two cases, and they are one rule: put it back where it came from, and where
+   * that no longer exists put it on the control that has taken its place. `E`
+   * pressed on a tile comes back to the tile, because the tile is still there.
+   */
+  const cameFrom = useRef<HTMLElement | null>(null);
+  const theWayIn = useRef<HTMLButtonElement | null>(null);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !intervening) {
+      const back = cameFrom.current;
+      if (back !== null && back.isConnected) {
+        back.focus();
+      } else {
+        theWayIn.current?.focus();
+      }
+    }
+    wasOpen.current = intervening;
+  }, [intervening]);
+
   const keys: MapKeys = useMemo(
     () => ({
       intervene: () => {
+        cameFrom.current = document.activeElement as HTMLElement | null;
         setDock("panel");
         setIntervening(true);
       },
@@ -619,6 +651,7 @@ export function MapScreen({
           <Inspector
             world={world}
             selection={selection}
+            changeRef={theWayIn}
             {...(intervening ? {} : { onChangeThis: keys.intervene })}
           />
         </>

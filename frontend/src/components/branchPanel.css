@@ -20,10 +20,9 @@
  * is two classes to this one's one, so anything written here about height or
  * overflow loses to it: a `max-height: 28%` and an `overflow-y: auto` sat here
  * for a while saying the opposite of the rule that was actually in force, and a
- * reader meeting both could not tell which won. */
+ * reader meeting both could not tell which won. The `flex` and the `min-height`
+ * that shared the column out went the same way and for the same reason. */
 .branch-panel {
-  flex: 0 1 auto;
-  min-height: 8rem;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);
@@ -168,9 +167,19 @@
   text-wrap: pretty;
 }
 
+/* A field takes the room it is given and asks for none of its own.
+ *
+ * **An `<input>` with no `size` has a min-content width of about 140 pixels**,
+ * which is not a width anybody chose: it is twenty characters of the browser's
+ * default. Three of them in a row inside a 303-pixel column want 430, and a
+ * track sized `1fr` — which is `minmax(auto, 1fr)` — hands them that and takes
+ * the row's right-hand edge off the screen. `min-width: 0` here and
+ * `minmax(0, 1fr)` on the row below are the same guard, written where each
+ * belongs. */
 .branch-panel__field,
 .intervene__field {
   width: 100%;
+  min-width: 0;
   padding: var(--space-hair) var(--space-1);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
@@ -257,11 +266,12 @@
 
 /* The six things you can do to a claim. It is opened on purpose and closed
  * again, so it takes the room it needs and no more — and, like every other
- * section, it does not scroll inside itself. The one scrolling box on this
- * screen is the panel around it, and `styles/app.css` owns that rule. */
+ * section, it is as tall as what is in it and does not scroll inside itself.
+ * The one scrolling box on this screen is the panel around it, and
+ * `.page--map .dock > *` in `styles/app.css` owns that rule for every section
+ * in it — which is why no `flex`, `min-height`, `max-height` or `overflow` is
+ * written here. */
 .intervene {
-  flex: 0 1 auto;
-  min-height: 11rem;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);
@@ -348,9 +358,12 @@
   border-radius: var(--radius);
 }
 
+/* The likelihood, the bottom of its range and the top, side by side. The three
+ * tracks share the room equally and may shrink to nothing, which is what
+ * `minmax(0, 1fr)` says and `1fr` alone does not. */
 .intervene__three {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   column-gap: var(--space-hair);
 }
 

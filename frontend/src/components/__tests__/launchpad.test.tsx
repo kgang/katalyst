@@ -65,6 +65,17 @@ const ONE_BAD_FILE: Readiness = {
   ],
 };
 
+/**
+ * The section that offers to build a map, on its own.
+ *
+ * The screen holds two lists of the same shape — the maps already drawn, and
+ * the sentences that build one — and counting rows across both couples a claim
+ * about one to the fixture behind the other.
+ */
+function building(container: HTMLElement): HTMLElement {
+  return container.querySelector(".launchpad__build") as HTMLElement;
+}
+
 /** Draw the first screen. */
 function draw(readiness: Readiness) {
   return render(
@@ -102,7 +113,8 @@ describe("with no model key", () => {
     expect(
       screen.getByText(
         "No model key configured — one of these four runs from recordings, made on " +
-          "2026-09-18; the other three have nothing recorded yet.",
+          "2026-09-18; the midterms, export controls and photonic chips have nothing " +
+          "recorded yet.",
       ),
     ).toBeInTheDocument();
 
@@ -141,12 +153,19 @@ describe("with no model key", () => {
     // interaction and does nothing, and now nothing on it is a row that cannot
     // be taken up either.
     expect(container.querySelectorAll('[data-state="not-yet"]')).toHaveLength(0);
-    expect(container.querySelectorAll(".example")).toHaveLength(
-      // The one recorded sentence, and the one map that is already drawn.
-      2,
-    );
+    // Counted inside the section that offers them, so that the list of maps
+    // already drawn — a different section, fed by a different route — cannot
+    // change this number.
+    expect(building(container).querySelectorAll(".example")).toHaveLength(1);
     expect(container.textContent).not.toContain("not yet live");
-    expect(container.textContent).toContain("the other three have nothing recorded yet");
+    // **The three with no card are named**, because they are not on the screen
+    // to be counted: a line reading *the other three* points at sentences that
+    // are no longer there. The short name is not the recording's short name —
+    // `export-controls` is an identifier, and an identifier is never words on
+    // the screen.
+    expect(container.textContent).toContain(
+      "the midterms, export controls and photonic chips have nothing recorded yet",
+    );
     // And the three sentences themselves are not on the screen as dead text.
     for (const gone of STARTING_SENTENCES.slice(1)) {
       expect(container.textContent).not.toContain(gone.sentence);
@@ -170,8 +189,8 @@ describe("with no model key", () => {
     // watch one build itself* over an empty list is worse than a sentence.
     expect(container.querySelectorAll("[data-state]")).toHaveLength(0);
     expect(container.textContent).toContain(
-      "No model key configured, and nothing recorded — so none of these four can be shown " +
-        "building here.",
+      "No model key configured, and nothing recorded — so the strait, the midterms, export " +
+        "controls and photonic chips cannot be shown building here.",
     );
     // It points at the thing that does work with neither, which is the whole
     // multiverse from a file on disk.
@@ -208,6 +227,57 @@ describe("with no model key", () => {
     }
     expect(screen.getByLabelText("An event you think will happen")).toBeDisabled();
     expect(container.textContent).toContain("Asking the server whether a model key is configured.");
+  });
+
+  it("test_an_ask_that_did_not_come_back_is_not_an_ask_still_in_flight", () => {
+    // **The state this screen got wrong twice.** A request that failed and a
+    // request in flight are both an absent answer, and with them folded into
+    // one the launchpad said *asking the server* for ever over an ask that
+    // ended minutes ago — while the strip below it printed the failure. A
+    // screen asserting a question that is not being asked is a state nobody
+    // can trace to an input, on the first screen a reviewer sees.
+    const said = "Nothing answered at /api/readyz — the server may not be running.";
+    const { container } = render(
+      <Launchpad
+        examples={EXAMPLES}
+        failure={null}
+        readiness={null}
+        readinessFailure={said}
+        onOpen={() => undefined}
+        onBuild={() => undefined}
+      />,
+    );
+
+    // Not a word about a question in flight, because none is.
+    expect(container.textContent).not.toContain("Asking the server");
+    // Nor a word about what this copy can do, because nobody has said.
+    expect(container.textContent).not.toContain("No model key configured");
+    expect(container.textContent).not.toContain("not yet live");
+
+    // Every sentence is still there, each in the vocabulary's own words for an
+    // ask that got no reply, and none of them is a control.
+    const cards = container.querySelectorAll('[data-state="no-answer"]');
+    expect(cards).toHaveLength(STARTING_SENTENCES.length);
+    for (const card of cards) {
+      expect(card.querySelector("button")).toBeNull();
+      expect(card.textContent).toContain("The ask did not come back");
+    }
+
+    // And the server's own sentence, printed as it came, **once under the
+    // cards** rather than on each of them: it is one fact about this copy and
+    // not four facts about four examples. The field below carries it a second
+    // time because the field is a different control with a different reason to
+    // be disabled — which is exactly what record 0012's own sentence does.
+    const section = building(container).textContent ?? "";
+    expect(section).toContain(said);
+    expect(section.split(said).length - 1).toBe(1);
+
+    // The field is disabled and says the same thing, with the one part that is
+    // true of it: nothing recorded can stand in for a sentence nobody has typed.
+    expect(screen.getByLabelText("An event you think will happen")).toBeDisabled();
+    expect(container.textContent).toContain(
+      "whether a sentence of your own could be turned into a map is not known",
+    );
   });
 
   it("test_a_recording_that_would_not_play_is_named_and_hides_nothing", () => {

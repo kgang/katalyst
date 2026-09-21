@@ -100,6 +100,16 @@ export interface InspectorProps {
    */
   readonly onChangeThis?: () => void;
   /**
+   * A handle on that control, so the screen can put the keyboard back on it.
+   *
+   * **The control unmounts the moment it is pressed**, so a reader who tabbed to
+   * it and pressed Enter would be left on nothing at all. The panel it opens
+   * takes the keyboard; when that closes, the screen puts it back here. Which
+   * is the screen's job rather than this panel's, because the screen is the only
+   * thing that knows where the reader came from.
+   */
+  readonly changeRef?: React.Ref<HTMLButtonElement>;
+  /**
    * The run that produced this map, when there was one.
    *
    * Absent on a stored example, which nobody generated. Present on a generated
@@ -172,12 +182,20 @@ const OWNER_WORDS: Record<BeliefOwner, string> = {
  * @param onOpen What it opens, or nothing at all — in which case nothing is
  *   drawn, because a control that does nothing is not a control.
  */
-function ChangeThis({ words, onOpen }: { words: string; onOpen?: (() => void) | undefined }) {
+function ChangeThis({
+  words,
+  onOpen,
+  handle,
+}: {
+  words: string;
+  onOpen?: (() => void) | undefined;
+  handle?: React.Ref<HTMLButtonElement> | undefined;
+}) {
   if (onOpen === undefined) {
     return null;
   }
   return (
-    <button className="inspector__change" type="button" onClick={onOpen}>
+    <button className="inspector__change" type="button" ref={handle} onClick={onOpen}>
       {words}
     </button>
   );
@@ -536,10 +554,12 @@ function ClaimDetail({
   world,
   claim,
   onChangeThis,
+  changeRef,
 }: {
   world: WorldView;
   claim: ClaimView;
   onChangeThis?: (() => void) | undefined;
+  changeRef?: React.Ref<HTMLButtonElement> | undefined;
 }) {
   const baseRate = claim.baseRate;
 
@@ -548,7 +568,7 @@ function ClaimDetail({
       <header className="inspector__head">
         <p className="inspector__claim">{claim.claim}</p>
         <p className="inspector__kind">{KIND_WORDS[claim.kind]}</p>
-        <ChangeThis words="Change this claim" onOpen={onChangeThis} />
+        <ChangeThis words="Change this claim" onOpen={onChangeThis} handle={changeRef} />
       </header>
 
       {/* Criteria, the source that adjudicates, and the date — all three, on
@@ -657,10 +677,12 @@ function WireDetail({
   world,
   wire,
   onChangeThis,
+  changeRef,
 }: {
   world: WorldView;
   wire: LinkView;
   onChangeThis?: (() => void) | undefined;
+  changeRef?: React.Ref<HTMLButtonElement> | undefined;
 }) {
   const from = world.claims.find((claim) => claim.id === wire.source);
   const to = world.claims.find((claim) => claim.id === wire.target);
@@ -677,7 +699,7 @@ function WireDetail({
             They are the same words as the button inside the panel this opens,
             and the two are never on screen together: the map screen stops
             passing this the moment the panel is open. */}
-        <ChangeThis words="Change this push" onOpen={onChangeThis} />
+        <ChangeThis words="Change this push" onOpen={onChangeThis} handle={changeRef} />
       </header>
 
       <Section title="Why">
@@ -936,7 +958,13 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
 }
 
 /** The panel beside the map. */
-export function Inspector({ world, selection, generation, onChangeThis }: InspectorProps) {
+export function Inspector({
+  world,
+  selection,
+  generation,
+  onChangeThis,
+  changeRef,
+}: InspectorProps) {
   const claim =
     selection?.kind === "claim" ? world.claims.find((one) => one.id === selection.id) : undefined;
   const wire =
@@ -948,9 +976,14 @@ export function Inspector({ world, selection, generation, onChangeThis }: Inspec
       {run !== undefined ? (
         <GenerationDetailPanel detail={run} />
       ) : claim !== undefined ? (
-        <ClaimDetail world={world} claim={claim} onChangeThis={onChangeThis} />
+        <ClaimDetail
+          world={world}
+          claim={claim}
+          onChangeThis={onChangeThis}
+          changeRef={changeRef}
+        />
       ) : wire !== undefined ? (
-        <WireDetail world={world} wire={wire} onChangeThis={onChangeThis} />
+        <WireDetail world={world} wire={wire} onChangeThis={onChangeThis} changeRef={changeRef} />
       ) : (
         <div className="inspector__empty">
           <h2 className="inspector__empty-heading">Nothing selected</h2>

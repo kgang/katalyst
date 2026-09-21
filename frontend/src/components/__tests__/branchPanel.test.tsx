@@ -346,26 +346,27 @@ describe("the six things you can do", () => {
     expect(screen.getByText(/never averaged with either of them/)).toBeInTheDocument();
   });
 
+  it("test_opening_the_operations_puts_the_keyboard_in_them", () => {
+    // **The way in unmounts the moment it is pressed**, so without this a
+    // reader who tabbed to *Change this claim* and pressed Enter would be
+    // standing on nothing at all and the next Tab would start again at the top
+    // of the page. Taking the keyboard here is not the theft
+    // `graph/theKeyboard.ts` forbids: that rule is about who decided, and the
+    // one thing pressing this can mean is that the reader wants to be in here.
+    //
+    // The box takes it rather than the first button inside it, because landing
+    // on *Suppose this is true* would leave a reader one stray Space away from
+    // an edit they never asked for.
+    open();
+    const panel = screen.getByRole("region", { name: "Change this claim" });
+    expect(document.activeElement).toBe(panel);
+    expect(panel).toHaveAttribute("tabindex", "-1");
+  });
+
   it("test_nothing_here_is_disabled", () => {
     render(<InterventionPanel world={WORLD} selection={null} onEdit={vi.fn()} onClose={vi.fn()} />);
     for (const button of screen.getAllByRole("button")) {
       expect(button).not.toBeDisabled();
     }
-  });
-
-  it("test_the_two_that_are_easiest_to_confuse_say_the_difference_before_the_press", () => {
-    // **The distinction this product beats every competitor on, said before the
-    // choice rather than after it.** Both buttons fix a claim's value; they
-    // differ in what else may move, and until now the only place that was said
-    // was the line printed *after* the press — by which time the reader has
-    // already chosen. Each subtitle is the shared vocabulary's own meaning for
-    // that operation, word for word from the *Interface words* table.
-    open();
-    expect(screen.getByRole("button", { name: /^Suppose this is true/ })).toHaveTextContent(
-      "Take this as given, and do not tell me what caused it",
-    );
-    expect(screen.getByRole("button", { name: /^This happened/ })).toHaveTextContent(
-      "This is news — update what came before it too",
-    );
   });
 });

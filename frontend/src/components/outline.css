@@ -7,11 +7,15 @@
  * has, because it has no colour to lean on at all.
  */
 
+/* It does not scroll inside itself, and it does not say so: the panel beside
+ * the map scrolls as one, and `styles/app.css` says that once for every section
+ * in it on `.page--map .dock > *`. An `overflow-y: auto` sat here and lost to
+ * that rule by two classes to one, which is a stylesheet telling a reader two
+ * opposite things about the same box. */
 .outline {
   display: grid;
   row-gap: var(--space-1);
   padding: var(--space-2);
-  overflow-y: auto;
 }
 
 .outline__heading {

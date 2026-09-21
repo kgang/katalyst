@@ -6,6 +6,7 @@
  * why it is absent. Everything below is one of those two halves.
  */
 
+import { readFileSync } from "node:fs";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
@@ -470,11 +471,25 @@ describe("the way from reading to doing", () => {
     }
   });
 
-  it("test_it_is_a_word_with_a_hairline_round_it_and_never_a_default_button", () => {
-    // The shape a button takes in this product. Checked as the class the
-    // stylesheet styles, because a component test has no layout engine and the
-    // alternative — asserting a colour — is the thing this rule exists to
-    // prevent.
+  it("test_the_way_in_is_a_word_with_a_hairline_round_it", () => {
+    // **Read off the stylesheet, not off the component.** Asserting the class
+    // the component itself writes would pass with the stylesheet deleted, which
+    // is a test that cannot fail for the thing it is named after. What is
+    // checked is the rule: a hairline round it, the panel's own surface behind
+    // it, the interface face — the shape every button in this product takes —
+    // and no fill drawn from the accent, which is what a template-looking
+    // button is made of.
+    const sheet = readFileSync("src/components/inspector.css", "utf8");
+    const rule = /\.inspector__change \{([^}]*)\}/.exec(sheet)?.[1] ?? "";
+    expect(rule, "inspector.css has no rule for the way in").not.toBe("");
+    expect(rule).toMatch(/border:\s*1px solid var\(--hairline\)/);
+    expect(rule).toMatch(/background:\s*var\(--surface\)/);
+    expect(rule).toMatch(/font-family:\s*var\(--font-interface\)/);
+    expect(rule).not.toMatch(/var\(--accent\)/);
+    expect(rule).not.toMatch(/box-shadow/);
+
+    // And it is in the head, beside what it is about, rather than somewhere
+    // else in the panel.
     const { container } = render(
       <Inspector
         world={hormuzish()}
@@ -484,7 +499,6 @@ describe("the way from reading to doing", () => {
     );
     const control = screen.getByRole("button", { name: "Change this claim" });
     expect(control).toHaveClass("inspector__change");
-    // In the head, beside what it is about, and not somewhere else in the panel.
     expect(container.querySelector(".inspector__head")?.contains(control)).toBe(true);
   });
 });

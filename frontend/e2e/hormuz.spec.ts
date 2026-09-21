@@ -242,78 +242,131 @@ const WINDOWS = [
 ] as const;
 
 /**
- * Every control in the panel beside the map is whole, and inside the panel.
+ * Every control in the panel beside the map can actually be reached and pressed.
  *
  * **This is a geometric assertion and never a picture.** A stored screenshot
  * over a canvas with a background-threaded layout engine, two variable fonts and
  * an arrival animation is a flake generator, and this project has already paid
  * for chasing flakes. What it asserts instead is the thing every layout defect
- * the audit found had in common: something in the panel was cut off by a box
- * around it.
+ * the interface audit found had in common: something in the panel could be seen
+ * in the markup and not used on the screen.
  *
- * **Scrolled out of view is allowed; clipped is not.** The panel scrolls as one
- * and draws a rule at whichever edge has more beyond it, so a control below the
- * fold is a control a reader can reach. What may never happen is a control
- * outside the panel's own scrollable content — cut off by a sibling that scrolls
- * on its own, or running past the panel's left or right edge, where no amount of
- * scrolling brings it back.
+ * **Three questions per control, and the third is the one that bites.**
  *
- * Every control is read in the page rather than one at a time over the wire,
- * because two hundred round trips at three window sizes is a minute of waiting
- * and every one of them would be reading a different moment.
+ * 1. It is drawn at a size at all.
+ * 2. Scrolled to, it lies inside the panel's **client box** — the part of the
+ *    panel that is actually on the glass, inside its border and beside its
+ *    scrollbar. Scrolled out of view is fine and is why each control is scrolled
+ *    to first: the panel scrolls as one and marks its edges, so below the fold is
+ *    reachable. Past the left or right edge is not, because the panel does not
+ *    scroll that way.
+ * 3. **At its own centre, the topmost thing on the screen is the control** — or
+ *    something inside it. That is the overlap test, and it is the only one of the
+ *    three that catches a sibling drawn over a button, which is what "nothing is
+ *    hidden behind anything" means. An earlier version of this helper asked only
+ *    where boxes were, and against this stylesheet — one scrolling column whose
+ *    sections all read `overflow: visible` — no box could ever land outside the
+ *    content. It could not have failed.
+ *
+ * Each control is scrolled to over the wire and then measured in the page, which
+ * is two round trips each rather than one for the lot. That is the price of
+ * asking a question about what is *on the glass* rather than about what the
+ * layout says.
  *
  * @param page The page the map is on.
  */
 async function everyControlInThePanelIsWhole(page: Page): Promise<void> {
+  const dock = page.locator(".dock");
+  await expect(dock).toBeVisible();
+  const controls = dock.locator("button, a, input");
+  const many = await controls.count();
+  expect(many, "the panel beside the map holds no controls at all").toBeGreaterThan(0);
+
+  const wrong: string[] = [];
+  for (let at = 0; at < many; at += 1) {
+    const control = controls.nth(at);
+    // Brought onto the glass first, because the question is about what a reader
+    // can reach and a reader scrolls. The panel is the only thing that moves.
+    await control.scrollIntoViewIfNeeded();
+    const verdict = await control.evaluate((element) => {
+      const panel = element.closest<HTMLElement>(".dock");
+      if (panel === null) {
+        return "a control left the panel between being counted and being measured";
+      }
+      const name = (element.getAttribute("aria-label") ?? element.textContent ?? "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 60);
+      const box = element.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) {
+        return `"${name}" is drawn at no size at all`;
+      }
+      // The part of the panel that is on the glass: inside its border, and
+      // beside its scrollbar rather than under it.
+      const frame = panel.getBoundingClientRect();
+      const left = frame.left + panel.clientLeft;
+      const top = frame.top + panel.clientTop;
+      const right = left + panel.clientWidth;
+      const bottom = top + panel.clientHeight;
+      if (
+        box.left < left - 1 ||
+        box.right > right + 1 ||
+        box.top < top - 1 ||
+        box.bottom > bottom + 1
+      ) {
+        return (
+          `"${name}" is drawn at ${Math.round(box.left)},${Math.round(box.top)} to ` +
+          `${Math.round(box.right)},${Math.round(box.bottom)}, outside the panel's ` +
+          `${Math.round(left)},${Math.round(top)} to ${Math.round(right)},${Math.round(bottom)} — ` +
+          `and it had already been scrolled to`
+        );
+      }
+      // **What is actually on top at its centre.** A pseudo-element with
+      // `pointer-events: none` — the rules the panel draws at its edges — is
+      // not an answer to this question and the browser does not give one.
+      const onTop = document.elementFromPoint(
+        Math.round(box.left + box.width / 2),
+        Math.round(box.top + box.height / 2),
+      );
+      if (onTop === null || !(onTop === element || element.contains(onTop))) {
+        const over =
+          onTop === null
+            ? "nothing at all"
+            : `<${onTop.tagName.toLowerCase()} class="${onTop.className}">`;
+        return `"${name}" has ${over} drawn over its own middle`;
+      }
+      return null;
+    });
+    if (verdict !== null) {
+      wrong.push(verdict);
+    }
+  }
+  expect(wrong, "controls in the panel a reader cannot reach").toEqual([]);
+}
+
+/**
+ * The page itself does not scroll sideways.
+ *
+ * **The one assertion here that varies with the window.** The panel is a fixed
+ * 336 pixels whatever the screen is, so nothing measured inside it changes
+ * between 1600 and 1280; the stage beside it takes the rest, and the two of them
+ * together are what can stop fitting. A page that scrolls sideways is the whole
+ * screen cut off rather than one control, and it is the defect a narrow window
+ * produces that a wide one hides.
+ *
+ * @param page The page to measure.
+ */
+async function theScreenFitsItsWindow(page: Page): Promise<void> {
   await expect
     .poll(
       () =>
         page.evaluate(() => {
-          const dock = document.querySelector<HTMLElement>(".dock");
-          if (dock === null) {
-            return ["there is no panel beside the map"];
-          }
-          const panel = dock.getBoundingClientRect();
-          const controls = dock.querySelectorAll<HTMLElement>("button, a, input");
-          if (controls.length === 0) {
-            return ["the panel beside the map holds no controls at all"];
-          }
-          const wrong: string[] = [];
-          for (const control of controls) {
-            const name = (control.getAttribute("aria-label") ?? control.textContent ?? "")
-              .replace(/\s+/g, " ")
-              .trim()
-              .slice(0, 60);
-            const box = control.getBoundingClientRect();
-            if (box.width === 0 || box.height === 0) {
-              wrong.push(`"${name}" is drawn at no size at all`);
-              continue;
-            }
-            // Sideways there is nowhere to go: the panel does not scroll that
-            // way, so anything past either edge is gone for good.
-            if (box.left < panel.left - 1 || box.right > panel.right + 1) {
-              wrong.push(
-                `"${name}" runs from ${Math.round(box.left)} to ${Math.round(box.right)}, ` +
-                  `outside the panel's ${Math.round(panel.left)} to ${Math.round(panel.right)}`,
-              );
-            }
-            // And down the page, measured against the panel's own content
-            // rather than against what is on the glass — a control below the
-            // fold is fine, and one outside the content is not reachable at all.
-            const top = box.top - panel.top + dock.scrollTop;
-            const bottom = top + box.height;
-            if (top < -1 || bottom > dock.scrollHeight + 1) {
-              wrong.push(
-                `"${name}" sits from ${Math.round(top)} to ${Math.round(bottom)} in a panel ` +
-                  `holding ${dock.scrollHeight} pixels of content`,
-              );
-            }
-          }
-          return wrong;
+          const page_ = document.documentElement;
+          return page_.scrollWidth - window.innerWidth;
         }),
-      { timeout: 15_000, message: "the panel never settled with every control inside it" },
+      { timeout: 15_000, message: "the page never stopped scrolling sideways" },
     )
-    .toEqual([]);
+    .toBeLessThanOrEqual(1);
 }
 
 /**
@@ -401,6 +454,11 @@ for (const window of WINDOWS) {
     await page.setViewportSize({ width: window.width, height: window.height });
     await theStoredMapWithTheStrikeBranch(page);
 
+    // The panel is a fixed 336 pixels and the stage takes the rest, so this is
+    // the one thing on this screen that a narrow window can break and a wide one
+    // cannot.
+    await theScreenFitsItsWindow(page);
+
     // Five sections, and the panel at its fullest: your branches, the change
     // list, the panel that says why a number is what it is — and, opened from
     // the Inspector's own head with the mouse, the things you can do to a claim.
@@ -424,6 +482,8 @@ for (const window of WINDOWS) {
     // keyboard goes back on the map first — the press is otherwise the
     // button's, which is the product's rule rather than this test's
     // convenience.
+    await theScreenFitsItsWindow(page);
+
     await standOn(page, "B");
     await page.keyboard.press("O");
     await expect(page.getByRole("tree")).toBeVisible();

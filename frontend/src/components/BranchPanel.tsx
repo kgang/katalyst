@@ -46,7 +46,7 @@
  * the fields below appear inside this panel, beside the map, which stays live.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { components } from "../api/schema";
 import { toDay } from "../graph/diff/days";
 import { pushAsNumber, pushInWords } from "../graph/wires/encodings";
@@ -329,6 +329,31 @@ export function InterventionPanel({
   const [push, setPush] = useState("");
   const [said, setSaid] = useState<string | null>(null);
 
+  /**
+   * The panel takes the keyboard when it opens, and that is the reader's own
+   * act rather than a theft.
+   *
+   * `graph/theKeyboard.ts` states the rule the map obeys: **the map takes the
+   * keyboard back from nowhere, and never from somewhere.** It is about who
+   * decided. A map that pulled a reader out of the palette would be taking a
+   * decision they had already taken; this is the opposite — the reader pressed
+   * `E`, or took up *Change this claim*, and the one thing they can have meant
+   * by it is that they want to be in here.
+   *
+   * **Without it the keyboard is simply dropped.** The way in from the panel's
+   * head unmounts the instant it is pressed, so Tab to it, press Enter, and the
+   * keyboard is on nothing at all: the next Tab starts again at the top of the
+   * page. The section takes focus rather than the first button, because landing
+   * on *Suppose this is true* would put a reader one stray Space away from an
+   * edit they did not ask for. Where the keyboard goes when this closes is the
+   * screen's to answer, not this panel's, because the thing it came from may no
+   * longer exist.
+   */
+  const panel = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    panel.current?.focus();
+  }, []);
+
   const claim =
     selection?.kind === "claim" ? world.claims.find((one) => one.id === selection.id) : undefined;
   const wire =
@@ -366,6 +391,10 @@ export function InterventionPanel({
   return (
     <section
       className="intervene"
+      ref={panel}
+      // Reachable by script and never a tab stop of its own: the reader tabs
+      // through the controls inside it, not through the box round them.
+      tabIndex={-1}
       aria-label="Change this claim"
       // What the panel is open on, by its identifier — for a test or a tool to
       // read, the way a tile and a wire already carry theirs. An identifier is

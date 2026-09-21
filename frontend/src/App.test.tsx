@@ -206,6 +206,26 @@ describe("the launchpad", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.querySelector("dialog")).toBeNull();
   });
+
+  it("test_a_readiness_ask_that_failed_is_not_drawn_as_one_still_in_flight", async () => {
+    // **The screen is handed two different absent answers, not one.** Asking
+    // and failed are both "no readiness answer", and folded together the first
+    // screen said *asking the server* for ever over an ask that had ended —
+    // while the strip below it printed the failure's own sentence. This is the
+    // wiring that keeps them apart, from the request to the card.
+    serverAnswersNormally();
+    vi.mocked(readReadiness).mockRejectedValue(
+      new Error("Nothing answered at /api/readyz — the server may not be running."),
+    );
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+
+    expect(await screen.findAllByText(/Nothing answered at \/api\/readyz/)).not.toHaveLength(0);
+    expect(document.querySelectorAll('[data-state="no-answer"]')).toHaveLength(4);
+    expect(document.body.textContent).not.toContain("Asking the server");
+    expect(document.body.textContent).not.toContain("No model key configured");
+    // And nothing pops up about it: a failure is printed in the page.
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
 
 describe("opening a map", () => {
@@ -282,6 +302,38 @@ describe("opening a map", () => {
     // And the second question carries the branch as it now stands.
     const asked = vi.mocked(source.readConditional).mock.calls.at(-1)?.[0];
     expect(asked?.branch?.edits).toHaveLength(1);
+  });
+
+  it("test_the_keyboard_goes_into_the_operations_and_comes_back_out", async () => {
+    // **Both directions of one rule.** The way in from the panel's head
+    // unmounts the instant it is pressed, so without this a reader who tabbed
+    // to *Change this claim* and pressed Enter would be standing on nothing and
+    // the next Tab would start again at the top of the page. The panel takes
+    // the keyboard — the reader's own act, since pressing that control can mean
+    // nothing else — and **Done** puts it back on the control it came from,
+    // which by then is a new element in the same place.
+    serverAnswersNormally();
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    fireEvent.click(screen.getByRole("button", { name: "select claim B" }));
+    const wayIn = await screen.findByRole("button", { name: "Change this claim" });
+    wayIn.focus();
+    expect(document.activeElement).toBe(wayIn);
+
+    fireEvent.click(wayIn);
+    const operations = await screen.findByRole("region", { name: "Change this claim" });
+    expect(document.activeElement).toBe(operations);
+    // And the way in is not on the screen at all while what it opens is open.
+    expect(screen.queryByRole("button", { name: "Change this claim" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    const back = await screen.findByRole("button", { name: "Change this claim" });
+    expect(document.activeElement).toBe(back);
+    // A new element in the same place, which is why the screen has to put the
+    // keyboard back rather than the panel restoring what it remembered.
+    expect(back).not.toBe(wayIn);
   });
 
   it("test_an_ask_that_did_not_come_back_is_asked_again", async () => {

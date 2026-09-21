@@ -143,6 +143,15 @@
   cursor: pointer;
 }
 
+/* A row that is not a control: nothing is known about it yet, because the
+ * server has not answered or because the ask did not come back. It reads
+ * quieter than a card that opens something — and the reading, not the quiet, is
+ * what says so: it carries no action line and so no arrow after it, which is
+ * the mark every row that opens something has and this one cannot. */
+.example--waiting .example__claim {
+  color: var(--text-muted);
+}
+
 .example--live:hover {
   background: var(--surface);
 }

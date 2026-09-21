@@ -447,6 +447,13 @@ export function App({
           examples={examples.state === "answered" ? examples.value : null}
           failure={examples.state === "failed" ? examples.reason : null}
           readiness={readiness.state === "answered" ? readiness.value : null}
+          // **An absent answer is two different facts and the screen is handed
+          // both.** Without this, a readiness request that failed looked exactly
+          // like one still in flight, and the first screen said *asking the
+          // server* for ever over an ask that had ended — while the strip below
+          // it printed the failure's own sentence. A screen asserting a question
+          // that is not being asked is a state nobody can trace to an input.
+          readinessFailure={readiness.state === "failed" ? readiness.reason : null}
           onOpen={open}
           onBuild={build}
         />
