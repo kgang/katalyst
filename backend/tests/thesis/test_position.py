@@ -8,9 +8,10 @@ so the levels are the claim arithmetic and nothing else.
 Three things these tests exist to catch:
 
 * **A number that flatters the trade.** Reading only the end of the window misses a
-  stop touched on day three; checking daily misses touches between closes; and a
-  day that crosses both levels could be read either way. Each has a test, and each
-  correction runs against the trade.
+  stop touched on day three; reading past the reader's horizon counts a stop they
+  were never open for; checking daily misses touches between closes; and a day on
+  which both levels are first reached could be read either way. Each has a test,
+  and each correction runs against the trade.
 * **A stop that somebody derived.** The stop, the target and the horizon arrive on
   a position the reader filled in. A separate file walks our own source to check
   nothing in this layer makes one up.
@@ -18,7 +19,7 @@ Three things these tests exist to catch:
   the question is refused by name rather than answered badly.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 import numpy
 import pytest
@@ -112,12 +113,22 @@ def paths_of(*rows: list[float], weight: list[float] | None = None, daily_move: 
         weight=counts,
         sample="built_by_hand",
         decay_shape={},
+        market_chance={},
     )
 
 
 def touched(paths: Paths, position: Position) -> FirstTouch:
-    """First touch, with the refusal case ruled out so the test reads straight."""
-    answer = first_touch(paths, position)
+    """First touch **read to the last day these paths carry**, with the refusal ruled out.
+
+    The reader's horizon is what says how far to walk, and almost every test below
+    is about which level is reached rather than about the window, so the horizon is
+    set here to the end of the paths the test wrote. The window has tests of its
+    own.
+    """
+    to_the_end = Position(
+        **{**position.__dict__, "horizon": paths.day_zero + timedelta(days=paths.days)}
+    )
+    answer = first_touch(paths, to_the_end)
     assert isinstance(answer, FirstTouch)
     return answer
 
@@ -319,17 +330,42 @@ def test_the_target_is_first_when_it_is_touched_first() -> None:
     assert answer.stop_first_on.tolist() == [NEVER]
 
 
-def test_a_day_that_crosses_both_levels_is_read_as_the_stop() -> None:
-    """The only reading that cannot flatter the trade.
+def test_when_both_levels_are_first_reached_on_the_same_day_the_stop_is_first() -> None:
+    """The tie, on an input that actually reaches it.
 
-    One day's close cannot say which level the price reached first inside the day,
-    and here the close is past both: 107 against a target of 106, on a day whose
-    low we cannot see. Taking the stop is the reading that never makes the trade
-    look better than it was.
+    A daily close cannot say which level the price reached first inside the day, so
+    when both are first reached on the same day the stop is taken — the only
+    reading that cannot flatter the trade.
+
+    The tie is reachable because the barrier shift moves both levels toward the
+    entry price and never past it. A stop a tenth below a hundred and a target a
+    tenth above, at a variability of five points a day, both clamp to a hundred; a
+    close of exactly a hundred then reaches both on the same day.
     """
-    answer = touched(paths_of([100.0, 96.0]), long_on(stop=97.0, target=95.0 + 11.0))
+    answer = touched(
+        paths_of([100.0, 100.0], daily_move=5.0),
+        long_on(stop=99.9, target=100.1, daily_move=5.0),
+    )
+
+    assert answer.stop_at == pytest.approx(ENTRY)
+    assert answer.target_at == pytest.approx(ENTRY)
+    assert answer.stop_first == pytest.approx(1.0)
+    assert answer.target_first == pytest.approx(0.0)
+
+
+def test_a_close_exactly_on_the_stop_is_a_touch() -> None:
+    """A level is reached the moment the path touches it, and landing on it is touching it."""
+    answer = touched(paths_of([100.0, 97.0, 99.0]), long_on(stop=97.0))
 
     assert answer.stop_first == pytest.approx(1.0)
+    assert answer.stop_first_on.tolist() == [1]
+
+
+def test_a_close_exactly_on_the_target_is_a_touch_too() -> None:
+    """The same rule on the other level, so neither side of it is free."""
+    answer = touched(paths_of([100.0, 106.0, 101.0]), long_on())
+
+    assert answer.target_first == pytest.approx(1.0)
 
 
 def test_neither_touched_is_its_own_answer_and_the_three_shares_sum_to_one() -> None:
@@ -478,7 +514,7 @@ def test_first_touch_over_a_walked_path_reads_the_claim_arithmetic() -> None:
     drawn = worlds_of(claims=["c"], on=[[4], [NEVER]], weight=[1.0, 3.0], days=10)
     moves = (
         ClaimMove(
-            claim=PropositionId("c"), move=8.0, market_chance=0.25, market_chance_from="model"
+            claim=PropositionId("c"), move=8.0, market_chance=0.25, market_chance_from="base_world"
         ),
     )
     paths = walk(drawn, moves, entry=ENTRY, daily_move=0.0, seed=1)
@@ -533,7 +569,7 @@ def test_touching_is_always_at_least_as_likely_as_finishing_beyond(
             claim=drawn.claims[0],  # type: ignore[attr-defined]
             move=2.0,
             market_chance=0.3,
-            market_chance_from="model",
+            market_chance_from="base_world",
         ),
     )
     paths = walk(
@@ -549,3 +585,64 @@ def test_touching_is_always_at_least_as_likely_as_finishing_beyond(
     assert answer.stop_touched >= answer.finished_beyond_the_stop - 1e-12
     assert answer.stop_first + answer.target_first + answer.neither == pytest.approx(1.0)
     assert answer.stop_first <= answer.stop_touched + 1e-12
+
+
+# --- The window the two shares are over -------------------------------------
+
+
+def test_first_touch_stops_at_the_reader_s_horizon() -> None:
+    """The window is the reader's, not whatever window the drawn worlds happen to carry.
+
+    One path over five days: 100, 101, 100, 99, 96. The stop is 97 and is reached
+    on day four. A reader whose horizon is day two is out before that, so for them
+    neither level is reached — and reading the whole five days would tell them they
+    were stopped out of a trade they had already closed.
+    """
+    paths = paths_of([100.0, 101.0, 100.0, 99.0, 96.0])
+    early = Position(**{**long_on().__dict__, "horizon": DAY_ZERO + timedelta(days=2)})
+    late = Position(**{**long_on().__dict__, "horizon": DAY_ZERO + timedelta(days=4)})
+
+    out_early = first_touch(paths, early)
+    out_late = first_touch(paths, late)
+
+    assert isinstance(out_early, FirstTouch) and isinstance(out_late, FirstTouch)
+    assert out_early.neither == pytest.approx(1.0)
+    assert out_early.stop_first == pytest.approx(0.0)
+    assert out_late.stop_first == pytest.approx(1.0)
+
+
+def test_the_answer_says_which_day_it_was_read_to() -> None:
+    """Two shares over an unnamed window are two numbers nobody can check."""
+    paths = paths_of([100.0, 101.0, 100.0, 99.0, 96.0])
+    early = Position(**{**long_on().__dict__, "horizon": DAY_ZERO + timedelta(days=2)})
+
+    answer = first_touch(paths, early)
+
+    assert isinstance(answer, FirstTouch)
+    assert answer.through == 2
+
+
+def test_finishing_beyond_the_stop_is_read_on_the_horizon_and_not_at_the_end() -> None:
+    """A trade closed on day two finished where it stood on day two."""
+    paths = paths_of([100.0, 96.0, 101.0, 99.0, 96.0])
+    early = Position(**{**long_on().__dict__, "horizon": DAY_ZERO + timedelta(days=2)})
+
+    answer = first_touch(paths, early)
+
+    assert isinstance(answer, FirstTouch)
+    assert answer.finished_beyond_the_stop == pytest.approx(0.0), "on day two it stood at 101"
+    assert answer.stop_touched == pytest.approx(1.0), "it was touched on day one on the way"
+
+
+def test_a_horizon_the_paths_do_not_reach_is_refused() -> None:
+    """Whatever built the draws built too short a window; answering a shorter question is worse."""
+    with pytest.raises(ValueError, match="does not reach"):
+        first_touch(paths_of([100.0, 96.0]), long_on())
+
+
+def test_a_horizon_on_the_day_the_window_opens_is_refused() -> None:
+    """A trade that is over before its first close has no path to touch."""
+    same_day = Position(**{**long_on().__dict__, "horizon": DAY_ZERO})
+
+    with pytest.raises(ValueError, match="at least one day"):
+        first_touch(paths_of([100.0, 96.0]), same_day)

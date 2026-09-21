@@ -9,10 +9,20 @@ was touched**? Divide by how often it came on across all the drawn worlds. Three
 means three times as often; one means it tells you nothing; below one means the
 claim kept company with the trade working.
 
-**"Before the stop" is load-bearing.** A claim that came on afterwards cannot have
-contributed, counting it inflates every row in the direction that makes the rail
-look useful, and it is what keeps a row's *days before the stop* from coming out
-negative.
+**"Before the stop" is load-bearing, and the arrival day itself counts.** A claim
+that came on *after* the stop was touched cannot have contributed, counting it
+inflates every row in the direction that makes the rail look useful, and leaving
+it out is what keeps a row's *days before the stop* from coming out negative.
+
+The boundary goes **on the day or earlier**, and that is one convention shared
+with the path rather than two. `paths.py` applies a claim's whole surprise **on**
+the day it comes on, so the close that first touch reads on that day already
+carries the move: a claim whose jump is what pushed the price through the stop
+arrives on the very day the stop is touched. Reading the boundary strictly would
+throw that world away and rank the claim that took you out below the ones that did
+nothing — measured at a lift of `0.04` against `3.19` on the reviewer's worlds. A
+gap of zero days is the right answer there, and a gap of zero is not a negative
+one.
 
 **Both shares are weighted**, because the worlds are drawn with weights, so a
 weighted sampler changes nothing here.
@@ -41,7 +51,9 @@ stopped you out because it shares a cause with whatever did. The word is
 
 What this file must never do
 ----------------------------
-- Never count a claim that came on after the stop was touched.
+- Never count a claim that came on **after** the stop was touched — and never drop
+  one that came on **on** that day, because that is the day the path applies its
+  move.
 - Never claim coverage for the ratio, and never print a lift without its interval
   and the count it rests on.
 - Never return a row below the floor, and never report one without naming the
@@ -314,7 +326,7 @@ def what_takes_you_out(draws: Draws, touch: FirstTouch) -> WhatTakesYouOut:
             dropped.append(_dropping(claim, "held_true_everywhere"))
             continue
 
-        before = anywhere[stop_first] & (came_on[stop_first] < stopped_on)
+        before = anywhere[stop_first] & (came_on[stop_first] <= stopped_on)
         numerator = weighted_share(before, weight_there)
         denominator = weighted_share(anywhere, draws.weight)
         low, high = wilson(numerator, counted, COVERAGE)

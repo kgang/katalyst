@@ -64,12 +64,13 @@ def a_rail(weight: numpy.ndarray | None = None) -> tuple[Draws, FirstTouch]:
     | `late` | all 500 | none | **20**, ten days after the stop |
     | `held-true` | all 500 | all 500 | 0 |
     | `never` | none | none | — |
+    | `on-the-day` | 475 | 100 | **10**, the very day the stop was touched |
 
     So `somewhat` came on in half of all the worlds and in three quarters of the
     stop-first ones: a lift of one and a half. `strongly` came on in 475 of 1000,
     and in 475 of the 500: `0.95 / 0.475`, a lift of two.
     """
-    names = ["strongly", "somewhat", "unrelated", "late", "held-true", "never"]
+    names = ["strongly", "somewhat", "unrelated", "late", "held-true", "never", "on-the-day"]
     came = numpy.full((WORLDS, len(names)), NEVER, dtype=numpy.int32)
     came[:475, 0] = CAME_ON
     came[:375, 1] = CAME_ON
@@ -77,6 +78,8 @@ def a_rail(weight: numpy.ndarray | None = None) -> tuple[Draws, FirstTouch]:
     came[::2, 2] = CAME_ON
     came[:STOPPED, 3] = AFTER
     came[:, 4] = 0
+    came[:475, 6] = STOP_DAY
+    came[500:600, 6] = STOP_DAY
 
     counts = numpy.ones(WORLDS) if weight is None else weight
     drawn = Draws(
@@ -110,6 +113,7 @@ def a_first_touch(weight: numpy.ndarray) -> FirstTouch:
         target_at=106.0,
         shift=0.0,
         effective_draws=effective_draws(weight),
+        through=DAYS,
         stop_first_on=stop_on,
         sample="built_by_hand",
     )
@@ -171,10 +175,15 @@ def test_a_row_says_how_many_days_before_the_stop_the_claim_came_on() -> None:
 
 
 def test_the_rail_is_ranked_by_lift() -> None:
-    """`strongly` at two, `somewhat` at one and a half, `late` at nothing."""
+    """Two, then five thirds, then three halves, then nothing."""
     rail = what_takes_you_out(*a_rail())
 
-    assert [str(one.claim) for one in rail.rows] == ["strongly", "somewhat", "late"]
+    assert [str(one.claim) for one in rail.rows] == [
+        "strongly",
+        "on-the-day",
+        "somewhat",
+        "late",
+    ]
     assert rail.rows[0].lift == pytest.approx(0.95 / 0.475)
 
 
@@ -394,3 +403,129 @@ def test_the_numerator_interval_covers_its_true_share_about_as_often_as_it_says(
 
     spread = numpy.sqrt(repetitions * COVERAGE * (1.0 - COVERAGE))
     assert covered >= repetitions * COVERAGE - 3.0 * spread
+
+
+def test_a_claim_that_came_on_the_day_the_stop_was_touched_counts() -> None:
+    """The boundary, stated once and pinned here: **the arrival day counts**.
+
+    The path applies a claim's whole surprise **on** the day it comes on, so the
+    close that first touch reads on that day already carries the move. A claim
+    whose jump is what pushed the price through the stop therefore arrives on the
+    very day the stop is touched — and counting it as *after* the stop would rank
+    the claim that took you out below the ones that did nothing.
+
+    `on-the-day` comes on day ten in 475 of the 500 stop-first worlds and in 100
+    others, so its numerator is `0.95` and its base share `575 / 1000`. Reading the
+    boundary the other way reads a numerator of nothing and a lift of nothing.
+    """
+    rail = what_takes_you_out(*a_rail())
+
+    row = rows_by_claim(rail)["on-the-day"]
+
+    assert row.came_on_first == pytest.approx(0.95)  # type: ignore[attr-defined]
+    assert row.lift == pytest.approx(0.95 / 0.575)  # type: ignore[attr-defined]
+    assert row.days_before_the_stop == pytest.approx(0.0)  # type: ignore[attr-defined]
+
+
+def test_a_claim_that_came_on_the_day_after_the_stop_does_not_count() -> None:
+    """The other side of the same boundary, so the rule is pinned from both directions.
+
+    `late` comes on ten days after the stop was touched, and counts for nothing.
+    One day after would count for nothing too: the rule is *on the day or before*,
+    and nothing later.
+    """
+    drawn, touch = a_rail()
+    came = drawn.on_day.copy()
+    came[:STOPPED, 3] = STOP_DAY + 1
+    just_after = Draws(**{**drawn.__dict__, "on_day": came})
+
+    rail = what_takes_you_out(just_after, touch)
+
+    assert rows_by_claim(rail)["late"].came_on_first == pytest.approx(0.0)  # type: ignore[attr-defined]
+
+
+def test_the_interval_is_measured_on_effective_worlds_and_not_on_a_count_of_rows() -> None:
+    """Weight a quarter of the worlds up and the interval widens, because the sample is worth less.
+
+    Five hundred worlds end with the stop first either way. Weighted three to one
+    they are worth four hundred equally-weighted ones, so the interval around the
+    same numerator is the one four hundred draws buy — wider than the one five
+    hundred would.
+    """
+    weight = numpy.ones(WORLDS)
+    weight[:250] = 3.0
+    rail = what_takes_you_out(*a_rail(weight=weight))
+
+    row = rows_by_claim(rail)["somewhat"]
+    on_effective = wilson(row.came_on_first, rail.effective_draws, COVERAGE)  # type: ignore[attr-defined]
+    on_a_count = wilson(row.came_on_first, float(STOPPED), COVERAGE)  # type: ignore[attr-defined]
+
+    assert rail.effective_draws == pytest.approx(400.0)
+    assert (row.came_on_first_lo, row.came_on_first_hi) == pytest.approx(on_effective)  # type: ignore[attr-defined]
+    assert on_effective[1] - on_effective[0] > on_a_count[1] - on_a_count[0]
+
+
+def a_rail_of_gaps(days: list[int], weight: list[float]) -> tuple[Draws, FirstTouch]:
+    """A thousand worlds: the five hundred that stop out carry a stated spread of arrival days.
+
+    The pattern of days and weights repeats to fill the stop-first half; the other
+    half never has the claim at all, so the rail has something to divide by and the
+    claim is not dropped as one held true everywhere.
+    """
+    times = STOPPED // len(days)
+    came = numpy.full((WORLDS, 1), NEVER, dtype=numpy.int32)
+    came[:STOPPED, 0] = numpy.array(days * times, dtype=numpy.int32)
+    weights = numpy.ones(WORLDS)
+    weights[:STOPPED] = numpy.array(weight * times, dtype=numpy.float64)
+    stop_on = numpy.full(WORLDS, NEVER, dtype=numpy.int32)
+    stop_on[:STOPPED] = STOP_DAY
+    return (
+        Draws(
+            day_zero=DAY_ZERO,
+            days=DAYS,
+            claims=(PropositionId("the-claim"),),
+            on_day=came,
+            off_day=numpy.where(came == NEVER, NEVER, STILL_HOLDING).astype(numpy.int32),
+            weight=weights,
+            effective=effective_draws(weights),
+            sample="built_by_hand",
+        ),
+        FirstTouch(
+            stop_first=0.5,
+            target_first=0.5,
+            neither=0.0,
+            stop_touched=0.5,
+            finished_beyond_the_stop=0.5,
+            stop_at=97.0,
+            target_at=106.0,
+            shift=0.0,
+            effective_draws=effective_draws(weights),
+            through=DAYS,
+            stop_first_on=stop_on,
+            sample="built_by_hand",
+        ),
+    )
+
+
+def test_the_typical_gap_is_the_middle_one_and_not_the_average() -> None:
+    """Gaps of 9, 9, 9 and 1 days: the middle is nine, the average is seven.
+
+    The middle rather than the average, because a handful of worlds where the claim
+    came on the day the window opened would drag an average away from the days most
+    of the worlds actually show.
+    """
+    rail = what_takes_you_out(*a_rail_of_gaps(days=[1, 1, 1, 9], weight=[1.0, 1.0, 1.0, 1.0]))
+
+    assert rail.rows[0].days_before_the_stop == pytest.approx(9.0)
+    assert rail.rows[0].days_before_the_stop != pytest.approx(7.0)
+
+
+def test_the_typical_gap_is_weighted() -> None:
+    """The same four gaps, with the world nine days out weighing nine times the others.
+
+    Its weight is over half the total, so the middle gap by weight is its one — a
+    day — where counting worlds would still read nine.
+    """
+    rail = what_takes_you_out(*a_rail_of_gaps(days=[1, 1, 1, 9], weight=[1.0, 1.0, 1.0, 9.0]))
+
+    assert rail.rows[0].days_before_the_stop == pytest.approx(1.0)

@@ -28,8 +28,13 @@ from hypothesis import given, settings
 
 from katalyst.domain import PropositionId
 from katalyst.thesis.draws import NEVER, STILL_HOLDING, Draws, weighted_share
-from katalyst.thesis.paths import ClaimMove, giveback_schedule, walk
-from tests.thesis.synthetic import draws, the_models_own_chance, worlds_of
+from katalyst.thesis.paths import (
+    ClaimMove,
+    giveback_schedule,
+    the_sample_s_own_chance,
+    walk,
+)
+from tests.thesis.synthetic import draws, worlds_of
 
 a_few = settings(max_examples=12, deadline=None)
 
@@ -62,12 +67,26 @@ def four_arrivals() -> Draws:
 
 
 def the_move(chance: float = CHANCE, move: float = MOVE) -> ClaimMove:
-    """The one claim's move, with the market's chance of it."""
+    """The one claim's move, with a market chance handed in from somewhere else."""
     return ClaimMove(
         claim=PropositionId(THE_CLAIM),
         move=move,
         market_chance=chance,
-        market_chance_from="model",
+        market_chance_from="base_world",
+    )
+
+
+def the_neutral_move(move: float = MOVE, claim: str = THE_CLAIM) -> ClaimMove:
+    """The same move with **no** chance handed in, so the walk reads it off the drawn worlds.
+
+    This is the neutral assumption — the market believes what the model believes —
+    and under it the path carries no drift at all.
+    """
+    return ClaimMove(
+        claim=PropositionId(claim),
+        move=move,
+        market_chance=None,
+        market_chance_from="sample_share",
     )
 
 
@@ -171,7 +190,7 @@ def test_a_schedule_for_a_claim_these_worlds_do_not_carry_is_refused() -> None:
                 claim=PropositionId("some-other-claim"),
                 move=MOVE,
                 market_chance=CHANCE,
-                market_chance_from="model",
+                market_chance_from="base_world",
             ),
         )
 
@@ -295,9 +314,8 @@ def test_a_path_has_no_drift_when_the_model_agrees_with_the_market() -> None:
     Nothing is typed in and nothing is measured.
     """
     drawn = four_arrivals()
-    agreeing = the_move(chance=the_models_own_chance(drawn, THE_CLAIM))
 
-    level = still_paths(drawn, (agreeing,))
+    level = still_paths(drawn, (the_neutral_move(),))
 
     for day in range(drawn.days + 1):
         assert weighted_share(level[:, day] > ENTRY, drawn.weight) >= 0.0
@@ -315,11 +333,10 @@ def test_the_old_rule_fails_the_same_assertion() -> None:
     hand, over the same worlds.
     """
     drawn = four_arrivals()
-    chance = the_models_own_chance(drawn, THE_CLAIM)
     came_on = drawn.on_day[:, 0]
     naive_end = numpy.where((came_on != NEVER) & (came_on > 0), ENTRY + MOVE, ENTRY)
 
-    honest = still_paths(drawn, (the_move(chance=chance),))[:, -1]
+    honest = still_paths(drawn, (the_neutral_move(),))[:, -1]
 
     assert float(naive_end.mean()) > ENTRY
     assert float(honest.mean()) == pytest.approx(ENTRY)
@@ -334,10 +351,9 @@ def test_the_claims_add_nothing_to_the_mean_of_the_walk_itself() -> None:
     real walk under it rather than with the variability switched off.
     """
     drawn = four_arrivals()
-    agreeing = the_move(chance=the_models_own_chance(drawn, THE_CLAIM))
 
     bare = walk(drawn, (), entry=ENTRY, daily_move=1.0, seed=SEED).level
-    carrying = walk(drawn, (agreeing,), entry=ENTRY, daily_move=1.0, seed=SEED).level
+    carrying = walk(drawn, (the_neutral_move(),), entry=ENTRY, daily_move=1.0, seed=SEED).level
 
     for day in range(drawn.days + 1):
         assert float(carrying[:, day].mean()) == pytest.approx(float(bare[:, day].mean()))
@@ -358,13 +374,7 @@ def test_two_claims_each_give_back_at_their_own_chance() -> None:
         days=10,
     )
     moves = tuple(
-        ClaimMove(
-            claim=PropositionId(name),
-            move=size,
-            market_chance=the_models_own_chance(two, name),
-            market_chance_from="model",
-        )
-        for name, size in (("first", 8.0), ("second", -5.0))
+        the_neutral_move(move=size, claim=name) for name, size in (("first", 8.0), ("second", -5.0))
     )
 
     level = still_paths(two, moves)
@@ -421,16 +431,43 @@ def test_the_walk_carries_the_window_and_the_weights_through() -> None:
 # --- What the walk refuses --------------------------------------------------
 
 
-def test_a_market_chance_of_one_is_refused() -> None:
-    """A market already certain has no surprise to apply and nothing left to give back."""
-    with pytest.raises(ValueError, match="already certain"):
-        the_move(chance=1.0)
+def test_a_market_chance_above_one_is_refused() -> None:
+    """A chance is a chance."""
+    with pytest.raises(ValueError, match="from nothing to one"):
+        the_move(chance=1.5)
 
 
 def test_a_market_chance_below_nothing_is_refused() -> None:
-    """A chance is a chance."""
-    with pytest.raises(ValueError, match="from nothing up to"):
+    """And so is the other end of it."""
+    with pytest.raises(ValueError, match="from nothing to one"):
         the_move(chance=-0.1)
+
+
+def test_a_market_certain_of_a_claim_is_a_chance_the_layer_reaches() -> None:
+    """The exact worlds the neutral assumption comes out at one on.
+
+    Three worlds already on at day zero and one where the claim arrives on day one:
+    every world the question arises for has it arriving, so the market's own chance
+    — read off the sample — is exactly one. A refusal here would be the layer
+    refusing its own recommended way of choosing that number.
+    """
+    certain = worlds_of(claims=[THE_CLAIM], on=[[0], [0], [0], [1]], days=8)
+
+    chance = the_sample_s_own_chance(certain, PropositionId(THE_CLAIM))
+    schedule, shape = giveback_schedule(certain, the_move(chance=chance))
+
+    assert chance == 1.0
+    assert shape == "nothing_given_back"
+    assert schedule.tolist() == pytest.approx([1.0] * 9)
+
+
+def test_a_claim_the_market_is_certain_of_moves_the_price_by_nothing() -> None:
+    """The whole move is already in today's price: no surprise to apply, nothing to give back."""
+    certain = worlds_of(claims=[THE_CLAIM], on=[[3], [NEVER]], days=10)
+
+    level = still_paths(certain, (the_move(chance=1.0),))
+
+    assert level.ravel().tolist() == pytest.approx([ENTRY] * 22)
 
 
 def test_a_move_that_is_not_a_real_number_is_refused() -> None:
@@ -489,18 +526,138 @@ def test_agreeing_with_the_market_leaves_the_mean_price_where_it_started(drawn: 
     nothing asks the model for that second number yet. The two tests above say
     exactly what that costs on a state.
     """
-    name = drawn.claims[0]
-    moves = (
-        ClaimMove(
-            claim=name,
-            move=7.0,
-            market_chance=the_models_own_chance(drawn, name),
-            market_chance_from="model",
-        ),
-    )
+    moves = (the_neutral_move(move=7.0, claim=str(drawn.claims[0])),)
 
     level = still_paths(drawn, moves)
 
-    for day in (0, drawn.days // 2, drawn.days):
+    for day in range(drawn.days + 1):
         mean = float((level[:, day] * drawn.weight).sum() / drawn.weight.sum())
         assert mean == pytest.approx(ENTRY, abs=1e-9)
+
+
+# --- Which chance was applied, and where it came from -----------------------
+
+
+def test_the_chance_read_off_the_drawn_worlds_is_the_share_that_come_true_in_the_window() -> None:
+    """Four worlds: the claim arrives on days four and eight, never in one, already on in one.
+
+    The world where it was already on when the window opened is left out of both
+    halves, because a claim already true is in today's price and the question does
+    not arise for it. So the share is two of the three worlds it does arise for.
+    """
+    assert the_sample_s_own_chance(four_arrivals(), PropositionId(THE_CLAIM)) == pytest.approx(
+        2.0 / 3.0
+    )
+
+
+def test_a_claim_already_true_everywhere_leaves_the_question_arising_nowhere() -> None:
+    """Every world has it on at day zero, so there is nothing left for the market to price."""
+    already = worlds_of(claims=[THE_CLAIM], on=[[0], [0]], days=10)
+
+    assert the_sample_s_own_chance(already, PropositionId(THE_CLAIM)) == 0.0
+
+
+def test_the_paths_say_which_chance_was_applied_and_where_it_came_from() -> None:
+    """Record 0019 wants the source in the same sentence as the number, so the value carries both.
+
+    The number may have been worked out here rather than handed in, and a card
+    cannot name what it cannot read.
+    """
+    drawn = four_arrivals()
+
+    paths = walk(
+        drawn,
+        (the_neutral_move(),),
+        entry=ENTRY,
+        daily_move=0.0,
+        seed=SEED,
+    )
+
+    used = paths.market_chance[PropositionId(THE_CLAIM)]
+    assert used.came_from == "sample_share"
+    assert used.value == pytest.approx(2.0 / 3.0)
+
+
+def test_a_chance_handed_in_keeps_the_source_it_was_handed_in_with() -> None:
+    """A venue's price is the market's own chance, and the card says so."""
+    drawn = four_arrivals()
+    quoted = ClaimMove(
+        claim=PropositionId(THE_CLAIM),
+        move=MOVE,
+        market_chance=0.07,
+        market_chance_from="venue_quote",
+    )
+
+    paths = walk(drawn, (quoted,), entry=ENTRY, daily_move=0.0, seed=SEED)
+
+    used = paths.market_chance[PropositionId(THE_CLAIM)]
+    assert used.came_from == "venue_quote"
+    assert used.value == pytest.approx(0.07)
+
+
+def test_a_chance_and_a_source_that_disagree_are_refused() -> None:
+    """`sample_share` is said when, and only when, no chance is handed in."""
+    with pytest.raises(ValueError, match="when and only when"):
+        ClaimMove(
+            claim=PropositionId(THE_CLAIM),
+            move=MOVE,
+            market_chance=0.3,
+            market_chance_from="sample_share",
+        )
+    with pytest.raises(ValueError, match="when and only when"):
+        ClaimMove(
+            claim=PropositionId(THE_CLAIM),
+            move=MOVE,
+            market_chance=None,
+            market_chance_from="base_world",
+        )
+
+
+def test_the_price_carries_the_gap_on_every_day_the_claim_holds_and_not_the_day_it_stops() -> None:
+    """The whole path around a state's two days, not just where it ends up.
+
+    One world over six days: the claim comes on day two and stops on day four. The
+    day it goes off is the first day it is **no longer** true, so the price carries
+    the surprise on days two and three and has given the gap up by day four. A test
+    that read only the last day could not tell that from giving it up a day late.
+    """
+    state = worlds_of(claims=[THE_CLAIM], on=[[2]], off=[[4]], days=6)
+
+    level = still_paths(state, (the_move(),))[0]
+
+    carried = MOVE * (1.0 - CHANCE)
+    given_back = -MOVE * CHANCE
+    assert level.tolist() == pytest.approx(
+        [
+            ENTRY,
+            ENTRY,
+            ENTRY + carried,
+            ENTRY + carried,
+            ENTRY + given_back,
+            ENTRY + given_back,
+            ENTRY + given_back,
+        ],
+        abs=1e-9,
+    )
+
+
+def test_holding_read_a_day_at_a_time_and_a_window_at_a_time_are_the_one_rule() -> None:
+    """Two shapes of the same question, so the off day cannot mean two things.
+
+    A price path asks *was this claim holding* for one claim across the whole
+    window; everything else asks it for every claim on one day. Both read the same
+    expression, and this checks the two agree on every day of a set of worlds that
+    has an arrival, a stop, a never and an already-on.
+    """
+    drawn = worlds_of(
+        claims=[THE_CLAIM],
+        on=[[2], [2], [NEVER], [0]],
+        off=[[4], [STILL_HOLDING], [NEVER], [STILL_HOLDING]],
+        days=6,
+    )
+    grid = numpy.arange(drawn.days + 1, dtype=numpy.int32)
+
+    a_window_at_a_time = drawn.holding_each_day(PropositionId(THE_CLAIM), grid)
+
+    for day in range(drawn.days + 1):
+        assert a_window_at_a_time[:, day].tolist() == drawn.holding_on(day)[:, 0].tolist()

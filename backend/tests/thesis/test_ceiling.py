@@ -143,6 +143,22 @@ def test_the_fee_makes_the_ceiling_smaller_and_never_larger() -> None:
     assert charged.fraction < free.fraction
 
 
+def test_the_fee_makes_a_seller_s_ceiling_smaller_too() -> None:
+    """Selling is paid the bid **less** the fee, so paying to deal puts less on, never more.
+
+    The buying side has its own test above; without this one the fee's sign on the
+    selling side is free, and a fee that helped the seller would go unnoticed.
+    """
+    model = Belief(p=0.4, lo=0.3, hi=0.5, owner="model")
+
+    free = ceiling_of(an_edge(model=model, bid=0.8, offer=0.9, fee=0.0))
+    charged = ceiling_of(an_edge(model=model, bid=0.8, offer=0.9, fee=0.05))
+
+    assert free.taken_by == "selling" and charged.taken_by == "selling"
+    assert charged.fraction is not None and free.fraction is not None
+    assert charged.fraction < free.fraction
+
+
 def test_an_unknown_fee_is_read_as_nothing_and_the_edge_says_it_is_unknown() -> None:
     """The ceiling cannot invent a fee; the edge it came from carries the absence."""
     model = Belief(p=0.5, lo=0.4, hi=0.6, owner="model")

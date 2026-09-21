@@ -297,9 +297,7 @@ class Draws:
         Returns:
             One true-or-false value per drawn world and claim.
         """
-        started: Flags = self.came_on_by(day)
-        running: Flags = (self.off_day == STILL_HOLDING) | (self.off_day > day)
-        return started & running
+        return _holding(self.on_day, self.off_day, day)
 
     def came_on_by(self, day: int) -> Flags:
         """Which claims had come on at all by a given day, in which worlds.
@@ -314,8 +312,65 @@ class Draws:
         Returns:
             One true-or-false value per drawn world and claim.
         """
-        started: Flags = (self.on_day != NEVER) & (self.on_day <= day)
-        return started
+        return _came_on_by(self.on_day, day)
+
+    def holding_each_day(self, claim: PropositionId, grid: Days) -> Flags:
+        """Whether one claim was holding, per drawn world, on each day of a grid at once.
+
+        The same rule as `holding_on`, read for one claim over many days instead of
+        for many claims on one day — the two share their one expression below, so
+        the day a claim stops holding cannot mean one thing to a price path and
+        another to everything else.
+
+        Args:
+            claim: Which claim.
+            grid: The days to read, as a row of whole numbers.
+
+        Returns:
+            One true-or-false value per drawn world and day.
+
+        Raises:
+            KeyError: If the claim is not in this set of draws at all.
+        """
+        column = self.column(claim)
+        return _holding(self.on_day[:, column, None], self.off_day[:, column, None], grid[None, :])
+
+    def came_on_each_day(self, claim: PropositionId, grid: Days) -> Flags:
+        """Whether one claim had come on at all, per drawn world, on each day of a grid.
+
+        Args:
+            claim: Which claim.
+            grid: The days to read, as a row of whole numbers.
+
+        Returns:
+            One true-or-false value per drawn world and day.
+
+        Raises:
+            KeyError: If the claim is not in this set of draws at all.
+        """
+        return _came_on_by(self.on_day[:, self.column(claim), None], grid[None, :])
+
+
+def _came_on_by(on_day: Days, day: Days | int) -> Flags:
+    """Had a claim come on by a day — the one expression, written once.
+
+    Read with a single day it answers for every claim at once; read with a row of
+    days it answers for one claim across the window. One expression rather than
+    two, because two would be two places the marker for *never* could be forgotten.
+    """
+    came: Flags = (on_day != NEVER) & (on_day <= day)
+    return came
+
+
+def _holding(on_day: Days, off_day: Days, day: Days | int) -> Flags:
+    """Was a claim holding on a day — the one expression, written once.
+
+    Holding means it came on that day or earlier and had not gone off by then. The
+    day it went off is the first day it is no longer true, so a state whose two days
+    are the same day held for no whole day at all.
+    """
+    running: Flags = (off_day == STILL_HOLDING) | (off_day > day)
+    return _came_on_by(on_day, day) & running
 
 
 def _two_dimensions_of_whole_days(days: Days, called: str) -> None:

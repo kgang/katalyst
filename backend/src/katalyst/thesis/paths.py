@@ -74,9 +74,9 @@ What this file must never do
 - Never take a move as a share of the price. A percentage move compounds, the
   surprise rule's arithmetic is additive, and the gap between them is free drift
   in the reader's favour.
-- Never use a market chance of one. A claim the market is certain of has no
-  surprise to apply and nothing left to give back, and the schedule's arithmetic
-  divides by nothing.
+- Never refuse a market chance of one. It is a chance the layer's own neutral
+  assumption reaches, and the honest answer there is that the claim moves the
+  price by nothing — not an error a reader cannot act on.
 - Never draw without a seed handed in.
 - Never put a contract on a price path. A random walk leaves the zero-to-one range
   and the contract's truth in that world is already known from the draw. That
@@ -93,7 +93,7 @@ import numpy
 from numpy.typing import NDArray
 
 from katalyst.domain import PropositionId
-from katalyst.thesis.draws import NEVER, STILL_HOLDING, Draws, SampleFrom, Weights
+from katalyst.thesis.draws import NEVER, Days, Draws, SampleFrom, Weights
 
 Levels = NDArray[numpy.float64]
 """Prices: one row per drawn world, one column per day of the window."""
@@ -106,19 +106,33 @@ reaching nothing on the last day, because a claim that has not happened by the e
 of the window never will.
 """
 
-MarketChanceFrom = Literal["venue_quote", "model", "reader"]
+MarketChanceFrom = Literal["venue_quote", "sample_share", "base_world", "reader"]
 """Where the market's chance of a claim came from, as a closed list.
 
-`venue_quote` — a venue quotes a contract asking this claim's own resolution test.
-`model` — nobody quotes it, so the neutral assumption is used: the market believes
-what the model believes, read from the world with nothing fixed by an edit.
-`reader` — the reader typed one over the top, which they may always do and never
-must. **The screen names this in the same sentence as the number**, because a path
-built on the model's own chance carries no drift at all and one built on a venue's
-does.
+`venue_quote` — a venue quotes a contract asking this claim's own resolution test,
+and its price is the market's own chance.
+
+`sample_share` — nobody quotes it, so the neutral assumption is used: **the market
+believes what the model believes**. The number is then the share of the drawn
+worlds in which the claim comes true inside the trade's window, worked out from
+the draws by `the_sample_s_own_chance` rather than handed in. It is the **only**
+reading under which the path carries no drift at all.
+
+`base_world` — the model's printed likelihood for the claim, read from the world
+with nothing fixed by an edit. It is the right fallback where the sample carries no
+arrivals inside the window, and it is **not** the number the no-drift rule holds
+for: the claim's own resolve-by day and the trade's window are two different
+questions, and the gap between them is drift. A screen using it owes the reader
+that sentence.
+
+`reader` — they typed one over the top, which they may always do and never must.
+
+**The screen names this in the same sentence as the number.** The two model
+readings are separate entries here rather than one, because a card that could not
+tell them apart could not say whether the number it is showing carries drift.
 """
 
-DecayShape = Literal["arrival_days", "straight_line"]
+DecayShape = Literal["arrival_days", "straight_line", "nothing_given_back"]
 """Which shape the giveback followed, as a closed list.
 
 `arrival_days` — the model's own distribution of the day the claim arrives, read
@@ -126,6 +140,10 @@ from the drawn worlds and rescaled to the market's chance. The only schedule
 measured fair on every day. `straight_line` — a straight run down to nothing, used
 where no drawn world has the claim arriving inside the window, so there is no
 histogram to borrow. It is fair over the window and quietly unfair within it.
+`nothing_given_back` — the market is **certain** of the claim, so the whole move is
+already in today's price, there is no surprise to apply and nothing is ever given
+back. The claim moves the price by nothing at all, which is the honest answer to a
+certainty rather than a refusal.
 """
 
 
@@ -140,40 +158,126 @@ class ClaimMove:
             stands in a world where this claim is true than in one where it is
             false, both read at the same moment. Never a share of the price, and
             never the reaction on the announcement day.
-        market_chance: The market's own chance of the claim, between nothing and
-            one, and never one exactly.
+        market_chance: The market's own chance of the claim, from nothing to one.
+            One means the market is certain, so the claim moves the price by
+            nothing at all. **Nothing at all** means *read it off the drawn worlds*
+            — the neutral assumption — and the walk fills it in.
         market_chance_from: Where that chance came from, which the screen names in
-            the same sentence as any number built on it.
+            the same sentence as any number built on it. It is `sample_share` when,
+            and only when, no chance was handed in.
     """
 
     claim: PropositionId
     move: float
-    market_chance: float
+    market_chance: float | None
     market_chance_from: MarketChanceFrom
 
     def __post_init__(self) -> None:
-        """Check the move is a real number and the market's chance is usable.
+        """Check the move is a real number, and that the chance and its source agree.
 
         A **negative** move is ordinary: it is a claim whose coming true pushes the
         instrument down rather than up, and the level gap carries its own sign.
 
+        **A chance of one is a chance**, and it is one the layer's own neutral
+        assumption reaches: a claim that comes true in every drawn world the
+        question arises for. The market is certain, so the whole move is already in
+        today's price, the claim moves nothing, and the schedule is flat at one
+        rather than dividing by nothing on the last day.
+
         Raises:
-            ValueError: If the move is not a real number, or if the market's chance
-                is below nothing or is one or more. A chance of one says the market
-                is already certain: there is no surprise to apply, nothing left to
-                give back, and the schedule's arithmetic has nothing to divide by.
+            ValueError: If the move is not a real number; if a chance is handed in
+                and is outside nothing to one; or if the chance and its source
+                disagree about whether this layer worked it out.
         """
         if not math.isfinite(self.move):
             raise ValueError(
                 f"a claim's move is a level gap in price units; got {self.move} for '{self.claim}'"
             )
-        if not 0.0 <= self.market_chance < 1.0:
+        if (self.market_chance is None) != (self.market_chance_from == "sample_share"):
             raise ValueError(
-                "the market's chance of a claim is from nothing up to but not including "
-                f"one; got {self.market_chance} for '{self.claim}'. A chance of one says "
-                "the market is already certain, so there is no surprise to apply and "
-                "nothing left to give back"
+                "a chance read off the drawn worlds is the one this layer works out, so "
+                "'sample_share' is said when and only when no chance is handed in; got "
+                f"{self.market_chance} from '{self.market_chance_from}' for '{self.claim}'"
             )
+        if self.market_chance is not None and not 0.0 <= self.market_chance <= 1.0:
+            raise ValueError(
+                "the market's chance of a claim is a chance, from nothing to one; got "
+                f"{self.market_chance} for '{self.claim}'"
+            )
+
+
+@dataclass(frozen=True)
+class ChanceUsed:
+    """The market's chance the walk actually applied to one claim, and where it came from.
+
+    Carried because record 0019 requires the source in the same sentence as the
+    number, and because the chance may have been **worked out here** rather than
+    handed in: a card cannot name what it cannot read.
+
+    Attributes:
+        value: The chance, from nothing to one.
+        came_from: Which of the four sources it is.
+    """
+
+    value: float
+    came_from: MarketChanceFrom
+
+
+def the_chance_applied(draws: Draws, move: "ClaimMove") -> "ChanceUsed":
+    """The market's chance this claim's move is scaled by, and where it came from.
+
+    One place, so the schedule and the number a card prints beside it can never be
+    two different chances. A chance handed in is taken as it stands; a move that
+    hands in none is read off the drawn worlds under the neutral assumption.
+
+    Args:
+        draws: The drawn worlds.
+        move: What the claim does to the price, and what is already in it.
+
+    Returns:
+        The chance and its source.
+
+    Raises:
+        KeyError: If the claim is not among the drawn worlds' claims.
+    """
+    if move.market_chance is not None:
+        return ChanceUsed(value=move.market_chance, came_from=move.market_chance_from)
+    return ChanceUsed(value=the_sample_s_own_chance(draws, move.claim), came_from="sample_share")
+
+
+def the_sample_s_own_chance(draws: Draws, claim: PropositionId) -> float:
+    """The market's chance of a claim under the neutral assumption, read off the drawn worlds.
+
+    **The market believes what the model believes**, except where a venue says
+    otherwise. Read straight off the sample, that chance is the weighted share of
+    the drawn worlds in which the claim **comes true inside the trade's window** —
+    among the worlds where it was not already true when the window opened, because
+    a claim already true is in today's price and the question does not arise for
+    it.
+
+    It is this number rather than the claim's printed likelihood, which is read on
+    the claim's own resolve-by day and answers a different question. The difference
+    is not cosmetic: with this number the weighted mean price is the entry price on
+    **every** day, exactly, which is the promise record 0019 makes about the base
+    world's path and the sentence the whole supposed-screen demonstration rests on.
+
+    Args:
+        draws: The drawn worlds.
+        claim: Which claim.
+
+    Returns:
+        A chance from nothing to one. **One** where every world the question arises
+        for has the claim coming true — a certainty, and a legitimate answer.
+        Nothing where the claim is already true in every drawn world, so the
+        question arises nowhere.
+
+    Raises:
+        KeyError: If the claim is not among the drawn worlds' claims.
+    """
+    came_on = draws.on_day[:, draws.column(claim)]
+    arises = float(draws.weight[came_on != 0].sum())
+    inside = float(draws.weight[(came_on != NEVER) & (came_on > 0)].sum())
+    return inside / arises if arises > 0.0 else 0.0
 
 
 @dataclass(frozen=True)
@@ -200,6 +304,9 @@ class Paths:
         decay_shape: For each claim that moves the price, which shape its giveback
             followed. Carried because the shape is an assumption and the Inspector
             says which one was used.
+        market_chance: For each of those claims, the chance the walk applied and
+            where it came from — which may be a number this file worked out rather
+            than one handed in.
     """
 
     day_zero: date
@@ -210,6 +317,7 @@ class Paths:
     weight: Weights
     sample: SampleFrom
     decay_shape: Mapping[PropositionId, DecayShape]
+    market_chance: Mapping[PropositionId, ChanceUsed]
 
 
 def giveback_schedule(draws: Draws, move: ClaimMove) -> tuple[Schedule, DecayShape]:
@@ -241,8 +349,10 @@ def giveback_schedule(draws: Draws, move: ClaimMove) -> tuple[Schedule, DecaySha
     Raises:
         KeyError: If the claim is not among the drawn worlds' claims.
     """
-    chance = move.market_chance
-    grid = numpy.arange(draws.days + 1)
+    chance = the_chance_applied(draws, move).value
+    grid = numpy.arange(draws.days + 1, dtype=numpy.int32)
+    if chance >= 1.0:
+        return numpy.ones(draws.days + 1), "nothing_given_back"
     came_on = draws.on_day[:, draws.column(move.claim)]
     inside = (came_on != NEVER) & (came_on > 0)
     arriving = float(draws.weight[inside].sum())
@@ -315,15 +425,17 @@ def walk(
     if not math.isfinite(entry) or entry <= 0.0:
         raise ValueError(f"an entry price is above nothing; got {entry}")
 
-    grid = numpy.arange(draws.days + 1)
+    grid = numpy.arange(draws.days + 1, dtype=numpy.int32)
     steps = numpy.random.default_rng(seed).standard_normal((draws.worlds, draws.days))
     level = entry + numpy.concatenate(
         [numpy.zeros((draws.worlds, 1)), numpy.cumsum(daily_move * steps, axis=1)], axis=1
     )
 
     shapes: dict[PropositionId, DecayShape] = {}
+    applied: dict[PropositionId, ChanceUsed] = {}
     for one in moves:
         schedule, shapes[one.claim] = giveback_schedule(draws, one)
+        applied[one.claim] = the_chance_applied(draws, one)
         carried = _carried(draws, one.claim, schedule, grid)
         level = level + one.move * (carried - carried[:, :1])
 
@@ -336,12 +448,11 @@ def walk(
         weight=draws.weight,
         sample=draws.sample,
         decay_shape=shapes,
+        market_chance=applied,
     )
 
 
-def _carried(
-    draws: Draws, claim: PropositionId, schedule: Schedule, grid: NDArray[numpy.int64]
-) -> Levels:
+def _carried(draws: Draws, claim: PropositionId, schedule: Schedule, grid: Days) -> Levels:
     """How much of one claim's move the price carries, per drawn world and per day.
 
     Three states and no fourth. **Holding** — the claim came on and has not gone off
@@ -368,12 +479,8 @@ def _carried(
     Returns:
         A share of the move per drawn world per day.
     """
-    column = draws.column(claim)
-    came_on = draws.on_day[:, column][:, None]
-    went_off = draws.off_day[:, column][:, None]
-    started = (came_on != NEVER) & (came_on <= grid[None, :])
-    holding = started & ((went_off == STILL_HOLDING) | (went_off > grid[None, :]))
-    gone = started & ~holding
+    holding = draws.holding_each_day(claim, grid)
+    gone = draws.came_on_each_day(claim, grid) & ~holding
     carried: Levels = numpy.where(
         holding, 1.0, numpy.where(gone, 0.0, numpy.broadcast_to(schedule, holding.shape))
     )

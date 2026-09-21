@@ -28,8 +28,9 @@ length of the step, so that a daily count matches what watching continuously wou
 have found. The distance is a known constant times the daily variability, and the
 constant is named and cited below.
 
-*When a day's step crosses both levels, the stop is taken as first.* It is the
-only reading that cannot flatter the trade.
+*When both levels are first reached on the same day, the stop is taken as first.*
+A daily close cannot say which of them the price reached first inside the day, and
+the stop is the only reading that cannot flatter the trade.
 
 **A contract ending has no first touch here.** A probability does not follow a
 price-path model: a random walk leaves the zero-to-one range, the contract's truth
@@ -208,6 +209,10 @@ class FirstTouch:
         target_at: The level actually checked for the target, after the shift.
         shift: How far each level was moved toward the entry price.
         effective_draws: How many equally-weighted worlds this rests on.
+        through: The last day of the window these shares were read to — the
+            reader's own horizon, counted from the day the window opened. Carried
+            because two shares over an unnamed window are two numbers nobody can
+            check.
         stop_first_on: For each drawn world, the day the stop was touched first, or
             `NEVER` where it was not. This is what lift reads.
         sample: Which sampler the days came from, so no screen can print these
@@ -223,6 +228,7 @@ class FirstTouch:
     target_at: float
     shift: float
     effective_draws: float
+    through: int
     stop_first_on: Days
     sample: SampleFrom
 
@@ -339,10 +345,17 @@ def _refusing(code: RefusalCode, field: str) -> Refusal:
 def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
     """Say how often the stop and the target are each reached first, or refuse by name.
 
-    Each drawn world's path is walked day by day from the day after entry. A level
-    counts as reached the moment the path touches it; when one day's step crosses
-    both, the stop is taken as first. Both levels are moved toward the entry price
-    by the barrier shift before they are checked, so that a daily count says what
+    Each drawn world's path is walked day by day from the day after entry **to the
+    reader's own horizon**, and no further: the two shares answer *how often is each
+    of my exits reached before I am out*, and reading to the end of whatever window
+    the drawn worlds happen to carry answers a question nobody asked — measured at
+    more than a tenth on both shares.
+
+    A level counts as reached the moment the path touches it. When both levels are
+    first reached **on the same day**, the stop is taken as first; a daily close
+    cannot say which came first inside the day, and the stop is the only reading
+    that cannot flatter the trade. Both levels are moved toward the entry price by
+    the barrier shift before they are checked, so that a daily count says what
     continuous watching would have found.
 
     Args:
@@ -354,10 +367,13 @@ def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
         ending names a contract rather than something traded.
 
     Raises:
-        ValueError: If the paths were not walked from this position's entry price,
-            or at its own day-to-day variability. Checking a stop against a path
-            that started somewhere else answers a question nobody asked, and one
-            walked at another variability would be corrected by the wrong amount.
+        ValueError: If the paths were not walked from this position's entry price
+            or at its own day-to-day variability; or if they do not reach the
+            reader's horizon, or the horizon is not at least a day after the window
+            opened. Checking a stop against a path that started somewhere else
+            answers a question nobody asked, one walked at another variability
+            would be corrected by the wrong amount, and one that stops short would
+            answer over a window the reader did not choose.
     """
     if position.trades == "contract":
         return _refusing("first_touch_on_a_contract", "ending")
@@ -368,6 +384,18 @@ def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
             f"{paths.daily_move}, and the position says {position.entry} and "
             f"{position.daily_move}"
         )
+    through = (position.horizon - paths.day_zero).days
+    if through < 1:
+        raise ValueError(
+            f"a window runs for at least one day; this one opens on {paths.day_zero} and "
+            f"the reader is out by {position.horizon}"
+        )
+    if through > paths.days:
+        raise ValueError(
+            f"this path does not reach the reader's horizon: it runs {paths.days} days "
+            f"from {paths.day_zero} and they are out on day {through}. Answering over a "
+            "shorter window would answer a question nobody asked"
+        )
 
     # Each level moves toward the entry price by the shift, and never past it: a
     # level nearer the entry than the shift is touched on the first day either way.
@@ -376,7 +404,7 @@ def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
     stop_at = position.entry + losing * max(0.0, abs(position.stop - position.entry) - shift)
     target_at = position.entry - losing * max(0.0, abs(position.target - position.entry) - shift)
 
-    walked = paths.level[:, 1:]
+    walked = paths.level[:, 1 : through + 1]
     beyond = (walked <= stop_at) if position.side == "long" else (walked >= stop_at)
     reached = (walked >= target_at) if position.side == "long" else (walked <= target_at)
     never = walked.shape[1] + 1
@@ -385,7 +413,7 @@ def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
     stop_won = (stop_on <= target_on) & (stop_on < never)
     target_won = target_on < stop_on
 
-    last = paths.level[:, -1]
+    last = paths.level[:, through]
     past_the_readers_stop = (
         (last < position.stop) if position.side == "long" else (last > position.stop)
     )
@@ -399,6 +427,7 @@ def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
         target_at=target_at,
         shift=shift,
         effective_draws=effective_draws(paths.weight),
+        through=through,
         stop_first_on=numpy.where(stop_won, stop_on + 1, NEVER).astype(numpy.int32),
         sample=paths.sample,
     )

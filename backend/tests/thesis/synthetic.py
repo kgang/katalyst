@@ -218,31 +218,3 @@ def positions(draw: Any, *, trades: str = "instrument", ending: str = "ending-0"
 def whole_days(draws_from: Draws) -> SearchStrategy[int]:
     """Every day of a window, as something to draw one of."""
     return st.integers(0, draws_from.days)
-
-
-def the_models_own_chance(drawn: Draws, claim: str) -> float:
-    """The model's own chance that a claim comes on inside the window, read off the draws.
-
-    The neutral assumption behind the surprise rule is that **the market believes
-    what the model believes**, except where a venue says otherwise. Read straight
-    off the drawn worlds, that chance is the weighted share of them in which the
-    claim comes on inside the window — among the worlds where it was not already on
-    when the window opened, because a claim already on is in today's price and the
-    question does not arise for it.
-
-    With the market's chance set to exactly this number, the mean price over the
-    drawn worlds is the entry price on **every** day, exactly rather than within a
-    sampling error. That is what makes the no-drift test an identity instead of a
-    measurement.
-
-    Args:
-        drawn: The drawn worlds.
-        claim: Which claim.
-
-    Returns:
-        A chance between nothing and one.
-    """
-    came_on = drawn.on_day[:, drawn.column(PropositionId(claim))]
-    open_to_it = float(drawn.weight[came_on != 0].sum())
-    inside = float(drawn.weight[(came_on != NEVER) & (came_on > 0)].sum())
-    return inside / open_to_it if open_to_it > 0.0 else 0.0
