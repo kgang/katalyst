@@ -10,6 +10,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { outlineOf } from "../../a11y/sentences";
+import { toTwoFigures } from "../../components/BeliefChip";
 import { Inspector } from "../../components/Inspector";
 import { ReceiptStrip } from "../../components/ReceiptStrip";
 import { RefusalStrip } from "../../components/RefusalStrip";
@@ -97,15 +98,46 @@ describe("the receipt", () => {
   ];
 
   it("test_the_receipt_strip_prints_every_field_and_adds_nothing_up", () => {
-    // One test, both renderings: beside the map, and in the panel's own section
-    // for the run that produced it.
-    const beside = render(<ReceiptStrip receipt={RECEIPT} />);
-    const inPanel = render(
+    const { container } = render(<ReceiptStrip receipt={RECEIPT} />);
+
+    const labels = [...container.querySelectorAll(".receipt-strip__label")].map(
+      (one) => one.textContent,
+    );
+    // Nine fields, each labelled, none omitted and none derived.
+    expect(labels).toEqual(LABELS);
+
+    const figures = [...container.querySelectorAll(".receipt-strip__reading")]
+      .map((one) => (one.textContent ?? "").replaceAll(" ", ""))
+      .join(" ");
+
+    // Every reading is the field it came from.
+    expect(figures).toContain(String(RECEIPT.calls));
+    expect(figures).toContain(String(RECEIPT.input_tokens));
+    expect(figures).toContain(String(RECEIPT.output_tokens));
+    expect(figures).toContain(String(RECEIPT.cache_read_tokens));
+    expect(figures).toContain(String(RECEIPT.searches));
+    expect(figures).toContain(RECEIPT.model);
+
+    // And nothing is a sum of two of them. The two token counts are never
+    // totalled, and nothing works a cost out of a token count and a price.
+    expect(figures).not.toContain(String(RECEIPT.input_tokens + RECEIPT.output_tokens));
+    expect(figures).not.toContain(
+      String(RECEIPT.input_tokens + RECEIPT.output_tokens + RECEIPT.cache_read_tokens),
+    );
+  });
+
+  it("test_the_cost_is_drawn_in_one_place_and_the_panel_points_at_it", () => {
+    // The nine readings used to be drawn twice, one above the other in a
+    // 320-pixel column: on the strip, and again in the panel's section for the
+    // run. Two copies of one cost read as two costs, and the second was the one
+    // no number on screen could be traced to.
+    const { container } = render(
       <Inspector
         world={theFinishedRun().world}
         selection={{ kind: "generation", id: "gen_worked_run" }}
         generation={{
-          receipt: RECEIPT,
+          seed: "4803646386380448080",
+          promptFingerprint: RECEIPT.prompt_hash,
           working: { state: "reading" },
           unknown: new Map(),
           openAt: null,
@@ -113,32 +145,63 @@ describe("the receipt", () => {
       />,
     );
 
-    for (const drawn of [beside.container, inPanel.container]) {
-      const labels = [...drawn.querySelectorAll(".receipt-strip__label")].map(
-        (one) => one.textContent,
-      );
-      // Nine fields, each labelled, none omitted and none derived.
-      expect(labels).toEqual(LABELS);
+    expect(container.querySelectorAll(".receipt-strip__line")).toHaveLength(0);
+    // And it says where the cost is instead of leaving a reader to find it.
+    expect(container.textContent).toContain("on the strip beside the map");
+  });
 
-      const figures = [...drawn.querySelectorAll(".receipt-strip__reading")]
-        .map((one) => (one.textContent ?? "").replaceAll(" ", ""))
-        .join(" ");
+  it("test_the_panel_prints_the_prompt_fingerprint_whole", () => {
+    // Eight characters of a thirty-two-character fingerprint is a fingerprint
+    // nobody can compare with anything — and cutting one is the browser
+    // deriving a reading, which is the one thing the receipt's own rule forbids.
+    const { container } = render(
+      <Inspector
+        world={theFinishedRun().world}
+        selection={{ kind: "generation", id: "gen_worked_run" }}
+        generation={{
+          seed: "4803646386380448080",
+          promptFingerprint: RECEIPT.prompt_hash,
+          working: { state: "reading" },
+          unknown: new Map(),
+          openAt: null,
+        }}
+      />,
+    );
 
-      // Every reading is the field it came from.
-      expect(figures).toContain(String(RECEIPT.calls));
-      expect(figures).toContain(String(RECEIPT.input_tokens));
-      expect(figures).toContain(String(RECEIPT.output_tokens));
-      expect(figures).toContain(String(RECEIPT.cache_read_tokens));
-      expect(figures).toContain(String(RECEIPT.searches));
-      expect(figures).toContain(RECEIPT.model);
+    const printed = container.textContent ?? "";
+    expect(printed).toContain(RECEIPT.prompt_hash);
+    expect(printed).toContain("prompt fingerprint");
+    // Said in words a reader can act on, rather than left as eight characters
+    // of hex with nothing beside them.
+    expect(printed).toContain("which wording of our instructions produced this run");
+  });
 
-      // And nothing is a sum of two of them. The two token counts are never
-      // totalled, and nothing works a cost out of a token count and a price.
-      expect(figures).not.toContain(String(RECEIPT.input_tokens + RECEIPT.output_tokens));
-      expect(figures).not.toContain(
-        String(RECEIPT.input_tokens + RECEIPT.output_tokens + RECEIPT.cache_read_tokens),
-      );
-    }
+  it("test_the_panel_is_drawn_before_anything_has_arrived", () => {
+    // From the moment there is a generation, with whatever has arrived in it. A
+    // section that appeared only once everything had landed would be a panel
+    // that is empty exactly while a reader is most likely to open it.
+    const { container } = render(
+      <Inspector
+        world={theFinishedRun().world}
+        selection={{ kind: "generation", id: "gen_worked_run" }}
+        generation={{
+          seed: null,
+          promptFingerprint: null,
+          working: { state: "reading" },
+          unknown: new Map(),
+          openAt: null,
+        }}
+      />,
+    );
+
+    expect(container.textContent).toContain("the run that built this map");
+    expect(container.textContent).toContain("What it was run against");
+    // Two slots with nothing in them yet, each an em dash rather than a zero,
+    // a blank or a placeholder that reads as a value.
+    const waiting = [...container.querySelectorAll(".inspector__mono")].map(
+      (one) => one.textContent,
+    );
+    expect(waiting).toEqual(["—", "—"]);
   });
 
   it("test_a_replayed_run_prints_its_zero_rather_than_hiding_it", () => {
@@ -151,6 +214,24 @@ describe("the receipt", () => {
     // A computed zero — the recording was played, nothing was called, nothing was
     // spent — printed rather than hidden.
     expect(cost?.textContent).toMatch(/^\$0\.0+$/);
+  });
+
+  it("test_the_mode_row_says_the_mode_and_the_day_and_nothing_else", () => {
+    // It used to carry `prompt 93f85980` as well: eight unexplained characters
+    // of hex, cut here from the thirty-two the engine sent, on a strip whose
+    // whole promise is that every reading is a field and none is derived.
+    const live = render(<ReceiptStrip receipt={RECEIPT} />);
+    const liveMode = live.container.querySelector(
+      '[data-field="mode"] .receipt-strip__reading',
+    )?.textContent;
+    expect(liveMode).toBe("live");
+
+    const played = render(<ReceiptStrip receipt={REPLAY_RECEIPT} />);
+    const playedMode =
+      played.container.querySelector('[data-field="mode"] .receipt-strip__reading')?.textContent ??
+      "";
+    expect(playedMode).toBe(`replay · recorded ${REPLAY_RECEIPT.recording_date}`);
+    expect(playedMode).not.toContain(RECEIPT.prompt_hash.slice(0, 8));
   });
 });
 
@@ -196,12 +277,21 @@ describe("the Verify door's two answers", () => {
       (one) => one.textContent,
     );
     expect(named).toEqual(REACHED.path.map((id) => world.claims.find((c) => c.id === id)?.claim));
-    expect(container.textContent).toContain("two steps from the hypothesis");
+
+    // **How long the route is is said once, and the engine says it.** The card
+    // used to work it out again as one fewer than the claims on the path and
+    // print that under the engine's own sentence — two derivations of one fact,
+    // agreeing until the day the engine counts a step differently.
+    expect(container.textContent).toContain(REACHED.why);
+    expect(container.textContent).not.toMatch(/steps? from the hypothesis/);
 
     // The number is the one on the verdict, at two significant figures, and the
-    // honest wart is beside it in the one place it is written.
+    // honest wart is beside it in the one place it is written. The figure it is
+    // compared with is worked out by the same function the screen uses, never
+    // typed in: a test with a number in it is a test that checks the number
+    // somebody typed.
     const reading = container.querySelector('[data-reading="number"]');
-    expect(reading?.textContent).toBe(".083");
+    expect(reading?.textContent).toBe(toTwoFigures(REACHED.product as number));
     expect(container.textContent).toContain(
       "it is not the chance of the whole chain happening together",
     );
@@ -347,7 +437,8 @@ describe("a generated map never prints an identifier", () => {
           world={grown.world}
           selection={{ kind: "generation", id: grown.generationId ?? "" }}
           generation={{
-            receipt: grown.receipt,
+            seed: grown.seed,
+            promptFingerprint: grown.receipt?.prompt_hash ?? null,
             working: { state: "reading" },
             unknown: new Map(),
             openAt: null,
@@ -358,10 +449,10 @@ describe("a generated map never prints an identifier", () => {
 
     // The reserved rectangles the map held open while it grew, and every
     // sentence the outline reads out.
-    const everyRectangle = A_REAL_RUN.reduce(
-      (so, event) => [...so, ...foldAll(waitingFor(THE_REAL_SENTENCE, null), [event]).skeletons],
-      [] as { words: string }[],
-    );
+    const everyRectangle: { words: string }[] = [];
+    for (const event of A_REAL_RUN) {
+      everyRectangle.push(...foldAll(waitingFor(THE_REAL_SENTENCE, null), [event]).skeletons);
+    }
     drawn.push(everyRectangle.map((one) => one.words).join(" "));
     drawn.push(
       outlineOf(grown.world)

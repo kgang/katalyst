@@ -89,5 +89,20 @@ export async function readTranscript(
         `The working of this run could not be read at ${address}. The reply was numbered ${answer.status}.`,
     };
   }
-  return { state: "read", transcript: (await answer.json()) as Transcript };
+  // **A 200 is not a promise that the body is the working.** A proxy answering
+  // for a server that is not there, a login page where an API used to be, a
+  // half-written body from a connection that dropped: each of those is a 200
+  // whose body is not JSON. Reading one without a guard leaves the panel saying
+  // *Reading the working…* for as long as the tab is open, which is the one
+  // sentence on that screen that is then false.
+  const body = (await answer.json().catch(() => null)) as Transcript | null;
+  if (body === null || !Array.isArray(body.lines)) {
+    return {
+      state: "gone",
+      reason:
+        `The working of this run came back from ${address} in a shape this build cannot read. ` +
+        `Nothing here guesses at what it said.`,
+    };
+  }
+  return { state: "read", transcript: body };
 }

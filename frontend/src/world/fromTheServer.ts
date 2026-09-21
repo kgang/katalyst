@@ -17,6 +17,7 @@
  */
 
 import type { components } from "../api/schema";
+import { absence } from "./absence";
 import type {
   Absence,
   AbsenceKind,
@@ -126,11 +127,10 @@ function source(item: Source): SourceView {
     retrieved:
       item.retrieved === null || item.retrieved === undefined
         ? {
-            absence: {
-              kind: "not_said",
-              words: "—",
-              reason: "nobody fetched this; a person put the address in by hand",
-            },
+            absence: absence(
+              "not_said",
+              "nobody fetched this; a person put the address in by hand",
+            ),
           }
         : { day: item.retrieved },
   };
@@ -151,11 +151,7 @@ function baseRate(
   const stored = proposition.base_rate;
   if (stored === null || stored === undefined) {
     return {
-      absence: {
-        kind: "not_said",
-        words: "—",
-        reason: "no reference class recorded for this claim",
-      },
+      absence: absence("not_said", "no reference class recorded for this claim"),
     };
   }
   return {
@@ -209,13 +205,11 @@ function marketAbsence(proposition: Proposition): Known<Ranged> {
  * together. The engine will carry it; until it does the slot says so, because
  * working it out here would put a second answer on the map beside the engine's.
  */
-export const NO_PATH_PRODUCT: Absence = {
-  kind: "no_engine",
-  words: "no engine yet",
-  reason:
-    "Nothing has multiplied this chain out. The likelihood of a whole route is worked out " +
+export const NO_PATH_PRODUCT: Absence = absence(
+  "no_engine",
+  "Nothing has multiplied this chain out. The likelihood of a whole route is worked out " +
     "where the map's numbers are, and the engine does not carry one yet.",
-};
+);
 
 /**
  * Turn one claim from the server into the claim a tile draws.
@@ -260,14 +254,12 @@ export function toClaim(proposition: Proposition): ClaimView {
  * whole extra run of the map, so it is worked out one arrow at a time, when a
  * reader asks about that arrow and not before.
  */
-export const NOT_ASKED_FOR_YET: Absence = {
-  kind: "no_engine",
-  words: "no engine yet",
-  reason:
-    "Nothing has worked this number through the map yet. The likelihood with this arrow's " +
+export const NOT_ASKED_FOR_YET: Absence = absence(
+  "no_engine",
+  "Nothing has worked this number through the map yet. The likelihood with this arrow's " +
     "cause supposed true costs a whole extra run of the map, so it is worked out one arrow " +
     "at a time — select this arrow and it is asked for.",
-};
+);
 
 /** Turn one arrow from the server into the arrow a wire draws. */
 export function toLink(link: Link): LinkView {

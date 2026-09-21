@@ -39,16 +39,72 @@ export const WHY_IT_STOPPED: Record<StopReason, string> = {
     "could trade.",
 };
 
+/**
+ * What a stream that simply stopped says.
+ *
+ * **It is not a failure and does not read as one.** Nothing here can name what
+ * went wrong, because on this side of the connection nothing did: a server was
+ * restarted, a proxy gave up on a connection it thought was idle, a laptop
+ * slept. So the sentence says the one thing that is known — the stream ended
+ * before the run said it had finished — and says what became of what arrived.
+ *
+ * It lives beside `WHY_IT_STOPPED` because it is the eighth thing this line can
+ * say, and because the spoken line and the printed one must not drift.
+ */
+export const THE_STREAM_ENDED_EARLY =
+  "The stream ended before this run said it had finished, so there is no telling whether the " +
+  "map below is all of it.";
+
 /** What the line needs to draw itself. */
 export interface DoneLineProps {
   /** The closing event, when the run closed. */
   readonly done: Done | null;
   /** The one sentence a broken run left, when one broke. */
   readonly failure: string | null;
+  /**
+   * True when the stream stopped without a terminator of any kind.
+   *
+   * A different thing from either of the two above: `done` is the run saying it
+   * finished and `failure` is the run saying it broke, and this is the run
+   * saying nothing at all.
+   */
+  readonly endedEarly?: boolean;
+  /**
+   * Ask for the same sentence again, and whether doing so spends money.
+   *
+   * Left out, no offer is made — which is what a run that finished properly
+   * wants, because there is nothing to offer: the map is on screen.
+   */
+  readonly runAgain?: {
+    /** True for a live run, false when this copy plays recordings and spends nothing. */
+    readonly costsMoney: boolean;
+    readonly go: () => void;
+  };
 }
 
 /** Why the run ended, said once, under the map. */
-export function DoneLine({ done, failure }: DoneLineProps) {
+export function DoneLine({ done, failure, endedEarly = false, runAgain }: DoneLineProps) {
+  if (endedEarly) {
+    return (
+      <p className="done-line" data-kind="ended_early">
+        <span className="done-line__word">ended early</span>
+        <span className="done-line__why">
+          {THE_STREAM_ENDED_EARLY} Everything that arrived is on the map, and nothing was made up to
+          fill the gap.
+        </span>
+        {runAgain === undefined ? null : (
+          <button className="done-line__again" type="button" onClick={runAgain.go}>
+            {/* The offer, with its price on it. A control that quietly spends
+                money the second time it is pressed is the one control in this
+                product that must say so before it is pressed. */}
+            {runAgain.costsMoney
+              ? "Run it again — this asks the model again, and spends again"
+              : "Play it again — this plays the recording again, and spends nothing"}
+          </button>
+        )}
+      </p>
+    );
+  }
   if (failure !== null) {
     return (
       <p className="done-line" data-kind="failed">

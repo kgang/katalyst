@@ -63,7 +63,24 @@ export default defineConfig({
       url: `http://localhost:${SERVER_PORT}/api/healthz`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
-      env: { ANTHROPIC_API_KEY: "", FRED_API_KEY: "" },
+      env: {
+        ANTHROPIC_API_KEY: "",
+        FRED_API_KEY: "",
+        // **A replay is paced on purpose, and a test is the one place that
+        // pacing is not wanted.** The delay exists so that a reviewer watching a
+        // recording sees a map arrive rather than appear — a replay that raced
+        // would teach them the product is faster than it is — and it is fixed on
+        // the server precisely so that no client can ask to skip it. A test run
+        // is not a client: it sets the setting, in the environment, where the
+        // person running the suite can see it.
+        //
+        // Both spellings are set because the server is being renamed under this
+        // one: it reads `REPLAY_INSTANT` today and is moving to the
+        // `KATALYST_` prefix every other setting carries. Setting both costs
+        // nothing and means this file needs no change on the day it lands.
+        REPLAY_INSTANT: "true",
+        KATALYST_REPLAY_INSTANT: "true",
+      },
     },
     {
       // The browser half, told where the server is exactly as the packaged app

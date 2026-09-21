@@ -3,10 +3,10 @@
  *
  * The one thing a reader can do to a map that needs the model. It asks for one
  * intervention: a claim and its arrows, already drafted and already checked by
- * the same rules every proposal passes. It is not a generation — no stream, no
- * reserved rectangle, no receipt — and what it cost appears nowhere, which is an
- * open question the chapter records rather than a thing this control should
- * guess at.
+ * the same rules every proposal passes. It is not a generation — no stream and
+ * no reserved rectangle — but it **is** several model calls, so it carries a
+ * receipt of its own, drawn by the same strip a generation's receipt is drawn
+ * by (settled 2026-09-20, `spec/generation/streaming.md`).
  *
  * **It is never silently inert.** When it cannot draft — no key and no recorded
  * intervention for what was typed — the server says so in one plain sentence and
@@ -20,8 +20,10 @@
  */
 
 import { useId, useState } from "react";
+import type { components } from "../api/schema";
 import type { Drafted, DraftedClaim } from "../stream/insert";
 import { draftAClaim } from "../stream/insert";
+import { asOneSentence } from "../world/failures";
 import { ReceiptStrip } from "./ReceiptStrip";
 import "./addAClaim.css";
 
@@ -29,6 +31,12 @@ import "./addAClaim.css";
 export interface AddAClaimProps {
   /** The map the new claim would go onto. */
   readonly baseId: string;
+  /**
+   * The branch built so far, sent whole, so that the claim is drafted and
+   * checked against the map the reader is actually looking at. Left out when no
+   * branch is open.
+   */
+  readonly branch?: components["schemas"]["Branch"];
   /** Where in the branch the new edit goes: the number of edits already in it. */
   readonly position?: number;
   /** What to do with a claim that was drafted and passed the rules. */
@@ -46,6 +54,7 @@ export interface AddAClaimProps {
 /** *"…but this also happens"*. */
 export function AddAClaim({
   baseId,
+  branch,
   position = 0,
   onDrafted,
   andThen,
@@ -68,13 +77,29 @@ export function AddAClaim({
           }
           setAsking(true);
           setAnswer(null);
-          draft({ base_id: baseId, claim_in_words: words.trim(), position }).then((drafted) => {
-            setAsking(false);
-            setAnswer(drafted);
-            if (drafted.state === "drafted") {
-              onDrafted?.(drafted.insert);
-            }
-          });
+          draft({
+            base_id: baseId,
+            ...(branch === undefined ? {} : { branch }),
+            claim_in_words: words.trim(),
+            position,
+          }).then(
+            (drafted) => {
+              setAsking(false);
+              setAnswer(drafted);
+              if (drafted.state === "drafted") {
+                onDrafted?.(drafted.insert);
+              }
+            },
+            // **A rejection puts the control back.** Without this the button
+            // stays disabled reading *Drafting the claim* for as long as the tab
+            // is open, which is a control that is silently inert in the exact
+            // way INV-workbench.74 forbids — and the reader has no way of
+            // knowing whether their claim is still being worked on.
+            (failure: unknown) => {
+              setAsking(false);
+              setAnswer({ state: "declined", reason: asOneSentence(failure) });
+            },
+          );
         }}
       >
         <label className="add-a-claim__label" htmlFor={fieldId}>
@@ -126,8 +151,11 @@ export function AddAClaim({
             {`Drafted and checked: "${answer.insert.proposition.claim}" ${andThen}`}
           </p>
           {/* What drafting it cost, in the same nine readings and the same strip
-              a generation's receipt is printed in. Absent on a copy of the route
-              that does not say yet, and then nothing is invented in its place. */}
+              a generation's receipt is printed in. An insert is several model
+              calls — one to draft the claim, then one per arrow — so it spends
+              real money, and the person who pressed the button is the person who
+              should see the bill. Absent only on a copy of the route older than
+              the receipt, and then nothing is invented in its place. */}
           {answer.receipt === null ? null : (
             <ReceiptStrip receipt={answer.receipt} heading="What drafting it cost" />
           )}

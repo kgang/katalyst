@@ -32,6 +32,28 @@
   color: var(--text);
 }
 
+/*
+ * The offer to run the same sentence again, after a stream that simply stopped.
+ *
+ * An ordinary control, drawn like every other one on this screen: a hairline
+ * box with words in it. It is not a warning and not a call to action, because
+ * pressing it spends money and the words on it say so.
+ */
+.done-line__again {
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  background: var(--surface-raised);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.done-line__again:hover {
+  border-color: var(--text-muted);
+}
+
 .done-line__counts {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

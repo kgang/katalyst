@@ -35,19 +35,36 @@ export type DraftedClaim = components["schemas"]["Insert"];
 /**
  * What one drafted claim cost.
  *
- * **An insert is several model calls, not one**, so it carries a receipt of its
- * own — the same nine readings a generation's receipt carries, and drawn by the
- * same strip, because a cost shown two ways is two costs. It is what closes the
- * chapter's third open question: the route answers with a receipt beside the
- * intervention rather than the session growing a running total, which would be
- * the first number in this product added up by something other than the engine.
+ * **An insert is several model calls, not one** — the starting-claim shape
+ * drafts the reader's sentence, and then the ordinary walk proposes its arrows,
+ * one call each — so it spends real money, and NFR-6 has no exception for money
+ * spent outside a stream. It carries a receipt of its own: the same nine
+ * readings a generation's receipt carries, drawn by the same strip, because a
+ * cost shown two ways is two costs.
+ *
+ * **This is the chapter's third open question, settled 2026-09-20**
+ * (`spec/generation/streaming.md`): the route answers `DraftedInsert` — the edit
+ * and its own receipt — rather than the session growing a running total, which
+ * would have been the first number in this product added up by something other
+ * than the engine, and would have vanished on a page reload.
  */
 export type InsertReceipt = Receipt;
 
 /** What it takes to ask for one. */
 export interface DraftRequest {
-  /** The map the new claim is going onto. */
+  /** The map the new claim is going onto, by the map's own identifier. */
   readonly base_id: string;
+  /**
+   * The branch built so far, sent whole.
+   *
+   * **The claim is drafted and validated against the map with the branch folded
+   * in**, which is the map the reader is looking at. Leaving it out asks the
+   * rules about a map nobody has in front of them: a claim that contradicts an
+   * edit made two minutes ago comes back accepted, and then breaks the branch it
+   * is added to. Left out on a map with no branch open, which is every
+   * generated map today.
+   */
+  readonly branch?: components["schemas"]["Branch"];
   /** What the reader typed. */
   readonly claim_in_words: string;
   /** Where in the branch the new edit goes. */
@@ -59,7 +76,7 @@ export type Drafted =
   | {
       readonly state: "drafted";
       readonly insert: DraftedClaim;
-      /** What drafting it cost, when the route says. Null on a route that does not yet. */
+      /** What drafting it cost, in the shape the stream's receipt event carries. */
       readonly receipt: InsertReceipt | null;
     }
   /** The rules would not have it, with every reason at once, in their own words. */
@@ -82,6 +99,10 @@ export async function draftAClaim(
     answer = await ask(INSERT_ADDRESS, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      // `{base_id, branch, claim_in_words, position}` — the route's four fields,
+      // and the branch is one of them. A claim drafted against the stored map
+      // when the reader is looking at the map plus two edits is a claim checked
+      // against a map nobody has in front of them.
       body: JSON.stringify({ position: 0, ...request }),
     });
   } catch {
@@ -93,16 +114,24 @@ export async function draftAClaim(
 
   const body = (await answer.json().catch(() => null)) as unknown;
   if (answer.ok) {
-    // **Two shapes, one reading.** The route is moving to answering with the
-    // drafted claim *and* what drafting it cost — an insert is several model
-    // calls, and a cost nobody is shown is a cost nobody can check. Until every
-    // copy answers that way, a body that is the claim on its own is still read,
-    // and the cost is then absent rather than invented.
+    // **The route answers a `DraftedInsert`: the edit, and its own receipt.**
+    // An insert is several model calls, so it spends real money, and a cost
+    // nobody is shown is a cost nobody can check.
     const both = body as { insert?: DraftedClaim; receipt?: InsertReceipt } | null;
     if (both?.insert !== undefined) {
       return { state: "drafted", insert: both.insert, receipt: both.receipt ?? null };
     }
-    return { state: "drafted", insert: body as DraftedClaim, receipt: null };
+    // A 200 that is not that shape is not a drafted claim, whatever else it is.
+    // It used to be read as one — the body handed straight through as the edit —
+    // which turned a body that was `null`, or an older route's bare `Insert`,
+    // into a screen that threw while drawing and took the whole page with it.
+    // Saying so is a worse answer for nobody and a readable one for everybody.
+    return {
+      state: "declined",
+      reason:
+        `The request to ${INSERT_ADDRESS} came back with something this build cannot read as a ` +
+        `drafted claim. Nothing has been added to the map.`,
+    };
   }
 
   const detail = (body as { detail?: unknown } | null)?.detail;

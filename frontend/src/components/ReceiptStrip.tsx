@@ -20,9 +20,12 @@
  * are printed whole, in the number face with fixed-width digits, and they carry
  * no range because nothing sampled them.
  *
- * The same nine lines are drawn in two places — here, beside a growing map, and
- * in the panel's own section for the run that produced the map. They are one
- * component so the two cannot drift.
+ * **The nine lines are drawn in exactly one place, and this is it.** They used
+ * to be drawn twice, one above the other in a 320-pixel column: here, and again
+ * in the panel's section for the run. Two copies of one cost is two costs to a
+ * reader scrolling past them, and the second was the one nobody could point at.
+ * The panel's section now holds the *working* — the transcript, the prompt's
+ * fingerprint, the seed — and points here for what it cost.
  */
 
 import type { Receipt } from "../stream/events";
@@ -87,20 +90,24 @@ export function receiptLines(receipt: Receipt): readonly Line[] {
 }
 
 /**
- * What the mode line says.
+ * What the mode line says: whether the run was live or a replay, and on a replay
+ * the day the recording was made. Nothing else.
  *
- * In a replay it names the day the recording was made and the prompt it was made
- * against, because those are the two things that say which run this is a picture
- * of. Live, there is no recording and no day, so it says only what it is.
+ * **The prompt's fingerprint used to be here and is not any more.** It read
+ * `prompt 93f85980` — eight characters of hex on a strip whose whole promise is
+ * that every reading is a field, with no label a reader could act on and, worse,
+ * cut here from the thirty-two the engine sent. A browser that trims an
+ * identifier has derived something (INV-workbench.72: none of the nine readings
+ * is derived), and eight characters of a hash are not a fingerprint — they are a
+ * fingerprint somebody could not check. It is printed whole, with a sentence
+ * saying what it is for, in the panel's view of the run.
  */
 function modeLine(receipt: Receipt): string {
   if (receipt.mode === "live") {
-    return `live · prompt ${receipt.prompt_hash.slice(0, 8)}`;
+    return "live";
   }
   const day = receipt.recording_date;
-  return day === null
-    ? `replay · prompt ${receipt.prompt_hash.slice(0, 8)}`
-    : `replay · recorded ${day} · prompt ${receipt.prompt_hash.slice(0, 8)}`;
+  return day === null ? "replay" : `replay · recorded ${day}`;
 }
 
 /** What the strip needs to draw itself. */
@@ -114,7 +121,7 @@ export interface ReceiptStripProps {
 }
 
 /** The nine labelled readings, and nothing else. */
-export function ReceiptLines({ receipt }: { receipt: Receipt }) {
+function ReceiptLines({ receipt }: { receipt: Receipt }) {
   return (
     <dl className="receipt-strip__lines">
       {receiptLines(receipt).map((line) => (

@@ -59,8 +59,16 @@ interface WhatItSaw {
   readonly rectangleBeforeAnyClaim: boolean;
   /** The most rectangles that stood at once. */
   readonly mostRectangles: number;
-  /** The most claims that were on the map at once. */
-  readonly mostClaims: number;
+  /**
+   * How many claims were on the map, every time that number changed.
+   *
+   * The sequence rather than the largest of them: the largest is whatever the
+   * map ended up with, which is a fact about the end and says nothing at all
+   * about how the map got there. A map that appeared all at once and a map that
+   * grew claim by claim have the same largest number and completely different
+   * sequences.
+   */
+  readonly claimsWentOn: readonly number[];
   /**
    * How many claims were on the map the first time any likelihood appeared, and
    * how many appeared at that moment.
@@ -72,67 +80,90 @@ interface WhatItSaw {
   readonly whenTheNumbersCame: { readonly claims: number; readonly numbers: number };
 }
 
+/** Where the page keeps what it has seen of itself. */
+declare global {
+  interface Window {
+    theRecord?: WhatItSaw & { rectangleBeforeAnyClaim: boolean };
+    stopWatching?: () => void;
+  }
+}
+
 /**
- * Watch the whole run, and say what the screen did while it grew.
+ * Have the page start watching itself, before anything is asked for.
  *
- * **Three of the things this test is for are about a screen that is moving**, and
+ * **Four of the things this test is for are about a screen that is moving**, and
  * a moving screen cannot be checked by looking at it once: *a rectangle is drawn
- * before any claim*, *rectangles stand at the growing edge*, and *not one
- * likelihood is on screen until the map is finished* are each true at some
- * moments and false at others, and by the time an assertion has been written the
- * moment it was about is gone. Polling for one of them races the run; asserting
- * after it is over asserts about the wrong moment.
+ * before any claim*, *rectangles stand at the growing edge*, *the claims arrive
+ * one at a time* and *not one likelihood is on screen until the map is finished*
+ * are each true at some moments and false at others, and by the time an
+ * assertion has been written the moment it was about is gone. Polling for one of
+ * them races the run; asserting after it is over asserts about the wrong moment.
  *
  * So the page watches itself. Every change to the page is looked at — which is
- * every moment the screen was different — what was on it is recorded, and the
- * whole record is handed back when the receipt arrives. Nothing here sleeps, and
- * nothing here can miss a moment that a poll would have stepped over.
+ * every moment the screen was different — and what was on it is written down.
+ * Nothing here sleeps, and nothing here can miss a moment that a poll would have
+ * stepped over.
  *
- * It is started the instant the run is asked for and awaited at the end.
+ * **It is installed before the press**, and awaited, so that the very first
+ * frame of the run is inside the record. Starting it after the press leaves the
+ * one moment the first assertion is about — a rectangle standing with no claim
+ * beside it — outside the window being watched, on a fast replay.
+ *
+ * @param page The page the map will be on.
+ */
+async function startWatching(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const record = {
+      rectangleBeforeAnyClaim: false,
+      mostRectangles: 0,
+      claimsWentOn: [] as number[],
+      whenTheNumbersCame: { claims: 0, numbers: 0 },
+    };
+    window.theRecord = record;
+
+    const look = (): void => {
+      const held = document.querySelectorAll(".skeleton-tile").length;
+      const claims = document.querySelectorAll(".tile").length;
+      // A chip says on its own face whether it is showing a number or words,
+      // and that is the marker to count: every chip renders a reading, and on
+      // a growing map most of them are reading an absence out.
+      const numbers = document.querySelectorAll('.belief-chip[data-reading="number"]').length;
+
+      if (held > 0 && claims === 0) {
+        record.rectangleBeforeAnyClaim = true;
+      }
+      record.mostRectangles = Math.max(record.mostRectangles, held);
+      if (record.claimsWentOn[record.claimsWentOn.length - 1] !== claims) {
+        record.claimsWentOn.push(claims);
+      }
+      if (numbers > 0 && record.whenTheNumbersCame.numbers === 0) {
+        record.whenTheNumbersCame = { claims, numbers };
+      }
+    };
+
+    const watching = new MutationObserver(look);
+    window.stopWatching = () => watching.disconnect();
+    watching.observe(document.body, { subtree: true, childList: true, attributes: true });
+    look();
+  });
+}
+
+/**
+ * Stop watching, and read back what the page saw of itself.
+ *
+ * **It waits for nothing.** The waiting is done by the named signals above it,
+ * which is where a test that has to give up belongs: a watcher that settled on a
+ * signal of its own would hang until the whole test timed out on a run that
+ * broke, and the failure a reader saw would be *"test timed out"* rather than
+ * *"the run said it failed"*.
  *
  * @param page The page the map is on.
  */
-function watchItGrow(page: Page): Promise<WhatItSaw> {
-  return page.evaluate(
-    () =>
-      new Promise<WhatItSaw>((settle) => {
-        let rectangleBeforeAnyClaim = false;
-        let mostRectangles = 0;
-        let mostClaims = 0;
-        let whenTheNumbersCame = { claims: 0, numbers: 0 };
-
-        const look = (): void => {
-          const held = document.querySelectorAll(".skeleton-tile").length;
-          const claims = document.querySelectorAll(".tile").length;
-          // A chip says on its own face whether it is showing a number or words,
-          // and that is the marker to count: every chip renders a reading, and on
-          // a growing map most of them are reading an absence out.
-          const numbers = document.querySelectorAll('.belief-chip[data-reading="number"]').length;
-
-          if (held > 0 && claims === 0) {
-            rectangleBeforeAnyClaim = true;
-          }
-          mostRectangles = Math.max(mostRectangles, held);
-          mostClaims = Math.max(mostClaims, claims);
-          if (numbers > 0 && whenTheNumbersCame.numbers === 0) {
-            whenTheNumbersCame = { claims, numbers };
-          }
-          if (document.querySelector(".receipt-strip") !== null) {
-            watching.disconnect();
-            settle({
-              rectangleBeforeAnyClaim,
-              mostRectangles,
-              mostClaims,
-              whenTheNumbersCame,
-            });
-          }
-        };
-
-        const watching = new MutationObserver(look);
-        watching.observe(document.body, { subtree: true, childList: true, attributes: true });
-        look();
-      }),
-  );
+async function whatItSaw(page: Page): Promise<WhatItSaw> {
+  return await page.evaluate(() => {
+    window.stopWatching?.();
+    return window.theRecord as WhatItSaw;
+  });
 }
 
 /**
@@ -142,10 +173,15 @@ function watchItGrow(page: Page): Promise<WhatItSaw> {
  * Two signals rather than one, because they are two events: the receipt is what
  * the run cost and the closing line is why it ended, and a screen that had the
  * first and not the second would be read here as finished when it is not.
+ *
+ * **No timeout of its own.** A wait that asks for longer than the whole test is
+ * allowed is a number that can never elapse, and a number that can never elapse
+ * reads as care while doing nothing at all. The config's timeout is the one
+ * bound, in one place.
  */
 async function waitUntilItStops(page: Page): Promise<void> {
-  await expect(page.locator(".receipt-strip")).toBeVisible({ timeout: 180_000 });
-  await expect(page.locator(".done-line")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".receipt-strip")).toBeVisible();
+  await expect(page.locator(".done-line")).toBeVisible();
   // Every rectangle goes when the likelihoods land: the set of claims still open
   // is empty by definition once the map is finished.
   await expect(page.locator(".skeleton-tile")).toHaveCount(0);
@@ -202,6 +238,12 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   expect(said.includes("these four run from recordings")).toBe(replayable.length === 4);
   await expect(page.getByLabel("An event you think will happen")).toBeDisabled();
 
+  // From here the page watches itself, because what follows is a screen that is
+  // moving and four of the claims made about it are about moments, not about the
+  // end. It starts **before** the press, so the very first frame is inside the
+  // record; it is read at the bottom of this test.
+  await startWatching(page);
+
   // The card that has a recording. It sends its sentence, exactly as a reader
   // would type it — the same request a live run sends — and it is opened with
   // the keyboard, because every way into this product is usable without a mouse.
@@ -210,14 +252,9 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   await expect(card).toBeFocused();
   await page.keyboard.press("Enter");
 
-  // From here the page watches itself, because what follows is a screen that is
-  // moving and the three claims made about it are about moments, not about the
-  // end. The record is read at the bottom of this test.
-  const grew = watchItGrow(page);
-
   // **The first paint is a reserved rectangle, not a spinner**, and it carries
   // the reader's own sentence.
-  await expect(page.locator(".skeleton-tile").first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".skeleton-tile").first()).toBeVisible();
   await expect(page.locator(".skeleton-tile").first()).toContainText(THE_SENTENCE);
 
   // The badge says this session is a replay, from the first frame, before the
@@ -231,7 +268,7 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
 
   // The map grows, and the first claim to arrive reads an absence where its
   // likelihood will go.
-  await expect(page.locator(".tile").first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".tile").first()).toBeVisible();
 
   // Where the first tile came to rest, before any of the others arrive. Nothing
   // already placed may move, and this is what that promise is checked against.
@@ -326,16 +363,56 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   }, stopped);
   expect(howOften).toBe(1);
 
+  // The map says where it is cut. A ten-claim map framed so its tiles stay
+  // readable does not fit the stage, and a map that is cut with nothing saying
+  // so is read as a map that ends there — which for a causal map is the worst
+  // thing it can be read as. The same two-pixel rule the panel beside it uses,
+  // measured by the stage about itself.
+  const stage = page.locator(".canvas");
+  const edges = await stage.evaluate((it) => ({
+    left: (it as HTMLElement).dataset.moreLeft,
+    right: (it as HTMLElement).dataset.moreRight,
+    above: (it as HTMLElement).dataset.moreAbove,
+    below: (it as HTMLElement).dataset.moreBelow,
+  }));
+  // Every edge has an answer — never a missing attribute, which would draw
+  // nothing and mean nothing.
+  expect(Object.values(edges).every((one) => one === "yes" || one === "no")).toBe(true);
+  // And what it says is true of where the tiles actually are, checked against
+  // the page rather than against a number written here.
+  const really = await page.evaluate(() => {
+    const room = document.querySelector(".canvas")?.getBoundingClientRect();
+    const boxes = [...document.querySelectorAll(".react-flow__node")].map((one) =>
+      one.getBoundingClientRect(),
+    );
+    if (room === undefined || boxes.length === 0) {
+      return null;
+    }
+    return {
+      left: boxes.some((at) => at.left < room.left - 1) ? "yes" : "no",
+      right: boxes.some((at) => at.right > room.right + 1) ? "yes" : "no",
+      above: boxes.some((at) => at.top < room.top - 1) ? "yes" : "no",
+      below: boxes.some((at) => at.bottom > room.bottom + 1) ? "yes" : "no",
+    };
+  });
+  expect(edges).toEqual(really);
+
   // And what the screen did while it was moving, read off the record the page
   // kept of itself.
-  const saw = await grew;
+  const saw = await whatItSaw(page);
   // A rectangle stood before any claim had arrived: the first paint is the shape
   // of the thing being waited for, not a spinner.
   expect(saw.rectangleBeforeAnyClaim).toBe(true);
   // Rectangles stood at the growing edge all the way through.
   expect(saw.mostRectangles).toBeGreaterThan(0);
-  // The claims arrived one at a time rather than all at the end.
-  expect(saw.mostClaims).toBe(claims);
+  // **The claims arrived one at a time.** The count went 0, 1, 2, … and reached
+  // the number on screen by rising by exactly one each time: a map that appeared
+  // all at once would have gone 0 and then that number, and a map that redrew
+  // itself would have gone down somewhere. Comparing the largest count with the
+  // final count says nothing at all — they are the same number by definition.
+  expect(saw.claimsWentOn[0]).toBe(0);
+  expect(saw.claimsWentOn[saw.claimsWentOn.length - 1]).toBe(claims);
+  expect(saw.claimsWentOn).toEqual(saw.claimsWentOn.map((_, step) => step));
   // **And the chips resolved last, and once.** The first likelihood to reach the
   // screen reached it when every claim was already on the map, and every other
   // likelihood reached it in the same breath — one event, one world, every

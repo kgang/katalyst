@@ -30,6 +30,7 @@
  */
 
 import { toMovement, toShare, toTwoFigures } from "../../components/BeliefChip";
+import { absence } from "../../world/absence";
 import type {
   Absence,
   Badge,
@@ -53,14 +54,12 @@ import type { Arrow } from "./reach";
  * The words are the shared vocabulary's; the sentence says which number is
  * missing and who would have to work it out.
  */
-export const NO_ENGINE: Absence = {
-  kind: "no_engine",
-  words: "no engine yet",
-  reason:
-    "Nothing has worked this number through the map yet. Your edit can reach this claim, so " +
+export const NO_ENGINE: Absence = absence(
+  "no_engine",
+  "Nothing has worked this number through the map yet. Your edit can reach this claim, so " +
     "its likelihood would move — and the part of this product that works out where to is not " +
     "connected. The old number would be the base map's, not this branch's.",
-};
+);
 
 /**
  * Where the engine has got to with this branch.

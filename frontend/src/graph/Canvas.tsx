@@ -42,6 +42,8 @@ import "@xyflow/react/dist/base.css";
 import { SkeletonTile } from "../components/SkeletonTile";
 import { Tile } from "../components/Tile";
 import { TileOverflow } from "../components/TileOverflow";
+import type { Edges } from "../components/useTheEdges";
+import { edgeMarks, NOTHING_BEYOND } from "../components/useTheEdges";
 import type { MapKeys } from "../keyboard/useMapKeys";
 import { useMapKeys } from "../keyboard/useMapKeys";
 import type { Selection, WorldView } from "../world";
@@ -348,6 +350,60 @@ function MapSurface({
   const framed = useRef<string | null>(null);
   const justFramed = useRef(false);
   const centredOn = useRef<string | null>(null);
+
+  // **Which edges of the stage have map beyond them.**
+  //
+  // A ten-claim map framed so its tiles stay readable does not fit: two tiles
+  // end up wholly off the glass and the bottom row is clipped. A map that is cut
+  // with nothing saying so is read as a map that ends there, which for a causal
+  // map is the worst thing it can be read as — the reader concludes the argument
+  // stops where the window does.
+  //
+  // So the stage says it, with the same two-pixel rule the panel beside it uses
+  // for the same fact (`useTheEdges.ts`). The measurement is different because
+  // the box is: the panel is scrolled and the stage is panned, so this compares
+  // where the tiles are, in the map's own coordinates, against what the viewport
+  // is showing of them.
+  const [beyond, setBeyond] = useState<Edges>(NOTHING_BEYOND);
+  const measureTheEdges = useCallback(() => {
+    const frame = mapBounds();
+    const room = surface.current?.getBoundingClientRect();
+    if (frame === null || room === undefined) {
+      setBeyond((was) => (was === NOTHING_BEYOND ? was : NOTHING_BEYOND));
+      return;
+    }
+    // A pixel of slack at each edge: a tile that ends exactly on the edge is not
+    // beyond it, and a rule drawn for half a pixel of rounding would be the map
+    // claiming something a reader can check by looking.
+    const view = flow.getViewport();
+    const onTheGlass = {
+      left: frame.x * view.zoom + view.x,
+      top: frame.y * view.zoom + view.y,
+      right: (frame.x + frame.width) * view.zoom + view.x,
+      bottom: (frame.y + frame.height) * view.zoom + view.y,
+    };
+    const next: Edges = {
+      left: onTheGlass.left < -1,
+      above: onTheGlass.top < -1,
+      right: onTheGlass.right > room.width + 1,
+      below: onTheGlass.bottom > room.height + 1,
+    };
+    setBeyond((was) =>
+      was.left === next.left &&
+      was.right === next.right &&
+      was.above === next.above &&
+      was.below === next.below
+        ? was
+        : next,
+    );
+  }, [flow, mapBounds]);
+
+  // Measured whenever the map is laid out again, whenever a tile arrives and
+  // whenever the reader pans or zooms — which is `onMove`, below. Missing any
+  // one of the three leaves a rule at an edge with nothing beyond it.
+  useEffect(() => {
+    measureTheEdges();
+  }, [measureTheEdges]);
 
   // Frame the map when it is a different map — the first time it is drawn, and
   // again when a branch adds a claim to it. Panning, zooming and walking around
@@ -720,6 +776,7 @@ function MapSurface({
       className="canvas"
       ref={surface}
       data-arriving={arriving ? "yes" : "no"}
+      {...edgeMarks(beyond)}
       onFocusCapture={onFocus}
       onPointerDownCapture={onPointAt}
     >
@@ -754,6 +811,9 @@ function MapSurface({
         elevateNodesOnSelect={false}
         onNodeMouseEnter={(_, node) => setPointingAt(node.id)}
         onNodeMouseLeave={() => setPointingAt(null)}
+        // Panning and zooming both move what is on the glass, so both change
+        // which edges have map beyond them.
+        onMove={measureTheEdges}
         // As far out as the map goes, and no further: past this the summary
         // tile's words would be drawn smaller than anything in this product is
         // allowed to be.

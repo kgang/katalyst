@@ -28,6 +28,7 @@
  * end nowhere is a picture of something that is not true.
  */
 
+import { absence } from "../world/absence";
 import type { WorldSummary } from "../world/apiSource";
 import { toWorldView } from "../world/apiSource";
 import { toClaim, toLink } from "../world/fromTheServer";
@@ -75,8 +76,24 @@ export interface Skeleton {
  *   which cap, in the engine's own words for it.
  * - `failed` — something on our side broke. The map that was built stays exactly
  *   where it is.
+ * - `ended_early` — the stream stopped without saying anything at all. Not a
+ *   failure, because nothing failed that anybody can name: a server was
+ *   restarted, a proxy gave up on an idle connection, a laptop went to sleep in
+ *   the middle of a ten-minute run.
  */
-export type Phase = "waiting" | "growing" | "settled" | "stopped" | "failed";
+export type Phase = "waiting" | "growing" | "settled" | "stopped" | "failed" | "ended_early";
+
+/**
+ * Has the run stopped, whatever stopped it?
+ *
+ * Four of the five phases are over and one is not, and every screen that asks
+ * asks the same question — so it is asked in one place. A screen listing the
+ * four by hand is a screen that will list three of them the day a fifth way to
+ * stop is added, and then a map will grow for ever in exactly one case.
+ */
+export function hasStopped(phase: Phase): boolean {
+  return phase !== "waiting" && phase !== "growing";
+}
 
 /** Everything the screen knows about a generation. */
 export interface Growth {
@@ -140,14 +157,12 @@ export interface Growth {
  * is exactly what is true: the map is not finished, and every likelihood is
  * worked through the finished map at once, when it is finished.
  */
-export const WHILE_IT_GROWS: Absence = {
-  kind: "no_engine",
-  words: "no engine yet",
-  reason:
-    "The map is still being built. Every likelihood is worked through the whole map at once, " +
+export const WHILE_IT_GROWS: Absence = absence(
+  "no_engine",
+  "The map is still being built. Every likelihood is worked through the whole map at once, " +
     "when the map is finished — a number worked out from half a map would be the answer to a " +
     "question about a map that will not exist in a second.",
-};
+);
 
 /** The one sentence under a growing map saying where everything on it came from. */
 function originWhileGrowing(generationId: string | null, seed: string | null): string {
@@ -311,7 +326,14 @@ function started(was: Growth, event: GenerationStarted): Growth {
     target: event.target,
     world: {
       ...was.world,
-      baseId: event.generation_id,
+      // **The map has no identifier of its own until it is finished**, and the
+      // generation's is not it: a generation is a run and a map is a thing it
+      // built, and one run can hand its map to any number of later questions.
+      // It arrives with `beliefs_propagated`, as the engine's own `base_id`.
+      // Putting the run's name here would hand it to the insert route as *the
+      // map the new claim is going onto*, which is a different thing that
+      // happens to be a string of the same shape — and it would do it on
+      // exactly the two screens where the map is half-built.
       title: event.hypothesis,
       origin: originWhileGrowing(event.generation_id, seedOf(event)),
     },
@@ -324,8 +346,11 @@ function started(was: Growth, event: GenerationStarted): Growth {
  *
  * @param was Everything known before this event.
  * @param event The event, with its name already joined onto its payload.
- * @returns Everything known after it. The same object when the event changed
- *   nothing, so a screen can tell one from the other cheaply.
+ * @returns Everything known after it, as a new object. Every one of the eight
+ *   events changes something — even an unknown name, which changes the count of
+ *   how many of it arrived — so there is no event this hands its argument back
+ *   for, and a screen that compared the two to decide whether to redraw would be
+ *   comparing two things that are never the same.
  */
 export function fold(was: Growth, event: ReadEvent): Growth {
   switch (event.event) {
@@ -450,4 +475,39 @@ function originOfTheFinishedMap(was: Growth, seed: string, versions: number): st
 /** Fold a whole stream, in order. What a test builds a finished map with. */
 export function foldAll(from: Growth, events: readonly ReadEvent[]): Growth {
   return events.reduce(fold, from);
+}
+
+/**
+ * The body ended, and nothing on it said the run was over.
+ *
+ * **A dropped stream is a finished generation with no terminator**
+ * (`spec/generation/streaming.md`). Every stream a reader stayed for ends in
+ * exactly one `done` or one `failed`; a stream that ends without either did not
+ * *fail*, it simply stopped being delivered — a server restarted, a proxy gave
+ * up on a connection it thought was idle, a laptop slept in the middle of a
+ * ten-minute run. None of those is a fault anybody can name, and calling it one
+ * would put a sentence on screen blaming something that may be blameless.
+ *
+ * **The rectangles come down.** They are the other half of the chapter's rule
+ * that no rectangle ever stands where nothing is coming: after this, nothing is.
+ * A map left growing for ever is the one screen in this product that lies
+ * without saying anything — it is drawn exactly as a map that is about to change
+ * and it is never going to change again.
+ *
+ * **The map is kept.** Everything that arrived is what arrived, and the working
+ * as far as it got is still readable at the transcript route.
+ *
+ * It is not a wire event and is never folded as one. The server did not say
+ * this; the reader noticed it, by reaching the end of a body.
+ *
+ * @param was Everything known when the body ended.
+ * @returns The same state when a terminator had already arrived — a body that
+ *   ends after `done` is a body ending normally — and an ended-early one when
+ *   none had.
+ */
+export function theStreamEnded(was: Growth): Growth {
+  if (hasStopped(was.phase)) {
+    return was;
+  }
+  return { ...was, phase: "ended_early", skeletons: [] };
 }

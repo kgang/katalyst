@@ -275,6 +275,44 @@ body {
   display: none;
 }
 
+/* **The same rule, at the edges of the map.**
+
+   The stage holds more than it shows for the same reason the panel does, and
+   says so the same way: a two-pixel rule in `--text-muted` at whichever edge has
+   more beyond it. A ten-claim map framed to keep its tiles readable leaves two
+   of them off the glass and clips the bottom row, and a map that is cut with
+   nothing saying so is read as a map that ends there — which is the one thing a
+   causal map must never be read as.
+
+   Four edges rather than two, because a map pans both ways, and drawn as the
+   four sides of one box so that a corner reads as a corner. It is not a scroll
+   shadow and never becomes one: a shadow is a veto condition, and a line says
+   the same thing without pretending to be a depth. */
+.canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 0 solid var(--text-muted);
+  pointer-events: none;
+}
+
+.canvas[data-more-above="yes"]::after {
+  border-top-width: 2px;
+}
+
+.canvas[data-more-below="yes"]::after {
+  border-bottom-width: 2px;
+}
+
+.canvas[data-more-left="yes"]::after {
+  border-left-width: 2px;
+}
+
+.canvas[data-more-right="yes"]::after {
+  border-right-width: 2px;
+}
+
 /* Every section in it is as tall as what is in it. One of them scrolling inside
    the panel would be a box inside a box, and the reader would have to work out
    which of the two was under the pointer. */

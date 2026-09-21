@@ -12,14 +12,17 @@
  * faint one would be a fabrication in the exact place the honesty bar exists to
  * prevent one.
  *
- * **Nothing here multiplies anything.** The route's likelihood arrives on the
- * verdict, worked out where the map's numbers are worked out, and this card
- * prints it. When there is none the slot says so with its reason.
+ * **Nothing here multiplies anything, and nothing here counts anything either.**
+ * The route's likelihood arrives on the verdict, worked out where the map's
+ * numbers are worked out, and this card prints it; when there is none the slot
+ * says so with its reason. How long the route is arrives the same way — inside
+ * the engine's own sentence — and is printed rather than derived a second time
+ * from the length of the path.
  */
 
 import type { Verdict } from "../stream/events";
 import type { WorldView } from "../world";
-import { countInWords, NOT_ON_THIS_MAP } from "../world/naming";
+import { NOT_ON_THIS_MAP } from "../world/naming";
 import { toTwoFigures } from "./BeliefChip";
 import { PATH_PRODUCT_WART } from "./PathBar";
 import "./verdictCard.css";
@@ -34,12 +37,6 @@ export interface VerdictCardProps {
   readonly world: WorldView;
   /** Put the panel and the map on one claim. */
   readonly onSelect?: (claimId: string) => void;
-}
-
-/** How long the route is, in words: *two steps from the hypothesis*. */
-function howLong(claims: number): string {
-  const steps = Math.max(0, claims - 1);
-  return `${countInWords(steps)} ${steps === 1 ? "step" : "steps"} from the hypothesis`;
 }
 
 /** The Verify door's answer, in whichever of its two shapes arrived. */
@@ -93,11 +90,17 @@ export function VerdictCard({ verdict, target, world, onSelect }: VerdictCardPro
       <p className="verdict-card__target">{target}</p>
       <p className="verdict-card__why">{verdict.why}</p>
 
-      {/* How long the route is, and then the route itself — one claim per row,
-          named by its own words and numbered by where it sits. **No identifier
-          is printed**: on a generated map they are twenty-six characters of the
-          engine's own bookkeeping, and a reader learns nothing from one. */}
-      <p className="verdict-card__route">{howLong(verdict.path.length)}</p>
+      {/* The route itself — one claim per row, named by its own words and
+          numbered by where it sits. **No identifier is printed**: on a generated
+          map they are twenty-six characters of the engine's own bookkeeping, and
+          a reader learns nothing from one.
+          **How long the route is is not worked out here.** The engine's own
+          sentence above already says it — *"…reaches it in 2 steps"* — and this
+          card used to say it again from a subtraction of its own, one fewer than
+          the claims on the path. Two derivations of one fact agree until the day
+          the engine counts a step differently, and then the card contradicts
+          itself in two adjacent paragraphs with nothing to say which is right. */}
+      <p className="verdict-card__route">the route, in order</p>
       <ol className="verdict-card__steps">
         {verdict.path.map((id, place) => (
           <li className="verdict-card__step" key={id}>

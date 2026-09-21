@@ -40,7 +40,6 @@ import {
   pushInWords,
   shapeInWords,
 } from "../graph/wires/encodings";
-import type { Receipt } from "../stream/events";
 import type { Working } from "../stream/transcript";
 import type {
   BeliefOwner,
@@ -56,8 +55,15 @@ import { inFewWords, NOT_ON_THIS_MAP } from "../world/naming";
 import { toMovement, toReading, toShare, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
-import { ReceiptLines } from "./ReceiptStrip";
 import "./inspector.css";
+
+/**
+ * What stands where a fact about the run will go, before it has arrived.
+ *
+ * The em dash the rest of this product uses for a slot with nothing in it, so
+ * that an empty slot never reads as a value of its own — and never as a zero.
+ */
+const NOT_YET = "—";
 
 /**
  * What the panel needs to draw itself.
@@ -84,8 +90,22 @@ export interface InspectorProps {
 
 /** Everything the panel knows about the run that produced this map. */
 export interface GenerationDetail {
-  /** What the run cost. Null until the receipt arrives; never estimated meanwhile. */
-  readonly receipt: Receipt | null;
+  /**
+   * The seed every likelihood in this run was worked out from, as its digits.
+   *
+   * Digits rather than a number because a seed can be nineteen of them and a
+   * browser holds a whole number exactly only up to sixteen. Null until the run
+   * has started.
+   */
+  readonly seed: string | null;
+  /**
+   * Which wording of our instructions produced this run, whole.
+   *
+   * Null until the receipt arrives, and never shortened: eight characters of a
+   * thirty-two-character fingerprint is a fingerprint nobody can check against
+   * anything.
+   */
+  readonly promptFingerprint: string | null;
   /** The working of the run, or the plain reason it could not be read. */
   readonly working: Working;
   /** Event names this build did not know, and how many of each arrived. */
@@ -709,16 +729,24 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
 }
 
 /**
- * The run that produced this map: what it cost, and every proposal it made.
+ * The run that produced this map: **its working**, and what it was run against.
  *
  * **The panel's third subject.** Until now it opened on a claim or an arrow; it
  * also opens on the run behind them, which is neither, and so gets a section of
  * its own rather than being squeezed into one.
  *
- * **Every number is a field and this panel adds nothing up.** It does not total
- * the two token counts, does not work a cost out of a token count and a price,
- * and does not time anything — the same rule that already forbids it adding up an
- * arrow's pushes to explain a likelihood.
+ * **What it cost is not here.** The nine readings are drawn once, on the strip
+ * beside the map, and this section points at it. They used to be drawn in both
+ * places, one above the other in a 320-pixel column, which reads to somebody
+ * scrolling past as two costs — and the second copy was the one no number on
+ * screen could be traced to, because the strip is what the receipt event fills
+ * in.
+ *
+ * **The section is drawn from the moment there is a generation**, with whatever
+ * has arrived in it. The working arrives when the run stops and the fingerprint
+ * arrives with the receipt, and each says which of those it is waiting for. A
+ * section that appeared only once everything had landed would be a panel that is
+ * empty exactly while a reader is most likely to open it.
  *
  * **Every line of the working is in the engine's own words.** An accepted line
  * names the claim it became; a refused line quotes what the model wrote and then
@@ -736,7 +764,7 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
  * the stops.
  */
 function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
-  const { receipt, working, unknown, openAt } = detail;
+  const { seed, promptFingerprint, working, unknown, openAt } = detail;
   return (
     <>
       <header className="inspector__head">
@@ -744,21 +772,28 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
         <p className="inspector__kind">the run that built this map</p>
       </header>
 
-      <Section title="What it cost">
-        {receipt === null ? (
-          <>
-            {/* Before the receipt arrives the section is not drawn. No running
-                estimate, no partial total, no ticking cost: a cost nobody has
-                totalled is a number nobody computed. */}
-            <p className="inspector__words">no engine yet</p>
-            <p className="inspector__reason">
-              The run has not sent its receipt. Nothing here estimates what it has spent so far — a
-              cost nobody has totalled is a number nobody computed.
-            </p>
-          </>
-        ) : (
-          <ReceiptLines receipt={receipt} />
-        )}
+      <Section title="What it was run against">
+        <dl className="inspector__pairs">
+          <dt>seed</dt>
+          {/* The one number every likelihood in this run was worked out from,
+              printed as the digits that came off the wire. Ask for the same
+              sentence at the same seed and the same map comes back. */}
+          <dd className="inspector__mono">{seed ?? NOT_YET}</dd>
+          <dt>prompt fingerprint</dt>
+          <dd className="inspector__mono">{promptFingerprint ?? NOT_YET}</dd>
+        </dl>
+        <p className="inspector__reason">
+          The prompt fingerprint says which wording of our instructions produced this run: two runs
+          with the same fingerprint were asked the same way, and two with different ones were not,
+          however alike their maps look. It is printed whole because half a fingerprint cannot be
+          compared with anything.
+        </p>
+        <p className="inspector__reason">
+          {/* One cost, in one place. A panel that repeated the nine readings
+              would be a second copy of a number nobody could point at. */}
+          What this run cost is on the strip beside the map, in nine readings, every one of them a
+          field the engine sent.
+        </p>
       </Section>
 
       <Section title="Every proposal, in order">
