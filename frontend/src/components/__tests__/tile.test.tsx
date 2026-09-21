@@ -485,3 +485,65 @@ describe("the belief columns a tile draws", () => {
     }
   });
 });
+
+/**
+ * Every rule in a stylesheet, as a selector and the declarations inside it.
+ *
+ * Flat rather than parsed properly: `tile.css` has no nesting and no media
+ * query, and a hand-rolled parser that handled either would be a thing to
+ * maintain for no reading. The same helper is in `styles/__tests__` for the same
+ * reason; it is four lines and copying it is cheaper than a shared one.
+ */
+function rulesOf(css: string): { selector: string; body: string }[] {
+  const found: { selector: string; body: string }[] = [];
+  // Comments first, or a `{` inside prose is read as a rule.
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const match of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    found.push({ selector: (match[1] ?? "").trim(), body: match[2] ?? "" });
+  }
+  return found;
+}
+
+/** The rules that only apply to a tile seen from far away. */
+const FAR_AWAY = rulesOf(readFileSync("src/components/tile.css", "utf8")).filter((rule) =>
+  rule.selector.includes('[data-detail="summary"]'),
+);
+
+/**
+ * What a tile seen from far away may never do to make a belief fit.
+ *
+ * **This reads the stylesheet rather than a drawn page**, because a simulated
+ * page has no layout: whether a line fits is a fact about laid-out boxes and is
+ * checked in the browser, by `e2e/farTiles.spec.ts`. What is checked here is the
+ * other half — the two ways of making a line fit that must never be taken, which
+ * are facts about the rules themselves and want no layout at all.
+ */
+describe("a tile seen from far away", () => {
+  it("test_the_far_away_form_sets_every_word_in_the_largest_size", () => {
+    // The far-away form exists to be readable at the furthest the map zooms out,
+    // which is half — so twenty-two pixels there is eleven on the reader's
+    // screen, and eleven is the floor this product promises. The tempting fix
+    // for a line that will not fit is to set it smaller. This is what says no.
+    const sized = FAR_AWAY.filter((rule) => rule.body.includes("font-size"));
+    expect(sized.length, "the far-away form sets no type size at all").toBeGreaterThan(0);
+    for (const rule of sized) {
+      for (const found of rule.body.matchAll(/font-size:\s*([^;]+);/g)) {
+        expect(
+          (found[1] ?? "").trim(),
+          `"${rule.selector}" sets a type size the floor does not allow`,
+        ).toBe("var(--text-lg)");
+      }
+    }
+  });
+
+  it("test_the_far_away_form_puts_no_part_of_a_belief_out_of_sight", () => {
+    // Out here the tile drops its heading and its foot, and that is the whole of
+    // what it drops. A belief keeps every part of itself — the owner, the number
+    // and the range — at every zoom: the other tempting fix for a line that will
+    // not fit is to stop drawing the end of it.
+    const hidden = FAR_AWAY.filter(
+      (rule) => rule.selector.includes("belief-chip") && /display:\s*none/.test(rule.body),
+    );
+    expect(hidden.map((rule) => rule.selector)).toEqual([]);
+  });
+});
