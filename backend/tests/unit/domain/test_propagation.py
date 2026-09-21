@@ -26,6 +26,7 @@ arithmetic *is*.
 
 import importlib
 import math
+from collections.abc import Sequence
 from datetime import date, timedelta
 from itertools import pairwise
 
@@ -49,6 +50,7 @@ from katalyst.domain import (
     Link,
     Observe,
     Proposition,
+    PropositionId,
     Resolution,
     Retune,
     World,
@@ -64,7 +66,7 @@ from tests.strategies import branches, graphs, interventions, seeds, uncertain_b
 
 # The package re-exports `propagate` under the name of the file it lives in, so
 # plain `import katalyst.domain.propagation` hands back the function. One test
-# replaces something inside that file, so it asks for the file by name.
+# reaches for a private seam inside that file, so it asks for the file by name.
 propagation_module = importlib.import_module("katalyst.domain.propagation")
 
 many = settings(max_examples=25, deadline=None)
@@ -776,6 +778,44 @@ def _every_shape_on_a_long_window() -> Graph:
     )
 
 
+def _agrees_on_every_shared_day(world: World, claims: Sequence[PropositionId]) -> tuple[int, int]:
+    """Work one world out twice — thinned and on every day — and compare the days both hold.
+
+    The thinned run is the engine's own, exactly as it ships. The full run comes
+    through `_versions_on_every_day`, a private seam that exists for this and
+    nothing else. **Both are taken before anything is compared**: a check that
+    recomputed one side after reading the other would be comparing a run with
+    itself, which is how the first version of this test came to pass on an engine
+    that was broken.
+
+    Every day the thinned run worked out must be a day the full run worked out too —
+    the thinned grid is a subset, never a shifted one — and on each of those days
+    every number behind every claim must match bit for bit.
+
+    Returns:
+        How many days each run worked out, thinned first, so a caller can insist
+        that the thinning it meant to exercise actually happened.
+    """
+    thinned, whole = versions_of(world), propagation_module._versions_on_every_day(world)
+    where = {day: index for index, day in enumerate(whole.days)}
+    missing = [day for day in thinned.days if day not in where]
+    assert not missing, ("a day was worked out thinly but not fully", missing)
+
+    for claim_id in claims:
+        assert numpy.array_equal(thinned.counting_for(claim_id), whole.counting_for(claim_id)), (
+            claim_id
+        )
+        for here, day in enumerate(thinned.days):
+            there = where[day]
+            assert numpy.array_equal(
+                thinned.likelihood[claim_id][:, here], whole.likelihood[claim_id][:, there]
+            ), (claim_id, day)
+            assert numpy.array_equal(
+                thinned.inner_spread[claim_id][:, here], whole.inner_spread[claim_id][:, there]
+            ), (claim_id, day)
+    return len(thinned.days), len(whole.days)
+
+
 @pytest.mark.parametrize(
     ("what", "edits"),
     [
@@ -799,9 +839,9 @@ def _every_shape_on_a_long_window() -> Graph:
     ],
 )
 def test_a_days_answer_does_not_depend_on_which_other_days_were_worked_out(
-    what: str, edits: tuple[Intervention, ...], monkeypatch: pytest.MonkeyPatch
+    what: str, edits: tuple[Intervention, ...]
 ) -> None:
-    """A claim's answer on a day comes from that day and the map's timings, never from the grid.
+    """A claim's answer on a day comes from that day and the map's timings, never the grid.
 
     **This is the invariant the whole thinning rests on.** The engine works out
     fewer days than a long window has — the days it sends, plus the handful the
@@ -812,54 +852,45 @@ def test_a_days_answer_does_not_depend_on_which_other_days_were_worked_out(
     onward — then the thinned grid and the full one would part company somewhere,
     and the grid would be deciding an answer instead of deciding where to look.
 
-    So the same map is worked out twice, on the grid the engine chooses and on
-    every day of the window, and every number behind every claim is required to
-    agree **bit for bit** on every day the two share: each version's answer, the
-    spread inside each version, how much each version counts, and the likelihood
-    and range the world reports. Over a map carrying every shape a push can have —
-    a spike with a half-life, a step, a ramp, a sustaining arrow, lags on all of
-    them — and under each of the edits that could plausibly carry a day's state
-    into the next, the undermined supposition most of all.
+    So the same map is worked out twice and every number behind every claim is
+    required to agree **bit for bit** on every day the two share: each version's
+    answer, the spread inside each version, and how much each version counts. Over
+    a map carrying every shape a push can have — a spike with a half-life, a step,
+    a ramp, a sustaining arrow, lags on all of them — and under each of the edits
+    that could plausibly carry a day's state into the next, the undermined
+    supposition most of all.
 
     Failing this would not mean the test is too strict. It would mean the grid
     matters, and every day it decides to skip is a day the engine is guessing at.
     """
     graph = _every_shape_on_a_long_window()
-    thinned = _folded(graph, *edits)
-    assert thinned.days > SERIES_CAP, "this map was meant to be thinned"
-    assert len(thinned.series_days) <= thinned.days, "this map was meant to be thinned"
+    world = _folded(graph, *edits)
+    assert world.days > SERIES_CAP, ("this map's window was meant to outrun the cap", world.days)
 
-    monkeypatch.setattr(
-        propagation_module,
-        "_days_to_send",
-        lambda claims, day_zero, days: numpy.arange(days + 1, dtype=numpy.int64),
-    )
-    every_day = _folded(graph, *edits)
-    assert len(every_day.series_days) == every_day.days + 1, "this one was meant to be whole"
+    thin, full = _agrees_on_every_shared_day(world, [one.id for one in graph.propositions])
+    assert full == world.days + 1, ("the full run is every day of the window", full, what)
+    assert thin < full, ("so the engine's own run was meant to be thinner", thin, full, what)
 
-    behind_thin, behind_full = versions_of(thinned), versions_of(every_day)
-    where = {day: index for index, day in enumerate(behind_full.days)}
-    shared = [(index, where[day]) for index, day in enumerate(behind_thin.days) if day in where]
-    assert len(shared) == len(behind_thin.days), "every day worked out thinly is worked out fully"
 
-    for claim in graph.propositions:
-        claim_id = claim.id
-        assert numpy.array_equal(
-            behind_thin.counting_for(claim_id), behind_full.counting_for(claim_id)
-        ), claim_id
-        for here, there in shared:
-            day = behind_thin.days[here]
-            assert numpy.array_equal(
-                behind_thin.likelihood[claim_id][:, here],
-                behind_full.likelihood[claim_id][:, there],
-            ), (claim_id, day, what)
-            assert numpy.array_equal(
-                behind_thin.inner_spread[claim_id][:, here],
-                behind_full.inner_spread[claim_id][:, there],
-            ), (claim_id, day, what)
-        # And what the reader is shown: the headline, read on the claim's own
-        # resolve-by day, which both grids carry.
-        assert thinned.beliefs[claim_id] == every_day.beliefs[claim_id], (claim_id, what)
+@given(st.data())
+@a_few
+def test_the_grid_is_safe_on_maps_nobody_wrote_by_hand(data: st.DataObject) -> None:
+    """The same invariant, over maps and runs of edits nobody wrote by hand.
+
+    One map carrying every shape is the case a person can reason about; this is the
+    case nobody thought of. It matters because the leak this guards against was a
+    rounding one: it needed a firing day that the thinned grid happened to miss,
+    and whether a grid misses a day depends on how the map's own dates fall. One
+    map is one arrangement of dates. The generator brings hundreds.
+
+    Nothing is assumed away and nothing is required of the map: a window too short
+    to be thinned still has to agree with itself, and the parametrised test above
+    is what insists the thinning is really exercised.
+    """
+    graph = data.draw(graphs(priors=uncertain_beliefs()))
+    branch = data.draw(branches(graph))
+    world = _folded_if_it_applies(graph, branch)
+    _agrees_on_every_shared_day(world, [one.id for one in graph.propositions])
 
 
 def test_observe_warns_below_two_percent_survival() -> None:

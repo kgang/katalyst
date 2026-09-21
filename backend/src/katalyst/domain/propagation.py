@@ -456,6 +456,28 @@ def versions_of(world: World) -> Versions:
     return _versions_from(setup, sample)
 
 
+def _versions_on_every_day(world: World) -> Versions:
+    """The same world's numbers, worked out on **every** day of the window.
+
+    Not how the engine runs and not reachable through `propagate`: the days worked
+    out are ordinarily the days sent plus the handful the arithmetic must land on
+    exactly, which past 180 days is far fewer than the window has. This exists so
+    that the licence for working out fewer days can be **checked** rather than
+    asserted — work a map out both ways and require the days they share to agree to
+    the bit. `test_a_days_answer_does_not_depend_on_which_other_days_were_worked_out`
+    is the only caller, and it is private because nothing that ships should want it.
+
+    Args:
+        world: The world to work out again, on every day.
+
+    Returns:
+        The version-by-version numbers, one column per day of the window.
+    """
+    setup = _prepare(world.graph, world.assignments, world.day_zero, every_day=True)
+    sample = _draw(setup, seed=world.seed, versions=world.versions, worlds=world.worlds)
+    return _versions_from(setup, sample)
+
+
 def _sent_days(setup: "_Setup") -> NDArray[numpy.int64]:
     """Where the days a reader is given sit among the days worked out.
 
@@ -543,7 +565,12 @@ class _Setup:
     warnings: tuple[str, ...]
 
 
-def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> _Setup:
+def _prepare(
+    graph: Graph,
+    assignments: tuple[Assignment, ...],
+    as_of: date,
+    every_day: bool = False,
+) -> _Setup:
     """Work out everything about a world that chance has no say in.
 
     The window, the order claims are worked through in, the day each claim's clock
@@ -556,6 +583,10 @@ def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> 
         graph: The map a fold left behind.
         assignments: Every value that fold fixed, in order.
         as_of: Day zero.
+        every_day: Work every day of the window out rather than the days a
+            reader is sent plus the ones the arithmetic must land on exactly.
+            Nothing that ships passes this; `_versions_on_every_day` does, so that
+            working out fewer days can be checked against working out all of them.
 
     Returns:
         Everything the draw below needs and nothing that depends on a seed.
@@ -597,7 +628,11 @@ def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> 
     # merely cheaper: a claim's answer on a given day is a function of that day and
     # of the map's own timings, never of which *other* days happen to be worked
     # out. So the grid decides only where the series is evaluated.
-    sent = _days_to_send(claims, as_of, days)
+    sent = (
+        numpy.arange(days + 1, dtype=numpy.int64)
+        if every_day
+        else _days_to_send(claims, as_of, days)
+    )
     must_be_exact = {min(max(0, one), days) for one in settled.values()}
     for stretches in spells.values():
         must_be_exact |= {
