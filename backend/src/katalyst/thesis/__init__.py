@@ -30,6 +30,13 @@ the worlds where the stop went first. `ceiling.py` works out the greyed
 quartered-Kelly ceiling that sits beside the reader's own arithmetic under the
 words *never size to this*.
 
+`card.py` builds the thesis a reader carries away — what carries it, what is
+priced in, what takes them out, what to watch, what they typed and what it does
+not know — and holds no bare numbers at all: each one carries whether it is the
+reader's, the model's, a venue's or something this program worked out. `export.py`
+turns a card into a declarative document a program can read and a page a person
+can read, and owns the committed description of the document beside it.
+
 What this layer must never do
 -----------------------------
 - Never compare a number from a world where an edit fixed something against a
