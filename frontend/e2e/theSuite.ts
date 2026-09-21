@@ -83,7 +83,9 @@ export const test = playwrights.extend<{ theBrowsersOwnComplaints: undefined }>(
         [THE_BROWSER_GAVE_UP, KEPT_UNDER] as const,
       );
 
-      await andThen();
+      // The fixture carries nothing — it only listens — and the library's type
+      // wants that nothing handed over by name.
+      await andThen(undefined);
 
       // **Asked of the page while it is still open.** This fixture is built on
       // `page`, so it is taken down before `page` is, which is the one moment
