@@ -23,5 +23,8 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0015](0015-a-claim-starts-with-the-range-the-model-stated.md) | A claim starts with the range the model stated, labelled as stated — not yet an ensemble, and whole maps are never reconciled | accepted | 2026-09-17 |
 | [0016](0016-a-claims-number-is-the-chance-it-happens-by-its-deadline.md) | A claim's number is the chance it happens by its deadline; whether is solved exactly, when is sampled | accepted | 2026-09-21 |
 | [0017](0017-a-claim-is-an-event-or-a-state-and-nothing-retracts-itself.md) | A claim is an event or a state; nothing retracts itself (reverses 0014 decision A) | accepted | 2026-09-21 |
+| [0018](0018-an-edge-is-computed-from-the-unsupposed-world.md) | Like with like: an edge is computed from the world with no supposition in force, against the price you would actually trade at | accepted | 2026-09-21 |
+| [0019](0019-a-stop-is-a-price-the-reader-owns.md) | A stop is a price the reader owns; what the map derives is *what takes you out* and *what to watch* | accepted | 2026-09-21 |
+| [0020](0020-a-quote-is-recorded-first-and-fetched-second.md) | A quote is recorded first and fetched second; a FRED figure is an observation, not a belief | accepted | 2026-09-21 |
 | [0021](0021-what-version-one-does-not-build.md) | What version one does not build — FR-17, FR-18, FR-20, part of FR-24, FR-29, FR-30 cut; INV-10 by a named refusal; FR-31 shrunk | accepted | 2026-09-21 |
 | [0022](0022-chains-are-worked-out-not-multiplied.md) | Chains are worked out, not multiplied — the path product replaced by the shift, the joint and the weakest arrow | accepted | 2026-09-21 |
