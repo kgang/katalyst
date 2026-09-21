@@ -101,9 +101,9 @@ export interface GenerationDetail {
   /**
    * Which wording of our instructions produced this run, whole.
    *
-   * Null until the receipt arrives, and never shortened: eight characters of a
-   * thirty-two-character fingerprint is a fingerprint nobody can check against
-   * anything.
+   * Null until the receipt arrives, and **never shortened**: a fingerprint cut
+   * to its first eight characters is a fingerprint nobody can check against
+   * anything, and cutting one is the browser deriving a reading.
    */
   readonly promptFingerprint: string | null;
   /** The working of the run, or the plain reason it could not be read. */
@@ -773,7 +773,7 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
       </header>
 
       <Section title="What it was run against">
-        <dl className="inspector__pairs">
+        <dl className="inspector__pairs inspector__pairs--facts">
           <dt>seed</dt>
           {/* The one number every likelihood in this run was worked out from,
               printed as the digits that came off the wire. Ask for the same

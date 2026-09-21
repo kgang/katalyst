@@ -234,6 +234,24 @@
   font-size: var(--text-sm);
 }
 
+/* The two facts about a run: the seed it drew with, and which wording of our
+   instructions produced it. Both are one long unbroken run of characters with
+   no space in them to break at, and both are printed **whole** — so the only
+   honest way to fit one in a 336-pixel panel is to let it break anywhere it
+   has to. Cutting it to what fits would be the browser deriving a reading, and
+   half a fingerprint cannot be compared with anything.
+
+   The labels are wider than the ordinary pair's nine characters because
+   "prompt fingerprint" is two words and a label that wraps under itself reads
+   as two labels. */
+.inspector__pairs--facts {
+  grid-template-columns: 17ch 1fr;
+}
+
+.inspector__pairs--facts dd {
+  overflow-wrap: anywhere;
+}
+
 .inspector__pairs--wide {
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--hairline);

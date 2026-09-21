@@ -151,9 +151,9 @@ describe("the receipt", () => {
   });
 
   it("test_the_panel_prints_the_prompt_fingerprint_whole", () => {
-    // Eight characters of a thirty-two-character fingerprint is a fingerprint
-    // nobody can compare with anything — and cutting one is the browser
-    // deriving a reading, which is the one thing the receipt's own rule forbids.
+    // A fingerprint cut to its first eight characters is a fingerprint nobody
+    // can compare with anything — and cutting one is the browser deriving a
+    // reading, which is the one thing the receipt's own rule forbids.
     const { container } = render(
       <Inspector
         world={theFinishedRun().world}
@@ -218,8 +218,8 @@ describe("the receipt", () => {
 
   it("test_the_mode_row_says_the_mode_and_the_day_and_nothing_else", () => {
     // It used to carry `prompt 93f85980` as well: eight unexplained characters
-    // of hex, cut here from the thirty-two the engine sent, on a strip whose
-    // whole promise is that every reading is a field and none is derived.
+    // of hex, cut here from the whole the engine sent, on a strip whose whole
+    // promise is that every reading is a field and none is derived.
     const live = render(<ReceiptStrip receipt={RECEIPT} />);
     const liveMode = live.container.querySelector(
       '[data-field="mode"] .receipt-strip__reading',

@@ -96,9 +96,9 @@ export function receiptLines(receipt: Receipt): readonly Line[] {
  * **The prompt's fingerprint used to be here and is not any more.** It read
  * `prompt 93f85980` — eight characters of hex on a strip whose whole promise is
  * that every reading is a field, with no label a reader could act on and, worse,
- * cut here from the thirty-two the engine sent. A browser that trims an
- * identifier has derived something (INV-workbench.72: none of the nine readings
- * is derived), and eight characters of a hash are not a fingerprint — they are a
+ * cut here from the whole the engine sent. A browser that trims an identifier
+ * has derived something (INV-workbench.72: none of the nine readings is
+ * derived), and eight characters of a hash are not a fingerprint — they are a
  * fingerprint somebody could not check. It is printed whole, with a sentence
  * saying what it is for, in the panel's view of the run.
  */
