@@ -23,10 +23,13 @@ dependencies = [
     # sort by the moment they were made. Used only at the edge, in engine/ids.py,
     # because minting one needs a clock and randomness.
     "python-ulid>=3.1,<4.0",
+    # The language model's own client library, from the company that serves the
+    # model. One package, used in exactly one file — engine/client.py — which is
+    # the only place in this program that talks over the network to a model.
+    # Decision record 0006 chose the vendor's own library over a framework that
+    # would hide the calls a reader wants to see.
+    "anthropic>=1.6,<2.0",
 ]
-
-# The model client library (the `anthropic` package) is deliberately absent.
-# Stack 04 adds it, together with the recorded responses its tests replay.
 
 [dependency-groups]
 dev = [
@@ -137,6 +140,14 @@ addopts = [
     # than printing a reassuring number nobody earned.
     "--cov",
     "--cov-report=term-missing",
+]
+markers = [
+    # A recorded answer this repository shaped by hand out of a real one, so a
+    # test can show a case a live model will not produce on demand: a proposal
+    # that would close a loop, or one citing a web address the search tool never
+    # returned. `make record-cassettes` leaves these alone; re-recording them
+    # would throw the deliberate case away.
+    "handmade: reads a recording shaped by hand, and is never re-recorded",
 ]
 
 [tool.coverage.run]

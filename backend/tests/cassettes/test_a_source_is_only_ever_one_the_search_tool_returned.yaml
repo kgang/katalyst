@@ -1,0 +1,428 @@
+interactions:
+- request:
+    body: "{\"max_tokens\":16000,\"messages\":[{\"role\":\"user\",\"content\":\"Today is 2026-09-17.\\\
+      n\\nHere is the map as it stands. The short name in front of each claim is ours; use\
+      \ one when you name a cause.\\n\\nClaims:\\n  B  Brent crude settles below $68 for five\
+      \ sessions.\\n  C  Lloyd's war-risk insurance premium for Gulf transits falls below\
+      \ 0.4%.\\n  H  The Strait of Hormuz reopens to unrestricted commercial transit. (this\
+      \ is what the person expects)\\n  M1  A Polymarket contract \\\"Brent below $70 on 2026-10-31\\\
+      \" resolves YES.\\n  M2  The energy fund XLE underperforms the S&P 500 fund SPY by more\
+      \ than 3% over 20 trading days.\\n  N1  Omani-mediated United States-Iran talks resume\
+      \ publicly.\\n  R  OPEC+ announces output restraint.\\n\\nArrows:\\n  B -> M1\\n  B\
+      \ -> M2\\n  B -> R\\n  C -> B\\n  H -> B\\n  H -> C\\n  H -> N1\\n  R -> B\\n\\nWe are\
+      \ asking about this claim: Lloyd's war-risk insurance premium for Gulf transits falls\
+      \ below 0.4%.\\n\\nIt already leads to:\\n  - Brent crude settles below $68 for five\
+      \ sessions.\\n\\nAnswer with the one next piece, or with a note that this part of the\
+      \ story is finished.\"}],\"model\":\"claude-opus-5\",\"output_config\":{\"format\":{\"\
+      schema\":{\"$defs\":{\"BaseRate\":{\"type\":\"object\",\"description\":\"How often this\
+      \ kind of thing has happened before: k times out of n.\\n\\nThe outside view \u2014\
+      \ the anchor a likelihood starts from before anything\\nspecific to this case is considered.\
+      \ Optional, because some claims have no\\nhonest reference class, and absent is better\
+      \ than invented.\",\"title\":\"BaseRate\",\"properties\":{\"reference_class\":{\"type\"\
+      :\"string\",\"description\":\"The set of past cases being counted, stated precisely\
+      \ enough that someone else could recount them: 'Hormuz closure or disruption episodes\
+      \ since 1980 that ended within 90 days'.\",\"title\":\"Reference Class\"},\"k\":{\"\
+      type\":\"integer\",\"description\":\"How many cases in that set came out true.\\n\\\
+      n{minimum: 0}\",\"title\":\"K\"},\"n\":{\"type\":\"integer\",\"description\":\"How many\
+      \ cases are in that set altogether.\\n\\n{exclusiveMinimum: 0}\",\"title\":\"N\"},\"\
+      sources\":{\"type\":\"array\",\"description\":\"Web addresses where the count can be\
+      \ checked. Empty means the count is the model's own recollection, and nothing downstream\
+      \ of it may claim to be documented.\\n\\n{default: []}\",\"title\":\"Sources\",\"items\"\
+      :{\"type\":\"string\"}}},\"additionalProperties\":false,\"required\":[\"reference_class\"\
+      ,\"k\",\"n\"]},\"ClaimProposal\":{\"type\":\"object\",\"description\":\"One new claim,\
+      \ and the one arrow that reaches it from a claim already there.\\n\\nThe ordinary answer\
+      \ while a map is growing. The pair travels together because\\na claim with nothing causing\
+      \ it is not a step in a story, and an arrow with\\nnothing at its far end is not an\
+      \ argument. That is still one thing: one\\nquestion, one answer.\\n\\nA claim is something\
+      \ that will be plainly true or false by a date, settled by\\na named source. Never a\
+      \ mood (\\\"tensions ease\\\"); always a check (\\\"at least 14\\nconsecutive days of\
+      \ unrestricted commercial transit through the Strait of\\nHormuz per Lloyd's List, by\
+      \ 2026-11-01\\\").\",\"title\":\"ClaimProposal\",\"properties\":{\"kind\":{\"type\"\
+      :\"string\",\"description\":\"Says this answer is a new claim with the arrow that reaches\
+      \ it.\\n\\n{const: claim}\",\"title\":\"Kind\"},\"claim\":{\"type\":\"string\",\"description\"\
+      :\"The claim in one sentence, as a person would say it out loud. The precise, settleable\
+      \ version goes in the test below.\",\"title\":\"Claim\"},\"claim_kind\":{\"type\":\"\
+      string\",\"enum\":[\"event\",\"market\",\"not_tradeable\"],\"description\":\"What this\
+      \ claim is for. 'event': a step in the middle of the story. 'market': an ending that\
+      \ names something you could trade. 'not_tradeable': an ending that names why there is\
+      \ nothing to trade.\",\"title\":\"Claim Kind\"},\"resolution\":{\"$ref\":\"#/$defs/Resolution\"\
+      },\"prior\":{\"$ref\":\"#/$defs/Ranged\"},\"base_rate\":{\"anyOf\":[{\"$ref\":\"#/$defs/BaseRate\"\
+      },{\"type\":\"null\"}],\"description\":\"How often this kind of thing has happened before:\
+      \ how many cases out of how many, and what set was counted. Leave it out when there\
+      \ is no honest set to count \u2014 absent is better than invented.\\n\\n{default: None}\"\
+      },\"payoff\":{\"anyOf\":[{\"anyOf\":[{\"$ref\":\"#/$defs/ContractPayoff\"},{\"$ref\"\
+      :\"#/$defs/PricePayoff\"}],\"description\":\"{discriminator: {'mapping': {'contract':\
+      \ '#/$defs/ContractPayoff', 'price': '#/$defs/PricePayoff'}, 'propertyName': 'kind'}}\"\
+      },{\"type\":\"null\"}],\"description\":\"What you would trade. Belongs to a 'market'\
+      \ ending, and is one of two things told apart by its own `kind` field, which always\
+      \ say which: `kind` 'contract' for a named contract at a named venue with the side you\
+      \ would take, or `kind` 'price' for an instrument, a direction, and how far its price\
+      \ would move.\\n\\n{default: None}\",\"title\":\"Payoff\"},\"not_tradeable_reason\"\
+      :{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Why this chain\
+      \ ends with nothing to trade, in one plain sentence. Belongs to a 'not_tradeable' ending.\\\
+      n\\n{default: None}\",\"title\":\"Not Tradeable Reason\"},\"cause\":{\"type\":\"string\"\
+      ,\"description\":\"The claim this arrow starts at, named by one of the short names this\
+      \ call's map listed. It is a claim already on the map; nothing new is named here, and\
+      \ nothing new is named anywhere else either.\",\"title\":\"Cause\"},\"link\":{\"$ref\"\
+      :\"#/$defs/LinkDraft\"}},\"additionalProperties\":false,\"required\":[\"kind\",\"claim\"\
+      ,\"claim_kind\",\"resolution\",\"prior\",\"cause\",\"link\"]},\"ContractPayoff\":{\"\
+      type\":\"object\",\"description\":\"A named contract at a named venue, and which side\
+      \ of it you would take.\\n\\nThe kind of ending where somebody already sells exactly\
+      \ this claim: a\\nprediction-market contract that settles on the same question the claim\
+      \ asks.\\nNothing here says what the contract costs, because that is a live price rather\\\
+      nthan a fact about the map.\",\"title\":\"ContractPayoff\",\"properties\":{\"kind\"\
+      :{\"type\":\"string\",\"title\":\"Kind\",\"description\":\"{const: contract, default:\
+      \ contract}\"},\"venue\":{\"type\":\"string\",\"description\":\"Where the contract trades,\
+      \ by the venue's own name: 'Polymarket', 'Kalshi'.\",\"title\":\"Venue\"},\"contract_id\"\
+      :{\"type\":\"string\",\"description\":\"How that venue identifies this exact contract,\
+      \ so a reader can look it up and a later step can fetch its price.\",\"title\":\"Contract\
+      \ Id\"},\"title\":{\"type\":\"string\",\"description\":\"The contract's question in\
+      \ the venue's own words, so a person reading the map can see it is really the same question\
+      \ the claim asks.\",\"title\":\"Title\"},\"side\":{\"type\":\"string\",\"enum\":[\"\
+      yes\",\"no\"],\"description\":\"'yes' if you make money when the claim comes true, 'no'\
+      \ if you make money when it fails.\",\"title\":\"Side\"}},\"additionalProperties\":false,\"\
+      required\":[\"venue\",\"contract_id\",\"title\",\"side\"]},\"LinkDraft\":{\"type\":\"\
+      object\",\"description\":\"The arrow itself: how hard it pushes, how long it takes,\
+      \ and why it is real.\\n\\nAn arrow is an argument, never a correlation, so a mechanism\
+      \ in plain words\\nis required of every one. What is absent is as deliberate as what\
+      \ is here:\\nno identifier, and nothing saying how well-backed the arrow is. The second\
+      \ is\\na fact about what our pipeline found, not a claim a model may make about\\nitself.\\\
+      n\\nThe two spans of time here are whole days. A model is asked for two days, not\\\
+      nfor two and a half; the arrow it becomes allows the half day, because\\narithmetic\
+      \ on a timeline needs it, and the widening happens on the way in.\",\"title\":\"LinkDraft\"\
+      ,\"properties\":{\"mode\":{\"type\":\"string\",\"enum\":[\"trigger\",\"sustain\"],\"\
+      description\":\"How the push behaves when the cause goes away. 'trigger': a one-time\
+      \ shove \u2014 once the cause becomes true the effect is pushed and stays pushed, fading\
+      \ on its own; undoing the cause later does not undo it. 'sustain': a continuous hold\
+      \ \u2014 the push exists only while the cause holds, and vanishes the moment it stops.\"\
+      ,\"title\":\"Mode\"},\"strength\":{\"type\":\"number\",\"description\":\"How far this\
+      \ arrow shifts the effect's odds while the push is at full size, on the scale where\
+      \ separate pushes add up instead of multiplying. Signed: positive makes the effect more\
+      \ likely to be true, negative less likely. Roughly: +1 triples the odds, -1 cuts them\
+      \ to a third. This is not a probability.\",\"title\":\"Strength\"},\"lag\":{\"type\"\
+      :\"integer\",\"description\":\"Whole days from the cause becoming true to the push reaching\
+      \ full size. 0 means the same day.\",\"title\":\"Lag\"},\"shape\":{\"type\":\"string\"\
+      ,\"enum\":[\"impulse\",\"step\",\"ramp\"],\"description\":\"What the push does over\
+      \ time. 'impulse': nothing during the delay, then a spike that fades. 'step': nothing\
+      \ during the delay, then full size, held. 'ramp': climbs from nothing to full size across\
+      \ the delay, then held.\",\"title\":\"Shape\"},\"half_life\":{\"anyOf\":[{\"type\":\"\
+      integer\"},{\"type\":\"null\"}],\"description\":\"Whole days for a spike to fall to\
+      \ half its size. Belongs to a spike and to nothing else: a step and a ramp switch on\
+      \ and hold, so they have nothing to fade.\\n\\n{default: None}\",\"title\":\"Half Life\"\
+      },\"rationale\":{\"type\":\"string\",\"description\":\"The mechanism in one to three\
+      \ plain sentences: why this cause moves this effect. An arrow with a number and no reason\
+      \ is worth nothing to the person reading it.\",\"title\":\"Rationale\"},\"sources\"\
+      :{\"type\":\"array\",\"description\":\"Addresses this call's search tool returned that\
+      \ back the mechanism above. Leave it empty when you did not search or found nothing\
+      \ \u2014 an empty list is an honest answer we can show, and an address you are recalling\
+      \ rather than reading is not.\\n\\n{default: []}\",\"title\":\"Sources\",\"items\":{\"\
+      $ref\":\"#/$defs/SourceDraft\"}}},\"additionalProperties\":false,\"required\":[\"mode\"\
+      ,\"strength\",\"lag\",\"shape\",\"rationale\"]},\"LinkProposal\":{\"type\":\"object\"\
+      ,\"description\":\"One arrow between two claims that are both already on the map.\\\
+      n\\nThe answer when the missing piece is not a new step but a connection between\\ntwo\
+      \ steps that are already there.\",\"title\":\"LinkProposal\",\"properties\":{\"kind\"\
+      :{\"type\":\"string\",\"description\":\"Says this answer is an arrow between two claims\
+      \ already on the map.\\n\\n{const: link}\",\"title\":\"Kind\"},\"source\":{\"type\"\
+      :\"string\",\"description\":\"The cause: one of the short names this call's map listed.\"\
+      ,\"title\":\"Source\"},\"target\":{\"type\":\"string\",\"description\":\"The effect:\
+      \ another of the short names this call's map listed.\",\"title\":\"Target\"},\"link\"\
+      :{\"$ref\":\"#/$defs/LinkDraft\"}},\"additionalProperties\":false,\"required\":[\"kind\"\
+      ,\"source\",\"target\",\"link\"]},\"PricePayoff\":{\"type\":\"object\",\"description\"\
+      :\"An instrument you would buy or sell, which way, and how far you expect it to move.\\\
+      n\\nThe kind of ending where no contract asks this question, but something traded\\\
+      nmoves when the answer changes: a futures contract, a ticker, one fund against\\nanother.\"\
+      ,\"title\":\"PricePayoff\",\"properties\":{\"kind\":{\"type\":\"string\",\"title\":\"\
+      Kind\",\"description\":\"{const: price, default: price}\"},\"instrument\":{\"type\"\
+      :\"string\",\"description\":\"The thing you would buy or sell, named the way its venue\
+      \ names it: a ticker, a futures contract, one fund against another.\",\"title\":\"Instrument\"\
+      },\"direction\":{\"type\":\"string\",\"enum\":[\"long\",\"short\"],\"description\":\"\
+      'long' if the position makes money when the claim comes true, 'short' if it makes money\
+      \ when the claim fails.\",\"title\":\"Direction\"},\"move\":{\"type\":\"number\",\"\
+      description\":\"How far the instrument's price is expected to move if the claim comes\
+      \ out true, as a fraction of that price: 0.03 means three per cent. The side is carried\
+      \ by `direction`, so this number is never negative.\\n\\n{minimum: 0.0}\",\"title\"\
+      :\"Move\"}},\"additionalProperties\":false,\"required\":[\"instrument\",\"direction\"\
+      ,\"move\"]},\"Ranged\":{\"type\":\"object\",\"description\":\"A likelihood and the range\
+      \ around it, with nobody's name on it.\\n\\nThe model gives three numbers and no owner,\
+      \ because whose number this is is a\\nfact about our pipeline: every likelihood a proposal\
+      \ carries is stamped as\\nthe model's own by us on the way in.\\n\\nThe two ends are\
+      \ the tenth and ninetieth of a hundred: if this claim were\\nsettled a hundred times\
+      \ over, nine in ten of the answers would sit between\\nthem. They say how sure the number\
+      \ is, not how much the world can move.\\n\\nThis shape must never grow a field for whose\
+      \ number it is. The moment it has\\none, a model can hand us a number wearing the person's\
+      \ name on it.\",\"title\":\"Ranged\",\"properties\":{\"p\":{\"type\":\"number\",\"description\"\
+      :\"How likely this claim is to come out true, from 0 (certainly not) to 1 (certainly\
+      \ yes), before anything on the map pushes it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"\
+      title\":\"P\"},\"lo\":{\"type\":\"number\",\"description\":\"The bottom of the honest\
+      \ range around that number. Never above it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"title\"\
+      :\"Lo\"},\"hi\":{\"type\":\"number\",\"description\":\"The top of the honest range around\
+      \ that number. Never below it.\\n\\n{maximum: 1.0, minimum: 0.0}\",\"title\":\"Hi\"\
+      }},\"additionalProperties\":false,\"required\":[\"p\",\"lo\",\"hi\"]},\"Resolution\"\
+      :{\"type\":\"object\",\"description\":\"How a claim gets settled: the test, who applies\
+      \ it, and by when.\\n\\nEvery proposition has one. A claim with no resolution is a vibe,\
+      \ and a\\nlikelihood attached to a vibe can never be scored, right or wrong.\",\"title\"\
+      :\"Resolution\",\"properties\":{\"criteria\":{\"type\":\"string\",\"description\":\"\
+      The test, written so that two people reading it would agree on the answer. 'At least\
+      \ 14 consecutive days of unrestricted commercial transit', not 'shipping returns to\
+      \ normal'.\",\"title\":\"Criteria\"},\"source\":{\"type\":\"string\",\"description\"\
+      :\"Who or what applies the test: a named publication, exchange, agency or venue. 'Lloyd's\
+      \ List transit counts', not 'the news'.\",\"title\":\"Source\"},\"by\":{\"type\":\"\
+      string\",\"description\":\"The date by which the test has been applied. After this date\
+      \ the claim is true or false \u2014 never still open.\",\"title\":\"By\",\"format\"\
+      :\"date\"}},\"additionalProperties\":false,\"required\":[\"criteria\",\"source\",\"\
+      by\"]},\"SourceDraft\":{\"type\":\"object\",\"description\":\"An address the model says\
+      \ backs an arrow, before we have checked it.\\n\\nIt is a *claim about a document*,\
+      \ not a document. Our code decides whether it\\nbecomes something a reader can open,\
+      \ and it does so only if the search tool\\nitself returned that address in the same\
+      \ call.\\n\\nOne field, and deliberately no more. The day it was fetched is the day\
+      \ *our*\\nretrieval step fetched something, and the title is what the search tool itself\\\
+      nreported \u2014 both are facts about us rather than about the model, so both are\\\
+      nwritten where a source is built and a model has no way to reach either.\",\"title\"\
+      :\"SourceDraft\",\"properties\":{\"url\":{\"type\":\"string\",\"description\":\"One\
+      \ address that opens, not a search query, and one the search tool returned to you in\
+      \ this call rather than one you are recalling.\",\"title\":\"Url\"}},\"additionalProperties\"\
+      :false,\"required\":[\"url\"]},\"Stop\":{\"type\":\"object\",\"description\":\"The answer\
+      \ that says this part of the story is finished.\\n\\nNot a failure and not an error.\
+      \ A chain that has reached somewhere you could\\nact on, or a step with nothing honest\
+      \ to hang off it, is done \u2014 and saying so\\nis more useful than inventing one more\
+      \ box.\",\"title\":\"Stop\",\"properties\":{\"kind\":{\"type\":\"string\",\"description\"\
+      :\"Says there is nothing more to add here.\\n\\n{const: stop}\",\"title\":\"Kind\"},\"\
+      why\":{\"type\":\"string\",\"description\":\"One plain sentence saying why this part\
+      \ of the story is finished. It is kept and shown, so write it for a person.\",\"title\"\
+      :\"Why\"}},\"additionalProperties\":false,\"required\":[\"kind\",\"why\"]}},\"type\"\
+      :\"object\",\"description\":\"The envelope a proposal travels in, and the one thing\
+      \ in this layer the wire forced.\\n\\nA proposal is one of three shapes told apart by\
+      \ a `kind` field. Written out as\\na description of what an answer must look like, that\
+      \ is a choice at the very\\ntop \u2014 and **the service refuses a top-level choice\
+      \ that also names shapes by\\nreference**: *\\\"output_config.format.schema: For 'anyOf',\
+      \ '$defs' is not\\nsupported\\\"* (2026-09-17, the first live call). Put the same choice\
+      \ one field\\ndown and the top is an ordinary object, which it accepts.\\n\\nSo this\
+      \ exists for the wire and for nothing else. It is put on at the moment\\nthe question\
+      \ goes out and taken off at the moment the answer comes back, both\\ninside this file.\
+      \ **No field of any proposal is renamed, and nothing outside\\nthis file knows the envelope\
+      \ exists** \u2014 `expand.py` is handed a plain\\nproposal, exactly as before.\\n\\\
+      nA single shape such as a starting claim is already an object at the top, so it\\nneeds\
+      \ no envelope and does not get one.\",\"title\":\"OneProposal\",\"properties\":{\"proposal\"\
+      :{\"anyOf\":[{\"$ref\":\"#/$defs/ClaimProposal\"},{\"$ref\":\"#/$defs/LinkProposal\"\
+      },{\"$ref\":\"#/$defs/Stop\"}],\"description\":\"The one thing this answer is.\\n\\\
+      n{discriminator: {'mapping': {'claim': '#/$defs/ClaimProposal', 'link': '#/$defs/LinkProposal',\
+      \ 'stop': '#/$defs/Stop'}, 'propertyName': 'kind'}}\",\"title\":\"Proposal\"}},\"additionalProperties\"\
+      :false,\"required\":[\"proposal\"]},\"type\":\"json_schema\"}},\"system\":[{\"type\"\
+      :\"text\",\"text\":\"You are helping somebody think through what an event they expect\
+      \ would set off,\\nstep by step, until the story reaches something they could actually\
+      \ trade.\\n\\nYou do this one step at a time. Each time we ask, we show you the map\
+      \ as it\\nstands and point at one claim on it, and you answer with a single next piece.\\\
+      nSomebody watches the map grow as your answers arrive, so a small, well-argued\\npiece\
+      \ beats a large, vague one.\\n\\nWhat a claim is.\\nA claim is something that will be\
+      \ plainly true or false by a date, settled by a\\nnamed source. \\\"The drug pipeline\
+      \ looks healthy\\\" is not a claim, because two\\nhonest people will never agree on\
+      \ whether it happened. \\\"The United States Food\\nand Drug Administration grants full\
+      \ approval to at least one new obesity\\ntreatment, listed in its own approvals database,\
+      \ by the thirty-first of March\\\" is\\na claim, because they will. Every claim you\
+      \ write carries the test, the name of\\nwhoever applies it, and the day by which the\
+      \ answer is known.\\n\\nStart from the outside, then come inside. Before you say how\
+      \ likely this claim\\nis, ask what set of past cases it belongs to, how many of them\
+      \ came out true, and\\nout of how many. Say what that set was, precisely enough that\
+      \ somebody else could\\ncount it again. Then say how likely this particular claim is,\
+      \ with the honest\\nrange around it \u2014 wide when you are reaching, narrow when you\
+      \ are on familiar\\nground. The range is how sure you are of your own number. Where\
+      \ there is no\\nhonest set of past cases, leave it out; absent is better than invented.\\\
+      n\\nWhat an arrow is.\\nAn arrow is a claim about a mechanism: this happening moves\
+      \ the odds of that.\\nIt says which way and how hard it pushes, how many whole days\
+      \ it takes to arrive,\\nand what it does over time \u2014 a spike that fades, a switch\
+      \ that stays on, or a\\nclimb that builds and then holds. It says whether the push survives\
+      \ its cause\\ngoing away: a toppled domino stays down, while an apple only stays up\
+      \ while the\\ndesk is under it. And it says, in one to three sentences, why the mechanism\
+      \ is\\nreal. An arrow with a number and no reason is worth nothing to the person reading\\\
+      nit.\\n\\nWhere the backing comes from.\\nUse the search tool when the ground is checkable\
+      \ and you are not certain of it,\\nand cite only addresses the search returned to you\
+      \ in this same call. If you did\\nnot search, or nothing useful came back, cite nothing\
+      \ and say what you know in\\nthe reason instead. An empty list of citations is an honest\
+      \ answer we can show.\\nAn address you are recalling rather than reading is not backing,\
+      \ and we will not\\ntreat it as backing.\\n\\nHow a story ends.\\nA chain ends either\
+      \ at something somebody could put money on \u2014 a contract at a\\nnamed venue with\
+      \ the side you would take, or an instrument with a direction and\\nhow far you expect\
+      \ its price to move \u2014 or at a plain statement that there is\\nnothing to trade\
+      \ here, and why. Both are good endings. An ending that trails off\\ninto prose is not.\\\
+      n\\nWhat an answer is.\\nExactly one of three things:\\n  a new claim, together with\
+      \ the one arrow that reaches it from a claim already\\n  on the map;\\n  an arrow between\
+      \ two claims that are both already on the map;\\n  or a note that this part of the story\
+      \ is finished, with one sentence saying\\n  why.\\n\\nYou never name a new claim with\
+      \ anything but its words. The short names in the\\nmap we show you are ours; point at\
+      \ one when you name a cause, and never invent\\nanother.\\n\",\"cache_control\":{\"\
+      type\":\"ephemeral\"}}],\"thinking\":{\"type\":\"adaptive\"},\"tool_choice\":{\"type\"\
+      :\"auto\"},\"tools\":[{\"type\":\"web_search_20260209\",\"name\":\"web_search\",\"max_uses\"\
+      :1}]}"
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '20271'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 1.6.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-helper:
+      - messages.parse
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.6.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.4
+      x-stainless-timeout:
+      - '600'
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: "{\"model\":\"claude-opus-5\",\"id\":\"msg_011Cf98xQ9npfnuyEz7iGbqR\",\"type\"\
+        :\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\"\
+        :\"\",\"signature\":\"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\"\
+        },{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_01WH77b3XX4Avdz2vpszXxNV\",\"name\"\
+        :\"code_execution\",\"input\":{\"code\":\"import json\\nr = await web_search({\\\"\
+        query\\\": \\\"war risk insurance premium Gulf tanker freight rates VLCC TD3C 2026\\\
+        \"})\\np = json.loads(r) if isinstance(r, str) else r\\nfor x in p[:5]:\\n    print(x.get(\\\
+        \"title\\\"), \\\"|\\\", x.get(\\\"url\\\"))\\n    print((x.get(\\\"content\\\") or\
+        \ \\\"\\\")[:400].replace(\\\"\\\\n\\\",\\\" \\\"))\\n    print(\\\"---\\\")\"}},{\"\
+        type\":\"server_tool_use\",\"id\":\"srvtoolu_016fFgitBKAv2sqYZqut1e7n\",\"name\":\"\
+        code_execution\",\"input\":{\"code\":\"import json\\nr2 = await web_search({\\\"query\\\
+        \": \\\"Baltic Exchange VLCC Middle East Gulf China time charter equivalent rate Frontline\
+        \ earnings war risk\\\"})\\np2 = json.loads(r2) if isinstance(r2, str) else r2\\nfor\
+        \ x in p2[:5]:\\n    print(x.get(\\\"title\\\"), \\\"|\\\", x.get(\\\"url\\\"))\\\
+        n    print((x.get(\\\"content\\\") or \\\"\\\")[:400].replace(\\\"\\\\n\\\",\\\" \\\
+        \"))\\n    print(\\\"---\\\")\"}},{\"type\":\"code_execution_tool_result\",\"tool_use_id\"\
+        :\"srvtoolu_01WH77b3XX4Avdz2vpszXxNV\",\"content\":{\"type\":\"code_execution_result\"\
+        ,\"stdout\":\"{\\\"status\\\": \\\"detection_timeout\\\", \\\"error\\\": \\\"Detection\
+        \ timed out after 90.0s\\\"}\",\"stderr\":\"\",\"return_code\":1,\"content\":[],\"\
+        abort_reason\":null}},{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_017w1x9ESubKF2vCkC5Pxpwh\"\
+        ,\"name\":\"web_search\",\"input\":{\"query\":\"Baltic Exchange VLCC Middle East Gulf\
+        \ China time charter equivalent rate Frontline earnings war risk\"},\"caller\":{\"\
+        type\":\"code_execution_20260120\",\"tool_id\":\"srvtoolu_016fFgitBKAv2sqYZqut1e7n\"\
+        }},{\"type\":\"web_search_tool_result\",\"tool_use_id\":\"srvtoolu_017w1x9ESubKF2vCkC5Pxpwh\"\
+        ,\"content\":[{\"type\":\"web_search_result\",\"title\":\"Middle East VLCC indexes\
+        \ are still near peak but Atlantic rates are sinking :: Lloyd's List\",\"url\":\"\
+        https://www.lloydslist.com/LL1156591/Middle-East-VLCC-indexes-are-still-near-peak-but-Atlantic-rates-are-sinking\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":\"March 12, 2026\"},{\"type\":\"web_search_result\",\"title\":\"Why\
+        \ VLCC rates just went ballistic and how they could go even higher :: Lloyd's List\"\
+        ,\"url\":\"https://www.lloydslist.com/LL1158430/Why-VLCC-rates-just-went-ballistic-and-how-they-could-go-even-higher\"\
+        ,\"encrypted_content\":\"Eo8ICioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDAl5yvu6cjFYqeLYmhoMvV2B8QKpFbY55eYvIjBMwX3Js7GpvsPlh2+leHeVsG/gbCth1p/uvi8p6nV3thyUX3LmqRYSbh2ftCs8XgAqkge3UD/prL3vgD+u2dqDbjE0+e1AUsX2jxBbo91vbs8BVo+y6vuqo9ZVy+Nma0GsxUVWQF4iEszLDYhOZ1Bsn1TJ9oHSwCgFQa3/Rukh9LeNGtOM11Nab4gHikLVJ/4Jwelsx1+Ucsd055wM2Je8vb1MZP5K1B85XxwLKIfEgrHXAhkuphLVu4sOUAVenfIyJWR2uPR2dwOGB1eQpsasBmDSUeVOhdeueRNgRsc2Hpu9Tzw4Jbr324OkGWyIZFKxFlanNRW4EQTXFEfFlV5G5Pc0OWuSp7qaOiZZjgCjH46CDpuustivpPiZeW/t5AiYw0rHA672ftATAApd8ORN0Jh0dE/I8MJLjwCnYlPeMww28pmxvGLB0Xd0m6taOAooJzQlAQbGJ4NwGPxYpjly9joTdttvb4kLE0WGrlotzCZ+KTGUs5gibiEfnN0VMwjsXbEIktZxD6eSlhsPK5QOK7aP3fegRdgw44Id1XdR0tS3ex9tvgZr7gza/ZkL9oflltFK/zBAF00UL4bUNo7Wk6VbmkRfJXSZCaKNb/lRtM5DAUxxYgzXW6NH5WZ/hfupwMH+K5XjTDjh6K7oFvnXLyab2u3eDN9TgaUAStWXg7BG+bCVzfwRZuxpRkUocQaq4/7+oV5+u3JUIdfQm49VCLBSbDPyd4adZCYrn7nrW48Pch3fUiXQCFD3vvCWmEs6j7c5GOK2mDcOAHnoIJ4FVVYqJUUiAq4l2mv1nGaIWuP6IBI5G3ijj2Wj8RAENpe8teSYWqRJMFR48WePgxwZnYmQimsRQDyT7oMxxpqFtPkAsUucgyDeA33SksVynzYUj+Kmd6aHrh4lXlOccMZ9GYnEDSgH0/90+Kdq0cKboqCJRCxo9yNVs/D8Xn/5lIUtuGfNiCePJM7yvfGZZEkr35w5eOQYIM4dPWtK7/51JGAOmsQgHvMxXEHwRwRFeMeNOiMnlkntK8ogvi5vv2g9TwfYcIDr06+80Fj+xuAcAZZ7Hkses36vyfvxRi2nzhHCA6vhUocUbpWtPa9yB7FBZZPe/oZ4XmPE3gUn6bNkHZiXsgZrHn1Yoz7wxPLzaBP4udenV4W2eql8IbEzbMrLtgq6e4NVxyl5e6F8NyXqZmWNmB7rh5xAfsiErenrCx19SmoN1TvJosTgFSApj/v59actNRjBjzGin9cBBBlixJNIltGTiIHeZ81yQeX4Qjx/e/YDAxgD\"\
+        ,\"page_age\":\"5 days ago\"},{\"type\":\"web_search_result\",\"title\":\"How strait\
+        \ reopening could impact VLCC rates in Middle East and Atlantic :: Lloyd's List\"\
+        ,\"url\":\"https://www.lloydslist.com/LL1157473/How-strait-reopening-could-impact-VLCC-rates-in-Middle-East-and-Atlantic\"\
+        ,\"encrypted_content\":\"EsMICioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDLI5nzwaconWKdwzLhoMui0hht3clmq50tNIIjBJWkfaxQoz7CXUxo2WI+2ZvF4IXNnzqzi2xiG33d3UTq54KlLdy9kjxKp7gtEo5DoqxgeKqW46mg1suWIj+EYrKCOeyb60WrqlclAzKhmuvVcDSoK8ZO6QZybjarp18+p8CARh81KQ/+39gSxtwN/tKkxAXjcIQn/4f5eT+KAVv1THWukcVDCLz53wALsLiOyxk4ii8yVYEZtZxgDWEuxpEBwg5HjuM1X6asv10GWpgQcWw0G+yJsN/j4wVDzNTocYgYmlW9sQKVPbLEqjWQArzJQDki31c5HmHAqB8kX5J/886ijBjlxbXsQZrrFImOmIMcayPIZAQLKcYPmgRzFeS+V09mvLmWJci9DE33zxyk5EgRIbiulDyM3a7gLvK5fHxXPvUzNm8Zow0CY6CfCRM8pRi3LnA+03NzltDUubOiuZS36Ag+gQEVKrC7cnU50xYU58JVrk1Mkdu1DHi8aN72GmQJtCZYJ5EDCXJiWAGe1CCC09JcQUAgyYqGZVqom3uPNQ6+RBW5HZApRZh+cFaJs8XTX9xA1Znms/JxhaP/qQx8OYhq+Lhsk6Lgexpeu9Dz2WErDWoEpM+O2E2WJ22k/ds+5D4TFUv2QmkKhlR3v7oxfj6eHr/DpedNZzAlo38Dms3w/oWStqw8gMOAhX9mGtWDRXE1o+0NA6pTaDN7OOKtL3UoFU3Qj+NGSjZzLp9uVDNh0iBhQba2Ju5+NSF8kq3hJCLoM4LVZfOiq3OqsqnDu1atoyJIwNNDIJ0yFCYLrroLyhGDmOeuTs1u078tuU68odHE1fh1Wj+3TSAMoG4twXWYZEEUCWxbVtAfCvJWqeW63+TT8eZ4rPyg3SrHbKuioCkg2QPD8DlmEqJO2QDl+rG/bG4IpGmRlflulsHhbLtCFevwdqmk6+t71Mqyq9QoIFr5UpiOQgJ9noh7aNGsCAqD7ocyD1s+Gjz8L6/Sj+WZGSXj1qb95bBTGfH1fWl1/Odp4Tb3YWCu+33fl8GvFjgXKjuTX1O+TspE0KA2CM8UhZ3pAlFZtyWW+kwxxDkaKXpBnp7nRyRFKm7vN5jo/nW39/8EscqKzaDrK8SMMDgZUbYoR/wvdl5mODisNctjfGIvbh3Xf9ef1mPWual1GiapJHxNVLsz3imDfaMfIakNuqGCEhSAjBiK0cN77giXAnqf3Da1rkRvSZW6uHNNE562cAJjDMcoYF9dbsEnpToYqjvLQr/NMQDbE/azCSArnn0d2Y//zLClsp5mBFKlqB4z2fjfS1g3UCInTdKiu77Z8f9VQZpaLqdYlgm5FOPLdah0noH9EAYZvzSxumBpsmvrNWXFsUAnij43x8+GdRqeqn5GQYAw==\"\
+        ,\"page_age\":\"June 16, 2026\"},{\"type\":\"web_search_result\",\"title\":\"How \u2018\
+        imaginary\u2019 Middle East VLCC rates are having real-world effects :: Lloyd's List\"\
+        ,\"url\":\"https://www.lloydslist.com/LL1156643/How-imaginary-Middle-East-VLCC-rates-are-having-real-world-effects\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":\"March 18, 2026\"},{\"type\":\"web_search_result\",\"title\":\"$862,150\
+        \ a Day: VLCC Rates Set Another Record as Global Composite Nears $500,000 | Xinde\
+        \ Maritime News\",\"url\":\"https://xindemarinenews.com/news/2098327758360031234\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":\"6 days ago\"},{\"type\":\"web_search_result\",\"title\":\"VLCC Rates\
+        \ Are Turning Into the Cleanest Signal in the Crude Tanker Market \u2013 Ship Universe\"\
+        ,\"url\":\"https://www.shipuniverse.com/vlcc-rates-are-turning-into-the-cleanest-signal-in-the-crude-tanker-market/\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"What Is TCE? \u2014\
+        \ The One Number That Tells You If a Voyage Made Money\",\"url\":\"https://www.fairwayeta.com/insights/what-is-tce-time-charter-equivalent-explained-2026\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":\"June 13, 2026\"},{\"type\":\"web_search_result\",\"title\":\"Crude\
+        \ tanker rates in unchartered territory; VLCC index tops $420K :: Lloyd's List\",\"\
+        url\":\"https://www.lloydslist.com/LL1156492/Crude-tanker-rates-in-unchartered-territory-VLCC-index-tops-420K\"\
+        ,\"encrypted_content\":\"EvwHCioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDN52AEJnu8NbAQDtARoMicGXdsi2F6vZDBkqIjB7QnXKx7utZAmkWUqIbnbS2CyWAPp0HV3lDievQKeirEaVLayqaCm07xaOV4szRloq/wbnn6EMkC1ruYWUc93Ck0sXI99q+p4Nu2yEiQeE+EVR/7lYdy+/0YYkngw1+JCSDYQmJ+XaP27OOSxC6HDdeNunS8TSNLT9nsNzk7iHoMph0c3aM5R19yZF02nVjjiN9fVXNhwZqlQmYLOgccbL4xIerJb/EvCb3JeYIW4xI32XFunQxFWIlaLzKnLuLiqhJTImekKXuz+/OaK41tDYzw4sDBmr3CY3eYh6wQT34pIbJ+XHmX3XEQ0XnZ+FweYJhIUy11XojGU+ZyYTgV4TYT6c5ywUB4WL4YyioKJHcRkf0iJc2dyK3kAvDp1BmV80rFy3cTpVW/1a0HUbvbz5kqvryVXKNsszT5nJPyochHpubWhXXemkXO6O3a4zpSl9KGmSnMdxUvEzTNtKMJtzhI4EoG0BBAxmnlVefOyDWS5w6mRAmVkivWL+AXuUAFovFNOM5bJTo3G7vrxv/NNJUdiENwndTd6LlTcgBb5wCNk4G4oOmcbA+/4fXpC6QH+VbEdGdgVor3RrJRU8F1aZZyh5T9uZpv0P7CP4ARNSWI67o6joIQFPWIhF7tZmmIn62UKquNTtJLoaOLZ2oD6eVN/RKLahHFB264y+lTHAwhyfqes1Vwr5MidIk8DbiHMnG/tlAbsDCpe8yxZcMG6bmYiCdkuDHekE3azMuVbSqVip/JJ66L2AxpmKPmSOQFuPwPaFcRnwbybU7K/pxdHmAC4WY61q1cS7dPNz7GW6fYxre3AeMvqSd8/zEBlf3QphxjvifZztx5KT3KvOGuemdoZ+zuRRQ+jUBL3BsHVoFxCOpOeWYDoV6pqUiitUJpYcL6WrtU9bId2aFPlQxq0EBigNN7ZZ2QFrAGlJwXWo+plu2ZRyJSkjVzVQ0BfmHbRoIszcTrU7Z+bggPe+pjbjzwxcKo6KekMye8rkm2BFLtfX0gSC0M2Dvjgt88ztU/7cOE1oLqU1hIookUO423pxnIwhHh0lh5o1vXJQkIyxa0oLQv5dM23EsuMhd1PBQdbbC2Inik7W/iGTBBAqfCA6J/ppz88J0KWNqfE1A6fwXVjUGLghXWbPci4s28kqku071QsQ8xAXqWlZQ3reudkbKFgZ3uWvVsCiU+fq0bXLP+OUVnDdwHtrS65Tzxb0WsT+vGVweS1xg08++u6mUthJ+1aUt4ySuYjldsmSzfcOMX45GAM=\"\
+        ,\"page_age\":\"March 3, 2026\"},{\"type\":\"web_search_result\",\"title\":\"Why VLCC\
+        \ rates just went ballistic and how they could go even higher - Time News\",\"url\"\
+        :\"https://time.news/why-vlcc-rates-just-went-ballistic-and-how-they-could-go-even-higher/\"\
+        ,\"encrypted_content\":\"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\"\
+        ,\"page_age\":\"4 days ago\"},{\"type\":\"web_search_result\",\"title\":\"The Index\
+        \ That Doesn't Exist \u2014 What TD3C Is Really Measuring\",\"url\":\"https://www.fairwayeta.com/insights/td3c-index-doesnt-exist-may-2026\"\
+        ,\"encrypted_content\":\"EuwICioIExgCIiQxZjFkNTAxZC0yZjBkLTQyMTItYjU0YS03MmFlZDExMjE4MzYSDGnjJz4ZGLILVuvpyxoM0vhMuebQfFQwMCzvIjD0/5Mv9E8d3ip/hvvAb31aEUHD6jORnlll8VW/8vJ5vXN0YAQP1DNKmu0jEcohtgoq7wemLjQmtmcm+92Yk+kBDU97RaUajq5gtPdznJq2X+lpmoFC7Pxc90A2mnOrVm+dBbhXzLc6kXmjooLZcWBIDwUoXqjmBFYFiWoeiR1utea/7c9GJw/1+5mk9bIr13w0hRXqGEO0rcDbJa8LLpRXs4MfjG5U2nDwCWdmnVa2rN70jT4Y81q8q+5C8kFSlwOPv7fw2PtOW/ViKLIdhEb+50waAMKJcaLKNBGSJabXGHraSq2dKr43hMEDk9Zsnq60BKs8RVNe6jhQvuK8g7AOQz2TFpY2DvunKaceYVHQ9CUeW6tQ2MgceD+4fNVIdijBKSgj/m1eIag24DIevcnvrqRXi6VNFtV5/YucYOWBysjbVmcw0XTQ09cgINyx7e+54xUwkm+ggHN4Nu0+23Hw5f03REEgQVNxjZNHR4z+nKoHRYW+fFdJes8gW1LogcTOZjZcQilh8BmFs49cBJioeb82CQX6kdCyRC4gg72ik8pY/IrIpPZarXWgbeZ9wpHbF1rVcrNYw9MzoEUmGYyqIVFHktEJDOUWCXDFpaHyDMDnTwYeWzd27kokHZ8Kgpvpv2nKUTv8A2ZR+uq43Q5Afb/1Tuojw1SaTG9L2cbhwP5O6yNsm8BVE3+FJbCMMQpUI5isTD8xA9urq/BtFcCmuvYKphOoL/rZZWHqPLQTvQfwChVhQRs0iLCfCWSXx6qVRHvs1ELt4QJT+gXRSG0PDjX3v0Ae3EnJucTRGKYZOTlPRnMyN6FMlJF2BDbojsfh+J7h051is3xLRu2uPBiPbif2vVGqdHYrRS4uIYZ/mKq3qElJ4EHSBt7U80BiLDFtuCSDClnnmS/eG4GP9K5yNNx+D6Yj0wo3vuR/V8CxDucQaog++E74qyhotwJ79+JdFb0BWqer3md4vBgieQXRlKSrjo2EBOF7ZjpzQJ7gsEpSefcUwlUqCchAyI8mRdie5Kj0BwtEx7lZb6rguV0iIgJyYGpu36Jp0d5eZ3KbwYSqYwEmliZNRFruk0tLSYoNi5YINYF4XCCjCBCWSwkI6f60XR2qtSZauGhIpL2JF8XAkd5R3J+NK0aE09g1BrhrJ0uJcf05xPwxmkMNQ2nN/7Vn7NtPb9RGuUTHs9nHC/nwDmiOydSr/O3WScuz7fHEA9R/dbxxehGOGawxtraDd6vEUGtpWxYe1pFwwWxFVuXOQ2lzvj49ka07DhA0QVtRey4gcUDUBDQKSqrigFt9svG4kZch3ya5XD0NShvd9wEimFHTXtvYL1aTM718mzOWgc7lyakNv9h6j9hh1YJnPP/A1or30Cu25/rE/DsXWTZl1UPGdOYfoT5+eSmkDmgDYhgD\"\
+        ,\"page_age\":\"May 13, 2026\"}],\"caller\":{\"type\":\"code_execution_20260120\"\
+        ,\"tool_id\":\"srvtoolu_016fFgitBKAv2sqYZqut1e7n\"}},{\"type\":\"code_execution_tool_result\"\
+        ,\"tool_use_id\":\"srvtoolu_016fFgitBKAv2sqYZqut1e7n\",\"content\":{\"type\":\"encrypted_code_execution_result\"\
+        ,\"encrypted_stdout\":\"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\"\
+        ,\"stderr\":\"\",\"return_code\":0,\"content\":[]}},{\"type\":\"thinking\",\"thinking\"\
+        :\"\",\"signature\":\"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\"\
+        },{\"type\":\"text\",\"text\":\"{\\\"proposal\\\":{\\\"kind\\\":\\\"claim\\\",\\\"\
+        claim\\\":\\\"Middle East Gulf tanker freight collapses back toward peacetime levels\
+        \ once war-risk cover is cheap again, crushing the earnings case that lifted tanker\
+        \ shares.\\\",\\\"claim_kind\\\":\\\"market\\\",\\\"resolution\\\":{\\\"criteria\\\
+        \":\\\"The Baltic Exchange TD3C index (270,000t crude, Middle East Gulf to China)\
+        \ publishes a time-charter-equivalent assessment below $100,000 per day on at least\
+        \ five consecutive publication days.\\\",\\\"source\\\":\\\"Baltic Exchange daily\
+        \ TD3C TCE assessments (as published by the Baltic Exchange and reported by Lloyd's\
+        \ List)\\\",\\\"by\\\":\\\"2026-12-31\\\"},\\\"prior\\\":{\\\"p\\\":0.45,\\\"lo\\\"\
+        :0.25,\\\"hi\\\":0.65},\\\"base_rate\\\":{\\\"reference_class\\\":\\\"Calendar months\
+        \ from January 2000 to December 2025 in which the Baltic Exchange TD3C VLCC time-charter-equivalent\
+        \ assessment printed below $100,000 per day on at least five consecutive publication\
+        \ days\\\",\\\"k\\\":305,\\\"n\\\":312,\\\"sources\\\":[]},\\\"payoff\\\":{\\\"kind\\\
+        \":\\\"price\\\",\\\"instrument\\\":\\\"FRO (Frontline plc, NYSE)\\\",\\\"direction\\\
+        \":\\\"short\\\",\\\"move\\\":0.35},\\\"cause\\\":\\\"C\\\",\\\"link\\\":{\\\"mode\\\
+        \":\\\"sustain\\\",\\\"strength\\\":2.6,\\\"lag\\\":5,\\\"shape\\\":\\\"ramp\\\",\\\
+        \"rationale\\\":\\\"A large share of the current Middle East Gulf freight assessment\
+        \ is compensation for war risk: hull war-risk premium on a $100m+ VLCC at several\
+        \ per cent of value is millions of dollars per Hormuz transit, plus crew bonuses and\
+        \ the scarcity of owners willing to fix the route at all, and Lloyd's List has described\
+        \ the wartime TD3C prints as pricing insurance-included voyages that cannot physically\
+        \ be performed. When the premium drops back under 0.4% that cost line and the willingness-to-fix\
+        \ scarcity both disappear, so assessments fall toward vessel-supply economics. The\
+        \ push is a hold rather than a shove: if war-risk quotes spike again, owners re-price\
+        \ transits upward within days, which is why the 2026 indexes moved with the risk quotes\
+        \ rather than with tonne-mile demand.\\\",\\\"sources\\\":[{\\\"url\\\":\\\"https://www.lloydslist.com/LL1156643/How-imaginary-Middle-East-VLCC-rates-are-having-real-world-effects\\\
+        \"},{\\\"url\\\":\\\"https://www.lloydslist.com/LL1157473/How-strait-reopening-could-impact-VLCC-rates-in-Middle-East-and-Atlantic\\\
+        \"},{\\\"url\\\":\\\"https://www.lloydslist.com/LL1158430/Why-VLCC-rates-just-went-ballistic-and-how-they-could-go-even-higher\\\
+        \"}]}}}\"}],\"container\":{\"id\":\"container_01F88F8LCNeSbhEUzECW9wKF\",\"expires_at\"\
+        :\"2026-09-17T15:06:20.999634Z\"},\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"\
+        stop_details\":null,\"usage\":{\"input_tokens\":490,\"cache_creation_input_tokens\"\
+        :2910,\"cache_read_input_tokens\":25722,\"cache_creation\":{\"ephemeral_5m_input_tokens\"\
+        :2910,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":3203,\"output_tokens_details\"\
+        :{\"thinking_tokens\":1934},\"service_tier\":\"standard\",\"inference_geo\":\"global\"\
+        ,\"server_tool_use\":{\"web_search_requests\":1,\"web_fetch_requests\":0}}}"
+    headers:
+      cf-cache-status:
+      - DYNAMIC
+      connection:
+      - keep-alive
+      content-length:
+      - '41765'
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - application/json
+      date:
+      - Thu, 17 Sep 2026 14:06:50 GMT
+      server:
+      - cloudflare
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      x-robots-tag:
+      - none
+    status:
+      code: 200
+      message: OK
+version: 1
