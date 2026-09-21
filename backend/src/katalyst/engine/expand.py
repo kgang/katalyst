@@ -134,14 +134,17 @@ def start_the_map(
     is_the_hypothesis: bool,
     answerer: Answerer,
     on: date,
+    may_search: bool = True,
 ) -> Outcome:
     """Turn one sentence a person typed into a claim anybody could settle.
 
     Asked once for the sentence the map starts from, and once more for the place
     the person asked whether it gets to. It is a different question from expanding
     a map — what did they mean, rather than what happens next — so it has its own
-    small shape and its own call, and searching is forbidden on it: the web has
-    nothing to say about what somebody meant.
+    small shape and its own call. **Searching is allowed on it**, and spends from
+    the same budget every other call spends from: what a person meant is not a
+    thing to look up, but how often this kind of thing has happened before is
+    exactly that, and this is the claim every number below it hangs off.
 
     **Both starting claims enter as what they are, and the model is not asked
     which.** A map has exactly one claim it started from, so that one is stamped
@@ -156,13 +159,15 @@ def start_the_map(
         is_the_hypothesis: True for the sentence the map starts from.
         answerer: Whatever this run asks its questions of.
         on: The day this run is happening, so a claim can be given a date.
+        may_search: Whether this run still has a whole call's worth of searches
+            left to spend.
 
     Returns:
         The minted claim, or the reason there is not one, and what the call cost.
     """
     question = starting_question(sentence, is_the_hypothesis=is_the_hypothesis, today=on)
     try:
-        said = answerer.starting_claim(question)
+        said = answerer.starting_claim(question, may_search=may_search)
     except AnswerWeCouldNotRead as did_not_fit:
         return Outcome(result=Refused(claim_in_words=did_not_fit.why), calls=1)
 
@@ -221,7 +226,7 @@ def _judge(
         The accepted claim and arrows, or every reason the map's rules gave.
     """
     candidate, claim, arrows, dropped, no_class = _candidate_map(graph, proposal, found)
-    introduced = _newly_wrong(validate(graph), validate(candidate))
+    introduced = newly_wrong(validate(graph), validate(candidate))
     if introduced:
         return Refused(claim_in_words=_in_the_models_words(proposal), violations=introduced)
     return Accepted(
@@ -360,7 +365,48 @@ def _arrow(
     return arrow, dropped
 
 
-def _newly_wrong(before: Sequence[Violation], after: Sequence[Violation]) -> tuple[Violation, ...]:
+def map_with(graph: Graph, accepted: Accepted) -> Graph:
+    """Put what one accepted answer brought onto the map.
+
+    Here rather than in `grow.py` because the walk now needs the map an answer
+    *would* leave behind before it commits to it: an answer judged against the
+    map as it stood at the start of a round has to be judged again against the
+    map as it stands when it lands (2026-09-20).
+
+    Args:
+        graph: The map as it stands. It is never changed.
+        accepted: The claim and arrows that were accepted.
+
+    Returns:
+        A new map with them on it.
+    """
+    claims = graph.propositions
+    if accepted.proposition is not None:
+        claims = (*claims, accepted.proposition)
+    return graph.model_copy(
+        update={"propositions": claims, "links": (*graph.links, *accepted.links)}
+    )
+
+
+def still_legal_on(graph: Graph, accepted: Accepted) -> tuple[Violation, ...]:
+    """Say what the map's rules object to if this answer lands on the map as it now stands.
+
+    The same question `_judge` asked when the answer came back, asked again at the
+    moment the map actually changes. A round of three calls is judged against one
+    snapshot, so two answers can each be legal against that snapshot and illegal
+    together — a loop, or the same arrow twice. This is where that is caught.
+
+    Args:
+        graph: The map as it now stands.
+        accepted: The claim and arrows that were accepted earlier.
+
+    Returns:
+        Every fault landing this answer would introduce, or nothing at all.
+    """
+    return newly_wrong(validate(graph), validate(map_with(graph, accepted)))
+
+
+def newly_wrong(before: Sequence[Violation], after: Sequence[Violation]) -> tuple[Violation, ...]:
     """Keep only the faults this proposal introduced, in the rules' own order.
 
     Args:
