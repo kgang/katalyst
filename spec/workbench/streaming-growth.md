@@ -1361,7 +1361,15 @@ moves")*. For every stream and every event in it, three things hold together.
 
 1. **The row is kept, while the map grows.** For every event up to and not including the one that
    stops the run, every tile that had a vertical position before the event has the identical
-   vertical position after it, and its order within its column is unchanged — which is
+   vertical position after it, and its order within its column is unchanged — **unless that
+   event moved its column and the row it held is taken there, and then it has the nearest free
+   row in its new column**: its own row when that row is free, otherwise the closest free row up
+   or down, a tie going down. Measured 2026-09-22 on both streams through the app's own layout
+   code: once on the live Verify run, by 48 pixels; never on the committed recording. The
+   exception is the price of the promise, not a softening of it: with the row held regardless,
+   the recording draws one claim 140 pixels on top of another, which INV-workbench.79 and the
+   visual checklist both forbid. A reserved rectangle is a box for this purpose, never room to
+   be drawn over. The rule without its exception is
    [`layout-and-zoom.md`](layout-and-zoom.md)'s INV-workbench.23, unchanged and now load-bearing.
    **The scope is the whole of the promise**: at the settle, clause 3, every pin goes and rows move
    with the columns — on the eighteen-claim recording the map's own height falls from 2 640 to 2 010
@@ -1388,6 +1396,8 @@ for by name rather than inherited from a height change that never happens. *Test
 with no browser over a live Verify stream and the committed recording, through the app's own
 `assignLayers`, `toElkGraph` and `readPositions`; growth ›
 `test_a_tile_keeps_its_row_while_the_map_grows`,
+`test_a_tile_sent_into_a_taken_row_takes_the_nearest_free_row`,
+`test_a_tie_between_two_free_rows_goes_down`,
 `test_nothing_moves_except_a_column_until_the_run_stops`; layout ›
 `test_no_two_tiles_in_a_column_collide`; `frontend/e2e/generate.spec.ts`. **Also: visual review
 checklist `VR13`.**
