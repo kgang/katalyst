@@ -882,3 +882,188 @@ I recommend a **polish pull request** (`fix/04-polish`, one session): the Change
 I did not run a browser; two findings remain unsettled from source.</result>
 <usage><subagent_tokens>264241</subagent_tokens><tool_uses>63</tool_uses><duration_ms>945738</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a16f221fbc09e0e79</task-id>
+<tool-use-id>toolu_01CmBqGfuhm13UPPBLhM3QAe</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a16f221fbc09e0e79.output</output-file>
+<status>completed</status>
+<summary>Agent "Digest reviews: probability engine" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `plans/analysis/2026-09-21-digest-engine.md` (571 lines; `plans/` is gitignored, so nothing tracked changed).
+
+**Summary**
+
+Both defects reproduce on `48eb562`, and I found a third: a claim with prior `.001` carrying a `−0.01` arrow **voids a supposition on day zero** — the tile never reads *Supposed*. Root causes are `propagation.py:1470-1472` (V1: a Rao-Blackwellised estimate averaged over surviving worlds is constant for a non-descendant of the evidence) and `_settled_days:806-843` + `:1463` (V2: one integer does two jobs — when outgoing delays start counting, and when a claim's truth is decided).
+
+Three measurements decided the recommendation. **review2's Plan A is ~1000× more expensive than its own estimate**: on generated 20-claim maps with in-degree 3, exact elimination over event times costs 0.7–7.8 s per band at K=12 with 4.8M–62.7M-entry intermediates (it predicted ≲10⁶ and "milliseconds"); 58–119 s at 30 claims. Its own kill criterion fires at K=6. But **the same network over binary truths, with all 200 versions on one numpy axis, is 0.5 ms** — the whole band, one pass.
+
+So: **keep review2's hazard model exactly; stop making event time a variable the network solves for.** The arrow keeps `strength`/`mode`/`lag`/`shape`/`half_life` as a hazard modifier; each parent's arrival time comes from one forward pass (redone under a `do`), not from inference; the binary network is solved exactly by variable elimination. Measured cost of that collapse against Plan A's exact answer: worst 0.0065 on a multi-parent map; over 30 generated maps with inhibitors, 97% of numbers within 0.01. Three sessions, net −350 lines in `propagation.py`, staged so `main` is never red (new core behind `engine="exact"`, then one flag flip). Locality becomes a theorem; the band becomes exact; V1, V2, starvation, the clamp bias and observe-noise all die together.
+
+Also: **land the spread** (it rides the versions, not the nest); **cut the path product** — it never moved to `domain/`, it is at `verify.py:139-167` — and replace it at 05 with total effect + joint + weakest arrow, rewriting INV-8; **recommend the event/state split** (net *negative* lines, reverses ADR-0014 A — Kent's call); **reject** moving formatting out of `domain/`, fix three raw-`repr` sites instead; and land `make numbers` + a committed `worked-numbers.txt` **before** the core change, since 547 prose decimals die with it.</result>
+<usage><subagent_tokens>252444</subagent_tokens><tool_uses>57</tool_uses><duration_ms>1105714</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aacdaca79e477c270</task-id>
+<tool-use-id>toolu_01LJGoxHU63CGAnntyno8QC9</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/aacdaca79e477c270.output</output-file>
+<status>completed</status>
+<summary>Agent "Wire fix: one-rule redesign" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is in place. Here is my report.
+
+---
+
+## What the coordinator must run to check me
+
+```bash
+# 1. The fast checks, already run by me — re-run directly if you want them fresh
+cd /Users/kentgang/git3/katalyst-wt/fix-04-vanishing-wire/frontend
+npx vitest run src/graph src/components     # 22 files, 195 tests
+npm run lint &amp;&amp; npm run typecheck
+
+# 2. The whole frontend suite (already run through the queue, exit 0)
+/Users/kentgang/git3/katalyst/plans/scripts/heavy.sh "npm run check" -- \
+  bash -c 'cd /Users/kentgang/git3/katalyst-wt/fix-04-vanishing-wire/frontend &amp;&amp; npm run check 2&gt;&amp;1 | tail -40'
+
+# 3. THE BROWSER RUNS — I ran none of these. You must.
+#    (a) the deliberate-fault test alone, first, on its own:
+cd /Users/kentgang/git3/katalyst-wt/fix-04-vanishing-wire/frontend
+CI=1 env -u ANTHROPIC_API_KEY -u FRED_API_KEY npx playwright test \
+  -g test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification
+#    (b) all seven once:
+CI=1 env -u ANTHROPIC_API_KEY -u FRED_API_KEY npx playwright test
+#    (c) the last bar, unchanged from J's:
+/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/scratchpad/bars/wire-bar.sh
+#    It uses ports 8015/5187 with CI=1 (no server reuse). 40× at 1, 3 and 6 workers.
+```
+
+**The pixel-exactness check in a real browser** — one page evaluation, worth doing once while the map is open (it is the only claim I could not make from a browser):
+
+```js
+// For every tile, compare what the library measured with what was declared.
+[...document.querySelectorAll('.react-flow__node')].flatMap((node) =&gt; {
+  const nb = node.getBoundingClientRect();
+  const zoom = Number(/scale\(([0-9.]+)\)/.exec(
+    document.querySelector('.react-flow__viewport').style.transform)[1]);
+  return [...node.querySelectorAll('.react-flow__handle')].map((h) =&gt; {
+    const r = h.getBoundingClientRect();
+    return { tile: node.dataset.id, port: h.dataset.handleid,
+             measuredX: (r.left - nb.left) / zoom, declaredX: parseFloat(h.style.left),
+             measuredY: (r.top  - nb.top ) / zoom, declaredY: parseFloat(h.style.top),
+             measuredW: h.offsetWidth, measuredH: h.offsetHeight };
+  });
+});
+```
+Every `measured − declared` should be under **0.02 px** (the browser's layout unit is 1/64 px). Anything at or above half a pixel means the declaration is wrong and wires will twitch on hover.
+
+---
+
+## The design I landed on, and why
+
+**Design 3 — declared ports. The hook is deleted.** It works exactly as the reviewer predicted, and I confirmed it by driving the installed library, not by reading alone.
+
+New file `frontend/src/graph/ports.ts` is the one place that says where a tile's ports are: the four ports, their two shares of the tile's height (0.38 / 0.62), their size, their standoff, and the single piece of arithmetic that turns a height into four boxes. Three consumers, one source:
+
+- `toFlow` hands those boxes to the library beside `initialWidth`/`initialHeight`.
+- `Tile.tsx` writes the *same four numbers* inline onto each `&lt;Handle&gt;` (`left`, `top`, `width`, `height`, plus `right: auto` and `transform: none` to switch off the library's own edge-pinning and half-size shift). So what is declared is literally what the browser lays out.
+- `wires/plates.ts` imports `DOWN_THE_TILE` and `PORT_STANDOFF` instead of keeping the second copy it used to keep — its old comment admitted the duplication and asked for a test to pin it. That copy is gone, and there is now a test that computes both sides.
+
+`tile.css` keeps only *how a port looks* (the one bar, the two bars). Its gradient stops end at `100%` rather than `6px`, so the port's height is not written down there either.
+
+**Correction to the review:** the port is **16 px** wide, not 8 — `--space-2` is `16px` (`src/styles/tokens.css:73`). It straddles the tile edge, 8 in and 8 out, which is why the standoff is exactly half the width and why the wire attaches a clean 8 px clear of the tile on both sides.
+
+---
+
+## The library evidence, and the precedence question
+
+Paths relative to `frontend/node_modules/`.
+
+| Fact | Where |
+|---|---|
+| A wire whose end is not initialised is **not rendered at all** — no `.react-flow__edge` element | `@xyflow/react/dist/esm/index.js:2955` (the only `getEdgePosition` call) → `:2973` `if (edge.hidden \|\| sourceX === null …) return null` |
+| A declared port satisfies initialisation: `!!(internals.handleBounds \|\| node.handles?.length) &amp;&amp; !!(measured.width \|\| width \|\| initialWidth)` | `@xyflow/system/dist/esm/index.js:1429–1432` |
+| **Precedence:** `getEdgePosition` prefers `internals.handleBounds` over `toHandleBounds(node.handles)` | `@xyflow/system/…:1439–1440` |
+| …**but** `internals.handleBounds` is itself rebuilt from `userNode.handles` whenever handles are declared — `parseHandles` returns the parsed declaration and throws the measured bounds away; only when `handles` is absent does it keep the previous measured bounds | `@xyflow/system/…:1639–1643`, called at `:1699` |
+| …on every `adoptUserNodes` where object identity changed (`checkEquality` compares `userNode === internalNode.internals.userNode`) | `@xyflow/system/…:1681`; the store passes `checkEquality: true` at `@xyflow/react/…:3438` |
+| The measurement path writes bounds from the DOM: `x = (handleRect.left − nodeRect.left)/zoom`, `width/height = offsetWidth/offsetHeight` | `@xyflow/system/…:1913–1921`, `:939–955`, `:909–912` |
+| The end point: Left → `(x, y + h/2)`; Right → `(x + w, y + h/2)` | `@xyflow/system/…:1487–1506` |
+
+**So: the measured bounds win only in the window between a measurement landing and the next redraw; the declared bounds win on every redraw after that.** This canvas builds new node objects on nearly every change, so the declared values are the steady state — which is exactly why they had to be the numbers the browser would have produced.
+
+**They are.** I drove the real installed library with our real `toFlow` output (throwaway script, now at `…/scratchpad/reviews/wire/ports-probe.ts` with a note on how to run it):
+
+```
+declared ports on H: [{"id":"in-trigger","type":"target","position":"left","x":-8,"y":54.76,"width":16,"height":6}, …]
+1. first frame, nothing measured   H-&gt;C: 288,94.24        -&gt; 392,149.12
+2. the measurement lands           H-&gt;C: 288,94.234375    -&gt; 392,149.125
+3. a hover, declared bounds again  H-&gt;C: 288,94.24        -&gt; 392,149.12
+worst move, declared vs measured, in pixels: 0.005625
+```
+
+Line 1 is the whole fix: **every wire is placed with nothing measured.** Lines 2–3 answer the reviewer's caveat (b): the only disagreement is the browser rounding our exact geometry to its own 1/64-px layout unit — **0.0056 px**, under a hundredth of a pixel, in either direction. (Line 2 simulates the measurement at that quantisation, because that is what a measurement of the very box the tile was drawn at must return.)
+
+**Why J's `test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification` will pass, reasoned rather than run.** The shim drops every notification whose target is inside `.react-flow__node`, so `updateNodeInternals` never runs for any tile and `internals.handleBounds` is only ever the parsed declaration. `isNodeInitialized` is satisfied by `handles.length` (4) and `initialWidth` (280) — neither of which the shim can touch — so `getEdgePosition` returns coordinates for all eight arrows on the first frame. That is exactly what the probe's line 1 shows, through the same two library functions the page uses. Tile visibility is unchanged: it hangs on `nodeHasDimensions`, which reads `initialWidth` (`@xyflow/react/…:2364`, `@xyflow/system/…:756`). **No repair loop anywhere** — there is nothing to retry, because nothing is waited for.
+
+The one behaviour that genuinely changes: with `handleBounds` now always defined, `getNodeInlineStyleDimensions` (`@xyflow/react/…:2044–2053`) stops putting `initialWidth`/`initialHeight` on the `.react-flow__node` wrapper as inline styles. The wrapper is `position: absolute` with no width, so it shrink-wraps to `.tile`, which carries explicit `width: 280px; height: Hpx` — the same box. No test measures the wrapper; the 280-px end-to-end assertion measures `.tile`.
+
+---
+
+## Nothing already placed moves
+
+- The share (0.38 / 0.62), the size (16 × 6) and the standoff (8) moved file, not value. I deliberately did **not** round the port's top to a whole pixel, even though it would have made declared and measured identical to the bit: it would have shifted every port by up to half a pixel and broken `plates.test.ts › test_the_sockets_are_where_the_tile_draws_them`, whose socket positions were read off the running app. Those numbers are untouched and that test passes unchanged.
+- `top: 38%` + `translateY(−50%)` becomes `top: &lt;38% of the height − 3&gt;px` with no transform — the same length, resolved once instead of twice.
+- The trigger/sustain gradients end at `100%` instead of `6px`; the gradient line on a 6-px-tall box *is* 6 px.
+
+## Which chapter numbers my change made stale
+
+None. One sentence added to `spec/workbench/tiles-ports-wires.md` under *Typed ports*: **the ports' places are declared, not discovered.** It extends INV-workbench.1's existing promise (*the height is never read back from the rendered element*) from the box to the ports inside it, and makes `layout-and-zoom.md`'s *"never measured off the screen — so layout stays a pure function"* true of the arrows too. No invariant needed renumbering.
+
+## The neighbour, `feat/04a-growth`
+
+I read it read-only. **It needs nothing extra, and here is why, so the rebaser can check rather than trust:**
+
+- Its `Canvas.tsx` node memo is `drawing.nodes.flatMap(node =&gt; ({ ...node, position, selected, className }))` — the spread carries `handles` through untouched, exactly as it already carries `initialWidth`.
+- Its `toFlow` keeps the same `sized` map and the same local: `const height = node.type === "claim" ? node.data.height : TILE_MIN_HEIGHT`. **The ports come out of that identical local**, so a tile that grows when its movement row appears (`roomFor`) takes its ports down with it automatically — the box and the ports cannot disagree, because there is one `height`. `ports.test.tsx › test_a_port_is_placed_from_the_height_the_box_was_declared_at` is the test that pins this, and it uses the taller-box path.
+- Its skeleton tiles (`type: "skeleton"`) render **no** `&lt;Handle&gt;` and are never at the end of a wire; my guard gives handles only to `type === "claim"`, so skeletons and overflow tiles keep today's behaviour exactly — including keeping the wrapper's inline `initialWidth`/`initialHeight`, which is what holds a `SkeletonTile`'s box open.
+- **Expect conflicts in two hunks:** the comment block above `sized` in `toFlow.ts` (growth adds a paragraph about reserved rectangles; I rewrote the surrounding prose), and `Canvas.tsx` (growth added ~318 lines; I removed the hook and its two imports and rewrote the file's opening paragraph). Both are small and textual.
+
+## Open questions
+
+- **`@xyflow/system` is not a declared dependency** (only `@xyflow/react` is), so I could not make the library-level proof a permanent test without adding one. The probe is in the scratchpad instead. If you want that proof to survive a library upgrade, adding `"@xyflow/system": "0.0.82"` as a devDependency and turning `ports-probe.ts` into a fifth case in `ports.test.tsx` is about twenty lines — I stopped short because it changes `package.json` and `package-lock.json`, which is outside what I was asked to touch.
+- **I took no screenshots** (no browser runs allowed). The visual change is bounded at 0.0056 px, so I claim nothing moved rather than showing it. If you want an eyeball: the ports on the stored example should sit where they always sat, one bar on the upper socket and two on the lower, straddling the tile edge.
+
+## Files touched
+
+```
+frontend/e2e/hormuz.spec.ts                 | 131 ++++++++++++++++--
+frontend/src/components/Tile.tsx            |  65 ++++-----
+frontend/src/components/tile.css            |  36 ++---
+frontend/src/graph/Canvas.tsx               |  13 +-
+frontend/src/graph/__tests__/ports.test.tsx | 201 ++++++++++++++++++++++++++++
+frontend/src/graph/ports.ts                 | 163 ++++++++++++++++++++++
+frontend/src/graph/toFlow.ts                |  42 +++---
+frontend/src/graph/wires/plates.ts          |  29 ++--
+spec/workbench/tiles-ports-wires.md         |   2 +
+9 files changed, 581 insertions(+), 101 deletions(-)
+```
+
+One commit, `54ea4ed`, amended over J's `6bc90d3` so the message is true; worktree clean, nothing pushed. Each of the four new tests was shown to fail first: removing the declaration reds the first two, putting `top: "38%"` back on the tile reds the third.
+
+**Written for you:** `…/scratchpad/msgs/pr-wire-body.md` (three headings) and `…/scratchpad/msgs/merge-wire.txt` (squash prose). The commit message is also kept at `…/scratchpad/msgs/commit-wire.txt`.
+
+## Verification tails
+
+```
+$ npm run lint       → biome ci . : Checked 114 files in 27ms. No fixes applied.   (+ no-library-stylesheet ok)
+$ npm run typecheck  → tsc -b --noEmit : (no output)
+$ npx vitest run src/graph src/components → Test Files 22 passed (22) · Tests 195 passed (195)
+$ heavy.sh "J2: npm run check"            → Test Files 29 passed (29) · Tests 248 passed (248) · [exited with code 0]
+```</result>
+<usage><subagent_tokens>271112</subagent_tokens><tool_uses>141</tool_uses><duration_ms>1276545</duration_ms></usage>
+</task-notification>
