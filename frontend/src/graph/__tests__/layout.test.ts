@@ -35,6 +35,7 @@ import {
   claimLines,
   firstFrame,
   LARGEST_ZOOM,
+  PAST_THE_ZOOM_BUTTONS,
   roomFor,
   SMALLEST_ZOOM,
   SUMMARY_BELOW_ZOOM,
@@ -700,7 +701,12 @@ describe("the union of two worlds", () => {
       { width: 1264, height: 850 },
     );
     expect(frame.zoom).toBe(SUMMARY_BELOW_ZOOM);
-    expect(frame.x).toBeGreaterThan(0);
-    expect(frame.x).toBeLessThan(40);
+
+    // **And it starts on the far side of the zoom buttons.** They float over the
+    // bottom-left corner of the canvas, so a map started at the canvas's own
+    // left edge is a map with its first tile — the hypothesis — drawn underneath
+    // a control. Read against the buttons' own reach rather than against the
+    // frame's own gap, which would be a test of nothing.
+    expect(frame.x).toBeGreaterThan(PAST_THE_ZOOM_BUTTONS);
   });
 });
