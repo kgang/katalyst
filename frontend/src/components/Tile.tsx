@@ -6,8 +6,11 @@
  *
  *   1. the claim, wrapping to three lines and then stopping — never cut in the
  *      middle of a word;
- *   2. three belief chips, the model's, the reader's and a market's, side by
- *      side and never averaged;
+ *   2. the belief chips, side by side and never averaged: the model's always,
+ *      and the reader's and a market's where they hold a number. A column with
+ *      nothing in it is two thirds of the belief area on a generated map, so
+ *      it is not drawn — the absence and its own reason are read in full in the
+ *      panel beside the map, which is where a reason has room to be a sentence;
  *   3. at most two evidence clippings, each a letter standing for a publication
  *      and one line of what it says;
  *   4. the day the claim is settled by;
@@ -303,14 +306,23 @@ export function Tile({ claim, isHypothesis, versions, height: reserved }: TilePr
       <p className="tile__claim">{claim.claim}</p>
 
       <div className="tile__beliefs">
+        {/* The model's column is always drawn — it is the one number every
+            claim on every map has, and while a map is still being built it is
+            the column that says so. The reader's and a venue's are drawn only
+            where they hold a number; where they do not, the absence and its
+            reason are read in full in the panel beside the map. */}
         <BeliefChip
           owner="model"
           slot={claim.beliefs.model}
           standing={claim.standing}
           versions={versions}
         />
-        <BeliefChip owner="user" slot={claim.beliefs.user} />
-        <BeliefChip owner="market" slot={claim.beliefs.market} />
+        {claim.beliefs.user.reading === undefined ? null : (
+          <BeliefChip owner="user" slot={claim.beliefs.user} />
+        )}
+        {claim.beliefs.market.reading === undefined ? null : (
+          <BeliefChip owner="market" slot={claim.beliefs.market} />
+        )}
       </div>
 
       {detail === "full" && hasFoot ? (

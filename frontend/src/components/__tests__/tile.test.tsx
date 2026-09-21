@@ -9,12 +9,16 @@
  * never sees the tile.
  */
 
+import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import { TILE_MIN_HEIGHT, TILE_WIDTH, tileHeight } from "../../graph/geometry";
+import type { ReadEvent } from "../../stream/events";
+import { joined } from "../../stream/generate";
+import { foldAll, waitingFor } from "../../stream/growth";
 import { aClaim } from "../../test/aMap";
-import type { ClaimView } from "../../world";
+import type { BeliefOwner, ClaimView, WorldView } from "../../world";
 import { absence } from "../../world/absence";
 import { SkeletonTile } from "../SkeletonTile";
 import { Tile } from "../Tile";
@@ -26,6 +30,49 @@ function draw(claim: ClaimView) {
       <Tile claim={claim} isHypothesis={false} versions={2000} />
     </ReactFlowProvider>,
   );
+}
+
+/** Whose belief columns this tile drew, in the order it drew them. */
+function columnsOf(container: HTMLElement): (string | null)[] {
+  return [...container.querySelectorAll(".belief-chip")].map((chip) =>
+    chip.getAttribute("data-owner"),
+  );
+}
+
+/** The two columns that are drawn only when they hold a number. */
+const ON_REQUEST: readonly BeliefOwner[] = ["user", "market"];
+
+/**
+ * The map a reviewer with no key actually watches build, folded by the app's
+ * own reducer from the recording the app itself replays.
+ *
+ * **Read off the committed recording rather than written here.** Every browser
+ * test in this tree plays the curated example, which is the one map where a
+ * reader's number and a venue's quote both exist — so two thirds of every real
+ * tile's belief area being an absence was invisible to all of them. The
+ * recording is the same bytes `/api/generate` sends back on a keyless copy: one
+ * JSON object per line, the first the header and every line after it one event,
+ * carrying the two fields the wire carries. So the events go through `joined`,
+ * the same reader the stream uses, and through `foldAll`, the same reducer the
+ * screen folds with. Nothing about this map is built here.
+ */
+function theGeneratedMap(): WorldView {
+  const file = readFileSync("../backend/recordings/hormuz.jsonl", "utf8");
+  const events: ReadEvent[] = [];
+  for (const line of file.split("\n")) {
+    if (line.trim() === "") {
+      continue;
+    }
+    const recorded = JSON.parse(line) as { event?: string; data?: unknown };
+    // The header line is the one line with no event name on it.
+    if (recorded.event === undefined) {
+      continue;
+    }
+    events.push(joined(recorded.event, JSON.stringify(recorded.data)));
+  }
+  // The sentence is the one the run was started from, and the run's own first
+  // event repeats it back — so the reducer takes it from the recording too.
+  return foldAll(waitingFor(""), events).world;
 }
 
 /**
@@ -230,19 +277,15 @@ describe("what a tile draws, and what it never draws", () => {
     expect(reserved.container.querySelector("time")).toBeNull();
   });
 
-  it("test_tile_draws_three_chips_and_never_a_fourth", () => {
+  it("test_tile_draws_one_chip_per_voice_and_never_a_fourth", () => {
     for (const claim of OF_EVERY_KIND) {
       const { container } = draw(claim);
-      const chips = [...container.querySelectorAll(".belief-chip")];
-      // Three voices, three chips, in this order, and never a fourth: if the
-      // model says .61 and the market says .48 the gap is the thing worth
-      // trading, and .545 is a number nobody holds.
-      expect(chips).toHaveLength(3);
-      expect(chips.map((one) => one.getAttribute("data-owner"))).toEqual([
-        "model",
-        "user",
-        "market",
-      ]);
+      // One chip per voice with something to say, in this order, and never a
+      // fourth: if the model says .61 and the market says .48 the gap is the
+      // thing worth trading, and .545 is a number nobody holds. None of these
+      // four claims carries a reader's number or a venue's quote, so each draws
+      // the model's column and nothing else.
+      expect(columnsOf(container)).toEqual(["model"]);
     }
   });
 
@@ -307,6 +350,24 @@ describe("what a tile draws, and what it never draws", () => {
     expect(markup).not.toContain("https://");
   });
 
+  it("test_a_belief_column_with_a_number_is_still_drawn", () => {
+    // The other half of the rule, and the half a map full of absences cannot
+    // show: where the reader has given a number and a venue is quoting one,
+    // all three columns are there, in their order, exactly as before.
+    //
+    // The readings are the builder's own — this test is about which columns are
+    // drawn and never about what is in them, so no number is typed here.
+    const stated = aClaim().beliefs.model;
+    const quoted = aClaim({ beliefs: { model: stated, user: stated, market: stated } });
+    const { container } = draw(quoted);
+
+    expect(columnsOf(container)).toEqual(["model", "user", "market"]);
+    // And every one of them is showing a number rather than words.
+    for (const chip of container.querySelectorAll(".belief-chip")) {
+      expect(chip.getAttribute("data-reading")).toBe("number");
+    }
+  });
+
   it("test_no_tail_marking_is_drawn_from_fixture_data_alone", () => {
     // A tail is a claim that is unlikely and large enough to matter, and nothing
     // on the map says which claim that is without arithmetic. So nothing in this
@@ -321,5 +382,75 @@ describe("what a tile draws, and what it never draws", () => {
       // make this fail for the wrong reason.
       expect(markup).not.toMatch(/(^|[-_\s"])tail([-_\s"]|$)/);
     }
+  });
+});
+
+/**
+ * **A belief column with nothing in it is not drawn** — checked on the map a
+ * reviewer with no key actually walks.
+ *
+ * Kent, 2026-09-21: *"In each of the nodes, the empty user specified values and
+ * the market values add visual clutter. The user and market values should only
+ * be viewable if they exist."*
+ *
+ * The rule is one line and takes no exception: **the model's column is always
+ * drawn; the reader's and a venue's are drawn when they hold a number.** The
+ * model's is always there because on a map that is still being built it is the
+ * column that says so, and because it is the one voice every claim on every map
+ * has.
+ *
+ * It is checked here on the recorded generation rather than on the curated
+ * example, and that is the whole point of this block: the curated example is the
+ * one map where a reader's number and a venue's quote both exist, so every
+ * browser test in this tree passed over a map two thirds of whose belief cells
+ * were absences without noticing one of them.
+ *
+ * **Where the absences went: nowhere new.** The panel beside the map draws all
+ * three rows whatever they hold and prints each absence's own reason in full —
+ * *no venue quotes this claim* — which is where a reason has room to be a
+ * sentence. The tile stops repeating them down a column.
+ */
+describe("the belief columns a tile draws", () => {
+  it("test_a_belief_column_with_no_number_is_not_drawn", () => {
+    const map = theGeneratedMap();
+    // The recording really did build a map — a fold that read nothing would
+    // pass every statement below by having nothing to check.
+    expect(map.claims.length).toBeGreaterThan(1);
+
+    for (const claim of map.claims) {
+      const { container } = draw(claim);
+      // Exactly the model's column, plus whichever of the other two hold a
+      // number — read off the claim the fold produced, never listed here.
+      expect(columnsOf(container)).toEqual([
+        "model",
+        ...ON_REQUEST.filter((owner) => claim.beliefs[owner].reading !== undefined),
+      ]);
+      // And no column but the model's is standing there showing words.
+      for (const chip of container.querySelectorAll(".belief-chip")) {
+        if (chip.getAttribute("data-owner") === "model") {
+          continue;
+        }
+        expect(chip.getAttribute("data-reading")).toBe("number");
+      }
+    }
+  });
+
+  it("test_on_the_generated_map_every_tile_is_down_to_one_column", () => {
+    // What the rule is worth on this map, stated as the two counts it is worth
+    // it because of. Not one of these claims carries a reader's number or a
+    // venue's quote, so every tile loses two of its three columns — which is
+    // the clutter Kent met and none of our tests had ever seen.
+    const map = theGeneratedMap();
+    const quiet = map.claims.filter(
+      (claim) =>
+        claim.beliefs.user.reading === undefined && claim.beliefs.market.reading === undefined,
+    );
+    expect(quiet).toHaveLength(map.claims.length);
+
+    const drawn = map.claims.reduce((sofar, claim) => {
+      const { container } = draw(claim);
+      return sofar + columnsOf(container).length;
+    }, 0);
+    expect(drawn).toBe(map.claims.length);
   });
 });
