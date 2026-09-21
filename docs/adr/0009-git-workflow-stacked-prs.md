@@ -112,3 +112,15 @@ The jobs are therefore `backend`, `frontend`, `types-fresh`, `docker`, `e2e` and
 **The job itself lands in stack 04b's stream pull request**, beside the recordings it reads. This record only names it and puts it on the required list.
 
 Nothing else changes: one workflow, no key anywhere in it, and the standing rule that a pull request which changes a prompt re-records whatever depended on it.
+
+## Second amendment (2026-09-21) — a stack is two deep
+
+**In force from today.** Kent decided this on 2026-09-21, and unlike the other amendments proposed that day it waits on no record: it is a change to how we work, it is his to make, and he made it.
+
+**The rule, as the dated decisions note records his choice** (row R13). A stack is **at most two deep** — a docs-only pull request at the bottom, and **one** code pull request on top of it; otherwise straight onto `main`. The sentence *"Never deeper than four"* under **Stacks** above is replaced by that, and nothing else in this record changes.
+
+**Why.** Four-deep stacks cost stack 04 a three-case rebase recipe, a file-ownership table nobody could hold in their head, and four days with `main` static while the bottom waited. The cost is not linear: every pull request below yours is a rebase you will do, and a `main` that cannot move is a review nobody can check against the thing that shipped.
+
+**Everything else in this record is unchanged** — Conventional Commits and its eight types; `<type>/<NN>-<slug>` branch names with the stack number from `PRODUCT_REQUIREMENTS.md` §12; a docs-only bottom, which is how the decision-gated cadence is enforced mechanically; the three pull-request headings *What* · *Which invariant(s) this satisfies* · *Deliberately not here*; squash-merge; `main` always green; the pre-commit set; the six build jobs and the four required checks; and the asynchronous-merge recipe above, which still applies to a two-deep stack exactly as written, including its trap about the top pull request.
+
+*An observation rather than a rule:* with stacks two deep, the bottom of a stack tends to carry more — a docs pull request now usually holds the decision records **and** the chapters they bind, because there is no third floor to put the chapters on.
