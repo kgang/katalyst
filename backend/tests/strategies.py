@@ -399,31 +399,40 @@ def quotes(
     live: bool | None = None,
     bid: float | None = None,
     offer: float | None = None,
+    side: str | None = None,
+    venue: str | None = None,
+    market_id: str | None = None,
 ) -> Quote:
     """One venue price for one claim, with everything needed to check it and to date it.
 
     Generates: a best bid and a best offer, the instant they were true, how the
-    price reached us, whether the venue says the market is still trading, and —
-    for a venue's own price, never for one the reader typed — the venue's name,
-    its three identifiers, the side priced, its question and rules, its end date,
-    its smallest price step and order, how much is resting and traded, and a web
-    address.
+    price reached us, and — for a venue's own price, never for one the reader
+    typed — the venue's name, its three identifiers, the side priced, its question
+    and rules, its four state flags, and sometimes an end date, the smallest
+    amounts it deals in and how much is resting and traded.
     Guarantees: the bid is never above the offer and both sit between zero and
-    one; a price read from a venue carries every one of the venue's own facts and
-    a price the reader typed carries none of them. Valid by construction, so
-    anything drawn here can be built without raising.
+    one; a price read from a venue carries every fact a venue always gives and a
+    price the reader typed carries none of them; a field the venue sometimes
+    leaves out is sometimes left out here too, because a generator that always
+    fills them would never meet the answers this venue really sends. Valid by
+    construction, so anything drawn here can be built without raising.
 
     Args:
         draw: Supplied by the generator library.
         source: Pin how the price reached us, when a test is about one of the
             three ways; otherwise one is chosen.
-        live: Pin whether the venue says the market is still trading. Left out,
+        live: Pin whether an order could be placed on this market. Left out,
             either. A finished market is generated too, on purpose: a settled
             market keeps serving a plausible book, and every reader of a quote has
             to cope with one.
         bid: Pin the best bid, when a test needs the price to sit somewhere
             particular against a claim's own number.
         offer: Pin the best offer, for the same reason.
+        side: Pin which outcome was priced, so a test can hand an ending the quote
+            that belongs to it.
+        venue: Pin the venue's name, for the same reason.
+        market_id: Pin the venue's own identifier for the market, for the same
+            reason.
     """
     chosen_source: QuoteSource = (
         source if source is not None else draw(st.sampled_from(("fetched", "recorded", "user")))
@@ -434,7 +443,6 @@ def quotes(
         if offer is not None
         else draw(st.floats(min_value=low, max_value=1.0, allow_nan=False))
     )
-    trading = live if live is not None else draw(st.booleans())
     instant = draw(
         st.datetimes(min_value=datetime(2026, 1, 1), max_value=datetime(2026, 12, 31)).map(
             lambda one: one.replace(tzinfo=UTC)
@@ -445,28 +453,67 @@ def quotes(
         "offer": max(low, high),
         "as_of": instant,
         "source": chosen_source,
-        "closed": not trading,
-        "accepting_orders": trading,
     }
     if chosen_source == "user":
         return Quote(**shared)
-    outcome = draw(st.sampled_from(("yes", "no")))
     return Quote(
         **shared,
-        venue=draw(st.sampled_from(CONTRACT_VENUES)),
+        **draw(venue_flags(live)),
+        venue=venue if venue is not None else draw(st.sampled_from(CONTRACT_VENUES)),
         condition_id=f"0x{draw(st.integers(min_value=0, max_value=2**32 - 1)):064x}",
-        market_id=str(draw(st.integers(min_value=1, max_value=9_999_999))),
+        market_id=(
+            market_id
+            if market_id is not None
+            else str(draw(st.integers(min_value=1, max_value=9_999_999)))
+        ),
         token_id=str(draw(st.integers(min_value=1, max_value=2**64 - 1))),
-        side=outcome,
+        side=side if side is not None else draw(st.sampled_from(("yes", "no"))),
         question=draw(st.sampled_from(VENUE_QUESTIONS)),
         rules=draw(st.sampled_from(VENUE_RULES)),
-        ends=draw(st.dates(min_value=date(2026, 1, 1), max_value=date(2030, 12, 31))),
-        tick=draw(st.sampled_from((0.001, 0.01))),
-        minimum_order=draw(st.sampled_from((1.0, 5.0))),
-        resting=draw(st.floats(min_value=0.0, max_value=1e6, allow_nan=False)),
-        traded=draw(st.floats(min_value=0.0, max_value=1e7, allow_nan=False)),
         url="https://example.test/event/a-question-somebody-quotes",
+        ends=draw(
+            st.one_of(st.none(), st.dates(min_value=date(2026, 1, 1), max_value=date(2030, 12, 31)))
+        ),
+        tick=draw(st.one_of(st.none(), st.sampled_from((0.001, 0.01)))),
+        minimum_order=draw(st.one_of(st.none(), st.sampled_from((1.0, 5.0)))),
+        resting=draw(
+            st.one_of(st.none(), st.floats(min_value=0.0, max_value=1e6, allow_nan=False))
+        ),
+        traded=draw(st.one_of(st.none(), st.floats(min_value=0.0, max_value=1e7, allow_nan=False))),
     )
+
+
+@composite
+def venue_flags(draw: Any, live: bool | None = None) -> dict[str, bool]:
+    """The four words a venue says about whether one of its markets can be traded.
+
+    Generates: active, closed, archived and accepting orders, in combinations that
+    really occur — measured over the 1 693 market records this repository saved
+    from the venue, including the 226 that say they are open and taking orders
+    while also saying they are not active.
+    Guarantees: when `live` is pinned, the four flags agree with it.
+
+    Args:
+        draw: Supplied by the generator library.
+        live: Pin whether an order could be placed. Left out, either.
+    """
+    trading = {"active": True, "closed": False, "archived": False, "accepting_orders": True}
+    if live is True:
+        return trading
+    stopped = draw(
+        st.sampled_from(
+            (
+                {"active": True, "closed": True, "archived": False, "accepting_orders": False},
+                {"active": False, "closed": False, "archived": False, "accepting_orders": True},
+                {"active": False, "closed": False, "archived": False, "accepting_orders": False},
+                {"active": False, "closed": False, "archived": True, "accepting_orders": True},
+            )
+        )
+    )
+    if live is False:
+        return stopped
+    chosen: dict[str, bool] = draw(st.sampled_from((trading, stopped)))
+    return chosen
 
 
 @composite

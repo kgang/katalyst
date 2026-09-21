@@ -18,6 +18,15 @@ played back rather than a summary of it.
 words: *"On the terms of service, we can commit a dated quote for research and
 development purposes."* Each file says that, in its own first line.
 
+**One file is one side of one contract.** A contract's yes and its no are two
+separate order books, so a quote is for the outcome its book was read for. The
+Hormuz file holds the **yes** token's book, which is the side the map's ending
+takes. Pricing a no-side ending needs the **no** token's own book read and
+committed beside it — the token's identifier is in the file already, inside the
+market record's list of outcomes. Deriving a no price from the yes book, as one
+minus each side, would be an assumption about how the venue matches orders that
+nobody here has checked.
+
 What this file must never do
 ----------------------------
 - Never reach over a network. It reads files, and only files.
@@ -27,6 +36,7 @@ What this file must never do
   reason is said out loud.
 """
 
+import glob as matching
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -87,7 +97,10 @@ def recorded_quote(market_id: str, folder: Path | None = None) -> Quote | None:
             "no venue prices this" and the other is "something here is broken".
     """
     looking_in = quotes_live_in(folder)
-    found = sorted(looking_in.glob(f"{market_id}-*.json"))
+    # The identifier comes from a payoff a model proposed, so it is treated as a
+    # name and never as a pattern: a `*` or a `?` inside it would otherwise match
+    # some other market's file and price a claim against the wrong contract.
+    found = sorted(looking_in.glob(f"{matching.escape(market_id)}-*.json"))
     if not found:
         return None
     return _quote_in(found[-1])

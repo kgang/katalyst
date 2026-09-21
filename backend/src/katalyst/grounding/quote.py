@@ -36,7 +36,13 @@ What this file must never do
 - Never let a price that is not a venue's own fill the market's likelihood.
 - Never decide from a price whether a market is still trading. A settled market
   keeps serving a plausible book — 0.999 against 1.00 — so that is read from the
-  venue's own flags and from nowhere else.
+  venue's own flags, **all** of them, and from nowhere else.
+- Never demand of a venue a field the venue does not always send. Two different
+  lists are kept below for two different things: what **only** a venue can tell
+  us, which a typed price therefore never carries, and what a venue **always**
+  tells us, which a venue's quote must have. Measured over the 1 693 real market
+  records this repository has saved: twelve fields are on every one of them, and
+  five are missing from between 24 and 189 of them.
 - Never reach over a network. Fetching is `polymarket.py`'s business; this file
   is the shape and the arithmetic on it.
 """
@@ -56,7 +62,7 @@ dated file the demo and the build run on. `user` — typed by the reader, as the
 report of a price they could deal at.
 """
 
-VENUE_FIELDS: tuple[str, ...] = (
+ALWAYS_FROM_A_VENUE: tuple[str, ...] = (
     "venue",
     "condition_id",
     "market_id",
@@ -64,19 +70,42 @@ VENUE_FIELDS: tuple[str, ...] = (
     "side",
     "question",
     "rules",
+    "url",
+    "active",
+    "closed",
+    "archived",
+    "accepting_orders",
+)
+"""What a venue always tells us, so a quote read from one must carry every one.
+
+Measured, not assumed: all twelve are on every one of the 1 693 distinct market
+records this repository has saved from the venue. A venue's quote missing one of
+them is refused by name, because identity, the venue's own question and whether
+the market is still trading are what make a price checkable at all.
+"""
+
+SOMETIMES_FROM_A_VENUE: tuple[str, ...] = (
     "ends",
     "tick",
     "minimum_order",
     "resting",
     "traded",
-    "url",
 )
+"""What a venue tells us most of the time, and sometimes simply leaves out.
+
+Measured over the same 1 693 records: 154 carry no resting size, 189 no traded
+volume and 24 no end date. An absent one stays **absent** — never nought, which
+would read as an empty book or a market that settles today. Demanding them would
+refuse ordinary, well-formed venue answers.
+"""
+
+VENUE_FIELDS: tuple[str, ...] = (*ALWAYS_FROM_A_VENUE, *SOMETIMES_FROM_A_VENUE)
 """Everything only a venue can tell us, listed once so one rule can check them all.
 
-A quote read from a venue carries every one of them. A price the reader typed
-carries none of them: the reader knows a price, not a contract's on-chain
-identifier or the venue's resolution rules, and an absent field stays absent
-rather than being filled with a plausible stand-in.
+A price the reader typed carries none of them: the reader knows a price, not a
+contract's on-chain identifier, not the venue's resolution rules, and not whether
+the venue has archived the market. An absent field stays absent rather than being
+filled with a plausible stand-in.
 """
 
 
@@ -118,17 +147,27 @@ class Quote(BaseModel):
     source: QuoteSource = Field(
         description="How this price reached us: read now, read from a committed file, or typed."
     )
-    closed: bool = Field(
+    active: bool | None = Field(
+        default=None,
         description=(
-            "Whether the venue says this market has closed. For a price the reader typed, "
-            "false: they are reporting a price they can deal at now."
-        )
+            "Whether the venue says this market is one of its live ones. Absent on a price "
+            "the reader typed, who knows a price and not the venue's own bookkeeping."
+        ),
     )
-    accepting_orders: bool = Field(
+    closed: bool | None = Field(
+        default=None,
+        description="Whether the venue says this market has closed. Absent on a typed price.",
+    )
+    archived: bool | None = Field(
+        default=None,
+        description="Whether the venue says it has put this market away. Absent on a typed price.",
+    )
+    accepting_orders: bool | None = Field(
+        default=None,
         description=(
-            "Whether the venue says it is still taking orders on this market. For a price "
-            "the reader typed, true, for the same reason."
-        )
+            "Whether the venue says it is still taking orders on this market. Absent on a "
+            "typed price."
+        ),
     )
     venue: str | None = Field(
         default=None,
@@ -222,22 +261,26 @@ class Quote(BaseModel):
             This same quote, once both halves have been checked.
 
         Raises:
-            ValueError: If a venue's quote is missing any of the venue's own facts,
-                or a typed price carries one of them.
+            ValueError: If a venue's quote is missing one of the facts a venue
+                always gives, or a typed price carries any fact only a venue could
+                have given.
         """
-        missing = [one for one in VENUE_FIELDS if getattr(self, one) is None]
         if self.source == "user":
-            if len(missing) != len(VENUE_FIELDS):
-                present = sorted(set(VENUE_FIELDS) - set(missing))
+            present = sorted(one for one in VENUE_FIELDS if getattr(self, one) is not None)
+            if present:
                 raise ValueError(
                     "a price the reader typed carries a price and the moment it was true, "
                     f"and nothing a venue would have told us; this one carries {present}"
                 )
-        elif missing:
-            raise ValueError(
-                "a quote read from a venue carries the venue's own facts about the "
-                f"contract; this one is missing {sorted(missing)}"
-            )
+        else:
+            missing = sorted(one for one in ALWAYS_FROM_A_VENUE if getattr(self, one) is None)
+            if missing:
+                raise ValueError(
+                    "a quote read from a venue carries the facts every venue answer has — "
+                    "its venue, its three identifiers, the side priced, the venue's own "
+                    "question and rules, a web address and its four state flags; this one "
+                    f"is missing {missing}"
+                )
         if self.bid > self.offer:
             raise ValueError(
                 f"a quote's best bid must not be above its best offer; got bid={self.bid}, "
@@ -259,18 +302,32 @@ class Quote(BaseModel):
 
     @property
     def live(self) -> bool:
-        """Whether this market is still trading, read from the venue's flags alone.
+        """Whether an order could be put in right now, read from the venue's flags alone.
 
         Never from the price. A settled market keeps serving a plausible book — the
         one this repository saved reads 0.999 against 1.00 — so a reader who decided
         from the numbers would show a finished market as a live one at nearly
         certain odds.
 
+        **All four flags, not two.** The venue publishes *active*, *closed*,
+        *archived* and *accepting orders*, and they disagree more often than one
+        would guess: of the 1 693 real market records this repository has saved,
+        **226** say they are open and taking orders while also saying they are not
+        active, and one of those says it is archived as well. Reading two flags
+        calls all 226 tradeable.
+
+        A price the reader typed is live by what it means: they are reporting what
+        they can get now. They are not asked about the venue's bookkeeping and it
+        is not invented for them.
+
         Returns:
-            True when the venue says the market has not closed and is still taking
-            orders.
+            True when an order could be placed: the venue says the market is
+            active, is not closed, is not archived and is taking orders — or the
+            reader typed the price themselves.
         """
-        return not self.closed and self.accepting_orders
+        if self.source == "user":
+            return True
+        return bool(self.active and self.accepting_orders and not self.closed and not self.archived)
 
 
 def market_belief(quote: Quote) -> Belief:

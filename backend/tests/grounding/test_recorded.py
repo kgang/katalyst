@@ -66,6 +66,20 @@ def test_a_market_with_no_file_is_nothing_rather_than_a_stand_in() -> None:
     assert recorded_quote("a-market-nobody-recorded") is None
 
 
+def test_an_identifier_is_a_name_and_never_a_pattern() -> None:
+    """A market identifier comes from a payoff a model proposed, so it matches itself only.
+
+    A `*` or a `?` in it would otherwise reach into other markets' files and price
+    a claim against the wrong contract — a number on a card that cannot be traced
+    to its source.
+    """
+    assert recorded_quote("*") is None
+    assert recorded_quote("350195?") is None
+    assert recorded_quote("[0-9]*") is None
+    # And the real identifier, matched as itself, still finds its file.
+    assert recorded_quote(HORMUZ_MARKET) is not None
+
+
 def test_every_committed_quote_reads(tmp_path: Path) -> None:
     """Reading the whole folder gives one quote per file, and no folder at all is not an error."""
     assert every_recorded_quote() != ()

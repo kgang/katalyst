@@ -53,10 +53,11 @@ def test_no_quote_test_touches_the_network() -> None:
     assert belief.owner == "market"
 
     world = _a_world_whose_ending_names(quote)
-    answer = priced(world, world, "ending", quote)
+    answer = priced(world, world, "ending", quote, fee=None)
 
     assert isinstance(answer, Edge)
     assert answer.quote is quote
+    assert answer.fee is None
 
 
 def _a_world_whose_ending_names(quote: Quote) -> World:

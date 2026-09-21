@@ -68,10 +68,34 @@ ORDER_BOOKS = "https://clob.polymarket.com/book"
 """Where the two sides of the book, and the instant they were true, are read from."""
 
 MARKET_PAGE = "https://polymarket.com/event/"
-"""What a market's public web address starts with. The venue's own slug follows."""
+"""What the public web address starts with. The **event's** own slug follows.
+
+Said plainly, because it is a known limit rather than an oversight: this opens the
+**event** a market belongs to, not the market. An event can hold many markets —
+the September crude event saved here holds thirty-five — and a market's own slug
+differs from its event's on 1 678 of the 1 693 markets saved. The market's slug
+would be the better address **if** the venue served it under this path, and
+nobody has checked that it does; the event address is the one this repository has
+a real answer for, so it is the one used. A reader following it finds the market
+by the venue's own question, which the quote carries word for word.
+"""
 
 HOW_LONG_TO_WAIT = 10.0
-"""How many seconds an opt-in read waits before giving up and keeping the recorded price."""
+"""How many seconds one read may sit with nothing happening before it is given up on.
+
+A limit on silence rather than on the whole read: a venue answering a byte at a
+time resets it. Nothing here needs a tighter promise, because a read that takes
+too long keeps the recorded price and says the refresh failed.
+"""
+
+NOT_MILLISECONDS_BEFORE = datetime(2000, 1, 1, tzinfo=UTC)
+"""A book's instant this old is the venue's milliseconds read as seconds.
+
+The venue sends the moment as milliseconds since 1970, as a string. Divide the
+same number by nothing and a book read this year dates itself to **1970-01-21** —
+a real price under a wrong day, which is the one thing a dated quote exists to
+prevent. Any year before this one is that mistake rather than a real reading.
+"""
 
 Ask = Callable[[str], Any]
 """Something that takes a web address and gives back the answer, already parsed.
@@ -154,7 +178,7 @@ def read_book(answer: Mapping[str, Any]) -> Book:
     Raises:
         ValueError: If either side of the book is empty, because a side with nothing
             on it has no best price and a quote with half a book is not a price
-            anybody could deal at.
+            anybody could deal at; or if the book's instant is not milliseconds.
     """
     bids = _sides(answer, "bids")
     offers = _sides(answer, "asks")
@@ -162,10 +186,58 @@ def read_book(answer: Mapping[str, Any]) -> Book:
         token_id=str(answer["asset_id"]),
         bid=max(bids),
         offer=min(offers),
-        as_of=datetime.fromtimestamp(int(answer["timestamp"]) / 1000.0, tz=UTC),
-        tick=float(answer["tick_size"]),
-        minimum_order=float(answer["min_order_size"]),
+        as_of=_instant_of(answer),
+        tick=_a_number(answer, "tick_size"),
+        minimum_order=_a_number(answer, "min_order_size"),
     )
+
+
+def _instant_of(answer: Mapping[str, Any]) -> datetime:
+    """Read the moment a book was true, and refuse a stamp that is not milliseconds.
+
+    The venue sends epoch milliseconds, as a string. The same number read as
+    seconds dates a book this year to **1970**, quietly, and a card would print the
+    wrong day beside a real price rather than saying anything was wrong. So the
+    answer is checked against the one thing that is certainly true of it: a book
+    read by this program was read after this program was written.
+
+    Args:
+        answer: One order-book answer, already parsed.
+
+    Returns:
+        The instant, in universal time.
+
+    Raises:
+        ValueError: If the stamp lands before the year 2000, which means it is not
+            the milliseconds the venue documents.
+    """
+    stamp = datetime.fromtimestamp(int(answer["timestamp"]) / 1000.0, tz=UTC)
+    if stamp < NOT_MILLISECONDS_BEFORE:
+        raise ValueError(
+            f"this order book says it was true at {stamp.isoformat()}, which is before "
+            "prediction markets existed. The venue sends the moment as milliseconds since "
+            "1970; a stamp this old is the same number read as seconds."
+        )
+    return stamp
+
+
+def _a_number(answer: Mapping[str, Any], named: str) -> float:
+    """Read one number a venue sends as a string, and say which one was missing if it is.
+
+    Args:
+        answer: One answer from the venue, already parsed.
+        named: The field to read.
+
+    Returns:
+        The number.
+
+    Raises:
+        ValueError: If the field is absent or is not a number.
+    """
+    try:
+        return float(answer[named])
+    except (KeyError, TypeError, ValueError) as trouble:
+        raise ValueError(f"this order book has no readable '{named}': {trouble}") from trouble
 
 
 def quote_from(
@@ -185,15 +257,32 @@ def quote_from(
         source: How this pair reached us: `fetched` from the venue just now, or
             `recorded` from the committed dated file.
 
+    **What is demanded and what is merely taken.** Twelve fields are on every one
+    of the 1 693 real market records this repository has saved, so a market record
+    missing one of them is refused by name. Five are not: 154 records carry no
+    resting size, 189 no traded volume and 24 no end date. Those are read with a
+    shrug and left absent, because a venue leaving a field out is an ordinary
+    answer and refusing it would refuse a working market.
+
+    Args:
+        event: One event from the venue's market-record address, already parsed —
+            the single object, not the list it arrives inside.
+        book_answer: The matching order-book answer, already parsed.
+        source: How this pair reached us: `fetched` from the venue just now, or
+            `recorded` from the committed dated file.
+
     Returns:
         One quote carrying both prices as read, the instant, the identifiers, the
-        venue's own question and rules, its end date, its state and its size.
+        venue's own question and rules, its four state flags, and whichever of its
+        end date, sizes and smallest dealing amounts it gave.
 
     Raises:
-        ValueError: If no market in the event has the book's contract identifier, if
-            the market does not list the outcome the book prices, or if that outcome
-            is named anything but yes or no. Each is a mismatch between two answers
-            that should describe the same contract, and guessing past one would
+        ValueError: If the book is unreadable; if no market in the event has the
+            book's contract identifier; if the market does not list the outcome the
+            book prices, or names that outcome anything but yes or no; or if the
+            market record is missing a field every venue answer has. Each is a
+            mismatch between two answers that should describe the same contract, or
+            an answer this program does not recognise, and guessing past one would
             price the wrong thing.
     """
     book = read_book(book_answer)
@@ -203,22 +292,73 @@ def quote_from(
         offer=book.offer,
         as_of=book.as_of,
         source=source,
-        closed=bool(market["closed"]),
-        accepting_orders=bool(market["acceptingOrders"]),
+        active=_a_flag(market, "active"),
+        closed=_a_flag(market, "closed"),
+        archived=_a_flag(market, "archived"),
+        accepting_orders=_a_flag(market, "acceptingOrders"),
         venue=VENUE,
-        condition_id=str(market["conditionId"]),
-        market_id=str(market["id"]),
+        condition_id=_a_word(market, "conditionId"),
+        market_id=_a_word(market, "id"),
         token_id=book.token_id,
         side=_side_of(market, book.token_id),
-        question=str(market["question"]),
-        rules=str(market["description"]),
-        ends=date.fromisoformat(str(market["endDateIso"])),
+        question=_a_word(market, "question"),
+        rules=_a_word(market, "description"),
+        ends=_a_day(market.get("endDateIso")),
         tick=book.tick,
         minimum_order=book.minimum_order,
-        resting=float(market["liquidityNum"]),
-        traded=float(market["volumeNum"]),
-        url=MARKET_PAGE + str(event["slug"]),
+        resting=_a_size(market.get("liquidityNum")),
+        traded=_a_size(market.get("volumeNum")),
+        url=MARKET_PAGE + _a_word(event, "slug"),
     )
+
+
+def _a_word(record: Mapping[str, Any], named: str) -> str:
+    """Read one field every venue answer has, and refuse by name when it is not there.
+
+    Args:
+        record: One market or event record from the venue, already parsed.
+        named: The field to read.
+
+    Returns:
+        The field, as text.
+
+    Raises:
+        ValueError: If the field is absent or empty. Every one of the 1 693 real
+            market records saved here has all of these, so an answer without one is
+            not an answer this program recognises.
+    """
+    said = record.get(named)
+    if said is None or not str(said).strip():
+        raise ValueError(
+            f"the venue's record {record.get('id')} has no '{named}', which every answer "
+            "this program has seen carries, so there is nothing here it can price"
+        )
+    return str(said)
+
+
+def _a_flag(market: Mapping[str, Any], named: str) -> bool:
+    """Read one of the venue's four state flags, and refuse by name when it is not there."""
+    said = market.get(named)
+    if not isinstance(said, bool):
+        raise ValueError(
+            f"market {market.get('id')} does not say whether it is '{named}', so whether an "
+            "order could be placed on it cannot be read from its flags"
+        )
+    return said
+
+
+def _a_day(said: Any) -> date | None:
+    """Read an end date the venue may simply not have sent. Absent stays absent."""
+    return None if said is None else date.fromisoformat(str(said))
+
+
+def _a_size(said: Any) -> float | None:
+    """Read a resting size or a traded volume the venue may not have sent.
+
+    Absent stays absent and never becomes nought, which would read as an empty book
+    rather than as a number the venue did not give.
+    """
+    return None if said is None else float(said)
 
 
 def refresh(recorded: Quote, ask: Ask | None = None) -> Refreshed:
@@ -231,10 +371,12 @@ def refresh(recorded: Quote, ask: Ask | None = None) -> Refreshed:
     answers go through the very same parsing the committed file does, so a refreshed
     quote and a recorded one are the same shape and can be compared field by field.
 
-    Anything at all going wrong — no answer, a slow answer, an answer in a shape
-    this program does not recognise — keeps the recorded price on screen with a
-    sentence saying the read did not happen. A stale price that says it is stale is
-    worth more than a blank.
+    Anything at all going wrong keeps the recorded price on screen with a sentence
+    saying so — a stale price that says it is stale is worth more than a blank —
+    and the sentence **names the right party**. A venue that cannot be reached and
+    a venue that answered something this program cannot read are two different
+    facts about two different people, and telling a reader the venue was down when
+    it answered perfectly well is worse than telling them nothing.
 
     Args:
         recorded: The quote to read again. It supplies the outcome identifier and,
@@ -260,13 +402,23 @@ def refresh(recorded: Quote, ask: Ask | None = None) -> Refreshed:
     try:
         events = fetch(f"{MARKET_RECORDS}?{named}")
         book = fetch(f"{ORDER_BOOKS}?{outcome}")
+    except Exception as trouble:
+        return Refreshed(
+            quote=recorded,
+            refresh_failed=(
+                f"{VENUE} could not be reached just now ({type(trouble).__name__}), so the "
+                "price shown is the one already on file and the day beside it is still true."
+            ),
+        )
+    try:
         return Refreshed(quote=quote_from(events[0], book, source="fetched"))
     except Exception as trouble:
         return Refreshed(
             quote=recorded,
             refresh_failed=(
-                f"{VENUE} could not be read just now ({type(trouble).__name__}), so the "
-                "price shown is the one already on file and the day beside it is still true."
+                f"{VENUE} answered, but this program could not read the answer "
+                f"({type(trouble).__name__}: {trouble}). The price shown is the one already "
+                "on file and the day beside it is still true."
             ),
         )
 
