@@ -46,7 +46,7 @@ from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from katalyst.domain import Belief, Graph, Proposition, PropositionId
+from katalyst.domain import Belief, Graph, Link, Proposition, PropositionId
 from katalyst.domain.validity import TERMINAL_KINDS
 from katalyst.engine.client import SEARCHES_INSIDE_ONE_CALL, Answerer
 from katalyst.engine.expand import expand, map_with, start_the_map, still_legal_on
@@ -459,13 +459,13 @@ class _Walk:
                     )
                 }
             )
-        crowded = self._out_of_room_beside(graph, accepted)
+        crowded = out_of_room_beside(graph, accepted.links, self.caps.width)
         if crowded is not None:
             return outcome.model_copy(
                 update={
                     "result": Refused(
                         claim_in_words=(
-                            f"There is no room beside {_named(graph, crowded)} for "
+                            f"There is no room beside {named_on(graph, crowded)} for "
                             f"another arrow: it already has the {self.caps.width} "
                             "this run allows it."
                         )
@@ -473,25 +473,6 @@ class _Walk:
                 }
             )
         return outcome
-
-    def _out_of_room_beside(self, graph: Graph, accepted: Accepted) -> PropositionId | None:
-        """Name the first claim an arrow would give more children than this run allows.
-
-        Args:
-            graph: The map as it stands.
-            accepted: The claim and arrows that arrived.
-
-        Returns:
-            The crowded claim, or nothing at all when every arrow has room.
-        """
-        leaving: dict[PropositionId, int] = {}
-        for arrow in graph.links:
-            leaving[arrow.source] = leaving.get(arrow.source, 0) + 1
-        for arrow in accepted.links:
-            if leaving.get(arrow.source, 0) >= self.caps.width:
-                return arrow.source
-            leaving[arrow.source] = leaving.get(arrow.source, 0) + 1
-        return None
 
     def _close_if_out_of_room(self, graph: Graph, claim_id: PropositionId) -> None:
         """Close a claim that has run out of layers below it, or of room beside it.
@@ -575,7 +556,38 @@ def _never_got_started(last_refusal: str | None) -> str:
     )
 
 
-def _named(graph: Graph, claim_id: PropositionId) -> str:
+def out_of_room_beside(graph: Graph, arrows: Sequence[Link], width: int) -> PropositionId | None:
+    """Name the first claim these arrows would give more children than a run allows.
+
+    **The width cap counts the arrows leaving a claim, whatever put them there.**
+    An arrow may name any claim on the map as its source, so a cap checked only
+    on the claim being expanded is a cap that arrow walks straight past — and a
+    cap that counted only an edit's *own* new arrows is one three edits walk past
+    together, one each (Kent, 2026-09-21).
+
+    Here rather than on the walk because both callers need the same answer: the
+    walk, when an answer lands, and the insert route, against the map the reader
+    is looking at. One function, used twice.
+
+    Args:
+        graph: The map as it stands, with everything already on it.
+        arrows: The arrows that would be added.
+        width: How many arrows one claim may have leaving it.
+
+    Returns:
+        The crowded claim, or nothing at all when every arrow has room.
+    """
+    leaving: dict[PropositionId, int] = {}
+    for arrow in graph.links:
+        leaving[arrow.source] = leaving.get(arrow.source, 0) + 1
+    for arrow in arrows:
+        if leaving.get(arrow.source, 0) >= width:
+            return arrow.source
+        leaving[arrow.source] = leaving.get(arrow.source, 0) + 1
+    return None
+
+
+def named_on(graph: Graph, claim_id: PropositionId) -> str:
     """Quote a claim by its own words, because a reader reads this on the screen.
 
     A refusal's sentence is drawn as a tile. It carried a twenty-six-character

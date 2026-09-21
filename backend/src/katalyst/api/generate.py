@@ -62,10 +62,9 @@ from katalyst.engine.events import (
 )
 from katalyst.engine.expand import add_a_claim
 from katalyst.engine.following import WENT_WRONG, Following, receipt_event
-from katalyst.engine.grow import grow
+from katalyst.engine.grow import grow, named_on, out_of_room_beside
 from katalyst.engine.ids import BIGGEST_SEED, mint_id, mint_seed
 from katalyst.engine.outcome import Caps, Outcome
-from katalyst.engine.receipt import Receipt as Spent
 from katalyst.engine.receipt import fold, nothing_spent_yet
 from katalyst.engine.transcript import (
     Transcript,
@@ -154,6 +153,9 @@ class DraftedInsert(BaseModel):
     reads, searches and dollars) has no exception for money spent outside a
     stream. The route used to answer a bare `Insert` and drop what it cost on the
     floor (`streaming.md`, settled 2026-09-20).
+
+    **Nothing here is remembered between requests.** An insert is one request and
+    one answer, so there is nothing to evict and nothing to go looking for.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -161,6 +163,17 @@ class DraftedInsert(BaseModel):
     insert: Insert = Field(description="The claim and its arrows, already validated.")
     receipt: Receipt = Field(
         description="What drafting it cost, in the shape the stream's receipt event carries."
+    )
+    working: tuple[TranscriptLine, ...] = Field(
+        default=(),
+        description=(
+            "Every call it took, in order, with what each one cost and how long "
+            "it took. **In the answer because there is nowhere else it could "
+            "be**: an insert is one request and one answer, and it is not a "
+            "generation. Filing it in the store instead made every insert "
+            "unfindable — nobody was told the identifier — and eight of them "
+            "evicted the map they were being added to (Kent, 2026-09-21)."
+        ),
     )
 
 
@@ -176,18 +189,20 @@ class InsertRequest(BaseModel):
             "any number of later questions."
         )
     )
-    branch: Branch | None = Field(default=None, description="The branch built so far, sent whole.")
+    branch: Branch | None = Field(
+        default=None,
+        description=(
+            "The branch built so far, sent whole. **A drafted edit goes at the end "
+            "of it**, and is drafted and judged against the map with it folded on "
+            "— which is the map the reader is looking at. There is no field for "
+            "where in the branch it goes: a branch is append-only everywhere else "
+            "in this product, and the field that said otherwise was read by "
+            "nothing while a reader who sent it got a 200 for an edit the world "
+            "route then refused (Kent, 2026-09-21)."
+        ),
+    )
     claim_in_words: str = Field(
         min_length=1, description='What the person typed: "…but Iran is struck the next day".'
-    )
-    position: int = Field(
-        default=0,
-        ge=0,
-        description=(
-            "Where in the branch the new edit goes. It is `position` and not `at`: "
-            "`at` already means a place in a transcript and a date on an edit, and a "
-            "third meaning is how a field stops meaning what it says."
-        ),
     )
 
 
@@ -267,13 +282,14 @@ def draft_a_claim(asked: InsertRequest) -> DraftedInsert:
         raise HTTPException(status_code=422, detail=[one.model_dump() for one in onto])
 
     spent = nothing_spent_yet()
-    answerer = live_answerer()
+    started = time.monotonic()
+    its_calls: tuple[Outcome, ...] = ()
+    answerer = live_answerer(when_nothing_is_said=EFFORT_WHEN_LIVE)
     if answerer is None:
         drafted = _scripted_insert(asked.claim_in_words)
         if drafted is None:
             raise HTTPException(status_code=501, detail=NO_KEY_FOR_A_NEW_CLAIM)
     else:
-        started = time.monotonic()
         drafted, its_calls = add_a_claim(
             onto,
             asked.claim_in_words,
@@ -283,7 +299,6 @@ def draft_a_claim(asked: InsertRequest) -> DraftedInsert:
         )
         for one in its_calls:
             spent = fold(spent, one)
-        _remember_what_the_insert_cost(asked, spent, its_calls, time.monotonic() - started)
         if drafted is None:
             raise HTTPException(
                 status_code=422,
@@ -299,14 +314,35 @@ def draft_a_claim(asked: InsertRequest) -> DraftedInsert:
                 ],
             )
 
+    crowded = out_of_room_beside(onto, drafted.links, Caps().width)
+    if crowded is not None:
+        raise HTTPException(
+            status_code=422,
+            detail=[
+                {
+                    "code": "edit_not_applicable",
+                    "subject": crowded,
+                    "message": (
+                        f"There is no room beside {named_on(onto, crowded)} for "
+                        f"another arrow: it already has the {Caps().width} this map "
+                        "allows it. The same cap the walk keeps, counted on the map "
+                        "as the reader is looking at it."
+                    ),
+                }
+            ],
+        )
     refused = _what_it_would_break(onto, drafted)
     if refused:
         raise HTTPException(status_code=422, detail=[one.model_dump() for one in refused])
     return DraftedInsert(
         insert=drafted,
         receipt=receipt_event(
-            spent, seconds=0.0, mode="live" if answerer is not None else "replay"
+            spent,
+            seconds=time.monotonic() - started,
+            mode="live" if answerer is not None else "replay",
+            effort=None if answerer is None else answerer.effort_used,
         ),
+        working=tuple(line_for(one, at) for at, one in enumerate(its_calls)),
     )
 
 
@@ -327,27 +363,6 @@ def _as_the_reader_sees_it(base: Graph, branch: Branch | None) -> Graph | list[V
     if isinstance(folded, list):
         return folded
     return folded[0]
-
-
-def _remember_what_the_insert_cost(
-    asked: InsertRequest, spent: Spent, its_calls: tuple[Outcome, ...], seconds: float
-) -> None:
-    """Put an insert's calls on a transcript of their own, so the money is readable.
-
-    NFR-6 has no exception for money spent outside a stream, and an insert is not
-    one call: a drafting call, then one call per arrow (Kent, 2026-09-20).
-    """
-    working = Transcript(
-        generation_id=mint_id(),
-        hypothesis=asked.claim_in_words,
-        target=None,
-        seed=0,
-        on=_today(),
-        mode="live",
-    )
-    for at, one in enumerate(its_calls):
-        working = working.plus(line_for(one, at))
-    held.remember(working.model_copy(update={"receipt": spent, "why": None}), None)
 
 
 @router.get("/generate/{generation_id}/transcript")

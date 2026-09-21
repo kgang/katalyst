@@ -222,7 +222,7 @@ All under `/api/`, like everything else, in `backend/src/katalyst/api/generate.p
 | Route | Body | Answer |
 |---|---|---|
 | `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed`. **A live run here asks the model for `medium` effort** unless `KATALYST_EFFORT` says otherwise (Kent, G13): a reader is waiting, and the `receipt` event says which effort made the map |
-| `POST /api/generate/insert` | `{base_id, branch, claim_in_words, position}` | A `DraftedInsert`: one `Insert` intervention — a claim and its arrows, drafted and already validated — **and its own small receipt** |
+| `POST /api/generate/insert` | `{base_id, branch?, claim_in_words}` | A `DraftedInsert`: one `Insert` intervention — a claim and its arrows, drafted and already validated — **its own small receipt, and its own working** |
 | `GET /api/generate/{generation_id}/transcript` | — | The transcript of a generation this process still holds; `404` with a plain sentence when it does not |
 
 **`seed` is the one optional field with a rule behind it.** Left out, `engine/ids.py` mints one and `generation_started` says which; sent, it reproduces a run the browser was handed. **The browser never invents a seed** — the three world routes still *require* one, because by then the run has a seed and asking for a world under a different one is asking a different question. On replay the recording's header seed wins over anything in the request.
@@ -241,10 +241,36 @@ The drafted claim is validated exactly like any other proposal, by the same `dom
 
 ```python
 class DraftedInsert(BaseModel):
-    """What the insert route answers with: the edit, and what drafting it cost."""
-    insert: Insert       # the claim and its arrows, already validated
-    receipt: Receipt     # the same shape the stream's receipt event carries
+    """What the insert route answers with: the edit, what it cost, and its working."""
+    insert: Insert                       # the claim and its arrows, already validated
+    receipt: Receipt                     # the same shape the stream's receipt event carries
+    working: tuple[TranscriptLine, ...]  # every call it took, in order
 ```
+
+**An insert is one request and one answer, and it is not a generation** (*decided
+here*, 2026-09-21). Its working comes back **in the answer**, because there is
+nowhere else it could be: filing it in the store of generations instead made
+every insert unfindable — nobody was ever told the identifier it was filed
+under — and, since that store is bounded, eight inserts evicted the map they
+were being added to and the ninth answered `404`. Nothing is remembered between
+requests, so there is nothing to evict and nothing to go looking for.
+
+**A drafted edit goes at the end of the branch it was drafted against**, and is
+drafted and judged against the map with that branch folded on — the map the
+reader is actually looking at. There is no field for where in the branch it
+goes. `position` used to be one: declared, documented, and read by nothing,
+while a reader who sent `position: 0` got a `200` for an edit that `POST
+/api/worlds` then refused with `unknown_target`, because the second edit hangs
+off the first. A branch is append-only everywhere else in this product — the
+browser only ever appends, and no route edits one in the middle — so it is
+append-only here too. A request that still carries `position` is **ignored**
+rather than refused, which is what every other route here does with a field it
+does not know.
+
+**The width cap is counted on that same folded map.** Three separate edits could
+each hang one more claim off the same one, because the drafting cap counts only
+the arrows of the new claim and says nothing about the out-degree of the claim
+they leave. It is the walk's own check, used twice.
 
 One shape for a cost, used twice — a second, smaller "insert cost" shape would be the same fact with a second set of field names. On replay the receipt is rebuilt exactly as a replayed stream's is: `mode: "replay"`, zeros, and the recording's date and hash ([`replay.md`](replay.md)).
 

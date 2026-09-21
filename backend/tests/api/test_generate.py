@@ -30,6 +30,7 @@ from tests.unit.engine.answers import (
     Storyteller,
     a_claim,
     a_declined_answer,
+    a_link,
     a_starting_claim,
     a_stop,
     an_answer,
@@ -940,3 +941,156 @@ def test_the_stand_in_answerer_can_never_reach_the_stream_route(
     read = stream()
 
     assert next(payload for name, payload in read if name == "receipt")["mode"] == "replay"
+
+
+# --- An insert is not a generation ----------------------------------------
+
+THE_RECORDED_MIDDLE = "War-risk cover for Gulf transits gets cheap again."
+"""The claim in the middle of the recorded map, which the reader's branch hangs off."""
+
+
+def a_drafting_answerer(new_claim: str, arrows: list[tuple[str, str]]) -> Storyteller:
+    """Draft one claim and then join it with the arrows a test asks for."""
+    return Storyteller(
+        starting=[an_answer(a_starting_claim(new_claim))],
+        joining=[an_answer(a_link(source, target)) for source, target in arrows]
+        + [an_answer(a_stop())],
+    )
+
+
+def test_an_insert_never_evicts_the_map_it_is_being_added_to(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An insert used to take a slot in the same bounded store the map lives in.
+
+    So eight of them evicted the map they were being added to, and the ninth
+    answered 404: one replay then ten inserts gave `[200 x8, 404, 404]`. An
+    insert is one request and one answer now — nothing is remembered, so there
+    is nothing to evict and nothing to find (2026-09-21).
+    """
+    stream()
+    monkeypatch.setattr(
+        generate,
+        "live_answerer",
+        lambda **_: a_drafting_answerer(
+            "Something new happens.", [("Something new happens.", THE_RECORDED_MIDDLE)]
+        ),
+    )
+
+    codes = [
+        insert_of(base_id=A_MAP, claim_in_words=f"…but number {at} happens").status_code
+        for at in range(10)
+    ]
+
+    assert codes == [200] * 10
+    assert held.how_many() == 1
+
+
+def test_an_insert_hands_back_its_own_working(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The calls are in the answer, because there is nowhere else they could be.
+
+    Filing them under a freshly minted identifier nobody was told made them
+    unfindable by anyone, which is the same as losing them (2026-09-21).
+    """
+    stream()
+    monkeypatch.setattr(
+        generate,
+        "live_answerer",
+        lambda **_: a_drafting_answerer(
+            "Something new happens.", [("Something new happens.", THE_RECORDED_MIDDLE)]
+        ),
+    )
+
+    said = insert_of(base_id=A_MAP, claim_in_words="…but something new happens").json()
+
+    # One call drafts the claim, one joins it, one is told it is joined enough.
+    assert said["receipt"]["calls"] == len(said["working"]) == 3
+    assert said["receipt"]["seconds"] > 0
+    assert [one["what"] for one in said["working"]] == ["accepted", "accepted", "stopped"]
+    assert all(one["calls"] == 1 for one in said["working"])
+
+
+def test_a_drafted_edit_goes_at_the_end_of_the_branch_it_was_drafted_against(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One rule, and the world route agrees with it (2026-09-21).
+
+    `position` was declared, documented and read nowhere, and a reader who sent
+    `position: 0` got a 200 for an edit that `POST /api/worlds` then refused with
+    `unknown_target` — because the second edit hangs off the first. A branch is
+    append-only everywhere else in this product; now it is here too.
+    """
+    stream()
+    monkeypatch.setattr(
+        generate,
+        "live_answerer",
+        lambda **_: a_drafting_answerer(
+            "The first thing.", [(THE_RECORDED_MIDDLE, "The first thing.")]
+        ),
+    )
+    first = insert_of(base_id=A_MAP, claim_in_words="…but the first thing happens").json()["insert"]
+    branch = {
+        "id": "br-1",
+        "label": "what the reader has done so far",
+        "parent": None,
+        "interventions": [first],
+    }
+
+    monkeypatch.setattr(
+        generate,
+        "live_answerer",
+        lambda **_: a_drafting_answerer(
+            "The second thing.", [("The first thing.", "The second thing.")]
+        ),
+    )
+    second = insert_of(
+        base_id=A_MAP, branch=branch, claim_in_words="…but the second thing happens"
+    ).json()["insert"]
+
+    at_the_end = dict(branch, id="br-2", interventions=[first, second])
+    world = client().post(
+        "/api/worlds", json={"base_id": A_MAP, "branch": at_the_end, "seed": 1, **SMALL}
+    )
+
+    assert world.status_code == 200, world.text
+
+
+def test_a_width_overrun_a_branch_introduces_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The width cap counts the arrows leaving a claim **on the map as folded**.
+
+    `add_a_claim`'s own `width` caps the new claim's arrows and says nothing
+    about the out-degree of a claim those arrows leave, so three edits could each
+    hang one more thing off the same claim (2026-09-21).
+    """
+    stream()
+    edits: list[dict[str, Any]] = []
+    for at in range(Caps().width - 1):
+        monkeypatch.setattr(
+            generate,
+            "live_answerer",
+            lambda at=at, **_: a_drafting_answerer(  # type: ignore[misc]
+                f"Branch claim {at}.", [(THE_RECORDED_MIDDLE, f"Branch claim {at}.")]
+            ),
+        )
+        answered = insert_of(
+            base_id=A_MAP,
+            branch={"id": "br", "label": "the reader's", "parent": None, "interventions": edits},
+            claim_in_words=f"…but branch claim {at}",
+        )
+        assert answered.status_code == 200, answered.text
+        edits.append(answered.json()["insert"])
+
+    monkeypatch.setattr(
+        generate,
+        "live_answerer",
+        lambda **_: a_drafting_answerer("One too many.", [(THE_RECORDED_MIDDLE, "One too many.")]),
+    )
+    over = insert_of(
+        base_id=A_MAP,
+        branch={"id": "br", "label": "the reader's", "parent": None, "interventions": edits},
+        claim_in_words="…but one arrow too many",
+    )
+
+    assert over.status_code == 422, over.text

@@ -900,12 +900,21 @@ export interface components {
          *     reads, searches and dollars) has no exception for money spent outside a
          *     stream. The route used to answer a bare `Insert` and drop what it cost on the
          *     floor (`streaming.md`, settled 2026-09-20).
+         *
+         *     **Nothing here is remembered between requests.** An insert is one request and
+         *     one answer, so there is nothing to evict and nothing to go looking for.
          */
         DraftedInsert: {
             /** @description The claim and its arrows, already validated. */
             insert: components["schemas"]["Insert"];
             /** @description What drafting it cost, in the shape the stream's receipt event carries. */
             receipt: components["schemas"]["katalyst__engine__events__Receipt"];
+            /**
+             * Working
+             * @description Every call it took, in order, with what each one cost and how long it took. **In the answer because there is nowhere else it could be**: an insert is one request and one answer, and it is not a generation. Filing it in the store instead made every insert unfindable — nobody was told the identifier — and eight of them evicted the map they were being added to (Kent, 2026-09-21).
+             * @default []
+             */
+            working: components["schemas"]["TranscriptLine"][];
         };
         /**
          * Evidence
@@ -1107,19 +1116,13 @@ export interface components {
              * @description The map the new claim is going onto, by **the map's own identifier** — the one a world carries as its `base_id`, and the one the stored examples answer to. Not the generation's identifier: a generation is a run and a map is a thing it built, and one run can hand its map to any number of later questions.
              */
             base_id: string;
-            /** @description The branch built so far, sent whole. */
+            /** @description The branch built so far, sent whole. **A drafted edit goes at the end of it**, and is drafted and judged against the map with it folded on — which is the map the reader is looking at. There is no field for where in the branch it goes: a branch is append-only everywhere else in this product, and the field that said otherwise was read by nothing while a reader who sent it got a 200 for an edit the world route then refused (Kent, 2026-09-21). */
             branch?: components["schemas"]["Branch"] | null;
             /**
              * Claim In Words
              * @description What the person typed: "…but Iran is struck the next day".
              */
             claim_in_words: string;
-            /**
-             * Position
-             * @description Where in the branch the new edit goes. It is `position` and not `at`: `at` already means a place in a transcript and a date on an edit, and a third meaning is how a field stops meaning what it says.
-             * @default 0
-             */
-            position: number;
         };
         /**
          * Link
