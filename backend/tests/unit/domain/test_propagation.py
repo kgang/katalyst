@@ -24,11 +24,13 @@ budget; only how steady the numbers are, and these tests are about what the
 arithmetic *is*.
 """
 
+import importlib
 import math
 from datetime import date, timedelta
 from itertools import pairwise
 
 import networkx
+import numpy
 import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
@@ -43,6 +45,7 @@ from katalyst.domain import (
     Do,
     Graph,
     Insert,
+    Intervention,
     Link,
     Observe,
     Proposition,
@@ -55,8 +58,14 @@ from katalyst.domain import (
     validate,
     versions_of,
 )
+from katalyst.domain.propagation import SERIES_CAP
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ
 from tests.strategies import branches, graphs, interventions, seeds, uncertain_beliefs
+
+# The package re-exports `propagate` under the name of the file it lives in, so
+# plain `import katalyst.domain.propagation` hands back the function. One test
+# replaces something inside that file, so it asks for the file by name.
+propagation_module = importlib.import_module("katalyst.domain.propagation")
 
 many = settings(max_examples=25, deadline=None)
 a_few = settings(max_examples=12, deadline=None)
@@ -734,6 +743,123 @@ def test_an_observation_a_later_supposition_overrode_throws_no_world_away() -> N
     # And in particular the far piece, which the observation never had business with.
     for claim_id in ("other", "beyond"):
         assert withdrawn.beliefs[claim_id] == _folded(graph).beliefs[claim_id], claim_id
+
+
+def _every_shape_on_a_long_window() -> Graph:
+    """One map carrying every shape a push can have, judged across a long window.
+
+    Long on purpose: past 180 days the engine works out fewer days than the window
+    has, so this is a map on which the thinning actually happens. And one of every
+    shape, because a day-to-day dependence — a running total, a "has fired by now",
+    a retraction that holds from a day onward — would hide in whichever shape
+    carries state, and there is no way to know in advance which that would be.
+    """
+    return _map(
+        (
+            _claim("cause", kind="hypothesis", prior=(0.5, 0.25, 0.75), days=0),
+            _claim("spike", prior=(0.4, 0.2, 0.6), days=40),
+            _claim("held", prior=(0.45, 0.25, 0.7), days=120),
+            _claim("climbing", prior=(0.35, 0.15, 0.6), days=300),
+            _claim("sustained", prior=(0.5, 0.25, 0.75), days=500),
+            _claim("striker", prior=(0.4, 0.2, 0.6), days=700),
+            _claim("ending", kind="market", prior=(0.4, 0.2, 0.6), days=900),
+        ),
+        (
+            _arrow("cause", "spike", strength=1.6, shape="impulse", lag=3.0, half_life=9.0),
+            _arrow("cause", "held", strength=1.2, shape="step", lag=7.0),
+            _arrow("spike", "climbing", strength=0.9, shape="ramp", lag=11.0),
+            _arrow("held", "sustained", strength=1.4, mode="sustain", lag=2.0),
+            _arrow("striker", "cause", strength=-1.9, shape="step", lag=4.0),
+            _arrow("sustained", "ending", strength=1.1, shape="impulse", half_life=30.0),
+            _arrow("climbing", "ending", strength=0.7, shape="step", lag=5.0),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("what", "edits"),
+    [
+        ("the map as written", ()),
+        ("a supposition", (Do(target="cause", value=True, at=DAY_ZERO),)),
+        ("an observation", (Observe(target="spike", value=True),)),
+        (
+            "a supposition something later undermines",
+            (
+                Do(target="cause", value=True, at=DAY_ZERO),
+                Do(target="striker", value=True, at=DAY_ZERO + timedelta(days=5)),
+            ),
+        ),
+        (
+            "an observation and a supposition together",
+            (
+                Observe(target="held", value=True),
+                Do(target="cause", value=True, at=DAY_ZERO + timedelta(days=2)),
+            ),
+        ),
+    ],
+)
+def test_a_days_answer_does_not_depend_on_which_other_days_were_worked_out(
+    what: str, edits: tuple[Intervention, ...], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A claim's answer on a day comes from that day and the map's timings, never from the grid.
+
+    **This is the invariant the whole thinning rests on.** The engine works out
+    fewer days than a long window has — the days it sends, plus the handful the
+    arithmetic must land on exactly — and that is only safe if working out *more*
+    days would give the very same numbers on the days both have. If anything
+    carried state from one worked-out day to the next — a running maximum, a
+    cumulative hazard, a "has fired by now", a retraction that holds from a day
+    onward — then the thinned grid and the full one would part company somewhere,
+    and the grid would be deciding an answer instead of deciding where to look.
+
+    So the same map is worked out twice, on the grid the engine chooses and on
+    every day of the window, and every number behind every claim is required to
+    agree **bit for bit** on every day the two share: each version's answer, the
+    spread inside each version, how much each version counts, and the likelihood
+    and range the world reports. Over a map carrying every shape a push can have —
+    a spike with a half-life, a step, a ramp, a sustaining arrow, lags on all of
+    them — and under each of the edits that could plausibly carry a day's state
+    into the next, the undermined supposition most of all.
+
+    Failing this would not mean the test is too strict. It would mean the grid
+    matters, and every day it decides to skip is a day the engine is guessing at.
+    """
+    graph = _every_shape_on_a_long_window()
+    thinned = _folded(graph, *edits)
+    assert thinned.days > SERIES_CAP, "this map was meant to be thinned"
+    assert len(thinned.series_days) <= thinned.days, "this map was meant to be thinned"
+
+    monkeypatch.setattr(
+        propagation_module,
+        "_days_to_send",
+        lambda claims, day_zero, days: numpy.arange(days + 1, dtype=numpy.int64),
+    )
+    every_day = _folded(graph, *edits)
+    assert len(every_day.series_days) == every_day.days + 1, "this one was meant to be whole"
+
+    behind_thin, behind_full = versions_of(thinned), versions_of(every_day)
+    where = {day: index for index, day in enumerate(behind_full.days)}
+    shared = [(index, where[day]) for index, day in enumerate(behind_thin.days) if day in where]
+    assert len(shared) == len(behind_thin.days), "every day worked out thinly is worked out fully"
+
+    for claim in graph.propositions:
+        claim_id = claim.id
+        assert numpy.array_equal(
+            behind_thin.counting_for(claim_id), behind_full.counting_for(claim_id)
+        ), claim_id
+        for here, there in shared:
+            day = behind_thin.days[here]
+            assert numpy.array_equal(
+                behind_thin.likelihood[claim_id][:, here],
+                behind_full.likelihood[claim_id][:, there],
+            ), (claim_id, day, what)
+            assert numpy.array_equal(
+                behind_thin.inner_spread[claim_id][:, here],
+                behind_full.inner_spread[claim_id][:, there],
+            ), (claim_id, day, what)
+        # And what the reader is shown: the headline, read on the claim's own
+        # resolve-by day, which both grids carry.
+        assert thinned.beliefs[claim_id] == every_day.beliefs[claim_id], (claim_id, what)
 
 
 def test_observe_warns_below_two_percent_survival() -> None:

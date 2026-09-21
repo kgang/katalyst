@@ -109,20 +109,19 @@ def propagate(
 
 Sixteen thousand worlds in total, and the two numbers are not interchangeable: they measure two different kinds of not-knowing, and B5 below says which is which.
 
-**What it costs, measured on the shipped engine** *(re-measured 2026-09-21, after every day of the window started being worked out; the figures before that date are kept in the row beside each)*. The cost is claims × days × 16 000 worlds, so the **window** is the term that grows, not the map.
+**What it costs, measured on the shipped engine** *(re-measured 2026-09-21; one map to a process, so the peak memory is that map's and nothing else's)*. The cost is claims × days worked out × 16 000 worlds.
 
 | Map | Before | Now |
 |---|---|---|
-| Hormuz, the base world — seven claims over sixty days | 60 ms | **62 ms** |
-| Hormuz, the strike branch — eight claims over sixty days | 68 ms | **72 ms** |
-| A whole Hormuz difference — two worlds and the versions behind each | 73 ms | **78 ms** |
-| Sixty claims over a sixty-one-day window | 510 ms | **542 ms** |
-| Sixty claims over a year | 1.2 s | **2.7 s** |
-| Sixty claims over two years | — | **5.4 s** |
-| Sixty claims over five years | — | **15.2 s** |
-| Thirty claims over five years | — | **7.5 s** |
+| Seven claims over sixty days | 0.06 s · 118 MB | **0.07 s · 117 MB** |
+| Sixty claims over sixty days | 0.51 s · 326 MB | **0.49 s · 320 MB** |
+| Sixty claims over a year | 2.50 s · 1 468 MB | **1.39 s · 839 MB** |
+| Thirty claims over five years | 6.80 s · 3 440 MB | **0.72 s · 515 MB** |
+| Sixty claims over five years | 13.72 s · 5 892 MB | **1.58 s · 958 MB** |
 
-**Nothing under 180 days moved**, because such a window was already worked out at every day — which is every map this product has drawn, the worked example included. Past 180 days the cost now grows with the window instead of flattening at the cap, which is the price of the rule above: a year doubles, five years is about eight times a year's old cost. A five-year map of sixty claims is **outside a ten-second budget**; a five-year map of thirty — the most claims a generated map carries — is inside it. If a longer horizon is ever wanted, the answer is not to thin the grid again but to thin it by a rule that reads only the day number and never the window's length: every day for the first stretch, every so-many-days after. That keeps the property this rule bought. (The plan's "about ten milliseconds at sixty claims" measured one day in a prototype and is not what the shipped engine does over a window.)
+"Before" is the engine that worked out **every** day of the window — the first repair of the leak below, and an honest one that was paid for in the wrong currency. Past 180 days the days worked out grew without limit, and on a long window the arrays behind the claims grew with them: a five-year map of sixty claims wanted **5.9 gigabytes**. In a small container such a map does not run slowly, it dies. **Memory, not time, was the ceiling**, and the chapter was silent on it.
+
+What replaced it costs neither. The days worked out are the days **sent** plus the handful the arithmetic must land on **exactly**, so a five-year map works out about 180 points rather than 1 826, and the numbers are the same ones — see the invariant below. The backend test suite came back from 88 seconds to **52** without coverage, against 46 before any of this — the eight seconds are six new tests and a state machine turned up from fifteen runs of four steps to a hundred of eight, which is what it takes to reach a sequence of two observations. (The plan's "about ten milliseconds at sixty claims" measured one day in a prototype and is not what the shipped engine does over a window.)
 
 **Three things that are deliberately absent.** There is no `strength_lo` and no `strength_hi`, now or ever: link strengths are **fixed numbers in stack 03a** and only priors vary between versions. Widening an arrow is derived from its `provenance` — "how well-backed" becomes "how wide" — and that ships in stack 04, where arrows finally differ from one another; every arrow in today's fixture is hand-written `argued` or `asserted`, so doing it now would widen everything by the same amount and teach nobody anything. There is no `scipy`: the Latin hypercube — a way of spreading draws evenly instead of letting them clump — is three lines of `numpy`, and the percentiles are one. And there is no module-level random generator — see B7.
 
@@ -168,6 +167,12 @@ Every number below is **illustrative**, exactly as the fixture's are, and pull r
 The one rule, and it is the whole of the repair: **every push fires on the true day its cause settles, read off a grid that does not depend on how long the window is.** Every day of the window is that grid, and it is the simplest one with the property: lengthening a window only adds days at the **end**, where they can re-time nothing that was already happening. Only the series is thinned, at the moment the world is built. `test_a_longer_window_moves_nothing_it_cannot_reach` is the reproducer, and both locality property tests now compare two worlds' answers for an untouched claim **bit for bit**, which is the sharpest form the claim has.
 
 *The repair that looks obvious is not the repair, and was tried: keeping every settled day among the drawn points makes the grid depend on the settled days, so a supposition — which cuts arrows and so moves them — re-spaces the grid and shifts a claim's own ancestors, breaking INV-3 (assert is not observe). It is worse than what it cures.*
+
+**The invariant the thinning rests on** *(added 2026-09-21)*. **A claim's answer on a day is a function of that day and of the map's own timings, and of no other day worked out.** Nothing in the engine carries state from one worked-out day to the next — no running total, no "has fired by now", no retraction that holds from a day onward — so working out *more* days cannot change the answer on a day already worked out. That is the whole licence for working out fewer days than the window has, and it is what makes the two kinds of day above safe to keep apart.
+
+It is tested rather than asserted: `test_a_days_answer_does_not_depend_on_which_other_days_were_worked_out` works one map out twice — on the grid the engine chooses and on every day of the window — and requires every number behind every claim to agree **bit for bit** on every day the two share, for every version. The map carries one of every shape a push can have (a spike with a half-life, a step, a ramp, a sustaining arrow, lags on all of them) over a nine-hundred-day window, and the test runs it under a supposition, under an observation, under both together, and under **a supposition something later undermines** — the likeliest place for a day to depend on the day before it. If that test ever fails, the grid has stopped deciding where to look and started deciding an answer, and every day it skips is a day the engine is guessing at.
+
+**One last-bit consequence, stated because it is measured** *(2026-09-21)*. Adding along the versions rather than across them (B5's reduction) is a different order of addition from the one the engine used before, at **every** width and not only at one — so on a sample of worlds, one to four band edges moved by between `2.8e-17` and `1.1e-16`. No likelihood `p` moved anywhere, every difference between two worlds is byte-identical, and nothing reaches the two significant figures this product prints. It is written down because a number that moves at all should be able to say why.
 
 Which is why the world carries **`series_days`**: one entry per point, saying which day of the window that point stands for. On a window of 180 days or fewer it is simply every day, and reading it is the same as counting. Past that the points are unevenly spaced, and `series_days` is then the only thing that says where they sit — a sparkline drawn as though they were evenly spaced would quietly misplace every date on the axis. `states` and every claim's `series` are always the same length as `series_days`.
 

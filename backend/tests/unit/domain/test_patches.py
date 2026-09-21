@@ -1167,5 +1167,11 @@ class GraphEditMachine(RuleBasedStateMachine):
         self.graph, self.fixed, self.world = after, fixed, world
 
 
-GraphEditMachine.TestCase.settings = settings(max_examples=15, stateful_step_count=4, deadline=None)
+# Big enough to reach a sequence of two observations, which is where the leak
+# lived: at fifteen runs of four steps it never got there, and the defect sat
+# through the whole of stack 03 unseen. A hundred runs of eight steps catches
+# it on the code that had it, and costs about three seconds when it is green.
+GraphEditMachine.TestCase.settings = settings(
+    max_examples=100, stateful_step_count=8, deadline=None
+)
 TestGraphEditMachine = GraphEditMachine.TestCase

@@ -1422,7 +1422,7 @@ export interface components {
             day_zero: string;
             /**
              * Days
-             * @description How long the window is, in whole days. Not the number of points in a series: a window longer than 180 days is drawn at 180 evenly spaced points.
+             * @description How long the window is, in whole days. Not the number of points in a series: past 180 days a series is drawn at 180 evenly spaced points, plus every claim's own resolve-by day, which is always kept.
              */
             days: number;
             /** @description The map the branch's edits left behind. */

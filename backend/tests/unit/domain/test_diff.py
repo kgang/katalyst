@@ -621,7 +621,7 @@ def test_delta_row_reads_the_peak_day(data: st.DataObject) -> None:
             for day in in_b
             if day in in_a
         ]
-        assert abs(row.peak_delta) >= max(gaps) - 1e-12
+        assert abs(row.peak_delta) >= max(gaps)
         assert row.before == before.series[row.target][in_a[named]]
         assert row.after == after.series[row.target][in_b[named]]
         assert row.peak_delta == row.after - row.before

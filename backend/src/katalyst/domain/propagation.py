@@ -108,10 +108,14 @@ NINETIETH_PERCENTILE = 1.2816
 """How many standard deviations out a bell curve's 10th and 90th percentiles sit."""
 
 SERIES_CAP = 180
-"""The most points a claim's series ever carries, however long the window is.
+"""The most **evenly spaced** points a series is drawn at, however long the window is.
 
-A cap on what is sent to a reader, never on what is worked out. Every day of
-the window is always worked out; see `_days_to_send`.
+A cap on what is sent to a reader, never on what is worked out. And a cap on the
+evenly spaced points alone: **every claim's resolve-by day is kept whatever the
+cap says**, because a tile's headline is read on that day and it has to be a
+point of the line drawn beneath it. A map with more than 180 claims judged on
+180 different days therefore sends one point per judged day and no more — more
+than this number, and every one of them earning its place. See `_days_to_send`.
 """
 
 LOWEST_SURVIVAL = 0.02
@@ -219,7 +223,8 @@ class World(BaseModel):
     days: int = Field(
         description=(
             "How long the window is, in whole days. Not the number of points in a series: "
-            "a window longer than 180 days is drawn at 180 evenly spaced points."
+            "past 180 days a series is drawn at 180 evenly spaced points, plus every claim's "
+            "own resolve-by day, which is always kept."
         )
     )
     graph: Graph = Field(description="The map the branch's edits left behind.")
@@ -452,15 +457,14 @@ def versions_of(world: World) -> Versions:
 
 
 def _sent_days(setup: "_Setup") -> NDArray[numpy.int64]:
-    """Which of the days worked out a reader is given, as positions in the full window.
+    """Where the days a reader is given sit among the days worked out.
 
-    Every day of the window is worked out; at most 180 of them are handed on. The
-    positions are the days themselves, because the days worked out are 0, 1, 2 and
-    so on — but they are looked up rather than assumed, so that this keeps working
-    if the days worked out ever stop being every day.
+    The days worked out are the days sent plus the handful the arithmetic must land
+    on exactly, so every sent day is among them and this is a lookup rather than a
+    search for a near miss. Worked out once, when the map is prepared, because a
+    world asks for it twice.
     """
-    wanted = _days_to_send(setup.claims, setup.day_zero, setup.days)
-    return numpy.searchsorted(setup.points, wanted).astype(numpy.int64)
+    return numpy.searchsorted(setup.points, setup.sent).astype(numpy.int64)
 
 
 def _versions_from(setup: "_Setup", sample: "_Sample") -> Versions:
@@ -531,6 +535,7 @@ class _Setup:
     day_zero: date
     days: int
     points: NDArray[numpy.int64]
+    sent: NDArray[numpy.int64]
     read_at: Mapping[PropositionId, int]
     shape_rows: Mapping[LinkId, Numbers]
     observation_reach: Mapping[PropositionId, frozenset[PropositionId]]
@@ -569,24 +574,42 @@ def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> 
     settled = _settled_days(order, arrows_into, fixed_on, as_of)
 
     days = _window_length(graph, as_of)
-    # **Every day of the window, always.** The 180-point cap is a cap on what is
-    # *sent*, never on what is worked out: a push fires on the day its cause is
-    # settled, and reading that day off a thinned grid would make it depend on how
-    # long the window happens to be — so a claim added at one end of a map could
-    # re-time something at the other end that nothing connects it to. The days
-    # here depend on the window's length and on nothing else, and lengthening a
-    # window only adds days at the end, where they can re-time nothing that was
-    # already happening.
-    points = numpy.arange(days + 1, dtype=numpy.int64)
-    read_at = {
-        claim_id: _day_index(one.resolution.by, as_of, days) for claim_id, one in claims.items()
-    }
-
-    shape_rows = {one.id: _shape_row(one, settled[one.source], points) for one in ordinary}
     spells = {
         claim_id: _spells_on(fixed_on[claim_id], arrows_into[claim_id], settled, as_of)
         for claim_id in claims
     }
+
+    # **The days the numbers are worked out on.** Two kinds, and the difference is
+    # the whole of what makes an edit local.
+    #
+    # The days a reader is *sent* — at most 180 of them, evenly spaced, with every
+    # claim's resolve-by day always among them. These move when the window's length
+    # moves, and that is allowed: they decide where a line is *drawn*, nothing more.
+    #
+    # And the days the arithmetic must land on **exactly**: the day each claim's
+    # clock starts, because a one-off push fires then, and the day each observation
+    # speaks, because that is when worlds are thrown away. Reading either off the
+    # nearest drawn day is what used to let the window's length re-time a push, so
+    # that an inserted claim at one end of a map moved a claim at the other by
+    # `.096`. They are put on the grid instead, and every lookup is then exact.
+    #
+    # Adding them cannot move anything, and that is why this is safe rather than
+    # merely cheaper: a claim's answer on a given day is a function of that day and
+    # of the map's own timings, never of which *other* days happen to be worked
+    # out. So the grid decides only where the series is evaluated.
+    sent = _days_to_send(claims, as_of, days)
+    must_be_exact = {min(max(0, one), days) for one in settled.values()}
+    for stretches in spells.values():
+        must_be_exact |= {
+            min(max(0, one.starts), days) for one in stretches if one.kind == "observe"
+        }
+    points = numpy.union1d(sent, numpy.array(sorted(must_be_exact), dtype=numpy.int64))
+    read_at = {
+        claim_id: _point_of(points, _day_index(one.resolution.by, as_of, days))
+        for claim_id, one in claims.items()
+    }
+
+    shape_rows = {one.id: _shape_row(one, settled[one.source], points) for one in ordinary}
 
     return _Setup(
         claims=claims,
@@ -597,6 +620,7 @@ def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> 
         day_zero=as_of,
         days=days,
         points=points,
+        sent=sent,
         read_at=read_at,
         shape_rows=shape_rows,
         observation_reach=_observation_reach(claims, ordinary, spells),
@@ -690,11 +714,12 @@ def _days_to_send(
 ) -> NDArray[numpy.int64]:
     """Choose which days of the window a claim's series carries to the reader.
 
-    **A cap on what is sent, never on what is worked out.** Every day of the window
-    is worked out, always; this only decides which of those days a series carries.
-    Ordinarily all of them. Past 180 days that is more points than anybody scrubs
-    through, so a series is drawn at 180 evenly spaced days instead — **and every
-    claim's own resolve-by day is always among them**. That is not a nicety: a
+    **A cap on what is sent, never on what is worked out**, and a cap on the evenly
+    spaced points alone. Ordinarily every day of the window. Past 180 days that is
+    more points than anybody scrubs through, so a series is drawn at 180 evenly
+    spaced days instead — **and every claim's own resolve-by day is kept whatever
+    the cap says**, so a map judged on more than 180 different days sends one point
+    per judged day, which is more than the cap and is the honest answer. That is not a nicety: a
     tile's headline number is read on the claim's own resolve-by day, and if that
     day were not on the claim's own series the number on the tile would not be a
     point of the line drawn beneath it.
@@ -1443,14 +1468,27 @@ def _surviving_both(
 def _point_of(points: NDArray[numpy.int64], day: int) -> int:
     """Find where one day of the window sits among the days actually worked out.
 
-    **Exact, because every day of the window is worked out.** A day is at its own
-    position, and a day past the end of the window is read at the last one — only a
-    claim whose clock starts outside the window can land there, and such a claim is
-    not doing anything inside it. This used to round a day up to the next drawn one,
-    which is how the length of the window leaked into the timing of a push; see
-    `_days_to_send`.
+    **Exact, and it has to be.** Every day the arithmetic reads by name — the day a
+    claim's clock starts, so a one-off push fires then, and the day an observation
+    speaks — is put on the grid when the grid is built, precisely so that this can
+    never round. Rounding here to the next drawn day along is what once let the
+    length of the window decide the timing of a push, and so let an edit at one end
+    of a map move a claim at the other; see `_days_to_send` and `_prepare`.
+
+    A day past the end of the window is read at the last one, which only a claim
+    whose clock starts outside the window can be, and such a claim is not doing
+    anything inside it.
+
+    Args:
+        points: The days worked out, in order.
+        day: The day wanted.
+
+    Returns:
+        Where that day sits among them.
     """
-    return min(max(0, day), len(points) - 1)
+    if day >= points[-1]:
+        return len(points) - 1
+    return int(numpy.searchsorted(points, max(0, day)))
 
 
 def _fixed_days(setup: _Setup, claim_id: PropositionId) -> tuple[Flags, Draws]:
