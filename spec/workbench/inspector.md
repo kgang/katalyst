@@ -621,7 +621,7 @@ arrow, the panel renders the day our retrieval step fetched it, or the reason th
 source with no retrieval day is never rendered as though it had one. *Test:* inspector ›
 `test_renders_a_fetch_day_or_its_reason`.
 
-**INV-workbench.60 — the only thing that changes which panel is on the glass is the reader** *(2026-09-22)*. For every map screen, choosing a claim or an arrow — by pointer or by keyboard — puts that subject's panel on the glass, and no event arriving from the run or from the engine ever changes which panel is showing. What an arrival may do is add a count to a panel's own name. Every name offered is a panel that screen has, and every one of them is a word. *Tests:* `frontend/src/components/__tests__/panelSwitch.test.tsx` ›
+**INV-workbench.84 — the only thing that changes which panel is on the glass is the reader** *(2026-09-22; numbered 84 because 60 to 79 are `streaming-growth.md`'s — 60 is *there is no spinner* — 80 and 81 are its two of 2026-09-21, and 82 and 83 are `first-screen.md`'s; a number is never reused, so a citation can never quietly come to mean another statement)*. For every map screen, choosing a claim or an arrow — by pointer or by keyboard — puts that subject's panel on the glass, and no event arriving from the run or from the engine ever changes which panel is showing. What an arrival may do is add a count to a panel's own name. Every name offered is a panel that screen has, and every one of them is a word. *Tests:* `frontend/src/components/__tests__/panelSwitch.test.tsx` ›
 `test_a_click_on_a_tile_during_a_replay_shows_that_claim_in_the_panel`,
 `test_a_click_on_an_arrow_shows_that_arrow_in_the_panel`,
 `test_a_refusal_arriving_does_not_pull_the_reader_off_what_they_are_reading`,
