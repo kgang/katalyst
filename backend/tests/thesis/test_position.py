@@ -269,7 +269,12 @@ def test_a_risk_budget_that_is_not_a_share_of_capital_is_refused(budget: float) 
 
 
 def test_a_contract_price_outside_nothing_to_one_is_refused() -> None:
-    """A contract cannot trade above everything, whatever a reader types."""
+    """A contract cannot trade above everything, whatever a reader types.
+
+    And the refusal names **the field at fault**: here the entry and the stop are
+    both fine and the target is not, so sending the reader to the entry would send
+    them to a good number.
+    """
     built = position_on(
         an_ending(A_CONTRACT),
         entry=0.4,
@@ -281,7 +286,43 @@ def test_a_contract_price_outside_nothing_to_one_is_refused() -> None:
     )
 
     assert isinstance(built, tuple)
-    assert [one.code for one in built] == ["price_outside_the_contract"]
+    assert [(one.code, one.field) for one in built] == [("price_outside_the_contract", "target")]
+
+
+def test_every_contract_price_out_of_range_is_named() -> None:
+    """Two prices out of range are two refusals, so the form marks both."""
+    built = position_on(
+        an_ending(A_CONTRACT),
+        entry=1.4,
+        stop=0.3,
+        target=1.7,
+        horizon=HORIZON,
+        risk_budget=0.02,
+        daily_move=0.0,
+    )
+
+    assert isinstance(built, tuple)
+    assert [one.field for one in built if one.code == "price_outside_the_contract"] == [
+        "entry",
+        "target",
+    ]
+
+
+def test_the_shift_clamps_a_level_to_the_entry_price_without_touching_it() -> None:
+    """Clamping is not touching, and the chapter used to say otherwise.
+
+    A stop a tenth below a hundred at a variability of five points a day is checked
+    at the entry price itself. A path that rises on its first day and stays up never
+    reaches it, so the stop is not touched — where *touched on the first day either
+    way* would have said it was.
+    """
+    tight = long_on(stop=99.9, target=140.0, daily_move=5.0)
+
+    answer = touched(paths_of([100.0, 101.0, 102.0], daily_move=5.0), tight)
+
+    assert answer.stop_at == pytest.approx(ENTRY)
+    assert answer.stop_first == pytest.approx(0.0)
+    assert answer.stop_touched == pytest.approx(0.0)
 
 
 def test_every_fault_comes_back_at_once() -> None:
@@ -434,7 +475,7 @@ def test_the_barrier_shift_catches_a_touch_a_daily_count_would_miss() -> None:
 
 
 def test_the_shift_never_moves_a_level_past_the_entry_price() -> None:
-    """A stop nearer the entry than the correction is touched on the first day either way."""
+    """A level nearer the entry than the correction is checked at the entry price itself."""
     tight = long_on(stop=99.9, target=100.1, daily_move=5.0)
 
     answer = touched(paths_of([100.0, 100.0], daily_move=5.0), tight)

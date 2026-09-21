@@ -265,6 +265,10 @@ def test_no_rows_come_back_below_the_floor_and_the_reason_does() -> None:
     assert thin.too_few_draws is not None
     assert str(THE_FLOOR) in thin.too_few_draws
     assert thin.effective_draws == pytest.approx(5.0)
+    assert "5 of the drawn worlds stopped out" in thin.too_few_draws
+    assert f"{WORLDS} drawn worlds" not in thin.too_few_draws, (
+        "the count to compare against is the worlds that stopped out, not every world drawn"
+    )
 
 
 def test_the_floor_counts_effective_worlds_and_not_rows() -> None:

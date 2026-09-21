@@ -34,6 +34,12 @@ the draws. **No coverage is claimed for the ratio**, because a ratio of two shar
 over overlapping sets is not a share. A row's interval says how firmly the
 numerator is pinned down and nothing more.
 
+**A row below one is a real row.** Lift measures company, in both directions: above
+one the claim kept company with losing, below one with the trade working. Both are
+worth reading, so both are printed and the rail is ranked from one end to the
+other. What is *not* printed is a claim the interval cannot tell apart from telling
+you nothing.
+
 **Three rules keep the rail honest.** No row rests on fewer than two hundred
 **effective** drawn worlds — effective meaning how many equally-weighted worlds
 the weighted sample is worth, which for the engine's sampler is most of them but
@@ -103,7 +109,8 @@ apart.
 
 TOO_FEW_DRAWS = (
     "Fewer than {floor} effective drawn worlds ended with the stop touched first, so nothing "
-    "here would be worth reading. {effective} of the {drawn} drawn worlds count."
+    "here would be worth reading. {stopped} of the drawn worlds stopped out, and their "
+    "weights are worth {effective} equally-weighted ones."
 )
 """What the rail prints instead of rows, when the draws behind it are too few.
 
@@ -115,8 +122,10 @@ sentence.
 DroppedBecause = Literal["held_true_everywhere", "never_came_on", "tells_you_nothing"]
 """Every reason a claim is left off the rail, as a closed list.
 
-`held_true_everywhere` — an edit holds it true in every drawn world, so its lift is
-one by construction and the rail is about what varies. `never_came_on` — it came on
+`held_true_everywhere` — it came on in every drawn world, so its lift can only be
+one or less and the rail is about what varies. An edit holding it true does that;
+so does a map that makes it all but certain, and the draws cannot tell the two
+apart, so the sentence names both. `never_came_on` — it came on
 in no drawn world, so there is nothing to divide by. `tells_you_nothing` — its
 numerator interval covers its own base share, so the rail cannot tell it apart from
 a claim that keeps no company with losing at all.
@@ -124,8 +133,9 @@ a claim that keeps no company with losing at all.
 
 DROPPED: Final[dict[str, str]] = {
     "held_true_everywhere": (
-        "You are holding this true, so it happened in every drawn world and tells you "
-        "nothing about which of them stopped you out."
+        "This came on in every drawn world, so it tells you nothing about which of them "
+        "stopped you out. An edit holding it true does that; so does a map that makes it "
+        "all but certain."
     ),
     "never_came_on": "This never came on in any drawn world, so there is nothing to compare.",
     "tells_you_nothing": (
@@ -309,7 +319,9 @@ def what_takes_you_out(draws: Draws, touch: FirstTouch) -> WhatTakesYouOut:
             floor=THE_FLOOR,
             sample=draws.sample,
             too_few_draws=TOO_FEW_DRAWS.format(
-                floor=THE_FLOOR, effective=f"{counted:.1f}", drawn=draws.worlds
+                floor=THE_FLOOR,
+                stopped=int(stop_first.sum()),
+                effective=f"{counted:.1f}",
             ),
         )
 

@@ -330,10 +330,18 @@ def what_the_form_refuses(position: Position, ending: Proposition) -> tuple[Refu
         found.append(_refusing("horizon_after_the_claim", "horizon"))
     if not 0.0 < position.risk_budget <= 1.0:
         found.append(_refusing("risk_budget_out_of_range", "risk budget"))
-    if position.trades == "contract" and not all(
-        0.0 <= one <= 1.0 for one in (position.entry, position.stop, position.target)
-    ):
-        found.append(_refusing("price_outside_the_contract", "entry"))
+    if position.trades == "contract":
+        # One refusal per field at fault, because a refusal that always says
+        # "entry" sends the reader to a field that may be perfectly good.
+        found.extend(
+            _refusing("price_outside_the_contract", named)
+            for named, price in (
+                ("entry", position.entry),
+                ("stop", position.stop),
+                ("target", position.target),
+            )
+            if not 0.0 <= price <= 1.0
+        )
     return tuple(found)
 
 
@@ -397,8 +405,10 @@ def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
             "shorter window would answer a question nobody asked"
         )
 
-    # Each level moves toward the entry price by the shift, and never past it: a
-    # level nearer the entry than the shift is touched on the first day either way.
+    # Each level moves toward the entry price by the shift, and never past it. A
+    # level nearer the entry than the shift is therefore checked *at* the entry
+    # price — so any close on the losing side of it counts, and a close on the
+    # other side still does not. Clamping is not the same as touching.
     shift = BARRIER_SHIFT * position.daily_move
     losing = -1.0 if position.side == "long" else 1.0
     stop_at = position.entry + losing * max(0.0, abs(position.stop - position.entry) - shift)

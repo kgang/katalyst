@@ -4,10 +4,10 @@
 
 The brief's most distinctive question is *what events could lead to a stop-loss?* This chapter answers it by arithmetic, and answers a second, smaller question beside it.
 
-* **What takes you out** — of the worlds where the reader's stop was touched before their target, which claims had already happened? Computed, ranked, with an interval and a count.
+* **What takes you out** — of the worlds where the reader's stop was touched before their target, how much company did each claim keep with losing? Computed, ranked, with an interval and a count. Above one it kept company with losing; below one, with the trade working. Both are printed, because both are worth reading.
 * **What to watch** — which single adverse turn would damage this ending most, *and* resolves before it, *and* can be seen by anybody? A watchlist, never a stop.
 
-The first is a list the map itself cannot give: not the causes of the ending, but the claims that keep company with losing.
+The first is a list the map itself cannot give: not the causes of the ending, but the claims that keep company with losing — and, at the other end of the same ranking, the ones that keep company with it working.
 
 ---
 
@@ -19,13 +19,13 @@ Two modules in `backend/src/katalyst/thesis/`, and one change to an existing fun
 
 **Lift is one division.** Among the worlds where the stop was touched first, how often had this claim **already come on before the stop was touched**? Divide by how often it came on across all the drawn worlds. Three means three times as often; one means it tells you nothing; below one means it kept company with the trade working.
 
-*Before the stop* is load-bearing: a claim that happened afterwards cannot have contributed, counting it inflates the rail in the flattering direction, and it is what keeps a row's "days before the stop" from coming out negative. **Both shares are weighted** by the drawn worlds' own weights, so a weighted sampler changes nothing here.
+*Before the stop* is load-bearing, **and the arrival day itself counts**. A claim that came on *after* the stop was touched cannot have contributed, counting it inflates the rail in the flattering direction, and leaving it out is what keeps a row's "days before the stop" from coming out negative. But the boundary goes *on the day or earlier*, because that is one convention shared with the path rather than two: `paths.py` applies a claim's whole surprise **on** the day it comes on, so the close first touch reads that day already carries the move. A claim whose jump is what pushed the price through the stop arrives on the very day the stop is touched, and reading the boundary strictly ranked it below claims that did nothing — measured at a lift of `0.04` against `3.19`. **Both shares are weighted** by the drawn worlds' own weights, so a weighted sampler changes nothing here.
 
 The interval is a **Wilson interval** — the standard interval for a share, which stays sensible when counts are small — **on the numerator share only**, that is on how often the claim came on first among the stop-first worlds; the denominator is taken from all draws. **No coverage is claimed for the ratio**, because a ratio of two shares over overlapping sets is not a share. A row's interval says how firmly the numerator is pinned down, and nothing more.
 
 Three rules keep the rail honest, and each claim they leave off says which one it was.
 
-**No row below two hundred effective drawn worlds** — *effective* meaning how many equally-weighted worlds the weighted sample is worth, which the engine's own measurement puts at 96.7% of the worlds drawn on average and 41.8% at worst. It is counted over the worlds where the **stop went first**, because that is the set the numerator is taken over, so it is the same number on every row. Below it **no rows come back at all** and the reason does, because an empty rail without one reads as *nothing takes you out*. It is a **chosen floor, not a measured one**, carried over from the finance analysis because some floor is needed; what would replace it with a measurement is the draw count at which the top rows stop changing order between seeds.
+**No row below two hundred effective drawn worlds** — *effective* meaning how many equally-weighted worlds the weighted sample is worth, which the engine's own measurement puts at 96.9% of the worlds drawn on average and 42.9% at worst (round two, under the additive rate, `plans/stack-05-sound-numbers.md` §2.5; record 0019 still quotes round one's 96.7% and 41.8% and is owed a dated line). It is counted over the worlds where the **stop went first**, because that is the set the numerator is taken over, so it is the same number on every row. Below it **no rows come back at all** and the reason does, because an empty rail without one reads as *nothing takes you out*. It is a **chosen floor, not a measured one**, carried over from the finance analysis because some floor is needed; what would replace it with a measurement is the draw count at which the top rows stop changing order between seeds.
 
 **A claim an edit holds true in every drawn world** has lift one by construction, so it is dropped with that reason rather than printed. So is **a claim that came on in no world at all**, which has nothing to divide by. And so is **a claim whose numerator interval covers its own base share**, which the rail cannot tell apart from a claim that keeps no company with losing.
 
@@ -43,7 +43,7 @@ It takes the sweep's rows, keeps the adverse direction for the side the reader i
 
 ### B1 — What takes you out, on the Hormuz map
 
-The reader is short oil through an ending the map offers, with a stop above their entry. The rail lists the claims that had already happened in the worlds where that stop went first: the claim, its lift with an interval, the number of drawn worlds behind it, and the typical days between the claim happening and the stop being touched. Rows are ordered by lift, and a row whose interval leaves the claim indistinguishable from telling you nothing is not shown.
+The reader is short oil through an ending the map offers, with a stop above their entry. The rail lists what each claim did in the worlds where that stop went first: the claim, its lift with an interval, the number of drawn worlds behind it, and the typical days between the claim happening and the stop being touched. Rows are ordered by lift, from most company with losing to least, and a row whose interval leaves the claim indistinguishable from telling you nothing is not shown.
 
 ### B2 — What to watch, on the same map
 

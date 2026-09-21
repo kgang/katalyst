@@ -24,6 +24,15 @@ Under the model's own chance `p` the window's expected move is then `m x (p - q)
 this replaced gave the path `m x p` points of free drift and read *the target is
 reached first* far too high.
 
+**Which `p`, exactly, and over which worlds.** `p` is the share of drawn worlds in
+which the claim comes true inside the window, **among the worlds where it was not
+already true when the window opened** — the same number `the_sample_s_own_chance`
+works out. Worlds where the claim was already on sit outside the statement
+altogether: the claim is in today's price there, it moves nothing, and they
+contribute nothing either way. So on a sample where a share `a` of the weight has
+the claim already on, the window's expected move is `m x (1 - a) x (p - q)`, and it
+is still nothing when the model and the market agree.
+
 **The giveback is paid day by day, not on the deadline.** Every schedule that
 starts at `q` and runs down to nothing has the same total, so the total cannot
 choose between them — and a first touch is about the way there, not the total. The
@@ -78,6 +87,9 @@ What this file must never do
   assumption reaches, and the honest answer there is that the claim moves the
   price by nothing — not an error a reader cannot act on.
 - Never draw without a seed handed in.
+- Never work out for itself whether a claim is holding. `Draws` fixes what an off
+  day means and this file reads it, because two copies of that comparison are two
+  answers to one question.
 - Never put a contract on a price path. A random walk leaves the zero-to-one range
   and the contract's truth in that world is already known from the draw. That
   refusal is in `position.py`, by name.
