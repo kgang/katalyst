@@ -329,6 +329,18 @@ describe("a generated map never prints an identifier", () => {
     for (const wire of grown.world.links) {
       take(render(<Inspector world={grown.world} selection={{ kind: "wire", id: wire.id }} />));
     }
+    // And with one of those arrows read as a market acting back on the world it
+    // measures, because the panel lists a feedback arrow in a place of its own
+    // and that place is one more place an identifier could reach the screen.
+    const withFeedback = {
+      ...grown.world,
+      links: grown.world.links.map((one, place) =>
+        place === 0 ? { ...one, reflexive: true, lag: 14 } : one,
+      ),
+    };
+    for (const claim of claims) {
+      take(render(<Inspector world={withFeedback} selection={{ kind: "claim", id: claim.id }} />));
+    }
     take(
       render(
         <Inspector

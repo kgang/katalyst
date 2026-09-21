@@ -92,6 +92,24 @@ describe("the rectangles are the frontier, drawn", () => {
     expect(closedByRefusal.skeletons.map((one) => one.after)).toEqual(["B"]);
   });
 
+  it("test_every_skeleton_goes_when_a_run_breaks", () => {
+    // A rectangle is a promise that a claim is coming. After a run breaks
+    // nothing is, so no rectangle may stand — and the map that was built stays
+    // exactly where it is, which is the other half of the same rule.
+    const grown = foldAll(fresh(), THE_GROWTH);
+    expect(grown.skeletons.length).toBeGreaterThan(0);
+
+    const broke = fold(grown, {
+      event: "failed",
+      message: "The model did not answer this call, and the run stopped where it was.",
+    });
+    expect(broke.skeletons).toEqual([]);
+    expect(broke.world.claims).toEqual(grown.world.claims);
+    expect(broke.world.links).toEqual(grown.world.links);
+    expect(broke.refusals).toEqual(grown.refusals);
+    expect(broke.failure).toContain("stopped where it was");
+  });
+
   it("test_every_skeleton_goes_when_the_beliefs_arrive", () => {
     const grown = foldAll(fresh(), THE_GROWTH);
     expect(grown.skeletons.length).toBeGreaterThan(0);

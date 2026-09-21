@@ -22,6 +22,7 @@
 import { useId, useState } from "react";
 import type { Drafted, DraftedClaim } from "../stream/insert";
 import { draftAClaim } from "../stream/insert";
+import { ReceiptStrip } from "./ReceiptStrip";
 import "./addAClaim.css";
 
 /** What the control needs to draw itself. */
@@ -120,9 +121,17 @@ export function AddAClaim({
           </ul>
         </div>
       ) : (
-        <p className="add-a-claim__line" data-answer="drafted">
-          {`Drafted and checked: "${answer.insert.proposition.claim}" ${andThen}`}
-        </p>
+        <div className="add-a-claim__line" data-answer="drafted">
+          <p className="add-a-claim__drafted">
+            {`Drafted and checked: "${answer.insert.proposition.claim}" ${andThen}`}
+          </p>
+          {/* What drafting it cost, in the same nine readings and the same strip
+              a generation's receipt is printed in. Absent on a copy of the route
+              that does not say yet, and then nothing is invented in its place. */}
+          {answer.receipt === null ? null : (
+            <ReceiptStrip receipt={answer.receipt} heading="What drafting it cost" />
+          )}
+        </div>
       )}
     </section>
   );

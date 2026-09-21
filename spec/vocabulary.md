@@ -104,7 +104,7 @@ Four things a reader sees only while a map is being generated. What each is, and
 
 ## Words for a number that is not there
 
-An empty slot never shows a blank, a zero or a placeholder: it shows words and, one hover or one click away, a reason. These are the words; change them here first. There are **four** kinds of absence, and the fourth — a number the engine refused to work out — is a kind of its own rather than a shade of *no engine yet*.
+An empty slot never shows a blank, a zero or a placeholder: it shows words and, one hover or one click away, a reason. These are the words; change them here first. There are **five** kinds of absence, and the last two — a number the engine refused to work out, and an ask that did not come back — are kinds of their own rather than shades of *no engine yet*.
 
 | Where | On the tile | The reason, read in the Inspector and on the chip's hover |
 |---|---|---|
@@ -114,8 +114,11 @@ An empty slot never shows a blank, a zero or a placeholder: it shows words and, 
 | No number of your own yet | **—** and *add yours* | "You have not given a number for this claim." |
 | Nothing has been computed | **no engine yet** | "Nothing has worked this number through the map yet." |
 | The engine **refused** to work it out | **not worked out** | the refusal's own reason, naming what was refused — for a branch that does not fit the map: "The engine would not work this map out from this branch: the branch does not fit the map. Every reason is beside the map, and nothing on the map has changed." |
+| The **ask did not come back** | **the ask did not come back** | the failure's own sentence, and what to do about it: "… Select this arrow again to ask once more." |
 
-**Why the last two are two rows and not one.** *No engine yet* says nothing has run and invites waiting; *not worked out* says the engine was asked, answered, and would not — which invites repairing the thing it turned down. They are two different facts about the same empty slot, and a reader who cannot tell them apart will wait for an answer that is never coming. The code carries the difference as a kind of its own (`refused` beside `no_engine`, `no_market` and `not_said`) rather than as a difference in the words, because words are not something code can read back.
+**Why the last three are three rows and not one.** *No engine yet* says nothing has run and invites waiting. *Not worked out* says the engine was asked, answered, and would not — which invites repairing the thing it turned down, and which will say the same thing every time until somebody does. *The ask did not come back* says the engine is there, it was asked, and one attempt got no reply — which invites asking again, and which may well be gone by the time you do. Three different facts about the same empty slot, and a reader who cannot tell them apart will wait for an answer that is never coming, or repair something that was never broken.
+
+The code carries the difference as three kinds — `no_engine`, `refused` and `ask_failed`, beside `no_market` and `not_said` — rather than as a difference in the words, because words are not something code can read back. **The last one is the only absence that is never kept**: it is not a fact about the map, so nothing files it with the answers.
 
 ## Words we do not use
 

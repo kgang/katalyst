@@ -419,7 +419,14 @@ export function fold(was: Growth, event: ReadEvent): Growth {
       // The map that had been built stays exactly where it is. Nothing is
       // cleared and nothing is greyed: a reader whose run broke after twenty
       // claims keeps the twenty claims.
-      return { ...was, phase: "failed", failure: event.message };
+      //
+      // **The rectangles go, and only the rectangles.** A reserved rectangle is
+      // a promise that a claim is coming, and after this nothing is: the chapter
+      // says no rectangle may ever stand where nothing will arrive, and a broken
+      // run is the case it does not name. The claims still open are in the
+      // working either way, so nothing is lost by taking the boxes down — what
+      // would be lost by leaving them is a reader waiting for a claim for ever.
+      return { ...was, phase: "failed", failure: event.message, skeletons: [] };
 
     case "unknown": {
       const counted = new Map(was.unknown);

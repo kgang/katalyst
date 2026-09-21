@@ -94,6 +94,62 @@ interface Reading {
   tone: Tone;
 }
 
+/**
+ * Whether the panel beside the map has more above and more below what it is
+ * showing.
+ *
+ * **The panel measures itself.** It is the one scrolling thing on this screen,
+ * and a reader has to be able to tell a control that is not there from a control
+ * that is merely below the fold. A scrollbar cannot tell them: on a Mac it is an
+ * overlay that fades in on a gesture, so it speaks only to somebody who is
+ * already scrolling.
+ *
+ * It is watched three ways because the panel changes for three different
+ * reasons: the reader scrolls it, a claim arrives and makes it taller, and the
+ * window is resized and makes it shorter. Missing any one of them leaves a rule
+ * drawn at an edge with nothing beyond it, which is the panel claiming something
+ * a reader can check in one gesture.
+ */
+function useTheEdgesOfThePanel(): {
+  panel: React.RefObject<HTMLElement | null>;
+  above: boolean;
+  below: boolean;
+} {
+  const panel = useRef<HTMLElement | null>(null);
+  const [edges, setEdges] = useState({ above: false, below: false });
+
+  useEffect(() => {
+    const it = panel.current;
+    if (it === null) {
+      return;
+    }
+    const measure = (): void => {
+      // A pixel of slack, because a panel scrolled to its very end lands a
+      // fraction short of its own height often enough to matter.
+      const above = it.scrollTop > 1;
+      const below = it.scrollTop + it.clientHeight < it.scrollHeight - 1;
+      setEdges((was) => (was.above === above && was.below === below ? was : { above, below }));
+    };
+    measure();
+    it.addEventListener("scroll", measure, { passive: true });
+    // Watching a box change size is the browser's own job, and a page that
+    // cannot do it — a simulated one in a test — still gets the scrolling half
+    // rather than nothing at all.
+    const watching =
+      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
+    watching?.observe(it);
+    for (const child of it.children) {
+      watching?.observe(child);
+    }
+    return () => {
+      it.removeEventListener("scroll", measure);
+      watching?.disconnect();
+    };
+  });
+
+  return { panel, above: edges.above, below: edges.below };
+}
+
 /** Turn whatever a failed request threw into one sentence. */
 function inWords(reason: unknown): string {
   return reason instanceof Error ? reason.message : "The reason was not recorded.";
@@ -312,16 +368,18 @@ const REFUSED: Absence = {
 /**
  * What stands there when the engine could not be reached at all.
  *
- * The same words and the same kind as a refusal, because from this slot's point
- * of view the two are one fact: the engine was asked for this number and did not
- * work it out. What differs is the reason beside them, and the reason is the
- * sentence the failure itself arrived with.
+ * **Not a refusal**, and the difference is the whole of why the two are separate
+ * kinds. A refusal is an answer: the engine looked, said no, and said why, and
+ * it will say the same thing until the branch is repaired. This is one attempt
+ * that did not come back — the engine is there and it was asked — and it stops
+ * being true the moment the reader asks again. So it takes the kind that is
+ * never kept, and its reason says what to do about it.
  */
 function unreachable(reason: string): Absence {
   return {
-    kind: "refused",
-    words: "not worked out",
-    reason: `The engine did not answer, so this number was never worked out. ${reason}`,
+    kind: "ask_failed",
+    words: "the ask did not come back",
+    reason: `${reason} Nothing on the map has changed; opening the branch again asks once more.`,
   };
 }
 
@@ -405,6 +463,7 @@ function MapScreen({
   );
   const [arriving, setArriving] = useState(true);
   const lastBranch = useRef<string | null>(null);
+  const { panel, above: moreAbove, below: moreBelow } = useTheEdgesOfThePanel();
 
   const open = shop.branches.find((branch) => branch.id === shop.openId);
 
@@ -836,7 +895,13 @@ function MapScreen({
         </div>
 
         {dock === "away" ? null : (
-          <aside className="dock" aria-label="The panel beside the map">
+          <aside
+            className="dock"
+            ref={panel}
+            data-more-above={moreAbove ? "yes" : "no"}
+            data-more-below={moreBelow ? "yes" : "no"}
+            aria-label="The panel beside the map"
+          >
             {dock === "outline" ? (
               <Outline
                 items={outline}
@@ -1014,6 +1079,7 @@ function GenerationScreen({
     "Press ? for every key. j and k walk a column; h and l follow the wires.",
   );
   const [working, setWorking] = useState<Working>({ state: "reading" });
+  const { panel, above: moreAbove, below: moreBelow } = useTheEdgesOfThePanel();
 
   const { generationId, phase } = growth;
   const finished = phase === "settled" || phase === "stopped" || phase === "failed";
@@ -1155,7 +1221,13 @@ function GenerationScreen({
           </p>
         </div>
 
-        <aside className="dock dock--generation" aria-label="The panel beside the map">
+        <aside
+          className="dock dock--generation"
+          ref={panel}
+          data-more-above={moreAbove ? "yes" : "no"}
+          data-more-below={moreBelow ? "yes" : "no"}
+          aria-label="The panel beside the map"
+        >
           {/* The map as a list, in place of the panel, exactly as it is on a
               stored map: press O for it, press O again for the panel. It grows
               as the map grows, in the same causal order, so a reader who never

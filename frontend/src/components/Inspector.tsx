@@ -340,9 +340,14 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
             out from the fact that the arrow is in a different place. */}
         {fedBackBy.map((wire) => (
           <Fragment key={wire.id}>
+            {/* Named by its own words, like every other claim on every other
+                surface: on a generated map an identifier is twenty-six
+                characters of the engine's own bookkeeping (`world/naming.ts`). */}
             <dt className="inspector__step-label">fed back into by</dt>
             <dd className="inspector__step">
-              <span className="inspector__mono">{wire.source}</span>
+              <span className="inspector__words">
+                {inFewWords(byId.get(wire.source)?.claim ?? NOT_ON_THIS_MAP)}
+              </span>
               <span className="inspector__reason">
                 {`a market acting back on the world it measures, ${
                   wire.lag === 0 ? "the same day" : `after ${inDays(wire.lag)}`

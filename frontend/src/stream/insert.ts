@@ -3,9 +3,9 @@
  *
  * *"…but this also happens"*. It asks for **one** intervention: a claim and its
  * arrows, already drafted and already checked by the same rules every proposal
- * passes. It is not a generation — no stream, no reserved rectangle, no receipt —
- * so what it cost appears nowhere, which is an open question the chapter records
- * rather than a thing this file should guess at.
+ * passes. It is not a generation — no stream and no reserved rectangle — but it
+ * **is** several model calls, so it carries a receipt of its own, drawn by the
+ * same strip a generation's receipt is drawn by.
  *
  * **The field is `position`, not `at`.** `at` already means a place in a
  * transcript on a stream event and a date on an edit, and a word that means three
@@ -26,10 +26,23 @@
  */
 
 import type { components } from "../api/schema";
+import type { Receipt } from "./events";
 import { INSERT_ADDRESS } from "./generate";
 
 /** One claim and its arrows, arriving as a single edit. */
 export type DraftedClaim = components["schemas"]["Insert"];
+
+/**
+ * What one drafted claim cost.
+ *
+ * **An insert is several model calls, not one**, so it carries a receipt of its
+ * own — the same nine readings a generation's receipt carries, and drawn by the
+ * same strip, because a cost shown two ways is two costs. It is what closes the
+ * chapter's third open question: the route answers with a receipt beside the
+ * intervention rather than the session growing a running total, which would be
+ * the first number in this product added up by something other than the engine.
+ */
+export type InsertReceipt = Receipt;
 
 /** What it takes to ask for one. */
 export interface DraftRequest {
@@ -43,7 +56,12 @@ export interface DraftRequest {
 
 /** How the ask turned out. Three answers, and a refusal is one of them. */
 export type Drafted =
-  | { readonly state: "drafted"; readonly insert: DraftedClaim }
+  | {
+      readonly state: "drafted";
+      readonly insert: DraftedClaim;
+      /** What drafting it cost, when the route says. Null on a route that does not yet. */
+      readonly receipt: InsertReceipt | null;
+    }
   /** The rules would not have it, with every reason at once, in their own words. */
   | { readonly state: "refused"; readonly reasons: readonly string[] }
   /** It could not be drafted at all. One plain sentence, the server's own. */
@@ -75,7 +93,16 @@ export async function draftAClaim(
 
   const body = (await answer.json().catch(() => null)) as unknown;
   if (answer.ok) {
-    return { state: "drafted", insert: body as DraftedClaim };
+    // **Two shapes, one reading.** The route is moving to answering with the
+    // drafted claim *and* what drafting it cost — an insert is several model
+    // calls, and a cost nobody is shown is a cost nobody can check. Until every
+    // copy answers that way, a body that is the claim on its own is still read,
+    // and the cost is then absent rather than invented.
+    const both = body as { insert?: DraftedClaim; receipt?: InsertReceipt } | null;
+    if (both?.insert !== undefined) {
+      return { state: "drafted", insert: both.insert, receipt: both.receipt ?? null };
+    }
+    return { state: "drafted", insert: body as DraftedClaim, receipt: null };
   }
 
   const detail = (body as { detail?: unknown } | null)?.detail;

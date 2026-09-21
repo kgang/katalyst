@@ -98,3 +98,17 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
+
+/* What drafting a claim cost, under the sentence saying it was drafted. The same
+ * strip a generation's receipt is drawn in, so the two cannot drift; it sits
+ * inside this section rather than beside it, because it is about this one edit
+ * and not about the run. */
+.add-a-claim__drafted {
+  margin: 0;
+  color: var(--text);
+}
+
+.add-a-claim [data-answer="drafted"] .receipt-strip {
+  padding: var(--space-1) 0 0;
+  background: none;
+}
