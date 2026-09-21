@@ -80,15 +80,17 @@ def _named(lines: list[str]) -> list[str]:
     return names
 
 
-def test_the_file_on_disk_is_what_the_program_prints_now() -> None:
+def test_the_file_on_disk_is_what_the_program_prints_now(tmp_path: Path) -> None:
     """Run the program and compare it with what is committed, byte for byte.
 
     With no key of any kind in its environment, because it needs none, and under a
     hash seed it has never seen, because a file whose lines depend on how this
     machine happens to order a set is a file that goes red on somebody else's
-    machine for no reason anybody changed.
+    machine for no reason anybody changed. It writes into a throwaway directory:
+    a test that rewrote the committed file would pass by repairing what it is
+    supposed to be checking.
     """
-    written = BACKEND / ".pytest-worked-numbers.txt"
+    written = tmp_path / "worked-numbers.txt"
     environment = {
         **{
             key: value
@@ -97,19 +99,16 @@ def test_the_file_on_disk_is_what_the_program_prints_now() -> None:
         },
         "PYTHONHASHSEED": "7919",
     }
-    try:
-        finished = subprocess.run(
-            [sys.executable, "-m", "katalyst.engine.worked_numbers", str(written)],
-            capture_output=True,
-            text=True,
-            cwd=BACKEND,
-            env=environment,
-            check=False,
-        )
-        assert finished.returncode == 0, finished.stderr
-        printed = written.read_text(encoding="utf-8")
-    finally:
-        written.unlink(missing_ok=True)
+    finished = subprocess.run(
+        [sys.executable, "-m", "katalyst.engine.worked_numbers", str(written)],
+        capture_output=True,
+        text=True,
+        cwd=BACKEND,
+        env=environment,
+        check=False,
+    )
+    assert finished.returncode == 0, finished.stderr
+    printed = written.read_text(encoding="utf-8")
 
     if printed != _committed():
         pytest.fail(
