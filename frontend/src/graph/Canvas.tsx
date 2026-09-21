@@ -2,12 +2,13 @@
  * The map: tiles, wires, panning and zooming.
  *
  * The drawing library owns four things and no more — panning, zooming, working
- * out what is under the pointer, and the sockets on the sides of a tile.
- * Everything you can see is ours. That is why only the library's bare
- * stylesheet is imported below and never its full one: the full one carries the
- * library's own look, and a tool that looks like the library it was built with
- * looks like a demo. A check in `npm run lint` fails the build if the full one
- * ever appears in this tree.
+ * out what is under the pointer, and working out where each wire's two ends are
+ * (the stroke between them is drawn by us). It is not told to find those ports: where each one sits is declared, in `ports.ts`, and
+ * handed over with the tile's box. Everything you can see is ours. That is why
+ * only the library's bare stylesheet is imported below and never its full one:
+ * the full one carries the library's own look, and a tool that looks like the
+ * library it was built with looks like a demo. A check in `npm run lint` fails
+ * the build if the full one ever appears in this tree.
  *
  * Three things this file works out that no single wire could work out for
  * itself, because a wire cannot see where the other tiles are:

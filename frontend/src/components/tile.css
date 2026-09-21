@@ -464,38 +464,40 @@
   min-height: 0;
 }
 
-/* ---- The sockets -------------------------------------------------------- *
+/* ---- The ports ---------------------------------------------------------- *
  * One group of inputs on the left, one group of outputs on the right, and two
  * sockets in each: an arrow that fires once and stays fired lands in a
  * different socket from one that has to keep holding. A single tick for the
  * first, a double tick for the second — the same doubling the wire itself will
  * use, so the socket and the wire say the same thing.
  *
- * These override the drawing library's own handle styling, which is a blue
- * circle. Nothing in this product looks like the library it was built with. */
+ * **Where a port sits is not here.** Its box — left, top, width and height —
+ * depends on how tall its tile turned out to be, and the drawing library is
+ * handed those same four numbers so that it can draw a wire before it has
+ * measured anything. So `graph/ports.ts` works them out and `Tile.tsx` writes
+ * them onto the element; a second copy in a stylesheet is a second thing to
+ * keep in step, and it would not be kept. What is left below is only how a port
+ * looks — which is an override of the drawing library's own handle styling, a
+ * blue circle, because nothing in this product looks like the library it was
+ * built with.
+ *
+ * Each bar below is measured in pixels down from the top of the port, and the
+ * last stop of each run is written `100%` — the foot of the port, whatever the
+ * port's height turns out to be. Writing that height here as a number would be
+ * the second copy this section exists to do without. */
 
 .tile__port.react-flow__handle {
-  width: var(--space-2);
-  height: 6px;
   min-width: 0;
   min-height: 0;
   border: none;
   border-radius: 0;
   background: none;
-  transform: translate(0, -50%);
 }
 
-.tile__port.react-flow__handle.react-flow__handle-left {
-  left: -8px;
-}
-
-.tile__port.react-flow__handle.react-flow__handle-right {
-  right: -8px;
-}
-
-/* One bar: fires once, and stays fired. */
+/* One bar: fires once, and stays fired. Shifted down by its own thickness, and
+ * repeating, so the single bar lands in the middle of the port. */
 .tile__port--trigger {
-  background: linear-gradient(var(--text-muted) 0 2px, transparent 2px 6px);
+  background: linear-gradient(var(--text-muted) 0 2px, transparent 2px 100%);
   background-position: 0 2px;
 }
 
@@ -504,6 +506,6 @@
   background: linear-gradient(
     var(--text-muted) 0 2px,
     transparent 2px 4px,
-    var(--text-muted) 4px 6px
+    var(--text-muted) 4px 100%
   );
 }

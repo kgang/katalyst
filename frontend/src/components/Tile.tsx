@@ -26,9 +26,10 @@
  * grey — which a colour never does.
  */
 
-import { Handle, Position, useStore } from "@xyflow/react";
+import { Handle, useStore } from "@xyflow/react";
 import { toDay } from "../graph/diff/days";
 import { claimLines, SUMMARY_BELOW_ZOOM, TILE_WIDTH, tileHeight } from "../graph/geometry";
+import { PORTS, portBox } from "../graph/ports";
 import type { Badge, ClaimKind, ClaimView } from "../world";
 import { BeliefChip } from "./BeliefChip";
 import "./tile.css";
@@ -257,38 +258,40 @@ export function Tile({ claim, isHypothesis, versions, height: reserved }: TilePr
         <path d={OUTLINES[claim.kind](height)} />
       </svg>
 
-      {/* The sockets. An arrow that fires once and an arrow that has to keep
+      {/* The ports. An arrow that fires once and an arrow that has to keep
           holding are different claims about the world, so they arrive at
           different sockets and leave from different sockets — what a wire means
-          is visible where it lands, before you follow it anywhere. */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="in-trigger"
-        className="tile__port tile__port--trigger"
-        style={{ top: "38%" }}
-      />
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="in-sustain"
-        className="tile__port tile__port--sustain"
-        style={{ top: "62%" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="out-trigger"
-        className="tile__port tile__port--trigger"
-        style={{ top: "38%" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="out-sustain"
-        className="tile__port tile__port--sustain"
-        style={{ top: "62%" }}
-      />
+          is visible where it lands, before you follow it anywhere.
+
+          **Each one's box is written on it rather than left to a stylesheet**,
+          because where a port sits depends on how tall this tile turned out to
+          be, and because the drawing library is handed these very numbers so
+          that it can draw a wire before it has measured anything. `ports.ts`
+          works them out; this writes them down; nothing measures them. */}
+      {PORTS.map((port) => {
+        const box = portBox(height, port);
+        return (
+          <Handle
+            key={port.id}
+            type={port.kind}
+            position={port.edge}
+            id={port.id}
+            className={`tile__port tile__port--${port.mode}`}
+            style={{
+              left: `${box.x}px`,
+              // The library's own stylesheet pins a port to the edge it is on
+              // and then shifts it by half its own size. Both are said here
+              // instead, in full, so that the box on the screen is the box that
+              // was declared and there is nothing left to work out.
+              right: "auto",
+              top: `${box.y}px`,
+              width: `${box.width}px`,
+              height: `${box.height}px`,
+              transform: "none",
+            }}
+          />
+        );
+      })}
 
       <header className="tile__header">
         <span className="tile__kind">{KIND_WORDS[claim.kind]}</span>
