@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M32D2HPRENR4PW5MGKF4YWG7",
+  "session_id": "b3719e32-fae2-4866-b0f9-fedf04e7fad7",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-21T16:34:07.450846Z",
+  "branch": "adr/06-the-trade",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/adr/0018-an-edge-is-computed-from-the-unsupposed-world.md",
+    "docs/adr/0019-a-stop-is-a-price-the-reader-owns.md",
+    "docs/adr/0020-a-quote-is-recorded-first-and-fetched-second.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "aca25c87c63b",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 95255,
+    "cache_read_tokens": 1698445,
+    "output_tokens": 11141,
+    "api_call_count": 20
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-21T16:34:07.278449Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 392,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 392,
+    "total_lines_changed": 392,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
