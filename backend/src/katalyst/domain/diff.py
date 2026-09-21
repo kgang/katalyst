@@ -200,8 +200,9 @@ class ClaimDiff(BaseModel):
         description=(
             "The share of versions of the map that moved the same way as the move above, "
             "each version counted by as much as it counted for the two numbers. Nothing at "
-            "all when only one of the two worlds holds the claim. On screen this column is "
-            "headed 'same direction'."
+            "all when there is no direction to report: when only one of the two worlds "
+            "holds the claim, and when no version of the map counted in both numbers. On "
+            "screen this column is headed 'same direction'."
         )
     )
     moved_only_by_reweighting: bool = Field(
@@ -615,28 +616,35 @@ def _counting_for(behind_a: Versions, behind_b: Versions, claim_id: PropositionI
     Under every edit that is not an observation neither world weights anything, so
     every version counts 1 and nothing this file reports can move by a bit.
 
+    **Each world's own weights are asked for first, one world at a time**, because
+    that is what each world's number was read with, fallbacks and all: a world that
+    kept nothing anywhere read every version equally, and so it counts equally
+    here. Taking the smaller of two vectors before letting either of them fall back
+    would leave the direction read with weights *neither* number was read with,
+    which is the one sentence this whole rule rests on, broken in a corner.
+
+    **When no version counted in both numbers the answer is nothing at all.** Two
+    branches that each observed something can keep disjoint sets of versions alive:
+    every version then counted in one number or the other and in neither pair. That
+    is not a direction anybody can read — the paired difference this file is built
+    on has no pair left — and inventing one by counting every version equally would
+    report a direction out of versions that contributed to neither reading. So it
+    comes back as a vector of nothing but zeroes, and `_states` says *no direction*
+    rather than guessing one. Reject, never repair.
+
     Args:
         behind_a: The version-by-version numbers behind the first world.
         behind_b: The same behind the second.
         claim_id: The claim whose move is being read.
 
     Returns:
-        How much each version counts, one number per version.
+        How much each version counts, one number per version. All zeroes when no
+        version counted in both numbers, which is the one case with no direction
+        to report; every caller checks the total before dividing by it.
     """
-    in_a = (
-        behind_a.weights if claim_id in behind_a.reweighted else numpy.ones_like(behind_a.weights)
+    together: Numbers = numpy.minimum(
+        behind_a.counting_for(claim_id), behind_b.counting_for(claim_id)
     )
-    in_b = (
-        behind_b.weights if claim_id in behind_b.reweighted else numpy.ones_like(behind_b.weights)
-    )
-    together: Numbers = numpy.minimum(in_a, in_b)
-    # Nothing at all survived what was observed, anywhere. Then every version
-    # counts the same again — which is exactly what the band does in the same
-    # corner, so the number and its direction stay read the same way. The world
-    # carries a loud warning saying the reader is looking at the map rather than
-    # at an answer.
-    if together.sum() <= 0.0:
-        return numpy.ones_like(together)
     return together
 
 
@@ -799,11 +807,19 @@ def _states(
         each_version = behind_a.likelihood[claim_id][:, _read_on(world_a, in_a[claim_id])]
         each_version_after = behind_b.likelihood[claim_id][:, _read_on(world_b, in_b[claim_id])]
         counting = _counting_for(behind_a, behind_b, claim_id)
-        agreement = _agreement_on(each_version, each_version_after, move, counting)
+        # No version of the map counted in both numbers, so there is no paired
+        # difference left and no direction to read off one. Everything that would
+        # have been read off it says nothing rather than guessing.
+        speaks = bool(counting.sum() > 0.0)
+        agreement = (
+            _agreement_on(each_version, each_version_after, move, counting) if speaks else None
+        )
         state: ClaimState = "unchanged"
         if _forced_false_in(world_b, claim_id):
             state = "killed"
-        elif abs(move) >= MOVED_AT_LEAST and agreement >= AGREEING_AT_LEAST:
+        elif (
+            agreement is not None and abs(move) >= MOVED_AT_LEAST and agreement >= AGREEING_AT_LEAST
+        ):
             state = "shifted"
         found[claim_id] = ClaimDiff(
             target=claim_id,
@@ -812,9 +828,8 @@ def _states(
             after=after,
             delta=move,
             agreement=agreement,
-            moved_only_by_reweighting=_moved_only_by_reweighting(
-                each_version, each_version_after, move, counting
-            ),
+            moved_only_by_reweighting=speaks
+            and _moved_only_by_reweighting(each_version, each_version_after, move, counting),
         )
     return found
 
@@ -1016,6 +1031,9 @@ def _ranked_endings(
     rows: list[DeltaRow] = []
 
     for claim in world_b.graph.propositions:
+        # Only a `shifted` ending gets a row, and `shifted` needed a direction to
+        # be readable in the first place — so the weights below always have some
+        # version counting in both numbers, and nothing here divides by nothing.
         if claim.kind not in TERMINAL_KINDS or claims[claim.id].state != "shifted":
             continue
         before = numpy.array([world_a.series[claim.id][one] for one in where_a])
@@ -1065,7 +1083,7 @@ def _width_of_the_band(
     Returns:
         The distance between the bottom and the top of the range, on that day.
     """
-    counting = behind.weights if claim_id in behind.reweighted else numpy.ones_like(behind.weights)
+    counting = behind.counting_for(claim_id)
     _, bottom, top = _band(
         behind.likelihood[claim_id][:, [column]],
         behind.inner_spread[claim_id][:, [column]],
@@ -1129,13 +1147,31 @@ def _two_figures(likelihood: float) -> str:
     same number reads two ways on one screen, and cross-check the two against each
     other wherever the two stacks meet.
 
+    **A number that is not a number is refused, not written.** "Not a number" and
+    the infinities cannot be rounded to two figures, and printing a modest `<.01`
+    for one would put a likelihood on screen that nothing computed — the one state
+    this product refuses to show. They cannot arrive from a world, because a
+    likelihood that is not a real number between 0 and 1 cannot be built into a
+    `Belief` at all; so one reaching here is a broken promise between two pieces of
+    our own code, and it is said out loud rather than quietly made to look
+    reasonable. Reject, never repair.
+
     Args:
         likelihood: The number, between 0 and 1.
 
     Returns:
         The number as it is written on screen: `.35`, or `<.01`, or `>.99`.
+
+    Raises:
+        ValueError: If the number is not a real number — "not a number" itself, or
+            either infinity.
     """
-    if not math.isfinite(likelihood) or likelihood <= 0.0:
+    if not math.isfinite(likelihood):
+        raise ValueError(
+            "a likelihood to be written on screen must be a real number between 0 and 1; "
+            f"got {likelihood!r}, which cannot be rounded to two significant figures"
+        )
+    if likelihood <= 0.0:
         return "<.01"
     if likelihood >= 1.0:
         return ">.99"

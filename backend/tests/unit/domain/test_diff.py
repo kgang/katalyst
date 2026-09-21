@@ -872,6 +872,112 @@ def test_a_claim_moved_only_by_reweighting_says_so() -> None:
     assert not any(one.moved_only_by_reweighting for one in struck.claims.values())
 
 
+# --- Two corners where the weights run out ---------------------------------
+
+
+def test_a_world_that_kept_nothing_does_not_erase_the_other_worlds_weights() -> None:
+    """Each world falls back on its own, and only then are the two counted together.
+
+    A world in which nothing at all survived what was observed reads every version
+    the same, because there is no surviving share left to weigh anything by. That
+    fallback belongs to **that world**. Take the smaller of the two worlds' weights
+    before letting either of them fall back, and the one that did keep survivors
+    has its weights thrown away too — every version counts the same, which is what
+    *neither* of the two numbers was read with, and the one sentence this whole
+    rule rests on is broken in a corner.
+
+    Reachable only branch against branch, which is why it went unseen: with a base
+    world on one side that world is unweighted anyway, so the two readings happen
+    to agree. Here one branch observes something that keeps some worlds and the
+    other observes something that can keep none.
+    """
+    graph = _map(
+        (
+            _claim("top", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("seen", kind="market", prior=(0.4, 0.2, 0.6)),
+            _claim("impossible", kind="market", prior=(0.0, 0.0, 0.0)),
+        ),
+        (_arrow("top", "seen"), _arrow("top", "impossible")),
+    )
+    kept_some = _world(graph, _branch(Observe(target="seen", value=True), identifier="kept-some"))
+    kept_none = _world(
+        graph, _branch(Observe(target="impossible", value=True), identifier="kept-none")
+    )
+    behind_a, behind_b = versions_of(kept_some), versions_of(kept_none)
+
+    # The corner is only the corner if one world really kept nothing, the other
+    # really is weighted, and the claim is one both observations are evidence about.
+    assert behind_b.weights.sum() == 0.0, "this observation was meant to keep nothing"
+    assert behind_a.weights.sum() > 0.0
+    assert not bool((behind_a.weights == 1.0).all()), "this observation was meant to weigh"
+    assert "top" in behind_a.reweighted and "top" in behind_b.reweighted
+
+    # The starved world counts every version the same — on its own, which is what
+    # its own number was read with — and never hands back nothing at all.
+    assert bool((behind_b.counting_for("top") == 1.0).all())
+    assert behind_a.counting_for("top").sum() > 0.0
+
+    # So the direction keeps the surviving world's own weights instead of losing
+    # them, which is what taking the smaller of the two first would have done.
+    counting = _counting_for(behind_a, behind_b, "top")
+    assert bool((counting == behind_a.counting_for("top")).all())
+    assert not bool((counting == 1.0).all()), "the weights of the world that kept some survived"
+
+    answer = diff(kept_some, kept_none, edit_in_words="what cannot have happened")
+    assert not isinstance(answer, list), answer
+    assert answer.claims["top"].agreement is not None
+
+
+def test_no_direction_at_all_when_no_version_counted_in_both_numbers() -> None:
+    """Two branches can keep disjoint versions alive, and then there is no direction.
+
+    Every version counted in one of the two numbers or the other and in neither
+    pair, so the paired difference this whole file is built on has no pair left.
+    Counting every version equally instead would report a direction read off
+    versions that contributed to neither reading — a number nobody computed, which
+    is the one state this product refuses to show. So the share comes back as
+    nothing at all and no claim can be `shifted`. Reject, never repair.
+
+    The map is built for it rather than waited for: one claim whose stated range
+    spans nearly the whole scale, so that at two versions of two worlds each
+    version draws a prior near one end or the other and comes out the same way in
+    both of its worlds. Observing it true then keeps one version and observing it
+    false keeps the other. Nothing here is typed in but the shape of the map; which
+    version survives which observation is the engine's own answer, and the test
+    asserts the disjointness it found rather than a number.
+    """
+    graph = _map(
+        (
+            _claim("either-way", kind="hypothesis", prior=(0.5, 1e-9, 1.0 - 1e-9)),
+            _claim("ending", kind="market", prior=(0.5, 0.25, 0.75)),
+        ),
+        (_arrow("either-way", "ending", strength=0.5),),
+    )
+    two_of_two = {"versions": 2, "worlds": 2}
+    said_true = _world(
+        graph, _branch(Observe(target="either-way", value=True), identifier="yes"), **two_of_two
+    )
+    said_false = _world(
+        graph, _branch(Observe(target="either-way", value=False), identifier="no"), **two_of_two
+    )
+    behind_a, behind_b = versions_of(said_true), versions_of(said_false)
+
+    # Each world kept something of its own, and between them they kept nothing in
+    # common. Without all three of those this is not the corner being tested.
+    assert behind_a.counting_for("either-way").sum() > 0.0
+    assert behind_b.counting_for("either-way").sum() > 0.0
+    assert _counting_for(behind_a, behind_b, "either-way").sum() == 0.0
+
+    answer = diff(said_true, said_false, edit_in_words="the other way round")
+    assert not isinstance(answer, list), answer
+    for claim_id, one in answer.claims.items():
+        assert one.agreement is None, claim_id
+        assert one.state != "shifted", claim_id
+        assert not one.moved_only_by_reweighting, claim_id
+    assert answer.rows == (), "no ending can be listed as moved when no direction can be read"
+    assert SECOND_SENTENCE.match(answer.summary), answer.summary
+
+
 # --- Locality, seen from the difference ------------------------------------
 
 
@@ -1009,6 +1115,21 @@ def test_a_likelihood_is_written_by_the_rule_on_the_cases_that_decide_it() -> No
     """
     for likelihood, expected in WRITTEN_BY_THE_RULE:
         assert _two_figures(likelihood) == expected, likelihood
+
+
+def test_a_likelihood_that_is_not_a_number_is_refused_rather_than_written() -> None:
+    """ "Not a number" and the infinities raise; they are never quietly written `<.01`.
+
+    Neither can be rounded to two significant figures, and writing a modest `<.01`
+    for one would put a likelihood on screen that nothing computed — the one state
+    this product refuses to show, arrived at by repairing rather than rejecting.
+    Neither can reach here from a world either: a likelihood that is not a real
+    number between 0 and 1 cannot be built into a `Belief` at all. So one arriving
+    is a broken promise between two pieces of our own code, and it is said out loud.
+    """
+    for not_a_number in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError, match="real number"):
+            _two_figures(not_a_number)
 
 
 # --- The one sentence beside the list --------------------------------------

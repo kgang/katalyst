@@ -507,7 +507,7 @@ export interface components {
             delta: number | null;
             /**
              * Agreement
-             * @description The share of versions of the map that moved the same way as the move above, each version counted by as much as it counted for the two numbers. Nothing at all when only one of the two worlds holds the claim. On screen this column is headed 'same direction'.
+             * @description The share of versions of the map that moved the same way as the move above, each version counted by as much as it counted for the two numbers. Nothing at all when there is no direction to report: when only one of the two worlds holds the claim, and when no version of the map counted in both numbers. On screen this column is headed 'same direction'.
              */
             agreement: number | null;
             /**

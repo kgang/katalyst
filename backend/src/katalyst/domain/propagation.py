@@ -323,6 +323,37 @@ class Versions:
     to read the change on, without a world carrying millions of numbers itself.
     """
 
+    def counting_for(self, claim_id: PropositionId) -> Numbers:
+        """Say how much each version counts when this claim's own number is read.
+
+        **The one rule, named once here because everything that reads a number or
+        its direction has to obey the same one.** Every version counts the same,
+        unless what was observed is evidence about this claim — the claims in
+        `reweighted` — and then each version counts by the share of its worlds that
+        survived. The likelihood, the band, the width a change list reports on
+        another day and the direction of a move are all read with the vector this
+        gives back, so none of them can be counted one way and another of them
+        another way.
+
+        **And a world that kept nothing at all counts every version the same
+        again.** Nothing survived what was observed anywhere, so there is no
+        surviving share to weigh anything by; counting evenly at least reports the
+        map rather than dividing by nothing, and the world carries a loud warning
+        saying the reader is looking at the map rather than at an answer. That
+        fallback lives here and nowhere else, so every reader gets it.
+
+        Args:
+            claim_id: The claim whose number is being read.
+
+        Returns:
+            How much each version counts, one number per version. Never all
+            zeroes, so anything dividing by its total is safe.
+        """
+        evenly: Numbers = numpy.ones_like(self.weights)
+        if claim_id not in self.reweighted:
+            return evenly
+        return self.weights if self.weights.sum() > 0.0 else evenly
+
 
 def propagate(
     graph: Graph,
@@ -406,6 +437,25 @@ def versions_of(world: World) -> Versions:
     """
     setup = _prepare(world.graph, world.assignments, world.day_zero)
     sample = _draw(setup, seed=world.seed, versions=world.versions, worlds=world.worlds)
+    return _versions_from(setup, sample)
+
+
+def _versions_from(setup: "_Setup", sample: "_Sample") -> Versions:
+    """Gather the version-by-version numbers a run produced into one record.
+
+    Written once and used twice: by `versions_of`, which recomputes a world's
+    versions for a comparison, and by the step that turns a run into a world,
+    which needs the same record to ask how much each version counts. Two copies of
+    this would be two chances for a world and the difference between two worlds to
+    disagree about what a version is.
+
+    Args:
+        setup: Everything chance had no say in.
+        sample: What the two loops produced.
+
+    Returns:
+        One record of the version-by-version numbers.
+    """
     return Versions(
         days=tuple(int(one) for one in setup.points),
         weights=sample.weights,
@@ -1385,17 +1435,17 @@ def _band(
     Args:
         values: One number per version, per day.
         spread: How much the worlds inside each version disagreed.
-        weights: How much each version counts.
+        weights: How much each version counts, which must be the vector
+            `Versions.counting_for` gives for this claim and nothing else. That is
+            what makes the band and the number on the tile the same reading, and it
+            is also what guarantees these weights are never all zeroes — the
+            "nothing survived anywhere" fallback lives there, so there is no second
+            copy of it here to drift from it.
         worlds: How many worlds ran under each version.
 
     Returns:
         The likelihood, the bottom of the range, and the top.
     """
-    # Nothing survived an observation anywhere: every version counts the same
-    # again, which at least reports the map rather than dividing by nothing. The
-    # world carries a loud warning about it, so the reader is not left guessing.
-    counted = weights if weights.sum() > 0.0 else numpy.ones_like(weights)
-    weights = counted
     middle = _weighted_mean(values, weights)
     across = _weighted_mean((values - middle[None, :]) ** 2, weights)
     within = _weighted_mean(spread, weights) / worlds
@@ -1479,15 +1529,12 @@ def _world_from(
     beliefs: dict[PropositionId, Belief] = {}
     series: dict[PropositionId, tuple[float, ...]] = {}
     drawn: dict[PropositionId, tuple[SeriesState, ...]] = {}
-    evenly = numpy.ones_like(sample.weights)
+    # How much each version counts, asked of the one place that knows. A world's
+    # own numbers and the difference between two worlds then count the versions
+    # the same way by construction rather than by two copies of one line agreeing.
+    behind = _versions_from(setup, sample)
     for claim_id in setup.order:
-        # A version counts by the share of its worlds that survived an
-        # observation — but only for the claims that observation is evidence
-        # about. For a claim it is not evidence about, every version counts the
-        # same, because the right answer for such a claim is the answer it
-        # already had and weighting it would only let a coin flip somewhere else
-        # move a number nobody touched.
-        counting = sample.weights if claim_id in setup.observation_reach else evenly
+        counting = behind.counting_for(claim_id)
         middle, bottom, top = _band(
             sample.likelihood[claim_id], sample.inner_spread[claim_id], counting, worlds
         )
