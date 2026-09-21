@@ -59,8 +59,9 @@ export interface GenerationScreenProps {
   /** The run, already asked for by the press that opened this screen. */
   readonly run: TheRun;
   /**
-   * True when this copy has no model key, so the run is a recording being played
-   * back. Known before the stream says anything, which is why the badge can be
+   * True when the reader asked for the recording, so the run is one being played
+   * back — whether or not this copy has a model key. Known before the stream
+   * says anything, which is why the badge can be
    * on screen from the first frame — and why the offer to run it again can say
    * truthfully whether pressing it spends money.
    */
