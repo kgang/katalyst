@@ -1,14 +1,14 @@
 /**
- * How the one end-to-end test runs.
+ * How the end-to-end tests run.
  *
- * There is one job and it drives the real app in a real browser against the real
- * server. Everything else about this product is checked by tests that need
- * neither — the rules of the map in the server's own suite, the components in a
- * simulated page. These exist for the thing neither can check: that the two
- * halves, started as a person would start them, actually draw the stored
- * example, that a mouse alone can do the thing the product is for, and that
- * nothing in the panel beside the map is cut off at any window this interface
- * is held to.
+ * They drive the real app in a real browser against the real server. Everything
+ * else about this product is checked by tests that need neither — the rules of
+ * the map in the server's own suite, the components in a simulated page. These
+ * exist for the things neither can check: that the two halves, started as a
+ * person would start them, actually draw the stored example and the recorded
+ * one; that a mouse alone can do the thing the product is for; and that nothing
+ * in the panel beside the map is cut off at any window this interface is held
+ * to.
  *
  * **Both halves are started here rather than by hand**, so that running it is
  * one command and so that the build job is the same command. The server is
@@ -46,9 +46,62 @@ assertPortsAreFree();
 
 export default defineConfig({
   testDir: "./e2e",
-  // One test, run once. A retry would hide a flake, and a flake in a test that
-  // drives two servers is a fault worth seeing.
+  // Run once. A retry would hide a flake, and a flake in a test that drives two
+  // servers is a fault worth seeing.
   retries: 0,
+  /**
+   * **Every test runs beside every other**, rather than one file at a time.
+   *
+   * Left alone, Playwright runs files in parallel and the tests inside one file
+   * in order — and five of this suite's tests watch a whole recording play at
+   * the server's own pace, four of them in one file. Run in order they are four
+   * waits end to end; run side by side they are one.
+   *
+   * **They may be**, and it is the server that decides. Each viewing of a
+   * recording mints an identifier of its own, so **each viewing's transcript is
+   * its own** and two people watching the same recording no longer overwrite
+   * each other's working; the process holds eight generations and never drops
+   * one still streaming, so five at once sit inside the bound with room; and the
+   * stored example's routes — a map, a world, a difference — are pure functions
+   * of the request body and keep nothing between calls.
+   *
+   * **One thing is shared, and it is named rather than glossed over.** Beside
+   * each transcript the process keeps an index from a map's identifier back to
+   * the generation that built it (`engine/transcript.py`), and every replay of
+   * one recording builds a map with the same identifier — so five concurrent
+   * replays are last-writer-wins on that one entry. It is harmless here for a
+   * reason worth writing down rather than trusting: all five build the identical
+   * map, and no end-to-end test asks the world routes for a generated map. The
+   * day one does, this is the line to come back to.
+   */
+  fullyParallel: true,
+  /**
+   * How many browsers at once: five here, two on the build machine.
+   *
+   * **Five is the long pole on the suite as it stands.** Fourteen tests, of
+   * which five watch a whole recording play — the four in `generate.spec.ts` and
+   * the one in `lateLayout.spec.ts` — at about twelve seconds each. The other
+   * nine are the stored example's and none has ever run for more than four
+   * seconds, though four of them ask for budgets of two minutes: three measure
+   * the panel whole at a window of their own, and one opens a branch and retunes
+   * an arrow under a report. Five is what it takes to have every recording in
+   * flight at once; a sixth browser would have only short tests left to overlap,
+   * on a machine that is often shared.
+   *
+   * **The build machine gets two, and nothing has been measured on four cores.**
+   * That number is reasoning rather than a reading: the runner has four cores to
+   * this machine's fourteen, and the layout runs on a background thread that has
+   * to answer between two events of a replay — leaving it no core to answer on
+   * is precisely the condition that produced the layout race of 2026-09-21,
+   * twenty clean runs here and red on the build's first.
+   *
+   * **And what actually changed for the build is not the worker count.** It
+   * already ran this suite's two files side by side, so it already used two
+   * browsers. What is new is that both of them can be watching a recording at
+   * the same time: replay concurrency there goes from one to two. That is the
+   * thing to look at if the build ever turns red on timing.
+   */
+  workers: process.env.CI ? 2 : 5,
   // Long enough for the layout engine's background thread to answer twice —
   // once for the map and once for the branch — on a slow build machine.
   timeout: 60_000,
@@ -104,20 +157,56 @@ export default defineConfig({
       env: {
         ANTHROPIC_API_KEY: "",
         FRED_API_KEY: "",
-        // **The replay's pacing is left on, and that is deliberate.**
+        // **The replay stays paced, and the pace is shortened rather than
+        // turned off.**
         //
-        // `KATALYST_REPLAY_INSTANT` exists so a test need not wait out a delay
-        // that is there for a reviewer's benefit, and for most tests it would be
-        // free. It is not free here: `generate.spec.ts`'s whole subject is a map
-        // *arriving* — a rectangle standing before any claim, the growing edge
-        // moving, the chips resolving last and once — and with the pacing off
-        // every event lands in one tick, React folds them into one render, and
-        // the screen goes straight from nothing to a finished map. There is then
-        // no moment at which the thing being tested is true, and the test fails
-        // saying it could not find a rectangle. Turning the pacing off to make a
-        // test faster would be turning off the behaviour the test is for.
+        // **What the pace is for, now that it is for one thing.** The first
+        // claim `generate.spec.ts` makes is that a reserved rectangle stood on
+        // screen before any claim had arrived — the first paint is the shape of
+        // the thing being waited for and not a spinner. That moment is exactly
+        // one gap wide: it opens when `generation_started` paints the rectangle
+        // and closes when the first `proposal_accepted` paints a claim. With no
+        // pause at all the two land in one tick, React draws them in one render,
+        // and the moment never exists to be seen. So the pace has to be
+        // comfortably longer than one render on the slowest machine that runs
+        // this, and that is the whole of its job.
         //
-        // It costs seconds: the whole suite runs in about twenty.
+        // **What it is no longer for.** Until 2026-09-21 these tests also asked
+        // for one render per claim — `heldWhenEachClaimArrived` holding exactly
+        // as many entries as the map has claims. A browser makes no such
+        // promise: React gathers whatever has landed since the last frame into
+        // one render, so two events close together paint once. Measured that
+        // day, running `generate.spec.ts` four browsers at a time on this
+        // fourteen-core machine, twice at each pace: 0.40 and 0.25 green 8 of 8;
+        // 0.15, 0.08 and 0.04 red on that assertion **and on nothing else**, at
+        // 17, 14 and 17 arrivals for 18 claims; 0.02 red with the whole run
+        // folded into a single change. The pace was holding up a statement about
+        // the browser's scheduling rather than about the product. That statement
+        // is gone — `watching.ts` says what replaced it and why — and the promise
+        // that events leave the server one at a time is tested on the server's
+        // own clock, where it can be tested honestly.
+        //
+        // **0.4 stays, and is now a generous margin on a weak requirement.** It
+        // is not tuned to anything: one gap has to outlast one render, and four
+        // tenths of a second is far more than that on any machine this runs on.
+        // Coming down to 0.25 would save about four seconds of a twenty-four
+        // second run and buy back a tail — two events fold whenever the main
+        // thread happens to be busy longer than the gap, a garbage collection or
+        // a loaded runner, and folding is only harmless because nothing asks
+        // about it any more.
+        //
+        // The other reason the pace cannot go to nothing is the layout, which
+        // runs on a background thread and has to answer between two events. It
+        // is no longer the only thing holding that together: `onTheGlass.ts`
+        // holds the growing edge's rectangle when the layout has placed nothing,
+        // so a late answer is a slower map rather than a wrong one — and
+        // `e2e/lateLayout.spec.ts` starts that thread nine hundred milliseconds
+        // late on purpose, on every run, to keep it that way. That test is also
+        // the joint-longest in this suite at about twelve seconds, so on the
+        // build machine, at two workers, it costs roughly what the shortened
+        // pace saves. It is worth it: what it buys is the one failure twenty
+        // local runs did not find.
+        KATALYST_REPLAY_PACE: "0.4",
       },
     },
     {

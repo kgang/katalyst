@@ -24,37 +24,30 @@
  * drawing library has measured a tile, and which is how a chip that plainly read
  * `.19` was once read as nothing at all.
  *
- * **A growing map needs one signal the stored one does not**, and it is the
- * reason this file has helpers of its own: on a stored map everything arrives at
- * once, and here the screen is *correct* and *incomplete* at the same moment for
+ * **A growing map needs signals the stored one does not**, and they are in
+ * `watching.ts` beside this file: on a stored map everything arrives at once,
+ * and here the screen is *correct* and *incomplete* at the same moment for
  * minutes at a time. So every read below waits for the count it is about — this
- * many claims, this many rectangles, the receipt — rather than for the page.
+ * many claims, this many rectangles, the receipt — rather than for the page. The
+ * page also watches itself, because four of the things this file is for are true
+ * of moments rather than of the end; `watching.ts` says how and why.
  *
  * Nothing here is a number typed into this file. Every figure is read off the
  * screen and compared with itself across a change, or checked for its shape.
  */
 
-import { expect, type Page, test } from "@playwright/test";
+import { aDroppedFrameIsExpectedHere, expect, test } from "./theSuite.js";
 import { whereTheMapCameToRest, whereTheTileSits } from "./waiting.js";
-
-/** The sentence the first screen's first card carries, as a reader would type it. */
-const THE_SENTENCE = "The Strait of Hormuz is going to open next week.";
-
-/**
- * How long a whole run is allowed to take before this test gives up on it.
- *
- * **A replay takes as long as its recording**, because the pacing is the
- * server's and the number of events is the file's — a twenty-proposal run is
- * four times the twenty seconds a five-proposal one takes, and neither number
- * is this test's to know. So the bound below is not a measurement and is not
- * tuned to a machine: it is generous on purpose, and exists only so that a run
- * which has genuinely stopped fails as a test rather than hanging.
- *
- * The default fifteen seconds is the wrong bound for exactly one thing in this
- * file — waiting for a run to finish — and the right one everywhere else, so it
- * is named here and used there.
- */
-const A_WHOLE_RUN = 120_000;
+import {
+  A_WHOLE_RUN,
+  boxesRunningIntoEachOther,
+  startWatching,
+  THE_SENTENCE,
+  theMapArrivedInSteps,
+  waitUntilItStops,
+  whatCanBeReplayed,
+  whatItSaw,
+} from "./watching.js";
 
 // Every test here plays a recording from beginning to end, so each needs room
 // for one. It is set on the file rather than in the configuration because it is
@@ -62,228 +55,25 @@ const A_WHOLE_RUN = 120_000;
 // be held to a minute.
 test.describe.configure({ timeout: A_WHOLE_RUN + 60_000 });
 
-/**
- * What this copy of the server says it can play back without a key.
- *
- * Asked of the server rather than read off the screen: whether this test has
- * anything to do at all is a fact about the server, and reading it off the page
- * would make the skip depend on the very screen being tested.
- */
-async function whatCanBeReplayed(page: Page): Promise<{ example: string }[]> {
-  const answer = await page.request.get("/api/readyz");
-  const said = (await answer.json()) as { replayable?: { example: string }[] };
-  return said.replayable ?? [];
-}
-
-/** What watching a whole run saw. */
-interface WhatItSaw {
-  /** True when, at some moment, a rectangle stood and not one claim had arrived. */
-  readonly rectangleBeforeAnyClaim: boolean;
-  /**
-   * The words on the first rectangle, read at a moment when no claim had
-   * arrived — so it is the one held open for the reader's own sentence and not
-   * one of the frontier's, which carry *one step on from "…"*.
-   *
-   * Empty when no such moment was seen.
-   */
-  readonly firstRectangleSaid: string;
-  /** The most rectangles that stood at once. */
-  readonly mostRectangles: number;
-  /**
-   * True when, at some moment, two boxes on the map stood in the same place.
-   *
-   * The place they would share is the map's origin, where the hypothesis is:
-   * a box the layout has not placed yet used to be drawn there, so every
-   * arriving claim sat on top of the first one until the layout answered.
-   */
-  readonly everStacked: boolean;
-  /**
-   * How many rectangles stood at the moment each claim arrived, in order.
-   *
-   * The growing edge saying where the map is going, step by step, rather than
-   * only at the start. **The last entry is allowed to be none**: the frontier
-   * empties when the last claim closes, and no rectangle may stand where
-   * nothing is coming.
-   */
-  readonly heldWhenEachClaimArrived: readonly number[];
-  /**
-   * How many claims were on the map, every time that number changed.
-   *
-   * The sequence rather than the largest of them: the largest is whatever the
-   * map ended up with, which is a fact about the end and says nothing at all
-   * about how the map got there. A map that appeared all at once and a map that
-   * grew claim by claim have the same largest number and completely different
-   * sequences.
-   */
-  readonly claimsWentOn: readonly number[];
-  /**
-   * How many claims were on the map the first time any likelihood appeared, and
-   * how many appeared at that moment.
-   *
-   * Both are zero when none ever did. Together they are the statement that the
-   * chips resolve **last** and **once**: the first number arrives when the map
-   * is complete, and every other number arrives in the same breath.
-   */
-  readonly whenTheNumbersCame: { readonly claims: number; readonly numbers: number };
-}
-
-/** Where the page keeps what it has seen of itself. */
-declare global {
-  interface Window {
-    theRecord?: WhatItSaw & { rectangleBeforeAnyClaim: boolean };
-    stopWatching?: () => void;
-  }
-}
-
-/**
- * Have the page start watching itself, before anything is asked for.
- *
- * **Four of the things this test is for are about a screen that is moving**, and
- * a moving screen cannot be checked by looking at it once: *a rectangle is drawn
- * before any claim*, *rectangles stand at the growing edge*, *the claims arrive
- * one at a time* and *not one likelihood is on screen until the map is finished*
- * are each true at some moments and false at others, and by the time an
- * assertion has been written the moment it was about is gone. Polling for one of
- * them races the run; asserting after it is over asserts about the wrong moment.
- *
- * So the page watches itself. Every change to the page is looked at — which is
- * every moment the screen was different — and what was on it is written down.
- * Nothing here sleeps, and nothing here can miss a moment that a poll would have
- * stepped over.
- *
- * **It is installed before the press**, and awaited, so that the very first
- * frame of the run is inside the record. Starting it after the press leaves the
- * one moment the first assertion is about — a rectangle standing with no claim
- * beside it — outside the window being watched, on a fast replay.
- *
- * @param page The page the map will be on.
- */
-async function startWatching(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const record = {
-      rectangleBeforeAnyClaim: false,
-      firstRectangleSaid: "",
-      mostRectangles: 0,
-      everStacked: false,
-      heldWhenEachClaimArrived: [] as number[],
-      claimsWentOn: [] as number[],
-      whenTheNumbersCame: { claims: 0, numbers: 0 },
-    };
-    window.theRecord = record;
-
-    const look = (): void => {
-      const held = document.querySelectorAll(".skeleton-tile").length;
-      const claims = document.querySelectorAll(".tile").length;
-      // A chip says on its own face whether it is showing a number or words,
-      // and that is the marker to count: every chip renders a reading, and on
-      // a growing map most of them are reading an absence out.
-      const numbers = document.querySelectorAll('.belief-chip[data-reading="number"]').length;
-
-      if (held > 0 && claims === 0) {
-        record.rectangleBeforeAnyClaim = true;
-        // **Read here, and never again from the live page.** What the first
-        // rectangle says is true of one moment: the moment after it is drawn
-        // and before the first claim replaces it with the frontier's. Reading
-        // it in a second round trip asks a screen that has moved on — and on a
-        // cold machine the whole run can finish in between, so the rectangle is
-        // not merely different, it is gone.
-        record.firstRectangleSaid = document.querySelector(".skeleton-tile")?.textContent ?? "";
-      }
-      record.mostRectangles = Math.max(record.mostRectangles, held);
-      if (record.claimsWentOn[record.claimsWentOn.length - 1] !== claims) {
-        // What the growing edge was saying at the moment this claim arrived.
-        if (claims > 0) {
-          record.heldWhenEachClaimArrived.push(held);
-        }
-        record.claimsWentOn.push(claims);
-      }
-      // Two boxes in one place. The place they would share is the map's origin,
-      // where a box the layout has not placed yet used to be drawn.
-      const places = [...document.querySelectorAll(".react-flow__node")].map(
-        (one) => (one as HTMLElement).style.transform,
-      );
-      if (new Set(places).size !== places.length) {
-        record.everStacked = true;
-      }
-      if (numbers > 0 && record.whenTheNumbersCame.numbers === 0) {
-        record.whenTheNumbersCame = { claims, numbers };
-      }
-    };
-
-    const watching = new MutationObserver(look);
-    window.stopWatching = () => watching.disconnect();
-    watching.observe(document.body, { subtree: true, childList: true, attributes: true });
-    look();
-  });
-}
-
-/**
- * Stop watching, and read back what the page saw of itself.
- *
- * **It waits for nothing.** The waiting is done by the named signals above it,
- * which is where a test that has to give up belongs: a watcher that settled on a
- * signal of its own would hang until the whole test timed out on a run that
- * broke, and the failure a reader saw would be *"test timed out"* rather than
- * *"the run said it failed"*.
- *
- * @param page The page the map is on.
- */
-async function whatItSaw(page: Page): Promise<WhatItSaw> {
-  return await page.evaluate(() => {
-    window.stopWatching?.();
-    return window.theRecord as WhatItSaw;
-  });
-}
-
-/**
- * Wait until the run is over, which is the receipt arriving and the map saying
- * why it stopped.
- *
- * Two signals rather than one, because they are two events: the receipt is what
- * the run cost and the closing line is why it ended, and a screen that had the
- * first and not the second would be read here as finished when it is not.
- *
- * **This is the one wait in this file with a bound of its own**, and it is the
- * one that needs one: everything else here is waiting for the page to catch up
- * with something that has already happened, where fifteen seconds is generous.
- * This waits for a whole recording to play, which takes as long as the
- * recording is — see `A_WHOLE_RUN`.
- */
-async function waitUntilItStops(page: Page): Promise<void> {
-  await expect(page.locator(".receipt-strip")).toBeVisible({ timeout: A_WHOLE_RUN });
-  await expect(page.locator(".done-line")).toBeVisible({ timeout: A_WHOLE_RUN });
-  // Every rectangle goes when the likelihoods land: the set of claims still open
-  // is empty by definition once the map is finished.
-  await expect(page.locator(".skeleton-tile")).toHaveCount(0);
-}
-
-/** Every pair of boxes on the map that overlap. Empty is the only right answer. */
-async function boxesRunningIntoEachOther(page: Page): Promise<string[]> {
-  return await page.locator(".react-flow__node").evaluateAll((boxes) => {
-    const seen = boxes.map((box) => ({
-      id: (box as HTMLElement).dataset.id ?? "?",
-      at: box.getBoundingClientRect(),
-    }));
-    const found: string[] = [];
-    for (let one = 0; one < seen.length; one += 1) {
-      for (let other = one + 1; other < seen.length; other += 1) {
-        const a = seen[one];
-        const b = seen[other];
-        if (
-          a !== undefined &&
-          b !== undefined &&
-          a.at.left < b.at.right &&
-          b.at.left < a.at.right &&
-          a.at.top < b.at.bottom &&
-          b.at.top < a.at.bottom
-        ) {
-          found.push(`${a.id} runs into ${b.id}`);
-        }
-      }
-    }
-    return found;
-  });
-}
+// **Every test here watches a map arrive, and a map arriving drops frames.**
+// Said once for the file rather than in each test, with the whole reason, so
+// that a reader who meets the browser's complaint finds the argument rather
+// than a silenced warning.
+test.beforeEach(() => {
+  aDroppedFrameIsExpectedHere(
+    "A map arriving draws its boxes in bursts, and the drawing library measures " +
+      "every box it draws. When a burst is big enough the browser abandons the rest " +
+      "of that frame's size notifications and says so. Measured on 2026-09-21, on " +
+      "this file and with the layout thread held back and not: it comes and goes " +
+      "with the size of the burst and not with anything this test injects, and at " +
+      "the moment it fires the stage's and the panel's edge readings are both true " +
+      "of where the boxes actually are, with no box left unpainted and no wire " +
+      "missing. It is harmless here because nothing on this map waits to be " +
+      "measured: `graph/toFlow.ts` declares every tile's box and both ends of every " +
+      "wire, and `test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification` " +
+      "drops every tile's notification on purpose and the map still draws.",
+  );
+});
 
 test("a map draws itself from a recording, with no model key", async ({ page }) => {
   await page.goto("/");
@@ -488,26 +278,23 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // waiting in general.
   expect(saw.rectangleBeforeAnyClaim).toBe(true);
   expect(saw.firstRectangleSaid).toContain(THE_SENTENCE);
-  // **Rectangles stood at the growing edge all the way through** — which is
-  // what this now says, rather than "at some point there was one". A step with
-  // no rectangle is a map that has stopped saying where it is going.
+  // **The map arrived in steps, and a rectangle stood at the growing edge at
+  // every one of them but the last.** The whole statement, and the reason it is
+  // not written out here, are in `watching.ts` — including why it does not ask
+  // for one render per claim, which is a promise about the browser's scheduling
+  // that no browser makes, and where the stream's own one-at-a-time promise is
+  // tested instead.
   //
-  // The last claim is the exception and the only one: the frontier empties when
-  // it closes, and no rectangle may stand where nothing is coming.
-  //
-  // **Continuous integration read a zero here, at the first claim, on 2026-09-21
-  // and nowhere else.** The layout answers on a background thread, and on a
-  // machine where its first answer lost the race to the first proposal the map
-  // had no place for anything — so the claim was painted at the origin, where
-  // the rectangle carrying the reader's own sentence had been, and the growing
-  // edge went quiet. `frontend/src/graph/onTheGlass.ts` is the rule that is no
-  // longer possible under, and `graph/__tests__/onTheGlass.test.ts` is the same
-  // statement made without a browser.
-  expect(saw.mostRectangles).toBeGreaterThan(0);
-  expect(saw.heldWhenEachClaimArrived.length).toBe(claims);
-  for (const [step, held] of saw.heldWhenEachClaimArrived.slice(0, -1).entries()) {
-    expect(held, `no rectangle stood when claim ${step + 1} arrived`).toBeGreaterThan(0);
-  }
+  // **Continuous integration read a zero in this record, at the first claim, on
+  // 2026-09-21 and nowhere else.** The layout answers on a background thread,
+  // and on a machine where its first answer lost the race to the first proposal
+  // the map had no place for anything — so the claim was painted at the origin,
+  // where the rectangle carrying the reader's own sentence had been, and the
+  // growing edge went quiet. `frontend/src/graph/onTheGlass.ts` is the rule that
+  // is no longer possible under, `graph/__tests__/onTheGlass.test.ts` is the same
+  // statement made without a browser, and `e2e/lateLayout.spec.ts` is this test
+  // run with that thread held back on purpose.
+  theMapArrivedInSteps(saw, claims);
   // **And no box was ever drawn in another box's place.** A box the layout has
   // not placed is not drawn at all — except the very first, which is a reserved
   // rectangle and never a claim: the origin is nobody's place before the layout
@@ -515,14 +302,6 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // it. It used to be every box: each arriving claim sat on the hypothesis for
   // as long as the layout took to answer.
   expect(saw.everStacked).toBe(false);
-  // **The claims arrived one at a time.** The count went 0, 1, 2, … and reached
-  // the number on screen by rising by exactly one each time: a map that appeared
-  // all at once would have gone 0 and then that number, and a map that redrew
-  // itself would have gone down somewhere. Comparing the largest count with the
-  // final count says nothing at all — they are the same number by definition.
-  expect(saw.claimsWentOn[0]).toBe(0);
-  expect(saw.claimsWentOn[saw.claimsWentOn.length - 1]).toBe(claims);
-  expect(saw.claimsWentOn).toEqual(saw.claimsWentOn.map((_, step) => step));
   // **And the chips resolved last, and once.** The first likelihood to reach the
   // screen reached it when every claim was already on the map, and every other
   // likelihood reached it in the same breath — one event, one world, every

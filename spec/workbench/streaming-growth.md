@@ -1342,7 +1342,20 @@ origin, before the layout has answered anything at all; it is never a claim. *Te
 `test_the_first_rectangle_keeps_the_readers_own_words_until_the_layout_answers`,
 `test_no_two_boxes_are_ever_drawn_in_one_place`, each walked over two runs with the layout answering
 late; `frontend/e2e/generate.spec.ts`, whose `heldWhenEachClaimArrived` is the same statement read off
-a real browser.
+a real browser; and `frontend/e2e/lateLayout.spec.ts`, which is that browser reading with the layout's
+background thread held back nine hundred milliseconds on purpose *(added 2026-09-21)*. Both browser
+tests make the statement through one helper, `frontend/e2e/watching.ts` › `theMapArrivedInSteps`.
+
+**What this invariant does not say, and why it matters.** It says a rectangle stood at every
+*arrival* — every moment the screen changed to show a new claim — and not at every *claim*. Those are
+different: a browser gathers whatever has landed since the last frame into one render, so two events
+arriving close together paint once and the two claims they carried appear together. A test that
+demanded one arrival per claim would be demanding that the browser never batch, which no browser
+promises and nothing here needs; that the events leave the server one at a time is a promise about
+the stream (FR-5), tested on the server's own clock by
+`backend/tests/api/test_the_stream_is_not_buffered.py` ›
+`test_the_events_of_a_replay_are_let_go_of_one_at_a_time`. *(Written down 2026-09-21, after the
+browser test asked for the stronger thing for a while and was quietly held up by the replay's pace.)*
 
 ---
 
@@ -1461,9 +1474,11 @@ a real browser.
    **Answered 2026-09-17 by `spec/generation/replay.md`, and nothing is open.** The delay is fixed on
    the **server** — an argument with a default the builder picks against a measurement, because a
    replay that races teaches a reviewer that the product is faster than it is — so two readers' replays
-   are the same length. `instant` drops it to nothing and is a **setting**, read once by
-   `katalyst.settings`, never a field on the request: a client that could ask for instant replay would
-   let anyone with the network tab open skip the thing the recording exists to show. **The browser
+   are the same length. It is **one setting**, `KATALYST_REPLAY_PACE` in seconds, read once by
+   `katalyst.settings` and never a field on the request: a client that could ask for a replay with no
+   pause would let anyone with the network tab open skip the thing the recording exists to show. A
+   pace of zero means no pause at all, which is the same question answered with a smaller number
+   rather than a second switch beside it *(2026-09-21; it was a length and an `instant` flag)*. **The browser
    therefore paces nothing, waits on nothing, and has no pacing code at all** — it reads events as
    they arrive, which is the same thing it does live.
 

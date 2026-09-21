@@ -15,10 +15,32 @@ is a fact `/api/readyz` reports, so the first screen can say plainly what works
 and what does not.
 """
 
+import math
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+A_COMFORTABLE_PACE = 0.6
+"""Seconds between two events of a replay when nobody says otherwise.
+
+Cosmetic and nothing else: pacing never changes an event, an order or a number.
+The figure is chosen against a measurement rather than taste — a live proposal
+took about a minute to come back on the first five recorded calls, so a replay
+that raced would teach a reviewer that the product is faster than it is, and one
+that matched would be unwatchable. This is the slowest speed somebody will sit
+through and the fastest that still reads as *arriving* rather than *appearing*.
+"""
+
+THE_SLOWEST_PACE = 10.0
+"""The longest pause between two events this program will accept, in seconds.
+
+Not a safety rail around a number that matters; a bound that makes the setting
+mean what it says. A recording holds tens of events, so ten seconds between them
+is minutes of watching an unchanged screen — past watching and into waiting, and
+far more likely to be a typed-in millisecond figure than anybody's intention.
+"""
 
 
 class Settings(BaseSettings):
@@ -55,12 +77,16 @@ class Settings(BaseSettings):
             two paid runs have been lost to bugs that only exist when a module is
             started rather than imported. A run answered this way is never written
             as a recording, whatever else it produces.
-        KATALYST_REPLAY_INSTANT: Whether a recorded generation plays back with no pause
-            between its events. Off by default, because the pause is what makes a
-            replay read as a map arriving rather than appearing. The test suite
-            and the build's own check turn it on; it is deliberately not
-            something a request can ask for, since a client that could skip the
-            pacing could skip the thing a recording exists to show.
+        KATALYST_REPLAY_PACE: How long a recorded generation waits between two of
+            its events, in seconds. The default is the speed a person watches at
+            (`A_COMFORTABLE_PACE` above); `0` means no pause at all. It is one
+            number rather than a speed and a switch beside it, because "how long
+            to wait" has one answer and a second way of saying *none* is a second
+            answer to the same question. It is deliberately not something a
+            request can ask for, since a client that could skip the pacing could
+            skip the thing a recording exists to show. The end-to-end browser run
+            sets a short pace rather than none: its subject is a map *arriving*,
+            and with no pause at all there is no moment at which that is true.
     """
 
     model_config = SettingsConfigDict(
@@ -80,7 +106,30 @@ class Settings(BaseSettings):
     KATALYST_RECORDINGS: str = ""
     KATALYST_RUNS: str = ""
     KATALYST_ANSWERER: str = ""
-    KATALYST_REPLAY_INSTANT: bool = False
+    KATALYST_REPLAY_PACE: float = A_COMFORTABLE_PACE
+
+    @field_validator("KATALYST_REPLAY_PACE")
+    @classmethod
+    def _a_pace_somebody_could_watch(cls, given: float) -> float:
+        """Refuse a pause that is not a length of time somebody could watch.
+
+        Says the whole thing in one sentence, because the person reading it is
+        looking at their own shell and not at this file: what the setting is,
+        what it may be, and what it was given.
+
+        **Asked as "is it a length of time in range", not as "is it out of
+        range".** A float can also be *not a number* or *infinite*, and neither
+        is less than zero or greater than anything — so a test written the other
+        way round lets both straight through to a program that would then sleep
+        for ever, or not at all, with nothing saying why.
+        """
+        if not math.isfinite(given) or not 0 <= given <= THE_SLOWEST_PACE:
+            raise ValueError(
+                "KATALYST_REPLAY_PACE is how many seconds a replay waits between "
+                "two of its events. It goes from 0, meaning no pause at all, to "
+                f"{THE_SLOWEST_PACE}. It was given {given}."
+            )
+        return given
 
 
 @lru_cache

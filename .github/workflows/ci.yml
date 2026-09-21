@@ -10,7 +10,7 @@
 #   frontend     the browser half: style, types, tests
 #   types-fresh  the browser's types still match the server's data shapes
 #   docker       both packaged images still build
-#   e2e          the one test that drives both halves in a real browser
+#   e2e          the tests that drive both halves in a real browser
 #   recordings   the committed recordings still read, still obey the stream's
 #                grammar, and were made against the prompt that is shipping
 #
@@ -184,14 +184,19 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
-  # The one end-to-end test. It starts both halves the way a person starts them
-  # and drives the real app in a real browser: the stored example draws, the
+  # The end-to-end tests. They start both halves the way a person starts them
+  # and drive the real app in a real browser: the stored example draws, the
   # strike branch changes what the claims say, the claim it provably cannot reach
-  # does not change, and the whole walk is done with the keyboard.
+  # does not change, the walk is done with the keyboard and again with the mouse
+  # alone, a recorded generation draws itself claim by claim, and the panel is
+  # checked whole at every window this interface is held to.
   #
-  # It is deliberately one test. Everything else about this product is checked by
-  # tests that need neither a browser nor a server, and a suite of browser tests
-  # is a suite of slow tests that fail for reasons that are not faults.
+  # **This machine is the point of them, not a second copy of the developer's.**
+  # It is slower, it has fewer cores, and it schedules differently, which is the
+  # cheapest way there is to run the same tests under a different set of timings
+  # — and it is what found a layout race that twenty clean local runs had missed.
+  # How much of this suite a change owes is decision record 0008's dated
+  # amendment of 2026-09-21; this job is the second half of its tier 1.
   #
   # **No key of any kind is given to this job, and it needs none.** The screen it
   # drives is fed by the stored-example route, which reads a file and calls
@@ -230,7 +235,7 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
 
-      - name: Open the stored map, branch it, and read it with the keyboard
+      - name: Drive the real app in a real browser, both halves started here
         run: npx playwright test
         working-directory: frontend
 
