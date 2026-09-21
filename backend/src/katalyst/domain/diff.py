@@ -54,7 +54,6 @@ What this file must never do
 import math
 from collections.abc import Mapping, Sequence
 from datetime import date, timedelta
-from decimal import ROUND_HALF_UP, Decimal
 from heapq import heappop, heappush
 from types import MappingProxyType
 from typing import Literal
@@ -62,6 +61,7 @@ from typing import Literal
 import numpy
 from pydantic import BaseModel, ConfigDict, Field
 
+from katalyst.domain.belief import two_figures
 from katalyst.domain.branch import Branch
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import BranchId, PropositionId
@@ -1372,109 +1372,6 @@ def _width_of_the_band(
 # --- The one sentence beside the list --------------------------------------
 
 
-def _two_figures(likelihood: float) -> str:
-    """Write a likelihood the way this product writes every likelihood.
-
-    Two significant figures, with the nought before the point dropped, so `.50`
-    and `.42` and `.060` — both figures always printed, because dropping a
-    trailing nought would claim less precision than we have.
-
-    **The whole rule, in one sentence: round to two significant figures, then use
-    a guard word exactly when it is true of the rounded number.** `<.01` when the
-    rounded number is less than a hundredth, `>.99` when it is more than
-    ninety-nine hundredths, and the figures themselves otherwise. That is all of
-    it, and it is stated this way because *the guard's words have to mean what
-    they say*: a chip reading `<.01` beside a number that was `.0035` is telling
-    the reader something true, and one reading `<.01` beside `.010` would not be
-    (Kent, 2026-09-20).
-
-    Two things fall out of that sentence rather than being decided beside it.
-    `.010` and `.99` print, because neither is below or above its own guard.
-    And the two figures always land in the first two places after the point —
-    `.99` down to `.010` — because anything further down rounds to less than a
-    hundredth and anything further up rounds to one.
-
-    **Never a certainty, and never a nothing.** Rounding to two figures turns
-    `.995` into `1.0` and `.0004` into `.0`, and both are claims nobody on this
-    map is entitled to make: one says the thing cannot fail, the other that it
-    cannot happen. The guards are what stand in their place.
-
-    **A move is not a likelihood**, and must never come through here. `.36 · up
-    by .0090` is the honest way to write a small move, because a move of `.0090`
-    is a real quantity a reader acts on, while a likelihood of `.0090` is one the
-    product declines to state that precisely. Nothing in this file writes a move
-    as text today; the day something does, it gets its own function, not a flag on
-    this one.
-
-    **Never scientific notation.** A sentence that reads *"moves this claim from
-    `>.99` to `1.0e-09`"* is not a sentence anybody can read aloud, and asking
-    Python for two significant figures directly produces exactly that below a ten
-    thousandth. So the rounding is done on the number's own decimal digits: the
-    shortest decimal that reads back as this exact number, its point shifted by
-    counting rather than by multiplying, and rounded half-up. That is also what
-    stops `.995` printing `.99` — a computer stores it as `0.99499999999999999556`,
-    so asking for two figures directly gives a number under the guard, and the
-    sentence would print the one thing this rule forbids.
-
-    **This rule is written twice and the two must move together.** The browser
-    writes it as `toTwoFigures` in `frontend/src/components/BeliefChip.tsx`, and
-    this function says the same thing for every input it can be given, carry cases
-    included. Change one and change the other in the same pull request, or the
-    same number reads two ways on one screen, and cross-check the two against each
-    other wherever the two stacks meet.
-
-    **A number that is not a number is refused, not written.** "Not a number" and
-    the infinities cannot be rounded to two figures, and printing a modest `<.01`
-    for one would put a likelihood on screen that nothing computed — the one state
-    this product refuses to show. They cannot arrive from a world, because a
-    likelihood that is not a real number between 0 and 1 cannot be built into a
-    `Belief` at all; so one reaching here is a broken promise between two pieces of
-    our own code, and it is said out loud rather than quietly made to look
-    reasonable. Reject, never repair.
-
-    Args:
-        likelihood: The number, between 0 and 1.
-
-    Returns:
-        The number as it is written on screen: `.35`, or `<.01`, or `>.99`.
-
-    Raises:
-        ValueError: If the number is not a real number — "not a number" itself, or
-            either infinity.
-    """
-    if not math.isfinite(likelihood):
-        raise ValueError(
-            "a likelihood to be written on screen must be a real number between 0 and 1; "
-            f"got {likelihood!r}, which cannot be rounded to two significant figures"
-        )
-    if likelihood <= 0.0:
-        return "<.01"
-    if likelihood >= 1.0:
-        return ">.99"
-    # The shortest decimal that reads back as this exact number, and where its
-    # point sits: `.995` becomes the digits 995 with its leading digit at the
-    # first place after the point.
-    shortest = Decimal(repr(likelihood))
-    place = shortest.adjusted()
-    # The two figures, as a whole number from 10 to 99. Shifting the point by
-    # counting places rather than by multiplying is what keeps `.995` at exactly
-    # 99.5 rather than a hair under it, so it rounds up the way a reader would.
-    figures = int(shortest.scaleb(1 - place).to_integral_value(rounding=ROUND_HALF_UP))
-    if figures >= 100:
-        # Rounding up carried into the next place: `.0999` is `.10`, not `.100`.
-        figures, place = 10, place + 1
-    # Where the rounded number's first figure landed is the whole guard. The
-    # first place after the point holds `.10` to `.99`, and the second holds
-    # `.010` to `.099`; one place further up is a rounded number of 1 or more,
-    # which is past `>.99`, and one further down is `.0099` or less, which is
-    # under `<.01`.
-    if place >= 0:
-        return ">.99"
-    if place <= -3:
-        return "<.01"
-    return f".{'0' * (-place - 1)}{figures}"
-
-
 def _without_full_stop(claim: str) -> str:
     """Give a claim's own words with the full stop it ends in removed.
 
@@ -1522,7 +1419,7 @@ def _summary(
     top = rows[0]
     return (
         f"{called} moves {_without_full_stop(named[top.target].claim)} from "
-        f"{_two_figures(top.before)} to {_two_figures(top.after)} by "
+        f"{two_figures(top.before)} to {two_figures(top.after)} by "
         f"{top.at_day.isoformat()} and leaves {counted} untouched."
     )
 

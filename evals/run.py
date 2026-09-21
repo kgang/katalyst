@@ -90,6 +90,28 @@ HERE = Path(__file__).resolve().parent
 NO_KEY = "This calls a model and spends money, and no key is configured. Nothing was run."
 """What it says when it cannot start at all."""
 
+SMALLEST_CAP = 0.005
+"""The smallest ceiling that still prints as money: anything under this reads `$0.00`.
+
+A ceiling is printed to two decimal places, so half a penny is the point below
+which the sentence beneath the table would say the round had a ceiling of nothing
+while the round was allowed to spend something. A number a reader cannot see is
+not a ceiling they can hold us to.
+"""
+
+CAP_IS_NOT_MONEY = (
+    "A spending ceiling has to be money somebody could spend: at least $0.01, so that it "
+    "prints as the figure it is. Nothing was run."
+)
+"""Why a round with a ceiling of nothing is refused rather than started.
+
+Two shapes of nonsense, one sentence. A ceiling at or below zero asks for a round
+that may never spend anything, which is not a round; and a ceiling under half a
+penny prints `$0.00`, so the round would report spending money out of a ceiling of
+nothing. Both are refused **before a model is asked for anything**, because the
+only honest moment to refuse a spending rule is before any of it is spent.
+"""
+
 ANSWERED_BY_A_STAND_IN = (
     "This run was answered by a stand-in named by KATALYST_ANSWERER, not by a "
     "model, so it is a measurement of nothing. The scorecard was printed and no "
@@ -1070,7 +1092,8 @@ def main(argv: list[str] | None = None) -> int:
     **The spending ceiling is the round's, not each case's.** One running total is
     carried across the cases; each is handed what is left of the ceiling, and the
     cases there is nothing left for are never started. The sentence beneath the
-    table names them.
+    table names them. **A ceiling that is not money is refused before anything
+    runs** — see `CAP_IS_NOT_MONEY`.
 
     Returns:
         0 when every check held on every case **and** every case ran, 1 otherwise
@@ -1095,7 +1118,8 @@ def main(argv: list[str] | None = None) -> int:
         default=Caps().dollars,
         help=(
             "What the whole round may spend, in dollars, across every case it runs. "
-            "Can only lower the figure in code."
+            "Can only lower the figure in code, and must be at least $0.01: a ceiling "
+            "that prints as $0.00 is refused before anything runs."
         ),
     )
     asking.add_argument(
@@ -1110,6 +1134,13 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     said = asking.parse_args(argv)
+
+    # **The ceiling is checked before anything else**, because everything after
+    # this line can cost money and a rule about spending is worth nothing once
+    # the spending has started.
+    if said.cap < SMALLEST_CAP:
+        print(CAP_IS_NOT_MONEY, file=sys.stderr)
+        return 1
 
     try:
         wanted = cases(only=said.only)

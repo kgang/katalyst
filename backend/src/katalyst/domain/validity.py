@@ -831,8 +831,8 @@ def _likelihoods_sit_inside_their_own_range(graph: Graph) -> list[Violation]:
             # the three numbers are written the way the product writes a
             # likelihood — never at the precision a computer happens to hold one
             # at. A number that is not between 0 and 1 says so in words instead;
-            # `belief.py` owns that rule and explains why.
-            low, likelihood, high = belief._as_written()
+            # `belief.py` owns both rules and explains why.
+            low, likelihood, high = belief.as_written()
             found.append(
                 Violation(
                     code="belief_out_of_range",

@@ -68,6 +68,7 @@ from katalyst.domain import (
     sensitivity,
     versions_of,
 )
+from katalyst.domain.belief import two_figures
 from katalyst.domain.diff import (
     AGREEING_AT_LEAST,
     MOVED_AT_LEAST,
@@ -79,7 +80,6 @@ from katalyst.domain.diff import (
     _counting_for,
     _ordinary_arrows,
     _read_on,
-    _two_figures,
     best_backed_routes,
 )
 from katalyst.domain.propagation import Numbers, Versions
@@ -1278,7 +1278,7 @@ def test_a_likelihood_is_written_as_a_plain_decimal(likelihood: float) -> None:
     that really is above ninety-nine hundredths. A guard beside a number those
     words are false of would be the product lying in two characters.
     """
-    written = _two_figures(likelihood)
+    written = two_figures(likelihood)
 
     assert "e" not in written.lower(), written
     assert WRITTEN_LIKELIHOOD.match(written), written
@@ -1317,7 +1317,7 @@ def test_a_likelihood_is_written_by_the_rule_on_the_cases_that_decide_it() -> No
     where the two stacks meet.
     """
     for likelihood, expected in WRITTEN_BY_THE_RULE:
-        assert _two_figures(likelihood) == expected, likelihood
+        assert two_figures(likelihood) == expected, likelihood
 
 
 def test_a_likelihood_that_is_not_a_number_is_refused_rather_than_written() -> None:
@@ -1332,7 +1332,7 @@ def test_a_likelihood_that_is_not_a_number_is_refused_rather_than_written() -> N
     """
     for not_a_number in (float("nan"), float("inf"), float("-inf")):
         with pytest.raises(ValueError, match="real number"):
-            _two_figures(not_a_number)
+            two_figures(not_a_number)
 
 
 # --- The one sentence beside the list --------------------------------------

@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from evals.run import ANSWERED_BY_A_STAND_IN
+from evals.run import ANSWERED_BY_A_STAND_IN, CAP_IS_NOT_MONEY
 
 from katalyst.engine.record import KeptRun
 
@@ -201,10 +201,15 @@ def test_the_cap_bounds_the_round_and_not_each_case(tmp_path: Path) -> None:
     Every answer this stand-in gives costs about a dollar, so a ceiling of two
     is reached inside the first case. What the test asks is not how many cases
     ran — that depends on what a call costs — but the two things that are true
-    however the arithmetic lands: **the round spent no more than a case's worth
-    past its ceiling**, and **it did not run all four**. And, because a round
-    that stopped short has scored nothing about what it never started, it says
-    which cases those were and it does not come back saying all is well.
+    however the arithmetic lands: **every case that started, started with money
+    left**, and **it did not run all four**. The first of those is exactly what a
+    round-wide ceiling promises, and it is asserted in that exact form: add the
+    receipts up in the order the cases ran, and what had gone before the last one
+    began was still under the ceiling. A case may finish over the line — the
+    ceiling is checked between cases, and no case can be stopped mid-call for
+    money it has already spent — but none may be begun past it. And, because a
+    round that stopped short has scored nothing about what it never started, it
+    says which cases those were and it does not come back saying all is well.
     """
     finished = run_the_evals(
         tmp_path, "--cap", "2.0", answerer="tests.unit.engine.dear_stand_in:dear"
@@ -216,11 +221,16 @@ def test_the_cap_bounds_the_round_and_not_each_case(tmp_path: Path) -> None:
     assert ran, "the round was meant to afford at least one case"
     assert sorted(ran) != every_case, "the round paid for every case out of one case's ceiling"
 
-    # What the round really spent, added up off the receipts the runs kept — not
-    # off the sentence, which is the thing being checked.
-    spent = sum(one.receipt.dollars for one in the_kept_runs(tmp_path) if one.receipt is not None)
-    assert spent > 2.0, "this stand-in was meant to be dear enough to reach the ceiling"
-    assert spent < 2.0 * len(every_case), "a four-case round spent four ceilings"
+    # What the round really spent, case by case, in the order they ran — off the
+    # receipts the runs kept, not off the sentence, which is the thing being
+    # checked. A case with no receipt counts as nothing and keeps its place, so
+    # the running total stays aligned with the order.
+    paid = [0.0 if one.receipt is None else one.receipt.dollars for one in the_kept_runs(tmp_path)]
+    assert sum(paid) > 2.0, "this stand-in was meant to be dear enough to reach the ceiling"
+    assert sum(paid[:-1]) < 2.0, (
+        "the last case was started after the whole ceiling had already gone, "
+        "so the ceiling did not bound the round"
+    )
 
     # And the scorecard says so, in one sentence, naming both halves.
     assert "The round spent" in finished.stdout
@@ -228,6 +238,37 @@ def test_the_cap_bounds_the_round_and_not_each_case(tmp_path: Path) -> None:
     for missed in set(every_case) - set(ran):
         assert missed in finished.stdout
     assert finished.returncode != 0
+
+
+@pytest.mark.parametrize("figure", ["0", "0.0", "-1", "0.0001", "0.004"])
+def test_a_ceiling_that_is_not_money_is_refused_before_anything_runs(
+    tmp_path: Path, figure: str
+) -> None:
+    """A spending rule is worth nothing once the spending has started, so it is checked first.
+
+    Three nonsenses, one sentence. A ceiling **below zero** asks for a round that
+    may spend less than nothing. A ceiling of **exactly zero** asks for a round
+    that may never start a case, which is not a round. And a ceiling **under half
+    a penny** prints `$0.00`, so the round would have reported spending a penny
+    out of a ceiling of nothing — the harness really did say *"The round spent
+    $0.01 of its $0.00 ceiling"*, which is a sentence that cannot be true.
+
+    Refused on the way in, before the key is looked for and before a case is
+    started, and it writes nothing: an empty runs directory is the whole proof
+    that no model was asked anything.
+    """
+    finished = run_the_evals(
+        tmp_path,
+        "--cap",
+        figure,
+        answerer="tests.unit.engine.stand_ins:an_eval_that_holds_every_check",
+    )
+
+    assert finished.returncode == 1
+    assert "Traceback" not in finished.stderr, finished.stderr
+    assert CAP_IS_NOT_MONEY in finished.stderr
+    assert "The round spent" not in finished.stdout
+    assert not list((tmp_path / "runs").glob("*.json"))
 
 
 @pytest.mark.parametrize("named", ["nonesuch", "hormuz,midterms"])

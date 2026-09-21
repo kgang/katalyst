@@ -72,16 +72,11 @@ from katalyst.domain import (
     World,
 )
 
-# The one rule for writing a likelihood on screen, imported rather than copied.
-# It is a private name in the rules layer because nothing outside that layer had
-# needed it before, and borrowing it is much the lesser evil: a second copy of
-# the rule is how the same number starts reading two ways in one product. The day
-# `diff.py` is touched for another reason, this is the line that asks for it to
-# be made public.
-from katalyst.domain.diff import _two_figures
-
-# The one rule for writing how hard an arrow pushes, borrowed for the same reason
-# and from the layer that owns the number.
+# The two rules for writing a number on screen, imported rather than copied: a
+# second copy of either is how the same number starts reading two ways in one
+# product. Each lives beside the thing it writes — a likelihood beside `Belief`,
+# a push beside the arithmetic that adds one up.
+from katalyst.domain.belief import two_figures
 from katalyst.domain.propagation import _push_as_written
 from katalyst.engine.worlds import VERSIONS, WORLDS, build_world, conditional, difference
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
@@ -281,9 +276,9 @@ def _chip(belief: Belief) -> tuple[str, str]:
     Returns:
         The chip as a reader sees it, and its three numbers at full precision.
     """
-    band = f"{_two_figures(belief.lo)}{BETWEEN}{_two_figures(belief.hi)}"
+    band = f"{two_figures(belief.lo)}{BETWEEN}{two_figures(belief.hi)}"
     return (
-        f"{_two_figures(belief.p)} ({band})",
+        f"{two_figures(belief.p)} ({band})",
         f"{_digits(belief.p)} {_digits(belief.lo)} {_digits(belief.hi)}",
     )
 
@@ -398,7 +393,7 @@ def _likelihood(world: World, claim_id: str, value: float | None) -> tuple[str, 
         )
     if _supposed(world, claim):
         return "supposed", NOTHING
-    return _two_figures(value), _digits(value)
+    return two_figures(value), _digits(value)
 
 
 # --- The worlds this file is about -----------------------------------------
@@ -713,7 +708,7 @@ def _change_list_lines(name: str, rows: Sequence[DeltaRow]) -> list[str]:
         lines.append(
             _line(
                 f"{under} was → is",
-                f"{_two_figures(row.before)} → {_two_figures(row.after)}",
+                f"{two_figures(row.before)} → {two_figures(row.after)}",
                 f"{_digits(row.before)} → {_digits(row.after)}",
             )
         )

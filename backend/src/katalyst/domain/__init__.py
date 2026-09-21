@@ -29,7 +29,10 @@ What this layer must never do
 What is here now
 ----------------
 The data shapes. `belief.py`, `proposition.py` and `link.py` hold the three
-things a map is made of; `graph.py` holds a whole map; `intervention.py` holds
+things a map is made of — and `belief.py` also holds `two_figures`, the one rule
+for writing a likelihood anybody will read, so that a chip, a refusal and a
+sentence beside a change list cannot round the same number three ways.
+`graph.py` holds a whole map; `intervention.py` holds
 the six typed edits and `branch.py` the ordered list of them; `ids.py` holds the
 identifier names. `validity.py` decides whether a proposed map is well-formed,
 and returns every fault at once rather than the first. `patch.py` folds a
@@ -43,7 +46,7 @@ one fixed sentence saying so; it also sweeps a world one claim at a time, to see
 what each flip would move.
 """
 
-from katalyst.domain.belief import Belief, Beliefs
+from katalyst.domain.belief import Belief, Beliefs, two_figures
 from katalyst.domain.branch import Branch
 from katalyst.domain.diff import (
     ClaimDiff,
@@ -139,6 +142,7 @@ __all__ = [
     "introduced_by",
     "propagate",
     "sensitivity",
+    "two_figures",
     "validate",
     "versions_of",
 ]

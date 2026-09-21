@@ -245,7 +245,7 @@ PRINTABLE_FLOOR = 0.01
 Every likelihood on screen is written to two significant figures, and one that
 rounds to nothing or to everything is written `<.01` or `>.99` instead, because
 printing `1.0` claims a certainty nobody asserted (`spec/graph/belief.md`, and
-`_two_figures` in `katalyst/domain/diff.py`). So `.01` to `.99` is the band in
+`two_figures` in `katalyst/domain/belief.py`). So `.01` to `.99` is the band in
 which this product is willing to state a likelihood at all, and a claim outside it
 is one the product itself treats as already settled. That makes it the floor for a
 generator asked for a claim that could still come out either way: **the margin is
