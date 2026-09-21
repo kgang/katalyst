@@ -14,14 +14,19 @@ import { aClaim, aWire, aWorld } from "../../test/aMap";
 import type { BranchView, Edit } from "../../world";
 import { BranchPanel, InterventionPanel } from "../BranchPanel";
 
-/** The words the vocabulary settles, and the only words these buttons may use. */
+/**
+ * The words the vocabulary settles, and the only words these buttons may use.
+ *
+ * *Split this claim* is not among them: it is not built, so it is not offered.
+ * The vocabulary still owns its wording, and the test below is what says it is
+ * not on the panel.
+ */
 const BUTTONS = [
   "Suppose this is true",
   "Suppose this is false",
   "This happened",
   "Add a claim",
   "Change this push",
-  "Split this claim",
   "My own number",
 ];
 
@@ -209,7 +214,13 @@ describe("the six things you can do", () => {
     const made = open();
     fireEvent.click(screen.getByRole("button", { name: /^Suppose this is true/ }));
     expect(made).toEqual([{ op: "do", target: "B", value: true, at: WORLD.today }]);
-    expect(screen.getByText(/Take this as given/)).toBeInTheDocument();
+    // Read off the line at the foot of the panel rather than off the panel as a
+    // whole: the same sentence is the button's own subtitle now, said before the
+    // press as well as after it, and a query over the whole panel would find
+    // both and not be able to say which one it meant.
+    expect(document.querySelector(".intervene__said")?.textContent ?? "").toMatch(
+      /Take this as given/,
+    );
   });
 
   it("test_add_a_claim_opens_the_one_field_that_needs_the_model", () => {
@@ -230,15 +241,35 @@ describe("the six things you can do", () => {
     expect(screen.queryByText(/pull request/i)).toBeNull();
   });
 
-  it("test_split_this_claim_is_visibly_not_yet_live", () => {
-    const made = open();
-    const split = screen.getByRole("button", { name: /^Split this claim/ });
-    expect(split).toHaveTextContent("not yet built");
-    fireEvent.click(split);
-    expect(made).toEqual([]);
-    expect(screen.getByText(/is not built yet/)).toBeInTheDocument();
-    // And no stack number on screen: a reader does not know what stack six is.
-    expect(screen.queryByText(/stack \d/i)).toBeNull();
+  it("test_split_this_claim_is_not_offered_at_all", () => {
+    // **It used to be a row that said it could do nothing.** That was honest
+    // and it was still a seventh of the one menu this product is demonstrated
+    // from spent on an absence: a reader counting what they can do to a claim
+    // counted one they cannot. What it would do is written where the rest of
+    // the unbuilt work is, in `spec/multiverse/interventions.md`, and the words
+    // it will come back with are already settled in the vocabulary.
+    open();
+    expect(screen.queryByRole("button", { name: /Split this claim/ })).toBeNull();
+    expect(screen.queryByText(/Split this claim/)).toBeNull();
+    // And nothing else took its place as a control that explains itself instead
+    // of working: every button on this panel does something when it is pressed.
+    expect(screen.queryByText(/not yet built/)).toBeNull();
+  });
+
+  it("test_the_two_that_are_easiest_to_confuse_say_the_difference_before_the_press", () => {
+    // **The distinction this product beats every competitor on, said before the
+    // choice rather than after it.** Both buttons fix a claim's value; they
+    // differ in what else may move, and until now the only place that was said
+    // was the line printed *after* the press — by which time the reader has
+    // already chosen. Each subtitle is the shared vocabulary's own meaning for
+    // that operation, word for word from the *Interface words* table.
+    open();
+    expect(screen.getByRole("button", { name: /^Suppose this is true/ })).toHaveTextContent(
+      "Take this as given, and do not tell me what caused it",
+    );
+    expect(screen.getByRole("button", { name: /^This happened/ })).toHaveTextContent(
+      "This is news — update what came before it too",
+    );
   });
 
   it("test_an_arrow_is_named_by_the_claims_at_its_two_ends_never_by_an_identifier", () => {

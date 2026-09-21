@@ -432,7 +432,7 @@ Three rules in this stack:
 1. **The buttons build a branch and show it. They do not move a number.** **My own number** and
    **Change this push** append an edit and the panel shows it immediately; the likelihood slots stay
    as they were, reading their absence.
-2. **Split this claim** is **visibly not yet live** and says so (stack 06). Never silently inert.
+2. **Split this claim** is **not offered at all** until it is built (stack 06). It was a row that took a press and then said it could do nothing, which was honest and was still a seventh of this menu spent on something a reader cannot take up. Never silently inert, and now never inert: every control on the panel does something when it is pressed. Its words stay settled in [`../vocabulary.md`](../vocabulary.md) for the day the operation arrives.
 3. **Edits are appended, never edited in place.** The branch is the audit trail, and an audit trail
    you can edit is not one.
 

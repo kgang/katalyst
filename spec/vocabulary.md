@@ -86,6 +86,8 @@ The six operations keep their code names in code, in the wire format and in this
 | `believe` | **My own number** | none — the three-up belief chip is the badge | Your number sits beside the model's and the market's |
 | none | **Build the map** | none — the map is the answer | "Turn what I typed into a map of what it would cause" |
 
+**Two of these rows have no control on screen in this build, for two different reasons.** **Split this claim** is not implemented, and an operation that does nothing is not offered — a control that takes a press and then explains that it cannot act is still a control a reader counted and cannot use. **Suppose this is false** is implemented and is offered, beside **Suppose this is true**. The panel also carries, under each of the two easiest to confuse, that operation's own line from the last column of this table, so the difference is read before the press rather than after it.
+
 One more badge is **derived**: no button produces it. **Retracted · date · by "…"** appears on a claim that was supposed true and has since been pushed back down by a later edit — what was holding this up was removed. It names the edit responsible and the day it landed (UX-14; the mechanism is in `multiverse/interventions.md`).
 
 **Build the map** is the one button in that table with no code name behind it, because it starts a generation rather than editing a map: there is no intervention called *build*. It is the only button on the input bar, and it is the same button on both doors — Explore and Verify differ by whether the destination field has anything in it, and a button whose label changed as you typed would be a control moving under you. Not *Generate*, which is the pipeline's word rather than the reader's.

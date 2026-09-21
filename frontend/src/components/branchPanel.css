@@ -11,14 +11,19 @@
  * will do rather than shouting.
  */
 
-/* Your branches and the edits in the one that is open. It takes the room its
- * list needs and no more, gives up what it has to when the column is full, and
- * scrolls inside itself rather than pushing anything off the bottom. */
+/* Your branches and the edits in the one that is open.
+ *
+ * **Nothing here says how tall it is or whether it scrolls, and that is the
+ * rule.** The panel beside the map scrolls as one and nothing inside it scrolls
+ * on its own — `styles/app.css` says so once, on `.page--map .dock > *`, which
+ * gives every section `max-height: none` and `overflow: visible`. That selector
+ * is two classes to this one's one, so anything written here about height or
+ * overflow loses to it: a `max-height: 28%` and an `overflow-y: auto` sat here
+ * for a while saying the opposite of the rule that was actually in force, and a
+ * reader meeting both could not tell which won. */
 .branch-panel {
   flex: 0 1 auto;
   min-height: 8rem;
-  max-height: 28%;
-  overflow-y: auto;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);
@@ -251,12 +256,12 @@
 /* ---- The six things you can do ------------------------------------------ */
 
 /* The six things you can do to a claim. It is opened on purpose and closed
- * again, so it takes the room it needs first and scrolls itself if the column
- * cannot spare it. */
+ * again, so it takes the room it needs and no more — and, like every other
+ * section, it does not scroll inside itself. The one scrolling box on this
+ * screen is the panel around it, and `styles/app.css` owns that rule. */
 .intervene {
   flex: 0 1 auto;
   min-height: 11rem;
-  overflow-y: auto;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);
@@ -326,15 +331,9 @@
   border-color: var(--text-muted);
 }
 
-/* A button for something that is not built yet. It is still a button, still
- * reachable, and it says what it would do and that it cannot yet — because a
- * control that is quietly inert is worse than one that explains itself. The
- * dashed edge is the glance; the words under it are the reading. */
-.intervene__button[data-live="no"] {
-  border-style: dashed;
-  color: var(--text-muted);
-}
-
+/* The line under a button's own words: what it means, or what it wants. Quieter
+ * than the button, and never the only thing that says anything — the button's
+ * words stand on their own. */
 .intervene__hint {
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);

@@ -97,7 +97,7 @@ When there is no wire in that direction, focus does not move and the status line
 
 ### B3 — `E`, `B`, `Space`, `?`
 
-- **`E`** opens the intervention panel on the focused claim: the six buttons, word for word from `spec/vocabulary.md`'s Interface words table — **Suppose this is true** · **This happened** · **Add a claim** · **Change this push** · **Split this claim** · **My own number**. A panel beside the canvas, never a pop-up.
+- **`E`** opens the intervention panel on the focused claim: every operation this build has, word for word from `spec/vocabulary.md`'s Interface words table — **Suppose this is true** · **Suppose this is false** · **This happened** · **Add a claim** · **Change this push** · **My own number**. A panel beside the canvas, never a pop-up. **Split this claim** is not among them: it is not built, so it is not offered — the words are settled and the control arrives with the operation. The mouse reaches the same panel from the Inspector's head, which carries **Change this claim** on a claim and **Change this push** on an arrow.
 - **`B`** forks a branch from the focused claim and names it.
 - **`Space`** flips A ⇄ A′ — the base world and the branch — as a **hard switch**, not a crossfade. What is painted in each is `diff-view.md`.
 - **`?`** opens the shortcuts sheet, which lists every key above and carries the line about dragging:
