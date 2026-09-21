@@ -197,9 +197,11 @@ Coverage is measured on the rules layer alone — `backend/src/katalyst/domain/`
 
 The one test that matters most is still `backend/tests/unit/test_import_boundary.py`. `test_domain_imports_nothing_impure` reads every file under `domain/` — twelve of them now — and fails if any imports the engine, the routes, the grounding layer, or a model client. It is the rule "the model proposes; our code decides" made mechanical.
 
-**Runs on every pull request**, in six checks named `backend`, `frontend`, `types-fresh`, `docker`, `e2e` and `recordings` (`.github/workflows/ci.yml`). None of them is given an API key, and none needs one. `types-fresh` regenerates `frontend/src/api/schema.ts` from the server's own description of itself and fails if the result differs from what is committed, which is what stops the two halves drifting apart. `e2e` installs Chromium alone and starts both halves. **`recordings`, new with stack 04, reads every committed recording**: that each parses, that each starts and ends where a generation does, that none stores likelihoods it should recompute, that no two were made from the same sentence, and that each was made against the words this program uses now — a prompt hash the build compares. It passes on an empty folder, so it is green from the commit that adds it.
+**Runs on every pull request**, in six checks named `backend`, `frontend`, `types-fresh`, `docker`, `e2e` and `recordings` (`.github/workflows/ci.yml`). None of them is given an API key, and none needs one. `types-fresh` regenerates `frontend/src/api/schema.ts` from the server's own description of itself and fails if the result differs from what is committed, which is what stops the two halves drifting apart. `backend` does the same thing for `docs/worked-numbers.txt` in a step of its own rather than in a seventh job, because it needs nothing the Python half has not already installed. `e2e` installs Chromium alone and starts both halves. **`recordings`, new with stack 04, reads every committed recording**: that each parses, that each starts and ends where a generation does, that none stores likelihoods it should recompute, that no two were made from the same sentence, and that each was made against the words this program uses now — a prompt hash the build compares. It passes on an empty folder, so it is green from the commit that adds it.
 
-Deliberately skipped in v1: snapshot tests of rendered graphs, load tests, coverage thresholds outside `domain/`, more than one end-to-end test.
+**One generated file owns every number the worked example quotes** `[built]`. `make numbers` runs the shipped engine on the Strait of Hormuz map at the example's own seed and the shipped loop sizes and writes [`docs/worked-numbers.txt`](docs/worked-numbers.txt): each claim's reading in each world, what the strike branch and the two observations did to it, the ranked list of endings each edit reached, the sentence beside each list, the number on every arrow, and where each band comes from — with the numbers a person typed into the fixture kept in a part of their own, labelled apart, because those are stable and the computed ones all move together. Every line starts with a stable name such as `B · base · reading`, so prose cites a line rather than restating a figure. The file is committed; the `backend` check regenerates it and fails on any difference, which is the mechanism `types-fresh` already uses, and `backend/tests/unit/engine/test_worked_numbers_as_a_program.py` starts the program in its own process so a developer finds out locally in two seconds instead of on a pull request. Computed numbers print twice, as the product prints them and at six decimal places — six rather than sixteen because the arithmetic runs through numpy, whose exponential is not promised to be identical on the Intel machine the build runs on and the Arm machine it is often written on. The rule this buys: **a number the engine computes appears in a document only where that file is one link away.** It matters most at the next engine change, when every number moves at once and the diff of one file is the whole reviewable statement of what moved.
+
+Deliberately skipped in v1: snapshot tests of rendered graphs, load tests, coverage thresholds outside `domain/`, more than one end-to-end test. A lint that scans prose for decimals is not here either: the numbers file and the build check are the gentle version of that rule, chosen on 2026-09-21 over a strict one that would have deleted about a hundred passages that teach.
 
 **Two things the browser half checks that no test can.** Whether the interface looks like somebody else's component library, and whether a greyscale screenshot still says everything the colour one did, are checked by a person against the twelve-line visual review checklist in `spec/workbench/README.md`. A checklist line is a checkable thing; it is checked by eye, on every screenshot, before any of it is shown to anyone.
 
@@ -213,9 +215,10 @@ Python tests live inside `backend/`, next to the project they test, so `pytest` 
 katalyst/
 ├── AGENTS.md  ASSIGNMENT.md  PRODUCT_REQUIREMENTS.md  ARCHITECTURE.md   enduring context
 ├── README.md            what this is, and how to run it
-├── Makefile             every task: dev  up  down  prod  test  lint  types  eval
+├── Makefile             every task: dev  up  down  prod  test  lint  types  numbers  eval
 ├── docs/adr/            numbered decision records (a journal)
 ├── docs/measurements.md what the paid runs cost and took, dated (a journal)
+├── docs/worked-numbers.txt  [generated] every number the worked example quotes
 ├── docs/research/       the four research reports that fed the requirements
 ├── spec/                the spec, organized as a book by idea
 ├── backend/
@@ -224,6 +227,7 @@ katalyst/
 │   │                   engine/: client (the only file that talks to a model)  prompt
 │   │                     proposal  expand  grow  grounding  verify  receipt  pricing
 │   │                     events  transcript  record  replay  check_recordings  ids  worlds
+│   │                     worked_numbers  (writes docs/worked-numbers.txt)
 │   ├── recordings/     one whole generation per example, for a keyless clone to play back
 │   ├── .runs/          [not committed] what every paid run produced, whatever became of it
 │   └── tests/          unit/ (domain/  engine/  fixtures/)  api/  boundary/

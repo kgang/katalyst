@@ -70,6 +70,18 @@ jobs:
       - name: Check types
         run: uv run mypy src
 
+      # The worked example's numbers are generated from the engine and committed,
+      # exactly as the browser's types are. This works them out again and fails if
+      # the result differs, which is what stops a chapter quoting a figure the
+      # engine stopped producing. It needs no key: it reads a stored map and does
+      # arithmetic.
+      - name: Work out every number the worked example quotes
+        run: uv run python -m katalyst.engine.worked_numbers
+
+      - name: docs/worked-numbers.txt is stale — run `make numbers` and commit the result
+        run: git diff --exit-code -- docs/worked-numbers.txt
+        working-directory: ${{ github.workspace }}
+
       - name: Run the tests
         # `--record-mode=none` means a test may only replay an exchange that is
         # already recorded. An unrecorded call fails the test instead of dialling
