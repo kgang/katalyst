@@ -123,12 +123,14 @@ The three voices are stored and drawn separately and **never averaged** — INV-
 **A chip is three stacked lines**: the owner, then the number, then the range beneath it.
 
 ```
-model          market                    model
-.61            .52                       .61
-.45–.74        .49–.55                   .45–.74
+ a venue quotes this claim, and           nobody quotes it and nothing
+ the reader has said nothing              has been said about it
 
-a claim a venue quotes, and the        the same claim with nobody
-reader has said nothing about          quoting it and nothing said
+ ┌──────────────────────────────┐         ┌──────────────────────────────┐
+ │ model         market         │         │ model                        │
+ │ .61           .52            │         │ .61                          │
+ │ .45–.74       .49–.55        │         │ .45–.74                      │
+ └──────────────────────────────┘         └──────────────────────────────┘
 ```
 
 Stacked, because three numbers and three ranges strung along one line of a 280-pixel tile is a row of digits nobody parses. The one-line form `.61 (.45–.74)` is still the canonical spelling and is used everywhere the chip is not: in prose, in the outline view, and as the chip's own accessible name, so a screen reader hears one phrase rather than three fragments.
