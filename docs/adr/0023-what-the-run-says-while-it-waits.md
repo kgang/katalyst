@@ -3,11 +3,11 @@
 status: proposed
 date: 2026-09-21
 decision-makers: Kent Gang
-consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/notes/2026-09-21-kent-m4-feedback.md`); analyst UA's read-only pass over the generating screen, the same day (`plans/ux-round/A-live-status.md`); the red team's re-run of it (`plans/ux-round/RT-red-team.md`, items 1, 5 and 7); ADR-0012 (a replay is the real stream played back); ADR-0008 (how much browser testing a change needs)
+consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/notes/2026-09-21-kent-m4-feedback.md`); analyst UA's read-only pass over the generating screen, the same day (`plans/ux-round/A-live-status.md`); the red team's re-run of it (`plans/ux-round/RT-red-team.md`: its verdict on this plan, and items 5 and 7 of *what must change*); ADR-0012 (a replay is the real stream played back); ADR-0008 (how much browser testing a change needs)
 informed: agents working in `frontend/src/stream/`, `frontend/src/components/`, `frontend/src/a11y/` and `frontend/e2e/`; the stack-06-4 dock lane, which owned the *Run details* move until this record pulled it forward
 supersedes: none
 superseded-by: none
-spec-impact: spec/workbench/streaming-growth.md (B1, the dock's fourth section, a new B11, B10, INV-workbench.78, two new invariants .80 and .81, anti-pattern 8 and a new 13, open question 1 answered — and INV-workbench.60, .18 and .73 explicitly unchanged); spec/workbench/README.md visual review checklist VR13; PRODUCT_REQUIREMENTS.md UX-8 and §10 anti-pattern 9; ARCHITECTURE.md §1 and §10
+spec-impact: spec/workbench/streaming-growth.md (B1, the dock's fourth section, a new B11, B10, INV-workbench.78, two new invariants .80 and .81, anti-pattern 8 and a new 13, open question 1 answered — and INV-workbench.60, .18 and .73 explicitly unchanged); spec/workbench/README.md visual review checklist VR2 and VR13; PRODUCT_REQUIREMENTS.md UX-8 and §10 anti-pattern 9; ARCHITECTURE.md §1 and §10
 ---
 
 # ADR-0023: What the run says while it waits
@@ -18,7 +18,7 @@ On 2026-09-21 Kent ran the app with his own model key for the first time, presse
 
 **Nothing was broken.** The run was working exactly as designed, and the screen had no way to say so.
 
-**How long the silences are.** Measured by the coordinator session the same evening, on Kent's own keyed run, and written down in `plans/notes/2026-09-21-kent-m4-feedback.md`: the first event arrives **about 23 seconds** after the press and later ones **50 to 110 seconds** apart; in between, the screen shows one dim dashed *HELD OPEN* rectangle and nothing else. The pictures are in `plans/logs/m4-look/`. Analyst UA measured one model call at **51.98 seconds** at `medium` effort and **109.65 seconds** at the effort the recorder uses, read off the two evaluation logs of that day (`plans/logs/eval-hormuz-medium.log`, `plans/logs/eval-hormuz.log`; `plans/ux-round/A-live-status.md` §1). A round asks about three claims at once, so events land in bursts and the screen is then still for about a minute.
+**How long the silences are.** Measured by the coordinator session the same evening, on Kent's own keyed run, and written down in `plans/notes/2026-09-21-kent-m4-feedback.md`: the first **proposal** arrives **about 23 seconds** after the press and later ones **50 to 110 seconds** apart; in between, the screen shows one dim dashed *HELD OPEN* rectangle and nothing else. *(The note says "the first event". It means the first proposal: `generation_started` is yielded before the engine makes any call at all — `_lived` in `backend/src/katalyst/api/generate.py` sends it before it builds the walk — and it is what draws the rectangle the reader is then left looking at. The measurement is unchanged; only the word is corrected.)* The pictures are in `plans/logs/m4-look/`. Analyst UA measured one model call at **51.98 seconds** at `medium` effort and **109.65 seconds** at the effort the recorder uses, read off the two evaluation logs of that day (`plans/logs/eval-hormuz-medium.log`, `plans/logs/eval-hormuz.log`; `plans/ux-round/A-live-status.md` §1). A round asks about three claims at once, so events land in bursts and the screen is then still for about a minute.
 
 **The sentence that would have told him already exists, and is clipped to one pixel.** `frontend/src/stream/GenerationScreen.tsx` passes `spokenOnly={true}` to the map frame, and `frontend/src/components/generationDock.css` gives `.map-live--spoken` a one-pixel box with its content clipped away. So *"Asked for a map of … A rectangle is held open where the first claim will go"* (`frontend/src/a11y/growth.ts`, `theOpeningLine`) is **spoken to a screen reader and never printed**. A browser test asserts that clipping — `frontend/e2e/generate.spec.ts:230` — which is why no test in the suite could have caught what Kent saw.
 
@@ -37,7 +37,7 @@ So: **what may the foot of a growing map show, while nothing has come back for a
 * **No server change.** `api/generate.py` says it in its own comment: *never send a heartbeat, a comment line or anything that is not one of the eight events. A recording is this stream line for line.* R5 holds every change to what the model is asked, and to what a recording carries, for one freeze after the engine's flip. A ninth event would break both.
 * **The browser may count only what it can honestly count.** Measured off `backend/recordings/hormuz.jsonl` by analyst UA (`plans/analysis/scripts/ux-round/A/what_the_wire_already_says.py`, 2026-09-21): the recording holds **26 events**; the transcript counter runs 0 → 22; claims 0 → 18; places held open 0 → 5; refusals 0 → 3. The receipt's **29 calls against 23 growth events** is the gap — so the browser can honestly count *proposals* and can never count *calls*.
 * **Never an estimate.** `spec/workbench/streaming-growth.md` anti-pattern 8 forbids estimating the cost, the progress or the remaining claims: the caps that would have to be divided by are the server's and are not on the wire.
-* **A replay is paced by us.** `KATALYST_REPLAY_PACE` is 0.6 seconds in the shipped product and 0.4 seconds under the browser suite (`frontend/playwright.config.ts:209`). A seconds counter on a replay would reset twice a second and would be measuring our own pacing rather than any wait.
+* **A replay is paced by us.** `KATALYST_REPLAY_PACE` is 0.6 seconds in the shipped product (`A_COMFORTABLE_PACE` in `backend/src/katalyst/settings.py`, which is the setting's default) and 0.4 seconds under the browser suite (`frontend/playwright.config.ts:209`). A seconds counter on a replay would reset twice a second and would be measuring our own pacing rather than any wait.
 * **A counter inside a live region speaks.** The polite region says what changed (INV-workbench.78). A number that ticks inside it would be announced every second.
 
 ## Considered Options
@@ -61,7 +61,7 @@ Chosen option: **"M3 — a sentence and counting seconds, and nothing else moves
 
 ### What ships
 
-**One strip at the foot of both map screens, in place of three strips that were not about the run.** Left, the state as one word in the mono mark box the foot already uses; then one human sentence; then, only while a live run is open, the count of seconds since the last event. Two strips stand at the foot afterwards, not one: this, and the keyboard's own *last key* line, which is unchanged here and belongs to `keyboard-and-access.md`.
+**One strip at the foot of both map screens, in place of three strips that were not about the run.** Left, the state as one word in the mono mark box the foot already uses; then one human sentence; then — whenever the screen is waiting on the server — the count of seconds since the last event. **Waiting on the server** means a live run that has not stopped, and it also means a stored map whose world is being worked out, which already says in words that it is asking; it never means a replay, whose pace we set ourselves. The table below is the authority, row by row. Two strips stand at the foot afterwards, not one: this, and the keyboard's own *last key* line, which is unchanged here and belongs to `keyboard-and-access.md`.
 
 Every sentence in this table is a string that exists today. The strip is only where they land.
 
@@ -120,7 +120,7 @@ One check is **added**, because this decision creates the first timer in product
 * One end-to-end test with `KATALYST_REPLAY_PACE` set long — the suite's first meeting with a real silence, with no key and no cost.
 * `frontend/e2e/generate.spec.ts:230`'s assertion that the live region carries `map-live--spoken` is **deleted and inverted**: at the gap the suite already brackets, the strip must be visible and must name what is being waited for.
 * `noSpinner.test.ts` › `test_the_only_thing_that_changes_on_a_timer_is_a_measured_reading`.
-* Visual review checklist `VR2` (no spinner, no pop-up, no dialog) is checked on a picture of a live run, not only of a replay.
+* Visual review checklist `VR2` (no spinner, no pop-up, no dialog) gains a clause in `spec/workbench/README.md` in the same pull request as this record: it is checked on a picture of a run that is **waiting**, not only of one that has finished, because the wait is the only place a spinner could be.
 
 ## Pros and Cons of the Options
 
@@ -163,7 +163,7 @@ One check is **added**, because this decision creates the first timer in product
 * **Kent's decision, 2026-09-21 (R35)**, taken with the question tool after the three sketches above: *"a sentence and counting seconds only"*. Recorded in `plans/notes/2026-09-21-decisions-after-review.md`, row R35, with his original words from `plans/notes/2026-09-21-kent-m4-feedback.md`.
 * **R16, pulled forward the same day** — *Run details* moves routes, seed and loop counts off the always-on strip into a section of the panel, never a dialog, and the strip keeps one human sentence. Decided for stack 06-4; dated into this stack by this record.
 * **The analysis:** `plans/ux-round/A-live-status.md` (analyst UA, 2026-09-21) — §1 for what is true today with file and line for each claim, §2 for the three designs, §3 for the rule about motion, §5 for the questions put to Kent. Its scripts are under `plans/analysis/scripts/ux-round/A/`.
-* **The adversarial pass:** `plans/ux-round/RT-red-team.md`, 2026-09-21 — item 1 (the plan is sound after changes), item 5(c) (a replay must show no seconds), item 7 (the suite has never seen a live run, and one end-to-end test with the pace set long is the cheap way to fix that).
+* **The adversarial pass:** `plans/ux-round/RT-red-team.md`, 2026-09-21 — the first row of its verdict table (*A — the run says what it is doing: sound after changes; every file and line checks out*), item 5(c) of *what must change* (a replay must show no seconds), item 7 of the same list (the suite has never seen a live run, and one end-to-end test with the pace set long is the cheap way to fix that).
 * **ADR-0012** — a replay is the real stream played back, which is why no ninth event is built before the recordings can carry it.
 * **ADR-0008**, amended 2026-09-21 — three tiers of browser testing; this is tier 2, so a no-browser test that injects the adverse timing is required.
 * **ADR-0006** — one whole proposal per call, which is why there is no token to stream and no progress to divide.

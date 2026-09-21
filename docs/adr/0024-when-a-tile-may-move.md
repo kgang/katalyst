@@ -3,11 +3,11 @@
 status: proposed
 date: 2026-09-21
 decision-makers: Kent Gang
-consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/notes/2026-09-21-kent-m4-feedback.md`); analyst UB's measurement of three real streams through the app's own layout code (`plans/ux-round/B-layout.md`, scripts under `plans/analysis/scripts/ux-round/B/`); the red team's re-run of those measurements (`plans/ux-round/RT-red-team.md`, items 1, 2 and 4); ADR-0007 (the canvas and its layered layout)
+consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/notes/2026-09-21-kent-m4-feedback.md`); analyst UB's measurement of three real streams through the app's own layout code (`plans/ux-round/B-layout.md`, scripts under `plans/analysis/scripts/ux-round/B/`); the red team's re-run of those measurements (`plans/ux-round/RT-red-team.md`, items 1 and 2 of *what must change*, and its question 4 to Kent); ADR-0007 (the canvas and its layered layout)
 informed: agents working in `frontend/src/graph/` — `layoutRunner.ts`, `elkGraph.ts`, `layers.ts`, `Canvas.tsx`, `geometry.ts` — and in `frontend/e2e/`
 supersedes: none
 superseded-by: none
-spec-impact: spec/workbench/streaming-growth.md (B3 rewritten, INV-workbench.64 rewritten, .79 given a dated clause, anti-pattern 7 rewritten, anti-pattern 12 reworded, open question 2 reopened and answered); spec/workbench/layout-and-zoom.md (B3, INV-workbench.22 and .23); spec/workbench/README.md visual review checklist VR13; ARCHITECTURE.md §10 — and spec/workbench/diff-view.md INV-workbench.40 explicitly untouched
+spec-impact: spec/workbench/streaming-growth.md (B3 rewritten, INV-workbench.64 rewritten, .79 given a dated clause, anti-pattern 7 rewritten, anti-pattern 12 reworded, open question 2 reopened and answered); spec/workbench/layout-and-zoom.md (B3, INV-workbench.22 and .23); spec/workbench/README.md visual review checklist VR13; ARCHITECTURE.md §1 and §10 — and spec/workbench/diff-view.md INV-workbench.40 explicitly untouched
 ---
 
 # ADR-0024: When a tile may move
@@ -24,7 +24,7 @@ He was looking at a real defect, and it has one cause.
 * `readPositions` (`frontend/src/graph/elkGraph.ts`) says in its own words: *a tile that had a position keeps that position, to the pixel*. The pin holds **x as well as y**. The layout engine re-lays the map out correctly underneath, and we put every placed tile back where it was.
 * `pinsFor` (same file) drops the pins only when a box changes height. Measured: **zero pin drops in 25, 14 and 12 layout passes** across the three runs. A tile reserves its belief rail from the first frame (`BELIEF_RAIL = 69` in `frontend/src/graph/geometry.ts`), so when the likelihoods land and every chip fills, no tile changes height and no pin is dropped. INV-workbench.64's note that *every tile gains a chip and so every tile can change height* does not describe what happens: the whole run is one unbroken chain of pins.
 
-**The Verify door makes it acute.** The destination claim arrives second, with **no incoming arrows at all** — nothing points at it yet — so it lands in column 0 beside the hypothesis and is pinned there. On one of Kent's kept live runs it ends in column **3**, with four arrows into it from claims placed to its right.
+**The Verify door makes it acute.** The destination claim arrives second, with **no incoming arrows at all** — nothing points at it yet — so it lands in column 0 beside the hypothesis and is pinned there. On one of Kent's kept live runs it ends in column **3**, with four arrows into it — three of them from claims placed to its right, which is where that run's three backwards arrows come from, and one from a claim in its own column.
 
 | Map | As drawn today | Backwards arrows | Wire length | Height |
 |---|---|---|---|---|
@@ -90,7 +90,7 @@ In full, as three clauses a test can hold:
 
 1. **A tile keeps its row.** Its vertical place, and its order within its column, are pinned from the moment it is first drawn and are never taken from it while the map grows. This is INV-workbench.23 and it is unchanged — it is now the half of the pin that does all the work.
 2. **A tile's column is re-read from the arrows on every pass.** When a later arrow proves a claim belongs further right, the claim goes there, on that arrival, rather than staying put and being drawn with an arrow doubling back into it. **No arrow points backwards at any moment**, except a feedback arrow, which is set aside before columns are assigned and is *meant* to point backwards.
-3. **The map settles once, when the run stops.** Whatever takes the run past *growing* — the likelihoods landing, a break, a stream that ends early — clears every pin and lays the map out once, whole, and it never moves again.
+3. **The map settles once, when the run stops.** Whatever takes the run past *growing* — the likelihoods landing, a break, a stream that ends early — clears every pin and lays the map out once, whole, and it never moves again. **This is the one moment a tile may change row**, and it is why clause 1 is scoped to the growing map: on the eighteen-claim recording the settle takes the map's height from 2 640 to 2 010 pixels, which no rule holding every row could allow.
 
 ### The settle happens at a moment that already exists
 
@@ -176,7 +176,7 @@ This is not a new event and not a new frame. `GenerationScreen.tsx` already pass
 
 * **Kent's decision, 2026-09-21 (R37)**, taken with the question tool: *both — during the run and once at the end.* Recorded in `plans/notes/2026-09-21-decisions-after-review.md`, row R37, with his original words in `plans/notes/2026-09-21-kent-m4-feedback.md`.
 * **The measurement:** `plans/ux-round/B-layout.md` (analyst UB, 2026-09-21) — §1 for the mechanism with file and line for each step and the three-map table, §2 for the candidates, §3 for the amendment each decision needs. Scripts under `plans/analysis/scripts/ux-round/B/`, which bundle the app's own layout modules rather than reimplementing them.
-* **The correction that changed the answer:** `plans/ux-round/RT-red-team.md`, 2026-09-21 — item 2 (the analysis argued Kent's own option down using the one map where the problem does not occur; split by map it costs 5 and 3 moves), item 1 (the evidence files are git-ignored), item 4 (one live Verify run committed as a test fixture).
+* **The correction that changed the answer:** `plans/ux-round/RT-red-team.md`, 2026-09-21 — item 2 of *what must change* (the analysis argued Kent's own option down using the one map where the problem does not occur; split by map it costs 5 and 3 moves), item 1 of the same list (the evidence files are git-ignored), and **question 4** of its five questions to Kent (may one live Verify run be committed as a test fixture).
 * **ADR-0007** — React Flow with the layered layout, `semiInteractive` crossing minimisation, and already-placed tiles pinned by `elk.position` so a newly streamed tile never reshuffles an existing layer. This record is the dated amendment to that last clause: the pin holds the row, not the column. *(Turning `semiInteractive` off was measured and changes nothing on any of the three maps — the options are not the problem; the pin is.)*
 * **ADR-0008**, amended 2026-09-21 — three tiers of browser testing; this is tier 2.
 * `spec/workbench/streaming-growth.md` B3, INV-workbench.64, anti-pattern 7, open question 2 · `spec/workbench/layout-and-zoom.md` B3, B7, INV-workbench.22, .23, .25 · `spec/workbench/diff-view.md` INV-workbench.40 (untouched) · `spec/workbench/README.md` visual review checklist VR13.
