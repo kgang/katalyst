@@ -61,7 +61,7 @@ Chosen option: **"M3 — a sentence and counting seconds, and nothing else moves
 
 ### What ships
 
-**One strip at the foot of both map screens, in place of three.** Left, the state as one word in the mono mark box the foot already uses; then one human sentence; then, only while a live run is open, the count of seconds since the last event.
+**One strip at the foot of both map screens, in place of three strips that were not about the run.** Left, the state as one word in the mono mark box the foot already uses; then one human sentence; then, only while a live run is open, the count of seconds since the last event. Two strips stand at the foot afterwards, not one: this, and the keyboard's own *last key* line, which is unchanged here and belongs to `keyboard-and-access.md`.
 
 Every sentence in this table is a string that exists today. The strip is only where they land.
 
@@ -70,7 +70,7 @@ Every sentence in this table is a string that exists today. The strip is only wh
 | stored map | `stored` | the map's own origin — *this map was built earlier and is drawn as it was written* | no |
 | stored map, engine asked | `asking` | the reason the map screen already prints while `/api/worlds` runs | yes |
 | replay | `replay` | the replay sentence, plus what has arrived so far | **no** |
-| live, waiting | `live` | the opening line, or the last thing that changed | yes |
+| live, waiting | `live` | the opening line, or the last thing that changed — and what is being worked on, named from `frontier` | yes |
 | live, arriving | `live` | what just changed, in its own words | yes |
 | finished | `finished` | why it stopped, with the run's own counts | no |
 | failed | `stopped` | the one plain sentence the run left | no |
@@ -84,7 +84,7 @@ Every sentence in this table is a string that exists today. The strip is only wh
 
 **The spoken sentence becomes the printed sentence.** `spokenOnly` is deleted rather than guarded, and the browser test that asserts the clipping is inverted. The live region keeps saying what *changed*; the strip prints the same sentence; the seconds sit **beside** the region, not inside it and not hidden from a screen reader — plain text, reachable, never announced.
 
-**Provenance moves into a *Run details* section of the panel — R16, pulled forward.** The line naming the route, the generation identifier and the seed leaves the always-on foot for a *Run details* section of the panel beside the map. **Never a dialog.** This is decision R16 word for word; all this record changes is *when* — it was stack 06-4's and is now this stack's, dated 2026-09-21 — and the reason for moving it now is that it is what makes un-hiding the run's sentence safe. With the provenance line gone, nothing else at the foot repeats it, and the foot is one strip instead of three.
+**Provenance moves into a *Run details* section of the panel — R16, pulled forward.** The line naming the route, the generation identifier and the seed leaves the always-on foot for a *Run details* section of the panel beside the map. **Never a dialog.** This is decision R16 word for word; all this record changes is *when* — it was stack 06-4's and is now this stack's, dated 2026-09-21 — and the reason for moving it now is that it is what makes un-hiding the run's sentence safe. With the provenance line gone, nothing else at the foot repeats what the run strip says.
 
 **No server change. The stream stays exactly the eight events.** Nothing here is folded from a new event, nothing polls, and no recording changes. That is what keeps this clear of R5's one shape freeze.
 
@@ -108,7 +108,7 @@ One check is **added**, because this decision creates the first timer in product
 * Good, because a reader who presses the button and waits 23 seconds is told, in ink, what the tool is doing and how long it has been doing it — which is the whole of what Kent could not see.
 * Good, because it costs no server change, no new event, no recording, and nothing from R5's freeze.
 * Good, because the sentence a screen reader hears and the sentence a reader sees become the same sentence, so the two can never drift apart again.
-* Good, because the foot goes from three strips of prose to one, and the provenance line stops asserting arrivals on an empty map.
+* Good, because the foot goes from three strips of prose to two, one of which is now about the run, and the provenance line stops asserting arrivals on an empty map.
 * Bad, because a reader gets less than Kent first asked for: nothing on the screen moves except a number, and on a slow call the screen is still a mostly-still picture for a minute.
 * Bad, because a replay and a live run now differ in one visible way — the replay has no seconds — and that difference has to be explained wherever somebody notices it.
 * Neutral, because the hairline of option M1 remains buildable later: it needs the same strip, the same clock and no new data, so choosing M3 now forecloses nothing.
