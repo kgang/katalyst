@@ -117,6 +117,8 @@ def some_shapes(
     return ClaimShapes(
         claim=claim,
         deadline=int(window.edges[slices]),
+        edges=window.edges,
+        middle_day=window.middle_day,
         width=width,
         points=reading_days(window, slices),
         arrows=tuple(f"arrow-{index}" for index in sorted(carried)),
@@ -291,14 +293,10 @@ def test_a_state_with_nothing_to_end_it_is_an_event():
     shapes, rates, added = a_claim_with_one_helper(window)
     causes = [times_of_an_event(1)]
 
-    as_an_event = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="event", joint=False
-    )
-    as_a_state = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="state", joint=False
-    )
+    as_an_event = on_and_off(shapes, rates, added, causes, persistence="event", joint=False)
+    as_a_state = on_and_off(shapes, rates, added, causes, persistence="state", joint=False)
     as_a_state_with_its_pair = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="state", joint=True
+        shapes, rates, added, causes, persistence="state", joint=True
     )
 
     assert not shapes.ends
@@ -324,7 +322,6 @@ def test_the_sign_of_an_arrow_picks_which_rate_it_bends():
         bare_rates,
         added_up_by_hand(bare_shapes, bare_rates),
         causes,
-        window=window,
         persistence="state",
         joint=False,
     )
@@ -336,7 +333,6 @@ def test_the_sign_of_an_arrow_picks_which_rate_it_bends():
         helping_rates,
         added_up_by_hand(helping_shapes, helping_rates),
         causes,
-        window=window,
         persistence="state",
         joint=False,
     )
@@ -348,7 +344,6 @@ def test_the_sign_of_an_arrow_picks_which_rate_it_bends():
         ending_rates,
         added_up_by_hand(ending_shapes, ending_rates),
         causes,
-        window=window,
         persistence="state",
         joint=False,
     )
@@ -389,7 +384,6 @@ def test_the_chance_it_stops_is_closed_form():
         rates,
         added,
         [times_of_an_event(0)],
-        window=window,
         persistence="state",
         joint=False,
     )
@@ -434,7 +428,6 @@ def test_a_sustain_arrow_reads_the_whole_interval_and_a_trigger_only_the_on_day(
         trigger_rates,
         trigger_added,
         [unchanging],
-        window=window,
         persistence="event",
         joint=False,
     )
@@ -443,7 +436,6 @@ def test_a_sustain_arrow_reads_the_whole_interval_and_a_trigger_only_the_on_day(
         trigger_rates,
         trigger_added,
         [stopping],
-        window=window,
         persistence="event",
         joint=False,
     )
@@ -458,7 +450,6 @@ def test_a_sustain_arrow_reads_the_whole_interval_and_a_trigger_only_the_on_day(
         sustain_rates,
         sustain_added,
         [unchanging],
-        window=window,
         persistence="event",
         joint=False,
     )
@@ -467,7 +458,6 @@ def test_a_sustain_arrow_reads_the_whole_interval_and_a_trigger_only_the_on_day(
         sustain_rates,
         sustain_added,
         [stopping],
-        window=window,
         persistence="event",
         joint=False,
     )
@@ -487,10 +477,8 @@ def test_the_cheap_path_and_the_joint_agree(monkeypatch):
     added = added_up_by_hand(shapes, rates)
     causes = [times_of_an_event(0), times_of_an_event(1)]
 
-    cheap = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="state", joint=False
-    )
-    whole = on_and_off(shapes, rates, added, causes, window=window, persistence="state", joint=True)
+    cheap = on_and_off(shapes, rates, added, causes, persistence="state", joint=False)
+    whole = on_and_off(shapes, rates, added, causes, persistence="state", joint=True)
 
     numpy.testing.assert_allclose(holding_curve(cheap), holding_curve(whole), rtol=0.0, atol=1e-12)
     numpy.testing.assert_allclose(
@@ -506,12 +494,10 @@ def test_the_cheap_path_and_the_joint_agree(monkeypatch):
         raise AssertionError("the square of still-holding chances was built")
 
     monkeypatch.setattr(states, "_still_on_at_each_slice", refuse)
-    again = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="state", joint=False
-    )
+    again = on_and_off(shapes, rates, added, causes, persistence="state", joint=False)
     assert the_same_bytes(again.holding, cheap.holding)
     with pytest.raises(AssertionError, match="was built"):
-        on_and_off(shapes, rates, added, causes, window=window, persistence="state", joint=True)
+        on_and_off(shapes, rates, added, causes, persistence="state", joint=True)
 
 
 def test_the_cheap_path_is_not_taken_for_an_event():
@@ -538,7 +524,6 @@ def test_a_state_switches_on_at_most_once():
         rates,
         added_up_by_hand(shapes, rates),
         [times_of_an_event(0), times_of_an_event(1)],
-        window=window,
         persistence="state",
         joint=True,
     )
@@ -575,13 +560,10 @@ def test_an_events_number_only_rises_and_a_states_can_fall():
         event_rates,
         added_up_by_hand(event_shapes, event_rates),
         causes,
-        window=window,
         persistence="event",
         joint=False,
     )
-    a_state = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="state", joint=False
-    )
+    a_state = on_and_off(shapes, rates, added, causes, persistence="state", joint=False)
 
     rises = numpy.diff(holding_curve(an_event), axis=1)
     assert (rises >= 0.0).all()
@@ -598,15 +580,11 @@ def test_a_pair_of_times_is_refused_by_name():
     shapes, rates, added = a_claim_with_one_helper(window)
     causes = [times_of_an_event(1)]
 
-    an_event = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="event", joint=False
-    )
+    an_event = on_and_off(shapes, rates, added, causes, persistence="event", joint=False)
     with pytest.raises(ValueError, match="claim-b is an event"):
         as_joint(an_event)
 
-    unread = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="state", joint=False
-    )
+    unread = on_and_off(shapes, rates, added, causes, persistence="state", joint=False)
     with pytest.raises(ValueError, match="claim-b is a state whose pair of times"):
         as_joint(unread)
 
@@ -644,9 +622,7 @@ def test_arrows_that_hold_a_claim_back_are_averaged_over_their_arrival_slices():
             pairs=None,
         ),
     ]
-    together = on_and_off(
-        shapes, rates, added, causes, window=window, persistence="event", joint=False
-    )
+    together = on_and_off(shapes, rates, added, causes, persistence="event", joint=False)
 
     one_at_a_time = numpy.zeros((VERSIONS, SLICES + 1))
     for arrived in range(SLICES + 1):
@@ -670,7 +646,6 @@ def test_arrows_that_hold_a_claim_back_are_averaged_over_their_arrival_slices():
                     pairs=None,
                 ),
             ],
-            window=window,
             persistence="event",
             joint=False,
         )
@@ -685,9 +660,7 @@ def test_every_row_of_times_is_a_chance_and_adds_to_one():
     shapes, rates, added = a_claim_with_one_helper(window)
     causes = [times_of_an_event(1)]
     for persistence in ("event", "state"):
-        times = on_and_off(
-            shapes, rates, added, causes, window=window, persistence=persistence, joint=False
-        )
+        times = on_and_off(shapes, rates, added, causes, persistence=persistence, joint=False)
         assert times.claim == shapes.claim
         assert times.persistence == persistence
         assert times.spread.dtype == numpy.float64

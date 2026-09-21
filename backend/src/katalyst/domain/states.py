@@ -59,7 +59,7 @@ from numpy.typing import NDArray
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import PropositionId
 from katalyst.domain.proposition import Proposition
-from katalyst.domain.rates import AddedUp, ClaimShapes, Persistence, Rates, Window
+from katalyst.domain.rates import AddedUp, ClaimShapes, Persistence, Rates
 
 NEVER: Final = -1
 """The marker for *this claim never came on*, where a day index is expected."""
@@ -291,7 +291,6 @@ def _ending_pushes(
     shapes: ClaimShapes,
     rates: Rates,
     cause_times: Sequence[Times],
-    window: Window,
 ) -> list[_EndingPush]:
     """Each ending arrow's push added up per slice, for each thing its cause might have done.
 
@@ -304,13 +303,12 @@ def _ending_pushes(
             days of its own window in each slice.
         rates: The claim's rates, for how much each ending arrow adds.
         cause_times: The times of each cause, in the arrow order of `shapes`.
-        window: The map's window, for the day that stands for an arrival in a slice.
 
     Returns:
         One entry per ending arrow, in the order `ClaimShapes.ends` lists them.
     """
     slices = shapes.width.shape[0]
-    at_or_after_the_middle = window.middle_day[:slices, None] <= shapes.points
+    at_or_after_the_middle = shapes.middle_day[:slices, None] <= shapes.points
     pushes = []
     for index in shapes.ends:
         carried = shapes.carried[index]
@@ -453,7 +451,6 @@ def on_and_off(
     added: AddedUp,
     cause_times: Sequence[Times],
     *,
-    window: Window,
     persistence: Persistence,
     joint: bool,
 ) -> Times:
@@ -472,10 +469,10 @@ def on_and_off(
         shapes: The claim's shapes, in whose arrow order `cause_times` is read.
         rates: The claim's rates, one column per version.
         added: Those rates already added up across the window.
-        cause_times: The times of each cause, in the arrow order of `shapes`.
-        window: The map's window, for the day that stands for an arrival in a slice.
-            A state's off-rate starts accruing at that day, not at the start of the
-            slice, and only this object says where it falls.
+        cause_times: The times of each cause, in the arrow order of `shapes`. A
+            claim is cut into slices over its **own** window, so a cause's slices are
+            not this claim's; `ClaimShapes.carried` has already carried each cause's
+            push onto this claim's own reading days.
         persistence: Which kind of truth this claim is. Passed in rather than read
             off the claim, because the field that carries it arrives with the flip.
         joint: True to build the whole pair of times, false to build only enough for
@@ -497,7 +494,7 @@ def on_and_off(
             pairs=None,
         )
 
-    pushes = _ending_pushes(shapes, rates, cause_times, window)
+    pushes = _ending_pushes(shapes, rates, cause_times)
     still_on = _still_on_at_each_slice(pushes, versions, slices) if joint else None
 
     if not shapes.ends:

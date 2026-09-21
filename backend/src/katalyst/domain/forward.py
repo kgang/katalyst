@@ -402,7 +402,6 @@ def _a_states_table(
                 rates,
                 added,
                 held or cause_times,
-                window=window,
                 persistence="state",
                 joint=False,
             )
@@ -513,7 +512,6 @@ def forward_pass(
                 rates,
                 added,
                 cause_times,
-                window=mine,
                 persistence=kind,
                 joint=wants_pairs,
             )
