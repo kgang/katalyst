@@ -175,8 +175,11 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // likelihood will go.
   await expect(page.locator(".tile").first()).toBeVisible();
 
-  // Where the first tile came to rest, before any of the others arrive. Nothing
-  // already placed may move, and this is what that promise is checked against.
+  // Where the first tile came to rest, before any of the others arrive. A tile
+  // keeps its row while the map grows, and this is what that promise is checked
+  // against — **while it is still growing**, because the map settles once at the
+  // moment it stops and a reading taken after that would fail by design
+  // (decision record 0024, 2026-09-21).
   const firstTile = page.locator(".react-flow__node.react-flow__node-claim").first();
   const wasAt = await whereTheTileSits(firstTile);
 
@@ -191,6 +194,13 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   await expect(sheet).toContainText("Tiles do not move");
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
+
+  // **And the first tile has not moved, with the map still growing under it.**
+  // Taken here, with more claims on the map than there were when the reading
+  // above was taken and more still on their way: that is what makes it a
+  // statement about a map that went on growing rather than about one frame.
+  await expect(page.locator(".tile").nth(1)).toBeVisible();
+  expect(await whereTheTileSits(firstTile)).toBe(wasAt);
 
   // Every proposal the rules refused is on screen, in the validator's own words
   // — and a run that refused nothing says that, rather than leaving an empty
@@ -250,13 +260,17 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   );
   await expect(page.locator(".tile").first()).not.toContainText("no engine yet");
 
-  // The map is framed once more when it stops — the one moment nothing on it is
-  // moving — and then it stays still.
+  // The map is framed once more when it stops, and settles in the same moment —
+  // every pin dropped, the whole map laid out as one thing — and then it stays
+  // still.
   const atRest = await whereTheMapCameToRest(page);
   expect(atRest).not.toBe("");
 
-  // And the tile that was placed first is exactly where it was.
-  expect(await whereTheTileSits(firstTile)).toBe(wasAt);
+  // **And the settle really happened.** On this recording it moves every one of
+  // the eighteen tiles, the first among them, so the tile read while the map was
+  // growing is no longer where it was. If this ever reads the same place again,
+  // the map stopped settling and half of decision record 0024 is gone.
+  expect(await whereTheTileSits(firstTile)).not.toBe(wasAt);
 
   // No two boxes on the map overlap. A claim drawn on top of another is the one
   // failure a growing map makes that a finished one never does.

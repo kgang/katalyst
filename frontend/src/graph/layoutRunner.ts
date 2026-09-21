@@ -137,11 +137,20 @@ function inWords(reason: unknown): string {
  * height, and the two have to be the same box — that is what `geometry.ts` means
  * by content-fit. A pin made for a shorter box no longer describes anything, so
  * the whole map is laid out again; see `pinsFor` for why it is all or none.
+ *
+ * @param settleOn A word that changes when the map should settle: every pin
+ *   dropped, the whole map laid out once, and then nothing moves again
+ *   (decision record 0024). It is the **same word** the canvas is asked to frame
+ *   the map again on, handed through unchanged — so on a map that builds itself
+ *   the settle and the re-frame are one moment and cannot come apart. Left out,
+ *   as every stored map leaves it out, nothing ever settles because nothing is
+ *   being written.
  */
 export function useLayout(
   tiles: readonly LayoutTile[],
   edges: readonly LayoutEdge[],
   mapKey: string,
+  settleOn?: string,
 ): Layout {
   // The map only changes when the claims or the arrows do, and comparing two
   // lists of strings is cheaper and steadier than comparing two arrays by
@@ -162,6 +171,10 @@ export function useLayout(
   // `pinsFor`.
   const placed = useRef(new Map<string, PinnedTile>());
   const laidOutFor = useRef(mapKey);
+  // The last word the map settled on. It starts as whatever it is asked for
+  // now, so a map that arrives already finished does not settle on its first
+  // pass — there is nothing to settle, nothing has been pinned yet.
+  const settledOn = useRef(settleOn);
   const [layout, setLayout] = useState<Layout>({
     positions: new Map(),
     runs: 0,
@@ -178,12 +191,18 @@ export function useLayout(
       placed.current = new Map();
       laidOutFor.current = mapKey;
     }
+    // The run has stopped: the map settles. Every pin goes, once, and the whole
+    // map is laid out as one thing — which is the only moment a tile may take a
+    // new row. It is read here rather than passed in as a flag so that the
+    // settle happens on exactly one pass, however many passes follow it.
+    const theRunHasJustStopped = settledOn.current !== settleOn;
+    settledOn.current = settleOn;
     const [boxes, wires] = JSON.parse(shape) as [[string, number][], [string, string, string][]];
     const tiles: LayoutTile[] = boxes.map(([id, height]) => ({ id, height }));
     // The pins to hold — all of them, or none. A map whose boxes have changed
     // size is laid out again from scratch: holding a grown tile where its
     // shorter self went runs it into whatever sits below.
-    const holding = pinsFor(placed.current, tiles);
+    const holding = pinsFor(placed.current, tiles, theRunHasJustStopped);
     const graph = toElkGraph(
       tiles,
       wires.map(([id, source, target]) => ({ id, source, target })),
@@ -215,7 +234,7 @@ export function useLayout(
     return () => {
       stillWanted = false;
     };
-  }, [shape, mapKey]);
+  }, [shape, mapKey, settleOn]);
 
   return layout;
 }

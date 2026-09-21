@@ -328,8 +328,54 @@ export interface Frame {
 /** The breathing room left around the map when it is framed, as a share of its size. */
 const FIRST_FRAME_MARGIN = 0.04;
 
-/** The gap left at the edge when the map is too big to fit and has to be panned. */
-const EDGE_GAP = 16;
+/**
+ * How far the zoom buttons float in from the corner of the canvas: `--space-2`,
+ * which is the margin `canvas.css` gives `.react-flow__controls`.
+ */
+const CONTROLS_INSET = 16;
+
+/**
+ * How wide the column of zoom buttons is: `--space-4` for the button itself and
+ * the hairline drawn around the stack of them. Measured on the page at two
+ * window sizes on 2026-09-22: they stand from 16 to 50 pixels in from the left
+ * edge of the canvas.
+ */
+const CONTROLS_WIDE = 34;
+
+/**
+ * How far in from the left edge of the canvas the zoom buttons reach.
+ *
+ * Exported so that the promise *the map never starts under a control* can be
+ * checked against the buttons' own geometry rather than against the frame's own
+ * constant, which would be a test of nothing.
+ */
+export const PAST_THE_ZOOM_BUTTONS = CONTROLS_INSET + CONTROLS_WIDE;
+
+/**
+ * The clear space the frame leaves at the edge of the canvas.
+ *
+ * **It is the room the zoom buttons take, and that is the whole point**
+ * *(2026-09-22)*. The buttons float over the bottom-left corner of the canvas,
+ * and this gap used to be `--space-2` — the same sixteen pixels the buttons
+ * themselves are inset by — so a map that did not fit was started at exactly the
+ * place they sit, and its bottom-left tile was drawn underneath them. Measured
+ * on the stored example at 1280 × 800: the hypothesis, the one tile a reader
+ * looks at first, with the zoom buttons over its corner.
+ *
+ * So the map starts on the far side of them, with the same gap again between the
+ * two, and nothing a reader has to read is ever behind a control.
+ */
+const EDGE_GAP = PAST_THE_ZOOM_BUTTONS + CONTROLS_INSET;
+
+/**
+ * The same gap at the top, where nothing floats over the map.
+ *
+ * The left edge has to clear the zoom buttons; the top has only to not touch, so
+ * it keeps the plain `--space-2` it always had. One constant each, rather than
+ * one constant doing two jobs and pushing fifty pixels of map off the bottom of
+ * the window to make room for buttons that are not up there.
+ */
+const TOP_GAP = CONTROLS_INSET;
 
 /**
  * How the map is framed the first time it is drawn — and the one promise that
@@ -348,6 +394,21 @@ const EDGE_GAP = 16;
  * rest. A tile changes representation rather than shrinking; the same principle,
  * applied to the frame rather than to the tile.
  *
+ * **And when it does not fit, it starts on the far side of the zoom buttons**
+ * *(2026-09-22)*. This gap was `--space-2`, the very sixteen pixels the buttons
+ * themselves are inset by, so a map that did not fit began exactly where they
+ * float — and at 1280 × 800 on the stored example the hypothesis, the first
+ * tile anybody reads, was drawn underneath them. See `EDGE_GAP`.
+ *
+ * **What this does not fix, measured the same day.** At 1600 × 1000 the stored
+ * map *does* fit, and it is centred with six pixels to spare on each side, so
+ * its last column sits all but touching the panel beside the map. That is not a
+ * margin that was forgotten: at the readable zoom the map is 1252 pixels wide in
+ * a stage 1264 pixels wide, so there are twelve pixels in the whole stage to
+ * share out. Leaving a proper gap would make the map stop fitting and be cut
+ * instead, which is worse. The fix for that one is a narrower panel or a lower
+ * floor on the zoom, and it is neither of them here.
+ *
  * @param map Everything the frame has to hold, in the map's own coordinates.
  * @param canvas How much room there is for it, in screen pixels.
  */
@@ -359,14 +420,16 @@ export function firstFrame(map: Box, canvas: { width: number; height: number }):
   // Never blown up past life size, however small the map; never shrunk past the
   // point where a full tile would have to become a summary.
   const zoom = Math.max(SUMMARY_BELOW_ZOOM, Math.min(1, fits));
-  const place = (room: number, start: number, size: number): number => {
+  const place = (room: number, gap: number, start: number, size: number): number => {
     const shown = size * zoom;
-    return shown <= room ? (room - shown) / 2 - start * zoom : EDGE_GAP - start * zoom;
+    return shown <= room ? (room - shown) / 2 - start * zoom : gap - start * zoom;
   };
   return {
     zoom,
-    x: place(canvas.width, map.x, map.width),
-    y: place(canvas.height, map.y, map.height),
+    // The left edge is the one the zoom buttons float over, so a map that has to
+    // start there starts past them. The top has nothing over it.
+    x: place(canvas.width, EDGE_GAP, map.x, map.width),
+    y: place(canvas.height, TOP_GAP, map.y, map.height),
   };
 }
 
