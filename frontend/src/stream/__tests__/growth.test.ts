@@ -14,17 +14,23 @@ import { toFlow } from "../../graph/toFlow";
 import { inFewWords } from "../../world/naming";
 import type { ProposalAccepted, StreamEvent } from "../events";
 import type { Growth } from "../growth";
-import { fold, foldAll, waitingFor } from "../growth";
+import { fold, foldAll, onlyTheStripChanged, theStreamEnded, waitingFor } from "../growth";
 import { A_REAL_RUN } from "./aRealRun";
 import {
+  activity,
   B,
   BELIEFS,
+  DONE,
   EVERY_ARROW,
   EVERY_CLAIM,
+  FOUND,
   H,
+  REFUSED,
+  SEARCHING,
   STARTED,
   THE_GROWTH,
   THE_SENTENCE,
+  THINKING,
   theWorld,
 } from "./aStream";
 
@@ -307,6 +313,97 @@ describe("an event this build does not know", () => {
     expect(after.unknown.get("a_call_went_out")).toEqual({ howMany: 2, unreadable: false });
     // Everything else is exactly as it was.
     expect({ ...after, unknown: grown.unknown }).toEqual(grown);
+  });
+
+  it("test_a_tenth_name_is_still_ignored_without_error_now_that_there_are_nine", () => {
+    // The browser learned a ninth name on 2026-09-22. The rule that made a
+    // ninth possible at all is the one that must still hold for a tenth: a
+    // browser that throws on a name it does not know makes the server unable to
+    // add one, and a browser that swallows one makes a missing feature look
+    // like a working one.
+    const grown = foldAll(fresh(), THE_GROWTH);
+    const after = foldAll(grown, [{ event: "unknown", name: "a_tenth_kind_of_line" }]);
+
+    expect(after.unknown.get("a_tenth_kind_of_line")).toEqual({ howMany: 1, unreadable: false });
+    // It touched nothing — not the map, and not what the strip may say either.
+    expect({ ...after, unknown: grown.unknown }).toEqual(grown);
+  });
+});
+
+describe("what the model is doing right now", () => {
+  it("test_an_activity_line_changes_what_the_strip_may_say_and_nothing_else", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+    const after = foldAll(grown, [SEARCHING, THINKING]);
+
+    // The latest of each kind, kept as it arrived, with nothing composed here.
+    expect(after.activity.searching).toEqual({
+      about: SEARCHING.about,
+      kind: SEARCHING.kind,
+      text: SEARCHING.text,
+    });
+    expect(after.activity.thinking?.text).toBe(THINKING.text);
+
+    // **And nothing else moved at all.** Not the map, not the rectangles, not
+    // the refusals, not the receipt, not the phase, not the counts. The line is
+    // never written to a recording, so anything it could move would be
+    // something a replay of this run could not reproduce.
+    expect({ ...after, activity: grown.activity }).toEqual(grown);
+  });
+
+  it("test_the_latest_of_each_kind_wins_and_no_list_is_kept", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+    const later = activity("searching", "a second query, issued a second later", "C");
+    const after = foldAll(grown, [SEARCHING, FOUND, later]);
+
+    // One slot for the search, one for the thought. What came back answers the
+    // query, and the next query answers that: latest only, never a log.
+    expect(after.activity.searching?.text).toBe(later.text);
+    expect(after.activity.thinking).toBeNull();
+  });
+
+  it("test_a_proposal_clears_the_lines_the_call_it_answers_was_saying", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+    const aboutTheStrait = activity("searching", "an open-ended search about the strait", "H");
+    const saying = foldAll(grown, [aboutTheStrait, THINKING]);
+
+    // The proposal that hangs off the war-risk premium — the claim the thinking
+    // line is about — arrives.
+    const answers = THE_GROWTH[4] as StreamEvent;
+    const after = fold(saying, answers);
+
+    expect(after.activity.thinking).toBeNull();
+    // The other call is still out, and still says what it is doing.
+    expect(after.activity.searching?.text).toBe(aboutTheStrait.text);
+  });
+
+  it("test_a_refusal_and_a_stop_clear_everything", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+    const saying = foldAll(grown, [SEARCHING, THINKING]);
+
+    // A refusal carries no claim it hangs off, so the browser cannot say which
+    // call came back. It stops asserting either.
+    const refused = fold(saying, REFUSED);
+    expect(refused.activity).toEqual({ searching: null, thinking: null });
+
+    // And when the run stops, nothing is out, so nothing is being done.
+    const stopped = fold(saying, DONE);
+    expect(stopped.activity).toEqual({ searching: null, thinking: null });
+    // Even a line that arrives after the end changes nothing.
+    expect(fold(stopped, SEARCHING)).toBe(stopped);
+    // A stream that simply stopped being delivered is the same answer.
+    expect(theStreamEnded(saying).activity).toEqual({ searching: null, thinking: null });
+  });
+
+  it("test_only_the_strip_changed_is_what_the_seconds_counter_asks", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+
+    // The counter at the foot reads *nothing new on the map for N s*, and it
+    // starts again on an arrival. An activity line is not one: it is the model
+    // saying what it is doing inside a call that has not come back.
+    expect(onlyTheStripChanged(grown, fold(grown, SEARCHING))).toBe(true);
+    expect(onlyTheStripChanged(grown, fold(grown, THE_GROWTH[4] as StreamEvent))).toBe(false);
+    // Before anything at all, there is nothing to have changed only part of.
+    expect(onlyTheStripChanged(null, grown)).toBe(false);
   });
 });
 
