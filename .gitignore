@@ -237,6 +237,12 @@ frontend/playwright-report/
 frontend/blob-report/
 frontend/.playwright/
 
+# Where a throwaway browser-test setting file goes while somebody is chasing one
+# failure: it names one machine's directories and one afternoon's ports, so it is
+# worthless to anybody else and misleading the moment either changes. The one
+# setting file the project keeps is `frontend/playwright.config.ts`.
+frontend/.tmp-e2e/
+
 # What a paid run left behind: its receipt, its reason for stopping, every
 # proposal with the seconds and thinking tokens it took, and the map it built.
 # Kept by `make record-demo` and `make run-demo` so a run nobody can afford to
