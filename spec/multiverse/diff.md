@@ -353,7 +353,7 @@ All under the `/api/` prefix, in `backend/src/katalyst/api/worlds.py`.
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /api/worlds` | `{base_id, branch, seed, versions?, worlds?}` — `branch` is a whole branch sent by the browser, not a stored identifier; there is no store until stack 05 | One `World` |
+| `POST /api/worlds` | `{base_id, branch, seed, versions?, worlds?}` — `branch` is a whole branch sent by the browser, not a stored identifier. **`worlds` is accepted and ignored since 2026-09-22**, and comes back `0`: there is no inner loop | One `World` |
 | `POST /api/worlds/diff` | `{base_id, branch_a, branch_b, seed, versions?, worlds?}` | One `Diff` |
 | `POST /api/worlds/conditional` | `{base_id, branch, seed, link_id}` | One `Belief`: the arrow's target with the arrow's source **supposed** true — a `do`, never an observation |
 
