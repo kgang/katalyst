@@ -70,6 +70,20 @@ jobs:
       - name: Check types
         run: uv run mypy src
 
+      # The worked example's numbers are generated from the engine and committed.
+      # This works them out again and compares them with what is committed, which
+      # is what stops a chapter quoting a figure the engine stopped producing. It
+      # needs no key: it reads a stored map and does arithmetic, and it writes no
+      # file, so it can sit anywhere in this job.
+      #
+      # It compares numbers **as numbers, with room**, and everything else
+      # character for character. An earlier version compared the file byte for
+      # byte and went red here over a number that differs from the one a Mac
+      # computes in its eighth decimal place — true, reproducible, and about
+      # nothing anybody changed. Stale has to mean a number moved.
+      - name: docs/worked-numbers.txt is stale — run `make numbers` and commit the result
+        run: uv run python -m katalyst.engine.worked_numbers --check
+
       - name: Run the tests
         # `--record-mode=none` means a test may only replay an exchange that is
         # already recorded. An unrecorded call fails the test instead of dialling

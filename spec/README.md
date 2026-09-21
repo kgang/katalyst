@@ -19,7 +19,7 @@ Each part is a directory with a `README.md` landing page (the idea, the terms an
 ## Shape of a chapter
 
 1. **Purpose** — one paragraph: what a user can do that they could not before.
-2. **Data model** — the pydantic models verbatim (pydantic is the Python library that defines and validates our data shapes), plus a diagram where a picture shows a mechanism.
+2. **Data model** — the **shape**: the fields, what each one means, any constraint the type itself cannot carry, and the name of the module that defines it — never the class body. Plus a diagram where a picture shows a mechanism. A chapter that pastes the code in goes stale the first time a field is renamed and says nothing the code did not already say; a chapter that says what a field is *for* is the only place that says it at all. Each chapter is brought into line in the pull request that next touches it, never as a sweep of its own.
 3. **Behaviour** — numbered user-visible flows (`B1`, `B2`, …), each with a worked example on a real event from the assignment.
 4. **INVARIANTS** — numbered statements that must always hold, each written as *for all inputs drawn from generator S, statement P holds*, and each naming the automated test that checks it. If no generator can be named, it is a wish, not an invariant, and belongs under Behaviour.
 5. **ANTI-PATTERNS** — *do not X, because Y; do Z instead*, each traceable to a real temptation.
@@ -30,3 +30,5 @@ Product-level invariants (`INV-1` … `INV-14`) are stated in `PRODUCT_REQUIREME
 ## Writing rules
 
 Every page stands alone: explain a term where it is used, or link to `vocabulary.md`. No unexplained abbreviations or symbols. Concise and punchy; formatting is a legibility aid, not decoration.
+
+**A number the engine computes appears in a chapter only where the numbers file is one link away.** That file is [`docs/worked-numbers.txt`](../docs/worked-numbers.txt): `make numbers` writes it from the shipped engine on the Strait of Hormuz map, the build fails when it goes stale, and every line starts with a name a chapter can cite — `B · base · reading`. Quote the figure if quoting it teaches something, and link to the line; the day the arithmetic changes, the diff of that one file is the whole list of what moved. Numbers a person typed into the example — a stated prior, an arrow's strength, a date — are in a part of their own in that file, are stable, and need no link.
