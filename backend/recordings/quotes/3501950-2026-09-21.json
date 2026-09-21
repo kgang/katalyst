@@ -1,0 +1,494 @@
+{
+  "purpose": "A dated quote from Polymarket, committed for research and development purposes (Kent's decision R23, 2026-09-21). It is the venue's own answers, kept word for word, so that this repository's demo, tests and build read a real price with no key and no network.",
+  "how_it_was_read": [
+    "curl 'https://gamma-api.polymarket.com/events?slug=strait-of-hormuz-traffic-returns-to-normal-by-october-31-20260810151043583'",
+    "curl 'https://clob.polymarket.com/book?token_id=65318042793305154928481822061228422214615698483328483747495637152414701080541'"
+  ],
+  "event": {
+    "id": "830253",
+    "ticker": "strait-of-hormuz-traffic-returns-to-normal-by-october-31-20260810151043583",
+    "slug": "strait-of-hormuz-traffic-returns-to-normal-by-october-31-20260810151043583",
+    "title": "Strait of Hormuz traffic returns to normal by October 31?",
+    "description": "This market will resolve to “Yes” if IMF Portwatch publishes a 7-day moving average of transit calls (“Arrivals of Ships”) for the Strait of Hormuz equal to or above 60 for any date between market creation and October 31, 2026. Otherwise, this market will resolve to “No”.\n\nDaily transit calls include container, dry bulk, roll-on/roll-off, general cargo, and tanker ships. Ships not reported by IMF Portwatch will not be considered.\n\nThis market will resolve as soon as IMF Portwatch publishes a 7-day moving average of transit calls equal to or above the specified level, or once data has been published for the final date in the specified period and no such value has been published. If no data has been published for the final date of the specified period within 14 calendar days (ET) after the end of that period, this market will resolve based on data published up to that point.\n\nRevisions to previously published data points made within this market’s timeframe will be considered. However, they will not disqualify a previously published data point from qualifying. Revisions to previously published data points after data is published for October 31, 2026, however, will not be considered.\n\nIn case of obvious data integrity issues (i.e., erroneous data), the market may remain open until the end of the third calendar day (ET) after the date on which such data is first released to allow for corrections. Data integrity issues refer only to clerical or other similar errors in the underlying data, and do not include cases where IMF Portwatch differs from alternative sources.\n\nThe resolution source for this market will be IMF Portwatch, specifically the transit calls data published for the Strait of Hormuz at https://portwatch.imf.org/pages/cb5856222a5b4105adc6ee7e880a1730, both in the chart and through downloadable files.",
+    "resolutionSource": "",
+    "startDate": "2026-08-11T09:19:18.848969Z",
+    "creationDate": "2026-08-11T09:20:19.263531Z",
+    "endDate": "2026-11-01T03:59:00Z",
+    "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-ships-transit-the-strait-of-hormuz-on-any-day-in-march-ERARnetK0FJm.jpg",
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-ships-transit-the-strait-of-hormuz-on-any-day-in-march-ERARnetK0FJm.jpg",
+    "active": true,
+    "closed": false,
+    "archived": false,
+    "new": false,
+    "featured": false,
+    "restricted": true,
+    "liquidity": 119387.4051,
+    "volume": 754974.3103329996,
+    "openInterest": 398671.882879,
+    "sortBy": "ascending",
+    "createdAt": "2026-08-10T22:38:21.302683Z",
+    "updatedAt": "2026-09-21T14:42:23.414386Z",
+    "competitive": 0.8439530762089628,
+    "volume24hr": 5061.183713,
+    "volume1wk": 83103.641054,
+    "volume1mo": 654756.2325129999,
+    "volume1yr": 754974.3103329999,
+    "enableOrderBook": true,
+    "liquidityClob": 119387.4051,
+    "negRisk": false,
+    "commentCount": 0,
+    "markets": [
+      {
+        "id": "3501950",
+        "question": "Strait of Hormuz traffic returns to normal by October 31?",
+        "conditionId": "0x405b56fc75f56d7635a94df9836d6cb6f9b9571d1fd33eb165c1e59d1d11801f",
+        "slug": "strait-of-hormuz-traffic-returns-to-normal-by-october-31-20260810151043583",
+        "resolutionSource": "",
+        "endDate": "2026-11-01T03:59:00Z",
+        "liquidity": "119187.2751",
+        "startDate": "2026-08-11T09:19:18.848969Z",
+        "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-ships-transit-the-strait-of-hormuz-on-any-day-in-march-ERARnetK0FJm.jpg",
+        "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-ships-transit-the-strait-of-hormuz-on-any-day-in-march-ERARnetK0FJm.jpg",
+        "description": "This market will resolve to “Yes” if IMF Portwatch publishes a 7-day moving average of transit calls (“Arrivals of Ships”) for the Strait of Hormuz equal to or above 60 for any date between market creation and October 31, 2026. Otherwise, this market will resolve to “No”.\n\nDaily transit calls include container, dry bulk, roll-on/roll-off, general cargo, and tanker ships. Ships not reported by IMF Portwatch will not be considered.\n\nThis market will resolve as soon as IMF Portwatch publishes a 7-day moving average of transit calls equal to or above the specified level, or once data has been published for the final date in the specified period and no such value has been published. If no data has been published for the final date of the specified period within 14 calendar days (ET) after the end of that period, this market will resolve based on data published up to that point.\n\nRevisions to previously published data points made within this market’s timeframe will be considered. However, they will not disqualify a previously published data point from qualifying. Revisions to previously published data points after data is published for October 31, 2026, however, will not be considered.\n\nIn case of obvious data integrity issues (i.e., erroneous data), the market may remain open until the end of the third calendar day (ET) after the date on which such data is first released to allow for corrections. Data integrity issues refer only to clerical or other similar errors in the underlying data, and do not include cases where IMF Portwatch differs from alternative sources.\n\nThe resolution source for this market will be IMF Portwatch, specifically the transit calls data published for the Strait of Hormuz at https://portwatch.imf.org/pages/cb5856222a5b4105adc6ee7e880a1730, both in the chart and through downloadable files.",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.07\", \"0.93\"]",
+        "volume": "754974.3103329996",
+        "active": true,
+        "closed": false,
+        "marketMakerAddress": "",
+        "createdAt": "2026-08-10T22:38:21.735368Z",
+        "updatedAt": "2026-09-21T14:42:00.323164Z",
+        "new": false,
+        "featured": false,
+        "submitted_by": "0xF43d55F3A8B7484Ed4B6931f93CB6F9eF5Dd369D",
+        "archived": false,
+        "resolvedBy": "0x65070BE91477460D8A7AeEb94ef92fe056C2f2A7",
+        "restricted": true,
+        "questionID": "0x11dd567a1641ecc26d40d65d21d4558ed6c1659e3b6cde7fa9442e11b8431585",
+        "enableOrderBook": true,
+        "orderPriceMinTickSize": 0.01,
+        "orderMinSize": 5,
+        "volumeNum": 754974.3103329996,
+        "liquidityNum": 119187.2751,
+        "endDateIso": "2026-11-01",
+        "startDateIso": "2026-08-11",
+        "hasReviewedDates": true,
+        "volume24hr": 5061.183713,
+        "volume1wk": 83103.641054,
+        "volume1mo": 654756.2325129999,
+        "volume1yr": 754974.3103329999,
+        "clobTokenIds": "[\"65318042793305154928481822061228422214615698483328483747495637152414701080541\", \"112428165813371561912833460698436648539922320261306010177252036814838759682453\"]",
+        "comboStatus": "disabled",
+        "umaBond": "500",
+        "umaReward": "5",
+        "volume24hrClob": 5061.183713,
+        "volume1wkClob": 83103.641054,
+        "volume1moClob": 654756.2325129999,
+        "volume1yrClob": 754974.3103329999,
+        "volumeClob": 754974.3103329996,
+        "liquidityClob": 119187.2751,
+        "customLiveness": 0,
+        "acceptingOrders": true,
+        "negRisk": false,
+        "negRiskRequestID": "",
+        "ready": false,
+        "funded": false,
+        "acceptingOrdersTimestamp": "2026-08-11T09:18:30Z",
+        "cyom": false,
+        "competitive": 0.8439530762089628,
+        "pagerDutyNotificationEnabled": false,
+        "approved": true,
+        "clobRewards": [
+          {
+            "id": "1288290",
+            "conditionId": "0x405b56fc75f56d7635a94df9836d6cb6f9b9571d1fd33eb165c1e59d1d11801f",
+            "assetAddress": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+            "rewardsAmount": 0,
+            "rewardsDailyRate": 1,
+            "startDate": "2026-09-13",
+            "endDate": "2500-12-31"
+          }
+        ],
+        "rewardsMinSize": 20,
+        "rewardsMaxSpread": 4.5,
+        "spread": 0.02,
+        "oneDayPriceChange": 0.005,
+        "oneWeekPriceChange": 0.015,
+        "oneMonthPriceChange": -0.065,
+        "lastTradePrice": 0.08,
+        "bestBid": 0.06,
+        "bestAsk": 0.08,
+        "automaticallyActive": true,
+        "clearBookOnStart": true,
+        "showGmpSeries": false,
+        "showGmpOutcome": false,
+        "manualActivation": false,
+        "negRiskOther": false,
+        "umaResolutionStatuses": "[]",
+        "pendingDeployment": false,
+        "deploying": false,
+        "deployingTimestamp": "2026-08-10T22:38:38.182505Z",
+        "rfqEnabled": false,
+        "holdingRewardsEnabled": false,
+        "feesEnabled": false,
+        "requiresTranslation": false,
+        "feeType": null,
+        "version": "v1"
+      }
+    ],
+    "series": [
+      {
+        "id": "11492",
+        "ticker": "hormuz-traffic-returns-to-normal",
+        "slug": "hormuz-traffic-returns-to-normal",
+        "title": "Hormuz Traffic Returns to Normal",
+        "seriesType": "single",
+        "image": "",
+        "icon": "",
+        "active": true,
+        "closed": false,
+        "archived": false,
+        "createdAt": "2026-03-31T18:45:41.417299Z",
+        "updatedAt": "2026-09-21T14:42:48.788811Z",
+        "volume24hr": 203644.42009000003,
+        "volume": 24873857.282125995,
+        "liquidity": 1395092.94778,
+        "commentCount": 4105,
+        "requiresTranslation": false
+      }
+    ],
+    "tags": [
+      {
+        "id": "309",
+        "label": "Oil",
+        "slug": "oil",
+        "forceShow": false,
+        "publishedAt": "2023-11-02 21:53:13.969+00",
+        "createdAt": "2023-11-02T21:53:13.977Z",
+        "updatedAt": "2026-04-17T20:40:55.156199Z",
+        "isCarousel": false,
+        "requiresTranslation": false
+      },
+      {
+        "id": "78",
+        "label": "Iran",
+        "slug": "iran",
+        "forceShow": false,
+        "publishedAt": "2023-11-02 21:16:51.647+00",
+        "updatedBy": 15,
+        "createdAt": "2023-11-02T21:16:51.667Z",
+        "updatedAt": "2026-04-17T20:19:53.890971Z",
+        "requiresTranslation": false
+      },
+      {
+        "id": "104139",
+        "label": "Hormuz",
+        "slug": "hormuz",
+        "forceShow": false,
+        "createdAt": "2026-03-09T20:12:10.823469Z",
+        "updatedAt": "2026-04-17T17:26:23.150452Z",
+        "isCarousel": false,
+        "requiresTranslation": false
+      },
+      {
+        "id": "2",
+        "label": "Politics",
+        "slug": "politics",
+        "forceShow": false,
+        "publishedAt": "2023-10-25 18:55:50.674+00",
+        "updatedBy": 13,
+        "createdAt": "2023-10-25T18:55:50.681Z",
+        "updatedAt": "2026-04-17T20:39:54.201881Z",
+        "forceHide": true,
+        "requiresTranslation": false
+      },
+      {
+        "id": "100265",
+        "label": "Geopolitics",
+        "slug": "geopolitics",
+        "forceShow": true,
+        "createdAt": "2024-06-12T20:13:03.615956Z",
+        "updatedAt": "2026-04-17T20:49:04.209055Z",
+        "requiresTranslation": false
+      },
+      {
+        "id": "262",
+        "label": "Strait of Hormuz",
+        "slug": "strait-of-hormuz",
+        "forceShow": false,
+        "publishedAt": "2023-11-02 21:45:34.694+00",
+        "createdAt": "2023-11-02T21:45:34.718Z",
+        "updatedAt": "2026-04-15T21:01:56.57983Z",
+        "isCarousel": false,
+        "requiresTranslation": false
+      }
+    ],
+    "cyom": false,
+    "showAllOutcomes": true,
+    "showMarketImages": true,
+    "enableNegRisk": false,
+    "automaticallyActive": true,
+    "seriesSlug": "hormuz-traffic-returns-to-normal",
+    "gmpChartMode": "default",
+    "negRiskAugmented": false,
+    "estimateValue": false,
+    "cumulativeMarkets": false,
+    "pendingDeployment": false,
+    "deploying": false,
+    "requiresTranslation": false,
+    "eventMetadata": {
+      "context_requires_regen": true
+    },
+    "version": "v1"
+  },
+  "book": {
+    "market": "0x405b56fc75f56d7635a94df9836d6cb6f9b9571d1fd33eb165c1e59d1d11801f",
+    "asset_id": "65318042793305154928481822061228422214615698483328483747495637152414701080541",
+    "timestamp": "1790002107921",
+    "hash": "ee972deb64697ea2bb2e04703702d611ceaed9ba",
+    "bids": [
+      {
+        "price": "0.01",
+        "size": "1315281.06"
+      },
+      {
+        "price": "0.02",
+        "size": "68457.14"
+      },
+      {
+        "price": "0.03",
+        "size": "44644.19"
+      },
+      {
+        "price": "0.04",
+        "size": "37357.04"
+      },
+      {
+        "price": "0.05",
+        "size": "32102.28"
+      },
+      {
+        "price": "0.06",
+        "size": "6624.83"
+      }
+    ],
+    "asks": [
+      {
+        "price": "0.99",
+        "size": "1100076.12"
+      },
+      {
+        "price": "0.98",
+        "size": "3048.1"
+      },
+      {
+        "price": "0.97",
+        "size": "200006.76"
+      },
+      {
+        "price": "0.96",
+        "size": "6782.82"
+      },
+      {
+        "price": "0.95",
+        "size": "52000"
+      },
+      {
+        "price": "0.94",
+        "size": "30000"
+      },
+      {
+        "price": "0.93",
+        "size": "9000"
+      },
+      {
+        "price": "0.91",
+        "size": "12444.44"
+      },
+      {
+        "price": "0.9",
+        "size": "35025.57"
+      },
+      {
+        "price": "0.89",
+        "size": "8680.75"
+      },
+      {
+        "price": "0.88",
+        "size": "9000"
+      },
+      {
+        "price": "0.87",
+        "size": "10769"
+      },
+      {
+        "price": "0.86",
+        "size": "13999.99"
+      },
+      {
+        "price": "0.82",
+        "size": "11111"
+      },
+      {
+        "price": "0.81",
+        "size": "5473.68"
+      },
+      {
+        "price": "0.8",
+        "size": "10000"
+      },
+      {
+        "price": "0.77",
+        "size": "3826.08"
+      },
+      {
+        "price": "0.74",
+        "size": "6000"
+      },
+      {
+        "price": "0.73",
+        "size": "7407"
+      },
+      {
+        "price": "0.72",
+        "size": "2857.14"
+      },
+      {
+        "price": "0.7",
+        "size": "10000"
+      },
+      {
+        "price": "0.69",
+        "size": "6451"
+      },
+      {
+        "price": "0.67",
+        "size": "5409.31"
+      },
+      {
+        "price": "0.66",
+        "size": "500"
+      },
+      {
+        "price": "0.64",
+        "size": "8125"
+      },
+      {
+        "price": "0.62",
+        "size": "1684.21"
+      },
+      {
+        "price": "0.6",
+        "size": "5000"
+      },
+      {
+        "price": "0.52",
+        "size": "2000"
+      },
+      {
+        "price": "0.49",
+        "size": "3652.6"
+      },
+      {
+        "price": "0.46",
+        "size": "4537.64"
+      },
+      {
+        "price": "0.45",
+        "size": "1847.96"
+      },
+      {
+        "price": "0.44",
+        "size": "946"
+      },
+      {
+        "price": "0.35",
+        "size": "1510.99"
+      },
+      {
+        "price": "0.27",
+        "size": "500"
+      },
+      {
+        "price": "0.26",
+        "size": "1000"
+      },
+      {
+        "price": "0.25",
+        "size": "1611"
+      },
+      {
+        "price": "0.24",
+        "size": "3083.33"
+      },
+      {
+        "price": "0.23",
+        "size": "27.54"
+      },
+      {
+        "price": "0.22",
+        "size": "3272.72"
+      },
+      {
+        "price": "0.21",
+        "size": "100"
+      },
+      {
+        "price": "0.2",
+        "size": "1005"
+      },
+      {
+        "price": "0.19",
+        "size": "100"
+      },
+      {
+        "price": "0.18",
+        "size": "1611"
+      },
+      {
+        "price": "0.17",
+        "size": "6"
+      },
+      {
+        "price": "0.16",
+        "size": "111"
+      },
+      {
+        "price": "0.15",
+        "size": "1140"
+      },
+      {
+        "price": "0.14",
+        "size": "6247.85"
+      },
+      {
+        "price": "0.13",
+        "size": "2924.97"
+      },
+      {
+        "price": "0.12",
+        "size": "2905"
+      },
+      {
+        "price": "0.11",
+        "size": "1151"
+      },
+      {
+        "price": "0.1",
+        "size": "6111"
+      },
+      {
+        "price": "0.09",
+        "size": "2591.99"
+      },
+      {
+        "price": "0.08",
+        "size": "9693.3"
+      }
+    ],
+    "min_order_size": "5",
+    "tick_size": "0.01",
+    "neg_risk": false,
+    "last_trade_price": "0.060"
+  }
+}

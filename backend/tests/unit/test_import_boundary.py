@@ -1,4 +1,4 @@
-"""The rules layer may not import anything that reaches outside itself.
+"""Which layer may import which, checked by reading our own import lines.
 
 Katalyst's one shaping rule is "the model proposes; our code decides". A
 language model hands us proposals; code we wrote and tested decides whether a
@@ -6,12 +6,28 @@ map is valid. That rule only means something if the deciding code cannot quietly
 start asking a model, calling a service, or reaching back into the routes. This
 file makes the rule mechanical.
 
-How it works: every file under `src/katalyst/domain` is parsed, its import lines
-are read, and each one is resolved to the full dotted name it brings in
-(including the shortened forms, so `from katalyst import engine` is caught as
-surely as `import katalyst.engine`, and so is the relative form `from ..api
-import main`). If any of them lands inside a forbidden package, the test fails
-and names the file and the line.
+How it works: every file under a named directory is parsed, its import lines are
+read, and each one is resolved to the full dotted name it brings in (including
+the shortened forms, so `from katalyst import engine` is caught as surely as
+`import katalyst.engine`, and so is the relative form `from ..api import main`).
+If any of them lands inside a forbidden package, the test fails and names the
+file and the line.
+
+Three directories are checked, and the order they are allowed to depend in runs
+one way only.
+
+* **The rules layer** (`domain/`) may import nothing that reaches outside itself:
+  not the pipeline that feeds it, not the routes that expose it, not the layer
+  that fetches prices, not the layer that turns a map into a trade, and nothing
+  that talks over a network. It is the part whose correctness we claim, and it is
+  property-tested against maps nobody wrote by hand precisely because it depends
+  on nothing.
+* **The layer that fetches prices** (`grounding/`) may import the rules layer,
+  because a price becomes a likelihood on a claim. It may not import the routes,
+  the model-facing pipeline, or the trade layer above it.
+* **The layer that turns a map into a trade** (`thesis/`) may import both of
+  those, because an edge is a claim's number set against a venue's price. It may
+  not import the routes.
 
 The rules layer is no longer close to empty — propositions, links, beliefs,
 validity, propagation, branches, worlds and diffs all live in it — so this check
@@ -28,24 +44,73 @@ from pathlib import Path
 import pytest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-DOMAIN_ROOT = BACKEND_ROOT / "src" / "katalyst" / "domain"
+SOURCE_ROOT = BACKEND_ROOT / "src" / "katalyst"
+DOMAIN_ROOT = SOURCE_ROOT / "domain"
 DOMAIN_PACKAGE = "katalyst.domain"
+
+TALKING_TO_A_MODEL: tuple[str, ...] = ("anthropic",)
+"""The one library that talks to a language model."""
+
+TALKING_OVER_A_NETWORK: tuple[str, ...] = ("httpx", "requests", "urllib.request")
+"""Libraries that open a connection to somewhere else."""
+
+THE_ONE_WAY_OUT = "urllib.request"
+"""The one of those the price-fetching layer is allowed, in one named function."""
+
+SERVING_OVER_A_NETWORK: tuple[str, ...] = ("fastapi", "uvicorn")
+"""Libraries that answer requests from somewhere else."""
 
 FORBIDDEN_PACKAGES: tuple[str, ...] = (
     # The other layers. The rules must not depend on the pipeline that feeds
-    # them, the routes that expose them, or the fetching of outside facts.
+    # them, the routes that expose them, the fetching of outside facts, or the
+    # layer that turns a map into a trade.
     "katalyst.engine",
     "katalyst.api",
     "katalyst.grounding",
-    # Talking to a language model.
-    "anthropic",
-    # Talking to anything at all over the network.
-    "httpx",
-    "requests",
-    # Serving anything over the network.
-    "fastapi",
-    "uvicorn",
+    "katalyst.thesis",
+    *TALKING_TO_A_MODEL,
+    *TALKING_OVER_A_NETWORK,
+    *SERVING_OVER_A_NETWORK,
 )
+
+FORBIDDEN_TO_GROUNDING: tuple[str, ...] = (
+    # The layer that fetches prices sits below the one that turns a map into a
+    # trade, and beside the pipeline that talks to a model rather than under it.
+    "katalyst.api",
+    "katalyst.engine",
+    "katalyst.thesis",
+    *TALKING_TO_A_MODEL,
+    *SERVING_OVER_A_NETWORK,
+    # And the network libraries this layer does **not** use. Its own docstring
+    # says the one way it opens a connection is the standard library's, in one
+    # named function; a client from one of these could appear tomorrow and the
+    # rule would say nothing, because one of them is already in the environment
+    # for the sake of the model boundary.
+    *(one for one in TALKING_OVER_A_NETWORK if one != THE_ONE_WAY_OUT),
+)
+"""What the price-fetching layer may not import.
+
+Deliberately **not** on this list: the rules layer, because a price becomes a
+likelihood on a claim; and the standard library's way of opening a connection,
+because this is the one layer allowed to reach a venue — and it does so in one
+named function that nothing in the demo, the tests or the build ever calls.
+"""
+
+FORBIDDEN_TO_THESIS: tuple[str, ...] = (
+    # The layer that turns a map into a trade reads worlds and quotes and builds
+    # an answer beside them. It serves nothing, fetches nothing, and asks nothing.
+    "katalyst.api",
+    "katalyst.engine",
+    *TALKING_TO_A_MODEL,
+    *TALKING_OVER_A_NETWORK,
+    *SERVING_OVER_A_NETWORK,
+)
+"""What the trade layer may not import.
+
+Deliberately **not** on this list: the rules layer and the price-fetching layer,
+which are exactly the two things an edge is made of — a claim's own number, and a
+venue's price for it.
+"""
 
 
 @dataclass(frozen=True)
@@ -160,6 +225,68 @@ def test_domain_imports_nothing_impure() -> None:
         "the pipeline that feeds it, the routes that expose it, or anything that "
         "talks over a network. Move this code into katalyst.engine instead:\n" + report
     )
+
+
+def test_grounding_imports_nothing_above_it() -> None:
+    """The layer that fetches prices depends on the rules layer, and on nothing above it."""
+    offenders = find_forbidden_imports(
+        SOURCE_ROOT / "grounding", "katalyst.grounding", FORBIDDEN_TO_GROUNDING
+    )
+    report = "\n".join(offender.describe() for offender in offenders)
+    assert not offenders, (
+        "Fetching a price is the bottom of the two layers that turn a map into a "
+        "trade: it may read the rules layer, because a price becomes a likelihood on "
+        "a claim, and nothing above it:\n" + report
+    )
+
+
+def test_thesis_imports_nothing_that_serves_or_fetches() -> None:
+    """The layer that turns a map into a trade reads worlds and quotes, and asks nobody."""
+    offenders = find_forbidden_imports(
+        SOURCE_ROOT / "thesis", "katalyst.thesis", FORBIDDEN_TO_THESIS
+    )
+    report = "\n".join(offender.describe() for offender in offenders)
+    assert not offenders, (
+        "An edge is a claim's own number set against a venue's price, so this layer "
+        "reads the rules layer and the price-fetching layer and nothing else. Fetching "
+        "belongs in katalyst.grounding and serving in katalyst.api:\n" + report
+    )
+
+
+def test_the_price_layer_may_not_reach_for_another_network_library() -> None:
+    """A checker that allowed every network library would pass on a layer that used one.
+
+    So the rule is shown catching what it claims to catch: the standard library's
+    way out is allowed in this layer and the two client libraries are not — and one
+    of them is already installed, for the model boundary, so it is a real risk and
+    not a hypothetical one.
+    """
+    allowed = tmp_written(THE_ONE_WAY_OUT)
+    forbidden = [tmp_written(one) for one in TALKING_OVER_A_NETWORK if one != THE_ONE_WAY_OUT]
+
+    assert allowed == []
+    assert forbidden and all(found for found in forbidden), (
+        "every network library but the standard library's must be refused in this layer"
+    )
+
+
+def tmp_written(imported: str) -> list[ForbiddenImport]:
+    """What the checker says about a price-layer file importing one named library."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as where:
+        file = Path(where) / "pretend_grounding.py"
+        file.write_text(
+            f'"""A file written only to be checked."""\n\nimport {imported}\n', encoding="utf-8"
+        )
+        return find_forbidden_imports(Path(where), "katalyst.grounding", FORBIDDEN_TO_GROUNDING)
+
+
+def test_every_layer_that_is_checked_really_has_files_in_it() -> None:
+    """A boundary test pointed at an empty directory passes for the wrong reason."""
+    for directory in (DOMAIN_ROOT, SOURCE_ROOT / "grounding", SOURCE_ROOT / "thesis"):
+        written = [one.name for one in directory.rglob("*.py") if one.name != "__init__.py"]
+        assert written, f"{directory} has nothing in it for the boundary check to read"
 
 
 @pytest.mark.parametrize(

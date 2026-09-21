@@ -103,8 +103,12 @@ no_implicit_reexport = true
 
 [[tool.mypy.overrides]]
 # The rules layer is the part whose correctness we claim, so it is checked as
-# strictly as the tool allows. Everywhere else the ordinary settings above
-# apply.
+# strictly as the tool allows — and so are the two layers that turn a map into a
+# trade, because one of their rules is carried by a type rather than by a check:
+# the function that builds an edge takes two worlds and both are required, so a
+# caller holding only the world on screen cannot write the mistake down. A rule
+# enforced by a signature is only enforced while the signatures are checked.
+# Everywhere else the ordinary settings above apply.
 #
 # The strict checks are listed one by one instead of writing the single word
 # `strict`, because the type checker treats that word as a setting for the
@@ -112,7 +116,7 @@ no_implicit_reexport = true
 # quietly check every layer strictly, and nobody reading the file would know.
 # Checked by hand on 2026-09-17: an untyped function under `domain/` fails,
 # the same function under `engine/` does not.
-module = "katalyst.domain.*"
+module = ["katalyst.domain.*", "katalyst.grounding.*", "katalyst.thesis.*"]
 disallow_untyped_defs = true       # every function says what it takes and returns
 disallow_incomplete_defs = true    # no half-annotated function
 disallow_untyped_calls = true      # no calling into unannotated code
@@ -151,7 +155,23 @@ markers = [
 ]
 
 [tool.coverage.run]
-# Only the rules layer is measured. The routes and the model-facing pipeline
-# are lightly tested on purpose; see decision record 0008.
-source = ["src/katalyst/domain"]
+# The rules layer is measured, and so are the two layers that turn a map into a
+# trade: they hold the arithmetic a reader would act on with money, so they are
+# held to the same standard. The routes and the model-facing pipeline are
+# lightly tested on purpose; see decision record 0008.
+#
+# One file is left out and it is the point of leaving anything out: the single
+# function in this program that opens a connection to a venue is never run by a
+# test, because no test may reach the network. Measuring it would say either that
+# the suite covers something it must not, or that coverage has a hole nobody can
+# close. It is named here rather than being quietly unmeasured.
+source = ["src/katalyst/domain", "src/katalyst/grounding", "src/katalyst/thesis"]
 branch = true
+
+[tool.coverage.report]
+exclude_also = [
+    # The one function that opens a connection to a venue. See above. Anchored and
+    # with its dots escaped, because these are regular expressions: an unanchored
+    # one would take some future block with it and nobody would notice.
+    "^\\s*with urllib\\.request\\.urlopen\\(",
+]
