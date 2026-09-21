@@ -146,7 +146,7 @@ Two things fall out of that, and both are worth saying plainly.
 
 **How far a number moved, and how wide a band is, keep two significant figures however small they get** *(Kent, 2026-09-20, G10)*. They are measured on the likelihood scale and they are not likelihoods: a move of nine thousandths is a measurement rather than a claim about the world, and `<.01` would throw out the only thing the reader came for. So the delta rail's **how firm** column and every before-and-after reading print `.0090`, `.0035`, `.00012` — and a move of exactly one prints `1.0`, because a move of one is a real move.
 
-The two rules live in one file each and are checked against each other: `toTwoFigures` and `toSize` in `frontend/src/components/BeliefChip.tsx`, and the engine's `_two_figures` in `backend/src/katalyst/domain/diff.py`, which writes the same numbers into the one-line summary the world carries. **They are one rule written twice and must move together** — a screen and a sentence that round the same number differently are two answers to one question.
+The two rules live in one file each and are checked against each other: `toTwoFigures` and `toSize` in `frontend/src/components/BeliefChip.tsx`, and the engine's `two_figures` in `backend/src/katalyst/domain/belief.py`, which writes the same numbers into the one-line summary the world carries and into every sentence the server sends back about a likelihood. **They are one rule written twice and must move together** — a screen and a sentence that round the same number differently are two answers to one question.
 
 ### Worked examples
 

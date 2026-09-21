@@ -301,7 +301,7 @@ Nothing about the arithmetic moved: on every day the two windows share, every ve
 
 `<terminal>` is the top row of the rail, `<before>`, `<after>` and `<date>` are that row's `before`, `after` and `at_day`, and `<n>` is the count of claims whose state is `unchanged`. Two significant figures, like every number this product shows.
 
-**The two numbers in this sentence are likelihoods, so they carry the guards** *(Kent, 2026-09-20 — G10)*. The rule in one sentence: **round to two significant figures, then use a guard word exactly when it is true of the rounded number** — `<.01` below a hundredth, `>.99` above ninety-nine hundredths, the figures themselves otherwise. `.010` and `.99` print, because neither is below or above its own guard; `.0099` and `.995` do not. The reason the boundary sits exactly there is that **the guard's words have to mean what they say**: `<.01` beside a likelihood of `.0035` is true, and beside `.010` it would not be. [`../graph/belief.md`](../graph/belief.md) B5 owns the rule and works it; [`../workbench/keyboard-and-access.md`](../workbench/keyboard-and-access.md) B6 owns the table of awkward cases; `_two_figures` in `domain/diff.py` writes this sentence and `toTwoFigures` in `BeliefChip.tsx` writes every chip, and the two are one rule that moves in one pull request.
+**The two numbers in this sentence are likelihoods, so they carry the guards** *(Kent, 2026-09-20 — G10)*. The rule in one sentence: **round to two significant figures, then use a guard word exactly when it is true of the rounded number** — `<.01` below a hundredth, `>.99` above ninety-nine hundredths, the figures themselves otherwise. `.010` and `.99` print, because neither is below or above its own guard; `.0099` and `.995` do not. The reason the boundary sits exactly there is that **the guard's words have to mean what they say**: `<.01` beside a likelihood of `.0035` is true, and beside `.010` it would not be. [`../graph/belief.md`](../graph/belief.md) B5 owns the rule and works it; [`../workbench/keyboard-and-access.md`](../workbench/keyboard-and-access.md) B6 owns the table of awkward cases; `two_figures` in `domain/belief.py` — beside the class that holds a likelihood — writes this sentence and `toTwoFigures` in `BeliefChip.tsx` writes every chip, and the two are one rule that moves in one pull request.
 
 **A move is not a likelihood and is never guarded.** It keeps two significant figures however small it is, because a move of `.0090` is a quantity the reader acts on while a likelihood of `.0090` is one this product declines to state that precisely. So every number in this chapter that is a *move* — the `0.005` floor, `peak_delta`, `+.0012` under an observation, `−.00019` on H, a `rank` — is written at two figures with no guard anywhere near it, and nothing writes a move through the likelihood formatter.
 
@@ -309,14 +309,11 @@ Nothing about the arithmetic moved: on every day the two windows share, every ve
 
 **The Hormuz instance.** Diffing the base world against `br_hormuz_then_strike`:
 
-```
-"Hormuz opens, then Iran is struck" moves A Polymarket contract "Brent below $70 on
-2026-10-31" resolves YES from .49 to .42 by 2026-10-04 and leaves 3 claims untouched.
-```
+**The sentence itself is not reprinted here.** It is worked out, so it moves the day the arithmetic does, and a copy in a second place is a copy that goes stale — this one did. It is in the generated numbers file on the line named `strike · the sentence beside the list`, word for word, beside the readings it is built from.
 
-`<terminal>` is filled with the claim's own words, exactly as the map stores them, minus the full stop the claim ends in — the sentence supplies its own. The three untouched claims are R, B and N1, each for its own reason and each saying which in `unchanged_because` — B2's table. Every number here is the engine's at seed `20261001`; none was typed.
+What the slots are filled with is the part this chapter owns. `<terminal>` takes the claim's own words, exactly as the map stores them, minus the full stop the claim ends in — the sentence supplies its own. The untouched claims are R, B and N1, each for its own reason and each saying which in `unchanged_because` — B2's table.
 
-Note which numbers these are. `.49` and `.42` are M1 on **2026-10-04**, the day the two worlds are furthest apart, not on M1's own resolve-by day, where the move is the smaller `−.042`. The summary quotes the top row of the rail, so it quotes the rail's day, and it names that day rather than leaving the reader to assume otherwise (B5).
+Note which reading the two likelihoods are. They are M1's on the day the two worlds are furthest apart — the line named `M1 · strike · change list was → is`, beside `M1 · strike · change list day` — and **not** M1 on its own resolve-by day, where the move is the smaller one on `M1 · strike · move`. The summary quotes the top row of the rail, so it quotes the rail's day, and it names that day rather than leaving the reader to assume otherwise (B5).
 
 **When no ending shifted, there is a second fixed sentence:**
 

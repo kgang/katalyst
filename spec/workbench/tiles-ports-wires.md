@@ -116,14 +116,16 @@ All four differ in outline alone, so all four survive a greyscale screenshot and
 
 ### The belief chips
 
-The three voices are stored and drawn separately and **never averaged** — INV-11, the product rule that says no code path merges them. If the model says `.61` and the market says `.48`, the gap is the thing worth trading, and `.545` is a number nobody holds.
+The three voices are stored and drawn separately and **never averaged** — INV-11, the product rule that says no code path merges them. If the model says `.61` and the market says `.52`, the gap is the thing worth trading, and `.565` is a number nobody holds.
+
+**The chip drawn below belongs to no claim on this map.** `.61 (.45–.74)` is the rounding example the browser's own chip test is written against, and the market beside it is made up to go with it. M1, the Polymarket contract, is the real tradeable ending on this map and reads its own numbers at B2 below, where the gap between the model and the venue is a good deal narrower than this one. An illustration that borrowed M1's quote read as M1 and contradicted B2, which is how it was found.
 
 **A chip is three stacked lines**: the owner, then the number, then the range beneath it.
 
 ```
 model          user           market
-.61            —              .48
-.45–.74                       .45–.52
+.61            —              .52
+.45–.74                       .49–.55
 ```
 
 Stacked, because three numbers and three ranges strung along one line of a 280-pixel tile is a row of digits nobody parses. The one-line form `.61 (.45–.74)` is still the canonical spelling and is used everywhere the chip is not: in prose, in the outline view, and as the chip's own accessible name, so a screen reader hears one phrase rather than three fragments.

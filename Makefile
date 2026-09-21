@@ -74,10 +74,20 @@ numbers-check: ## Check that file still says what the engine says. Changes no fi
 # sentence, because a test that judges a sentence fails when somebody improves
 # the prompt.
 #
-#   make eval                     every case, for the ceiling written in code
-#   make eval ONLY=hormuz         one of them
-#   make eval CAP=5               the same, with a lower ceiling over the round
-#   make eval EFFORT=medium       the same, thinking less hard
+#   make eval ONLY=hormuz         THE ONE TO RUN TODAY - see the paragraph below
+#   make eval ONLY=hormuz CAP=5   the same, with a lower ceiling over the round
+#   make eval ONLY=hormuz EFFORT=medium   the same, thinking less hard
+#   make eval                     all four cases, for the ceiling written in code
+#
+# **Run it as `ONLY=hormuz` until the prompt is frozen** (Kent, 2026-09-21). Only
+# the Strait of Hormuz has a committed recording; the other three cases each mean
+# a live run of about forty minutes against words that are about to change, and
+# every such change is being batched into one freeze at the end of the engine
+# work. When that freeze lands, all four are recorded together and `make eval`
+# with nothing else on the line is the ordinary use again. **The program's own
+# default is still all four** - this is a standing instruction about what to run
+# now, not a change to what the command means, so nothing here silently scores
+# less than it says it did.
 #
 # The same three flags as `record-demo`, meaning the same three things. CAP can
 # only lower the $15 hard stop written in code, never lift it — and it bounds the
