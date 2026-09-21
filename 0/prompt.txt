@@ -1,0 +1,480 @@
+Please read
+
+
+<pasted_content id="5ced">
+/Users/kentgang/git3/katalyst/plans/RESUME-ux-round.md
+</pasted_content id="5ced">
+
+
+Read other high level planning docs, specs, code, and any other files to hydrate your context. Use opus sub-agent to structure and parallelize and execute the work specified in RESUME-ux-round.md. Afterwards create PRs, do moderate reviews of code (this is an experimental prototype where . alot can change) and update docs where appropriate and relevant.
+
+---
+
+<task-notification>
+<task-id>af96fc12519c46764</task-id>
+<tool-use-id>toolu_01TA8CMunoS5erhYtoopkJ2x</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/af96fc12519c46764.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane K: the question mark" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Run this to check me** (in order):
+
+```bash
+cd /Users/kentgang/git3/katalyst-wt/fix-04-the-question-mark/frontend &amp;&amp; npm ci
+cd /Users/kentgang/git3/katalyst-wt/fix-04-the-question-mark/frontend &amp;&amp; npx vitest run src/keyboard
+cd /Users/kentgang/git3/katalyst-wt/fix-04-the-question-mark/frontend &amp;&amp; /Users/kentgang/git3/katalyst/plans/scripts/heavy.sh "K keyboard: frontend check" -- npm run check
+# the one browser file — I may not run playwright. It starts both servers itself;
+# `uv run` will create backend/.venv in this worktree on first use (it is absent now).
+cd /Users/kentgang/git3/katalyst-wt/fix-04-the-question-mark/frontend &amp;&amp; /Users/kentgang/git3/katalyst/plans/scripts/heavy.sh "K keyboard: e2e generate" -- npx playwright test e2e/generate.spec.ts
+# only the one walk I touched: add  -g "a map draws itself from a recording"
+# other worktrees' servers must be down, or set KATALYST_E2E_BACKEND_PORT / _FRONTEND_PORT
+```
+
+**What I built.** One commit, `1e4e4a5`, on `fix/04-the-question-mark`.
+
+- `frontend/src/keyboard/everyKey.ts` — a `useEveryKey({ everyKey, palette?, escape })` hook binding `?`, `⌘K`/`Ctrl+K` and `Escape` on the window. Same behaviour as the block it replaces (typing guard on `?` only; `⌘K` and `Escape` work from inside a field). `palette` is optional: a screen with no commands leaves it out and the chord does nothing rather than opening an empty list.
+- `MapScreen.tsx` — the 26-line listener effect becomes a 9-line `useEveryKey` call; behaviour identical, `Escape` still also drops `intervening` and `naming`.
+- `GenerationScreen.tsx` — 5 added lines (+1 import). `Launchpad.tsx` — 8 added lines (+3 imports) plus a 6-line render of `ShortcutsSheet` when the sheet is up. I put the first screen's hook-up in `Launchpad.tsx`, not `App.tsx`, because `App` returns early into the other two screens and a hook there would double-bind `?` on the map screens.
+- `frontend/src/keyboard/everyKey.css` — 2 rules. The sheet positions itself at the bottom right of its containing box, which on the map screens is `.map-stage`; the first screen has none, so it hangs it in a window-sized pane that passes clicks through.
+- `frontend/src/keyboard/__tests__/everyKey.test.tsx` — the four cases from `qkey.test.tsx`, adapted: the two that asserted nothing happened now assert the sheet opens and `Escape` closes it; the stored map and the top-bar control stay as the controls.
+- `frontend/e2e/generate.spec.ts` — one added step in the replay walk, right after the first tile's resting place is read and before `waitUntilItStops`: press `?` while the map is still arriving, expect `.sheet` visible and containing *Tiles do not move*, press `Escape`, expect it hidden. Mirrors the idiom already at `hormuz.spec.ts:718-723`.
+- `spec/workbench/keyboard-and-access.md:16` said the whole key map is *"Bound on the canvas root"*. That passage now names the three bound on the window, the module, the three screens, and that `⌘K` does nothing on the first screen.
+
+**How I checked the tests fail on `main`'s code.** With the new test file in place I stashed only the three screen files (`git stash push -- src/components/MapScreen.tsx src/stream/GenerationScreen.tsx src/components/Launchpad.tsx`), which restores `03794cf`'s versions with their own inline listener, and ran the file: `Tests 2 failed | 2 passed (4)` — the generation screen and the first screen both failing with *Unable to find an element with the text: /Tiles do not move/*, the stored-map control and the top-bar-button case still passing. Then `git stash pop`. Re-run: 4 passed.
+
+**What is rough** (flagging rather than polishing):
+- **The sheet on the first screen lists keys that do nothing there.** It is headed *Every key* and names `j`, `k`, `h`, `l`, `E`, `B`, `Space`, `O`, `P`, `⌘K` — all map keys. Pressing `?` there now opens an honest-looking list of nine lies. `keys.ts` is mine and I left it alone: the planned Help page absorbs this sheet, and cutting the list per screen now is work that gets thrown away. If that reads as a veto risk, the cheap patch is one sentence at the head of the sheet saying which keys need a map.
+- `⌘K` still does nothing on the first screen (no commands exist to offer).
+- Nothing on the first screen advertises `?` — the key now works there but no words invite it.
+- The `.every-key-anchor` pane is a workaround for `.sheet` being `position: absolute`; `shortcutsSheet.css` is not mine to change.
+- The browser step is unrun by me. Its one risk is timing: `?` is pressed after the first tile is visible, which on a 0.6 s-per-event replay leaves plenty of run left, but a very fast replay could have it stop mid-assertion — harmless, the sheet does not depend on the run.
+
+**Where I deviated.** None from the lane, except that the e2e step is four assertions rather than "one line" (open, contains, close, gone), and I added `Escape` assertions inside two of the four unit tests rather than as new tests. I left `plans/analysis/scripts/ux-round/D/qkey.test.tsx` in place (it is cited evidence in `D-one-flow.md`, and it lives in the main checkout, not my worktree) — the repo copy is a rewrite of it, not a move.
+
+**What outside my files must change.** Nothing blocking. Two things later lanes already own: the sheet's contents per screen (Help page lane), and `GenerationScreen.tsx:83`'s *Press ? for every key* line, which is now true and which the run-strip lane rewrites.
+
+**Files touched** (`git diff --stat main`):
+```
+ frontend/e2e/generate.spec.ts                     |  12 +++
+ frontend/src/components/Launchpad.tsx             |  21 ++++
+ frontend/src/components/MapScreen.tsx             |  40 +++----
+ frontend/src/keyboard/__tests__/everyKey.test.tsx | 123 ++++++++++++++++++++++
+ frontend/src/keyboard/everyKey.css                |  20 ++++
+ frontend/src/keyboard/everyKey.ts                 |  82 +++++++++++++++
+ frontend/src/stream/GenerationScreen.tsx          |  10 ++
+ spec/workbench/keyboard-and-access.md             |  14 ++-
+ 8 files changed, 294 insertions(+), 28 deletions(-)
+```
+
+**Verification output.**
+```
+$ npx vitest run src/keyboard
+ Test Files  3 passed (3)
+      Tests  14 passed (14)
+
+$ heavy.sh "K keyboard: frontend npm run check" -- npm run check
+biome ci .  → Checked 172 files in 39ms. No fixes applied.
+tsc -b --noEmit  → (no output)
+ Test Files  42 passed (42)
+      Tests  362 passed (362)
+   Duration  3.14s
+```
+
+---
+
+**Draft pull request body**
+
+**What**
+`?`, `⌘K` and `Escape` were bound in one window listener inside the stored-map screen, so they were dead on the two screens that never mount it: the map building itself, and the first screen. The screen a map builds on prints *Press ? for every key* under the map — that is the screen the key was reported broken on. They move into `frontend/src/keyboard/everyKey.ts`, which all three screens call. The first screen has no commands, so `⌘K` does nothing there rather than opening an empty list, and it hangs the sheet in a window-sized pane because it has no map stage to hang one in. The four cases that located the bug come into the repository as `src/keyboard/__tests__/everyKey.test.tsx`; the replay walk in `e2e/generate.spec.ts` now presses `?` **while the recording is still arriving**, which is the one press no browser test had ever made — every `?` in the suite until now was pressed on a map that had finished.
+
+**Which invariant it satisfies**
+INV-workbench.34 — for every overlay in the app, `Escape` closes it and nothing is left pending — on the two screens where the overlay could not be opened by the key that names it. `spec/workbench/keyboard-and-access.md`'s statement of where the key map is bound is made true in the same commit.
+
+**What is deliberately not here**
+The sheet still lists the map's keys on the first screen, where most of them do nothing; that surface is folded into the Help page later, and cutting it per screen now would be thrown away. No new invariant is written (the docs lane owns INV-workbench.80). No change to the sheet, the palette, their CSS, or anything on the three screens beyond the listener hook-up — two later lanes rewrite those files and rebase over this.</result>
+<usage><subagent_tokens>123615</subagent_tokens><tool_uses>74</tool_uses><duration_ms>414609</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b85uv9gyq</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/b85uv9gyq.output</output-file>
+<status>completed</status>
+<summary>Background command "Run lane K's whole browser suite once, cold, through the shared queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/78976.sock" from-name="katalyst-9d" from-mode="bypass">
+Heads-up from the stacks 05/06 coordinator session (katalyst-9d), if you are the UX-round coordinator: no reply needed unless something here collides.
+I started from plans/HANDOFF-stacks-05-06.md. Running now: T-land (adr/06-the-trade + feat/06-quote; touches docs/adr/README.md rows 0018–0020 and one ARCHITECTURE.md paragraph), R-catch-up (branch docs/05-06-requirements-catch-up: PRODUCT_REQUIREMENTS.md, spec/vocabulary.md, ARCHITECTURE.md planned engine passages — one PR), T2a (feat/06-position, new files under backend thesis/ only), and a read-only planner. I will not touch Tile.tsx, Inspector.tsx, stream/**, keyboard/**, generate.py, replay.py, or records 0012/0023–0025. Whoever lands second on ARCHITECTURE.md / the ADR index rebases and keeps both sides. Later, the engine flip needs the retraction badge removed from Tile.tsx/Inspector.tsx — I will message you before any agent of mine opens those files. Whole suites go through plans/scripts/heavy.sh as agreed.
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>a350df416ede232e6</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/a350df416ede232e6.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane D1: records 0023, 0024" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me, in order** (docs only — no suite, no browser, nothing paid):
+
+```
+cd /Users/kentgang/git3/katalyst-wt/adr-04-run-says-tile-moves
+git log --oneline main..HEAD &amp;&amp; git diff --stat main
+$EDITOR docs/adr/0023-what-the-run-says-while-it-waits.md   # Kent reads this
+$EDITOR docs/adr/0024-when-a-tile-may-move.md               # and this
+git diff main -- spec/workbench/streaming-growth.md
+```
+
+## What I built
+
+**Record 0023 — what the run says while it waits** (`proposed`). R35. One strip at the foot of both map screens: the state as a word, the sentence the live region already speaks, and — only while a **live** run is open — the count of seconds since the last event. The three options are in *Considered Options* with Kent's own ask at full strength first (M1, the measuring hairline), the true spinner second (M2), the chosen one third; two more (a ninth `asking` event, polling the transcript) are there with the measurements that ruled them out. Provenance moves into *Run details* in the panel — **R16 pulled forward from 06-4 and dated 2026-09-21**. No rule and no architectural test's assertions change; the stream stays the eight events; a replay shows no seconds.
+
+**Record 0024 — when a tile may move** (`proposed`). R37. Rewrites *a placed tile never moves* as **a tile moves only when an arrow would otherwise point backwards, and once when the run stops**, as three testable clauses (row kept · column re-read every pass · one settle at the moment the canvas already re-frames). Options L1 (Kent's ask at full strength), L2, L3, L4 and L1+L2, each with what it was measured to cost. The diff view's *nothing re-positions when a branch opens* (INV-workbench.40) is named as explicitly untouched, as are INV-workbench.22, .23, .25 and the feedback-arrow exemption.
+
+**`spec/workbench/streaming-growth.md`, in one pass** so no code lane reopens the chapter: B1 gains the pointer; **B3 rewritten** (a tile keeps its row; why the column had to be freed, measured; the settle); the dock gains a fourth section, *Run details*; B10 gains the reduced-motion clause; **a new B11** holds the whole strip (state table, the frontier sentence, the seconds rule, the replay exception, where provenance went); **INV-workbench.64 rewritten**; .78 and .79 given dated clauses; **new .80 and .81**; anti-patterns 7 rewritten, 8 extended, 12 reworded, **new 13**; **open questions 1 and 2 answered** (2 reopened on three maps and re-answered, with the first answer's measurement preserved — a measurement is never rewritten).
+
+**The restatements of the rule, made true:** `spec/workbench/layout-and-zoom.md` B3 (plus dated notes on INV-workbench.22 and .23), `spec/workbench/README.md` **VR13**, `PRODUCT_REQUIREMENTS.md` **UX-8** and **anti-pattern 9**, `ARCHITECTURE.md` §1 and §10 (two `[planned]` entries — decided, not built).
+
+Every file:line in the evidence was checked against the code before I relied on it; all of it holds. Every number is dated and attributed to who measured it and how.
+
+## What is rough
+
+- **The chapter is now ahead of the code**, which is the repo's cadence (AGENTS.md: record and spec first, then code) but worth saying. I added a dated paragraph to the chapter's Purpose naming exactly which two things are decided-and-not-built, so nobody reads B11 or B3 as shipped.
+- **0023 flags one thing for Kent.** R35 says *"no rule or architectural test changes"*. Nothing is weakened — but one check is **added** (a timer allowlist in `noSpinner.test.ts`), because this decision creates the first timer in product code that redraws something. The record says plainly that this is an addition, not an amendment, and says what to do if Kent reads R35 as forbidding even that.
+- **0024's evidence is not in the repository.** The 3-of-9 and 2-of-5 figures come from two runs under git-ignored `backend/.runs/`. The record states this as an honest cost and carries the fixture request with its fallback.
+- I corrected two things the analyses overstated rather than repeating them: the foot ends as **two** strips, not one (the last-key line stays), and the settle does **not** reduce crossings on every map (2 → 5 on the recording while the wire halves) — both now stated in the record.
+
+## Where I deviated and why
+
+- **New invariants needed numbers past the chapter's block.** All of 60–79 were taken, so I extended the chapter's range to *80 onward* with a sentence saying why 80 was free. `.80` and `.81` are 0023's; 0024 needed none — its rule is INV-workbench.64 rewritten, one rule over two.
+- **B11 sits after B10** rather than being inserted mid-chapter, so no existing section is renumbered and no citation elsewhere slides.
+- **Commit attribution** uses `Co-Authored-By: Claude Opus 5 (1M context)`, per the harness instruction in force this session, not the `Claude Fable 5.1` line in `plans/briefs/04-common.md` and in every commit on `main`. Say the word and I will amend the three commits.
+
+## What outside my files must change (I did not touch these)
+
+| Where | What it still says |
+|---|---|
+| `docs/adr/0007-canvas-react-flow-elk.md:47` | *"Already-placed nodes are pinned by `elk.position`, so a newly streamed tile never reshuffles an existing layer"* — **0024's dated amendment belongs on 0007**; the record's *More Information* says so, but 0007 is not mine |
+| `ARCHITECTURE.md` §9 decisions table | Ends at 0015 — records 0016–0022 are missing (the 05/06 lane's owed work). I did not add 0023/0024 rows: nothing rests on a `proposed` record, and it keeps the collision surface small |
+| `frontend/src/graph/elkGraph.ts:212–231` | `readPositions`' docstring: *"a tile that had a position keeps that position, to the pixel"* — lane #5's |
+| `frontend/src/graph/onTheGlass.ts:53`, `GenerationScreen.tsx:130` | *"nothing already drawn ever moves (INV-workbench.64)"* — lanes #3 and #5 |
+| `frontend/src/stream/__tests__/growth.test.ts:135` | `describe("nothing already placed moves")` · `test_a_tile_keeps_its_place_when_a_later_tile_arrives` — renamed by lane #5 |
+| `frontend/src/graph/__tests__/layout.test.ts:5` | file docstring, same promise |
+| `frontend/e2e/generate.spec.ts:136,230`, `lateLayout.spec.ts:152,218`, `watching.ts:255`, `waiting.ts:174` | the browser suite's copies: **`generate.spec.ts:230` asserts the clipping and must be inverted**; `generate.spec.ts:204` and `lateLayout.spec.ts:218` read a tile's place *after* the stop and must take that reading earlier |
+| `frontend/src/components/generationDock.css:38-48`, `GenerationScreen.tsx:305`, `MapFrame.tsx:71,87,138` | `spokenOnly` / `.map-live--spoken` — deleted by lane #3 |
+
+**Nothing I own touches the server, a fixture, a prompt or a recording**, so R5's shape freeze is untouched. Record 0012, `spec/workbench/first-screen.md` and `tiles-ports-wires.md` were not opened.
+
+## Files touched
+
+```
+ ARCHITECTURE.md                                   |   4 +
+ PRODUCT_REQUIREMENTS.md                           |   4 +-
+ docs/adr/0023-what-the-run-says-while-it-waits.md | 170 ++++++++++
+ docs/adr/0024-when-a-tile-may-move.md             | 182 ++++++++++
+ docs/adr/README.md                                |   2 +
+ spec/workbench/README.md                          |   2 +-
+ spec/workbench/layout-and-zoom.md                 |   6 +-
+ spec/workbench/streaming-growth.md                | 383 ++++++++++++++++++----
+ 8 files changed, 683 insertions(+), 70 deletions(-)
+```
+
+Three commits on `adr/04-what-the-run-says-and-when-a-tile-moves`; nothing pushed, no pull request opened, working tree clean.
+
+## Verification output
+
+No suite was run (docs only; the queue was not used). Structural check of every edited markdown file:
+
+```
+spec/workbench/streaming-growth.md: fences=14 (ok) tables=6 badrows=0
+spec/workbench/layout-and-zoom.md:  fences=6  (ok) tables=6 badrows=0
+spec/workbench/README.md:           fences=0  (ok) tables=3 badrows=0
+docs/adr/0023-…md:                  fences=0  (ok) tables=1 badrows=0
+docs/adr/0024-…md:                  fences=0  (ok) tables=2 badrows=0
+docs/adr/README.md:                 fences=0  (ok) tables=1 badrows=0
+ARCHITECTURE.md:                    fences=6  (ok) tables=4 badrows=0
+PRODUCT_REQUIREMENTS.md:            fences=2  (ok) tables=4 badrows=2  ← pre-existing escaped pipes at :65,:67, untouched by me
+```
+
+## Draft pull request body
+
+&gt; ### What
+&gt; Two decision records, both `proposed`, from Kent's M4 walk of the app with his own key on 2026-09-21 — **0023** (what the run says while it waits, R35, with R16's *Run details* move dated forward from 06-4) and **0024** (when a tile may move, R37). Plus every passage of `spec/workbench/streaming-growth.md` either record touches, edited here in one pass so the code lanes after this one need not reopen the chapter, and every restatement of *a placed tile never moves* in a document this branch owns: `layout-and-zoom.md` B3, the visual checklist's `VR13`, `PRODUCT_REQUIREMENTS.md` UX-8 and anti-pattern 9. `ARCHITECTURE.md` marks both as `[planned]`.
+&gt;
+&gt; ### Which invariant it satisfies
+&gt; `INV-workbench.64` is rewritten from *nothing already placed moves* to *a tile moves only when an arrow would otherwise point backwards, and once when the run stops*, as three clauses a test can hold; `.78` gains *and the same sentence is printed at the foot of the screen*; `.79` gains a dated clause and is otherwise unchanged; **new `.80`** (the foot says what the run is doing, in ink) and **`.81`** (the only thing that changes on a timer is a measured reading). `INV-workbench.60`, `.18`, `.22`, `.23`, `.25`, `.73` and `diff-view.md`'s `.40` are named as unchanged, on purpose.
+&gt;
+&gt; ### What is deliberately not here
+&gt; No code. Nothing is implemented against a `proposed` record. No ninth stream event, no progress bar, no count of calls in flight, no faster replay, no *Tidy the map* command, no change to the ELK options, and no fix for the zoom-button or panel-edge framing faults — those belong to the lane that owns the stage. No server file, fixture, prompt or recording is touched, so R5's one shape freeze is untouched. Record 0007's own line about pinning, and the seven copies of the old promise in browser code and test names, are named in the records and left for the lanes that own them.
+
+---
+
+## For Kent — five lines each
+
+**Record 0023 — what the run says while it waits** (`proposed`, 2026-09-21)
+
+1. You pressed *Watch it build* and saw nothing: measured, the first event takes about 23 seconds and later ones 50–110 seconds, and the one sentence that would have told you exists but is clipped to a one-pixel box — with a browser test asserting the clipping, which is why nothing caught it.
+2. One strip at the foot of both map screens: the state as a word, that sentence made visible (naming what is being worked on, from a field the stream already carries), and *nothing new for 23 s* counting up on a live run.
+3. You asked for spinners; shown three sketches you chose the quietest, and the record puts your ask at full strength — the measuring hairline — beside it, so the option you did not take is on the page with what it would have cost.
+4. Nothing spins, pulses or sweeps; no rule and no architectural test's assertions change; the server is untouched and the stream stays exactly the eight events; a replay shows no seconds, because there the number would be measuring our own pacing.
+5. The provenance line — *"Every claim and arrow on this map arrived from…"*, which asserts arrivals on an empty map — moves into a *Run details* section of the panel: that is your R16, pulled forward from a later stack and dated here, and it is what makes showing the run's sentence safe.
+
+**Record 0024 — when a tile may move** (`proposed`, 2026-09-21)
+
+1. A claim's column is frozen the moment it is first drawn, so on the Verify door the destination lands beside the hypothesis and stays there: **3 of 9 arrows point backwards** on one of your live runs, 2 of 5 on the other — the feedback rule is not involved.
+2. The promise *a placed tile never moves* becomes **a tile moves only when an arrow would otherwise point backwards, and once when the run stops** — the row is always kept, only the column is taken from the arrows.
+3. Your answer was *both*, and the measurements support it: keeping the map legible during the run costs **5 tile-moves and 3** on your two runs (the analysis's scary "44 across 14" was the Explore recording, the map you did not complain about), and the settle halves the wire.
+4. The settle happens at a moment that already exists — the frame the canvas already re-frames in — so it is one rule, one moment, a cut rather than an animation, and the motion budget is untouched.
+5. The diff view's *nothing re-positions when a branch opens* is untouched and the record says so; the honest costs are stated — tiles now move while you watch, one moment moves every tile, and the evidence rests on two runs the repository does not yet hold, so one kept live Verify run should be committed as a test fixture (your call; there is a fallback if you would rather not).</result>
+<usage><subagent_tokens>264421</subagent_tokens><tool_uses>112</tool_uses><duration_ms>962885</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>af31f1854503fd6ca</task-id>
+<tool-use-id>toolu_01MjrWNt1faakwpAMVM8nbme</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/af31f1854503fd6ca.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane D2: what a start is" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Lane D2 is done — three commits on `adr/04-what-a-start-is`, nothing pushed.
+
+## What the coordinator must run to check me
+
+```bash
+cd /Users/kentgang/git3/katalyst-wt/adr-04-what-a-start-is/backend
+uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src
+uv run pytest -q                      # via plans/scripts/heavy.sh — already run once: 644 passed
+uv run pytest -q tests/unit/test_replay.py::test_every_recording_carries_the_current_prompt_hash \
+  tests/unit/engine/test_prompt.py tests/unit/engine/test_wire_schema.py tests/boundary
+cd ../frontend &amp;&amp; npm run typecheck &amp;&amp; npm run lint
+cd .. &amp;&amp; make types &amp;&amp; git diff --exit-code frontend/src/api/schema.ts   # must be empty
+```
+**No browser end-to-end file was touched**, so no Playwright run is owed by this lane. (If you want belt-and-braces on the keyless path: `npx playwright test e2e/generate.spec.ts e2e/hormuz.spec.ts` — both run keyless and are unaffected by the new default.)
+
+## The two commits, in order
+
+1. **`b49ce1f` `adr:` + `bf8ca2b` `spec:`** → pull request 1, docs only.
+2. **`75d2110` `feat(generate):`** → pull request 2, the server.
+
+**PR 2 must not land before Kent accepts the amendment** — the amendment is written `proposed`, and ARCHITECTURE.md in PR 2 states the new rule as fact.
+
+## What I built
+
+**Half 1.** A dated amendment at the foot of `docs/adr/0012-*.md`, marked `proposed`, added — nothing above it rewritten. It replaces only the *How the app chooses* rule: the request names a live run or a recording; the server does what it was asked or says why it cannot, and never substitutes. It argues why a reader choosing a replay is not a fallback (a fallback is the server choosing; reading the key to choose is exactly that, and it leaves the reader no say in either direction), tabulates the four cases, quotes Kent's two questions, justifies the default, says why a default is *not* the server choosing, and reserves stack 07's third value. One clause added to the index row in `docs/adr/README.md`.
+
+`spec/workbench/first-screen.md` — new chapter in `spec/README.md`'s shape: Purpose · Data model · B1–B6 · two invariants · eight anti-patterns · four open questions. **INV-workbench.80** (the same ways drawn in the same order in the same words for both states of the key; a way that cannot be taken says why beside itself — the one Kent's walk broke) and **INV-workbench.81** (every duration and price came from the server's answer about itself and carries the day it was measured). One line added to `spec/workbench/README.md`'s chapter list.
+
+**Half 2.** `GenerateRequest.start: Literal["replay","live"]`, default `replay`. `_written_out` reads it instead of the key; `_pause` keyed off what was asked rather than off whether an answerer exists; a new `_no_key_for_a_live_run` generator ending the ordinary way — receipt of zeroes with `mode: "live"`, then `NO_KEY_FOR_A_LIVE_RUN`, a sentence that names what is missing *and* says nothing was put in its place. `_nothing_spent` gained a `mode` argument so a refused live run is not filed under the word for playing a recording.
+
+**Why the default is `replay`** — a request that did not ask to spend money must never spend it (the committed recording's own receipt says the other reading could be 29 calls, ~36 min, $4.04); it keeps every keyless caller working unchanged; and a default is not the server choosing, because it is a property of the request shape published in the server's own description of itself, reading no key, no environment and no folder.
+
+**R5 proven untouched.** `prompt_hash()` is `1c224cc32fb0e3f3b8b2508158affca16a3cc839d6a015d410e080ec276516ed`, equal to the header of `backend/recordings/hormuz.jsonl`. Passing untouched: `test_every_recording_carries_the_current_prompt_hash`, all of `tests/unit/engine/test_prompt.py` and `test_wire_schema.py`, and the nine boundary cassette tests (33 passed together). The field is our own HTTP body; it never reaches the vendor.
+
+`frontend/src/api/schema.ts` regenerated with `make types`. **`frontend/src/api/client.ts` needed no change** — the field has a default, so it is optional on the wire, and `npm run typecheck &amp;&amp; npm run lint` are green untouched.
+
+## What is rough — read this one
+
+**With a key, the browser degrades until lane 6 (`feat/04-one-first-screen`) lands.** The browser sends no `start`, so it gets the default. Keyless: identical to today. With a key: the four launchpad cards now try to replay; only Hormuz has a recording, so the other three and any typed sentence end in *"no recording of that sentence"*. This is the window the plan already implies (row 7 depends on D2), but it is real and it is on the first screen.
+
+The three lines that close it, if lane 6 wants them before its rewrite — all in files I was told not to touch:
+- `frontend/src/stream/events.ts`, `interface GenerateRequest`: add `readonly start?: "replay" | "live";`
+- `frontend/src/stream/generate.ts`, `bodyOf`: `if (request.start !== undefined) body.start = request.start;`
+- `frontend/src/App.tsx`, where the request is assembled: `start: hasKey ? "live" : "replay"` — the exact expression the server used to compute for itself.
+
+Also rough: the chapter's B3 specifies a row the server cannot feed yet (below), and the chapter is written but nothing is built against it.
+
+## Where I deviated and why
+
+1. **The two invariants are first-screen invariants, not the analysis's.** `D-one-flow.md` §3 proposed INV-workbench.80 as *"every key a screen names in its own words works on that screen"*. That belongs in `keyboard-and-access.md` with lane K's `?` fix, not in a chapter about the first screen. I took .80 and .81 for the first screen; **lane K's key invariant should be numbered INV-workbench.82.**
+2. **Field named `start`, not `source`.** The analysis proposed `source: "live" | "recording"`; RESUME and the plan say the values are `replay`/`live`. `start` names how the run starts, matches the record's own title, and reads naturally for stack 07's third value.
+3. **Thirteen existing live tests in `tests/api/test_generate.py` now say `start="live"`**, through a new `live_stream` helper. They relied on a key being configured, which the route no longer reads. That file is mine.
+4. **Refusal is a stream event, not an HTTP error.** Symmetry with the existing no-recording ending (receipt, then `failed`), and it needs no new browser handling.
+5. **I touched `docs/adr/README.md`** — one clause on the existing 0012 row (line 20), marked **proposed**. No rows added, so it should not collide with the lane adding rows.
+6. **Commit trailer.** My harness attribution says `Co-Authored-By: Claude Opus 5 (1M context)`; the repo history and the 04-common brief say `Claude Fable 5.1`. I followed the harness. Amend the three commits if you want history consistent.
+
+## What outside my files must change
+
+1. **`RecordingSummary` needs three receipt fields before lane 6 can build B3.** It carries `example` and `recording_date` only; the recorded run's `calls`, `seconds` and `dollars` sit in the recording's own receipt line and are served nowhere. `RecordingSummary` is in `engine/replay.py` (mine), but the readiness route that fills it is `api/health.py` (not mine), and the analysis assigns these fields to the top pull request — so I stopped short. Without them, **INV-workbench.81 cannot be satisfied and the live row must print nothing.**
+2. **`spec/workbench/streaming-growth.md` §B9** should keep a one-line pointer to the new chapter (plan row 6 says so). Lane D1 owns that file; I was told not to touch it.
+3. **`spec/generation/streaming.md:224`** lists the request body as `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` — now missing `start`. Not my file.
+4. **`frontend/src/stream/__tests__/eventsMatchSchema.test-d.ts:71`** says *"The browser sends four of the six the route takes"* — now seven. One word, not my file, test still passes.
+5. **`spec/vocabulary.md`'s Interface words table** has no row for the first screen's three new buttons (*Open the map*, *Watch the recording*, *Run it live*). The chapter says they start a run rather than edit a map and so take no code name; if you disagree, that table is the place to settle it. Row 4 is `Build the map` word for word already.
+
+## Files touched
+
+```
+ ARCHITECTURE.md                                    |   6 +-
+ backend/src/katalyst/api/generate.py               | 129 ++++++++--
+ backend/tests/api/test_generate.py                 | 116 +++++++--
+ docs/adr/0012-replay-mode-from-recorded-transcripts.md | 48 ++++
+ docs/adr/README.md                                 |   2 +-
+ frontend/src/api/schema.ts                         |  17 +-
+ spec/workbench/README.md                           |   1 +
+ spec/workbench/first-screen.md                     | 264 +++++++++++++++++++++
+ 8 files changed, 538 insertions(+), 45 deletions(-)
+```
+
+## Verification tails
+
+```
+All checks passed!                      # ruff check
+99 files already formatted              # ruff format --check
+Success: no issues found in 45 source files   # mypy src
+
+644 passed, 1 warning in 150.13s (0:02:30)    # whole server suite, through heavy.sh
+domain/ coverage TOTAL 1345 0 354 0 100%
+
+2 passed, 57 deselected                 # the two named tests
+33 passed in 1.89s                      # fingerprint + wire-schema + nine cassette tests
+1c224cc32fb0e3f3b8b2508158affca16a3cc839d6a015d410e080ec276516ed   # == hormuz.jsonl header
+
+&gt; tsc -b --noEmit                       # no output
+Checked 169 files in 51ms. No fixes applied.   # biome
+gen-types: wrote .../frontend/src/api/schema.ts
+```
+
+This lane called no model and cost **$0**.
+
+---
+
+## Draft pull request 1 — `adr/04-what-a-start-is` (docs)
+
+**What.** A dated amendment to decision record 0012, written `proposed`: a generation is asked for as a live run or as a recording, the request says which, and the server does what it was asked or says plainly why it cannot — it never chooses and never substitutes. A reader choosing a recording, labelled a replay, is not a fallback; what the record forbids is the server choosing on the reader's behalf, and reading the key to do it is exactly that. Nothing above the amendment was rewritten. Plus a new chapter, `spec/workbench/first-screen.md`: one first screen, four ways to start — the finished map (free, instant), the recording (free, badged a replay), a live run that states its price and its length before the press, and a sentence of your own — reading the same with a key and without one, differing only in what is enabled and why.
+
+**Which invariant it satisfies.** It writes two new ones. **INV-workbench.80** — the same ways are drawn in the same order in the same words for both states of the key, and a way that cannot be taken carries its reason beside itself. That is the invariant Kent's walk broke: with a key all four cards ran live and the committed recording was unreachable; with none, three were not drawn at all. **INV-workbench.81** — every duration and every price the screen prints came from the server's answer about itself and is printed with the day it was measured, which is the traceability rule applied to the first thing a reviewer reads.
+
+**What is deliberately not here.** No code — this is the bottom of the stack and Kent accepts before the server lands. No Help page (it rides after the first screen exists). No word glossary (record 0025, stack 05's freeze). No new recordings (R9). No change to pacing, to what a recording contains, or to `make record-demo`. And no edit to `streaming-growth.md` §B9, which owes a one-line pointer and belongs to the lane editing that file.
+
+## Draft pull request 2 — the server half
+
+**What.** `GenerateRequest` gains one field, `start`, either `replay` or `live`, and the generate route reads it instead of reading the key. Four honest cases: a recording asked for plays whether or not a key is present; a live run asked for with no key ends in a receipt of zeroes and one plain sentence that names what is missing and says nothing was substituted; the two cases that worked before are unchanged. The default is `replay`, because a request that did not ask to spend money must never spend it. Two tests pin it, `frontend/src/api/schema.ts` is regenerated, and ARCHITECTURE.md says who chooses now.
+
+**Which invariant it satisfies.** Record 0012's amended rule — *the server never chooses and never substitutes* — in both directions, pinned by `test_a_recording_plays_when_the_request_asks_for_one_and_a_key_is_present` (a key really configured, the seam handed a script, and the script asked nothing) and `test_a_live_run_with_no_key_is_refused_in_words` (receipt then a sentence, and the recording of that very sentence sitting on disk unplayed). **R5's freeze is untouched and proven**: the prompt fingerprint is byte-for-byte the one in the committed recording's header, and the fingerprint, wire-schema and cassette tests pass with no edit.
+
+**What is deliberately not here.** The first screen itself — `Launchpad.tsx`, `App.tsx` and `client.ts` are a later lane's, and the browser still sends no `start`, so with a key the cards replay until that lane lands. The three receipt fields `RecordingSummary` needs before a live row can state its price. Stack 07's third value, which the field is shaped for but does not carry. And no change to the pacing, which stays a server setting and never a field on a request.</result>
+<usage><subagent_tokens>208103</subagent_tokens><tool_uses>90</tool_uses><duration_ms>1020880</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a00127b8afdcfd6b6</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/a00127b8afdcfd6b6.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane 4: the quieter tile" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Servers stopped, ports free, tree clean, three commits on `feat/04-the-quieter-tile`.
+
+## To check me
+
+```bash
+cd /Users/kentgang/git3/katalyst-wt/feat-04-the-quieter-tile/frontend
+npm run check                      # already run once through the queue: green
+# browser (coordinator only — I edited no e2e spec, so this is the ordinary tier-1 run):
+npx playwright test e2e/hormuz.spec.ts e2e/generate.spec.ts
+```
+
+## What I built
+
+**The rule, in `Tile.tsx`:** the model's column is always drawn; the reader's and a venue's are drawn when their slot holds a number. Nine lines of JSX plus one grid rule (`grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr)` replacing `repeat(3, …)`), so the row shares its whole width between however many chips are there — one fills the tile, two take half each, three take a third each exactly as before.
+
+**Measured, on the running app, at 1600×1000** (pictures below): on the curated map the hypothesis keeps `model + user`, the Polymarket ending keeps `model + market`, the other five are down to `model`. On the replayed generated map **all 18 tiles go from three columns to one**, and every tile's box is pixel-identical before and after — the before/after screenshots show every tile in the same place at the same size.
+
+**Layout-neutral, pinned as well as looked at.** `test_the_reserved_height_is_the_same_whether_one_column_is_drawn_or_three` runs over all 18 generated claims, comparing `tileHeight()` and the box written on the tile with one column against three. `geometry.ts:73`'s 69 px and `Tile.tsx`'s inline width were already independent of the chips; nothing there changed.
+
+**The pinning test.** `test_a_belief_column_with_no_number_is_not_drawn` in `frontend/src/components/__tests__/tile.test.tsx`, run on the map folded out of `backend/recordings/hormuz.jsonl` through the app's own reader and reducer (`joined` → `foldAll(waitingFor(""), …)`, the same path `measured.test.ts` already uses). It asserts columns and `data-reading` states, never a number. Fold confirmed: **18 claims, 18 empty `user`, 18 empty `market`** — the analysis's 36 of 54, reproduced. A second test, `test_a_belief_column_with_a_number_is_still_drawn`, holds the other half, and `test_on_the_generated_map_every_tile_is_down_to_one_column` states what the rule is worth on that map.
+
+**The copy.** `encodings.ts` `MODES`: *"a domino — …"* → **"fires once. The push lands when the cause becomes true and then decays on its own; undoing the cause later does not undo it"**; *"an apple on a desk — …"* → **"holds while the cause holds. The push exists only while the cause is true, and goes the moment it stops."** A new test, `test_no_kind_of_push_is_explained_by_a_picture_of_something_else`, fails if a domino, an apple or a desk comes back. `link.py` and `prompt.py` untouched, with a note in the code and the chapter saying why.
+
+**Spec.** `spec/workbench/README.md` gains `VR14` (and its `VR1`–`VR14` preamble line). `tiles-ports-wires.md`: the six-things row 2, the chip illustration redrawn as two tiles, a new *A column with no number in it is not drawn* section with the counts and the three mechanical facts, the *states of a chip* table (the two empty-slot rows out, the supposed-value state in), `INV-workbench.6` amended with its new tests, and the ports paragraph's two metaphor sentences.
+
+## What is rough
+
+- **`add yours` is now unreachable.** `BeliefChip` still renders the reader's em dash with *add yours* under it, but no tile ever draws that chip. I deliberately did **not** delete it: `spec/vocabulary.md:121` still lists those words and that file is not mine, so removing the code would have made the book false. It is dead until the panel's `user` row becomes **My own number** (the follow-up after #3). The chip docstring says so.
+- **`VR14` needed a parenthesis to be true.** Literally, "no tile draws a belief column with no number in it" is false while a map is still building — the model's column stands alone saying *no engine yet*. I added the demanded sentence and then a parenthetical naming that one exception, rather than shipping a checklist line that fails on a growing map.
+- **The "curated fixture" assertion is on a built claim, not on the curated map.** The frontend has no committed copy of `fixtures/hormuz.py`; reaching it needs the server, which is what `e2e/hormuz.spec.ts` does. So `test_a_belief_column_with_a_number_is_still_drawn` uses `test/aMap.ts`'s builder with all three slots holding the builder's own model reading — no number typed. See *What outside my files must change* for the one-line e2e assertion I'd propose instead.
+- **A tile's accessible name no longer carries the `user` and `market` absences**, because those chips are not rendered. The panel prints both rows with words and reason whatever they hold (`Inspector.tsx:226–235`), so `INV-workbench.53` still holds — but a screen-reader user now hears them in the panel only, which is a change in where, not whether.
+- The belief row is sometimes *shorter* than before (one full-width chip never wraps *no engine yet* to two lines). The tile's box is unchanged, so this only widens the gap above the foot, which is pinned to the bottom. Visible in the pictures; it reads fine, but it is a change nobody asked for.
+
+## Where I deviated
+
+1. **I edited one line of `frontend/src/components/__tests__/inspector.test.tsx`** (not in my ownership list, though `Inspector.tsx` itself is untouched). Line 384 asserted `getByText(/domino/)` on the arrow's `kind` row and went red the moment `encodings.ts` changed. It now reads `getByText(/undoing the cause later does not undo it/)` — the distinctive tail, because `/fires once/` matches two elements (`Inspector.tsx:823` contains it too). Without this, `npm run check` could not go green. **Collision warning for the lane holding `Inspector.tsx`:** one line, easy to keep both sides.
+2. **The `Co-Authored-By:` line is `Claude Opus 5 (1M context)`**, not `Claude Fable 5.1` as the brief says — the session's attribution reminder names Opus 5 and it is who actually wrote this. Trivial to rewrite with a rebase if you'd rather.
+3. **I added a second pinned test** (`test_the_reserved_height_is_the_same_whether_one_column_is_drawn_or_three`) beyond the one the row names. `C-declutter.md:170` proposes it and layout-neutrality is the load-bearing claim of this lane; it is 20 lines and no browser.
+4. **I rewrote `tiles-ports-wires.md:180`'s metaphor** as well as the browser copy. It is a definition in my own chapter that quoted the exact sentence being replaced, so leaving it would have left the book disagreeing with the screen.
+
+## What outside my files must change (I did not touch any of it)
+
+| Where | What | Why |
+|---|---|---|
+| `spec/vocabulary.md:121` | Row *"No number of your own yet \| **—** and *add yours*"* now describes a state no tile draws. Should become the panel's row and, later, **My own number**. | Shared, hot, and the glossary lane's |
+| `spec/workbench/inspector.md:266–291` | Quotes the on-screen `kind` text with the domino, word for word. Stale as of this branch. | The Inspector chapter is another lane's / 06-4's |
+| `backend/.../domain/link.py:118–125`, `engine/prompt.py:105`, mirrored at `frontend/src/api/schema.ts:1178` | Still say *toppled domino* / *apple on a desk*. | Moves the prompt fingerprint — rides stack 05's one freeze (R5), as planned |
+| `frontend/src/world/types.ts:35–37`, `graph/diff/badges.ts:164`, `graph/__tests__/diffState.test.ts:853` | Code comments using the metaphors. No reader sees them; harmless, and tidying them is a sweep nobody asked for |
+| `frontend/e2e/hormuz.spec.ts` | **Optional, and the honest home for the "curated fixture" half.** After the map opens, one line: `await expect(page.locator('.react-flow__node[data-id="H"] .belief-chip[data-owner="user"]')).toBeVisible();` — the curated H is the one claim carrying a reader's number (`fixtures/hormuz.py:166`). I did not add it because the e2e specs are the round's known collision point. |
+
+**No e2e spec asserts on an empty belief column** — I checked every `.belief-chip` reference. `generate.spec.ts:193` counts `[data-owner="model"][data-reading="number"] === tiles` (still 18 = 18); `hormuz.spec.ts:818/825/833/861/875/882/1017` all take `.first()`, which is the model's column; `watching.ts:151` counts `[data-reading="number"]`, unchanged in value. One comment at `watching.ts:150–152` ("on a growing map most of them are reading an absence out") is now only true of the model's column — wording, not an assertion.
+
+## Files touched (`git diff --stat 03794cf`)
+
+```
+ frontend/src/components/BeliefChip.tsx             |   8 +
+ frontend/src/components/Tile.tsx                   |  20 ++-
+ frontend/src/components/__tests__/inspector.test.tsx |  2 +-
+ frontend/src/components/__tests__/tile.test.tsx    | 186 +++++++++++++++++++--
+ frontend/src/components/tile.css                   |  20 ++-
+ frontend/src/graph/wires/__tests__/encodings.test.ts |  23 ++-
+ frontend/src/graph/wires/encodings.ts              |  25 ++-
+ spec/workbench/README.md                           |   3 +-
+ spec/workbench/tiles-ports-wires.md                |  55 +++++--
+ 9 files changed, 297 insertions(+), 45 deletions(-)
+```
+
+Commits: `ab5d9e6` feat · `b1daf80` test · `5029973` spec.
+
+## Verification output
+
+`heavy.sh "04c lane 4 …: npm run check" -- npm run check` (queued, 23:42:57):
+```
+ Test Files  41 passed (41)
+      Tests  363 passed (363)
+   Duration  2.99s
+```
+Lint and typecheck, run directly after the last spec edit:
+```
+biome ci .  →  Checked 169 files in 42ms. No fixes applied.
+tsc -b --noEmit  →  (no output)
+BOTH CLEAN
+```
+Fold of the recording, confirmed against `count-empty-belief-cells.py`: `{ claims: 18, userAbsent: 18, marketAbsent: 18 }`.
+
+## Pictures (1600 × 1000, read by me)
+
+| | Path |
+|---|---|
+| Generated map, **after** | `/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/scratchpad/tile/generated-map.png` |
+| Generated map, **before** | `…/scratchpad/tile/BEFORE-generated-map.png` |
+| Curated map, after / before | `…/scratchpad/tile/curated-map.png` · `…/BEFORE-curated-map.png` |
+| One tile close up, after / before | `…/scratchpad/tile/generated-tile.png` · `…/BEFORE-generated-tile.png`; curated: `…/curated-tile.png` · `…/BEFORE-curated-tile.png` |
+| The throwaway script | `…/scratchpad/tile/look.mjs` (and `before.mjs`) — one-off screenshots, not the test runner |
+
+Visual review on my own pictures: `VR1`–`VR13` unaffected (the change only removes elements; tokens, shapes, hues, motion and the grew-rather-than-appeared behaviour are untouched, and the before/after maps are identical in tile size and position, which is `VR8` and `VR6`). `VR14` passes on both maps. `VR4` holds — every drawn column still shows two figures with its range. `VR9`: a tile now has one focusable chip instead of three; each drawn one is still a button with its own name.
+
+## Draft pull request body
+
+**What.** In each tile, the reader's column and a venue's column are drawn only when they hold a number; the model's is always drawn. On the recorded generation a keyless reviewer watches build, that is 36 of 54 belief cells gone — 18 of 18 tiles had both columns empty, and not one was an exception. The reasons keep their home in the panel, which already draws all three rows whatever they hold and prints each absence's own reason in full. Also: the two sentences saying what a kind of push does are said plainly — *fires once* and *holds while the cause holds* — instead of a domino and an apple on a desk.
+
+**Which invariant it satisfies.** `INV-workbench.6` (three voices, never merged) gains *and a column with no number is not drawn*, and the visual review checklist gains `VR14`. `INV-workbench.5` (every absence says why) is unchanged and still met: the panel prints every absence's words and reason, and the one column a tile draws whatever it holds carries its own. The change is layout-neutral by construction — `geometry.ts` reserves the same belief rail whatever the chips hold and a tile's box is written on it, so no tile changes size and nothing re-lays out; a test over all eighteen generated claims says so.
+
+**What is deliberately not here.** The panel's empty `user` row becoming **My own number** (it rewrites `Inspector.tsx`, which the run-strip branch has open). The model-facing copies of the two metaphors in `domain/link.py` and `engine/prompt.py` — they move the prompt's fingerprint and ride stack 05's one freeze. The glossary and the dotted-underline word control (R36). Deleting the now-unreachable *add yours* from `BeliefChip`, which would leave `spec/vocabulary.md` false; it goes with the panel's way in.</result>
+<usage><subagent_tokens>249462</subagent_tokens><tool_uses>133</tool_uses><duration_ms>1030569</duration_ms></usage>
+</task-notification>
