@@ -18,7 +18,9 @@ Every number on a card was worked out by the module whose subject it is — the 
 
 A card holds no bare numbers. Each one is a **figure** carrying its value, its **owner**, what it is in plain words, where it came from, and the range around it where one was stated. There are exactly four owners and no fifth: **the reader** (they typed it), **the model** (it stated it, and nobody has calibrated it), **a venue** (a market published it), and **computed** (this program worked it out over the drawn worlds or from the numbers above). A price the reader typed is **theirs**, never a venue's: it is their report of what they believe they could deal at, and it never fills the market's slot.
 
-That is a shape rather than a rule to remember, so no screen and no document can print a number from a card without being handed its owner at the same time.
+Each figure also says what it **is** — a likelihood, a share, a move, a size, a ratio, a price, a count or a number of days — because this product writes a likelihood one way and everything else another, and a rendering holding a bare number cannot know which rule applies to it. A **likelihood** and a **share** go through the one rule for writing a likelihood: two significant figures, the nought before the point dropped, `<.01` where it rounds below a hundredth and `>.99` where it rounds above ninety-nine, because `1.0` claims a thing cannot fail and `.0` claims it cannot happen and nobody on this map may claim either. A **move** never goes through that rule: a move of `.0090` is a real quantity a reader acts on, so it keeps its two figures however small, and its sign. A price, a count and a number of days are written as they stand.
+
+That is a shape rather than a rule to remember, so no screen and no document can print a number from a card without being handed its owner and its rule at the same time.
 
 ### No array reaches a card
 
@@ -31,7 +33,7 @@ The shapes underneath carry one row per drawn world; fifty thousand worlds by tw
 | **The trade** | The ending, the instrument or contract, the side, and the test that settles it | the map's payoff |
 | **What carries it** | The claims whose arrows carry most of the hypothesis's effect on this ending, with the shift each accounts for | computed |
 | **What is priced in** | The model's number, the venue's bid and offer with their source and day, the fee, both edges and the side to lead with — or the named refusal and the break-even | computed, and the venue's |
-| **What takes you out** | The claims over-represented where the stop went first: lift, interval, count, typical days ahead | computed |
+| **What takes you out** | The claims over-represented where the stop went first: lift, interval, count, typical days ahead — or the reason there are none | computed |
 | **What to watch** | The adverse turn that resolves before the ending and can be seen; and, apart from it, what is adverse but unhedgeable, with the reason | computed |
 | **Your exit** | Stop, target, horizon, risk budget, the size those imply, the two first-touch shares, and a greyed **quartered-Kelly ceiling** under the words *never size to this* | **the reader's**, except the shares and the greyed ceiling, which are computed |
 | **Tails and shocks** | Claims that are unlikely and would hurt; and any shock the reader placed | the model's, and the reader's |
@@ -65,7 +67,7 @@ The reader asks the brief's second question. The card lists every tradeable endi
 
 Two rules, said out loud, never one blended number. Each list is ordered within itself; **no row is ever ordered against a row in the other list**, which is why they are two fields and not one.
 
-Both of record 0018's thresholds appear here, and they do different things. An edge that is worth taking at one end of the model's own stated range and not at the other is **neither headlined nor ranked**, and is listed with that reason. An edge narrower than the venue's smallest price step **is ranked but never led with**, because it cannot be traded.
+Both of record 0018's thresholds appear here, and they do different things. An edge that is worth taking at one end of the model's own stated range and not at the other is **neither headlined nor ranked**: it is left out of the ranking with that reason, and in *what is priced in* the card leads with neither side and says the model's own range is why. An edge narrower than the venue's smallest price step **is ranked but never led with**, because it cannot be traded. And a row whose better edge is a loss is never led with either — the more a venue prices an ending out of reach, the less worth leading with it is, not the more.
 
 An ending neither rule can rank is listed with its reason rather than dropped: a contract ending whose edge was refused carries the refusal's own sentence; a contract ending nobody priced says so, which is a different fact a reader can act on; an instrument ending nothing has worked out a shift for says that.
 
@@ -75,7 +77,7 @@ An ending neither rule can rank is listed with its reason rather than dropped: a
 
 A **tail** is a claim that is unlikely and would hurt a lot. Tails get their own rows with their likelihood, what they would do to the position, and what could be done about them — **never averaged into an expected value**, because an average hides the case that wipes the reader out. On the Hormuz map the OPEC+ claim is the tail: unlikely, and enough to undo the move the whole map was built to catch.
 
-**Ranked by harm alone**, worst first, with the likelihood beside it and never multiplied into it. Likelihood times harm is an expected loss by another name, and an expected loss is precisely what a tail row exists to stop the reader from reading. No row is cut: how many tails a fixed strip can hold is a question about the screen, and the card answers it by ranking rather than by dropping.
+**Ranked by harm alone**, worst first, with the likelihood beside it and never multiplied into it. Likelihood times harm is an expected loss by another name, and an expected loss is precisely what a tail row exists to stop the reader from reading. No row is cut: how many tails a fixed strip can hold is a question about the screen, and the card answers it by ranking rather than by dropping. *This is what the code does and it is **proposed**, not settled: it closes one of this chapter's own open questions, and that is Kent's to take.*
 
 A **shock** is different: the reader adds *"but Iran is struck"* with the mouse and supposes it true. The card re-runs the position on that branch and reports **the change to the position and nothing else — no probability**, because supposing something is not a statement about how likely it is, and the map's number for a claim an edit has just fixed is not one either. On the card the shape has **no field a probability could go in**. In the document the field is written and **fixed at nothing**, and the committed description will not allow anything else there — because an absent field reads as an oversight and a null one reads as an answer.
 
@@ -99,13 +101,21 @@ Three fields make it different from an ordinary export. **`refuses`** holds the 
 
 ### B5 — The committed description of the document
 
-`backend/src/katalyst/thesis/export.schema.json` describes the document, and it is **generated from the shapes and committed beside them**. Two tests hold it there: one regenerates it and compares byte for byte, so a field that changes without the description changing fails; the other reads the committed file and checks every document these tests build against it, including documents over maps nobody wrote by hand.
+`backend/src/katalyst/thesis/export.schema.json` describes the document, and it is **generated from the shapes and committed beside them**. Three tests hold it there. One regenerates it and compares byte for byte, so a field that changes without the description changing fails. One reads the committed file and checks every document these tests build against it, including documents over maps nobody wrote by hand. And one walks the committed file for any rule of the description language the reader below cannot read, and fails on the first.
 
-The second test's reader understands only the part of the description language these shapes use — named types, fixed values, closed lists, required keys, list items, references and choices — and **every rule it understands is shown catching a document that breaks it**, so it cannot pass by accepting everything.
+That third test is what makes the second honest. The reader understands only the part of the language these shapes use — named types, fixed values, closed lists, required keys, list items and how few a list may hold, references and choices — and **every rule it understands is shown catching a document that breaks it**, so it cannot pass by accepting everything. What it does not understand it passes over, which would otherwise mean that the day a shape grew a lower bound or a pattern, the description would carry a rule nothing checked. The drift test closes that.
+
+Three things the description pins that an ordinary export would leave loose: the document's **own name** is a closed list of one, so a document calling itself something else is not a thesis; **`refuses` may not be empty**, because a document with no limits is a claim nobody here may make; and a shock's **`probability` is required and must be nothing**, because an absent field reads as an oversight where a null one reads as an answer.
+
+### B5a — What the card takes on trust, and says so
+
+**Where each claim's market chance came from is handed in and not checked.** The card names it beside every first-touch number, because record 0019 requires it, and nothing ties it to the price paths that were actually walked: the shape those paths come back in carries which decay shape each claim followed and not which market chance it used. So a caller that hands in sources the paths never used will have them printed. That is the one promise on this card that nothing enforces, and the honest close is for the paths to carry each claim's market-chance source the way they already carry its decay shape.
 
 ### B6 — The page a person reads
 
-The same card written out as text, in the same order as the panel. There is **one place a number is written out**, and it cannot write one without its owner and its source, so a page that showed a number nobody owns could not be produced. A section with nothing in it says so in a sentence rather than printing a blank, because a blank reads as an answer.
+The same card written out as text, in the same order as the panel. There is **one place a number is written out**, and it cannot write one without its owner and without the rule its kind names, so a page that showed a number nobody owns, or a likelihood at six figures, could not be produced. A section with nothing in it says so in a sentence rather than printing a blank, because a blank reads as an answer.
+
+**A sentence that belongs to a whole section is said once.** Which sample the drawn worlds came from, and where the market's chance of each claim came from, is one sentence on *what takes you out* and one on *your exit* — while every figure in those sections still carries the sample's short name, so no number read off drawn worlds is ever shown without one. Repeating a forty-word sentence on every line of a rail is how a page stops being one a person reads.
 
 ---
 
@@ -113,9 +123,9 @@ The same card written out as text, in the same order as the panel. There is **on
 
 Written *for all inputs drawn from generator S, statement P holds*. This chapter owns `INV-thesis.13`–`INV-thesis.15`.
 
-**INV-thesis.13 — The export is valid, and it carries its limits.** For every card built over every map from `graphs()` with a contract ending attached: the document answers the committed description, contains every line of `refuses`, and contains the not-advice line. **Tests:** `test_a_document_over_a_map_nobody_wrote_by_hand_answers_the_description`, `test_the_document_carries_every_refusal_the_not_advice_line_and_the_execution_sentence`, and `test_the_reader_of_the_description_bites`, which shows the checking has teeth.
+**INV-thesis.13 — The export is valid, and it carries its limits.** For every card built over every map from `graphs()` with a contract ending attached: the document answers the committed description, contains every line of `refuses`, and contains the not-advice line. **Tests:** `test_a_document_over_a_map_nobody_wrote_by_hand_answers_the_description`, `test_the_document_carries_every_refusal_the_not_advice_line_and_the_execution_sentence`, `test_the_reader_of_the_description_bites`, which shows the checking has teeth, and `test_the_description_states_no_rule_the_reader_cannot_read`, which fails the day it stops having them.
 
-**INV-thesis.14 — Every number on the card names its owner.** For every card built as above: every number anywhere inside it belongs to exactly one of four owners — the reader, the model, a venue, or a computation over the drawn worlds — and carries it. The one number that is not a measurement, the seed, is named in the test rather than hidden. **Tests:** `test_every_card_number_names_its_owner`, `test_a_number_the_reader_typed_is_never_labelled_a_venues`, and `test_the_page_names_an_owner_beside_every_number`.
+**INV-thesis.14 — Every number on the card names its owner.** For every card built as above: every number anywhere inside it belongs to exactly one of four owners — the reader, the model, a venue, or a computation over the drawn worlds — and carries it. The one number that is not a measurement, the seed, is named in the test rather than hidden. Every number also names what kind it is, so the page can write it by the one rule for numbers of that kind. **Tests:** `test_every_card_number_names_its_owner`, `test_a_number_the_reader_typed_is_never_labelled_a_venues`, `test_the_page_names_an_owner_beside_every_number`, and `test_every_likelihood_the_page_can_meet_is_written_by_the_house_rule` with `test_a_move_keeps_its_two_figures_however_small`.
 
 **INV-thesis.15 — It replays.** For every card built as above: the document names the base map, the branch and the seed, and the same card written twice is the same bytes. **Tests:** `test_the_document_names_the_map_the_branch_and_the_seed`, `test_the_same_card_writes_the_same_bytes`. *The other half — that rebuilding a world from those three reproduces the same card — belongs with the route that rebuilds one, and is not checked here.*
 
@@ -139,14 +149,18 @@ Written *for all inputs drawn from generator S, statement P holds*. This chapter
 
 8. **Do not carry an array onto a card.** Because the shapes underneath hold one row per drawn world, and no reader and no browser should ever be sent a million numbers. **Instead:** read the share, the count or the day off them, and leave the arrays where they are.
 
-9. **Do not maintain the document's description by hand.** Because it drifts, and the drift is silent. **Instead:** generate it from the shapes, commit it beside them, and let a test compare the two byte for byte.
+9. **Do not write an absence as a zero.** Because *no drawn world had this claim come on before the stop* and *it came on the day the stop was touched* are opposite facts, and a zero says the second. **Instead:** nothing at all, with a sentence beside it saying why there is nothing.
+
+10. **Do not print a number without saying what kind of number it is.** Because the rule that writes a likelihood turns `.0090` into `<.01`, which is true of a chance and a lie about an edge. **Instead:** every figure names its kind, and one table decides which rule writes it.
+
+11. **Do not maintain the document's description by hand.** Because it drifts, and the drift is silent. **Instead:** generate it from the shapes, commit it beside them, and let a test compare the two byte for byte.
 
 ---
 
 ## Open questions
 
-*Raised 2026-09-21; the second answered 2026-09-22.*
+*Raised 2026-09-21; the second has a proposal, dated 2026-09-22, for Kent to take.*
 
 1. **Does the export carry the whole map, or references into it?** Today: references — the base map's identifier, the branch, the seed, and claim identifiers on each row. A reader with the repository can rebuild everything; a reader without it cannot.
-2. ~~**How many tail rows?**~~ **Answered 2026-09-22: none are cut.** Tails are ranked by harm, worst first, with the likelihood beside it. The alternative considered and declined was ranking by likelihood times harm and cutting at a number: that product is an expected loss by another name, and anti-pattern 2 forbids leading with one. How many rows a fixed strip shows is a question for the screen, not for the card.
+2. ~~**How many tail rows?**~~ **Proposed 2026-09-22, for Kent: none are cut.** Tails are ranked by harm, worst first, with the likelihood beside it. The alternative considered and declined was ranking by likelihood times harm and cutting at a number: that product is an expected loss by another name, and anti-pattern 2 forbids leading with one. How many rows a fixed strip shows is a question for the screen, not for the card.
 3. **Is there a second card when the reader holds two positions?** One position is what this stack builds; two is a portfolio, and a portfolio is where the cut risk measures would start to mean something. The document's `legs` is already a list, so a second position is a second leg rather than a different shape.
