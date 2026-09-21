@@ -65,6 +65,7 @@ vi.mock("./graph/Canvas", () => ({
 
 import { App } from "./App";
 import { readAbout, readHealth, readReadiness } from "./api/client";
+import { STARTING_SENTENCES } from "./components/Launchpad";
 import { absence } from "./world/absence";
 
 /** Set the three stand-ins to answer the way a healthy server with no key would. */
@@ -220,7 +221,10 @@ describe("the launchpad", () => {
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
 
     expect(await screen.findAllByText(/Nothing answered at \/api\/readyz/)).not.toHaveLength(0);
-    expect(document.querySelectorAll('[data-state="no-answer"]')).toHaveLength(4);
+    // One row for each starting sentence, counted off the list itself.
+    expect(document.querySelectorAll('[data-state="no-answer"]')).toHaveLength(
+      STARTING_SENTENCES.length,
+    );
     expect(document.body.textContent).not.toContain("Asking the server");
     expect(document.body.textContent).not.toContain("No model key configured");
     // And nothing pops up about it: a failure is printed in the page.

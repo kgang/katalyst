@@ -169,13 +169,19 @@
 
 /* A field takes the room it is given and asks for none of its own.
  *
- * **An `<input>` with no `size` has a min-content width of about 140 pixels**,
- * which is not a width anybody chose: it is twenty characters of the browser's
- * default. Three of them in a row inside a 303-pixel column want 430, and a
- * track sized `1fr` — which is `minmax(auto, 1fr)` — hands them that and takes
- * the row's right-hand edge off the screen. `min-width: 0` here and
- * `minmax(0, 1fr)` on the row below are the same guard, written where each
- * belongs. */
+ * **`width: 100%` is what does that, and it was always here.** A field whose
+ * width is a percentage counts as needing no room at all when its row is
+ * sized, so three of them share a 303-pixel column evenly. Measured in a real
+ * browser on 2026-09-21 at 1600, 1440 and 1280 wide, with `min-width: 0` and
+ * the `minmax(0, 1fr)` below both taken out: the three fields still sat inside
+ * the panel. So those two lines rescue nothing today. They are kept because
+ * every other row of tracks in this interface carries them, and because a
+ * field that one day loses its percentage width — an `<input>` with no `size`
+ * asks for about 140 pixels, twenty characters of the browser's default —
+ * would otherwise push the row's right-hand edge off the screen. The check
+ * that would catch that is `everyControlInThePanelIsWhole` in
+ * `e2e/hormuz.spec.ts`, which asks the panel whether it is wider inside than
+ * it is on the glass. */
 .branch-panel__field,
 .intervene__field {
   width: 100%;
@@ -360,7 +366,8 @@
 
 /* The likelihood, the bottom of its range and the top, side by side. The three
  * tracks share the room equally and may shrink to nothing, which is what
- * `minmax(0, 1fr)` says and `1fr` alone does not. */
+ * `minmax(0, 1fr)` says and `1fr` alone does not. A guard, not a fix: see the
+ * note on the field above for what was measured. */
 .intervene__three {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

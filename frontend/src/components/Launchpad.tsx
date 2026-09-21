@@ -431,7 +431,7 @@ export function Launchpad({
             ask that did not come back apart from an answer that said no. */}
         {readinessFailure === null ? null : (
           <p className="launchpad__keyless">
-            {`${readinessFailure} Until it answers, nothing here is offered as if it could run.`}
+            {`${readinessFailure} This page asks once: reload it to ask again. Until it answers, nothing here is offered as if it could run.`}
           </p>
         )}
         {/* **A recording that would not play is named, in the server's own
@@ -460,7 +460,7 @@ export function Launchpad({
         <InputBar
           disabledBecause={
             readinessFailure !== null
-              ? `${readinessFailure} Until it answers, whether a sentence of your own could be turned into a map is not known.`
+              ? `${readinessFailure} This page asks once: reload it to ask again. Until it answers, whether a sentence of your own could be turned into a map is not known.`
               : readiness === null
                 ? "Asking the server whether a model key is configured. A sentence of your own needs the model, and nothing recorded can stand in for one."
                 : hasKey

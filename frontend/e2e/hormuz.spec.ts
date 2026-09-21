@@ -258,8 +258,16 @@ const WINDOWS = [
  *    panel that is actually on the glass, inside its border and beside its
  *    scrollbar. Scrolled out of view is fine and is why each control is scrolled
  *    to first: the panel scrolls as one and marks its edges, so below the fold is
- *    reachable. Past the left or right edge is not, because the panel does not
- *    scroll that way.
+ *    reachable.
+ * 4. **The panel itself does not scroll sideways.** This is a question of its
+ *    own and not a consequence of the second. The panel scrolls up and down, and
+ *    a box that scrolls on one axis scrolls on the other as well unless it is
+ *    told not to — so a field that runs past the right edge makes the panel
+ *    wider inside than it is on the glass, scrolling to that field slides the
+ *    whole panel left, and the field is then measured *inside* the client box.
+ *    The first three questions pass on exactly the defect this helper was
+ *    written for. Asking the panel how wide its content is cannot be fooled by
+ *    where it happens to be scrolled to.
  * 3. **At its own centre, the topmost thing on the screen is the control** — or
  *    something inside it. That is the overlap test, and it is the only one of the
  *    three that catches a sibling drawn over a button, which is what "nothing is
@@ -342,6 +350,14 @@ async function everyControlInThePanelIsWhole(page: Page): Promise<void> {
     }
   }
   expect(wrong, "controls in the panel a reader cannot reach").toEqual([]);
+
+  // Asked last, and of the panel rather than of any one control: by now every
+  // control has been scrolled to, so anything that could widen the panel has.
+  const sideways = await dock.evaluate((panel) => panel.scrollWidth - panel.clientWidth);
+  expect(
+    sideways,
+    "the panel beside the map is wider inside than it is on the glass, so something in it runs past its edge",
+  ).toBeLessThanOrEqual(1);
 }
 
 /**
@@ -391,6 +407,10 @@ async function everyOutlineItemIsASentenceWide(page: Page): Promise<void> {
             return ["the map is not being read as a list"];
           }
           const room = outline.clientWidth;
+          if (room === 0) {
+            // A third of nothing is nothing, and every item would pass.
+            return ["the map read as a list is drawn at no width at all"];
+          }
           const sentences = outline.querySelectorAll<HTMLElement>(".outline__sentence");
           if (sentences.length === 0) {
             return ["the map read as a list has no items in it"];
