@@ -55,12 +55,16 @@ Decision record 0006 settled the tool, and the specifics were re-verified agains
 ### The three functions that write a receipt
 
 ```python
-def found_in(answer: Message, *, on: date) -> tuple[Source, ...]:
+def found_in(said: Said, *, on: date) -> tuple[Source, ...]:
     """Every address the search tool itself returned during this one call.
 
-    One `Source` per search result the vendor's answer carries, with
-    `retrieved` set to the day the call ran. This is the only place a `Source`
-    is built during generation.
+    One `Source` per search result the call's answer carries, with `retrieved`
+    set to the day the call ran. This is the only place a `Source` is built
+    during generation.
+
+    It takes a `Said` — our own shape — and not the vendor library's message.
+    One module names that library's types and this is not it, so what the search
+    returned has already crossed the seam by the time this reads it.
 
     It must never include an address that came from the model's own text. The
     whole rule rests on this function reading the tool's results and nothing
@@ -129,7 +133,7 @@ def provenance_of(draft: LinkDraft, kept: tuple[Source, ...]) -> Provenance:
 
 **A base rate is kept only when at least one of its sources is a page the search tool returned in that call.** That is the same one rule as an arrow's sources — `keep_cited`, above, serves both — and it has the same reason: an address the tool never returned is the model reporting what it remembers reading.
 
-**When nothing survives, the base rate is dropped and the claim is still accepted.** The count goes; the claim, its resolution and its likelihood stay; the transcript notes that a count was offered without a page behind it. The tile then shows *no reference class*, which is true, rather than a count nobody can check, which is the state this product refuses to show (`test_a_base_rate_nobody_sourced_is_dropped_and_noted`).
+**When nothing survives, the base rate is dropped and the claim is still accepted.** The count goes; the claim, its resolution and its likelihood stay; the transcript notes the **reference class** that was offered and that nothing backed it. *(The chapter first said the transcript keeps the count as well. It does not, deliberately, since 2026-09-20: a figure with no page behind it reads as measured however it is marked, and a transcript is read by the same person the tile is. The class is what a reader needs to dispute — and the class is what can be looked up again.)* The tile then shows *no reference class*, which is true, rather than a count nobody can check, which is the state this product refuses to show (`test_a_base_rate_nobody_sourced_is_dropped_and_noted`).
 
 Dropping is not repair. Repair would be *rewriting* what the model said to make it pass; this removes an unbacked claim and says out loud that it did so, in the one place a reader can go and look.
 
@@ -192,7 +196,7 @@ Worked on `H`. Round one: the model searches for how often the Strait of Hormuz 
 
 `keep_cited` finds that address among the pages the tool returned. It survives, so the base rate is kept with its source. The likelihood the model then states sits well below 7-in-9, because this claim asks for 14 *consecutive* days inside one month, which is a harder test than an episode merely ending. The Inspector shows the class, the count and the source, so a person who disputes the number disputes the **class** instead of arguing with a feeling. That is the whole value of asking in this order.
 
-**Now the failing case, which is the one that was actually measured.** In the first live run — Hormuz, 2026-09-17, on `claude-opus-5`, ten calls — **eight of the ten claims came back with a count such as "12 of 15" and an empty source list**, because there was one search per call and it always went to the mechanism. Under the rule above each of those eight counts is dropped: the claim is accepted, the tile says *no reference class*, and the transcript carries the count that was offered and the note that nothing backed it. Nobody is shown "12 of 15" as though somebody had counted.
+**Now the failing case, which is the one that was actually measured.** In the first live run — Hormuz, 2026-09-17, on `claude-opus-5`, ten calls — **eight of the ten claims came back with a count such as "12 of 15" and an empty source list**, because there was one search per call and it always went to the mechanism. Under the rule above each of those eight counts is dropped: the claim is accepted, the tile says *no reference class*, and the transcript carries the reference class that was offered and the note that nothing backed it. Nobody is shown "12 of 15" as though somebody had counted.
 
 **An honest caveat about the ordering.** The order the prompt asks in is not the order the answer's fields are written in: in the shape, `prior` sits above `base_rate`. Adaptive thinking means the model reasons before it writes anything at all (decision record 0006), and the research now happens before any field is written at all, so the field order matters less than it did — but nobody has measured it, and Open questions 3 says how it would be measured.
 
@@ -237,9 +241,9 @@ Local numbers come from one pool shared by the five chapters of this part. **Thi
 | **INV-generation.9** | For every recorded call in `backend/tests/cassettes/`, the `provenance` on every accepted arrow equals what the rule table gives when applied to that call's own search results — compared against the tool's result set read out of the same cassette, never against what the model said | `test_provenance_is_written_from_what_was_found` |
 | **INV-generation.10** | For every recorded call, every `Source` on every accepted arrow has an address the search tool returned in that same call, and every cited address it did not return appears in `sources_dropped` and in the transcript's note. No accepted arrow carries a source the tool never returned | `test_a_cited_url_the_search_never_returned_is_not_a_source` |
 | **INV-generation.11** | For a recorded call whose every citation the search never returned, the accepted arrow reads `argued`. For any map holding an arrow marked `documented`, `historical` or `market_implied` with an empty source list, `validate` returns exactly one `documented_without_source` | `test_expand_rejects_a_documented_arrow_that_cites_nothing` |
-| **INV-generation.12** | For every recorded run, the number of searches counted across its outcomes is at most the run's searches cap; every call made after the cap is reached is forbidden to search and makes no search; and the run still ends on one of the reasons in [`proposals.md`](proposals.md) B4, never on the cap itself | `test_a_run_stops_searching_at_its_search_cap` |
+| **INV-generation.12** | For every recorded run, the number of searches counted across its outcomes is at most the run's searches cap; **the cap is never reached**, because a call is allowed the tool only while a whole call's research budget still fits in what is left — so the last call's worth goes unspent, and every call allowed the tool may spend all of it; and the run still ends on one of the reasons in [`proposals.md`](proposals.md) B4, never on the cap itself | `test_a_run_stops_searching_at_its_search_cap` |
 | **INV-generation.13** | Read over our own source: no code path under `backend/src/katalyst/engine/` writes `historical` or `market_implied`. The companion check — that `engine/proposal.py` contains no field named `provenance` — is a line on the pull request's own done-list, run as a plain search | `test_provenance_is_written_from_what_was_found` (its source-reading half) |
-| **INV-generation.14** | For every recorded call, every accepted claim that carries a `base_rate` has at least one source the search tool returned in that same call. For a recorded call offering a count with no such source, the claim is accepted, its `base_rate` is `None`, and the transcript holds the count that was offered and a note that nothing backed it | `test_a_base_rate_nobody_sourced_is_dropped_and_noted` |
+| **INV-generation.14** | For every recorded call, every accepted claim that carries a `base_rate` has at least one source the search tool returned in that same call. For a recorded call offering a count with no such source, the claim is accepted, its `base_rate` is `None`, and the transcript holds the reference class that was offered and a note that nothing backed it — the class, never the count | `test_a_base_rate_nobody_sourced_is_dropped_and_noted` |
 | **INV-generation.15** | For every recorded call, the number of research rounds is at most five and the number of searches at most the call's `max_uses`; a call that reaches its fifth round returns the proposal it has rather than raising or looping again | `test_research_stops_at_five_rounds` |
 
 ---

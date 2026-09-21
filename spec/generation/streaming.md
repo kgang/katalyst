@@ -260,7 +260,7 @@ With no key, this route declines in plain words rather than failing: *"drafting 
 
 **The budget they are measured against is the server's own, not the browser's.** NFR-7's hundred milliseconds is a *rendering* budget — sixty tiles drawn and laid out again — and it has nothing to say about how long `propagate` may run. The quantity that matters here is the one [`../multiverse/propagation.md`](../multiverse/propagation.md) already times: how long one world takes to work through, at the shipped loop sizes, on the machine those timings were taken on. The ceiling is **the largest pair of loop sizes that keeps one request inside the time a person will wait for a world before assuming the app has stopped**, measured the same way and written down with the measurement and the date beside it, in that chapter's units.
 
-The values are **measured, not invented**, and the ceiling is never below the shipped default. Until they are measured, nothing may quote one.
+The values are **measured, not invented**, and the ceiling is never below the shipped default. They were measured on 2026-09-17 and the measurement is written beside them in `engine/worlds.py`, which is the only place either number appears.
 
 **A request above the ceiling is refused, never clamped.** Clamping is a repair: the caller asks for one run and silently gets a different one, and every number that comes back is answering a question nobody asked. Refusal is a `422` naming the field and the ceiling, which pydantic's `le=` produces for free. Test: `test_a_run_above_the_loop_ceilings_is_refused_not_clamped`.
 

@@ -50,7 +50,7 @@ class Graph(BaseModel):
 
 
 ViolationCode = Literal[
-    # Fourteen faults in a map — what `validate` finds.
+    # Fifteen faults in a map — what `validate` finds.
     "missing_resolution",
     "missing_rationale",
     "documented_without_source",
@@ -196,7 +196,7 @@ Violations come back in the order of the rule table above, and within a rule sor
 
 ### Refusing an edit — four more codes *(decided 2026-09-17)*
 
-The fifteen rules above describe a **map**. An **edit** can fail for reasons that have nothing to do with the map being malformed — it can simply not fit the map it was handed. Those come back through the same `Violation` shape, from `apply` rather than from `validate`, and they carry four codes of their own. They arrive with `apply` in **stack 03a**; [`../multiverse/interventions.md`](../multiverse/interventions.md) owns which edit produces which.
+The fourteen rules above describe a **map**. An **edit** can fail for reasons that have nothing to do with the map being malformed — it can simply not fit the map it was handed. Those come back through the same `Violation` shape, from `apply` rather than from `validate`, and they carry four codes of their own. They arrive with `apply` in **stack 03a**; [`../multiverse/interventions.md`](../multiverse/interventions.md) owns which edit produces which.
 
 | Code | Raised when | Message pattern |
 |---|---|---|
