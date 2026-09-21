@@ -30,6 +30,7 @@ The last four belong to a map that is being generated and are defined, with the 
 | [`color-motion-type.md`](color-motion-type.md) | The color law, the three budgeted animations, typography | stack 03b — written, built bar the number-roll, which has nothing to roll until a number changes |
 | [`keyboard-and-access.md`](keyboard-and-access.md) | Keyboard map, outline view for screen readers, reduced motion, contrast | stack 03b — written, canvas built |
 | [`streaming-growth.md`](streaming-growth.md) | How the map draws itself during generation: the eight stream events, skeleton tiles, growth in causal order, the refusal strip, the receipt strip, the Verify door's two cards, the input bar, the replay badge | stack 04a — written, canvas built |
+| [`first-screen.md`](first-screen.md) | The screen a reader meets first: four ways to start, the same with a key and without one, each saying what it costs and why it cannot be taken | stack 04c — written, not built |
 
 **"Built" here now means fed and grown as well as drawn.** The canvas reads the map from `GET /api/fixtures/hormuz` and asks the engine's three world routes for everything computed: `POST /api/worlds` for a world, `POST /api/worlds/diff` for what an edit moved, and `POST /api/worlds/conditional` for the number on one arrow, asked one arrow at a time. And it reads `POST /api/generate` as a stream, folding the eight events into a map as they arrive. So the numbers on screen are the engine's own, worked out from the map, the branch and one seed — whether the map was stored or written a minute ago.
 
