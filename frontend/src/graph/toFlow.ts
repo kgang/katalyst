@@ -9,7 +9,7 @@
 import type { Node } from "@xyflow/react";
 import type { ClaimView, LinkMode, WorldView } from "../world";
 import type { LayoutEdge, LayoutTile } from "./elkGraph";
-import { TILE_MIN_HEIGHT, tileHeight } from "./geometry";
+import { TILE_MIN_HEIGHT, TILE_WIDTH, tileHeight } from "./geometry";
 import { assignLayers, capLayers } from "./layers";
 import type { CausalEdge } from "./wires/CausalWire";
 
@@ -183,11 +183,36 @@ export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>):
     }
   }
 
-  const tiles: LayoutTile[] = nodes.map((node) =>
-    node.type === "claim"
-      ? { id: node.id, height: node.data.height }
-      : { id: node.id, height: TILE_MIN_HEIGHT },
-  );
+  // **Every tile is told how big it is, and the layout and the drawing library
+  // are told the same number.**
+  //
+  // A tile's box is not something to be discovered: it is 280 pixels wide
+  // (`TILE_WIDTH`) and exactly as tall as the height this file worked out from
+  // the claim, and the components draw themselves at precisely that size. The
+  // layout engine has always been told. The drawing library was not — it was
+  // left to measure each tile with a `ResizeObserver`, and **it draws nothing
+  // it has not measured**: a node with no size is rendered `visibility:
+  // hidden`.
+  //
+  // That is a promise the browser does not keep. When too many size
+  // observations fall due in one frame the browser abandons the rest of them —
+  // *"a ResizeObserver loop completed with undelivered notifications"* — and an
+  // abandoned one is never delivered. A tile whose box then never changes size
+  // again is never observed again, so it stays invisible for the life of the
+  // page: the map holds its claims, in their places, and a reader cannot see
+  // them. It is reachable today, on a cold machine, on the stored example.
+  //
+  // Saying the size is not a guess and not a duplicate: it is the one number,
+  // handed to both of the things that need it, from the one place that worked
+  // it out. The library still measures afterwards and still corrects itself —
+  // `initialWidth` and `initialHeight` are what it asks for exactly so that a
+  // caller who knows can say — and nothing downstream reads these back.
+  const tiles: LayoutTile[] = [];
+  const sized = nodes.map((node) => {
+    const height = node.type === "claim" ? node.data.height : TILE_MIN_HEIGHT;
+    tiles.push({ id: node.id, height });
+    return { ...node, initialWidth: TILE_WIDTH, initialHeight: height };
+  }) as MapNode[];
 
-  return { nodes, edges, layoutEdges, tiles };
+  return { nodes: sized, edges, layoutEdges, tiles };
 }
