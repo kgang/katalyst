@@ -1,0 +1,1314 @@
+Could you please read these docs
+
+
+
+<pasted_content id="cfb3">
+/Users/kentgang/git3/katalyst/plans/RESUME-stack-04.md
+/Users/kentgang/git3/katalyst/plans/HANDOFF.md
+/Users/kentgang/git3/katalyst/plans/STATUS.md
+/Users/kentgang/git3/katalyst/plans/README.md
+</pasted_content id="cfb3">
+
+
+and other relevant docs to hydrate your context and better understand this project?
+Afterwards, can you lay out to me what remain of stack 4 per the resume stack 4 doc?
+I'd like you to orchestrate the completion of it using opus sub-agents to parallelize as much as possible, while centralizing test runs and other resource management to avoid unnecessary slow downs.
+Aim for a principled but simple as possible project to understand and maintain.
+
+---
+
+Let's keep the recordings to just the hormuz example until my explicit approval. I am concerned that recording all four scenarios will take too long
+
+---
+
+<task-notification>
+<task-id>bcxpw24n9</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/bcxpw24n9.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the vanishing-wire repeat bar through the heavy queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+Could you please dispatch additional agents to read and digest the critical reviews in
+
+
+<pasted_content id="cfb3">
+/Users/kentgang/git3/katalyst/plans/review2
+/Users/kentgang/git3/katalyst/plans/review
+</pasted_content id="cfb3">
+
+and make principled adjustments to the remaining portions, in particular stack 5-7? Rewrites or refactors of the previous stacks are allowed but should be weighed against a high standard of quality improvement. Try to find the best tradeoffs in terms of work required versus improvements made
+
+Make this portion mostly about planning, though you can direct the currently outstanding agents based on the results of this analysis. Afterwards please write planning docs to 
+
+<pasted_content id="cfb3">
+/Users/kentgang/git3/katalyst/plans
+</pasted_content id="cfb3">
+
+ to reflect the latest iteration on the plans, design, and architecture of this project. Aim for a code architecture and design that is principled and simple as possible to understand and maintain
+
+---
+
+<task-notification>
+<task-id>a8b8933a0102b9767</task-id>
+<tool-use-id>toolu_01Md87Z8pjRU3tXehtnjceP3</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a8b8933a0102b9767.output</output-file>
+<status>completed</status>
+<summary>Agent "Review vanishing-wire fix (read-only)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## VERDICT: READY AFTER MUST-FIX
+
+The diagnosis is right and the new end-to-end test has real teeth. But the hook's stop condition is not the fact the docstring claims it is, and in this app it never becomes true — so the fix works only because it polls the library forever. That has to be corrected before it lands, especially since it is about to be rebased together with `feat/04a-growth`.
+
+---
+
+## MUST FIX BEFORE MERGE
+
+### 1. `frontend/src/graph/Canvas.tsx:160` — the stop condition never fires; the asking never stops
+
+**What is wrong.** `useNodesInitialized()` with its default options does **not** report handle bounds, and in this app it is permanently `false`. So `useHandlesTheLibraryHasMeasured` creates a 120 ms interval on mount and clears it only on unmount (or when the tile list changes, when it immediately makes another). The map forces a full re-measure of every tile ~8 times a second for the life of the page.
+
+**How I know** (all read in the installed `@xyflow/react@12.11.6` / `@xyflow/system@0.0.82`, plus one probe I ran):
+
+- `node_modules/@xyflow/react/dist/esm/index.mjs:4218-4221` — with the default `includeHiddenNodes: false` the selector returns `s.nodesInitialized` and never looks at `handleBounds`. (Only the `includeHiddenNodes: true` branch checks `internals.handleBounds`.)
+- `node_modules/@xyflow/system/dist/esm/index.js:1671-1717` (`adoptUserNodes`) — `nodesInitialized` is computed from `internalNode.measured.width/height` alone, and a rebuilt internal node re-seeds `measured` from `userNode.measured`, which `toFlow` never sets (it sets `initialWidth`/`initialHeight`, `toFlow.ts:214`).
+- `node_modules/@xyflow/react/dist/esm/index.mjs:3482-3499` — the store's `updateNodeInternals` ends in `set({})`; it never recomputes `nodesInitialized`. `setNodes` (`:3428-3457`) is the only writer, and `StoreUpdater` (`:281-320`) calls it only when the `nodes` **prop identity** changes — at which point `Canvas.tsx:245-266` has always built brand-new node objects, so `checkEquality` cannot preserve `measured`.
+- `triggerNodeChanges` (`:3550`) only writes measurements back when `hasDefaultNodes` is true or `onNodesChange` is given; `Canvas.tsx:678-680` gives neither.
+
+I ran a probe against the real `adoptUserNodes` (`/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/scratchpad/reviews/wire/probe.mjs`):
+
+```
+1. first setNodes (as Canvas builds them)          -&gt; nodesInitialized: false | handleBounds: undefined
+2. next setNodes, new objects (hover/selection)    -&gt; nodesInitialized: false | handleBounds: undefined   (measurement discarded)
+4. setNodes, same objects, after measurement       -&gt; nodesInitialized: true  | handleBounds: undefined   &lt;-- true WITHOUT handle bounds
+```
+
+Row 4 falsifies "false until every tile has handle bounds" outright. Row 2 shows why it can never turn true here.
+
+**Cost, per tick, forever:** one `querySelector` per tile, then `getDimensions` + `getBoundingClientRect` on the tile and on each of its four sockets (`system:939` `getHandleBounds`), plus `getComputedStyle` on the viewport — roughly 5N forced layout reads for N tiles — and a new internal node object for every tile, which re-renders every `NodeWrapper`. On a 20-tile growing map that is ~100 forced layout reads and 20 React re-renders 8 times a second, permanently. I proved the loop and the work; I did **not** measure wall-clock cost.
+
+**Smallest fix.** Ask for the fact that actually means "the sockets have been measured", and bound the asking:
+
+```ts
+// The option is named for hidden nodes, but it is the only branch of this hook
+// that looks at handle bounds at all — see the library's own selector.
+const EVERY_TILE_MEASURED = { includeHiddenNodes: true } as const;
+const measured = useNodesInitialized(EVERY_TILE_MEASURED);
+```
+
+That branch walks the live `nodeLookup`, so it re-evaluates on the `set({})` the forced measurement produces, and `nodeHasDimensions` is already satisfied by #37's `initialWidth`/`initialHeight`. Add a bounded number of attempts (about 25, ~3 s) so a tile that can never be measured — a hidden one gets `handleBounds: undefined` written deliberately at `react:3450`-ish in `updateNodeInternals` — cannot hold a timer for the life of the page. (No tile is `hidden` today; on `feat/04a-growth` unplaced tiles are filtered out of the array rather than hidden, so this is insurance, not a present bug.)
+
+### 2. `frontend/src/graph/Canvas.tsx:136-173` and the commit message — the explanation says three things that are not true
+
+- *"`nodesInitialized` is that fact — false until every tile has handle bounds"* — false; see probe row 4.
+- *"The asking stops the moment the library says it has measured"* — it never stops.
+- *"It is a timer rather than an animation frame because a browser produces no frames while nothing is changing"* — `useUpdateNodeInternals` itself defers the whole update to `requestAnimationFrame` (`react:3940`), so the fix already rides on a frame; the timer supplies only the repetition. (`setInterval` is throttled in a background tab too, so it is not the escape the sentence implies.)
+
+This is Kent's second veto — not knowing why it did that — and the house rule that a word must mean what it says. Fix the words in the same change as the code, and fix the commit message when the branch is re-committed.
+
+---
+
+## SHOULD FIX
+
+### 3. One rule, not two: the sockets can be declared, exactly as #37 declared the box
+
+`getEdgePosition` falls back to `toHandleBounds(node.handles)` when `internals.handleBounds` is missing, and `isNodeInitialized` (`system:1429`) accepts `node.handles?.length` together with `node.initialWidth`. So if `toFlow` gave each tile its `handles` the way it already gives it `initialWidth`/`initialHeight`, **the wires would be drawable on the first frame with no measurement and no polling at all**, and the file would carry one rule — *every tile is told its box and where its sockets sit, from the one place that worked them out* — instead of a declaration plus a repair loop. It would also be pinnable by a pure-data vitest test in the shape of `src/graph/__tests__/measured.test.ts`, and it matches `spec/workbench/layout-and-zoom.md:50` ("never measured off the screen — so layout stays a pure function").
+
+Two honest caveats, which is why I am not making this a must-fix: the socket geometry lives only in `tile.css:477-494` (8 × 6 px, `left/right: -8px`, `top: 38%`/`62%`, `translateY(-50%)`), so declaring it in TypeScript duplicates a number unless the CSS is driven from the same constants; and `parseHandles` (`system:1639-1647`) rebuilds bounds from the declared handles on **every** `adoptUserNodes`, so a wrong declared offset would move a wire's ends on every hover, not just once. Worth putting to Kent as a design choice rather than deciding here.
+
+### 4. No component-level test pins the rule; one is practical
+
+The diff adds no vitest test. Existing tests already render inside `ReactFlowProvider` (`src/graph/wires/__tests__/causalWire.test.tsx`, `src/components/__tests__/tile.test.tsx`), so a jsdom test that renders `&lt;ReactFlow&gt;` with nodes carrying `measured` and asserts the asking **stops** is straightforward — and it fails on the code as it stands, which is exactly the pin this needs. If the fix goes the way of item 3 instead, the test is pure data and even simpler.
+
+### 5. `frontend/e2e/hormuz.spec.ts:389` — on the ordinary path only one arrow is ever checked
+
+Outside the new shimmed test, the only arrow asserted to be on the glass is `H-&gt;C`, through `openThePanelOnTheArrow` at line 863. A different vanished arrow would still go unnoticed in an ordinary cold run. Add the eight-by-name assertion (the one already written at lines 970-980) right after `waitForTheLayout(page, 7)` in the stored-example test — it costs nothing and closes the blind spot for every run, not just the shimmed one.
+
+### 6. For the rebase with `feat/04a-growth`
+
+- That branch's `nodes` memo uses `flatMap` and **drops** tiles with no position yet (`feat-04a-growth/frontend/src/graph/Canvas.tsx:276-309`), so `everyTile` built from `drawing.nodes` will name tiles that are not on the glass. Harmless (`useUpdateNodeInternals` skips ids it cannot find in the DOM) but the docstring's "Every tile on the glass" stops being true. Build the list from the `nodes` the surface actually hands over.
+- Every arriving claim changes `drawing`, so the effect restarts and fires one immediate forced re-measure of the whole map per arrival — on top of the permanent poll. That branch's own comment at `Canvas.tsx:450-454` calls re-delivering sizes per arrival *"the storm that starved the drawing library's own measuring"*. Fixing item 1 removes the poll; the per-arrival re-measure is fine and probably wanted.
+
+### 7. `Canvas.tsx:194-197` — `everyTile` churns more than it needs to
+
+`drawing` is recomputed whenever `heights` changes (opening or closing a branch), so `everyTile` is a new array even when the identifiers are identical, and the effect restarts. Comparing the joined identifiers, or keying the memo on something stable, would make the comment "held still so that the asking does not restart on every render" true in more cases.
+
+---
+
+## NITS
+
+- `Canvas.tsx:159` — `useHandlesTheLibraryHasMeasured` uses the drawing library's word. `spec/vocabulary.md:73` says the project's word for where a wire attaches is **port**, and `tiles-ports-wires.md` calls them sockets on screen. The docstring does explain "handle", so this is house-style rather than a rule break.
+- `Canvas.tsx:169,170` — `[...ids]` copies the array on every call; only the `readonly` type needs it.
+- `e2e/hormuz.spec.ts:305-311` — "the waiting is gone" overstates it: `toHaveCount` is auto-retrying and still waits, up to the config's 15 s `expect.timeout`. The comment's "fifteen seconds" is right; the sentence before it is not.
+- `frontend/playwright.config.ts` on this branch still uses fixed ports 8015/5187 with `reuseExistingServer`. Lesson 18's fix rides on `feat/04a-growth`, so whoever runs this branch's last repeat bar must not run it as-is — a bar is on those ports in this worktree right now.
+
+---
+
+## What I checked and found sound
+
+**Proved by reading the installed library:**
+
+- **The root cause is right.** `EdgeWrapper` returns `null` — no `.react-flow__edge` element at all — when `getEdgePosition` is null (`react:2974`), and `getEdgePosition` is null when a node has no handle bounds and no declared handles (`system:1424-1440`). Handle bounds are written only by `updateNodeInternals`, reached either from the `ResizeObserver` (`react:2147-2171`) or from `useUpdateNodeInternals`; the `Handle` component registers nothing itself. So "tiles all present, arrows gone" is exactly the signature of a dropped tile notification, and #37's `initialWidth`/`initialHeight` is precisely why the tiles stay visible while the wires do not.
+- **Nothing already placed moves.** Positions come from our own layout and `updateAbsolutePositions` recomputes them identically; the node extent is infinite so nothing is clamped; `NodeWrapper`'s inline size comes from `node.width/height`, not from `measured` (`react:2360-2365`). A forced re-measure cannot make anything jump.
+- **Unmount is clean.** The interval is cleared; the in-flight `requestAnimationFrame` inside `useUpdateNodeInternals` is harmless because the store action early-returns with no viewport element.
+- **No ResizeObserver feedback loop.** The forced updates do not change any element's size, so they cannot feed the observer. (They do add load, which is item 1's concern, not a loop.)
+- **No fight with the keyboard rule from #36/#37.** The poll re-renders `NodeWrapper` but React keeps the same DOM element, so focus is never dropped to the page and `mayLandAgain` is never put in the "nowhere" state by it. Read, not run in a browser.
+
+**Proved by running:**
+
+- `npx biome check src/graph/Canvas.tsx e2e/hormuz.spec.ts` — clean.
+- `npx vitest run src/graph` — 13 files, 114 tests, green.
+- The `adoptUserNodes` probe above.
+
+**Checked and found in order:**
+
+- The new end-to-end test is deterministic and would be red without the fix: its shim drops every tile's notification and keeps the glass's, so with no repair path no handle bounds are ever written and all eight edges are absent. It asserts both the count and the eight arrows **by name**, so "some arrows drew" cannot pass.
+- The old tolerance in `openThePanelOnTheArrow` — the loop that swallowed "the arrow was not on the glass at all" for 45 s — is genuinely gone and replaced by a named assertion.
+- No spec chapter or `ARCHITECTURE.md` sentence is made false by this change. #37's rule was never written into the spec (it lives only in `toFlow.ts`'s comment and `measured.test.ts`), so nothing about handles needs a chapter today. If item 3 is taken, `spec/workbench/tiles-ports-wires.md` §"The ports" deserves one sentence saying the sockets' places are declared, not discovered.
+- The branch is one commit on `48eb562`, the worktree is clean, and it touches only the two files RESUME lists.
+
+**What I did not do:** no browser, no Playwright, no repeat bar, no whole suite; I did not measure the wall-clock or CPU cost of the poll, only proved that it runs forever and counted the DOM work per tick.</result>
+<usage><subagent_tokens>163445</subagent_tokens><tool_uses>68</tool_uses><duration_ms>719161</duration_ms></usage>
+</task-notification>
+
+---
+
+Please disregard the spec as compression principle as a strict maxim. Instead we can find opportunities to simplify and reduce the length of the specs where warranted
+
+---
+
+<task-notification>
+<task-id>af1c09eb17ac2b4fd</task-id>
+<tool-use-id>toolu_01RopJ5REaqDqcXD19ikAvM7</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/af1c09eb17ac2b4fd.output</output-file>
+<status>completed</status>
+<summary>Agent "Payoff kind required fix" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>Done. The monitor ended on its own.
+
+---
+
+**what the coordinator must run to check you** (in this order, from `/Users/kentgang/git3/katalyst-wt/fix-04-payoff-kind`):
+
+```
+cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . \
+  &amp;&amp; uv run mypy src &amp;&amp; uv run mypy --strict src/katalyst/domain
+cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest -q     # 8 failed, 552 passed
+cd frontend &amp;&amp; npm run lint &amp;&amp; npm run typecheck
+make types &amp;&amp; git diff --exit-code frontend/src/api/schema.ts               # must be empty
+```
+
+**Old fingerprint** `1c224cc32fb0e3f3b8b2508158affca16a3cc839d6a015d410e080ec276516ed`
+**New fingerprint** `ed0763b5e019b181e03ab6dd349d0dfbbe269135545ea43a856b121127b915d9`
+
+## What I built
+
+One commit on `fix/04-payoff-kind-required`: `ed77555` (plus an auto-added `Entire-Checkpoint:` trailer this harness appends on every commit — main's commits don't carry one; strip it when you squash if you care).
+
+- **The two defaults are gone.** `ContractPayoff.kind` and `PricePayoff.kind` are now `Field(description=…)` with no default, matching how every other discriminator in the pipeline is written (`ClaimProposal.kind`, `LinkProposal.kind`, `Stop.kind`). Measured before: `required` was `[venue, contract_id, title, side]` / `[instrument, direction, move]`. After: `['kind', 'venue', 'contract_id', 'title', 'side']` / `['kind', 'instrument', 'direction', 'move']`.
+- **Every construction site fixed** — 13 of them across `fixtures/hormuz.py`, `tests/strategies.py`, `tests/unit/domain/{test_models,test_diff,test_patches,test_propagation}.py`, `tests/unit/engine/{answers,a_recording}.py`. Nothing in `engine/` or `api/` builds a payoff; nothing in `frontend/` does either (the browser doesn't read a payoff yet — `fromTheServer.ts` only mentions the word in a sentence, and `apiSource.test.ts` passes `payoff: null`).
+- **New test** `test_a_payoff_must_say_which_of_the_two_shapes_it_is`, parametrized over both shapes, reading `required` off `what_goes_out()` — the wire, not the pydantic schema (lesson 15).
+- **`make types` run.** The diff to `frontend/src/api/schema.ts` is **two comment lines only**: `openapi-typescript` writes a discriminator in as required whatever the server says, so `kind: "contract"` was already non-optional in TypeScript. That is exactly why the defect was invisible from the browser side — it only ever existed on the wire to the model.
+- **Spec kept true**: `spec/graph/proposition.md` quoted both classes with the defaults; both lines corrected, plus one paragraph on the `Payoff` union saying the field may never carry a default again. **Decision record amended, not rewritten**: `docs/adr/0013` gained `## Amendment (2026-09-21) — kind is required, and it was not`, with the measured `required` lists. `ARCHITECTURE.md` §117 and `spec/graph/validity.md` §191 were already true (the latter is about `Proposition.payoff` being optional, which is unchanged).
+
+## Has the defect already bitten? No — the three Hormuz refusals are genuine
+
+A `market` proposal whose payoff omits `kind` **never reaches** `market_without_payoff`. Pydantic extracts the tag from what arrived before any member model applies, so a default on our side never gets the chance to fill one in; I reproduced it on main's exact shapes and got `union_tag_not_found` at `('payoff',)`. That `ValidationError` is raised inside `messages.parse`, caught in `client.py::_ask`, and re-raised as **`AnswerWeCouldNotRead`** — which `expand.py` turns into `Outcome(result=Refused(claim_in_words=…), calls=1)`: a `proposal_rejected` event with **empty violations and no code**, the sentence *"…did not fit the shape this call asked for, at: proposal.payoff."*, a whole call billed with its tokens uncounted (the receipt is knowingly short there), and **one strike of three** against that frontier claim in `grow.py` — three in a row close the line with `refusal_cap`. The three refusals in `hormuz.jsonl` all carry `code: "market_without_payoff"` **with a `subject` identifier**, which means a `Proposition` was actually minted and its `payoff` was plainly `None` — the model proposed three tradeable claims (dollar-index, E-mini S&amp;P, fed-funds futures) and named nothing to trade. So the defect had not bitten that recording; it was a live trap that had not sprung.
+
+## Tests that wait only on re-recorded cassettes — 8, and nothing else
+
+All in `backend/tests/boundary/test_expand_cassettes.py`. Four recorded (`test_expand_returns_one_proposal_per_call`, `test_provenance_is_written_from_what_was_found`, `test_generation_receipt_records_cache_reads`, `test_a_source_is_only_ever_one_the_search_tool_returned`) and four `handmade` (`test_expand_rejects_cycle`, `test_expand_rejects_a_claim_with_no_resolution_criteria`, `test_a_cited_url_the_search_never_returned_is_not_a_source`, `test_expand_rejects_a_documented_arrow_that_cites_nothing`). They fail on the body matcher, as designed. **The remake script builds no payoff** — it only edits link proposals and a `resolution.criteria` — so it needs no change.
+
+What you must run, in order (I hold no key and recorded nothing):
+
+1. `make record-cassettes` — **spends money.** Re-records the four non-handmade tests. Measured from the counters in the cassettes being replaced: **5 billed requests** (that middle test records two calls), 25 web searches, 2.5k input / 40.6k output / 555k cache-read / 68k cache-write tokens on `claude-sonnet-5` — **$0.94** priced through this repo's own `dollars_for`. Its second line re-runs the key-scanner.
+2. `cd backend &amp;&amp; uv run python tests/boundary/remake_handmade_cassettes.py` — remakes the four hand-made ones from the fresh recordings. **Free**: four files in, four out, no key, no network.
+3. `cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest tests/boundary -q` — all 8 green.
+4. **Separately, on whichever branch carries recordings.** `backend/recordings/` is empty here, but `feat-04b-recordings/backend/recordings/hormuz.jsonl` has `prompt_hash: 1c224cc3…`. The moment this lands beside it, `test_every_recording_carries_the_current_prompt_hash` and `faults_in` go red, and INV-generation.27 is broken. `make record-demo` is the fix. That one recording's own receipt says **29 calls, 93 searches, $4.04, 36 minutes** — so four examples is roughly $16 and two and a half hours, matching the plan's estimate.
+
+## Where I deviated
+
+- The plan says "five really-recorded cassettes". It is **four** recorded tests in eight cassette files; the fifth is a second recorded interaction inside `test_generation_receipt_records_cache_reads.yaml`. Five billed requests, four files rewritten.
+- The plan called this "a two-line change". I also gave both `kind` fields a plain-words description, because `proposition.py`'s own module docstring says every field carries one and the file had no other way to say what the field is for once the default was gone. Those descriptions travel over the wire and are part of why the fingerprint moved.
+- I added one paragraph to the `Payoff` union docstring in code. I checked first that a type-alias docstring does **not** travel: the fingerprint is byte-identical with and without it.
+
+## Chapters made stale
+
+None quote a number I moved. `spec/graph/proposition.md` needed the two class lines corrected (done). No chapter or record states the payoff's required-field list except ADR-0013, which got the dated amendment.
+
+## Open questions
+
+- The fingerprint is not written down anywhere in the repo, so nothing needed updating for it — but that also means nothing catches a *silent* drift except the recordings themselves. Worth a thought for whoever owns `replay.md`.
+- One mid-task self-inflicted scare worth recording: my first queued suite reported `domain/proposition.py` at 87%. I had edited that file while the run was in flight, so the traced line numbers no longer matched the file on disk. The second queued run against a frozen tree reports **100% across the whole domain layer**. Lesson 18 applies to your own running suite, not just somebody else's server.
+
+## Files touched
+
+`git diff --stat main..HEAD` — 13 files, 113 insertions, 18 deletions: `backend/src/katalyst/domain/proposition.py` (23), `backend/src/katalyst/fixtures/hormuz.py` (2), `backend/tests/strategies.py` (2), `backend/tests/unit/domain/test_diff.py` (9), `test_models.py` (15), `test_patches.py` (1), `test_propagation.py` (1), `backend/tests/unit/engine/a_recording.py` (8), `answers.py` (8), `test_wire_schema.py` (35), `docs/adr/0013-payoff-names-the-trade-quote-names-the-price.md` (10), `frontend/src/api/schema.ts` (4), `spec/graph/proposition.md` (13).
+
+## Verification tails
+
+```
+91 files already formatted
+All checks passed!
+Success: no issues found in 44 source files          # mypy src
+Success: no issues found in 12 source files          # mypy --strict src/katalyst/domain
+Checked 112 files in 38ms. No fixes applied.         # npm run lint
+&gt; tsc -b --noEmit                                    # npm run typecheck, clean
+Test Files 2 passed (2) · Tests 17 passed (17)       # npx vitest run src/world src/graph/diff
+```
+
+```
+16:32:42 END   P: server suite (final tree) exit=0 took=119s
+TOTAL                                  1304      0    348      0   100%
+FAILED tests/boundary/test_expand_cassettes.py::test_expand_returns_one_proposal_per_call
+FAILED tests/boundary/test_expand_cassettes.py::test_provenance_is_written_from_what_was_found
+FAILED tests/boundary/test_expand_cassettes.py::test_generation_receipt_records_cache_reads
+FAILED tests/boundary/test_expand_cassettes.py::test_a_source_is_only_ever_one_the_search_tool_returned
+FAILED tests/boundary/test_expand_cassettes.py::test_expand_rejects_cycle - A...
+FAILED tests/boundary/test_expand_cassettes.py::test_expand_rejects_a_claim_with_no_resolution_criteria
+FAILED tests/boundary/test_expand_cassettes.py::test_a_cited_url_the_search_never_returned_is_not_a_source
+FAILED tests/boundary/test_expand_cassettes.py::test_expand_rejects_a_documented_arrow_that_cites_nothing
+8 failed, 552 passed, 1 warning in 117.82s (0:01:57)
+```</result>
+<usage><subagent_tokens>191224</subagent_tokens><tool_uses>145</tool_uses><duration_ms>896730</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>af1c09eb17ac2b4fd</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/af1c09eb17ac2b4fd.output</output-file>
+<status>completed</status>
+<summary>Agent "Payoff kind required fix" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>Those were only my leftover polling jobs finishing — no new information in any of them. One correction to my report, and nothing else has changed.
+
+**The commit hash moved: `ed77555` → `2f0845a`.** I did not re-commit; this harness rewrites the commit when it appends its `Entire-Checkpoint:` trailer, so the hash I quoted was stale the moment I printed it. Use `2f0845a` (or just the branch tip of `fix/04-payoff-kind-required`). The content is identical — same 13 files, 113 insertions, 18 deletions against `main`, same message ending in `Co-Authored-By: Claude Fable 5.1 &lt;noreply@anthropic.com&gt;` plus that auto-added trailer.
+
+Everything else in my report stands, re-confirmed against the committed tree just now:
+
+- Working tree clean; nothing has changed since the verified suite run.
+- New fingerprint still `ed0763b5e019b181e03ab6dd349d0dfbbe269135545ea43a856b121127b915d9` (old: `1c224cc32fb0e3f3b8b2508158affca16a3cc839d6a015d410e080ec276516ed`).
+- Final queued suite: **8 failed, 552 passed**, domain coverage 100% — the eight failures are exactly the cassette tests in `backend/tests/boundary/test_expand_cassettes.py`, waiting on your `make record-cassettes` (≈$0.94, 5 billed requests) then `uv run python tests/boundary/remake_handmade_cassettes.py` (free), and separately `make record-demo` on the branch that carries `hormuz.jsonl`.</result>
+<usage><subagent_tokens>192728</subagent_tokens><tool_uses>147</tool_uses><duration_ms>919885</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>af1c09eb17ac2b4fd</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/af1c09eb17ac2b4fd.output</output-file>
+<status>completed</status>
+<summary>Agent "Payoff kind required fix" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>Another leftover polling job finishing. No new information, and nothing left to do.
+
+The task is complete. Final state:
+
+- **Branch** `fix/04-payoff-kind-required` in `/Users/kentgang/git3/katalyst-wt/fix-04-payoff-kind`, one commit at `2f0845a`, clean tree, not pushed, no pull request opened.
+- **The fix**: `kind` carries no default on `ContractPayoff` or `PricePayoff`, so it is required both in the rules layer and — the part that mattered — in the description of an answer the model receives.
+- **Fingerprint**: `1c224cc32fb0e3f3…` → `ed0763b5e019b181…`.
+- **Waiting on you**: the eight cassette tests, via `make record-cassettes` (≈$0.94, 5 billed requests), then `cd backend &amp;&amp; uv run python tests/boundary/remake_handmade_cassettes.py` (free), then `make record-demo` on whichever branch carries `backend/recordings/`.
+- **The Hormuz question**: the three `market_without_payoff` refusals are genuine — the model named a tradeable claim and no trade. A payoff missing its `kind` would never have reached that code; it would have surfaced as `AnswerWeCouldNotRead`. The defect was a live trap that had not sprung.</result>
+<usage><subagent_tokens>193425</subagent_tokens><tool_uses>147</tool_uses><duration_ms>927024</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a02955ba3d3f670e1</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a02955ba3d3f670e1.output</output-file>
+<status>completed</status>
+<summary>Agent "Rebase growth onto wire fix" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is verified. Here is my report.
+
+---
+
+# G2 — `feat/04a-growth` carried onto `fix/04-vanishing-wire`
+
+## What the coordinator must run to check me
+
+```bash
+cd /Users/kentgang/git3/katalyst-wt/feat-04a-growth
+
+# 1. Nothing was lost: 18 of 20 commits byte-identical, 1 and 2 marked "!"
+git range-diff 16c2189..growth-before-rebase fix/04-vanishing-wire..HEAD
+
+# 2. #40's reach rule is untouched — must print NOTHING
+git diff --stat main HEAD -- frontend/src/graph/diff/diffState.ts \
+    frontend/src/graph/diff/reach.ts frontend/src/graph/__tests__/diffState.test.ts
+
+# 3. Growth's only change to the end-to-end spec is the helper extraction —
+#    the wire fix's strict assertion and #40's test must be visible as context
+git diff fix/04-vanishing-wire HEAD -- frontend/e2e/hormuz.spec.ts
+
+# 4. The browser suite (queue it; it takes 6 seconds)
+cd frontend &amp;&amp; npm run check
+
+# 5. The 20 cold runs — MY SCRIPT, not the old one (see "Cold runs" below)
+bash /private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/scratchpad/bars/growth-cold-runs.sh 20
+```
+
+**New tip: `b87e93016ecd0c0248b8f4d274f3b590d7896ecc`** · base `6bc90d3` (`fix/04-vanishing-wire`, which contains `main` = `48eb562`) · 20 commits · worktree clean · never pushed.
+Old tip recorded at `scratchpad/growth-tip-before-rebase.txt` = `fb80b69`. Safety branches `growth-before-rebase` (= `fb80b69`) and `growth-after-rebase-v1` both exist; delete both after landing.
+
+## What I did
+
+Rebased the 20 commits onto `fix/04-vanishing-wire`. **One textual conflict.** Then, having proved a claim in my own conflict-resolution comment was false, I rebuilt the branch once more so the correction sat in the commit it belongs to rather than tacked on at the end — hence `growth-after-rebase-v1`, which differs from the final tip only in that comment's wording.
+
+### The one conflict, and how I resolved it
+
+**`frontend/src/graph/Canvas.tsx`, in `MapSurface`.** Both sides changed the same line. Growth: `toFlow(world, heights, reserved)` — the reserved rectangles at the growing edge. The wire fix: two new lines after it, `everyTile` and `useHandlesTheLibraryHasMeasured(everyTile)`. Neither side's change was optional, so both are kept in that order:
+
+```ts
+const drawing = useMemo(() =&gt; toFlow(world, heights, reserved), [world, heights, reserved]);
+// Every box the glass holds, by identifier — the list the measuring asks
+// about, held still so that the asking does not restart on every render.
+// A map that is still being built puts a new box in this list each time a
+// claim arrives, so the asking covers a tile that was not there before.
+const everyTile = useMemo(() =&gt; drawing.nodes.map((node) =&gt; node.id), [drawing.nodes]);
+useHandlesTheLibraryHasMeasured(everyTile);
+```
+
+I deliberately left `everyTile` reading `drawing.nodes` rather than the rendered `nodes`: on a growing map `drawing` changes when a box arrives, whereas `nodes` also changes on every hover and every selection, which would restart the asking for reasons that have nothing to do with measuring. Asking about an identifier the library does not hold (a box growth has dropped because the layout has not placed it yet) is a no-op in the library — `updateNodeInternals` skips an unknown id — so nothing breaks.
+
+### Three auto-merges I checked by hand, because this is where a loss would hide
+
+- **`frontend/e2e/hormuz.spec.ts`.** Growth moves seven shared helpers out to `e2e/waiting.ts`; the wire fix rewrote `openThePanelOnTheArrow`, which growth left in place. Disjoint. `git diff fix/04-vanishing-wire HEAD` on that file is *only* the helper removal and the new import. **The wire fix's strict `await expect(arrow).toHaveCount(1)` is at line 150 and the tolerance is gone; #40's `openThePanelOnTheArrow` and its `test_a_retune_under_a_report_moves_the_arrows_source` are intact; the fix's `test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification` is intact.** No helper in `waiting.ts` re-introduces a tolerance — the only `waitForTimeout` left in `e2e/` is the 250 ms inside #40's own retry loop over the click point, which the fix kept on purpose.
+- **The `@xyflow/react` import block.** Growth adds `type ReactNode` to the React import; the fix adds `useNodesInitialized` and `useUpdateNodeInternals`. Both present.
+- **`interface SurfaceProps`.** Growth appends `reserved`, `badge`, `frameAgainOn`; the fix inserts its hook immediately after the closing brace. Both present, in that order.
+
+### `diffState.ts` / `reach.ts`
+
+Growth never touched them, so there was nothing to resolve: `git diff --stat main HEAD` on `diffState.ts`, `reach.ts` and `diffState.test.ts` is empty. **#40's rule — an edit that can move a claim an observation was made about can move everything that observation is evidence about — lands bit for bit, and growth brings back nothing older.** The browser test count went 321 → 325: growth's 321 plus #40's three new `diffState` tests and one more from the suite it extended.
+
+### Do the three rules fight on a growing map?
+
+The brief's question, answered from the library's source rather than from timing:
+
+- **Does the hook re-run when a tile arrives?** Yes. `ids` is derived from `drawing.nodes`, which gains an entry per arrival, so the effect restarts and asks about the new box immediately.
+- **Can it cause an observer loop?** No. `useUpdateNodeInternals` changes no box's size, so no `ResizeObserver` it does not own can re-fire; growth's own stage observer sets a state drawn by `.canvas::after`, absolutely positioned, taking no space. It also passes `triggerFitView: false`, so it cannot fight growth's `frameAgainOn`, and it does not remount a node, so it cannot take the keyboard away from #37's `mayLandAgain`.
+- **Does it terminate? No — and that is a real finding about the fix branch, not about growth.** `useNodesInitialized()` with its default options returns the store flag, and that flag is set **only** by `adoptUserNodes`, which requires `userNode.measured.width/height` (`@xyflow/system` line 1706). This app passes controlled `nodes` with **no `onNodesChange`/`applyNodeChanges` and never sets `measured`** — `toFlow` sets `initialWidth`/`initialHeight`, which is #37's fix and which that particular check does not accept. So `nodesInitialized` is false from the first render and never becomes true, and `useHandlesTheLibraryHasMeasured` keeps a 120 ms interval alive for the life of the page, forcing a `getBoundingClientRect` over every tile and every handle about eight times a second. It still fixes the bug — by brute force — but its docstring's "the asking stops the moment the library says it has measured" is not true here, and a permanent forced-layout timer is exactly the kind of pressure that made the browser drop notifications in the first place (#37, and the measuring storm this branch already paid for once in `4c39fc8`).
+  **The cheapest honest remedy is one argument:** `useNodesInitialized({ includeHiddenNodes: true })` reads the internal lookup instead (`handleBounds` set *and* `nodeHasDimensions`, which does accept `initialWidth`), so it flips true as soon as the library really has measured, and the asking stops. The branch has no `hidden` nodes, so the option's name is misleading but its effect is right. **I did not apply it: `fix/04-vanishing-wire` is read-only for me and is under its own review.**
+- **Can the two be said as one rule?** Yes — *the library is never left with a box or a handle it has not measured.* #37 gives the library each box up front; the wire fix makes it go and look for the handles. They are one rule told in two places only because the app never feeds the library its own measurements back. Wire `onNodesChange` + `applyNodeChanges` (or carry `measured` on the nodes `toFlow` builds) and `nodesInitialized` starts meaning what it says, at which point both halves collapse into that one sentence. **Noted, not refactored** — it crosses the two branches.
+
+## Verification
+
+Run directly, all on the final tip `b87e930`:
+
+```
+$ npm run lint       → exit 0   (biome: Checked 166 files, Found 1 info — pre-existing, in e2e/ports.ts)
+$ npm run typecheck  → exit 0   (tsc -b --noEmit, silent)
+$ npx vitest run src/graph src/stream
+   Test Files  20 passed (20)
+        Tests  174 passed (174)
+```
+
+Through the queue (`heavy.sh`, twice — once mid-rebase, once on the final tip):
+
+```
+16:32:44 START G2: npm run check (final tip) (waited 20s, load 5.10)
+16:32:50 END   G2: npm run check (final tip) exit=0 took=6s
+
+   Test Files  39 passed (39)
+        Tests  325 passed (325)
+```
+
+Range-diff, `16c2189..growth-before-rebase` against `fix/04-vanishing-wire..HEAD`: **18 of 20 commits `=`. No commit dropped out; none shrank.** The two marked `!`:
+
+- **1 `f9d6502` → `27270d4`** — the conflict above, and nothing else.
+- **2 `91d44fb` → `f64bcc0`** — a context-line shift only (`/** The surface itself…` became `/**`, because the fix's hook docstring now sits above it). No content change.
+
+No backend file is touched by this branch, so there is nothing to run on the server side.
+
+## Cold runs
+
+**`plans/notes/2026-09-21-cold-runs.sh` is still nearly right for the rebased tree but it is the reason the two failures were lost, so do not use it.** Worktree path, `KATALYST_E2E_*` and `KATALYST_RECORDINGS` are all still correct (the recording is on disk at `…/feat-04b-recordings/backend/recordings/hormuz.jsonl`, 54 KB), and leaving `KATALYST_REPLAY_INSTANT` unset is right. But it keeps only four grepped lines of a failing run and then `rm -rf test-results` — traces, screenshots and error context gone. It also defaults to 8071/5171, which `04-resume-common.md` puts off limits.
+
+Improved copy written to **`scratchpad/bars/growth-cold-runs.sh`** (`bash -n` clean). It keeps **every run's complete output in its own file**, moves a failed run's `test-results/` to `run-NN-test-results` so the next run cannot overwrite it and nothing deletes it, defaults to ports 8079/5179 (overridable), refuses to start if the recording is missing rather than silently skipping four tests, bounds each run at 900 s, and prints where everything landed. The suite is now **nine tests**, four of which skip without the recording (5 in `hormuz.spec.ts` — the fix added one — and 4 in `generate.spec.ts`).
+
+## `KATALYST_REPLAY_INSTANT` — leave it paced
+
+Only `generate.spec.ts` replays at all, so the five `hormuz.spec.ts` tests read the stored example and the setting would save them nothing; of its four, the first is the arrival test that commit `d0e24fe` already proved needs the pacing, and the other three would still *pass* instant only by going quiet — their "no box was ever drawn in another box's place" and "the map stopped" checks are about a map that arrives over time, and with the pacing off there is no over-time left to check. The honest answer is leave it paced: the minute is not recoverable through this setting without hollowing out three of the four tests that spend it.
+
+## One thing the coordinator must decide before the pull request opens
+
+**`frontend/.tmp-e2e/` — four throwaway Playwright configs are committed on this branch** (`pw-gen`, `pw-mine`, `pw-norec`, `pw-replay`). Their own first line says "Throwaway". Nothing in the repository references them, no `.gitignore` entry covers them, they are outside every `tsconfig` so they are never type-checked, and two of them hardcode absolute paths into a *previous session's* scratchpad (`…/ef0fe818-…/scratchpad/g-shots/backend/recordings`) and into this worktree. They were swept in by three separate commits. They were never part of what this branch does; they are scratch that a `git add -A` caught.
+
+I did **not** remove them, because a 21st commit would have broken the "20 commits, range-diff clean" proof I was asked to produce, and because the brief says not to change what the branch does. The removal is one line, before pushing:
+
+```bash
+git rm -r --cached frontend/.tmp-e2e &amp;&amp; echo 'frontend/.tmp-e2e/' &gt;&gt; .gitignore   # then amend or add a commit
+```
+
+My recommendation is to take it: shipping a take-home repo with four scratch files pointing at a dead temp directory is exactly the hygiene AGENTS.md asks for.
+
+## Files touched by me
+
+Only `frontend/src/graph/Canvas.tsx`, and only the eight lines quoted above. The branch as a whole, against its new base: **98 files, +12,773 / −1,402** — `frontend/src/components` (30), `frontend/src/stream` and its tests (17), `frontend/src/world` (7), `frontend/src/graph` (8), `frontend/e2e` (4), `frontend/.tmp-e2e` (4, see above), `spec/workbench` (2), `spec/generation`, `spec/vocabulary.md`, `README.md`. No backend file.
+
+## Deliverables written
+
+- `scratchpad/msgs/pr-growth-body.md` — *What* · *Which invariant it satisfies* · *What is deliberately not here*, from the branch's own commits and `spec/workbench/streaming-growth.md`, ending with the generated-with line.
+- `scratchpad/msgs/merge-growth.txt` — the squash message, the What as prose in six paragraphs, ending with `Co-Authored-By: Claude Fable 5.1`.
+- `scratchpad/bars/growth-cold-runs.sh` — the replacement cold-runs script.
+- `scratchpad/growth-range-diff.txt`, `growth-tip-before-rebase.txt`, `growth-tip-after-rebase.txt`.
+
+## Chapter numbers made stale
+
+None by me. I changed four lines of comment; no number, no rule, no name moved.
+
+## Open questions
+
+1. **The non-terminating re-measure timer** above. It belongs to `fix/04-vanishing-wire`'s review, not to this rebase, but it is worth settling before either lands — the one-argument remedy is in hand and costs nothing.
+2. **`frontend/.tmp-e2e/`** — yours to call.
+3. If `fix/04-vanishing-wire` changes after its review, the re-rebase is cheap: there is exactly one conflict, in `Canvas.tsx`, resolved by keeping growth's `reserved` argument on `toFlow` and the fix's two lines immediately after it, in that order.</result>
+<usage><subagent_tokens>194793</subagent_tokens><tool_uses>79</tool_uses><duration_ms>851396</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>af1c09eb17ac2b4fd</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/af1c09eb17ac2b4fd.output</output-file>
+<status>completed</status>
+<summary>Agent "Payoff kind required fix" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The last of my polling jobs has drained. Nothing new, nothing outstanding — the work was reported two messages ago and the state is unchanged.
+
+Summary for the coordinator, unchanged:
+
+- **`fix/04-payoff-kind-required`**, commit `2f0845a`, clean tree, not pushed.
+- **`kind` is required on both payoff shapes**, on the wire as much as in the rules layer; 13 construction sites fixed; `test_a_payoff_must_say_which_of_the_two_shapes_it_is` pins it by reading `what_goes_out()`.
+- **Fingerprint** `1c224cc32fb0e3f3…` → `ed0763b5e019b181…`.
+- **8 failed, 552 passed** — exactly the cassette tests, waiting on `make record-cassettes` (≈$0.94, 5 billed requests) → `remake_handmade_cassettes.py` (free) → `make record-demo` on the recordings branch.
+- **The defect had not yet bitten**: the three Hormuz refusals are real `market_without_payoff` cases, not unreadable answers.</result>
+<usage><subagent_tokens>194169</subagent_tokens><tool_uses>147</tool_uses><duration_ms>992023</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a4dc33ac02c661eb3</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a4dc33ac02c661eb3.output</output-file>
+<status>completed</status>
+<summary>Agent "Digest reviews: finance and thesis" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-digest-finance.md`.
+
+**Summary (FINANCE — stack 05, the thesis)**
+
+Verified against `main` = `48eb562`: the engine computes M1 = **.4562** against the fixture's market **.48**, so the flagship "+13 points, buy" prose is a **sell** by accident — and the `.61 vs .48` story sits in five files, not three. Flipping `C` or `R` moves both tradeable endings by exactly `0.0000`. Every sensitivity row reads `to=True`, so the *damaging* direction is never computed. For M1, the only claim resolving before it is B — the thesis's own support — so INV-14 yields no usable stop. Zero hits for any "not investment advice" line. And the one real recording holds **11 price payoffs and zero contracts**, so on the recorded map there is nothing for Polymarket to quote.
+
+**The rule:** an edge is computed only from the world with no supposition in force. Enforced by a signature — `priced(base, shown, claim, quote)` — where a branch world alone cannot type-check, plus the mixture shown term by term.
+
+**Biggest cut:** **no `Quantity` node.** A `Position` already holds spot, vol and horizon honestly; the node would add a fifth proposition kind, a validity rule, a prompt change and a **paid re-recording**. Also cut: expected shortfall, drawdown, ruin, options, Kalshi, and a docs-only chapters PR.
+
+**Four PRs:** quote+edge → position+lift+paths → card+export+fixture → dock. One engine contract, `Draws{when, weight}`, satisfiable by today's engine *and* by either reformulation, so **stack 05 is not blocked on ENGINE**.
+
+**Three decisions for Kent:** does `move` become a range while the payoff-`kind` branch is already moving the prompt fingerprint (marginal cost $0 — otherwise a second paid re-recording later); drop the path product from `domain/` (`feat/04b-evals` item 3, on hold — **yes, drop it**); and does M1 name a Polymarket contract that actually exists.</result>
+<usage><subagent_tokens>206034</subagent_tokens><tool_uses>54</tool_uses><duration_ms>741839</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a71d9716bd02dd1e4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a71d9716bd02dd1e4.output</output-file>
+<status>completed</status>
+<summary>Agent "Evals branch: docs sweep" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Here is my report.
+
+---
+
+**What the coordinator must run to check me:** nothing that costs money or load. `git diff -- ARCHITECTURE.md PRODUCT_REQUIREMENTS.md README.md docs/ spec/` in `/Users/kentgang/git3/katalyst-wt/feat-04b-evals`, then fill the five `&lt;&lt;…&gt;&gt;` tokens. To re-derive any number I quote: from `backend/`, `env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run python /private/tmp/…/scratchpad/xd/rail.py` (≈2 min), and the same script from `/Users/kentgang/git3/katalyst/backend` for the before.
+
+## What I built
+
+**Part A was paused by you part-way through**; where I stopped is written in full at `/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/scratchpad/xd/PART-A-STOPPED-HERE.md`. Nothing is reverted.
+
+**Part B — the root documents.** `ARCHITECTURE.md` §1 (the browser's half of the stream is real), §3 (all eight steps, plus the spread on step 7), §4 (`Diff` gains the which-half word; `Payoff.kind` required), §5 (eleven invariants fully checked, not twelve — **INV-8 is now honest rather than closed**), §7 (evaluation row `[built]`, the sixth layer filled), §8 (`evals/`, one recording, the new `stream/` folder), §10 (stack 04 complete; four `[planned]` bullets replaced by three true ones; a new *settled since* entry for the spread). `PRODUCT_REQUIREMENTS.md` §12 (04a/04b **merged**), §13 (replay made true for one recording), FR-12 and FR-16 amended. `README.md` (a **Start here** paragraph, the growing map, `make eval` promoted out of the "not written yet" line into the money section with its eight checks, *Not built yet* rewritten). `docs/measurements.md` gains a recording entry and a rule that scorecards are not restated here.
+
+**Part C — closing the book.** Both landing pages now describe built chapters; `spec/generation/grounding.md` states the spread's second job where provenance is written; `spec/multiverse/interventions.md` open question 4 gets a dated 2026-09-21 note; `spec/generation/replay.md` and `spec/workbench/streaming-growth.md` B9 made true for one recording; `spec/workbench/keyboard-and-access.md` B8 rewritten (it still said "in this stack there is no engine").
+
+## Where I deviated, and why
+
+- **I did not write the path product as built.** Your correction; XC's message confirms it is held. §5's INV-8 row and §10 describe `main`'s behaviour.
+- **I did not add the dated 2026-09-21 note to `docs/adr/0014`**, and did not claim an amendment in §9. The note's content is numbers, and numbers are paused. It is the one part-C item left undone.
+- **`spec/graph/proposition.md` gained a paragraph** saying why neither `kind` has a default. The brief asked me to write the field as it will be; a required field with no stated reason invites somebody to put the default back.
+- **I fixed two things the sweep found that the spread did not cause**: `keyboard-and-access.md` B8 and `tiles-ports-wires.md`'s "the route does not exist yet". Both stated the engine was absent.
+
+## (1) Numbers changed, old → new
+
+| File, line | old → new | measured by |
+|---|---|---|
+| `spec/workbench/inspector.md:143` | `.40 (.25–.55)` → **`.40 (.24–.56)`** | `rail.py`, *every claim, base and strike*, `B base` |
+| `spec/workbench/inspector.md:231` | `65% … 30 points to 12` → **`57% … 31 points to 16`** | `old-vs-new.py` §K, `share of B's band that is B's own prior: 57.4802%` and `free … (31 points) -&gt; pinned … (16 points)` |
+| `spec/workbench/inspector.md:303` (new line) | — → **`.38 (.17–.61)`** | `rail.py`, `N1 … strike .38 (.17-.61)` |
+| `spec/workbench/diff-view.md:285` | `.50 ▼ .42  .27  97%` → **`.49 ▼ .42  .27  95%`** | `rail.py`, `M1: .49 -&gt; .42 … how firm .27 … same direction 95.3%` |
+| `spec/workbench/diff-view.md:296` | `.50 → .42` → **`.49 → .42`**; three rows → **two** | `rail.py`, *the rail*, two rows only |
+| `spec/workbench/diff-view.md:297` (new) | — → **`.28 → .38`** for N1, and **88 in 100** | `rail.py`, `N1 unchanged before 0.2834 after 0.3762 … agreement 0.877` |
+| `spec/workbench/diff-view.md:393, 396` | `about .080` → **`.086`** | `rail.py`, *H's series*, `day 4: raw 0.0858 printed .086` |
+
+XC independently measured the same values (its message, §3–4): B 85.1%, N1 87.7%, every belief identical to mine.
+
+## (2) Strike-branch passages I changed — **the list Kent may overturn**
+
+1. `spec/workbench/diff-view.md` B5, the "three rows it gives" paragraph → **two ranked rows plus a new paragraph on N1**: biggest move on the map, still `unchanged`, off the ranked list, listed as a greyed *no change* row. This is the honest walk and it is the visible product change.
+2. `spec/workbench/diff-view.md` B5, the worked M1 row block (`.49 ▼ .42 … 95%`).
+3. `spec/workbench/diff-view.md` B6, H's `pushed` value.
+4. `spec/workbench/inspector.md` B4, a new paragraph tying the single `asserted` mark to N1's band.
+
+All four are in two files and all four quote the strike branch by name, so `git diff -- spec/workbench/diff-view.md spec/workbench/inspector.md` is the whole of it.
+
+## (3) Tokens left, and sentences written ahead of code
+
+**Tokens:** `&lt;&lt;COUNT: server&gt;&gt;`, `&lt;&lt;COUNT: browser&gt;&gt;`, `&lt;&lt;COUNT: end-to-end&gt;&gt;` at `README.md:159` and `ARCHITECTURE.md:191, 194`. Ten `&lt;&lt;HORMUZ RECORDING: …&gt;&gt;` at `docs/measurements.md:15–33`. I used no `&lt;&lt;AFTER RECORDINGS&gt;&gt;` token.
+
+**Re-check against XC's final code:**
+- `ARCHITECTURE.md:124` — `Diff` carries `under_the_floor` / `versions_disagree`, and `test_an_unchanged_claim_says_which_half_it_failed`. *(XC has landed this; the real test names are four, listed in `diff.md` INV-multiverse.34 — the coordinator may want all four.)*
+- `spec/workbench/diff-view.md` — `unchangedBecause` on `ClaimDiffView`, the new B5 paragraph, and the added `test_the_no_change_sentence_comes_from_the_engines_own_word` in INV-workbench.46. **That test does not exist yet** — it is the browser follow-up in `frontend/src/graph/diff/noChange.ts`.
+- `ARCHITECTURE.md:145`, `spec/graph/proposition.md` — `kind` required on both payoff shapes, and `test_both_payoff_shapes_require_their_kind`. **Written ahead of the other agent's pull request.**
+- `ARCHITECTURE.md:160` — `test_band_is_not_sampling_noise` freezes priors *and* pushes; the three new spread tests are named from the plan.
+- Every browser sentence (`ARCHITECTURE.md` §1, §7, §8, §10; `README.md`; `spec/workbench/README.md`, `streaming-growth.md`, `keyboard-and-access.md`) is written from the **growth branch**, read-only, and is true only once it lands.
+
+## The inventory you asked for — engine-computed numbers in committed documents
+
+Roughly **90 places** across 13 files. By file, with the notable ones:
+
+- **`spec/multiverse/propagation.md`** (XC's) — ~30: lines 287, 336, 340, 382, 402–407, 439, 470.
+- **`spec/multiverse/diff.md`** (XC's) — ~20: lines 200, 225–226, 251, 282, 315, 381.
+- **`spec/graph/belief.md`** — 4: line 103 `.35 (.20–.49)`, 184 `.42 (.25–.60)`, 209 `.6134 → .61 (.45–.75)`, 220 `.36 · up by .0090`.
+- **`spec/workbench/tiles-ports-wires.md`** — 5: 117, 124, 127 (`.61 (.45–.74)`), 137–139 (record 0014's `.35 / .20 / .49`), **307** (`M1 … .61 over .45–.74 … 13 points`, already contradicting `inspector.md`).
+- **`spec/workbench/inspector.md`** — 4: 143, 152, 154, 231.
+- **`spec/workbench/diff-view.md`** — 4: 285, 296–297, 393.
+- **`spec/workbench/keyboard-and-access.md`** — 1 engine number: line 171, `.0089679… → .0090`, the move observing the premium makes to the strait. The rest of that table is abstract rounding.
+- **`README.md`** — 2, and they are the worst: **line 48**, the `curl` example's printed answer at full precision (`0.4562071732264012 / 0.3183414645119589 / 0.6011338456638751`, now `0.4557… / 0.3178… / 0.6025…`), and **line 65**, the diff summary. A reader can run both commands and get different numbers.
+- **`PRODUCT_REQUIREMENTS.md`** — 2: FR-21 line 134, and NFR-1 line 179 (that one is H's *stated prior* and did not move).
+- **`ARCHITECTURE.md`** — 4, all timings quoted from `propagation.md` (67 ms, 41 ms, 544 ms, 1.4 s) plus `100%` coverage. **I left the timings alone**; I measured 77 ms on main and 81 ms on this branch, so the spread costs a few per cent and the gap to 67 ms is the machine.
+- **`docs/adr/0014`** line 126, and one figure each in 0005, 0006, 0012, 0015 — these are dated measurements and are only ever amended, never rewritten.
+
+The rule would cost most in `propagation.md`, `diff.md` and `belief.md`; it would **pay for itself immediately in `README.md`**, where the two quoted outputs are commands a reviewer actually runs.
+
+## Which chapter numbers my change made stale
+
+None: everything I wrote is measured or is a token. Two pieces of drift I found and did **not** fix, both larger than this task:
+
+1. **`in this stack` means `stack 03b` in six workbench chapters** — about twenty passages saying the engine does not exist, nothing computes, `ranked` is false, `shifted` cannot appear. `ApiWorldSource` landed in #33. `inspector.md:18, 135, 227, 240, 488`, `diff-view.md:43, 187, 222, 395, 455, 573`, `tiles-ports-wires.md:19, 149, 190` are the clearest. **This is the single largest untruth left in the book** and it wants one agent and one pass.
+2. **`frontend/src/a11y/announcement.ts:20–23` and its two tests** quote *"six claims moved"*; the engine now says four. Also stale and not mine: `Inspector.tsx:182–183` (`92% … 29 points to 8`, two corrections out of date), `deltaRail.test.tsx:97,106`, `inspector.test.tsx:335,346,385`, `apiSource.test.ts:93,97,135,191`, `App.test.tsx:236,248,266`.
+
+## Open questions
+
+- **`docs/adr/0014` has no 2026-09-21 note.** Held with part A.
+- **`spec/generation/replay.md`'s title still reads "the four examples".** That is the design; I left it and made the body true.
+- **XC could not reproduce `+.27`, `+.21` or "22 fields"** in `diff.md`. I grepped every file I own for all three: **none of them appears outside `diff.md`.**
+
+## Verification
+
+No suite run — documents only, and no linter covers markdown here. Code-fence balance checked on all fifteen files (all even). The two measurement scripts:
+
+```
+$ cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run python .../rail.py
+  M1: .49 -&gt; .42  (raw 0.4941 0.4176)  largest on 2026-10-04  how firm .27 (raw 0.2732)  same direction 95.3%  rank 0.0459  peak -0.0765
+  M2: .43 -&gt; .36  (raw 0.4307 0.3634)  largest on 2026-10-06  how firm .28 (raw 0.2781)  same direction 93.1%  rank 0.0403  peak -0.0672
+```
+```
+$ cd /Users/kentgang/git3/katalyst/backend &amp;&amp; … uv run python .../rail.py     # main, 48eb562
+  M1: .50 -&gt; .42 … same direction 96.5% … N1: .28 -&gt; .37 … 99.9% … rank 0.0263
+```
+
+**A trap worth keeping:** `_propagate_with_no_spread` does **not** give the old diff numbers. `versions_of` rebuilds a world's versions with `PROVENANCE_SPREAD` whatever the world was built with, so `agreement`, `peak_delta`, `rank`, `range_width` and every `ClaimDiff.state` read off such a world are the *new* ones. I lost half an hour to it; the old values must come from the main checkout. XC has been told.
+
+## (4) Files touched, grouped into the commits I would make
+
+**Commit 1 — `docs: the root documents say what stack 04 actually built`**
+`ARCHITECTURE.md` · `PRODUCT_REQUIREMENTS.md` · `README.md` · `docs/measurements.md`
+
+**Commit 2 — `spec: the book closes stack 04 — every chapter built, every landing page linking it`**
+`spec/generation/README.md` · `spec/generation/grounding.md` · `spec/generation/replay.md` · `spec/workbench/README.md` · `spec/workbench/streaming-growth.md` · `spec/workbench/keyboard-and-access.md` · `spec/workbench/tiles-ports-wires.md` · `spec/multiverse/interventions.md`
+
+**Commit 3 — `spec: the strike branch walks as the engine now walks it, and the payoff says which shape it is`**
+`spec/workbench/diff-view.md` · `spec/workbench/inspector.md` · `spec/graph/proposition.md`
+*(This is the commit to show Kent. It holds all four overturnable strike-branch passages and the `kind` change.)*
+
+I touched no code, no test, and nothing under `frontend/`, `backend/` or `evals/`. The other entries in `git status` are XC's.</result>
+<usage><subagent_tokens>414593</subagent_tokens><tool_uses>177</tool_uses><duration_ms>1545332</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a1edb458f4db996ae</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a1edb458f4db996ae.output</output-file>
+<status>completed</status>
+<summary>Agent "Digest reviews: generation and evidence" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-digest-generation.md`.
+
+**Summary (~300 words)**
+
+I measured the committed Hormuz recording and the three kept runs before judging anything. Two of review2's central generation claims are already dead. The map is **not a tree**: 1.12–1.37 links per claim, two claims with two parents in the recording, one with four in the 09-21 run, and `LinkProposal` — the shape review2 says is never used — accounts for 2 of 20 and 7 of 28 accepted proposals. So *"`ClaimProposal`'s single `cause` is why the map is a tree"* is false, and with it the main **quality** argument for skeleton-first. Its remaining case is latency: first tile 67–135 s, first complete chain 95–611 s, whole map 36 min, $4.04 (29 calls, 93 searches). Priced against $0.139/call and 55 output-tokens/s, review2's "~3 min, ~$0.70" is roughly 2× optimistic on time and 3× on cost — realistically $2.0–2.6 and 5–6 min, and 20 s to first tile *only* with a streaming path that does not exist. A searchless first call gives 7 s, measured. Skeleton-first belongs in 06 with a kill criterion, not in 05.
+
+G7 is the clock: searching calls take 3–4× the seconds and bought 5 base rates on 18 claims, three of them `0/2`, `2/3`, `1/1`. Review2's evidence fix cannot be built — the service returns `encrypted_content`, and the structured answer carries no citations; review/'s passage-plus-support-role is right.
+
+**The coordinator's held question, answered: do not re-record.** Land the existing recording, hold `fix/04-payoff-kind-required` and the cassette re-record, batch every shape change (conditional q₀/q₁, source quote+role, payoff `kind`, the missing inhibitor sentences) into one freeze at the top of 05, then record once — $5 instead of $10. The defect is latent; all eleven payoffs read back fine.
+
+Also found: `make eval`'s $15 cap is per case, so a four-case round can spend $60.</result>
+<usage><subagent_tokens>229856</subagent_tokens><tool_uses>49</tool_uses><duration_ms>758112</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7e81b7cffbeedb0d</task-id>
+<tool-use-id>toolu_01GHtjDCqqfn21wqA6GLGBgX</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a7e81b7cffbeedb0d.output</output-file>
+<status>completed</status>
+<summary>Agent "Evals branch: spread, path product" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All work is done and verified. Here is my report.
+
+---
+
+# XC — report (stack 04, `feat/04b-evals`, code half)
+
+## What the coordinator must run to check me
+
+```bash
+cd /Users/kentgang/git3/katalyst-wt/feat-04b-evals/backend
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest -q                       # 617 passed, domain 100%
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run ruff check .                    # All checks passed!
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run ruff format --check .           # 97 files already formatted
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run mypy --strict src/katalyst/domain   # 12 files, clean
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run mypy src                        # 44 files, clean
+cd ../frontend &amp;&amp; npx tsc -b --noEmit &amp;&amp; npm run lint                           # both clean
+cd .. &amp;&amp; make types &amp;&amp; git diff --stat frontend/src/api/schema.ts               # must come back empty
+# the measurements every chapter number now rests on (about 2 min each):
+cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run python /private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/scratchpad/xc/measure.py
+# the same script on main's engine gives the "before" column of every table below
+```
+
+Tails: `617 passed, 1 warning in 126.10s`, `TOTAL 1333 0 354 0 100%`. `npm run check` was **not** run (I had used one heavy slot; the frontend change is the generated `schema.ts`, which biome ignores and no source file reads yet — `tsc -b --noEmit` and `biome ci .` both pass directly).
+
+---
+
+## A. The spread's engine — I read it as a reviewer and it is right and finished
+
+Everything the plan and the brief demand is there, and I found no defect:
+
+- **Per-arrow draw stream.** `STRENGTHS_STREAM = 3`, `default_rng([seed, STRENGTHS_STREAM, _stream_key(arrow.id)])` — keyed by the arrow's own identifier, the same shape the priors use. `test_adding_an_arrow_does_not_move_another_arrows_draws` bites.
+- **Log-odds scale.** `arrow.strength + steps * spreads[arrow.provenance]` — added straight to a number already written in log-odds. Correct.
+- **No `strength_lo`/`strength_hi`.** `grep -rn "strength_lo\|strength_hi" backend/` finds nothing.
+- **Locality holds bit for bit.** All 240 domain tests pass, including `test_intervention_locality`, `test_diff_states_respect_locality`, `TestGraphEditMachine` and `test_a_feedback_arrow_never_carries_a_change`. Measured directly: R's series and belief are `==` between base and strike world. The shape of the map is read off the *stated* strength (`_opposing`, `_spells_on`, `_states`, `_retractions` all use `link.strength`), so a drawn push can never re-time a retraction — the one way this could have broken locality.
+- **`test_band_is_not_sampling_noise` collapses with priors AND spreads frozen**, through `_propagate_with_no_spread` rather than a knob on `propagate` — the right call, because a world built with a different spread table could not be rebuilt by `versions_of`. Its other half, `test_freezing_the_priors_alone_leaves_the_arrows_talking`, fails the day the spread stops doing anything.
+- **The three new tests exist and have teeth**: `test_a_documented_arrow_gives_a_narrower_band_than_an_asserted_one` (three words, one map, ordering asserted), `test_link_spread_comes_only_from_provenance` (two arrows differing in *every* other field draw byte-identical pushes), `test_adding_an_arrow_does_not_move_another_arrows_draws`.
+- `test_range_matches_analytic_first_order_on_fixture` gained a term per arrow and tightened from `.02` to `.01`; measured gaps are `.0001`–`.0052`.
+
+**Two small things I added, not fixes:** a sentence on `World.range_shares` and in `_range_shares`' docstring saying the shares no longer account for the whole band (B's seven now total 72%, not 81%) — without it the field silently means something narrower than it did.
+
+**I changed nothing in X's engine.** It is complete as reported.
+
+## A′. The two pre-existing defects the coordinator asked about (not fixed, on main too)
+
+Both reproduce **unchanged** on this branch, so the spread neither creates nor masks either.
+
+**1. `observe(B=true)` leaves a cause at its prior (.3000 against Bayes's .4562).** Root cause: step 3 of `propagation.md` B5 — *keep the likelihood, not the coin flip*. `_one_pass` keeps `answer` (the claim's marginal likelihood in that draw) and throws away `came_true` (the realised flag). For a claim with **no causes** `total` is `broadcast(baseline)`, so `answer` is *identical in all eight worlds of a version*; `_per_version` then averages it over the surviving subset and gets exactly the same number back. Rao-Blackwellisation is exact for an *unconditional* mean, and invalid once you condition on another claim's realised outcome, because the conditioning event depends on the value that was discarded. The Bayes answer would come back by reading `came_true[A]` over the surviving worlds instead of `answer[A]`, at the cost of the variance reduction the whole band rests on — which is why this is a design decision and not a patch. It is the same phenomenon `diff.md` already records as G3's "moved only by reweighting", described there as a property rather than as a defect. **Interaction with the spread: none.** A has no incoming arrows, so no drawn push enters its baseline and its answer is still constant across worlds within a version. For a claim that *does* have causes, the answer already varies across worlds, the observation does reach it, and the spread only widens the band.
+
+**2. `do(C)`/`do(R)` move B but move M1 and M2 by exactly 0.0000.** Root cause: `fired[claim_id] = came_true[:, :, starts]` where `starts = _point_of(points, setup.settled[claim_id])`. A **trigger** arrow multiplies its push by that single flag — the source's truth on the source's own *settled* day — while a **sustain** arrow multiplies by the full per-day `truth` array. `settled[B]` is day 2, the day B's *earliest* live arrow (`H→B`, lag 2) reaches it; `C→B` has lag 7 and `R→B` lag 5, so their pushes land in B's own series (B goes `.393 → .476` under `do(C)`) and are invisible to `B→M1` and `B→M2`. The intent in the code comment is defensible — a claim must be true-or-false once per world, or a sustaining push would flicker day to day — but the day chosen is a property of the map's *earliest* arrow rather than of when the trigger fires. The two readings that would let later pushes through are "the day this arrow's own push fires" (`settled[source] + lag`) and "the source's own resolve-by day"; both change every recorded number, so this is Kent's call. **Interaction with the spread: none that can change the zero.** The spread varies `H→B`, `C→B` and `R→B`, so it changes the distribution of B's day-2 flag — but identically in the base world and the `do(C)` world, because C's arrow contributes nothing on day 2 in either. The base-versus-branch difference stays exactly zero, which I confirmed by running the repro here.
+
+## B. The chapter sweep — `propagation.md` and `diff.md`
+
+Every number both chapters quote was re-measured against the engine, before (main, `48eb562`) and after, with one script run on both. **I typed no number I did not measure.** The spread's rule is stated **once**, in `propagation.md` B5 under *"How wide an arrow's push is drawn — the rule, stated once"* (the table, the four things it means, and the pointer to `diff.md`'s different provenance table); `diff.md` cites it.
+
+`propagation.md`: the "deliberately absent" paragraph (it ships now), B2's hand sums beside the engine's `.039`/`.19`, B3's *nine in a hundred* and N1 `.38`/C `.074`, B4's `.086`, B5's spread rule, the loop's step 1, B at day 45 `.35 (.20–.50)`, the sampled/analytic bands, the range shares (58% / 5.0% / 3.8%, and the new note that they total 72%), the frozen-prior band (31 points to 16), `do(H)` widths `.314→.380`, H's share 5.0%→0.6%, the "widen H" figure (now measured, with its method), B7's **three** streams, B8's whole readings table, INV-12 (both freezes), INV-13, a new INV-13b for the spread, anti-patterns 1, 2, 5 and 9.
+
+`diff.md`: the Purpose line, the `ClaimDiff` shape, B2's four `shifted` claims and the new **three-row `unchanged` table** (R / B / N1, each with its reason), B3's 209-dead-versions measurement (87.95/86.70 → 97.16/95.73, survivors 98.21/96.82), the band-overlap measurement (56% of the narrower), B4's two rail tables and the rewritten N1 paragraph, B5's peak/headline figures, B6's summary instance (`.49 → .42`, three untouched), anti-patterns 1, 6, 7, 8 and a new 10, and open question 7.
+
+**Two numbers I could not reproduce and therefore replaced.** `diff.md` B5's "second known wart" quoted a two-piece map moving an ending `+.27` on day 3 and `+.21` on day 4, and "22 fields" on the Hormuz rail. I rebuilt that map from the construction the chapter describes and got `+.033` on **both** engines, and no field-counting method I could infer gives 22. I replaced the passage with a Hormuz measurement whose method is written into the chapter (inserting a pushless claim judged 365/900/1 825 days out moves **7 of the 14** fields the two rows carry, and at 1 825 days the rows swap order), and said in a dated aside that the old figures could not be re-derived.
+
+**One number the chapter's own rule got wrong and I corrected while quoting it:** `−0.0002` for H under `observe(B)` is one significant figure; a move keeps two, so both chapters now say `−.00019`. The spread did not move it (`−0.000192` on both engines).
+
+**I told XD at once**, in `/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/scratchpad/msgs/XC-to-XD.md`: the plan's script is correct but incomplete, where my extended copy is, the whole before/after table, the two unreproducible numbers, the `.19 (.08–.32)` → `.080` K2 fix, and the strike-branch product change to sweep for.
+
+## C. NOT STARTED — and cleanly so
+
+I had **not written a line of item C** when the reorder arrived, and I wrote none after. Nothing to back out:
+
+- `engine/verify.py` is untouched — `_multiplied_out` is still there, still private, still the only multiplier.
+- `domain/` gained no route module, no `World` field, no new type. `best_backed_routes` and `Route` are where they were, in `domain/diff.py`.
+- No test, no chapter sentence and no schema field anywhere refers to a path product on the world. `spec/generation/proposals.md` is **untouched** (its B7 edit was item C's only reason to open it).
+- The browser's `pathProduct` slot stays the honest absence it is (`apiSource.ts:272`, `fromTheServer.ts:251`).
+
+For the record, had I built it the shape would have been a new `domain/routes.py` holding `Route` + `best_backed_routes` + the product function, because `propagation.py` cannot import `diff.py` (`diff.py` imports `propagation.py`) and `World` is only ever built inside `propagate`. If the reviews' objection stands — multiplying marginals along a dependent chain — that module never needs to exist.
+
+## D. A diff row now says which half of *unchanged* failed
+
+One field, one word, one rule.
+
+```python
+UnchangedBecause = Literal["under_the_floor", "versions_disagree"]
+ClaimDiff.unchanged_because: UnchangedBecause | None     # required-but-nullable, like `agreement`
+```
+
+`_which_half_failed(state, move, agreement)` is the whole of it: nothing unless the state is `unchanged`; `under_the_floor` when `abs(move) &lt; MOVED_AT_LEAST`; otherwise `versions_disagree` when `agreement` is a number under `AGREEING_AT_LEAST`; otherwise nothing. **The floor is read first**, so a claim failing both halves says `under_the_floor` — and the two cases with no test to fail (a claim only one world holds; a claim no version counted in both numbers) carry nothing, because their absent `agreement` already says there was no direction. The reweighting case (G3) keeps `moved_only_by_reweighting` and also carries `versions_disagree`; `diff.md` says the fuller one is the one to show.
+
+No default on the field, deliberately — a default would drop it out of the schema's `required` list, which is the exact trap item 3 of the plan is about.
+
+Four tests, no typed-in words: `test_an_unchanged_claim_says_which_half_it_failed` (property test over generated maps; the expected word is worked out from the row's own two numbers), `test_only_an_unchanged_claim_says_which_half_it_failed`, `test_the_floor_is_read_first_when_a_claim_fails_both_halves`, `test_a_claim_moved_only_by_reweighting_keeps_both_fields`. Plus a tightened assertion inside `test_no_direction_at_all_when_no_version_counted_in_both_numbers`. New invariant **INV-multiverse.34** in `diff.md`.
+
+## E. `make types`, and the browser follow-up
+
+The regenerated `frontend/src/api/schema.ts` diff is **exactly two things**, both explained above and nothing else:
+
+1. `ClaimDiff.unchanged_because: ("under_the_floor" | "versions_disagree") | null` (required), with the `ClaimDiff` docstring paragraph that explains it — item D.
+2. `World.range_shares`'s `@description`, one sentence longer — item B.
+
+`frontend/src/stream/__tests__/eventsMatchSchema.test-d.ts` **does not exist** on this branch, and neither does `frontend/src/stream/` at all. I created neither. Nothing under `frontend/src` but the generated `schema.ts` was touched.
+
+**For whoever does the browser follow-up:**
+
+| What to read | Generated field | Where it lands today |
+|---|---|---|
+| which half of *unchanged* failed | `components["schemas"]["ClaimDiff"]["unchanged_because"]` — `"under_the_floor" \| "versions_disagree" \| null` | `frontend/src/world/apiSource.ts:325` maps `row.moved_only_by_reweighting → onlyReweighted`; add the new word beside it. `Movement` in `frontend/src/world/types.ts:309` gains one optional field. `frontend/src/graph/diff/noChange.ts` is the one place the sentence is written — **its closing clause, *"Which of the two it was is the engine's to say, and it does not say."*, becomes false the moment the field is read**, and its file docstring says exactly what to do when the engine starts saying it |
+| the path's multiplied-out likelihood | **still nothing** — item C is held. `pathProduct` stays `{ absence: NO_PATH_PRODUCT }` in `apiSource.ts:272` and `fromTheServer.ts:251`, read by `PathBar.tsx:223` | no change |
+
+**Browser and end-to-end tests that assume the old strike branch** (listed, not edited — none of them fails today, because the browser is unchanged; every one of them fails the moment the growth branch runs against this engine):
+
+- `frontend/e2e/hormuz.spec.ts:549` — `.map-live` expects *"One claim added, **six claims moved**, one supposition retracted."* → four claims move now.
+- `frontend/e2e/hormuz.spec.ts:597-599` — `'.tile[data-diff="untouched"]'` count **1** → 3, `'.tile[data-diff="shifted"]'` count **6** → 4 (`added` 1 and total 8 stay).
+- `frontend/e2e/hormuz.spec.ts:611` and `:614` — `.delta-rail__row` and `.delta-rail__values` count **3** → 2.
+- `frontend/e2e/hormuz.spec.ts:786-793` — `test_the_tile_says_why_the_engine_reports_no_change` asserts the title matches `/Which of the two it was is the engine's to say, and it does not say\./` and *not* `/did not move by enough/`. Passes today; must be rewritten with the field.
+- `frontend/src/graph/__tests__/diffState.test.ts:300-360` — the `"why the engine reports no change"` block and its doc comment (*"`unchanged` is the default, and it does not say which half failed. Neither does the wire"*) are now factually wrong about the engine. The tests build their own `Movement`, so they still pass.
+
+## F. The one thing Kent must see — re-measured myself, before and after
+
+Hormuz strike branch, seed `20261001`, 2 000 versions × 8 worlds. **Before** = `main` at `48eb562`, read-only. **After** = this branch. Same script, both engines. X's report was right on every point.
+
+| Claim | Reading before | State before | Same direction before | Reading after | State after | Same direction after |
+|---|---|---|---|---|---|---|
+| **H** strait reopens | `.081 (.040–.13)` | shifted | 100% | `.086 (.034–.15)` | shifted | 100% |
+| **C** premium falls | `.069 (.033–.11)` | shifted | 100% | `.074 (.029–.13)` | shifted | 100% |
+| **B** Brent below $68 | `.30 (.17–.44)` | shifted | 94.2% | `.31 (.16–.48)` | **unchanged** | **85.1%** |
+| **R** OPEC+ restraint | `.19 (.080–.32)` | unchanged | 100% | `.19 (.080–.32)` byte for byte | unchanged | 100% |
+| **M1** Polymarket contract | `.41 (.28–.55)` | shifted | 96.6% | `.41 (.28–.55)` | shifted | 95.4% |
+| **M2** XLE against SPY | `.36 (.23–.51)` | shifted | 95.5% | `.36 (.23–.51)` | shifted | 93.1% |
+| **N1** talks resume | `.37 (.22–.53)` | shifted | 99.9% | `.38 (.17–.61)` | **unchanged** | **87.7%** |
+| **S** the strike | supposed | added | — | supposed | added | — |
+
+**The change list, in order** — before: **M1, M2, N1**. After: **M1, M2**.
+**The summary sentence** — before: *"… from `.50` to `.42` by 2026-10-04 and leaves **1 claim** untouched."* After: *"… from `.49` to `.42` by 2026-10-04 and leaves **3 claims** untouched."*
+
+Why, in one line each: **B** has two large opposing pushes — `S → B` down and `H → B`'s trigger back up — and once each version draws its own pushes about one version in seven comes out the other way. **N1**'s only arrow is `H → N1`, the map's single `asserted` arrow, drawn at `0.60` against the `argued` arrows' `0.40`, so its band runs `.17`–`.61` and the versions cannot agree on a direction. Both are consequences of rules Kent already chose (record 0014's table, the 90% bar, K5's ranking); what is new is that the demo's scripted strike now shows two rail rows instead of three, and N1 — the biggest-moving *ending* on the map — is reported honestly as *we cannot vouch for which way*.
+
+---
+
+## Files touched, grouped into the commits I would make
+
+**Commit A — nothing.** X's engine commit `a59409c` needs no change; I only reviewed it. The coordinator should reword its subject from `wip(…)` to a final one, e.g.
+`feat(domain): every version draws every arrow's push as wide as its receipt says`
+
+**Commit B — the chapter sweep**
+```
+spec/multiverse/propagation.md
+spec/multiverse/diff.md          (the sweep hunks only; D's hunks below are in the same file)
+backend/src/katalyst/domain/propagation.py   (two docstrings: range_shares no longer covers the band)
+```
+`docs(multiverse): every number the spread moved, re-measured — and the spread's rule said once`
+
+**Commit C — nothing.** Held by the coordinator; not started.
+
+**Commit D — which half of *unchanged* failed**
+```
+backend/src/katalyst/domain/diff.py
+backend/src/katalyst/domain/__init__.py
+backend/tests/unit/domain/test_diff.py
+spec/multiverse/diff.md          (the unchanged_because hunks)
+```
+`feat(domain): an unchanged claim says which half of the test it failed`
+
+**Commit E — the regenerated types**
+```
+frontend/src/api/schema.ts
+```
+`chore(types): regenerate the browser's types for the diff row's new word`
+
+B and D both touch `spec/multiverse/diff.md`; if the coordinator wants two clean commits they must be split by hunk, and squashing B, D and E into one is the simpler choice.
+
+**Not mine, changed by XD in the same worktree** (do not attribute to me): `ARCHITECTURE.md`, `PRODUCT_REQUIREMENTS.md`, `README.md`, `docs/measurements.md`, `spec/generation/{README,grounding,replay}.md`, `spec/graph/proposition.md`, `spec/multiverse/interventions.md`, `spec/workbench/*`.
+
+## Open questions
+
+1. **`uv run mypy --strict src/katalyst`** (the whole package, stricter than the project's own setting) reports one pre-existing error, `engine/grow.py:873: Call to untyped function (unknown) in typed context`. The command the Makefile and CI run, `uv run mypy src`, is clean, and I did not touch `grow.py`. Worth a look some day; not mine.
+2. **The two unreproducible `diff.md` numbers** (`+.27`/`+.21` and "22 fields") — I replaced them with a measurement whose method is stated. If whoever originally measured them remembers the construction, the aside I left can be corrected rather than kept.
+3. **The `range_shares` blind spot.** Now that the arrows carry a quarter of B's band, the same six lines over the drawn pushes would answer *which arrow should we go and back up?* — which is closer to what FR-21 is actually for than *which prior?*. Not built; nothing reads either yet.</result>
+<usage><subagent_tokens>392818</subagent_tokens><tool_uses>159</tool_uses><duration_ms>1666908</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>af4359220ce22e6bc</task-id>
+<tool-use-id>toolu_01BRiuGhdXYi3dAPANdDUt5s</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/af4359220ce22e6bc.output</output-file>
+<status>completed</status>
+<summary>Agent "Digest reviews: UX, engineering, process" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both trees are clean; `main` and the growth branch are untouched. Report written to `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-digest-craft.md`.
+
+---
+
+**CRAFT digest — 300-word summary**
+
+**Audit H read an older branch.** On `feat/04a-growth` today, five of its findings are already fixed and fixed well: the dock is one scroll container with measured *more above / below* rules (H2), fit-view frames the stage rect and the canvas draws edge rules (H5), `App.tsx` is 483 lines not 1,524 (H7 code), `engineState` is memoized (H13a), there is an error boundary (H16) and a light theme (H11).
+
+**Still true, and demo-deciding:** `setIntervening(true)` has exactly two callers — `e` and ⌘K. **No mouse route to the brief's core interaction.** One button in the Inspector head, ~20 lines, one hour.
+
+I recommend a **polish pull request** (`fix/04-polish`, one session): the Change-this button; two subtitles distinguishing *Suppose* from *This happened*; the rail's rows above its prose; `min-width: 0` on the outline; two dead CSS rules deleted; the launchpad's three unrecorded cards collapsed to one line; and an end-to-end **geometric** no-clipping assertion at 1440×900 and 1280×800 — not a screenshot baseline, which would flake.
+
+**Stack 05's browser half** needs no new real estate: a pinned three-line YOUR TRADE strip in the frame that already exists, and *what takes you out* is **the delta rail run backwards** — same component, third instance. ~600 lines, and `user`/`market` collapsing to glyphs on tiles is the prerequisite that frees room for the distribution strip.
+
+**On the spec** I give eight local cuts (~24,500 words, ~17%), not a freeze. Largest: one line of the chapter template creates 43,425 words of verbatim class bodies. The checklist is **thirteen** lines, `ARCHITECTURE.md` says twelve twice, and it is cited 35 times by line number.
+
+**CI stays six jobs**; what they assert changes. Rejected: the slider (it would write thirty edits into an append-only audit trail), small multiples, the PRD/ARCHITECTURE merge, splitting `propagation.py`, and a reducer for `MapScreen`.
+
+I did not run a browser; two findings remain unsettled from source.</result>
+<usage><subagent_tokens>264241</subagent_tokens><tool_uses>63</tool_uses><duration_ms>945738</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a16f221fbc09e0e79</task-id>
+<tool-use-id>toolu_01CmBqGfuhm13UPPBLhM3QAe</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a16f221fbc09e0e79.output</output-file>
+<status>completed</status>
+<summary>Agent "Digest reviews: probability engine" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `plans/analysis/2026-09-21-digest-engine.md` (571 lines; `plans/` is gitignored, so nothing tracked changed).
+
+**Summary**
+
+Both defects reproduce on `48eb562`, and I found a third: a claim with prior `.001` carrying a `−0.01` arrow **voids a supposition on day zero** — the tile never reads *Supposed*. Root causes are `propagation.py:1470-1472` (V1: a Rao-Blackwellised estimate averaged over surviving worlds is constant for a non-descendant of the evidence) and `_settled_days:806-843` + `:1463` (V2: one integer does two jobs — when outgoing delays start counting, and when a claim's truth is decided).
+
+Three measurements decided the recommendation. **review2's Plan A is ~1000× more expensive than its own estimate**: on generated 20-claim maps with in-degree 3, exact elimination over event times costs 0.7–7.8 s per band at K=12 with 4.8M–62.7M-entry intermediates (it predicted ≲10⁶ and "milliseconds"); 58–119 s at 30 claims. Its own kill criterion fires at K=6. But **the same network over binary truths, with all 200 versions on one numpy axis, is 0.5 ms** — the whole band, one pass.
+
+So: **keep review2's hazard model exactly; stop making event time a variable the network solves for.** The arrow keeps `strength`/`mode`/`lag`/`shape`/`half_life` as a hazard modifier; each parent's arrival time comes from one forward pass (redone under a `do`), not from inference; the binary network is solved exactly by variable elimination. Measured cost of that collapse against Plan A's exact answer: worst 0.0065 on a multi-parent map; over 30 generated maps with inhibitors, 97% of numbers within 0.01. Three sessions, net −350 lines in `propagation.py`, staged so `main` is never red (new core behind `engine="exact"`, then one flag flip). Locality becomes a theorem; the band becomes exact; V1, V2, starvation, the clamp bias and observe-noise all die together.
+
+Also: **land the spread** (it rides the versions, not the nest); **cut the path product** — it never moved to `domain/`, it is at `verify.py:139-167` — and replace it at 05 with total effect + joint + weakest arrow, rewriting INV-8; **recommend the event/state split** (net *negative* lines, reverses ADR-0014 A — Kent's call); **reject** moving formatting out of `domain/`, fix three raw-`repr` sites instead; and land `make numbers` + a committed `worked-numbers.txt` **before** the core change, since 547 prose decimals die with it.</result>
+<usage><subagent_tokens>252444</subagent_tokens><tool_uses>57</tool_uses><duration_ms>1105714</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aacdaca79e477c270</task-id>
+<tool-use-id>toolu_01LJGoxHU63CGAnntyno8QC9</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/aacdaca79e477c270.output</output-file>
+<status>completed</status>
+<summary>Agent "Wire fix: one-rule redesign" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is in place. Here is my report.
+
+---
+
+## What the coordinator must run to check me
+
+```bash
+# 1. The fast checks, already run by me — re-run directly if you want them fresh
+cd /Users/kentgang/git3/katalyst-wt/fix-04-vanishing-wire/frontend
+npx vitest run src/graph src/components     # 22 files, 195 tests
+npm run lint &amp;&amp; npm run typecheck
+
+# 2. The whole frontend suite (already run through the queue, exit 0)
+/Users/kentgang/git3/katalyst/plans/scripts/heavy.sh "npm run check" -- \
+  bash -c 'cd /Users/kentgang/git3/katalyst-wt/fix-04-vanishing-wire/frontend &amp;&amp; npm run check 2&gt;&amp;1 | tail -40'
+
+# 3. THE BROWSER RUNS — I ran none of these. You must.
+#    (a) the deliberate-fault test alone, first, on its own:
+cd /Users/kentgang/git3/katalyst-wt/fix-04-vanishing-wire/frontend
+CI=1 env -u ANTHROPIC_API_KEY -u FRED_API_KEY npx playwright test \
+  -g test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification
+#    (b) all seven once:
+CI=1 env -u ANTHROPIC_API_KEY -u FRED_API_KEY npx playwright test
+#    (c) the last bar, unchanged from J's:
+/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/scratchpad/bars/wire-bar.sh
+#    It uses ports 8015/5187 with CI=1 (no server reuse). 40× at 1, 3 and 6 workers.
+```
+
+**The pixel-exactness check in a real browser** — one page evaluation, worth doing once while the map is open (it is the only claim I could not make from a browser):
+
+```js
+// For every tile, compare what the library measured with what was declared.
+[...document.querySelectorAll('.react-flow__node')].flatMap((node) =&gt; {
+  const nb = node.getBoundingClientRect();
+  const zoom = Number(/scale\(([0-9.]+)\)/.exec(
+    document.querySelector('.react-flow__viewport').style.transform)[1]);
+  return [...node.querySelectorAll('.react-flow__handle')].map((h) =&gt; {
+    const r = h.getBoundingClientRect();
+    return { tile: node.dataset.id, port: h.dataset.handleid,
+             measuredX: (r.left - nb.left) / zoom, declaredX: parseFloat(h.style.left),
+             measuredY: (r.top  - nb.top ) / zoom, declaredY: parseFloat(h.style.top),
+             measuredW: h.offsetWidth, measuredH: h.offsetHeight };
+  });
+});
+```
+Every `measured − declared` should be under **0.02 px** (the browser's layout unit is 1/64 px). Anything at or above half a pixel means the declaration is wrong and wires will twitch on hover.
+
+---
+
+## The design I landed on, and why
+
+**Design 3 — declared ports. The hook is deleted.** It works exactly as the reviewer predicted, and I confirmed it by driving the installed library, not by reading alone.
+
+New file `frontend/src/graph/ports.ts` is the one place that says where a tile's ports are: the four ports, their two shares of the tile's height (0.38 / 0.62), their size, their standoff, and the single piece of arithmetic that turns a height into four boxes. Three consumers, one source:
+
+- `toFlow` hands those boxes to the library beside `initialWidth`/`initialHeight`.
+- `Tile.tsx` writes the *same four numbers* inline onto each `&lt;Handle&gt;` (`left`, `top`, `width`, `height`, plus `right: auto` and `transform: none` to switch off the library's own edge-pinning and half-size shift). So what is declared is literally what the browser lays out.
+- `wires/plates.ts` imports `DOWN_THE_TILE` and `PORT_STANDOFF` instead of keeping the second copy it used to keep — its old comment admitted the duplication and asked for a test to pin it. That copy is gone, and there is now a test that computes both sides.
+
+`tile.css` keeps only *how a port looks* (the one bar, the two bars). Its gradient stops end at `100%` rather than `6px`, so the port's height is not written down there either.
+
+**Correction to the review:** the port is **16 px** wide, not 8 — `--space-2` is `16px` (`src/styles/tokens.css:73`). It straddles the tile edge, 8 in and 8 out, which is why the standoff is exactly half the width and why the wire attaches a clean 8 px clear of the tile on both sides.
+
+---
+
+## The library evidence, and the precedence question
+
+Paths relative to `frontend/node_modules/`.
+
+| Fact | Where |
+|---|---|
+| A wire whose end is not initialised is **not rendered at all** — no `.react-flow__edge` element | `@xyflow/react/dist/esm/index.js:2955` (the only `getEdgePosition` call) → `:2973` `if (edge.hidden \|\| sourceX === null …) return null` |
+| A declared port satisfies initialisation: `!!(internals.handleBounds \|\| node.handles?.length) &amp;&amp; !!(measured.width \|\| width \|\| initialWidth)` | `@xyflow/system/dist/esm/index.js:1429–1432` |
+| **Precedence:** `getEdgePosition` prefers `internals.handleBounds` over `toHandleBounds(node.handles)` | `@xyflow/system/…:1439–1440` |
+| …**but** `internals.handleBounds` is itself rebuilt from `userNode.handles` whenever handles are declared — `parseHandles` returns the parsed declaration and throws the measured bounds away; only when `handles` is absent does it keep the previous measured bounds | `@xyflow/system/…:1639–1643`, called at `:1699` |
+| …on every `adoptUserNodes` where object identity changed (`checkEquality` compares `userNode === internalNode.internals.userNode`) | `@xyflow/system/…:1681`; the store passes `checkEquality: true` at `@xyflow/react/…:3438` |
+| The measurement path writes bounds from the DOM: `x = (handleRect.left − nodeRect.left)/zoom`, `width/height = offsetWidth/offsetHeight` | `@xyflow/system/…:1913–1921`, `:939–955`, `:909–912` |
+| The end point: Left → `(x, y + h/2)`; Right → `(x + w, y + h/2)` | `@xyflow/system/…:1487–1506` |
+
+**So: the measured bounds win only in the window between a measurement landing and the next redraw; the declared bounds win on every redraw after that.** This canvas builds new node objects on nearly every change, so the declared values are the steady state — which is exactly why they had to be the numbers the browser would have produced.
+
+**They are.** I drove the real installed library with our real `toFlow` output (throwaway script, now at `…/scratchpad/reviews/wire/ports-probe.ts` with a note on how to run it):
+
+```
+declared ports on H: [{"id":"in-trigger","type":"target","position":"left","x":-8,"y":54.76,"width":16,"height":6}, …]
+1. first frame, nothing measured   H-&gt;C: 288,94.24        -&gt; 392,149.12
+2. the measurement lands           H-&gt;C: 288,94.234375    -&gt; 392,149.125
+3. a hover, declared bounds again  H-&gt;C: 288,94.24        -&gt; 392,149.12
+worst move, declared vs measured, in pixels: 0.005625
+```
+
+Line 1 is the whole fix: **every wire is placed with nothing measured.** Lines 2–3 answer the reviewer's caveat (b): the only disagreement is the browser rounding our exact geometry to its own 1/64-px layout unit — **0.0056 px**, under a hundredth of a pixel, in either direction. (Line 2 simulates the measurement at that quantisation, because that is what a measurement of the very box the tile was drawn at must return.)
+
+**Why J's `test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification` will pass, reasoned rather than run.** The shim drops every notification whose target is inside `.react-flow__node`, so `updateNodeInternals` never runs for any tile and `internals.handleBounds` is only ever the parsed declaration. `isNodeInitialized` is satisfied by `handles.length` (4) and `initialWidth` (280) — neither of which the shim can touch — so `getEdgePosition` returns coordinates for all eight arrows on the first frame. That is exactly what the probe's line 1 shows, through the same two library functions the page uses. Tile visibility is unchanged: it hangs on `nodeHasDimensions`, which reads `initialWidth` (`@xyflow/react/…:2364`, `@xyflow/system/…:756`). **No repair loop anywhere** — there is nothing to retry, because nothing is waited for.
+
+The one behaviour that genuinely changes: with `handleBounds` now always defined, `getNodeInlineStyleDimensions` (`@xyflow/react/…:2044–2053`) stops putting `initialWidth`/`initialHeight` on the `.react-flow__node` wrapper as inline styles. The wrapper is `position: absolute` with no width, so it shrink-wraps to `.tile`, which carries explicit `width: 280px; height: Hpx` — the same box. No test measures the wrapper; the 280-px end-to-end assertion measures `.tile`.
+
+---
+
+## Nothing already placed moves
+
+- The share (0.38 / 0.62), the size (16 × 6) and the standoff (8) moved file, not value. I deliberately did **not** round the port's top to a whole pixel, even though it would have made declared and measured identical to the bit: it would have shifted every port by up to half a pixel and broken `plates.test.ts › test_the_sockets_are_where_the_tile_draws_them`, whose socket positions were read off the running app. Those numbers are untouched and that test passes unchanged.
+- `top: 38%` + `translateY(−50%)` becomes `top: &lt;38% of the height − 3&gt;px` with no transform — the same length, resolved once instead of twice.
+- The trigger/sustain gradients end at `100%` instead of `6px`; the gradient line on a 6-px-tall box *is* 6 px.
+
+## Which chapter numbers my change made stale
+
+None. One sentence added to `spec/workbench/tiles-ports-wires.md` under *Typed ports*: **the ports' places are declared, not discovered.** It extends INV-workbench.1's existing promise (*the height is never read back from the rendered element*) from the box to the ports inside it, and makes `layout-and-zoom.md`'s *"never measured off the screen — so layout stays a pure function"* true of the arrows too. No invariant needed renumbering.
+
+## The neighbour, `feat/04a-growth`
+
+I read it read-only. **It needs nothing extra, and here is why, so the rebaser can check rather than trust:**
+
+- Its `Canvas.tsx` node memo is `drawing.nodes.flatMap(node =&gt; ({ ...node, position, selected, className }))` — the spread carries `handles` through untouched, exactly as it already carries `initialWidth`.
+- Its `toFlow` keeps the same `sized` map and the same local: `const height = node.type === "claim" ? node.data.height : TILE_MIN_HEIGHT`. **The ports come out of that identical local**, so a tile that grows when its movement row appears (`roomFor`) takes its ports down with it automatically — the box and the ports cannot disagree, because there is one `height`. `ports.test.tsx › test_a_port_is_placed_from_the_height_the_box_was_declared_at` is the test that pins this, and it uses the taller-box path.
+- Its skeleton tiles (`type: "skeleton"`) render **no** `&lt;Handle&gt;` and are never at the end of a wire; my guard gives handles only to `type === "claim"`, so skeletons and overflow tiles keep today's behaviour exactly — including keeping the wrapper's inline `initialWidth`/`initialHeight`, which is what holds a `SkeletonTile`'s box open.
+- **Expect conflicts in two hunks:** the comment block above `sized` in `toFlow.ts` (growth adds a paragraph about reserved rectangles; I rewrote the surrounding prose), and `Canvas.tsx` (growth added ~318 lines; I removed the hook and its two imports and rewrote the file's opening paragraph). Both are small and textual.
+
+## Open questions
+
+- **`@xyflow/system` is not a declared dependency** (only `@xyflow/react` is), so I could not make the library-level proof a permanent test without adding one. The probe is in the scratchpad instead. If you want that proof to survive a library upgrade, adding `"@xyflow/system": "0.0.82"` as a devDependency and turning `ports-probe.ts` into a fifth case in `ports.test.tsx` is about twenty lines — I stopped short because it changes `package.json` and `package-lock.json`, which is outside what I was asked to touch.
+- **I took no screenshots** (no browser runs allowed). The visual change is bounded at 0.0056 px, so I claim nothing moved rather than showing it. If you want an eyeball: the ports on the stored example should sit where they always sat, one bar on the upper socket and two on the lower, straddling the tile edge.
+
+## Files touched
+
+```
+frontend/e2e/hormuz.spec.ts                 | 131 ++++++++++++++++--
+frontend/src/components/Tile.tsx            |  65 ++++-----
+frontend/src/components/tile.css            |  36 ++---
+frontend/src/graph/Canvas.tsx               |  13 +-
+frontend/src/graph/__tests__/ports.test.tsx | 201 ++++++++++++++++++++++++++++
+frontend/src/graph/ports.ts                 | 163 ++++++++++++++++++++++
+frontend/src/graph/toFlow.ts                |  42 +++---
+frontend/src/graph/wires/plates.ts          |  29 ++--
+spec/workbench/tiles-ports-wires.md         |   2 +
+9 files changed, 581 insertions(+), 101 deletions(-)
+```
+
+One commit, `54ea4ed`, amended over J's `6bc90d3` so the message is true; worktree clean, nothing pushed. Each of the four new tests was shown to fail first: removing the declaration reds the first two, putting `top: "38%"` back on the tile reds the third.
+
+**Written for you:** `…/scratchpad/msgs/pr-wire-body.md` (three headings) and `…/scratchpad/msgs/merge-wire.txt` (squash prose). The commit message is also kept at `…/scratchpad/msgs/commit-wire.txt`.
+
+## Verification tails
+
+```
+$ npm run lint       → biome ci . : Checked 114 files in 27ms. No fixes applied.   (+ no-library-stylesheet ok)
+$ npm run typecheck  → tsc -b --noEmit : (no output)
+$ npx vitest run src/graph src/components → Test Files 22 passed (22) · Tests 195 passed (195)
+$ heavy.sh "J2: npm run check"            → Test Files 29 passed (29) · Tests 248 passed (248) · [exited with code 0]
+```</result>
+<usage><subagent_tokens>271112</subagent_tokens><tool_uses>141</tool_uses><duration_ms>1276545</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7e81b7cffbeedb0d</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a7e81b7cffbeedb0d.output</output-file>
+<status>completed</status>
+<summary>Agent "Evals branch: spread, path product" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is green. Final report.
+
+---
+
+# XC — report (stack 04, `feat/04b-evals`, code half)
+
+## What the coordinator must run to check me
+
+```bash
+cd /Users/kentgang/git3/katalyst-wt/feat-04b-evals/backend
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest -q                      # 618 passed, domain 100%
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run ruff check . ../evals          # All checks passed!
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run ruff format --check . ../evals # 99 files already formatted
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run mypy --strict src/katalyst/domain   # 12 files, clean
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run mypy src                       # 44 files, clean
+cd ../frontend &amp;&amp; npx tsc -b --noEmit &amp;&amp; npm run lint                          # both clean
+cd .. &amp;&amp; make types &amp;&amp; git diff --stat frontend/src/api/schema.ts              # must stay at 16 insertions, 1 change
+# the measurements every chapter number now rests on (about 2 min each; the same
+# script runs on main's engine and gives the "before" column of every table below):
+cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run python /private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/scratchpad/xc/measure.py
+```
+
+Tails: `618 passed, 1 warning in 132.40s`, `TOTAL 1333 0 354 0 100%`, exit 0. Both heavy slots used, through the queue. `npm run check` was **not** run — the only frontend change is the generated `schema.ts`, which biome ignores and no source file reads yet; `tsc -b --noEmit` and `biome ci .` were run directly and pass.
+
+---
+
+## A. The spread's engine — read as a reviewer, and it is right and finished
+
+No defect found; **I changed nothing in X's engine.**
+
+- **Per-arrow draw stream**: `STRENGTHS_STREAM = 3`, keyed by `_stream_key(arrow.id)` — the same shape the priors use. `test_adding_an_arrow_does_not_move_another_arrows_draws` bites.
+- **Log-odds scale**: `arrow.strength + steps * spreads[arrow.provenance]`, added straight to a number already in log-odds.
+- **No `strength_lo`/`strength_hi`**: `grep -rn "strength_lo\|strength_hi" backend/` finds nothing.
+- **Locality holds bit for bit**: all 240 domain tests pass, including `test_intervention_locality`, `test_diff_states_respect_locality`, `TestGraphEditMachine` and `test_a_feedback_arrow_never_carries_a_change`. Measured directly: R's series and belief are `==` between base and strike world. The *shape* of the map — `_opposing`, `_spells_on`, `_states`, `_retractions` — is read off the **stated** strength, so a drawn push can never re-time a retraction, which was the one way this could have broken locality.
+- **`test_band_is_not_sampling_noise` collapses with priors AND spreads frozen**, through `_propagate_with_no_spread` rather than a knob on `propagate` — the right call, because a world built with a different spread table could not be rebuilt by `versions_of`. `test_freezing_the_priors_alone_leaves_the_arrows_talking` is its other half.
+- **The three named tests exist and have teeth**, and `test_range_matches_analytic_first_order_on_fixture` gained a term per arrow and tightened from `.02` to `.01` (measured gaps `.0001`–`.0052`).
+
+The only engine-adjacent thing I added is two docstrings (`World.range_shares` and `_range_shares`) saying the shares no longer account for the whole band — B's seven now total 72%, not 81% — because without that the field silently means something narrower than it did.
+
+## A′. The two pre-existing defects the coordinator asked about — not fixed, reproduce on main too
+
+**1. `observe(B=true)` leaves a cause at its prior (.3000 against Bayes's .4562).** Root cause is step 3 of `propagation.md` B5 — *keep the likelihood, not the coin flip*. `_one_pass` keeps `answer` (the marginal likelihood in that draw) and discards `came_true` (the realised flag). For a claim with **no causes**, `total` is `broadcast(baseline)`, so `answer` is **identical in all eight worlds of a version**; `_per_version` then averages it over the surviving subset and gets the same number back. Rao-Blackwellisation is exact for an *unconditional* mean and invalid once you condition on another claim's realised outcome, because the conditioning event depends on exactly the value that was discarded. The Bayes answer would come back by reading `came_true[A]` over the surviving worlds instead of `answer[A]`, at the cost of the variance reduction the whole band rests on — which is why it is a design decision, not a patch. It is the same phenomenon `diff.md` already records as G3's *moved only by reweighting*, described there as a property rather than a defect. **Interaction with the spread: none.** A has no incoming arrows, so no drawn push enters its baseline and its answer is still constant across worlds within a version. For a claim that *does* have causes, the answer already varies across worlds, the observation does reach it, and the spread only widens the band.
+
+**2. `do(C)`/`do(R)` move B but move M1 and M2 by exactly 0.0000.** Root cause is `fired[claim_id] = came_true[:, :, starts]` where `starts = _point_of(points, setup.settled[claim_id])`. A **trigger** arrow multiplies its push by that single flag — the source's truth on the source's own *settled* day — while a **sustain** arrow multiplies by the full per-day `truth` array. `settled[B]` is day 2, the day B's *earliest* live arrow (`H→B`, lag 2) reaches it; `C→B` has lag 7 and `R→B` lag 5, so their pushes land in B's own series (B goes `.393 → .476` under `do(C)`) and are invisible to `B→M1` and `B→M2`. The intent in the code comment is defensible — a claim must be true-or-false once per world or a sustaining push would flicker — but the day chosen is a property of the map's *earliest* arrow rather than of when the trigger fires. The two readings that would let later pushes through are "the day this arrow's own push fires" (`settled[source] + lag`) and "the source's own resolve-by day"; both change every recorded number, so this is Kent's call. **Interaction with the spread: none that can change the zero.** The spread varies `H→B`, `C→B` and `R→B`, so it changes the distribution of B's day-2 flag — but identically in the base world and the `do(C)` world, because C's arrow contributes nothing on day 2 in either. The base-versus-branch difference stays exactly zero; I ran the repro here and got the coordinator's numbers.
+
+## B. The chapter sweep — `propagation.md` and `diff.md`
+
+Every number both chapters quote was re-measured against the engine, before (main, `48eb562`) and after, with one script run on both. **I typed no number I did not measure.** The spread's rule is stated **once**, in `propagation.md` B5 under *"How wide an arrow's push is drawn — the rule, stated once"* (the width table, the four things it means, the pointer to `diff.md`'s different provenance table); `diff.md` cites it.
+
+`propagation.md`: the "deliberately absent" paragraph, B2's hand sums beside the engine's `.039`/`.19`, B3's *nine in a hundred* and N1 `.38` / C `.074`, B4's `.086`, the new B5 rule section, the loop's step 1, B at day 45 `.35 (.20–.50)`, the sampled/analytic bands, the range shares (58% / 5.0% / 3.8%, and the new note that they total 72%), the frozen-prior band (31 points to 16), `do(H)` widths `.314→.380`, H's share 5.0%→0.6%, the "widen H" figure (now measured, with its method), B7's **three** streams, B8's whole readings table, INV-12 (both freezes), INV-13, a new INV-13b for the spread, anti-patterns 1, 2, 5 and 9.
+
+`diff.md`: the Purpose line, the `ClaimDiff` shape, B2's four `shifted` claims and a new **three-row `unchanged` table** (R / B / N1, each with its own reason), B3's 209-dead-versions measurement, the band-overlap measurement, B4's two rail tables and the rewritten N1 passage, B5's peak/headline figures, B6's summary instance, anti-patterns 1, 6, 7, 8 and a new 10, and open question 7.
+
+**Two numbers I could not reproduce and therefore replaced.** `diff.md` B5's "second known wart" quoted a two-piece map moving an ending `+.27` on day 3 and `+.21` on day 4, and "22 fields" on the Hormuz rail. I rebuilt that map from the construction the chapter describes and got `+.033` on **both** engines, and no field-counting method I could infer gives 22. I replaced the passage with a Hormuz measurement whose method is written into the chapter (inserting a pushless claim judged 365/900/1 825 days out moves **7 of the 14** fields the two rows carry, and at 1 825 days the rows swap order), and said in a dated aside that the old figures could not be re-derived.
+
+**One number the chapter's own rule got wrong while I was quoting it:** `−0.0002` for H under `observe(B)` is one significant figure; a move keeps two. Both chapters now say `−.00019`. The spread did not move it (`−0.000192` on both engines).
+
+**I told XD at once**, in `…/scratchpad/msgs/XC-to-XD.md`: the plan's script is correct but incomplete, where my extended copy is, the whole before/after table, the two unreproducible numbers, the `.19 (.08–.32)` → `.080` K2 fix, and the strike-branch product change to sweep for.
+
+## C. NOT STARTED, and cleanly so
+
+Not a line was written, before or after the hold. Nothing to back out:
+
+- `engine/verify.py` untouched — `_multiplied_out` still there, still private, still the only multiplier.
+- `domain/` gained no route module, no `World` field, no new type; `best_backed_routes` and `Route` are where they were.
+- No test, chapter sentence or schema field anywhere refers to a path product on the world. **`spec/generation/proposals.md` is untouched** (its B7 edit was item C's only reason to open it).
+- The browser's `pathProduct` slot stays the honest absence it is.
+
+For the record, the shape would have been a new `domain/routes.py`, because `propagation.py` cannot import `diff.py` and `World` is only built inside `propagate`. If the analysts' objection stands, that module never needs to exist.
+
+## D. A diff row now says which half of *unchanged* failed
+
+```python
+UnchangedBecause = Literal["under_the_floor", "versions_disagree"]
+ClaimDiff.unchanged_because: UnchangedBecause | None     # required-but-nullable, like `agreement`
+```
+
+`_which_half_failed(state, move, agreement)` is the whole rule: nothing unless the state is `unchanged`; `under_the_floor` when `abs(move) &lt; MOVED_AT_LEAST`; otherwise `versions_disagree` when `agreement` is a number under `AGREEING_AT_LEAST`; otherwise nothing. **The floor is read first**, so a claim failing both halves says `under_the_floor`. The two cases with no test to fail — a claim only one world holds, and a claim no version counted in both numbers — carry nothing, because their absent `agreement` already says there was no direction. The G3 reweighting case keeps its own field and also carries `versions_disagree`; `diff.md` says the fuller one is what to show.
+
+**No default on the field, deliberately** — a default would drop it out of the schema's `required` list, which is the exact trap item 3 of the plan is about.
+
+Four new tests, no typed-in words, plus a tightened assertion in `test_no_direction_at_all_when_no_version_counted_in_both_numbers`. New invariant **INV-multiverse.34**.
+
+## E. `make types`, and the browser follow-up
+
+The regenerated `frontend/src/api/schema.ts` diff is **exactly two things**: the new `unchanged_because` field with its `ClaimDiff` docstring (item D), and `World.range_shares`'s description, one sentence longer (item B). Re-running `make types` after every later edit produces the identical diff, so `types-fresh` will be green.
+
+`frontend/src/stream/__tests__/eventsMatchSchema.test-d.ts` **does not exist** on this branch, and neither does `frontend/src/stream/` at all. I created neither. Nothing under `frontend/src` but the generated file was touched.
+
+| What to read | Generated field | Where it lands today |
+|---|---|---|
+| which half of *unchanged* failed | `components["schemas"]["ClaimDiff"]["unchanged_because"]` — `"under_the_floor" \| "versions_disagree" \| null` | `frontend/src/world/apiSource.ts:325` maps `row.moved_only_by_reweighting → onlyReweighted`; add the word beside it. `Movement` in `frontend/src/world/types.ts:309` gains one optional field. `frontend/src/graph/diff/noChange.ts` is the one place the sentence is written, and **its closing clause — *"Which of the two it was is the engine's to say, and it does not say."* — becomes false the moment the field is read**; its own file docstring says what to do when the engine starts saying it |
+| the path's multiplied-out likelihood | **still nothing** — item C is held. `pathProduct` stays `{ absence: NO_PATH_PRODUCT }` in `apiSource.ts:272` and `fromTheServer.ts:251`, read by `PathBar.tsx:223` | no change |
+
+**Browser and end-to-end tests that assume the old strike branch** (listed, not edited — none fails today, because the browser is unchanged; every one fails the moment the growth branch runs against this engine):
+
+- `frontend/e2e/hormuz.spec.ts:549` — `.map-live` expects *"…**six claims moved**…"* → four now.
+- `frontend/e2e/hormuz.spec.ts:597-599` — `data-diff="untouched"` count **1** → 3, `data-diff="shifted"` count **6** → 4 (`added` 1 and total 8 unchanged).
+- `frontend/e2e/hormuz.spec.ts:611` and `:614` — `.delta-rail__row` and `.delta-rail__values` count **3** → 2.
+- `frontend/e2e/hormuz.spec.ts:786-793` — `test_the_tile_says_why_the_engine_reports_no_change` asserts the title matches `/…it does not say\./` and *not* `/did not move by enough/`. Passes today; must be rewritten with the field.
+- `frontend/src/graph/__tests__/diffState.test.ts:300-360` — the `"why the engine reports no change"` block and its doc comment (*"`unchanged` … does not say which half failed. Neither does the wire"*) are now factually wrong about the engine. The tests build their own `Movement`, so they still pass.
+
+## F. The one thing Kent must see — re-measured myself, before and after
+
+Hormuz strike branch, seed `20261001`, 2 000 versions × 8 worlds. **Before** = `main` at `48eb562`, read-only. **After** = this branch. Same script, both engines. X's report was right on every point.
+
+| Claim | Reading before | State before | Same direction before | Reading after | State after | Same direction after |
+|---|---|---|---|---|---|---|
+| **H** strait reopens | `.081 (.040–.13)` | shifted | 100% | `.086 (.034–.15)` | shifted | 100% |
+| **C** premium falls | `.069 (.033–.11)` | shifted | 100% | `.074 (.029–.13)` | shifted | 100% |
+| **B** Brent below $68 | `.30 (.17–.44)` | shifted | 94.2% | `.31 (.16–.48)` | **unchanged** | **85.1%** |
+| **R** OPEC+ restraint | `.19 (.080–.32)` | unchanged | 100% | identical, byte for byte | unchanged | 100% |
+| **M1** Polymarket contract | `.41 (.28–.55)` | shifted | 96.6% | `.41 (.28–.55)` | shifted | 95.4% |
+| **M2** XLE against SPY | `.36 (.23–.51)` | shifted | 95.5% | `.36 (.23–.51)` | shifted | 93.1% |
+| **N1** talks resume | `.37 (.22–.53)` | shifted | 99.9% | `.38 (.17–.61)` | **unchanged** | **87.7%** |
+| **S** the strike | supposed | added | — | supposed | added | — |
+
+**The change list, in order** — before: **M1, M2, N1**. After: **M1, M2**.
+**The summary** — before: *"… from `.50` to `.42` by 2026-10-04 and leaves **1 claim** untouched."* After: *"… from `.49` to `.42` by 2026-10-04 and leaves **3 claims** untouched."*
+
+Why, one line each: **B** has two large opposing pushes — `S → B` down and `H → B`'s trigger back up — and once each version draws its own pushes, about one version in seven comes out the other way. **N1**'s only arrow is `H → N1`, the map's single `asserted` arrow, drawn at `0.60` against the `argued` arrows' `0.40`, so its band runs `.17`–`.61` and the versions cannot agree on a direction. Both follow from rules Kent already chose (record 0014's table, the 90% bar, K5's ranking). What is new on screen is that the scripted strike shows two rail rows instead of three, and N1 — the biggest-moving *ending* on the map — is reported honestly as *we cannot vouch for which way*.
+
+## G. `make eval`'s cap now bounds the round (the coordinator's late item)
+
+**The defect is real and exactly as described.** `ceiling = min(cap, Caps().dollars)` sat inside `run_one`, which is called once per case, so `CAP=15` over the four shipped cases bought a round of up to **$60** against Kent's $15 intent.
+
+The fix is one running total in `main()`: each case is handed `ceiling - spent`, a case with nothing left is **not started**, and `wanted[len(scored):]` names the ones that were left out. Beneath the table a new `what_the_round_spent` prints one plain sentence, either
+
+&gt; `The round spent $6.31 of its $15.00 ceiling, over export-controls, hormuz, midterms, photonics.`
+
+or
+
+&gt; `The round spent $2.40 of its $2.00 ceiling on export-controls and stopped there: hormuz, midterms, photonics were never started, so they are on no row of this scorecard.`
+
+and the program exits non-zero, because a round that stopped short has scored nothing about what it never ran.
+
+**The test goes red on today's code — I checked, rather than assuming.** `test_the_cap_bounds_the_round_and_not_each_case` starts the program as a program with the dear stand-in (about $1.20 a call) and `--cap 2.0`, and asserts the two things true however the arithmetic lands: the round did **not** run all four cases, and the money it spent, added off the kept receipts, is over its ceiling but under four ceilings. With the per-case behaviour put back it fails on the first of those (`assert sorted(ran) != every_case`), which I ran and watched fail before restoring the fix.
+
+**`evals/`, the Makefile and `spec/generation/evaluation.md` now say "per round" truthfully**: the module docstring, `run_one`'s and `main`'s docstrings, the `--cap` help text, the Makefile's `eval` comment block, and the chapter's `make eval` bullet, its exit-code bullet and B3 — which now also distinguishes *a case that reached its cap* (a row with `stopped_for: spend_cap`) from *a case that was never started* (no row, no kept run, no checks; named only in the sentence, because an empty row would put a case on the scorecard no model ever answered).
+
+**One real flaky test found and fixed on the way.** `test_a_derived_column_never_disagrees_with_what_it_came_from` asserted `seconds_per_call * calls == seconds` exactly. Dividing and multiplying back does not round-trip in floating point: measured over 200 000 drawn durations at two to eleven calls, **44 446 do not** — so that assertion fails about one run in five on the arithmetic alone, and it failed on me. It is pre-existing (my change is in `main()`; that test calls `run_one` directly) and it is lesson 17's shape exactly. Now `pytest.approx(rel=1e-12)`, with the measurement and the reason in the docstring. `tests/unit/evals` ran ten times in a row green afterwards.
+
+---
+
+## Files touched, grouped into the commits I would make
+
+**Commit A — nothing.** X's engine commit `a59409c` needs no change; I only reviewed it. Reword its subject from `wip(…)` to e.g.
+`feat(domain): every version draws every arrow's push as wide as its receipt says`
+
+**Commit B — the chapter sweep**
+```
+spec/multiverse/propagation.md
+spec/multiverse/diff.md                     (sweep hunks; D's hunks are in the same file)
+backend/src/katalyst/domain/propagation.py  (two docstrings)
+```
+`docs(multiverse): every number the spread moved, re-measured — and the spread's rule said once`
+
+**Commit C — nothing.** Held; not started.
+
+**Commit D — which half of *unchanged* failed**
+```
+backend/src/katalyst/domain/diff.py
+backend/src/katalyst/domain/__init__.py
+backend/tests/unit/domain/test_diff.py
+spec/multiverse/diff.md                     (the unchanged_because hunks)
+```
+`feat(domain): an unchanged claim says which half of the test it failed`
+
+**Commit E — the regenerated types**
+```
+frontend/src/api/schema.ts
+```
+`chore(types): regenerate the browser's types for the diff row's new word`
+
+**Commit G — the eval cap**
+```
+evals/run.py
+Makefile
+spec/generation/evaluation.md
+backend/tests/unit/evals/test_the_eval_harness_as_a_program.py
+backend/tests/unit/evals/test_the_scorecard.py
+```
+`fix(evals): the spending cap bounds the round, not each case`
+
+B and D both touch `spec/multiverse/diff.md`; splitting them needs a hunk-level split, and squashing B, D and E is the simpler choice. The flaky-test fix in `test_the_scorecard.py` is arguably its own `fix(evals): a derived column is compared to the last bit, not the last digit` — separate it if you prefer a clean bisect.
+
+**Not mine, changed by XD in the same worktree**: `ARCHITECTURE.md`, `PRODUCT_REQUIREMENTS.md`, `README.md`, `docs/measurements.md`, `spec/generation/{README,grounding,replay}.md`, `spec/graph/proposition.md`, `spec/multiverse/interventions.md`, `spec/workbench/*`.
+
+## Open questions
+
+1. **`uv run mypy ../evals`** reports one error, `Library stubs not installed for "yaml"`. Pre-existing and out of the type-checked tree: CI and the Makefile run `uv run mypy src`, which is clean. `types-PyYAML` in the dev dependencies would close it; not mine to add.
+2. **`uv run mypy --strict src/katalyst`** (stricter than the project's own setting) reports one pre-existing error in `engine/grow.py:873`. `uv run mypy src` is clean, and I did not touch that file.
+3. **No invariant number for the round cap.** `evaluation.md`'s invariants all quantify over `cassettes()`, `sources()` or `cases()`; the cap rule is a behaviour of a program, stated twice in Behaviour with its test named. Add `INV-generation.33` if you would rather it were numbered.
+4. **The two unreproducible `diff.md` numbers** — replaced with a measurement whose method is stated. If whoever measured them first remembers the construction, the aside can be corrected rather than kept.
+5. **The `range_shares` blind spot.** Now that the arrows carry a quarter of B's band, the same six lines over the drawn pushes would answer *which arrow should we go and back up?* — closer to what FR-21 is for than *which prior?*. Not built; nothing reads either yet.</result>
+<usage><subagent_tokens>477696</subagent_tokens><tool_uses>226</tool_uses><duration_ms>2341870</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b658tdwh7</task-id>
+<tool-use-id>toolu_013Jooqqib6TMimYDb65KJJd</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/b658tdwh7.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the redesigned wire fix's browser checks and repeat bar through the queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a6c20a6cba69e6774</task-id>
+<tool-use-id>toolu_01KquXzdsbeyaeXut8GojTCc</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b70a1857-a894-4bbe-b3a6-4d7cf3ebc4f8/tasks/a6c20a6cba69e6774.output</output-file>
+<status>completed</status>
+<summary>Agent "Red-team the revised plan" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report written to `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-red-team.md`.
+
+**Verdict: sound with changes — but three are load-bearing and one is an error of fact.**
+
+The engine idea survives. I could not break `Suppose this is true`: across 4,480 `do` queries on adversarially generated maps the mean gap against exact-over-times is .00007. The hazard model is right, and the impulse-near-a-deadline case I expected to break it gave .0000.
+
+**What breaks.** "Solved exactly" is false under *This happened*. The forward pass gives arrival times under the prior; evidence moves them; the tables never learn. I built a faithful implementation with all three arrow shapes — the analyst's scripts use `step` only — and measured **.124** on a four-claim map, stable at a finer grid. 6.6% of observation numbers exceed .005, the second printed figure. The obvious repair makes it worse. Every gap over .01 in every family I tried is an observation.
+
+Consequently PLAN 05-1's oracle proves the wrong thing: at 1e-9 it either shares the core's tables (blind to all of this) or cannot pass. I wrote the two tests that should replace it.
+
+`sustain` does not survive §2.2 — under first passage it is bit-identical to `trigger`, so `mode` becomes dead data. The event/state split is required, not optional, and a state cannot be one bit: four maps a yes/no variable cannot distinguish give a child .148 to .827. `persistence` must move into the 05-2 freeze or there is a second paid re-record — the recording has six `sustain` arrows, all leaving `event` claims.
+
+Also: `series` cannot keep its meaning (the golden test pins it *falling*, 1.0 → .36 → &lt;.10; a by-deadline curve cannot fall); "3 sessions / −350 lines" omits `diff.py`, the browser, 60 tests and ~400 spec lines; §4's "the prompt never asks for negative arrows" is false — the words ship in the fingerprinted payload; and the document Kent must answer does not exist, so nothing in 05–07 is startable.</result>
+<usage><subagent_tokens>197117</subagent_tokens><tool_uses>31</tool_uses><duration_ms>1284196</duration_ms></usage>
+</task-notification>
+
+---
+
+Could you walk me through the decisions requiring my input and state your recommended path? Use the quetion tool. Afterwards update the docs as appropriate the orchestrate the completion of the remained of stack 4 using opus sub-agents
