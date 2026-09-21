@@ -94,12 +94,20 @@ def a_run_that_shows_none() -> Storyteller:
     )
 
 
-def a_run(told: Storyteller) -> object:
-    """Run one story through the recorder, saying nothing to the terminal."""
-    return run_one("hormuz", answerer=told, cap=15.0, on=A_DAY, seed=20261001, say=lambda _: None)  # type: ignore[arg-type]
+def a_run(told: Storyteller, kept_in: Path) -> object:
+    """Run one story through the recorder, saying nothing and writing nowhere real."""
+    return run_one(
+        "hormuz",
+        answerer=told,  # type: ignore[arg-type]
+        cap=15.0,
+        on=A_DAY,
+        seed=20261001,
+        keep_in=kept_in,
+        say=lambda _: None,
+    )
 
 
-def test_a_run_that_shows_no_refusal_is_a_perfectly_good_recording() -> None:
+def test_a_run_that_shows_no_refusal_is_a_perfectly_good_recording(tmp_path: Path) -> None:
     """Kent, 2026-09-20: show what happened, honestly.
 
     In twenty-six live proposals across two runs the model never once gave the
@@ -107,14 +115,14 @@ def test_a_run_that_shows_no_refusal_is_a_perfectly_good_recording() -> None:
     mistake and calling it evidence — the one thing on the list that would have
     been staged.
     """
-    run = a_run(a_run_that_shows_none())
+    run = a_run(a_run_that_shows_none(), tmp_path)
 
     assert faults_of(run) == ()  # type: ignore[arg-type]
 
 
 def test_a_run_is_kept_in_full_whatever_becomes_of_it(tmp_path: Path) -> None:
     """The money is spent either way, and the measurements are on no event."""
-    run = a_run(a_run_that_shows_none())
+    run = a_run(a_run_that_shows_none(), tmp_path)
     faults = ("kept for a reason of somebody's own",)
 
     where = keep(run, faults, folder=tmp_path)  # type: ignore[arg-type]
@@ -137,7 +145,7 @@ def test_a_run_is_kept_in_full_whatever_becomes_of_it(tmp_path: Path) -> None:
 
 
 def test_the_running_total_is_the_money_actually_spent_so_far(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The bug this is a fence against: every progress line read $0.00.
 
@@ -153,6 +161,7 @@ def test_the_running_total_is_the_money_actually_spent_so_far(
         cap=15.0,
         on=A_DAY,
         seed=20261001,
+        keep_in=tmp_path,
         say=said.append,
     )
 
@@ -162,9 +171,9 @@ def test_the_running_total_is_the_money_actually_spent_so_far(
     assert all("calls" in one and "searches" in one for one in totals)
 
 
-def test_what_a_run_cost_is_said_out_loud_whatever_becomes_of_it() -> None:
+def test_what_a_run_cost_is_said_out_loud_whatever_becomes_of_it(tmp_path: Path) -> None:
     """A figure nobody wrote down is a figure somebody pays for twice."""
-    said = what_it_cost(a_run(a_run_that_shows_none()))  # type: ignore[arg-type]
+    said = what_it_cost(a_run(a_run_that_shows_none(), tmp_path))  # type: ignore[arg-type]
 
     printed = "\n".join(said)
     assert "dollars" in printed
@@ -177,7 +186,7 @@ def test_what_a_run_cost_is_said_out_loud_whatever_becomes_of_it() -> None:
 
 def test_a_run_that_shows_a_refusal_becomes_a_recording(tmp_path: Path) -> None:
     """And the header names the map's own minted identifier, never the example's name."""
-    run = a_run(a_run_that_shows_a_refusal())
+    run = a_run(a_run_that_shows_a_refusal(), tmp_path)
 
     assert faults_of(run) == ()  # type: ignore[arg-type]
 
@@ -197,7 +206,7 @@ def test_a_run_that_shows_a_refusal_becomes_a_recording(tmp_path: Path) -> None:
 
 def test_a_measurement_run_is_kept_and_writes_no_recording(tmp_path: Path) -> None:
     """One code path, one flag: a run meant as a measurement is not a failed recording."""
-    run = a_run(a_run_that_shows_a_refusal())
+    run = a_run(a_run_that_shows_a_refusal(), tmp_path)
     as_a_measurement = ("This was a measurement run, so no recording was written.",)
 
     where = keep(run, as_a_measurement, folder=tmp_path)  # type: ignore[arg-type]
@@ -211,8 +220,10 @@ def test_a_measurement_run_is_kept_and_writes_no_recording(tmp_path: Path) -> No
 
 def test_every_kept_run_gets_its_own_file(tmp_path: Path) -> None:
     """Two runs of one example are two measurements, and neither overwrites the other."""
-    keep(a_run(a_run_that_shows_none()), (), folder=tmp_path)  # type: ignore[arg-type]
-    keep(a_run(a_run_that_shows_none()), (), folder=tmp_path)  # type: ignore[arg-type]
+    first = a_run(a_run_that_shows_none(), tmp_path)
+    second = a_run(a_run_that_shows_none(), tmp_path)
 
-    assert len(list(tmp_path.glob("hormuz-*.json"))) >= 1
+    assert len(list(tmp_path.glob("hormuz-*.json"))) == 2
+    assert keep(first, (), folder=tmp_path) != keep(second, (), folder=tmp_path)  # type: ignore[arg-type]
+    assert len(list(tmp_path.glob("hormuz-*.json"))) == 2
     assert all(one.stat().st_size > 0 for one in tmp_path.glob("*.json"))

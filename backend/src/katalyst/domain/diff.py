@@ -1027,9 +1027,17 @@ def best_backed_routes(
         heappush(waiting, (-math.inf, 1, (), subject, climbing))
 
     while waiting:
-        reached, _, taken, here, climbing = heappop(waiting)
+        reached, length, taken, here, climbing = heappop(waiting)
         width = -reached
-        walked = best[(here, climbing)][1]
+        # A claim goes on the queue once per route that beat every route found to
+        # it so far, and the beaten ones are still on there. Reading one without
+        # this check pairs its width with the route that beat it — two halves of
+        # two different answers, handed out as one. The ordinary guard: an entry
+        # that is no longer the best route to its claim is dropped where it is
+        # popped (2026-09-20).
+        along, walked, steps = best[(here, climbing)]
+        if (width, length, taken) != (along, len(walked), steps):
+            continue
         onwards: list[
             tuple[tuple[PropositionId, bool], float, tuple[PropositionId, ...], tuple[int, ...]]
         ]

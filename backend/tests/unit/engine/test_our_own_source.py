@@ -168,3 +168,43 @@ def test_one_rule_chooses_every_route_and_it_is_the_maps_own() -> None:
         if isinstance(holder, ast.FunctionDef) and "route" in holder.name
     ]
     assert chose_a_route == [], chose_a_route
+
+
+# --- The guard that runs a module as a program is the last thing in it -----
+
+
+def every_module_of_ours() -> list[Path]:
+    """Every Python file this package ships, so nothing can be added and missed."""
+    root = Path(the_pipeline.__file__).parent.parent
+    return sorted(one for one in root.rglob("*.py") if "__pycache__" not in one.parts)
+
+
+def test_nothing_follows_the_guard_that_runs_a_module_as_a_program() -> None:
+    """A 26-minute paid run was lost to this, on 2026-09-20.
+
+    `record.py` had `if __name__ == "__main__": raise SystemExit(main())` at line
+    617 and defined a function `main` calls at line 621 — below the guard. Run as
+    a program, `main()` executes before the rest of the module exists, and the run
+    died with a `NameError` after the money was spent. Imported by a test, every
+    name is defined first, so every test passed and no linter saw it.
+
+    Nothing catches this by running the code: the only reliable check is that the
+    guard is the last thing in the file. Blank lines and comments after it are
+    fine; a definition, an assignment or a statement is not.
+    """
+    offenders: list[str] = []
+    for module in every_module_of_ours():
+        written = ast.parse(module.read_text(encoding="utf-8"))
+        guards = [
+            one
+            for one in written.body
+            if isinstance(one, ast.If)
+            and ast.unparse(one.test) in ('__name__ == "__main__"', "__name__ == '__main__'")
+        ]
+        if not guards:
+            continue
+        after = [one for one in written.body if one.lineno > guards[-1].lineno]
+        if after:
+            offenders.append(f"{module.name}: {', '.join(ast.unparse(one)[:40] for one in after)}")
+
+    assert offenders == []

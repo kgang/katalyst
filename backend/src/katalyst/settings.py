@@ -44,6 +44,17 @@ class Settings(BaseSettings):
         KATALYST_RECORDINGS: Where the committed recordings are read from. Left
             empty, `backend/recordings/`. A test or an end-to-end browser run
             points it at a folder of its own.
+        KATALYST_RUNS: Where every paid run is written, whatever becomes of it.
+            Left empty, `backend/.runs/`. A test that starts the recorder as a
+            program points it somewhere throwaway, because that folder holds what
+            real money bought and nothing may overwrite it.
+        KATALYST_ANSWERER: The import path of a factory that builds the answerer,
+            as `module:name`. Left empty — which it is everywhere but a test — the
+            live answerer is built from the key. It exists so that the recorder
+            can be run **as a program**, end to end, with no key and no network:
+            two paid runs have been lost to bugs that only exist when a module is
+            started rather than imported. A run answered this way is never written
+            as a recording, whatever else it produces.
         REPLAY_INSTANT: Whether a recorded generation plays back with no pause
             between its events. Off by default, because the pause is what makes a
             replay read as a map arriving rather than appearing. The test suite
@@ -67,6 +78,8 @@ class Settings(BaseSettings):
     KATALYST_MODEL: str = "claude-sonnet-5"
     KATALYST_EFFORT: Literal["low", "medium", "high", "xhigh", "max", ""] = ""
     KATALYST_RECORDINGS: str = ""
+    KATALYST_RUNS: str = ""
+    KATALYST_ANSWERER: str = ""
     REPLAY_INSTANT: bool = False
 
 

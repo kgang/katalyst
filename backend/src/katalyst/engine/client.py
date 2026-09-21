@@ -72,6 +72,7 @@ What this file must never do
 
 import time
 from collections.abc import Sequence
+from importlib import import_module
 from typing import Any, Protocol
 
 import anthropic
@@ -636,6 +637,28 @@ def _did_not_fit_the_shape(problem: ValidationError) -> str:
     return f"The model's answer did not fit the shape this call asked for, at: {named}."
 
 
+def _named(path: str) -> Any:
+    """Build whatever `module:name` names, by calling it.
+
+    Args:
+        path: An import path of the form `module:name`, naming something that
+            can be called with no arguments and hands back an answerer.
+
+    Returns:
+        Whatever that factory built.
+
+    Raises:
+        ValueError: If the path does not name a module and something in it.
+    """
+    module, _, name = path.partition(":")
+    if not module or not name:
+        raise ValueError(
+            f"KATALYST_ANSWERER is {path!r}, which does not name anything. It wants "
+            "'module:name', where the name can be called with no arguments."
+        )
+    return getattr(import_module(module), name)()
+
+
 def live_answerer(*, effort: str | None = None) -> Model | None:
     """Build the live answerer, or say plainly that there is no key for one.
 
@@ -650,6 +673,13 @@ def live_answerer(*, effort: str | None = None) -> Model | None:
     Returns:
         A live answerer, or nothing at all when no key is configured.
     """
+    stand_in = get_settings().KATALYST_ANSWERER
+    if stand_in:
+        # The one seam that lets the recorder be started as a program in a test,
+        # with no key and no network. Empty everywhere but there, and a run
+        # answered this way can never become a recording — `record.py` names it
+        # as a fault (Kent, 2026-09-20).
+        return _named(stand_in)
     key = get_settings().ANTHROPIC_API_KEY
     if not key:
         return None

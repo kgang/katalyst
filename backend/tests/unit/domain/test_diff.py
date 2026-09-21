@@ -58,6 +58,7 @@ from katalyst.domain import (
     Refine,
     Resolution,
     Retune,
+    Source,
     World,
     apply,
     diff,
@@ -69,6 +70,7 @@ from katalyst.domain import (
 from katalyst.domain.diff import (
     AGREEING_AT_LEAST,
     MOVED_AT_LEAST,
+    NO_ARROW_TO_WEAKEN,
     PROVENANCE_WEIGHT,
     SWEEP_VERSIONS,
     SWEEP_WORLDS,
@@ -76,6 +78,7 @@ from katalyst.domain.diff import (
     _counting_for,
     _read_on,
     _two_figures,
+    best_backed_routes,
 )
 from katalyst.domain.propagation import Numbers, Versions
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
@@ -1389,3 +1392,147 @@ def test_a_sweep_works_from_a_world_that_already_holds_a_branch() -> None:
     swept = sensitivity(world, **SMALL)
 
     assert [one.flipped for one in swept] == [one.id for one in world.graph.propositions]
+
+
+# --- The one rule for choosing a route, and the walk that applies it -------
+
+
+def a_route_map(arrows: list[tuple[str, str, str]]) -> Graph:
+    """Build a small map from `(cause, effect, provenance)` triples, in that order."""
+    names = []
+    for cause, effect, _ in arrows:
+        for one in (cause, effect):
+            if one not in names:
+                names.append(one)
+    claims = tuple(
+        Proposition(
+            id=name,
+            claim=f"Claim {name}.",
+            kind="hypothesis" if index == 0 else ("market" if name == "T" else "event"),
+            resolution=Resolution(
+                criteria="A test two people reading it would agree on.",
+                source="A named judge.",
+                by=date(2026, 11, 1),
+            ),
+            prior=Belief(p=0.4, lo=0.2, hi=0.6, owner="model"),
+            beliefs=Beliefs(model=Belief(p=0.4, lo=0.2, hi=0.6, owner="model")),
+            payoff=(
+                ContractPayoff(venue="Somewhere", contract_id="c-1", title="Does it?", side="yes")
+                if name == "T"
+                else None
+            ),
+        )
+        for index, name in enumerate(names)
+    )
+    links = tuple(
+        Link(
+            id=f"arrow-{position}",
+            source=cause,
+            target=effect,
+            mode="sustain",
+            strength=0.5,
+            lag=1.0,
+            shape="step",
+            rationale="The cause moves the effect, and here is how.",
+            sources=(Source(url="https://example.test/page", title="A page"),)
+            if provenance in ("documented", "historical", "market_implied")
+            else (),
+            provenance=provenance,  # type: ignore[arg-type]
+        )
+        for position, (cause, effect, provenance) in enumerate(arrows)
+    )
+    return Graph(id="a-route-map", propositions=claims, links=links, hypothesis_id=names[0])
+
+
+def test_a_routes_width_is_always_the_weakest_arrow_on_that_very_route() -> None:
+    """The invariant a stale entry in the walk's own queue could break (2026-09-20).
+
+    The search pushes a claim onto its queue each time it finds a better route to
+    it, and an entry that has since been beaten still comes off. Read without a
+    check, that pairs one route's width with another route's path — two halves of
+    two different answers, handed out as one. The guard is the ordinary one: an
+    entry that is no longer the best route to its claim is dropped where it is
+    popped.
+    """
+    graph = a_route_map(
+        [
+            ("S", "X", "asserted"),
+            ("S", "Y", "documented"),
+            ("X", "A", "documented"),
+            ("Y", "A", "asserted"),
+            ("A", "T", "documented"),
+            ("X", "T", "argued"),
+        ]
+    )
+
+    routes = best_backed_routes(graph, frozenset({"S"}))
+
+    for claim_id, route in routes.items():
+        along = [
+            PROVENANCE_WEIGHT[one.provenance]
+            for step, next_step in pairwise(route.path)
+            for one in graph.links
+            if one.source == step and one.target == next_step
+        ]
+        assert route.path[-1] == claim_id
+        assert route.path[0] == "S"
+        assert route.width == (min(along) if along else NO_ARROW_TO_WEAKEN)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Open defect, found 2026-09-20 and reported rather than fixed in that round. "
+        "The walk keeps one route per claim — the widest — so a narrower route that "
+        "would have given an equally wide but SHORTER route onward is thrown away "
+        "before it can. The width it hands back is right; the path can be the longer "
+        "of two equally wide ones. Fixing it means a second pass: once every claim's "
+        "width is known, find the shortest route to it over the arrows worth at least "
+        "that much, ties broken by the map's own order. That is a rewrite of this "
+        "function rather than a guard inside it, so it wants its own round."
+    ),
+)
+def test_two_equally_backed_routes_are_separated_by_the_shorter_one() -> None:
+    """The rule's own second clause, which the walk does not yet keep.
+
+    Three routes reach C. `S -> C` is asserted and worth 0.3. `S -> B -> C` and
+    `S -> A -> B -> C` are both worth 0.5, because both run through the same
+    weakest arrow, so the shorter of the two wins under the rule this function's
+    own docstring states. The walk hands back the longer one: B is reached by
+    `S -> B` worth 0.5 and then improved to `S -> A -> B` worth 0.9, and the
+    narrower route to B — the one that would have given the shorter route to C —
+    is gone by the time C is reached.
+    """
+    graph = a_route_map(
+        [
+            ("S", "A", "historical"),
+            ("B", "C", "simulated"),
+            ("S", "T", "simulated"),
+            ("S", "C", "asserted"),
+            ("B", "T", "asserted"),
+            ("A", "B", "documented"),
+            ("S", "B", "simulated"),
+        ]
+    )
+
+    routes = best_backed_routes(graph, frozenset({"S"}))
+
+    assert routes["C"].width == 0.5
+    assert routes["C"].path == ("S", "B", "C")
+
+
+def test_two_equally_backed_routes_of_one_length_take_the_earlier_arrow() -> None:
+    """And the rule's third clause, so nothing is left to whichever the search reached."""
+    graph = a_route_map(
+        [
+            ("S", "X", "documented"),
+            ("S", "Y", "documented"),
+            ("X", "A", "documented"),
+            ("Y", "A", "documented"),
+        ]
+    )
+
+    routes = best_backed_routes(graph, frozenset({"S"}))
+
+    assert routes["A"].width == 1.0
+    assert routes["A"].path == ("S", "X", "A")

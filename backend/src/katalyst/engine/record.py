@@ -37,7 +37,8 @@ import argparse
 import json
 import sys
 import time
-from collections.abc import Callable
+import traceback
+from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -62,9 +63,10 @@ from katalyst.engine.outcome import Caps, Outcome
 from katalyst.engine.prompt import prompt_hash
 from katalyst.engine.receipt import Receipt as RunningTotal
 from katalyst.engine.receipt import fold, nothing_spent_yet
-from katalyst.engine.replay import RECORDINGS
+from katalyst.engine.replay import where_they_live
 from katalyst.engine.transcript import Transcript, line_for, makes_an_event
 from katalyst.engine.verify import verdict
+from katalyst.settings import get_settings
 
 THE_FOUR = {
     "hormuz": "The Strait of Hormuz is going to open next week.",
@@ -81,12 +83,36 @@ nowhere else.
 """
 
 KEPT_RUNS = Path(__file__).resolve().parents[3] / ".runs"
-"""Where every paid run is written, whatever becomes of it.
+"""Where every paid run is written when nothing else is said.
 
 Not committed, and not `backend/recordings/`: those two are different things.
 A recording is a file the product plays back and the build checks; this is the
 record of an afternoon's spending, kept so that nobody has to pay twice to answer
 the same question.
+"""
+
+
+def where_runs_are_kept() -> Path:
+    """Where this running program writes what its runs produced.
+
+    Read when asked rather than when this module was written, so that a test
+    starting the recorder as a program can point it somewhere throwaway. Nothing
+    may overwrite `backend/.runs/`: it holds what real money bought.
+
+    Returns:
+        The folder, from the settings when they name one and `backend/.runs/`
+        when they do not.
+    """
+    said = get_settings().KATALYST_RUNS
+    return Path(said) if said else KEPT_RUNS
+
+
+NOT_FINISHED_YET = "This run is not finished yet."
+"""What the first write of a run says, before anybody knows how it ends.
+
+Overwritten by the second write, in the same file. A file still carrying this
+sentence is a run that was interrupted between the two — a terminal closed, a
+machine that went to sleep — and what is in it is everything that was paid for.
 """
 
 DOLLARS_EVERY = 4
@@ -153,6 +179,15 @@ class KeptRun(BaseModel):
             "Kept so a run that failed a recording's checks can still be read."
         ),
     )
+    broke: str | None = Field(
+        default=None,
+        description=(
+            "One plain sentence, when the run stopped for a reason nobody chose. "
+            "A crash is not a reason to lose what was already paid for, so this "
+            "file is written the moment a generation ends and again once the "
+            "scripted intervention has been drafted (Kent, 2026-09-20)."
+        ),
+    )
 
 
 class Run(BaseModel):
@@ -169,6 +204,10 @@ class Run(BaseModel):
     transcript: Transcript
     finished: Finished | None
     scripted_insert: Insert | None = None
+    broke: str | None = None
+    """One plain sentence when the run stopped for a reason nobody chose."""
+    kept_at: Path | None = None
+    """Where it was written the moment its generation ended, before the insert."""
 
 
 def run_one(
@@ -178,6 +217,7 @@ def run_one(
     cap: float,
     on: date | None = None,
     seed: int | None = None,
+    keep_in: Path | None = None,
     say: Callable[[str], None] | None = None,
 ) -> Run:
     """Run one example against a model, telling the terminal what is happening.
@@ -192,6 +232,10 @@ def run_one(
         cap: What this run may spend. Never above the figure in code.
         on: The day to run as. Today when not said.
         seed: The seed to use. A minted one when not said.
+        keep_in: Where to write what the run produced, as it produces it.
+            `backend/.runs/` when not said, or wherever `KATALYST_RUNS` says. A
+            test passes a throwaway directory: that folder holds what real money
+            bought and nothing may overwrite it.
         say: Where progress goes. The terminal's error stream when not said.
 
     Returns:
@@ -224,6 +268,7 @@ def run_one(
     ]
 
     at = 0
+    broke: str | None = None
     finished: Finished | None = None
     walking = grow(hypothesis, answerer=answerer, on=today, caps=Caps(dollars=ceiling))
     try:
@@ -242,19 +287,54 @@ def run_one(
             at += 1
             if at % DOLLARS_EVERY == 0:
                 telling(_so_far(so_far, working, time.monotonic() - started))
+    except Exception as went_wrong:
+        # A paid run is never discarded, and a crash is no exception. What was
+        # spent is on disk a few lines below, whatever happened here; the whole
+        # traceback goes to the terminal, where somebody can act on it, and one
+        # plain sentence goes in the file (Kent, 2026-09-20).
+        broke = _in_one_plain_sentence(went_wrong)
+        telling("  the run stopped for a reason nobody chose:")
+        traceback.print_exc(file=sys.stderr)
     finally:
         walking.close()
+
+    # **The generation is on disk before anything else is asked for.** A paid run
+    # is never discarded, and a crash is no exception: everything from here on is
+    # another model call, and a bug after one of them used to take the whole
+    # afternoon's spending with it (Kent, 2026-09-20).
+    so_far_a_run = _a_run(
+        example,
+        hypothesis,
+        its_seed,
+        today,
+        started,
+        (*written, *_closing_events(finished, started)),
+        _with_the_ending(working, finished),
+        finished,
+    ).model_copy(update={"broke": broke})
+    kept_at = keep(so_far_a_run, (NOT_FINISHED_YET,), folder=keep_in)
+    telling(f"  what it has so far is on disk at {kept_at}")
+    so_far_a_run = so_far_a_run.model_copy(update={"kept_at": kept_at})
+    if broke is not None:
+        return so_far_a_run
 
     drafted: Insert | None = None
     if finished is not None and finished.graph is not None:
         telling(f"  drafting the one intervention the card offers: {THE_ONE_THEY_OFFER[example]!r}")
-        drafted, its_calls = add_a_claim(
-            finished.graph,
-            THE_ONE_THEY_OFFER[example],
-            answerer=answerer,
-            on=today,
-            width=Caps().width,
-        )
+        try:
+            drafted, its_calls = add_a_claim(
+                finished.graph,
+                THE_ONE_THEY_OFFER[example],
+                answerer=answerer,
+                on=today,
+                width=Caps().width,
+            )
+        except Exception as went_wrong:
+            telling("    it stopped for a reason nobody chose while drafting:")
+            traceback.print_exc(file=sys.stderr)
+            return so_far_a_run.model_copy(
+                update={"broke": _in_one_plain_sentence(went_wrong), "seconds": _since(started)}
+            )
         for one in its_calls:
             so_far = fold(so_far, one)
             working = working.plus(line_for(one, None))
@@ -263,31 +343,132 @@ def run_one(
             update={"receipt": _with_the_insert(finished.receipt, its_calls)}
         )
 
-    if finished is not None:
-        working = working.model_copy(
-            update={"receipt": finished.receipt, "reason": finished.reason, "why": finished.why}
+    return _a_run(
+        example,
+        hypothesis,
+        its_seed,
+        today,
+        started,
+        (*written, *_closing_events(finished, started)),
+        _with_the_ending(working, finished),
+        finished,
+    ).model_copy(update={"scripted_insert": drafted, "kept_at": kept_at})
+
+
+def _closing_events(finished: Finished | None, started: float) -> tuple[Event, ...]:
+    """The events that close a generation: the verdict, the receipt and the ending.
+
+    Built twice on purpose — once the moment the generation ends, and once more
+    once the scripted intervention has been drafted and added to the bill — so
+    that the file written before the insert already carries the receipt. A kept
+    run with a map in it and no receipt beside it is the one thing this file
+    exists to prevent (Kent, 2026-09-20).
+
+    Args:
+        finished: What the walk handed back, or nothing when it never got there.
+        started: When the clock was started.
+
+    Returns:
+        The closing events, in the order the grammar wants them. Empty when the
+        walk never finished.
+    """
+    if finished is None:
+        return ()
+    closing: list[Event] = []
+    if finished.graph is not None and finished.destination is not None:
+        closing.append(verdict(finished.graph, finished.destination))
+    closing.append(_receipt_of(finished, _since(started)))
+    closing.append(
+        Done(
+            reason=finished.reason,
+            claims=finished.claims,
+            links=finished.links,
+            rejected=finished.refused,
         )
-        if finished.graph is not None and finished.destination is not None:
-            written.append(verdict(finished.graph, finished.destination))
-        written.append(_receipt_of(finished, time.monotonic() - started))
-        written.append(
-            Done(
-                reason=finished.reason,
-                claims=finished.claims,
-                links=finished.links,
-                rejected=finished.refused,
-            )
-        )
+    )
+    return tuple(closing)
+
+
+def _with_the_ending(working: Transcript, finished: Finished | None) -> Transcript:
+    """Put what the walk spent, and why it stopped, onto the transcript.
+
+    Args:
+        working: The transcript as it stands.
+        finished: What the walk handed back, or nothing at all.
+
+    Returns:
+        The transcript, with the ending on it when there is one.
+    """
+    if finished is None:
+        return working
+    return working.model_copy(
+        update={"receipt": finished.receipt, "reason": finished.reason, "why": finished.why}
+    )
+
+
+def _since(started: float) -> float:
+    """How long it has been, in seconds, since the clock was started."""
+    return time.monotonic() - started
+
+
+def _in_one_plain_sentence(broke: BaseException) -> str:
+    """Say that a run stopped for a reason nobody chose, without a stack trace in it.
+
+    What goes in the kept file is what a reader of that file needs: that this run
+    did not finish, that what is in the file is everything it got to, and that
+    somebody should look at the terminal. The exception itself is printed there.
+
+    Args:
+        broke: Whatever went wrong.
+
+    Returns:
+        One plain sentence.
+    """
+    return (
+        "This run stopped for a reason nobody chose, after the money below had "
+        f"already been spent. It was a {type(broke).__name__}; the terminal that "
+        "ran it has the rest."
+    )
+
+
+def _a_run(
+    example: str,
+    hypothesis: str,
+    its_seed: int,
+    today: date,
+    started: float,
+    written: Sequence[Event],
+    working: Transcript,
+    finished: Finished | None,
+) -> Run:
+    """Gather what a run has produced so far into the one shape everything reads.
+
+    Called twice: once the moment the generation ends, and once more when the
+    scripted intervention has been drafted. Both write to the same file.
+
+    Args:
+        example: Which of the four this is.
+        hypothesis: The sentence it was asked for.
+        its_seed: The number its likelihoods are worked out from.
+        today: The day it ran.
+        started: When the clock was started.
+        written: The events so far.
+        working: The transcript so far.
+        finished: What the walk handed back, if it got that far.
+
+    Returns:
+        The run as it stands.
+    """
     return Run(
         example=example,
         hypothesis=hypothesis,
         seed=its_seed,
         on=today,
-        seconds=time.monotonic() - started,
+        seconds=_since(started),
         events=tuple(written),
         transcript=working,
         finished=finished,
-        scripted_insert=drafted,
+        scripted_insert=None,
     )
 
 
@@ -311,6 +492,14 @@ def faults_of(run: Run) -> tuple[str, ...]:
         One sentence per reason, or nothing at all when it may.
     """
     found: list[str] = []
+    if run.broke is not None:
+        found.append(run.broke)
+    if get_settings().KATALYST_ANSWERER:
+        found.append(
+            "This run was answered by a stand-in named by KATALYST_ANSWERER, not by "
+            "a model, so it is a recording of nothing. It is kept, and it is not "
+            "written to the recordings folder."
+        )
     if run.finished is None or run.finished.graph is None:
         found.append("The run did not finish, so there is no map to play back.")
     if not any(isinstance(one, Done) for one in run.events):
@@ -335,15 +524,20 @@ def keep(run: Run, faults: tuple[str, ...], *, folder: Path | None = None) -> Pa
     Args:
         run: What the run produced.
         faults: Why it may not become a recording, if it may not.
-        folder: Where to write it. `backend/.runs/` when not said.
+        folder: Where to write it. `backend/.runs/` when not said, or wherever
+            `KATALYST_RUNS` says.
 
     Returns:
-        The file that was written.
+        The file that was written — the run's own, when it already has one.
     """
-    where = folder or KEPT_RUNS
+    where = folder or where_runs_are_kept()
     where.mkdir(parents=True, exist_ok=True)
+    # Written to the same file the generation was written to, when there is one,
+    # so a run leaves one record of itself rather than two halves of one.
     stamped = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
-    written = where / f"{run.example}-{stamped}.json"
+    # The generation's own identifier is in the name as well as the day and the
+    # time, so two runs started inside one second are still two files.
+    written = run.kept_at or where / f"{run.example}-{stamped}-{run.transcript.generation_id}.json"
     written.write_text(
         KeptRun(
             example=run.example,
@@ -359,6 +553,7 @@ def keep(run: Run, faults: tuple[str, ...], *, folder: Path | None = None) -> Pa
             receipt=next((one for one in run.events if isinstance(one, Receipt)), None),
             graph=None if run.finished is None else run.finished.graph,
             events=run.events,
+            broke=run.broke,
         ).model_dump_json(indent=2),
         encoding="utf-8",
     )
@@ -374,12 +569,15 @@ def write_recording(run: Run, *, folder: Path | None = None) -> Path:
 
     Args:
         run: What the run produced.
-        folder: Where to write it. `backend/recordings/` when not said.
+        folder: Where to write it. When not said, wherever recordings are read
+            back from — the setting, not the constant. A writer that ignored the
+            setting the reader obeys would write into the shipped folder from a
+            test, which is exactly what it did once (2026-09-20).
 
     Returns:
         The file that was written.
     """
-    where = folder or RECORDINGS
+    where = folder or where_they_live()
     where.mkdir(parents=True, exist_ok=True)
     written = where / f"{run.example}.jsonl"
     built = run.finished.graph if run.finished is not None else None
@@ -614,10 +812,6 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if wrote_everything else 1
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-
 def _with_the_insert(spent: RunningTotal, its_calls: tuple[Outcome, ...]) -> RunningTotal:
     """Add what drafting the scripted intervention cost to what the run spent.
 
@@ -627,3 +821,14 @@ def _with_the_insert(spent: RunningTotal, its_calls: tuple[Outcome, ...]) -> Run
     for one in its_calls:
         spent = fold(spent, one)
     return spent
+
+
+# **The guard is the last thing in this file, and must stay there.** Started as a
+# program, `main()` runs before anything written below it exists — which cost a
+# 26-minute paid run on 2026-09-20, when this very function sat underneath it and
+# the run died with a `NameError` after the money was spent. Imported by a test
+# every name is defined first, so nothing caught it.
+# `test_nothing_follows_the_guard_that_runs_a_module_as_a_program` reads this
+# file, and every other module of ours, to keep it true.
+if __name__ == "__main__":
+    raise SystemExit(main())
