@@ -30,7 +30,7 @@ twenty-six character identifier in a failing example teaches nobody anything. Th
 rules layer never checks the format, which is what makes this possible.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import networkx
@@ -60,6 +60,7 @@ from katalyst.domain import (
     Retune,
     Source,
 )
+from katalyst.grounding import Quote, QuoteSource
 
 # --- Words, so a failing example reads like a map and not like noise -------
 
@@ -374,6 +375,97 @@ def payoffs(draw: Any) -> Payoff:
         instrument=draw(st.sampled_from(INSTRUMENTS)),
         direction=draw(st.sampled_from(("long", "short"))),
         move=draw(st.floats(min_value=0.0, max_value=3.0, allow_nan=False)),
+    )
+
+
+VENUE_QUESTIONS: tuple[str, ...] = (
+    "Strait of Hormuz traffic returns to normal by October 31?",
+    "US x Iran diplomatic meeting by October 31, 2026?",
+)
+"""Questions written the way a prediction market writes them, for a generated quote."""
+
+VENUE_RULES: tuple[str, ...] = (
+    "This market resolves Yes if the named publisher reports the stated level for any date "
+    "in the window, and No otherwise.",
+    "This market resolves Yes if two named wire services report the meeting took place.",
+)
+"""Resolution rules written the way a venue writes them, for a generated quote."""
+
+
+@composite
+def quotes(
+    draw: Any,
+    source: QuoteSource | None = None,
+    live: bool | None = None,
+    bid: float | None = None,
+    offer: float | None = None,
+) -> Quote:
+    """One venue price for one claim, with everything needed to check it and to date it.
+
+    Generates: a best bid and a best offer, the instant they were true, how the
+    price reached us, whether the venue says the market is still trading, and —
+    for a venue's own price, never for one the reader typed — the venue's name,
+    its three identifiers, the side priced, its question and rules, its end date,
+    its smallest price step and order, how much is resting and traded, and a web
+    address.
+    Guarantees: the bid is never above the offer and both sit between zero and
+    one; a price read from a venue carries every one of the venue's own facts and
+    a price the reader typed carries none of them. Valid by construction, so
+    anything drawn here can be built without raising.
+
+    Args:
+        draw: Supplied by the generator library.
+        source: Pin how the price reached us, when a test is about one of the
+            three ways; otherwise one is chosen.
+        live: Pin whether the venue says the market is still trading. Left out,
+            either. A finished market is generated too, on purpose: a settled
+            market keeps serving a plausible book, and every reader of a quote has
+            to cope with one.
+        bid: Pin the best bid, when a test needs the price to sit somewhere
+            particular against a claim's own number.
+        offer: Pin the best offer, for the same reason.
+    """
+    chosen_source: QuoteSource = (
+        source if source is not None else draw(st.sampled_from(("fetched", "recorded", "user")))
+    )
+    low = bid if bid is not None else draw(st.floats(min_value=0.0, max_value=1.0, allow_nan=False))
+    high = (
+        offer
+        if offer is not None
+        else draw(st.floats(min_value=low, max_value=1.0, allow_nan=False))
+    )
+    trading = live if live is not None else draw(st.booleans())
+    instant = draw(
+        st.datetimes(min_value=datetime(2026, 1, 1), max_value=datetime(2026, 12, 31)).map(
+            lambda one: one.replace(tzinfo=UTC)
+        )
+    )
+    shared = {
+        "bid": min(low, high),
+        "offer": max(low, high),
+        "as_of": instant,
+        "source": chosen_source,
+        "closed": not trading,
+        "accepting_orders": trading,
+    }
+    if chosen_source == "user":
+        return Quote(**shared)
+    outcome = draw(st.sampled_from(("yes", "no")))
+    return Quote(
+        **shared,
+        venue=draw(st.sampled_from(CONTRACT_VENUES)),
+        condition_id=f"0x{draw(st.integers(min_value=0, max_value=2**32 - 1)):064x}",
+        market_id=str(draw(st.integers(min_value=1, max_value=9_999_999))),
+        token_id=str(draw(st.integers(min_value=1, max_value=2**64 - 1))),
+        side=outcome,
+        question=draw(st.sampled_from(VENUE_QUESTIONS)),
+        rules=draw(st.sampled_from(VENUE_RULES)),
+        ends=draw(st.dates(min_value=date(2026, 1, 1), max_value=date(2030, 12, 31))),
+        tick=draw(st.sampled_from((0.001, 0.01))),
+        minimum_order=draw(st.sampled_from((1.0, 5.0))),
+        resting=draw(st.floats(min_value=0.0, max_value=1e6, allow_nan=False)),
+        traded=draw(st.floats(min_value=0.0, max_value=1e7, allow_nan=False)),
+        url="https://example.test/event/a-question-somebody-quotes",
     )
 
 
