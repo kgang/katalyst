@@ -1141,20 +1141,48 @@ def test_two_arrows_on_the_same_day_are_broken_by_which_arrived_first() -> None:
 
 
 def test_band_is_not_sampling_noise() -> None:
-    """Freeze every prior at a point and the band collapses: it is not the coin flips.
+    """Take every number on the map down to a point and the band collapses.
 
     This is the single most likely way to get the engine wrong. An implementation
     that reported how much its own sampling wobbled would pass every other test in
-    this file and fail here, loudly: with no stated range left anywhere on the map
-    there is nothing for a band to be about, so there must be no band.
+    this file and fail here, loudly: with nothing uncertain left anywhere on the
+    map there is nothing for a band to be about, so there must be no band.
+
+    **Two things have to be frozen now, not one.** A version of the map draws a
+    likelihood for every claim's prior *and* a push for every arrow, so freezing
+    the priors alone leaves the arrows still varying and leaves a band that is
+    perfectly real. Both go: `_frozen` rewrites the priors as points and
+    `_propagate_with_no_spread` holds every push at exactly what the map states.
     """
     real = propagate(HORMUZ, (), as_of=FIXTURE_DATE, seed=SEED, **FULL)
-    flat = propagate(_frozen(HORMUZ), (), as_of=FIXTURE_DATE, seed=SEED, **FULL)
+    flat = _no_spread(_frozen(HORMUZ))
 
     for claim_id, belief in flat.beliefs.items():
         width = belief.hi - belief.lo
         assert width < 0.02, f"{claim_id} still reports a band of {width:.3f}"
         assert width < 0.1 * (real.beliefs[claim_id].hi - real.beliefs[claim_id].lo)
+
+
+def test_freezing_the_priors_alone_leaves_the_arrows_talking() -> None:
+    """The other half of the test above, and the reason it gained a second freeze.
+
+    With every prior held at a point and every arrow still drawn from where it
+    came from, there is still something for a band to be about — and there had
+    better be, or the spread on the arrows is doing nothing.
+    """
+    priors_only = propagate(_frozen(HORMUZ), (), as_of=FIXTURE_DATE, seed=SEED, **FULL)
+    nothing_left = _no_spread(_frozen(HORMUZ))
+
+    widest = max(one.hi - one.lo for one in priors_only.beliefs.values())
+    assert widest > 0.02
+    assert all(one.hi - one.lo < 0.02 for one in nothing_left.beliefs.values())
+
+
+def _no_spread(graph: Graph) -> World:
+    """Work a map through with every arrow's push held at exactly what the map states."""
+    return propagation_module._propagate_with_no_spread(
+        graph, (), as_of=FIXTURE_DATE, seed=SEED, **FULL
+    )
 
 
 def test_range_matches_analytic_first_order_on_fixture() -> None:
@@ -1168,10 +1196,18 @@ def test_range_matches_analytic_first_order_on_fixture() -> None:
 
     The sums are done on the log-odds scale, half by half, because that is the
     scale the pushes add on and the scale the stated ranges were fitted on.
+
+    **There are two kinds of term now, not one.** A version of the map draws a
+    likelihood for every claim's prior and a push for every arrow, so the
+    calculus has to carry both: each prior's own half-widths, and each arrow's
+    spread, which is symmetric and so weighs the same on both halves. The
+    nudged runs hold every *other* number at its stated value, which is what makes
+    a slope a slope rather than a slope plus a wash of noise.
     """
     sampled = propagate(HORMUZ, (), as_of=FIXTURE_DATE, seed=SEED, **FULL)
-    middles = propagate(_frozen(HORMUZ), (), as_of=FIXTURE_DATE, seed=SEED, **FULL)
+    middles = _no_spread(_frozen(HORMUZ))
     claims = [one.id for one in HORMUZ.propositions]
+    arrows = [one for one in HORMUZ.links if not one.reflexive]
     halves = {
         one.id: (
             (_log_odds(one.prior.p) - _log_odds(one.prior.lo)) / 1.2816,
@@ -1179,33 +1215,47 @@ def test_range_matches_analytic_first_order_on_fixture() -> None:
         )
         for one in HORMUZ.propositions
     }
+    spreads = propagation_module.PROVENANCE_SPREAD
 
     step = 0.05
     slope: dict[str, dict[str, float]] = {one: {} for one in claims}
     for source in claims:
-        up = propagate(_frozen(HORMUZ, source, step), (), as_of=FIXTURE_DATE, seed=SEED, **FULL)
-        down = propagate(_frozen(HORMUZ, source, -step), (), as_of=FIXTURE_DATE, seed=SEED, **FULL)
+        up = _no_spread(_frozen(HORMUZ, source, step))
+        down = _no_spread(_frozen(HORMUZ, source, -step))
         for target in claims:
             slope[target][source] = (
                 _log_odds(up.beliefs[target].p) - _log_odds(down.beliefs[target].p)
             ) / (2.0 * step)
+    per_push: dict[str, dict[str, float]] = {one: {} for one in claims}
+    for arrow in arrows:
+        up = _no_spread(_nudged(_frozen(HORMUZ), arrow.id, step))
+        down = _no_spread(_nudged(_frozen(HORMUZ), arrow.id, -step))
+        for target in claims:
+            per_push[target][arrow.id] = (
+                _log_odds(up.beliefs[target].p) - _log_odds(down.beliefs[target].p)
+            ) / (2.0 * step)
 
     for target in claims:
+        from_the_pushes = sum(
+            (per_push[target][one.id] * spreads[one.provenance]) ** 2 for one in arrows
+        )
         below = math.sqrt(
             sum(
                 (slope[target][one] * halves[one][0 if slope[target][one] > 0 else 1]) ** 2
                 for one in claims
             )
+            + from_the_pushes
         )
         above = math.sqrt(
             sum(
                 (slope[target][one] * halves[one][1 if slope[target][one] > 0 else 0]) ** 2
                 for one in claims
             )
+            + from_the_pushes
         )
         middle = _log_odds(middles.beliefs[target].p)
-        assert abs(_likelihood(middle - 1.2816 * below) - sampled.beliefs[target].lo) < 0.02
-        assert abs(_likelihood(middle + 1.2816 * above) - sampled.beliefs[target].hi) < 0.02
+        assert abs(_likelihood(middle - 1.2816 * below) - sampled.beliefs[target].lo) < 0.01
+        assert abs(_likelihood(middle + 1.2816 * above) - sampled.beliefs[target].hi) < 0.01
 
 
 def _frozen(graph: Graph, moved: str | None = None, step: float = 0.0) -> Graph:
@@ -1229,6 +1279,127 @@ def _frozen(graph: Graph, moved: str | None = None, step: float = 0.0) -> Graph:
             )
         )
     return graph.model_copy(update={"propositions": tuple(rewritten)})
+
+
+def _nudged(graph: Graph, arrow_id: str, step: float) -> Graph:
+    """Move one arrow's push along the log-odds scale and leave the rest of the map alone.
+
+    A push is already written in log-odds, so the step is added to it straight,
+    with no fitting in between. The mirror of `_frozen`'s `moved` and `step`, for
+    the other half of the delta method.
+    """
+    changed = tuple(
+        one.model_copy(update={"strength": one.strength + step}) if one.id == arrow_id else one
+        for one in graph.links
+    )
+    return graph.model_copy(update={"links": changed})
+
+
+# --- Where an arrow's push came from is how wide it is drawn ----------------
+
+
+def _one_arrow_map(provenance: str, strength: float = 1.2) -> Graph:
+    """A cause, an ending, and one arrow between them, with nothing else uncertain.
+
+    Every prior is a point, so the only thing left that can widen the ending's
+    band is how sure we are of the one arrow's push.
+    """
+    graph = _map(
+        (_claim("top", kind="hypothesis"), _claim("ending", kind="market")),
+        (_arrow("top", "ending", strength=strength),),
+    )
+    backed = tuple(one.model_copy(update={"provenance": provenance}) for one in graph.links)
+    return _frozen(graph.model_copy(update={"links": backed}))
+
+
+def test_a_documented_arrow_gives_a_narrower_band_than_an_asserted_one() -> None:
+    """How well-backed an arrow is becomes how wide it is, with nobody asked twice.
+
+    One map, one arrow, two words for where that arrow came from, and nothing else
+    different anywhere. The band on the claim the arrow points at has to be wider
+    where the arrow is a sentence with no mechanism than where the search tool
+    handed us a page — and the claim the arrow *starts* at has no incoming arrow
+    at all, so its own band stays flat either way.
+    """
+    documented = propagate(_one_arrow_map("documented"), (), as_of=DAY_ZERO, seed=SEED, **FULL)
+    argued = propagate(_one_arrow_map("argued"), (), as_of=DAY_ZERO, seed=SEED, **FULL)
+    asserted = propagate(_one_arrow_map("asserted"), (), as_of=DAY_ZERO, seed=SEED, **FULL)
+
+    def width(world: World, claim_id: str) -> float:
+        return world.beliefs[claim_id].hi - world.beliefs[claim_id].lo
+
+    assert width(documented, "ending") < width(argued, "ending")
+    assert width(argued, "ending") < width(asserted, "ending")
+    assert width(asserted, "top") < 0.02
+
+
+def test_link_spread_comes_only_from_provenance() -> None:
+    """The width of a drawn push is read off where the arrow came from, and off nothing else.
+
+    Two halves. Each word draws pushes whose spread is the width that word stands
+    for, centred on what the map states — and two arrows that share that word but
+    differ in every other thing an arrow carries draw pushes that agree to the
+    bit. Where a number came from is the only question asked.
+    """
+    spreads = propagation_module.PROVENANCE_SPREAD
+    for word, wide in spreads.items():
+        drawn = propagation_module._version_strengths(
+            _arrow("top", "ending", strength=1.2).model_copy(update={"provenance": word}),
+            SEED,
+            FULL["versions"],
+            spreads,
+        )
+        assert abs(float(numpy.mean(drawn)) - 1.2) < 0.01, word
+        assert abs(float(numpy.std(drawn, ddof=1)) - wide) < 0.02, word
+
+    plain = _arrow("top", "ending", strength=1.2)
+    different = plain.model_copy(
+        update={
+            "mode": "sustain",
+            "shape": "impulse",
+            "lag": 4.0,
+            "half_life": 9.0,
+            "rationale": "A wholly different sentence about a wholly different mechanism.",
+            "sources": (),
+        }
+    )
+    both = [
+        propagation_module._version_strengths(one, SEED, FULL["versions"], spreads)
+        for one in (plain, different)
+    ]
+    assert numpy.array_equal(both[0], both[1])
+
+
+def test_adding_an_arrow_does_not_move_another_arrows_draws() -> None:
+    """Every arrow gets a stream of its own, keyed by its own identifier.
+
+    One long stream shared between the arrows, or a stream keyed by an arrow's
+    position on the map, would mean that adding an arrow re-drew every other
+    arrow's push — and then two worlds of one map would stop agreeing about a
+    claim neither of them touched, which is the product's central correctness
+    claim failing through the sampling rather than along the arrows.
+    """
+    before = _two_step_map()
+    after = before.model_copy(
+        update={
+            "propositions": (*before.propositions, _claim("later")),
+            "links": (*before.links, _arrow("middle", "later", strength=0.8)),
+        }
+    )
+
+    drawn = [
+        propagation_module._draw(
+            propagation_module._prepare(one, (), DAY_ZERO),
+            seed=SEED,
+            spreads=propagation_module.PROVENANCE_SPREAD,
+            **FULL,
+        ).strengths
+        for one in (before, after)
+    ]
+
+    assert set(drawn[1]) - set(drawn[0]) == {"middle->later"}
+    for arrow_id in drawn[0]:
+        assert numpy.array_equal(drawn[0][arrow_id], drawn[1][arrow_id]), arrow_id
 
 
 def test_where_a_bands_width_comes_from_is_carried_but_shown_to_nobody() -> None:

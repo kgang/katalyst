@@ -1284,12 +1284,14 @@ def test_a_warning_either_world_carried_is_said_once() -> None:
 def test_the_hormuz_rail_reads_the_way_the_story_reads() -> None:
     """The shipped example's change list, pinned by its directions and its order.
 
-    Four sentences a person can check, and not one number among them. The two
-    tradeable endings fall and the one nobody quotes rises; the one that rises
-    moves furthest and still ranks last, because the only arrow into it is the
-    weakest on the map and the rank's second factor says so; the claim reached only
-    through a feedback arrow is identical to the byte; and the strike itself is a
-    claim the base map has never heard of.
+    Five sentences a person can check, and not one number among them. Both
+    tradeable endings fall. The claim nobody quotes moves further than either of
+    them and does **not** make the list at all, because the only arrow into it is
+    the one arrow on the map that nobody could back, so its push is drawn widest
+    and the versions do not agree which way it went — *we cannot vouch for this
+    one* is the honest reading, and the change list is for changes a reader can
+    act on. The claim reached only through a feedback arrow is identical to the
+    byte, and the strike itself is a claim the base map has never heard of.
 
     Values are deliberately absent. The example is a curated one whose illustrative
     inputs may be tuned, so a test that pinned numbers would break every time
@@ -1300,13 +1302,19 @@ def test_the_hormuz_rail_reads_the_way_the_story_reads() -> None:
     answer = diff(base, strike, edit_in_words=HORMUZ_THEN_STRIKE.label)
     assert not isinstance(answer, list), answer
 
-    assert [one.target for one in answer.rows] == ["M1", "M2", "N1"]
+    assert [one.target for one in answer.rows] == ["M1", "M2"]
     by_name = {one.target: one for one in answer.rows}
     assert by_name["M1"].peak_delta < 0.0
     assert by_name["M2"].peak_delta < 0.0
-    assert by_name["N1"].peak_delta > 0.0
-    assert abs(by_name["N1"].peak_delta) == max(abs(one.peak_delta) for one in answer.rows)
-    assert by_name["N1"].rank == min(one.rank for one in answer.rows)
+
+    talks = answer.claims["N1"]
+    assert talks.delta is not None and talks.agreement is not None
+    assert talks.delta > 0.0
+    assert abs(talks.delta) > max(abs(one.peak_delta) for one in answer.rows)
+    assert talks.state == "unchanged"
+    assert talks.agreement < AGREEING_AT_LEAST
+    only_arrow = next(one for one in HORMUZ.links if one.target == "N1")
+    assert only_arrow.provenance == "asserted"
 
     assert answer.claims["R"].state == "unchanged"
     assert base.series["R"] == strike.series["R"]
@@ -1316,7 +1324,7 @@ def test_the_hormuz_rail_reads_the_way_the_story_reads() -> None:
     contract = next(one for one in HORMUZ.propositions if one.id == "M1")
     assert contract.claim.rstrip(".") in answer.summary
     assert HORMUZ_THEN_STRIKE.label in answer.summary
-    assert "leaves 1 claim untouched" in answer.summary
+    assert "leaves 3 claims untouched" in answer.summary
 
 
 # --- One claim at a time ---------------------------------------------------
