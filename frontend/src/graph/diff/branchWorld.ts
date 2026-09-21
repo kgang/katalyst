@@ -44,6 +44,7 @@ import type {
   WorldView,
 } from "../../world/types";
 import { badgesByClaim, standingByClaim } from "./badges";
+import { toDay } from "./days";
 import { readDiff } from "./diffState";
 import { NO_CHANGE, noChangeReason } from "./noChange";
 import type { Arrow } from "./reach";
@@ -150,11 +151,18 @@ export function tileState(
  *   numbers itself.
  * @param waiting What to say instead when the engine has not answered: its own
  *   word for where it has got to.
+ * @param resolvesBy The day this claim is judged, as the server writes one.
+ *   **The two readings on this line are read on that day and on no other**, and
+ *   the change list beside the map reads its rows on a different day — the day
+ *   the two maps are furthest apart. Somebody who notices one claim carrying two
+ *   different pairs of numbers concludes that one of them is wrong, so the line
+ *   names its own day and names the other.
  */
 function movedBadge(
   moved: Movement | undefined,
   shifted: boolean,
   waiting: Absence | undefined,
+  resolvesBy: string,
 ): Badge {
   if (waiting !== undefined) {
     return { words: waiting.words, reason: waiting.reason, movement: true };
@@ -168,9 +176,23 @@ function movedBadge(
   const agreed = moved.sameDirection.reading;
   return {
     words: toMovement(moved.from, moved.to, moved.by, moved.way),
+    // **The clause about the day is in the sentence behind the line, not in the
+    // line.** The line's words are what the tile draws, and how many lines the
+    // badges take is what reserves the tile's height before the browser has
+    // drawn one (`graph/geometry.ts`). About thirty-eight characters fit on a
+    // line; the longest thing this line ever reads is *the ask did not come
+    // back*, at twenty-five, and any clause worth writing takes it over. The
+    // tile would then be one badge line taller in some states than in others —
+    // and a tile whose reserved height depends on which answer came back is a
+    // map that re-lays itself out when the answer lands, which is the one thing
+    // the diff view promises never to do. So the day is on the hover and in the
+    // accessible description, where it costs no height at all.
     reason:
       `Your edit moved this claim ${moved.way}, from ${toTwoFigures(moved.from)} to ` +
-      `${toTwoFigures(moved.to)}, read on the day this claim is judged. ` +
+      `${toTwoFigures(moved.to)}, read on ${toDay(resolvesBy)} — the day this claim is judged. ` +
+      `The change list beside the map reads each ending on the day the two maps are furthest ` +
+      `apart instead, which is usually a different day, so the two are two readings rather than ` +
+      `a disagreement. ` +
       (agreed === undefined
         ? moved.sameDirection.absence.reason
         : `${toShare(agreed)} of the versions of the map moved the same way.`),
@@ -459,6 +481,7 @@ export function branchWorld(base: WorldView, branch: BranchView, engine?: Engine
                   moved,
                   state === "shifted",
                   engine.at === "waiting" ? engine.absence : undefined,
+                  claim.resolvesBy,
                 ),
               ]
             : []),
