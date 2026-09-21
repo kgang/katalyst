@@ -54,6 +54,9 @@ TALKING_TO_A_MODEL: tuple[str, ...] = ("anthropic",)
 TALKING_OVER_A_NETWORK: tuple[str, ...] = ("httpx", "requests", "urllib.request")
 """Libraries that open a connection to somewhere else."""
 
+THE_ONE_WAY_OUT = "urllib.request"
+"""The one of those the price-fetching layer is allowed, in one named function."""
+
 SERVING_OVER_A_NETWORK: tuple[str, ...] = ("fastapi", "uvicorn")
 """Libraries that answer requests from somewhere else."""
 
@@ -78,6 +81,12 @@ FORBIDDEN_TO_GROUNDING: tuple[str, ...] = (
     "katalyst.thesis",
     *TALKING_TO_A_MODEL,
     *SERVING_OVER_A_NETWORK,
+    # And the network libraries this layer does **not** use. Its own docstring
+    # says the one way it opens a connection is the standard library's, in one
+    # named function; a client from one of these could appear tomorrow and the
+    # rule would say nothing, because one of them is already in the environment
+    # for the sake of the model boundary.
+    *(one for one in TALKING_OVER_A_NETWORK if one != THE_ONE_WAY_OUT),
 )
 """What the price-fetching layer may not import.
 
@@ -242,6 +251,35 @@ def test_thesis_imports_nothing_that_serves_or_fetches() -> None:
         "reads the rules layer and the price-fetching layer and nothing else. Fetching "
         "belongs in katalyst.grounding and serving in katalyst.api:\n" + report
     )
+
+
+def test_the_price_layer_may_not_reach_for_another_network_library() -> None:
+    """A checker that allowed every network library would pass on a layer that used one.
+
+    So the rule is shown catching what it claims to catch: the standard library's
+    way out is allowed in this layer and the two client libraries are not — and one
+    of them is already installed, for the model boundary, so it is a real risk and
+    not a hypothetical one.
+    """
+    allowed = tmp_written(THE_ONE_WAY_OUT)
+    forbidden = [tmp_written(one) for one in TALKING_OVER_A_NETWORK if one != THE_ONE_WAY_OUT]
+
+    assert allowed == []
+    assert forbidden and all(found for found in forbidden), (
+        "every network library but the standard library's must be refused in this layer"
+    )
+
+
+def tmp_written(imported: str) -> list[ForbiddenImport]:
+    """What the checker says about a price-layer file importing one named library."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as where:
+        file = Path(where) / "pretend_grounding.py"
+        file.write_text(
+            f'"""A file written only to be checked."""\n\nimport {imported}\n', encoding="utf-8"
+        )
+        return find_forbidden_imports(Path(where), "katalyst.grounding", FORBIDDEN_TO_GROUNDING)
 
 
 def test_every_layer_that_is_checked_really_has_files_in_it() -> None:

@@ -170,6 +170,8 @@ branch = true
 
 [tool.coverage.report]
 exclude_also = [
-    # The one function that opens a connection to a venue. See above.
-    "with urllib.request.urlopen",
+    # The one function that opens a connection to a venue. See above. Anchored and
+    # with its dots escaped, because these are regular expressions: an unanchored
+    # one would take some future block with it and nobody would notice.
+    "^\\s*with urllib\\.request\\.urlopen\\(",
 ]
