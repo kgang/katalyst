@@ -26,7 +26,6 @@
  */
 
 import type { Absence, AbsenceKind } from "./types";
-import { WRITTEN_HERE } from "./types";
 
 /**
  * The words each kind of absence shows on the tile.
@@ -59,7 +58,9 @@ export const ABSENCE_WORDS: Record<AbsenceKind, string> = {
  *   wherever there is something to do.
  */
 export function absence(kind: AbsenceKind, reason: string): Absence {
-  return { kind, words: ABSENCE_WORDS[kind], reason, [WRITTEN_HERE]: true };
+  // The mark is a promise to the compiler and nothing at runtime, so it is
+  // made here by the one cast in this codebase that is allowed to make one.
+  return { kind, words: ABSENCE_WORDS[kind], reason } as Absence;
 }
 
 /**
@@ -82,7 +83,7 @@ export function absence(kind: AbsenceKind, reason: string): Absence {
  * @param reason Which reading this is, and why it has nothing to say here.
  */
 export function noReadingAtAll(reason: string): Absence {
-  return { kind: "no_engine", words: "—", reason, [WRITTEN_HERE]: true };
+  return { kind: "no_engine", words: "—", reason } as Absence;
 }
 
 /**
@@ -104,5 +105,5 @@ export function noReadingAtAll(reason: string): Absence {
  * @param reason Why they are standing where a number would.
  */
 export function inTheEnginesWords(words: string, reason: string): Absence {
-  return { kind: "no_engine", words, reason, [WRITTEN_HERE]: true };
+  return { kind: "no_engine", words, reason } as Absence;
 }
