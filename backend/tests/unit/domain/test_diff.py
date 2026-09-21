@@ -982,6 +982,114 @@ def test_no_direction_at_all_when_no_version_counted_in_both_numbers() -> None:
         assert not one.moved_only_by_reweighting, claim_id
     assert answer.rows == (), "no ending can be listed as moved when no direction can be read"
     assert SECOND_SENTENCE.match(answer.summary), answer.summary
+    for claim_id, one in answer.claims.items():
+        # No direction was readable, so the second half of the test never ran and
+        # there is no honest way to say it failed. Where the move is under the
+        # floor the first half did run, and that answer stands on its own.
+        assert one.unchanged_because in {None, "under_the_floor"}, claim_id
+        if one.unchanged_because is None:
+            assert one.delta is None or abs(one.delta) >= 0.005, claim_id
+
+
+# --- Which half of the test an unchanged claim failed ----------------------
+
+
+@given(st.data())
+@many
+def test_an_unchanged_claim_says_which_half_it_failed(data: st.DataObject) -> None:
+    """The word on the row is the rule applied to the two numbers beside it.
+
+    Both constants live in the engine and reach no reader, so *unchanged* on its
+    own cannot tell "it barely moved" from "nobody agrees which way it went".
+    The word says which. Nothing here is typed in: the expected answer is worked
+    out from the row's own `delta` and `agreement`, so the row has to be
+    self-consistent for every map a generator can produce.
+    """
+    graph = data.draw(graphs())
+    answer = _compared(graph, data.draw(branches(graph)), data.draw(branches(graph)))
+
+    for claim_id, one in answer.claims.items():
+        if one.state != "unchanged" or one.delta is None:
+            assert one.unchanged_because is None, claim_id
+            continue
+        if abs(one.delta) < 0.005:
+            assert one.unchanged_because == "under_the_floor", claim_id
+        elif one.agreement is not None and one.agreement < 0.90:
+            assert one.unchanged_because == "versions_disagree", claim_id
+        else:
+            assert one.unchanged_because is None, claim_id
+
+
+def test_only_an_unchanged_claim_says_which_half_it_failed() -> None:
+    """Every other word means the test did not fail, so there is no half to name.
+
+    On the worked example's strike branch: claims that moved, the claim the
+    branch added, and a claim forced false all carry nothing at all, and the
+    claims that held still all carry a word.
+    """
+    base = _hormuz_world(None)
+    strike = _hormuz_world(HORMUZ_THEN_STRIKE)
+    answer = diff(base, strike, edit_in_words=HORMUZ_THEN_STRIKE.label)
+    assert not isinstance(answer, list), answer
+
+    held_still = [one for one in answer.claims.values() if one.state == "unchanged"]
+    moved = [one for one in answer.claims.values() if one.state != "unchanged"]
+    assert held_still and moved, "the worked example was expected to show both"
+    assert all(one.unchanged_because is not None for one in held_still), held_still
+    assert all(one.unchanged_because is None for one in moved), moved
+
+    cut = _hormuz_world(_branch(Do(target="C", value=False, at=FIXTURE_DATE)), **SMALL)
+    forced = diff(_hormuz_world(None, **SMALL), cut, edit_in_words="The premium never falls")
+    assert not isinstance(forced, list), forced
+    assert forced.claims["C"].state == "killed"
+    assert forced.claims["C"].unchanged_because is None
+
+
+def test_the_floor_is_read_first_when_a_claim_fails_both_halves() -> None:
+    """A claim that barely moved and disagreed about it says it barely moved.
+
+    Two true answers, and something has to choose; the floor is the cheaper fact
+    to act on, because a move nobody would notice needs no second sentence about
+    its direction. The claim is the one an observation moves through the version
+    weights alone — its move is tiny and its same-direction share is zero — and
+    the test finds it by those two facts rather than by name.
+    """
+    base = _hormuz_world(None)
+    observed = _hormuz_world(_branch(Observe(target="B", value=True)))
+    answer = diff(base, observed, edit_in_words="Brent settled below $68")
+    assert not isinstance(answer, list), answer
+
+    failing_both = [
+        one
+        for one in answer.claims.values()
+        if one.state == "unchanged"
+        and one.delta is not None
+        and abs(one.delta) < 0.005
+        and one.agreement is not None
+        and one.agreement < 0.90
+    ]
+    assert failing_both, "the observation was expected to leave a claim failing both halves"
+    assert all(one.unchanged_because == "under_the_floor" for one in failing_both), failing_both
+
+
+def test_a_claim_moved_only_by_reweighting_keeps_both_fields() -> None:
+    """The reweighting field is the fuller answer, and neither field replaces the other.
+
+    Such a claim moved far enough and every version that counts moved by exactly
+    nothing, so the half it failed is the same-direction half — and the reason it
+    failed is the one `moved_only_by_reweighting` states. Both are true, both are
+    carried, and the Inspector shows the fuller one.
+    """
+    base = _hormuz_world(None)
+    observed = _hormuz_world(_branch(Observe(target="C", value=True)))
+    answer = diff(base, observed, edit_in_words="the premium printed below 0.4%")
+    assert not isinstance(answer, list), answer
+
+    reweighted = [one for one in answer.claims.values() if one.moved_only_by_reweighting]
+    assert reweighted, "the worked example was expected to show one"
+    for one in reweighted:
+        assert one.state == "unchanged"
+        assert one.unchanged_because == "versions_disagree"
 
 
 # --- Locality, seen from the difference ------------------------------------

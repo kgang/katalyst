@@ -51,6 +51,7 @@ from katalyst.domain.diff import (
     DeltaRow,
     Diff,
     SensitivityRow,
+    UnchangedBecause,
     diff,
     sensitivity,
 )
@@ -126,6 +127,7 @@ __all__ = [
     "SensitivityRow",
     "SeriesState",
     "Source",
+    "UnchangedBecause",
     "Versions",
     "Violation",
     "ViolationCode",

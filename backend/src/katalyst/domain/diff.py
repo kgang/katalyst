@@ -108,6 +108,23 @@ MOVED_AT_LEAST = 0.005
 AGREEING_AT_LEAST = 0.90
 """How many of the versions have to move the same way before the move counts."""
 
+UnchangedBecause = Literal["under_the_floor", "versions_disagree"]
+"""Which half of the moved-at-all test an `unchanged` claim failed, in one word.
+
+`under_the_floor` — the claim did move, but by less than `MOVED_AT_LEAST`.
+`versions_disagree` — the move cleared the floor, and fewer than
+`AGREEING_AT_LEAST` of the versions of the map moved that way.
+
+**The floor is read first**, so a claim that fails both halves says
+`under_the_floor`. Something has to choose, and the floor is the cheaper fact to
+act on: a move nobody would notice needs no second sentence about direction.
+
+Both constants live in this file and on no wire, so without this word a reader is
+told only that the engine says nothing moved. It is a fact about how the number
+was **read**, exactly as `moved_only_by_reweighting` is, and it never becomes a
+fifth state.
+"""
+
 SWEEP_VERSIONS = 250
 """The outer loop a one-at-a-time sweep runs at.
 
@@ -170,6 +187,16 @@ class ClaimDiff(BaseModel):
     where it was supposed false) so that the arithmetic stays ordinary. **No
     surface prints that number**: every reader looks at the world's `states`
     first and writes the word *Supposed* where the number would go.
+
+    `unchanged_because` says which half of the moved-at-all test an `unchanged`
+    claim failed. It is here because the floor and the bar are constants inside
+    this file and appear on no wire, so a reader who is only told *unchanged*
+    cannot tell "it barely moved" from "nobody agrees which way it went" — and
+    working it out at the other end would mean a second copy of both constants,
+    disagreeing with these ones. Where `moved_only_by_reweighting` is also true
+    it is the fuller answer and is the one to show: such a claim always says
+    `versions_disagree`, because every version that counts moved by exactly
+    nothing, and *nothing agreed with the direction* is a thin way to put that.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -211,6 +238,18 @@ class ClaimDiff(BaseModel):
             "much each version counts: the claim is in both worlds, it moved by at least "
             "0.005, and not one version that counts moved at all. Only an observation can "
             "produce it, and the Inspector says so in one sentence."
+        )
+    )
+    unchanged_because: UnchangedBecause | None = Field(
+        description=(
+            "Which half of the moved-at-all test this claim failed, in one word: "
+            "'under_the_floor' when the move is smaller than the floor, "
+            "'versions_disagree' when it cleared the floor and too few versions of the map "
+            "moved that way. The floor is read first, so a claim that fails both says "
+            "'under_the_floor'. Nothing at all unless the claim is 'unchanged', and nothing "
+            "when there is no test to fail: a claim only one world holds, and a claim no "
+            "version counted in both numbers, whose absent 'agreement' already says there "
+            "was no direction to read."
         )
     )
 
@@ -727,6 +766,43 @@ def _moved_only_by_reweighting(
     return not bool(numpy.any((after != before) & (counting > 0.0)))
 
 
+def _which_half_failed(
+    state: ClaimState, move: float | None, agreement: float | None
+) -> UnchangedBecause | None:
+    """Say which half of the moved-at-all test an `unchanged` claim failed.
+
+    A claim is `shifted` only when it moved by at least the floor **and** at
+    least the bar's share of the versions moved that way. `unchanged` is what it
+    gets when either half fails, and which one it was is a fact only this file
+    can state: both constants live here and neither is ever put on a wire.
+
+    **The floor is read first**, so a claim that fails both halves says
+    `under_the_floor`. Something has to choose between two true answers, and this
+    one is the cheaper fact to act on.
+
+    Nothing at all where there is no test to fail: every state but `unchanged`,
+    a claim only one world holds (there is no move to measure), and a claim no
+    version counted in both numbers (there is no direction to read, which the
+    absent `agreement` beside it already says).
+
+    Args:
+        state: The word this claim came out with.
+        move: The move, or nothing at all where one of the worlds has no number.
+        agreement: The share of counted versions that moved that way, or nothing
+            at all where no version counted in both numbers.
+
+    Returns:
+        The word, or nothing at all.
+    """
+    if state != "unchanged" or move is None:
+        return None
+    if abs(move) < MOVED_AT_LEAST:
+        return "under_the_floor"
+    if agreement is not None and agreement < AGREEING_AT_LEAST:
+        return "versions_disagree"
+    return None
+
+
 def _forced_false_in(world: World, claim_id: PropositionId) -> bool:
     """Say whether the last word any edit had on this claim fixed it false.
 
@@ -771,6 +847,9 @@ def _states(
     it had and says so in one field of its own, which the Inspector turns into one
     sentence.
 
+    An `unchanged` claim also says **which** half it failed, in `unchanged_because`,
+    because both constants live in this file and never reach a reader.
+
     Args:
         world_a: The world to compare from.
         world_b: The world to compare to.
@@ -794,6 +873,7 @@ def _states(
                 delta=None,
                 agreement=None,
                 moved_only_by_reweighting=False,
+                unchanged_because=None,
             )
             continue
         if claim_id not in in_b:
@@ -811,6 +891,7 @@ def _states(
                 delta=None,
                 agreement=None,
                 moved_only_by_reweighting=False,
+                unchanged_because=None,
             )
             continue
 
@@ -843,6 +924,7 @@ def _states(
             agreement=agreement,
             moved_only_by_reweighting=speaks
             and _moved_only_by_reweighting(each_version, each_version_after, move, counting),
+            unchanged_because=_which_half_failed(state, move, agreement),
         )
     return found
 

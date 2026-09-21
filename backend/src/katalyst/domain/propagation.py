@@ -347,7 +347,9 @@ class World(BaseModel):
         default_factory=dict,
         description=(
             "How much of each claim's band comes from not being sure of each claim's "
-            "prior: range_shares[target][source]. Nothing on screen reads it yet; it is "
+            "prior: range_shares[target][source]. These do not add up to the whole band, "
+            "and are not meant to: a version draws every arrow's push as well, and what "
+            "the pushes explain is in no entry here. Nothing on screen reads it yet; it is "
             "carried because the sample it comes from is thrown away otherwise."
         ),
     )
@@ -1943,6 +1945,13 @@ def _range_shares(
     those group averages explain. That share is what a later stack turns into
     "where would more homework pay?" — it is worked out here because the sample it
     comes from is thrown away otherwise.
+
+    **The shares do not add up to the whole band, and must never be presented as
+    though they did.** A version draws every arrow's push as well as every prior,
+    so part of every band is the arrows, and this answers about the priors only.
+    On the shipped example B's seven shares total about seven tenths of its band;
+    the rest is the arrows. Asking the same question of the arrows would be the
+    same six lines over `sample.strengths`, and nothing needs the answer yet.
 
     Args:
         setup: Everything chance has no say in.
