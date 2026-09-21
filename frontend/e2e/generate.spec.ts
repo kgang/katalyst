@@ -477,8 +477,10 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
     expect(held, `no rectangle stood when claim ${step + 1} arrived`).toBeGreaterThan(0);
   }
   // **And no box was ever drawn in another box's place.** A box the layout has
-  // not placed is not drawn at all: it used to be drawn at the map's origin, on
-  // top of the hypothesis, for as long as the layout took to answer.
+  // not placed is not drawn at all — except the very first, where the origin is
+  // nobody's place and the alternative is a first paint with nothing on it. It
+  // used to be every box: each arriving claim sat on the hypothesis for as long
+  // as the layout took to answer.
   expect(saw.everStacked).toBe(false);
   // **The claims arrived one at a time.** The count went 0, 1, 2, … and reached
   // the number on screen by rising by exactly one each time: a map that appeared
