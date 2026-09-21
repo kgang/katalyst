@@ -78,6 +78,41 @@ function inward(arrows: readonly Arrow[]): Map<string, string[]> {
 }
 
 /**
+ * Everything one observation is evidence about: up, down, and down again.
+ *
+ * Learning something is done by throwing away the worlds it did not happen in,
+ * and that changes what the survivors say about the claim's **causes** as much
+ * as about what it causes. So an observation reaches the claim observed,
+ * everything it leads to, everything that leads to it, and everything those
+ * causes go on to lead to — and nothing else. A claim joined to the observed one
+ * by no chain of arrows either way, and sharing no cause with it, is independent
+ * of what was reported.
+ *
+ * **This is one rule written twice, and the two copies must move together.** The
+ * engine's copies are `_evidence_reach` in
+ * `backend/src/katalyst/domain/patch.py` — which decides what an edit is allowed
+ * to move — and `_observation_reach` in `.../propagation.py`, which decides
+ * which worlds a number is read off. The set is the same in all three, and a day
+ * when it is not is a day the browser tells a reader a claim cannot move while
+ * the engine moves it.
+ *
+ * @param observed The claim the news is about.
+ * @param arrows The arrows to follow, feedback arrows already set aside by the
+ *   caller — this is a question about what can move.
+ */
+export function evidenceAbout(observed: string, arrows: readonly Arrow[]): Set<string> {
+  const reached = descendants(observed, arrows);
+  reached.add(observed);
+  for (const cause of ancestors(observed, arrows)) {
+    reached.add(cause);
+    for (const one of descendants(cause, arrows)) {
+      reached.add(one);
+    }
+  }
+  return reached;
+}
+
+/**
  * Everything this claim causes, however many steps away.
  *
  * @param from The claim to start at. It is not itself in the answer.

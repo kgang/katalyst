@@ -437,6 +437,40 @@ describe("the second world", () => {
       expect(disagreements(strike().states, ENGINE)).toEqual([]);
     });
 
+    /**
+     * What the engine really answers for a branch that reports a claim and then
+     * changes how hard one of its causes pushes it.
+     *
+     * Words, not numbers, and measured from the running server rather than
+     * chosen: `POST /api/worlds/diff` on the stored example at seed 20261001.
+     * The arrow's source reads *unchanged* here — it moves, but by less than
+     * the engine reports — and the browser must still say the edit can reach
+     * it, because the reader's tile shows the number either way.
+     */
+    const REPORTED_THEN_RETUNED: ReadonlyMap<string, EngineState> = new Map([
+      ["C", "shifted"],
+      ["H", "unchanged"],
+      ["B", "unchanged"],
+      ["N1", "unchanged"],
+      ["M1", "unchanged"],
+      ["M2", "unchanged"],
+      ["R", "unchanged"],
+    ]);
+
+    it("test_a_retune_under_a_report_agrees_with_the_engine", () => {
+      // Report the premium fell, then change how hard the strait's opening
+      // pushes it. The engine moves the **source** of that arrow — how much
+      // news about an effect says about a cause depends on how hard that cause
+      // was pushing — and the browser has to have said the edit could reach it.
+      const branch = readDiff(CLAIMS, ARROWS, [
+        { op: "observe", target: "C", value: true, at: "2026-10-01" },
+        { op: "retune", link: "H->C", strength: 3, wasStrength: 1.6 },
+      ]);
+      expect(branch.states.get("H")).toBe("downstream");
+      expect(branch.states.get("R")).toBe("untouched");
+      expect(disagreements(branch.states, REPORTED_THEN_RETUNED)).toEqual([]);
+    });
+
     it("test_a_disagreement_with_the_engine_is_caught", () => {
       // A check that cannot fail is not a check. Pretend the engine moved the
       // one claim this branch provably cannot reach, and the comparison has to
@@ -453,6 +487,101 @@ describe("the second world", () => {
         "B: the browser says your edit can reach this, and the engine says it arrived with the edit",
       ]);
     });
+  });
+});
+
+/**
+ * The rule that reaches further than any row of the table.
+ *
+ * > An edit that can move a claim some report was made about can move
+ * > everything that report is evidence about — and that applies again to any
+ * > further report whose own claim has just been brought in.
+ *
+ * **This is one rule written twice**: here, and in `affected_set` in
+ * `backend/src/katalyst/domain/patch.py`. The engine's own tests for it are
+ * `test_an_edit_under_an_observation_may_move_what_the_observation_is_about`
+ * and `test_a_retune_under_an_observation_moves_the_arrows_source`; these are
+ * the browser's half, and the two must move together.
+ *
+ * **Why the cases below are about reach and not about numbers.** The engine
+ * reports only moves that clear its floor *and* that the versions of the map
+ * agree about, so a claim this rule brings in often comes out `unchanged`
+ * while its number has plainly moved — on the stored example, reporting OPEC's
+ * announcement and then hanging a claim off it moves the insurance premium
+ * from `.3977` to `.3925` and calls it unchanged. The four words cannot catch
+ * that; the tile can, which is why the end-to-end test reads the numbers off
+ * the screen and this reads the shape.
+ */
+describe("an edit that can move a reported claim", () => {
+  /** The stored example's shape, with a claim the branch hangs off the talks. */
+  const WITH_A_STRIKE = [...CLAIMS, "S"];
+
+  /** Report OPEC's announcement, then hang a new claim between the talks and it. */
+  const REPORT_THEN_ATTACH: Edit[] = [
+    { op: "observe", target: "R", value: true, at: "2026-10-01" },
+    {
+      op: "insert",
+      claimId: "S",
+      words: "A confirmed military strike on Iranian territory.",
+      arrows: [
+        { id: "N1->S", source: "N1", target: "S" },
+        { id: "S->R", source: "S", target: "R" },
+      ],
+    },
+  ];
+
+  it("test_an_edit_that_can_move_a_reported_claim_can_move_what_the_report_is_about", () => {
+    const read = readDiff(WITH_A_STRIKE, ARROWS, REPORT_THEN_ATTACH);
+
+    // The new arrows make the talks a cause of the claim that was reported,
+    // so the report is now evidence about the talks — and about the strait
+    // that causes them, and about the premium that strait also causes. An
+    // edit that can move the reported claim can move all of it.
+    for (const id of ["N1", "H", "C"]) {
+      expect(read.states.get(id), id).toBe("downstream");
+    }
+    // And those are numbers the browser must not draw from the map as it was
+    // written while it waits for the engine.
+    for (const id of ["N1", "H", "C"]) {
+      expect(read.canMove.has(id), id).toBe(true);
+    }
+  });
+
+  it("test_your_own_number_never_reaches_through_a_report", () => {
+    // The one edit the rule never widens, and the reason it has a row of its
+    // own: your number sits beside the model's and is not pushed through the
+    // map, so it cannot change which versions of the map survive and cannot
+    // change what a report says about anything.
+    const read = readDiff(CLAIMS, ARROWS, [
+      { op: "observe", target: "R", value: true, at: "2026-10-01" },
+      { op: "believe", target: "N1", belief: { p: 0.9, lo: 0.8, hi: 0.95 } },
+    ]);
+    // Your number reaches the claim you wrote it on and nothing else. The
+    // report speaks about OPEC's announcement and what that leads to; the
+    // belief brings none of it in, and brings in nothing of its own either.
+    expect(read.states.get("N1")).toBe("downstream");
+    expect(read.canMove.has("N1")).toBe(false);
+    for (const id of ["H", "C"]) {
+      expect(read.states.get(id), id).toBe("untouched");
+    }
+  });
+
+  it("test_an_edit_that_cannot_touch_the_reported_claim_is_not_widened", () => {
+    // The other half of the same sentence. Without it, a report anywhere on a
+    // map would make every later edit touch everything, and the promise that
+    // an edit leaves the rest of the map alone would say nothing at all.
+    const read = readDiff(CLAIMS, ARROWS, [
+      { op: "observe", target: "R", value: true, at: "2026-10-01" },
+      { op: "retune", link: "H->N1", strength: 3, wasStrength: 0.7 },
+    ]);
+    // The report speaks about OPEC's announcement, the price it moves and the
+    // two contracts hanging off that. The retune reaches the talks and
+    // nothing else: it cannot move the claim that was reported, so none of
+    // what the report is about comes in with it.
+    expect(read.states.get("N1")).toBe("downstream");
+    for (const id of ["H", "C"]) {
+      expect(read.states.get(id), id).toBe("untouched");
+    }
   });
 });
 
