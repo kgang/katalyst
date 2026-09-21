@@ -20,6 +20,11 @@
  * because `JSON.parse` has already rounded a nineteen-digit number by the time
  * anything here sees it. It is marked below, once, with the reason.
  *
+ * **There is one dated allowance at the foot of this file**, for one event,
+ * `activity`, whose server half has not landed yet. It is written as a check
+ * that fails the day the server's description gains the shape, so it cannot be
+ * forgotten. Read it before adding a second one.
+ *
  * **What is not pinned, and why it cannot be.** The eight stream events are not
  * in `schema.ts` at all: they travel as server-sent events, and OpenAPI has no
  * way to describe the body of a stream — it describes `text/event-stream` and
@@ -35,7 +40,7 @@
  */
 
 import type { components } from "../../api/schema";
-import type { GenerateRequest, Receipt } from "../events";
+import type { Activity, GenerateRequest, Receipt } from "../events";
 import type { Drafted } from "../insert";
 import type { Transcript, TranscriptLine } from "../transcript";
 
@@ -95,3 +100,40 @@ pinned<Agree<Omit<TheDraftedArm, "state">, components["schemas"]["DraftedInsert"
  */
 pinned<Agree<TranscriptLine, components["schemas"]["TranscriptLine"]>>(true);
 pinned<Agree<Transcript, components["schemas"]["Transcript"]>>(true);
+
+/* ---- One allowance, for one event, dated -----------------------------------
+ *
+ * **`activity` is hand-typed against the shapes sheet and pinned to nothing.**
+ * *(2026-09-22, branch `feat/04d-the-strip-says-it`.)*
+ *
+ * The ninth event is being built in two halves at once — the server's in
+ * `feat/04d-the-model-says-what-it-is-doing`, this one in the browser — against
+ * one written sheet the two halves share. Until the server half lands there is
+ * nothing generated to check this half against: `api/schema.ts` is generated
+ * from the server's own description of itself, it is never edited by hand, and
+ * it has no `Activity` in it at all.
+ *
+ * That is the honest position, and this block is it written down rather than
+ * left unsaid. It is **not** a skipped check: the line below is a check, and
+ * what it holds is the very fact that makes the allowance necessary. The day
+ * the server's description gains the shape, this stops compiling — `npm run
+ * typecheck`, `npm run check` and the build all go red — and whoever is at the
+ * join deletes this whole block and pins `Activity` to the generated shape
+ * exactly as the receipt above is pinned.
+ *
+ * Until then, `Activity` is named here for one reason: so that this file
+ * mentions the event it is making an exception for, and `tsc` fails if the
+ * event is ever deleted or renamed without this being revisited.
+ */
+type TheSchemasNamedActivity = Extract<keyof components["schemas"], `${string}Activity`>;
+type NoGeneratedActivityYet = [TheSchemasNamedActivity] extends [never]
+  ? true
+  : {
+      theServerNowDescribesActivity: TheSchemasNamedActivity;
+      soDeleteThisBlockAndPinItLikeTheReceipt: true;
+    };
+pinned<NoGeneratedActivityYet>(true);
+
+/** The one event with nothing generated to pin it to. Named so it cannot vanish quietly. */
+type TheHandTypedNinth = Omit<Activity, "event">;
+pinned<[keyof TheHandTypedNinth] extends [never] ? false : true>(true);
