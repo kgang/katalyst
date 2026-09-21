@@ -11,7 +11,7 @@
 
 # These are names of tasks, not names of files to build. Saying so means `make
 # test` still works if a file called `test` ever appears.
-.PHONY: help dev up down prod test lint types numbers numbers-check eval record-cassettes record-demo run-demo
+.PHONY: help dev up down prod test lint types numbers numbers-check eval record-cassettes record-demo run-demo record-quotes
 
 help: ## Show this list
 	@echo "Katalyst — make <task>"
@@ -242,6 +242,37 @@ record-cassettes: ## Record the model's real answers for the tests to replay. Sp
 	cd backend && uv run pytest tests/boundary -m "not handmade" --record-mode=rewrite
 	cd backend && env -u ANTHROPIC_API_KEY uv run pytest \
 		tests/boundary/test_expand_cassettes.py::test_no_cassette_contains_a_key
+
+# --- the one task that reads a price from a venue ---------------------------
+#
+# `record-quotes` writes the committed dated price files under
+# `backend/recordings/quotes/`. Everything else in this repository reads those
+# files — the demo, the tests and the build alike — so a price reaches the
+# product from a committed file before it ever reaches it from a venue. This is
+# the only thing that writes one, and the only task here that opens a connection
+# to a venue.
+#
+#   make record-quotes                          re-read every price already committed
+#   make record-quotes SLUG=<slug> TOKEN=<id>   record a contract for the first time
+#
+# It spends nothing and needs no key. It is out of `test` and out of the build
+# for the same reason `eval` is out of them: a check that leaves the machine goes
+# red the day somebody else's server is busy.
+#
+# SLUG is the venue's own name for the event a market belongs to — the last part
+# of its public web address. TOKEN identifies the one outcome being priced, since
+# a contract's yes and its no are two separate order books and one file is one
+# side of one contract. Both are already inside every file this has written
+# before, which is why re-reading them all needs nothing typed.
+#
+# Nothing in a written file is a number somebody typed: it holds the venue's two
+# answers word for word, and the price, the day, the identifiers and the side are
+# worked out from them afterwards by the same code the app reads them with. That
+# reading happens BEFORE the file is written, so an answer this program cannot
+# read never lands in the repository looking fine. The rest is in the script.
+
+record-quotes: ## Read a contract's price from the venue and commit it, dated. Needs the network; no key
+	./scripts/record-quotes.sh $(SLUG) $(TOKEN)
 
 # --- the one rule here that builds a real thing -----------------------------
 

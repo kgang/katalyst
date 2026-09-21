@@ -10,7 +10,7 @@
 
 ## 1. The system in one picture `[built]`
 
-Both halves of the drawing below run today, and so does the line between them: **the model pipeline, the event stream and the browser that draws it are built**. What is still drawn ahead is the grounding adapters and the stored state, and both are named again under it.
+Both halves of the drawing below run today, and so does the line between them: **the model pipeline, the event stream and the browser that draws it are built**. What is still drawn ahead is the stored state and the screens the trade needs, and both are named again under it.
 
 ```
  ┌──────────────────────────── browser ─────────────────────────────┐
@@ -28,7 +28,8 @@ Both halves of the drawing below run today, and so does the line between them: *
  │  api/        routes, request/response shapes, the event stream   │
  │  engine/     talks to the model; turns answers into proposals    │
  │  domain/     PURE: graph rules, propagation, branches. No I/O.   │
- │  grounding/  adapters for outside data (Polymarket, FRED)        │
+ │  grounding/  outside prices: a saved file first, a venue second  │
+ │  thesis/     the trade: a claim's number against a real price    │
  │  settings.py the only place environment variables are read       │
  │                                                                  │
  │  storage: one SQLite file on a volume (sessions, branches,       │
@@ -48,7 +49,9 @@ Both halves of the drawing below run today, and so does the line between them: *
 
 **The event stream is real, and so is the browser's half of it.** `POST /api/generate` writes `event:` and `data:` lines as a generation happens — a claim proposed, a claim refused, the likelihoods worked through, the verdict, the receipt, and why it stopped — and a terminal with `curl -N` can watch a map being built. **The browser reads the same stream and draws the map as it arrives**: a reserved rectangle where the next claim will go, claims as they are accepted, wires in causal order, every refusal beside the map in the validator's own words, and the likelihood chips filling in once at the end. There is no spinner anywhere in the product, and a test walks every component and every stylesheet to keep it that way.
 
-`[planned]` Two parts of the drawing still have no code behind them. `grounding/` is an empty package: nothing has ever called Polymarket or FRED, and the web search that does run lives inside `engine/` as part of a model call rather than there. And there is no storage — no database file, no volume declared in either compose file, nothing kept between requests except what one running process holds in memory for the life of that process.
+**`grounding/` and `thesis/` have code now, and it is the price half** `[built]`. `grounding/` reads a prediction market's own answers back from a committed dated file under `backend/recordings/quotes/` and works a price out of them — the best bid, the best offer, the instant the book was true, the identifiers, and the venue's four flags saying whether it still trades. Asking Polymarket again is one function that nothing calls unless a reader asks for it, so no test and no build ever leaves the machine. `thesis/` holds the arithmetic on top: a claim's model number, read from the world with nothing supposed in it, set against the price somebody would actually deal at — the offer to buy, the bid to sell, less the venue's fee — or, where the two cannot honestly be compared, a named refusal and the break-even price instead.
+
+`[planned]` The rest of both packages: the economic-data adapter that anchors a price ending, the reader's position and what it walks through, the card and the export, and the routes that serve them. The web search that does run today lives inside `engine/` as part of a model call rather than in `grounding/`. And there is still no storage — no database file, no volume declared in either compose file, nothing kept between requests except what one running process holds in memory for the life of that process.
 
 Two halves, one contract: the backend publishes an OpenAPI description (a machine-readable list of every route and data shape); the frontend's TypeScript types are generated from it and committed, and continuous integration fails if regeneration would change them. The two halves cannot drift silently.
 
@@ -65,6 +68,8 @@ The language model never edits the graph. It returns *proposals* — one proposi
 This is why `domain/` is pure: no network, no model, no clock, no randomness except an explicit seed. It is the part of the system whose correctness is *proven by tests* rather than *requested of a model*, and it is the part a reviewer should read first.
 
 Enforced by `test_domain_imports_nothing_impure`, in `backend/tests/unit/test_import_boundary.py`: it reads every file under `domain/` and fails if one of them imports `engine/`, `api/`, `grounding/`, or a model client. It runs in the `backend` check on every pull request, and two further tests in the same file check the checker itself, so a boundary test that has quietly stopped looking cannot pass by accident. The same checker is pointed the other way by `test_the_rules_layer_never_reads_the_examples`, so whether a map is valid can never come to depend on which worked examples we ship.
+
+**The two price layers are held to the same shape** `[built]`. `test_grounding_imports_nothing_above_it` and `test_thesis_imports_nothing_that_serves_or_fetches` say that `grounding/` may read the rules layer and nothing above it, and that `thesis/` may read worlds and prices and ask nobody for them — so the trade's arithmetic cannot quietly acquire a network call. A third test, `test_the_price_layer_may_not_reach_for_another_network_library`, names the libraries that open a connection, because a checker that listed only the one library in use today would pass a layer that had switched to a different one. One function in the whole program opens a connection to a venue, it is named for what it does, and nothing calls it unless a reader asked.
 
 The disposing half exists too: `validate` in `domain/validity.py` walks a whole map and returns every fault at once, each named in the claim's own words rather than by identifier.
 
@@ -148,7 +153,7 @@ Every test named below is real; all but one run in `make test`, and that one is 
 | INV-10 — splitting a claim into finer claims adds back up | `domain/` propagation | none | A test that the parts recombine to the original within a small tolerance. Stack 06, with `refine` |
 | INV-11 — model, user and market likelihoods are never merged | `domain/`, and the browser | `test_beliefs_never_merged`, which reads our own source code looking for an average taken across two owners, plus its four self-checks — `test_the_checker_catches_two_likelihoods_averaged`, `test_the_checker_catches_a_merge_hidden_in_a_structure`, `test_the_checker_leaves_honest_functions_alone`, `test_the_checker_is_pointed_at_the_real_rules_layer`. **The browser side landed in stack 03b**, and it is checked the same two ways: by what is drawn — `test_renders_three_owners_and_never_averages_them` in `frontend/src/components/__tests__/inspector.test.tsx`, and `frontend/src/components/__tests__/branchPanel.test.tsx` › "records your own number, and says it is never averaged with the model's" — and by reading the browser's own source, in `test_canvas_never_combines_two_model_numbers` and its self-check `test_the_files_being_walked_are_really_there`, both in `frontend/src/graph/wires/__tests__/noArithmetic.test.ts` | — |
 | INV-12 — nothing carries meaning in colour alone | the browser's colour tokens, wire encodings, direction readout and origin mark | The greyscale test itself: `test_nothing_is_carried_by_hue_alone` in `frontend/src/graph/wires/__tests__/notByColourAlone.test.tsx`. Provenance is a mark and never the stroke: `test_two_wires_differing_only_in_provenance_have_identical_strokes` and `test_the_stroke_changes_when_and_only_when_the_kind_of_push_changes` in `frontend/src/graph/wires/__tests__/strokeIsShapeOnly.test.tsx`, with `test_the_stroke_is_never_a_hue` and `test_wire_and_inspector_draw_the_same_origin_mark` in `frontend/src/graph/wires/__tests__/causalWire.test.tsx`, and `test_the_panels_mark_matches_the_wires_mark` in `frontend/src/components/__tests__/inspector.test.tsx`. A direction always carries a glyph, a sign and a word: `test_direction_always_has_its_glyph_sign_and_word` and `test_no_file_outside_direction_readout_names_a_direction_token` in `frontend/src/components/__tests__/directionReadout.test.tsx`. Every shape and every receipt has its own pattern: `test_each_shape_has_its_own_stroke_pattern` and `test_seven_receipts_fall_into_three_steps` in `frontend/src/graph/wires/__tests__/encodings.test.ts`. And the stylesheet walk in `frontend/src/styles/__tests__/colourLaw.test.ts` — `test_every_token_the_law_names_exists_in_both_themes`, `test_every_new_colour_carries_its_measured_ratio`, `test_likelihood_ramp_is_read_only_by_the_two_chips`, `test_no_rule_sets_a_text_colour_to_the_ramp`, `test_the_ramp_never_paints_a_whole_tile`, `test_the_branch_teal_is_not_the_accent_teal_or_the_focus_teal`, with its own self-check `test_the_files_being_walked_are_really_there` | — |
-| INV-13 — the checks run with no model key | the test suite, `.github/workflows/ci.yml` | `test_healthz_is_ok_with_no_environment_variables_set`, `test_readyz_reports_not_ready_when_no_model_key_is_configured`, `test_readyz_treats_an_empty_key_as_no_key`, `test_readyz_reports_ready_when_a_model_key_is_configured`, and `test_no_cassette_contains_a_key`. **Eight recorded model answers are committed** under `backend/tests/cassettes/` and replayed by the nine boundary tests, so the model boundary is exercised with no key at all. Beyond the tests: `--record-mode=none` is on by default in `backend/pyproject.toml`, so an unrecorded call fails instead of dialling out; `make test` unsets both keys before running; and the sixth build job, `recordings`, reads every committed recording without one | — |
+| INV-13 — the checks run with no model key | the test suite, `.github/workflows/ci.yml` | `test_healthz_is_ok_with_no_environment_variables_set`, `test_readyz_reports_not_ready_when_no_model_key_is_configured`, `test_readyz_treats_an_empty_key_as_no_key`, `test_readyz_reports_ready_when_a_model_key_is_configured`, and `test_no_cassette_contains_a_key`. **Eight recorded model answers are committed** under `backend/tests/cassettes/` and replayed by the nine boundary tests, so the model boundary is exercised with no key at all. Beyond the tests: `--record-mode=none` is on by default in `backend/pyproject.toml`, so an unrecorded call fails instead of dialling out; `make test` unsets both keys before running; and the sixth build job, `recordings`, reads every committed recording without one. **Since stack 06 the rule covers outside prices too**: `test_no_quote_test_touches_the_network` runs the price layer's tests with outbound connections refused, and the committed dated quote under `backend/recordings/quotes/` is what the suite reads instead of a venue | — |
 | INV-14 — the thing that would prove you wrong resolves in time, and in public | `domain/` thesis derivation | none | Unit tests on the timing and observability filters. Stack 05, with `Thesis` |
 
 More tests belong beside these, though they guard no numbered product invariant. `test_domain_imports_nothing_impure` keeps the rules layer pure, and `test_the_rules_layer_never_reads_the_examples` keeps it independent of the worked examples we ship (§2).
@@ -214,7 +219,7 @@ Deliberately skipped in v1: snapshot tests of rendered graphs, load tests, cover
 
 ## 8. Repository layout `[built]`
 
-Python tests live inside `backend/`, next to the project they test, so `pytest` and `uv` run from one root (decided 2026-09-16). Nothing is created before it holds something, so a directory that is still empty is marked below: `grounding/` holds a package marker and nothing else. `backend/recordings/` holds **one** committed generation, the Strait of Hormuz; the other three example sentences have none yet, and `make record-demo ONLY=<example>` is what writes one when the owner chooses to pay for it.
+Python tests live inside `backend/`, next to the project they test, so `pytest` and `uv` run from one root (decided 2026-09-16). Nothing is created before it holds something, so nothing below is an empty directory. `backend/recordings/` holds **one** committed generation, the Strait of Hormuz; the other three example sentences have none yet, and `make record-demo ONLY=<example>` is what writes one when the owner chooses to pay for it. Beside it, `backend/recordings/quotes/` holds the venue's own answers for one contract, kept and dated, so the demo, the tests and the build read a real price with no key and no network.
 
 ```
 katalyst/
@@ -228,13 +233,16 @@ katalyst/
 ├── spec/                the spec, organized as a book by idea
 ├── backend/
 │   ├── pyproject.toml  uv.lock  .python-version
-│   ├── src/katalyst/   domain/  engine/  grounding/ [planned]  api/  fixtures/  settings.py
+│   ├── src/katalyst/   domain/  engine/  grounding/  thesis/  api/  fixtures/  settings.py
+│   │                   grounding/: quote  recorded  polymarket (the one opt-in read)
+│   │                   thesis/: edge  (the rest of the trade is still ahead)
 │   │                   engine/: client (the only file that talks to a model)  prompt
 │   │                     proposal  expand  grow  following  grounding  verify  outcome
 │   │                     receipt  pricing  events  transcript  record  replay
 │   │                     check_recordings  ids  worlds
 │   │                     worked_numbers  (writes docs/worked-numbers.txt)
 │   ├── recordings/     one whole generation per recorded example, for a keyless clone to play back
+│   │   └── quotes/     a venue's own answers for one contract, kept and dated
 │   ├── .runs/          [not committed] what every paid run produced, whatever became of it
 │   └── tests/          unit/ (domain/  engine/  fixtures/)  api/  boundary/
 │                       cassettes/  the model's own recorded answers, keys stripped
@@ -253,7 +261,9 @@ katalyst/
 │                       a11y/ (the map read aloud, and what it may say)
 │                       styles/ (design tokens)  test/ (test setup)
 ├── scripts/
-│   └── gen-types.sh    rewrites frontend/src/api/schema.ts from the server
+│   ├── gen-types.sh    rewrites frontend/src/api/schema.ts from the server
+│   └── record-quotes.sh  the one thing that writes a price file, and the one that
+│                       opens a connection to a venue (`make record-quotes`)
 ├── docker/             Dockerfile.backend  Dockerfile.frontend  nginx.conf
 ├── compose.yaml        both halves, with reload, while working
 ├── compose.prod.yaml   the same two, packaged, laid over the file above
@@ -304,7 +314,7 @@ What is left, each with the stack that will build it. **Stack 04 ran as two para
 - **`[planned]` One number the engine could compute and does not: a path's multiplied-out likelihood.** `engine/verify.py` works one out for the Verify door, and nothing carries one for a stored or generated map, so everywhere else the path bar names the route's steps and says honestly that there is no product to show. The fix is one function in `domain/` beside the best-backed route, used by the world and by the Verify door alike, so there is one multiplication in the product rather than two.
 - **`[planned]` Three of the four example sentences have no recording.** `backend/recordings/` holds the Strait of Hormuz and nothing else, so a copy with no key can open that one and watch the whole map being built; the other three cards say plainly that there is nothing recorded for them yet. Each is about forty minutes and a few dollars of live model time, written by `make record-demo ONLY=<example>`, and none is made until the owner chooses to pay for it.
 - **`[planned]` Three surfaces that are decided and not drawn**: the thesis dock, the world-state strip of tradeable instruments, and time as a real axis on which lags are real distances (UX-3). All three need the stacks after this one.
-- **Grounding.** `grounding/` is an empty package. There is no Polymarket adapter and no FRED adapter, so a market likelihood on a map today is a number a person wrote down by hand with its source beside it. Stack 05.
+- **Grounding, half built.** `grounding/` now reads a prediction market's own saved answers and works a price out of them, and one committed dated file holds a real contract. Still ahead: the economic-data adapter, so a price ending has a measured level to start from, and the fixture's own market likelihoods, which are still numbers a person wrote down by hand with the source beside them. Stack 06.
 - **The thesis.** Legs, entry, invalidation, take-profit, the outcome distribution, tails, caveats, export. The one-at-a-time sweep the derived invalidation reads — flip each claim and see what it does to every ending — is already built and comes back unranked, because which direction hurts depends on the trade. Nothing on screen reads it. Stack 05.
 - **Probes.** `refine` — splitting a claim into finer claims, which folding a branch refuses today with a sentence saying so — the simulated outcome distribution, value-of-information ranking, and the propagation of reflexive links, a market feeding back on the world it is measuring, which the engine sets aside rather than working through. The engine already works out `range_shares` — how much of each claim's range comes from not being sure of each prior — and it travels on every world the three routes serve, but nothing on screen reads it. Stack 06.
 - **Storage.** Nothing is kept between requests: no database file, no volume in either compose file, no session.
