@@ -20,9 +20,14 @@
  * built, and the outline beside them grows in the same order.
  *
  * Nothing here composes a sentence about a refusal: a refused proposal is read
- * out in the words the rule itself wrote. And nothing here counts anything the
- * stream did not count — the claim and arrow counts at the end are the fields the
- * closing event carried.
+ * out in the model's own words and then in the words the rule itself wrote. And
+ * nothing here counts anything the stream did not count — the claim and arrow
+ * counts at the end are the fields the closing event carried.
+ *
+ * **And nothing here says a word about what the model is doing right now.** The
+ * strip prints those two lines, and they change every few seconds; a polite
+ * region that said them would be reading a stopwatch over the top of the map
+ * being built. They are printed, reachable and never announced.
  *
  * **And each line about a growing map ends by naming what is still open**, from
  * the frontier both growth events carry (added 2026-09-21). These lines are now
@@ -63,14 +68,30 @@ export function theOpeningLine(growth: Growth): string {
  *   rather than falling silent.
  */
 export function whatChanged(was: Growth, now: Growth): string {
-  // A refusal, in the rule's own sentences, said once and never said again.
-  // Accepted and refused are two different events, so only one of the two
-  // branches below can be the reason for any one change.
+  // A refusal: **what the model proposed, in its own words**, and then the
+  // rule's own sentences. Said once and never said again. Accepted and refused
+  // are two different events, so only one of the two branches below can be the
+  // reason for any one change.
+  //
+  // **The model's words were added on 2026-09-22**, because of what Kent asked
+  // for: *"if we could see the different things that the llm is proposing even
+  // if the events are rejected, that'd be helpful."* Every refusal was already
+  // listed in full in the panel, and this line already carried the rule's
+  // sentence — but at the moment a refusal arrives a reader is looking at the
+  // foot of the screen, and what the foot said was *a proposal* rather than
+  // which one. A rule's sentence with nothing to attach it to is half a fact.
+  //
+  // It is shortened the same way a claim arriving is, and for the same reason:
+  // enough to know which proposal it was, on one line. The whole of it, with
+  // every rule it broke, is in the panel.
   if (now.refusals.length > was.refusals.length) {
     const last = now.refusals[now.refusals.length - 1];
     return last === undefined
       ? ""
-      : `A proposal was refused. ${last.reasons.join(" ")} ${whatIsOpen(now, null)}`.trim();
+      : (
+          `A proposal was refused: "${inFewWords(last.claimInWords)}". ` +
+          `${last.reasons.join(" ")} ${whatIsOpen(now, null)}`
+        ).trim();
   }
 
   // The likelihoods landing: one event, one world, every number. It is the

@@ -35,7 +35,7 @@ import { useEveryKey } from "../keyboard/everyKey";
 import type { MapKeys } from "../keyboard/useMapKeys";
 import type { Selection } from "../world";
 import type { Growth, Phase } from "./growth";
-import { hasStopped } from "./growth";
+import { hasStopped, onlyTheStripChanged } from "./growth";
 import type { TheRun, WhereItHasGot } from "./theRun";
 import type { Working } from "./transcript";
 import { readTranscript } from "./transcript";
@@ -125,8 +125,15 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
   //
   // It counts the run's own state being replaced, which is one for one with an
   // event arriving: `fold` hands back a new state for every one of the eight
-  // events — it says so in its own words, *there is no event this hands its
-  // argument back for* — so a new object here is something having landed.
+  // events a recording holds, so a new object here is something having landed.
+  //
+  // **The ninth is not an arrival, and that is a decision rather than an
+  // oversight** *(2026-09-22)*. An `activity` line is the model saying what it
+  // is doing inside a call that has not come back; it reaches the strip and
+  // nothing else. A counter that started again on each of them would read
+  // *nothing new on the map for 1 s* for three solid minutes while nothing
+  // whatever reached the map. The lines say the tool is alive by changing in
+  // front of the reader; the number says how long this call has been out.
   //
   // **It is a count of arrivals and nothing else, and it is never drawn.**
   // The browser can count what it was sent; it cannot count the model's calls,
@@ -134,10 +141,11 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
   const [arrivals, setArrivals] = useState(0);
   const lastSeen = useRef<Growth | null>(null);
   useEffect(() => {
-    if (lastSeen.current === growth) {
+    const before = lastSeen.current;
+    lastSeen.current = growth;
+    if (before === growth || onlyTheStripChanged(before, growth)) {
       return;
     }
-    lastSeen.current = growth;
     setArrivals((many) => many + 1);
   }, [growth]);
 
@@ -376,6 +384,12 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
           // second an event, so the reading would reset twice a second and
           // would be measuring our own pacing rather than any wait.
           arrivals={replaying || finished ? null : arrivals}
+          // **And the same rule for what the model is doing.** A recording
+          // holds no such line, so a replay has none to show; a run that has
+          // stopped has nothing out. Only a live run that is still open is
+          // given them, and then the room for both is held open whether or not
+          // either has anything in it yet.
+          doing={replaying || finished ? null : growth.activity}
           after={
             <DoneLine
               done={growth.done}
