@@ -49,11 +49,23 @@ What this file must never do
 - Never read lift as a cause, or name it anything that suggests one.
 """
 
+import math
 from dataclasses import dataclass
+from statistics import NormalDist
 from typing import Final, Literal
 
+import numpy
+
 from katalyst.domain import PropositionId
-from katalyst.thesis.draws import Draws, SampleFrom
+from katalyst.thesis.draws import (
+    NEVER,
+    Days,
+    Draws,
+    SampleFrom,
+    Weights,
+    effective_draws,
+    weighted_share,
+)
 from katalyst.thesis.position import FirstTouch
 
 THE_FLOOR: Final = 200
@@ -129,9 +141,11 @@ class LiftRow:
             which this claim came on at all.
         effective_draws: How many equally-weighted worlds the numerator rests on.
         days_before_the_stop: The typical number of days between this claim coming
-            on and the stop being touched, over the worlds the numerator counted.
-            Never negative, because the numerator counts only claims that came on
-            first.
+            on and the stop being touched, over the worlds the numerator counted —
+            the middle one by weight. Never negative, because the numerator counts
+            only claims that came on first. **Nothing at all** where the numerator
+            counted no world, which is a claim that kept company with the trade
+            working: there is no gap to be typical of.
         coverage: How often the interval above is meant to cover the numerator's
             true share. Carried so a screen can say which interval it is showing.
     """
@@ -143,7 +157,7 @@ class LiftRow:
     came_on_first_hi: float
     came_on: float
     effective_draws: float
-    days_before_the_stop: float
+    days_before_the_stop: float | None
     coverage: float
 
 
@@ -222,7 +236,20 @@ def wilson(share: float, count: float, coverage: float) -> tuple[float, float]:
             above nothing, or if the coverage is not strictly between nothing and
             one.
     """
-    raise NotImplementedError
+    if not 0.0 <= share <= 1.0:
+        raise ValueError(f"an interval is taken around a share, from nothing to one; got {share}")
+    if count <= 0.0:
+        raise ValueError(f"an interval rests on some draws; got {count}")
+    if not 0.0 < coverage < 1.0:
+        raise ValueError(
+            f"a coverage is strictly between nothing and one; got {coverage}. Nothing and "
+            "one are not intervals: one says nothing and the other says everything"
+        )
+    spread = NormalDist().inv_cdf(0.5 + coverage / 2.0)
+    widened = count + spread * spread
+    middle = (share * count + spread * spread / 2.0) / widened
+    half = spread * math.sqrt(count * share * (1.0 - share) + spread * spread / 4.0) / widened
+    return max(0.0, middle - half), min(1.0, middle + half)
 
 
 def what_takes_you_out(draws: Draws, touch: FirstTouch) -> WhatTakesYouOut:
@@ -251,4 +278,98 @@ def what_takes_you_out(draws: Draws, touch: FirstTouch) -> WhatTakesYouOut:
             one sample's numerator by another's denominator is the kind of
             comparison this whole layer exists to refuse.
     """
-    raise NotImplementedError
+    if touch.stop_first_on.shape != (draws.worlds,) or touch.sample != draws.sample:
+        raise ValueError(
+            "the numerator and the denominator are counted over one sample, and these are "
+            f"two: {touch.stop_first_on.shape[0]} worlds from '{touch.sample}' against "
+            f"{draws.worlds} from '{draws.sample}'"
+        )
+
+    stop_first = touch.stop_first_on != NEVER
+    weight_there = draws.weight[stop_first]
+    counted = effective_draws(weight_there)
+    if counted < THE_FLOOR:
+        return WhatTakesYouOut(
+            rows=(),
+            dropped=(),
+            effective_draws=counted,
+            stop_first_worlds=int(stop_first.sum()),
+            floor=THE_FLOOR,
+            sample=draws.sample,
+            too_few_draws=TOO_FEW_DRAWS.format(
+                floor=THE_FLOOR, effective=f"{counted:.1f}", drawn=draws.worlds
+            ),
+        )
+
+    rows: list[LiftRow] = []
+    dropped: list[Dropped] = []
+    stopped_on = touch.stop_first_on[stop_first]
+    for claim in draws.claims:
+        came_on = draws.on_day[:, draws.column(claim)]
+        anywhere = came_on != NEVER
+        if not anywhere[draws.weight > 0.0].any():
+            dropped.append(_dropping(claim, "never_came_on"))
+            continue
+        if anywhere[draws.weight > 0.0].all():
+            dropped.append(_dropping(claim, "held_true_everywhere"))
+            continue
+
+        before = anywhere[stop_first] & (came_on[stop_first] < stopped_on)
+        numerator = weighted_share(before, weight_there)
+        denominator = weighted_share(anywhere, draws.weight)
+        low, high = wilson(numerator, counted, COVERAGE)
+        if low <= denominator <= high:
+            dropped.append(_dropping(claim, "tells_you_nothing"))
+            continue
+        rows.append(
+            LiftRow(
+                claim=claim,
+                lift=numerator / denominator,
+                came_on_first=numerator,
+                came_on_first_lo=low,
+                came_on_first_hi=high,
+                came_on=denominator,
+                effective_draws=counted,
+                days_before_the_stop=_the_middle_gap(
+                    stopped_on[before] - came_on[stop_first][before], weight_there[before]
+                ),
+                coverage=COVERAGE,
+            )
+        )
+
+    return WhatTakesYouOut(
+        rows=tuple(sorted(rows, key=lambda one: one.lift, reverse=True)),
+        dropped=tuple(dropped),
+        effective_draws=counted,
+        stop_first_worlds=int(stop_first.sum()),
+        floor=THE_FLOOR,
+        sample=draws.sample,
+        too_few_draws=None,
+    )
+
+
+def _dropping(claim: PropositionId, because: DroppedBecause) -> Dropped:
+    """One claim left off the rail, with the sentence written once for every screen."""
+    return Dropped(claim=claim, because=because, sentence=DROPPED[because])
+
+
+def _the_middle_gap(gaps: Days, weight: Weights) -> float | None:
+    """The middle number of days by weight: half the weight is below it and half above.
+
+    The middle rather than the average, because a handful of worlds where the claim
+    came on the day the window opened would drag an average away from the days most
+    of the worlds actually show.
+
+    Args:
+        gaps: The days between the claim coming on and the stop being touched, one
+            per world the numerator counted.
+        weight: How much each of those worlds counts.
+
+    Returns:
+        The middle gap in whole days, or nothing at all where no world counted.
+    """
+    if gaps.size == 0 or float(weight.sum()) <= 0.0:
+        return None
+    order = numpy.argsort(gaps, kind="stable")
+    running = numpy.cumsum(weight[order])
+    return float(gaps[order][int(numpy.searchsorted(running, running[-1] / 2.0))])
