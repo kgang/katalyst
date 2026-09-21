@@ -483,3 +483,20 @@ Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
 **Commit message:** `feat(solving): whether, exactly — variable elimination over the yes/no tables, and locality bit for bit`</result>
 <usage><subagent_tokens>171079</subagent_tokens><tool_uses>40</tool_uses><duration_ms>721681</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a5ce355daa417b56b</task-id>
+<tool-use-id>toolu_01RqHkbS5v285nvk1Xm1aNvd</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a5ce355daa417b56b.output</output-file>
+<status>completed</status>
+<summary>Agent "E1: oracles and defect tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Reproduced red first: `ValueError: cannot reshape array of size 2 into shape (3,2,1)`. Fixed as B suggested — `_certainly(value, lead)` builds the certainty already carrying the version axis, passed at both call sites. Added `test_a_version_axis_answers_both_verbs_too`: both verbs, both values, every claim, three versions, each equal to the one-version answer bit for bit. Watched it go red on the old file, then restored. `ruff check` + `format --check` on `tests/oracles` clean; `tests/oracles` **10 passed in 7.17 s**.
+
+```
+fix(oracles): by_summing answers a pinned claim when the tables carry versions
+```</result>
+<usage><subagent_tokens>291099</subagent_tokens><tool_uses>9</tool_uses><duration_ms>83160</duration_ms></usage>
+</task-notification>
