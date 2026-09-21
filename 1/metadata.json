@@ -1,0 +1,51 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M32TQAGHNQFTS4RNTP0KFD7S",
+  "session_id": "b614e696-28f8-496c-b341-dd2bd0ba2a74",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-21T20:32:39.873077Z",
+  "branch": "fix/04-the-question-mark",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "frontend/e2e/generate.spec.ts",
+    "frontend/src/components/Launchpad.tsx",
+    "frontend/src/components/MapScreen.tsx",
+    "frontend/src/keyboard/__tests__/everyKey.test.tsx",
+    "frontend/src/keyboard/everyKey.css",
+    "frontend/src/keyboard/everyKey.ts",
+    "frontend/src/stream/GenerationScreen.tsx",
+    "spec/workbench/keyboard-and-access.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "ffb9a3a6b114",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 338,
+    "cache_creation_tokens": 962782,
+    "cache_read_tokens": 43440124,
+    "output_tokens": 206048,
+    "api_call_count": 134
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-21T20:32:39.666971Z",
+    "agent_lines": 0,
+    "agent_removed": 28,
+    "human_added": 2676,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 2676,
+    "total_lines_changed": 2704,
+    "agent_percentage": 1.0355029585798818,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

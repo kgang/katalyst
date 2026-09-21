@@ -3,8 +3,17 @@
   "checkpoint_id": "01M32TQAGHNQFTS4RNTP0KFD7S",
   "strategy": "manual-commit",
   "branch": "fix/04-the-question-mark",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "frontend/e2e/generate.spec.ts",
+    "frontend/src/components/Launchpad.tsx",
+    "frontend/src/components/MapScreen.tsx",
+    "frontend/src/keyboard/__tests__/everyKey.test.tsx",
+    "frontend/src/keyboard/everyKey.css",
+    "frontend/src/keyboard/everyKey.ts",
+    "frontend/src/stream/GenerationScreen.tsx",
+    "spec/workbench/keyboard-and-access.md"
+  ],
   "sessions": [
     {
       "metadata": "/0/metadata.json",
@@ -12,14 +21,21 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 38,
-    "cache_creation_tokens": 89758,
-    "cache_read_tokens": 1542180,
-    "output_tokens": 16476,
-    "api_call_count": 19,
+    "input_tokens": 376,
+    "cache_creation_tokens": 1052540,
+    "cache_read_tokens": 44982304,
+    "output_tokens": 222524,
+    "api_call_count": 153,
     "subagent_tokens": {
       "input_tokens": 114,
       "cache_creation_tokens": 340239,
