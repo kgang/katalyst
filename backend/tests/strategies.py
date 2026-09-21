@@ -237,6 +237,87 @@ def beliefs(draw: Any, owner: str | None = None) -> Belief:
     return Belief(lo=edges[0], p=edges[1], hi=edges[2], owner=chosen)
 
 
+PRINTABLE_FLOOR = 0.01
+"""The smallest likelihood this product will write as a number rather than as words.
+
+Every likelihood on screen is written to two significant figures, and one that
+rounds to nothing or to everything is written `<.01` or `>.99` instead, because
+printing `1.0` claims a certainty nobody asserted (`spec/graph/belief.md`, and
+`_two_figures` in `katalyst/domain/diff.py`). So `.01` to `.99` is the band in
+which this product is willing to state a likelihood at all, and a claim outside it
+is one the product itself treats as already settled. That makes it the floor for a
+generator asked for a claim that could still come out either way: **the margin is
+the product's own printing rule, not a number chosen here.**
+"""
+
+
+@composite
+def uncertain_beliefs(draw: Any, owner: str = "model") -> Belief:
+    """One likelihood for a claim that could genuinely still come out either way.
+
+    Generates: a range at least `.01` wide with both ends inside the band this
+    product is willing to print, and a likelihood strictly between those two ends.
+    Guarantees, all three from the one printing rule above:
+
+    * the likelihood is at least `.01` and at most `.99`, so the engine cannot
+      settle the claim in every world before anything else happens;
+    * the bottom is below the likelihood and the top is above it, so both halves of
+      the fitted curve have width and every version of the map draws a different
+      number for this claim rather than the same number two thousand times;
+    * the bottom and the top are at least `.01` apart — the smallest difference this
+      product will write down at all — so the range is one it could actually show,
+      and not two ends that print as the same number.
+
+    Built, never filtered: nothing drawn here is discarded.
+
+    `beliefs()` above is the right generator for testing the *shape* of a
+    likelihood, and it produces the degenerate ones on purpose — nought, one, and a
+    range of no width. A claim with no stated range is what
+    `test_band_is_not_sampling_noise` deliberately builds, and it is a different
+    test. This generator is for the ones that need a claim the engine can still
+    move.
+
+    Args:
+        draw: Supplied by the generator library.
+        owner: Whose number it is. The model's, unless a caller says otherwise.
+    """
+    ceiling = 1.0 - PRINTABLE_FLOOR
+    # The bottom stops a whole floor short of the ceiling, so there is always room
+    # above it for a range at least that wide, and the draw below can never be
+    # asked for a number above the one under it.
+    bottom = draw(
+        st.floats(
+            min_value=PRINTABLE_FLOOR,
+            max_value=ceiling - PRINTABLE_FLOOR,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
+    top = draw(
+        st.floats(
+            min_value=bottom + PRINTABLE_FLOOR,
+            max_value=ceiling,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
+    return Belief(
+        lo=bottom,
+        p=draw(
+            st.floats(
+                min_value=bottom,
+                max_value=top,
+                exclude_min=True,
+                exclude_max=True,
+                allow_nan=False,
+                allow_infinity=False,
+            )
+        ),
+        hi=top,
+        owner=owner,
+    )
+
+
 @composite
 def belief_sets(draw: Any) -> Beliefs:
     """The three slots on one claim, each holding a number owned by the right voice.
@@ -346,7 +427,12 @@ def sources(draw: Any) -> Source:
 
 
 @composite
-def propositions(draw: Any, identifier: str | None = None, kind: str | None = None) -> Proposition:
+def propositions(
+    draw: Any,
+    identifier: str | None = None,
+    kind: str | None = None,
+    priors: SearchStrategy[Belief] | None = None,
+) -> Proposition:
     """One claim that will be true or false by a date, judged by a named source.
 
     Generates: an identifier, the claim in a sentence, one of the four kinds, how it
@@ -361,6 +447,11 @@ def propositions(draw: Any, identifier: str | None = None, kind: str | None = No
         draw: Supplied by the generator library.
         identifier: Pin the identifier when the caller is assembling a whole map.
         kind: Pin the kind for the same reason; otherwise one of the four is chosen.
+        priors: Where the claim's `prior` comes from. The default covers every
+            likelihood the rules allow, degenerate ones included. Hand in
+            `uncertain_beliefs()` when the test needs a claim the engine can still
+            move — that is the number the engine actually reads, so it is the one
+            worth choosing.
     """
     chosen_id = (
         identifier
@@ -377,7 +468,7 @@ def propositions(draw: Any, identifier: str | None = None, kind: str | None = No
         claim=draw(st.sampled_from(CLAIM_SENTENCES)),
         kind=chosen_kind,
         resolution=draw(resolutions()),
-        prior=draw(beliefs(owner="model")),
+        prior=draw(priors if priors is not None else beliefs(owner="model")),
         beliefs=draw(belief_sets()),
         base_rate=draw(st.one_of(st.none(), base_rates())),
         evidence=tuple(draw(st.lists(evidence_items(), max_size=2))),
@@ -452,7 +543,9 @@ def links(
 
 
 @composite
-def graphs(draw: Any, separated: bool = False) -> Graph:
+def graphs(
+    draw: Any, separated: bool = False, priors: SearchStrategy[Belief] | None = None
+) -> Graph:
     """A whole cause-and-effect map that already satisfies every rule.
 
     Generates: between two and eight claims — four and eight when a map in two
@@ -479,6 +572,10 @@ def graphs(draw: Any, separated: bool = False) -> Graph:
             to pin. Each piece gets at least two claims, so each has at least one
             arrow in it. The default is a single piece, which is what every test
             written before this option expects.
+        priors: Where each claim's `prior` comes from, handed straight to
+            `propositions()`. The default covers every likelihood the rules allow.
+            Hand in `uncertain_beliefs()` for a map on which nothing is settled
+            before the engine starts.
     """
     size = draw(st.integers(min_value=4 if separated else 2, max_value=8))
     identifiers = [f"claim-{index}" for index in range(size)]
@@ -499,7 +596,7 @@ def graphs(draw: Any, separated: bool = False) -> Graph:
             kinds.append(draw(st.sampled_from(("event", "event", "market", "not_tradeable"))))
 
     claims = [
-        draw(propositions(identifier=identifiers[index], kind=kinds[index]))
+        draw(propositions(identifier=identifiers[index], kind=kinds[index], priors=priors))
         for index in range(size)
     ]
 

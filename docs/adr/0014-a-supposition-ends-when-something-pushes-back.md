@@ -12,6 +12,8 @@ spec-impact: spec/graph/belief.md (what the range means; open questions 3 and 4)
 
 # ADR-0014: A supposition ends when something pushes back; a range says how sure we are of the number, not how the dice fall
 
+> **Amended in place on 2026-09-17** — see *Amendment (2026-09-17) — the direction is read with the number's own weights*, at the end. It says how the versions are counted while section D decides that something moved. Nothing in the decision changed, and no measurement below was rewritten.
+
 ## Context and Problem Statement
 
 Stack 03a is about to write the engine, and two rules it cannot be written without are unsettled. The first: the showcase branch supposes the strait is open on 1 October, then inserts a strike on the 2nd that pushes against it. What happens to the supposed claim, and on which day does it stop being taken as given? The second: every claim shows a range — `.35 (.20–.49)` — and nothing says what that range *is*. Record 0005 called it "a standard interval for such a share" and admitted in the same breath that it mixes simulation noise with the elicited spread, which means the width shrinks by running the machine longer. A number that moves when you buy more computer time is not telling you anything about the world. So: **when does a supposition end, and what does the range under a computed likelihood mean?**
@@ -239,3 +241,28 @@ Hormuz, supposing the strait opens: B's two bands **overlap by a third**, and ye
 * **Input to a stack 04 decision, not a decision here — stated ranges from language models are reliably too narrow.** FermiEval (2025): a nominal 90 per cent range covered the truth 28 per cent of the time; QuantSightBench (2026) reproduced it; Paleka et al. (ICLR 2025) found stated ranges incoherent under rewording; Farquhar et al. (*Nature*, 2024) found measured disagreement across runs beats self-report; Halawi (2024) and the AIA Forecaster (2025) both ensemble. The likely shape: a trimmed mean for the point, and the wider of the stated range and the measured spread for the range, the measured number being *agreement*.
 * **Related records.** ADR-0004 (a `do` is a timed assertion — the warrant for decision A) and its 2026-09-17 amendment; ADR-0005 (amended here in three places, not superseded); ADR-0008 (which owns test names); ADR-0012 (recordings of the system stand in for the system).
 * **Chapters bound by this record.** `spec/multiverse/propagation.md` and `spec/multiverse/diff.md` are written in stack 03a and cite this record; they are not written here.
+
+## Amendment (2026-09-17) — the direction is read with the number's own weights
+
+Section **F** already says that under an `observe` each version is weighted by its own survival share. Section **D** said how a change counts as shifted without saying how the versions are counted while that happens, and the engine read the direction with every version counted as one vote. This amendment says how they are counted. **Nothing in the decision changed** — the two loops, the band, the noise correction, the 90% bar and the eight worlds per version are all as they were, and every measurement above stands exactly as it was taken. Amended in place, as record 0008 was, rather than superseded.
+
+**What was measured.** Hormuz, seed `20261001`, the shipped **2 000 versions × 8 worlds**, comparing the base world with `Observe(target="B", value=True)`. Re-run by the coordinator on 2026-09-17 and re-measured on the same day by the agent who made the change:
+
+| | |
+|---|---|
+| Versions with **no surviving world** at all | **209 of 2 000** |
+| M1 and M2, every version counted as one vote | **89.05%** — a hair under the 90% bar, so both read `unchanged` and the change list was empty |
+| M1 and M2, each version counted by how much it survived | **98.66%** — both `shifted`, both on the change list |
+| M1 and M2, among the versions that survived, one vote each | **99.44%** |
+
+A version with no surviving world reports nothing to the number and nothing to the band, because its weight is zero. Counted as one vote each, all 209 of them voted against the direction.
+
+**The rule (Kent, 2026-09-17).** *Read the direction with the same weights the number was read with.* A version counts for a move by as much as it counted for the two numbers — the smaller of the two weights it carried — so a version with no surviving world counts for nothing and does not vote. A claim the observation is not evidence about is read with every version counting the same, on both sides, exactly as its number is. If nothing survived anywhere, every version counts the same again, which is what section B's band already does in that corner.
+
+**What it does not change.** **Worlds per version stays 8**, and the **90% bar of section D is untouched**. Under the five edits that are not an observation every weight is 1, so nothing else moves by a bit — pinned by computing one such difference both ways and requiring identical bytes, never by comparing against a typed-in number.
+
+**Kent chose this on 2026-09-17** over the alternative of **running more worlds under each version while an observation is in force**. The noise does fall as the survivors grow, but that buys steadiness with time and leaves the arithmetic wrong: a version that contributed to neither number would still be voting on the direction. The cheaper rule is also the correct one.
+
+**A consequence, decided the same day.** A claim with **no causes** is its own prior in every world of a version, so throwing worlds away cannot change what a version says about it: every version that counts gives it the identical number in both worlds, and its same-direction share is zero by construction rather than by disagreement. Its reported number still moves, because the versions are counted differently — `Observe(target="C", value=True)` moves the hypothesis H from `.356` to `.365`, nearly twice the `0.005` floor. **The four states of section D stay as they are**; the claim's row carries one field saying the move was nothing but the reweighting, and the Inspector prints one sentence: *"this claim moved only because the observation made some versions count more."*
+
+**Confirmation.** `test_an_observation_puts_a_row_on_the_rail` · `test_a_dead_version_does_not_vote` · `test_direction_is_read_with_the_numbers_own_weights` · `test_an_edit_that_is_not_an_observation_is_unchanged_by_the_weights` · `test_a_claim_moved_only_by_reweighting_says_so`, all in `backend/tests/unit/domain/test_diff.py`. `spec/multiverse/diff.md` states the rule once, in B3, and closes its open question 7 with it.

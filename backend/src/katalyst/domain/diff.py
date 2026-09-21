@@ -29,6 +29,13 @@ What this file must never do
   tight and all one way. The move is read off the **paired** difference: version
   7 of one world against version 7 of the other, which cancels the elicitation
   noise because both versions were built from the same numbers.
+- Never count the versions one way for the number and another way for the
+  direction. **The direction is read with the same weights the number was read
+  with.** When something was observed, a version counts by the share of its
+  worlds that survived, so a version with no surviving world counts for nothing
+  in the number and must not vote on the direction either. Let it vote and a
+  version that contributed nothing to either number argues about which way they
+  moved.
 - Never fold how wide a range is, or how much the versions agreed, into the
   rank. "This moved a lot", "we are unsure how much" and "we are sure which way"
   are three separate facts a trader weighs separately, and one blended score
@@ -47,6 +54,7 @@ What this file must never do
 import math
 from collections.abc import Mapping, Sequence
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from heapq import heappop, heappush
 from types import MappingProxyType
 from typing import Literal
@@ -154,7 +162,9 @@ class ClaimDiff(BaseModel):
 
     `agreement` is carried on every claim both worlds hold, not only the ones
     that moved, so a reader — or a test — can check the rule that decided the
-    state without recomputing anything.
+    state without recomputing anything. It is read with the same weights the two
+    numbers above were read with, so a version that counted for nothing in them
+    does not vote on which way they moved.
 
     A claim still supposed on its own resolve-by day carries the stored 1 (or 0,
     where it was supposed false) so that the arithmetic stays ordinary. **No
@@ -188,9 +198,19 @@ class ClaimDiff(BaseModel):
     )
     agreement: float | None = Field(
         description=(
-            "The share of versions of the map that moved the same way as the move above. "
-            "Nothing at all when only one of the two worlds holds the claim. On screen "
-            "this column is headed 'same direction'."
+            "The share of versions of the map that moved the same way as the move above, "
+            "each version counted by as much as it counted for the two numbers. Nothing at "
+            "all when there is no direction to report: when only one of the two worlds "
+            "holds the claim, and when no version of the map counted in both numbers. On "
+            "screen this column is headed 'same direction'."
+        )
+    )
+    moved_only_by_reweighting: bool = Field(
+        description=(
+            "True when the move above came from nothing but the observation changing how "
+            "much each version counts: the claim is in both worlds, it moved by at least "
+            "0.005, and not one version that counts moved at all. Only an observation can "
+            "produce it, and the Inspector says so in one sentence."
         )
     )
 
@@ -235,8 +255,9 @@ class DeltaRow(BaseModel):
     )
     agreement: float = Field(
         description=(
-            "The share of versions of the map that moved the same way on that day. A "
-            "column, never a factor. On screen it is headed 'same direction'."
+            "The share of versions of the map that moved the same way on that day, each "
+            "version counted by as much as it counted for the two numbers. A column, never "
+            "a factor. On screen it is headed 'same direction'."
         )
     )
     rank: float = Field(
@@ -573,30 +594,124 @@ def _read_on(world: World, claim: Proposition) -> int:
     return min(int(numpy.searchsorted(world.series_days, day)), len(world.series_days) - 1)
 
 
-def _agreement_on(before: Numbers, after: Numbers, move: float) -> float:
+def _counting_for(behind_a: Versions, behind_b: Versions, claim_id: PropositionId) -> Numbers:
+    """Say how much each version of the map counts when one claim's move is read.
+
+    **One rule: the direction is read with the same weights the number was read
+    with.** A world reads a claim's number off every version equally — unless an
+    observation is evidence about that claim, in which case each version counts by
+    the share of its worlds that survived what was observed. The two worlds of a
+    difference can each answer that differently, so a version counts for the move
+    by **the smaller of the two weights it carried**: a version can only speak
+    about a difference as far as it counted in both numbers. A version with no
+    surviving world therefore counts for nothing and does not vote.
+
+    Three cases fall out of that one sentence, and none of them is a special case.
+    Only the second world observed something: the version weights that world read
+    the claim with. Both observed something: the smaller of the two. The claim is
+    one the observation is not evidence about — it is joined to what was observed
+    by no chain of arrows and shares no cause with it — so both worlds read it off
+    every world equally, and every version counts the same here too.
+
+    Under every edit that is not an observation neither world weights anything, so
+    every version counts 1 and nothing this file reports can move by a bit.
+
+    **Each world's own weights are asked for first, one world at a time**, because
+    that is what each world's number was read with, fallbacks and all: a world that
+    kept nothing anywhere read every version equally, and so it counts equally
+    here. Taking the smaller of two vectors before letting either of them fall back
+    would leave the direction read with weights *neither* number was read with,
+    which is the one sentence this whole rule rests on, broken in a corner.
+
+    **When no version counted in both numbers the answer is nothing at all.** Two
+    branches that each observed something can keep disjoint sets of versions alive:
+    every version then counted in one number or the other and in neither pair. That
+    is not a direction anybody can read — the paired difference this file is built
+    on has no pair left — and inventing one by counting every version equally would
+    report a direction out of versions that contributed to neither reading. So it
+    comes back as a vector of nothing but zeroes, and `_states` says *no direction*
+    rather than guessing one. Reject, never repair.
+
+    Args:
+        behind_a: The version-by-version numbers behind the first world.
+        behind_b: The same behind the second.
+        claim_id: The claim whose move is being read.
+
+    Returns:
+        How much each version counts, one number per version. All zeroes when no
+        version counted in both numbers, which is the one case with no direction
+        to report; every caller checks the total before dividing by it.
+    """
+    together: Numbers = numpy.minimum(
+        behind_a.counting_for(claim_id), behind_b.counting_for(claim_id)
+    )
+    return together
+
+
+def _agreement_on(before: Numbers, after: Numbers, move: float, counting: Numbers) -> float:
     """Say what share of the versions of the map moved the way the reported move says.
 
     Subtract the first world's version *k* from the second world's version *k*, for
     every version. Because the stream that picks the versions never depends on the
     branch, both versions were built from the same underlying numbers, so the
     elicitation noise cancels and what is left is the edit. This counts how many of
-    those paired differences point the same way as the move being reported.
+    those paired differences point the same way as the move being reported, **each
+    version counted by as much as it counted for the two numbers** — which is what
+    `_counting_for` works out, and is why a version with no surviving world says
+    nothing here.
 
-    A claim that did not move at all in any version comes out at 1: every version
-    agreed, about nothing happening. Its move is nowhere near the floor, so it
-    reads `unchanged` whatever this number says.
+    A claim that did not move at all in any version that counts comes out at 0
+    unless the move is itself nothing: no paired difference points the reported
+    way, because none of them points any way at all. That is the claim an
+    observation moved through the version weights alone, and `_states` names it.
 
     Args:
         before: The first world's answer for one claim on one day, per version.
         after: The second world's answer for the same claim and day, per version.
         move: The move being reported, whose direction the versions are counted
             against.
+        counting: How much each version counts, one number per version.
 
     Returns:
-        The share of versions that moved that way, between 0 and 1.
+        The share of the counted versions that moved that way, between 0 and 1.
     """
     paired = after - before
-    return float(numpy.mean(numpy.sign(paired) == numpy.sign(move)))
+    agreeing = numpy.sign(paired) == numpy.sign(move)
+    return float((counting * agreeing).sum() / counting.sum())
+
+
+def _moved_only_by_reweighting(
+    before: Numbers, after: Numbers, move: float, counting: Numbers
+) -> bool:
+    """Say whether a claim's whole move came from how much each version counts.
+
+    True when the claim moved far enough for the move to count at all and **not one
+    version that counts moved by so much as a bit**: every paired difference among
+    them is exactly zero. Then the two worlds' version-by-version answers are the
+    same numbers, and the only thing left that can have moved the reported number is
+    how much each of those versions counts.
+
+    Only an observation can produce it. Under every other edit both worlds count
+    every version the same, so identical version-by-version answers give identical
+    numbers and the move is exactly nothing, which is below the floor.
+
+    The claim it happens to is a claim with **no causes** — the hypothesis, usually.
+    Inside one version such a claim is its own prior in every world, so throwing
+    worlds away cannot change what that version says about it, and only the version
+    weights are left to move it.
+
+    Args:
+        before: The first world's answer for one claim on one day, per version.
+        after: The second world's answer for the same claim and day, per version.
+        move: The move being reported.
+        counting: How much each version counts, one number per version.
+
+    Returns:
+        True when the move is at least the floor and no counted version moved.
+    """
+    if abs(move) < MOVED_AT_LEAST:
+        return False
+    return not bool(numpy.any((after != before) & (counting > 0.0)))
 
 
 def _forced_false_in(world: World, claim_id: PropositionId) -> bool:
@@ -636,6 +751,13 @@ def _states(
     width while 99.9% of versions move the same way, so overlap would report "no
     change" about the clearest change on the map.
 
+    Each claim's direction is read with the same weights its two numbers were read
+    with, so a version an observation left with no surviving world does not vote.
+    A claim whose whole move came from those weights — every version that counts
+    says exactly the same thing in both worlds — keeps whichever of the four words
+    it had and says so in one field of its own, which the Inspector turns into one
+    sentence.
+
     Args:
         world_a: The world to compare from.
         world_b: The world to compare to.
@@ -658,6 +780,7 @@ def _states(
                 after=world_b.beliefs[claim_id].p,
                 delta=None,
                 agreement=None,
+                moved_only_by_reweighting=False,
             )
             continue
         if claim_id not in in_b:
@@ -674,21 +797,29 @@ def _states(
                 after=None,
                 delta=None,
                 agreement=None,
+                moved_only_by_reweighting=False,
             )
             continue
 
         before = world_a.beliefs[claim_id].p
         after = world_b.beliefs[claim_id].p
         move = after - before
-        agreement = _agreement_on(
-            behind_a.likelihood[claim_id][:, _read_on(world_a, in_a[claim_id])],
-            behind_b.likelihood[claim_id][:, _read_on(world_b, in_b[claim_id])],
-            move,
+        each_version = behind_a.likelihood[claim_id][:, _read_on(world_a, in_a[claim_id])]
+        each_version_after = behind_b.likelihood[claim_id][:, _read_on(world_b, in_b[claim_id])]
+        counting = _counting_for(behind_a, behind_b, claim_id)
+        # No version of the map counted in both numbers, so there is no paired
+        # difference left and no direction to read off one. Everything that would
+        # have been read off it says nothing rather than guessing.
+        speaks = bool(counting.sum() > 0.0)
+        agreement = (
+            _agreement_on(each_version, each_version_after, move, counting) if speaks else None
         )
         state: ClaimState = "unchanged"
         if _forced_false_in(world_b, claim_id):
             state = "killed"
-        elif abs(move) >= MOVED_AT_LEAST and agreement >= AGREEING_AT_LEAST:
+        elif (
+            agreement is not None and abs(move) >= MOVED_AT_LEAST and agreement >= AGREEING_AT_LEAST
+        ):
             state = "shifted"
         found[claim_id] = ClaimDiff(
             target=claim_id,
@@ -697,6 +828,8 @@ def _states(
             after=after,
             delta=move,
             agreement=agreement,
+            moved_only_by_reweighting=speaks
+            and _moved_only_by_reweighting(each_version, each_version_after, move, counting),
         )
     return found
 
@@ -898,6 +1031,9 @@ def _ranked_endings(
     rows: list[DeltaRow] = []
 
     for claim in world_b.graph.propositions:
+        # Only a `shifted` ending gets a row, and `shifted` needed a direction to
+        # be readable in the first place — so the weights below always have some
+        # version counting in both numbers, and nothing here divides by nothing.
         if claim.kind not in TERMINAL_KINDS or claims[claim.id].state != "shifted":
             continue
         before = numpy.array([world_a.series[claim.id][one] for one in where_a])
@@ -918,6 +1054,7 @@ def _ranked_endings(
                     behind_a.likelihood[claim.id][:, where_a[at]],
                     behind_b.likelihood[claim.id][:, column],
                     peak,
+                    _counting_for(behind_a, behind_b, claim.id),
                 ),
                 rank=abs(peak) * widest.get(claim.id, 0.0),
             )
@@ -946,7 +1083,7 @@ def _width_of_the_band(
     Returns:
         The distance between the bottom and the top of the range, on that day.
     """
-    counting = behind.weights if claim_id in behind.reweighted else numpy.ones_like(behind.weights)
+    counting = behind.counting_for(claim_id)
     _, bottom, top = _band(
         behind.likelihood[claim_id][:, [column]],
         behind.inner_spread[claim_id][:, [column]],
@@ -963,22 +1100,103 @@ def _two_figures(likelihood: float) -> str:
     """Write a likelihood the way this product writes every likelihood.
 
     Two significant figures, with the nought before the point dropped, so `.50`
-    and `.42` and `.060`. A number that rounds to nothing or to everything is
-    written as `<.01` or `>.99` instead, because a product that prints `1.0`
-    claims a certainty nobody asserted.
+    and `.42` and `.060` — both figures always printed, because dropping a
+    trailing nought would claim less precision than we have.
+
+    **The whole rule, in one sentence: round to two significant figures, then use
+    a guard word exactly when it is true of the rounded number.** `<.01` when the
+    rounded number is less than a hundredth, `>.99` when it is more than
+    ninety-nine hundredths, and the figures themselves otherwise. That is all of
+    it, and it is stated this way because *the guard's words have to mean what
+    they say*: a chip reading `<.01` beside a number that was `.0035` is telling
+    the reader something true, and one reading `<.01` beside `.010` would not be
+    (Kent, 2026-09-20).
+
+    Two things fall out of that sentence rather than being decided beside it.
+    `.010` and `.99` print, because neither is below or above its own guard.
+    And the two figures always land in the first two places after the point —
+    `.99` down to `.010` — because anything further down rounds to less than a
+    hundredth and anything further up rounds to one.
+
+    **Never a certainty, and never a nothing.** Rounding to two figures turns
+    `.995` into `1.0` and `.0004` into `.0`, and both are claims nobody on this
+    map is entitled to make: one says the thing cannot fail, the other that it
+    cannot happen. The guards are what stand in their place.
+
+    **A move is not a likelihood**, and must never come through here. `.36 · up
+    by .0090` is the honest way to write a small move, because a move of `.0090`
+    is a real quantity a reader acts on, while a likelihood of `.0090` is one the
+    product declines to state that precisely. Nothing in this file writes a move
+    as text today; the day something does, it gets its own function, not a flag on
+    this one.
+
+    **Never scientific notation.** A sentence that reads *"moves this claim from
+    `>.99` to `1.0e-09`"* is not a sentence anybody can read aloud, and asking
+    Python for two significant figures directly produces exactly that below a ten
+    thousandth. So the rounding is done on the number's own decimal digits: the
+    shortest decimal that reads back as this exact number, its point shifted by
+    counting rather than by multiplying, and rounded half-up. That is also what
+    stops `.995` printing `.99` — a computer stores it as `0.99499999999999999556`,
+    so asking for two figures directly gives a number under the guard, and the
+    sentence would print the one thing this rule forbids.
+
+    **This rule is written twice and the two must move together.** The browser
+    writes it as `toTwoFigures` in `frontend/src/components/BeliefChip.tsx`, and
+    this function says the same thing for every input it can be given, carry cases
+    included. Change one and change the other in the same pull request, or the
+    same number reads two ways on one screen, and cross-check the two against each
+    other wherever the two stacks meet.
+
+    **A number that is not a number is refused, not written.** "Not a number" and
+    the infinities cannot be rounded to two figures, and printing a modest `<.01`
+    for one would put a likelihood on screen that nothing computed — the one state
+    this product refuses to show. They cannot arrive from a world, because a
+    likelihood that is not a real number between 0 and 1 cannot be built into a
+    `Belief` at all; so one reaching here is a broken promise between two pieces of
+    our own code, and it is said out loud rather than quietly made to look
+    reasonable. Reject, never repair.
 
     Args:
         likelihood: The number, between 0 and 1.
 
     Returns:
-        The number as it is written on screen.
+        The number as it is written on screen: `.35`, or `<.01`, or `>.99`.
+
+    Raises:
+        ValueError: If the number is not a real number — "not a number" itself, or
+            either infinity.
     """
-    written = f"{likelihood:#.2g}"
-    if float(written) >= 1.0:
-        return ">.99"
-    if float(written) <= 0.0:
+    if not math.isfinite(likelihood):
+        raise ValueError(
+            "a likelihood to be written on screen must be a real number between 0 and 1; "
+            f"got {likelihood!r}, which cannot be rounded to two significant figures"
+        )
+    if likelihood <= 0.0:
         return "<.01"
-    return written.lstrip("0")
+    if likelihood >= 1.0:
+        return ">.99"
+    # The shortest decimal that reads back as this exact number, and where its
+    # point sits: `.995` becomes the digits 995 with its leading digit at the
+    # first place after the point.
+    shortest = Decimal(repr(likelihood))
+    place = shortest.adjusted()
+    # The two figures, as a whole number from 10 to 99. Shifting the point by
+    # counting places rather than by multiplying is what keeps `.995` at exactly
+    # 99.5 rather than a hair under it, so it rounds up the way a reader would.
+    figures = int(shortest.scaleb(1 - place).to_integral_value(rounding=ROUND_HALF_UP))
+    if figures >= 100:
+        # Rounding up carried into the next place: `.0999` is `.10`, not `.100`.
+        figures, place = 10, place + 1
+    # Where the rounded number's first figure landed is the whole guard. The
+    # first place after the point holds `.10` to `.99`, and the second holds
+    # `.010` to `.099`; one place further up is a rounded number of 1 or more,
+    # which is past `>.99`, and one further down is `.0099` or less, which is
+    # under `<.01`.
+    if place >= 0:
+        return ">.99"
+    if place <= -3:
+        return "<.01"
+    return f".{'0' * (-place - 1)}{figures}"
 
 
 def _without_full_stop(claim: str) -> str:

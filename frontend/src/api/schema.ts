@@ -469,7 +469,9 @@ export interface components {
          *
          *     `agreement` is carried on every claim both worlds hold, not only the ones
          *     that moved, so a reader — or a test — can check the rule that decided the
-         *     state without recomputing anything.
+         *     state without recomputing anything. It is read with the same weights the two
+         *     numbers above were read with, so a version that counted for nothing in them
+         *     does not vote on which way they moved.
          *
          *     A claim still supposed on its own resolve-by day carries the stored 1 (or 0,
          *     where it was supposed false) so that the arithmetic stays ordinary. **No
@@ -505,9 +507,14 @@ export interface components {
             delta: number | null;
             /**
              * Agreement
-             * @description The share of versions of the map that moved the same way as the move above. Nothing at all when only one of the two worlds holds the claim. On screen this column is headed 'same direction'.
+             * @description The share of versions of the map that moved the same way as the move above, each version counted by as much as it counted for the two numbers. Nothing at all when there is no direction to report: when only one of the two worlds holds the claim, and when no version of the map counted in both numbers. On screen this column is headed 'same direction'.
              */
             agreement: number | null;
+            /**
+             * Moved Only By Reweighting
+             * @description True when the move above came from nothing but the observation changing how much each version counts: the claim is in both worlds, it moved by at least 0.005, and not one version that counts moved at all. Only an observation can produce it, and the Inspector says so in one sentence.
+             */
+            moved_only_by_reweighting: boolean;
         };
         /**
          * ConditionalRequest
@@ -636,7 +643,7 @@ export interface components {
             range_width: number;
             /**
              * Agreement
-             * @description The share of versions of the map that moved the same way on that day. A column, never a factor. On screen it is headed 'same direction'.
+             * @description The share of versions of the map that moved the same way on that day, each version counted by as much as it counted for the two numbers. A column, never a factor. On screen it is headed 'same direction'.
              */
             agreement: number;
             /**

@@ -56,7 +56,7 @@ from katalyst.domain import (
     versions_of,
 )
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ
-from tests.strategies import branches, graphs, interventions, seeds
+from tests.strategies import branches, graphs, interventions, seeds, uncertain_beliefs
 
 many = settings(max_examples=25, deadline=None)
 a_few = settings(max_examples=12, deadline=None)
@@ -198,6 +198,32 @@ def _folded_if_it_applies(graph: Graph, branch: Branch, **budget: int) -> World:
         seed=SEED,
         introduced_by=introduced_by(branch),
         **(budget or SMALL),
+    )
+
+
+def _a_claim_with_causes(data: st.DataObject, graph: Graph) -> str:
+    """Pick a claim to observe from the ones the map actually gives causes to.
+
+    Read off the shape of the map rather than drawn and then discarded. Every claim
+    but the first on a map that is all of one piece is given at least one cause by
+    `graphs()` itself, so the list is never empty; that guarantee is asserted rather
+    than assumed, so the day it stops holding this says so out loud instead of
+    quietly checking fewer maps.
+    """
+    with_causes = [one.id for one in graph.propositions if _causes_of(graph, one.id)]
+    assert with_causes, "graphs() gives every claim but the first at least one cause"
+    return str(data.draw(st.sampled_from(with_causes)))
+
+
+def _pushing_nothing(graph: Graph) -> Graph:
+    """The same map with every arrow's push set to exactly nothing.
+
+    The arrows stay where they are — what a claim's causes *are* is a fact about the
+    shape of the map, and none of them moves — so this leaves every question of
+    which claims are connected to which alone and takes away only the push.
+    """
+    return graph.model_copy(
+        update={"links": tuple(one.model_copy(update={"strength": 0.0}) for one in graph.links)}
     )
 
 
@@ -455,25 +481,87 @@ def test_do_leaves_ancestors_unchanged(data: st.DataObject) -> None:
 
 
 @given(st.data())
-@many
+@a_few
 def test_observe_may_update_ancestors(data: st.DataObject) -> None:
     """Learning something reaches back into what caused it, which supposing never does.
 
     Keeping only the worlds in which the claim came out as observed changes what
     the survivors say about the claim's causes just as much as about what it
-    causes. That is a *capability* claim, so the map is filtered to ones where a
-    cause could move at all.
-    """
-    graph = data.draw(graphs())
-    target = data.draw(st.sampled_from([one.id for one in graph.propositions]))
-    causes = _causes_of(graph, target)
-    assume(causes)
-    claims = {one.id: one for one in graph.propositions}
-    assume(0.05 < claims[target].prior.p < 0.95)
-    assume(any(0.0 < claims[one].prior.p < 1.0 for one in causes))
+    causes.
 
-    base = _folded(graph)
-    learned = _folded(graph, Observe(target=target, value=True))
+    **The map is built to be one a cause can move on, never filtered down to one.**
+    Every claim's prior comes from `uncertain_beliefs()` — a likelihood this product
+    would be willing to print, with a range of real width around it — so nothing on
+    the map is settled before the engine starts and the versions really do draw
+    different numbers for each claim. The claim to observe is picked from the ones
+    that actually have causes, read off the shape of the map.
+
+    Asking instead for *any* likelihood above nought, as this test once did, lets
+    through a number like `3.4e-289`: a cause that comes out false in every world,
+    so nothing upstream can move, and the test fails on a rare seed rather than on a
+    real fault. A generator that builds what a test needs cannot have that hole, and
+    it throws nothing away to get there.
+
+    **And this one runs at the shipped budget, not the small one.** The thing it is
+    about is the weight an observation gives each version — the share of that
+    version's worlds that survived — and at four worlds per version that share is
+    one of five numbers. A map whose observed claim is nearly certain then discards
+    no world at all in any version, every weight is 1, and the two worlds come out
+    identical: the test would be reporting how coarse its own budget is rather than
+    anything about the engine. The propagation chapter's section B6 says the same
+    thing about the size of the move. Measured over four hundred generated maps:
+    sixteen of them could not show the effect at sixteen versions of four worlds,
+    and every single one showed it at the shipped two thousand of eight.
+
+    **What the map does *not* need is an arrow that pushes.** How hard the arrows
+    push is left free here on purpose, and about a fifth of the maps this test
+    draws have nothing but arrows of strength nought into the observed claim. The
+    test below says why that is fine and pins it.
+    """
+    graph = data.draw(graphs(priors=uncertain_beliefs()))
+    target = _a_claim_with_causes(data, graph)
+    causes = _causes_of(graph, target)
+
+    base = _folded(graph, **FULL)
+    learned = _folded(graph, Observe(target=target, value=True), **FULL)
+
+    assert any(learned.beliefs[one] != base.beliefs[one] for one in causes)
+
+
+@given(st.data())
+@a_few
+def test_an_observation_moves_a_cause_even_when_no_arrow_pushes(data: st.DataObject) -> None:
+    """An observation reaches a cause through the version weights, not along the arrows.
+
+    This is the one worth stating plainly, because the arrows look as though they
+    must be what carries it. They are not. Observing something throws away the
+    worlds it did not happen in, and each version is then counted by the share of
+    its worlds that survived. A cause's number is the average of what each version
+    said about it — so counting the versions differently moves that average, and it
+    moves it whether or not a single arrow on the map pushes by anything at all.
+
+    So this takes a whole generated map and sets **every** arrow's push to exactly
+    nothing, which is the strongest form of the worry, and requires a cause to move
+    anyway. What it needs instead is that the versions disagree about the cause,
+    which is what `uncertain_beliefs()` builds: a range of real width, so every
+    version draws a different number and a different weighting gives a different
+    average.
+
+    It is the same mechanism as a claim with **no causes at all** moving under an
+    observation — an arrow of strength nought and no arrow are the same thing to
+    the arithmetic — which `domain/diff.py` reports as `moved_only_by_reweighting`
+    and `spec/multiverse/diff.md` B3 spells out.
+
+    Measured before it was written: over nine hundred generated maps with every
+    arrow flattened to nought, a cause moved in every one.
+    """
+    graph = _pushing_nothing(data.draw(graphs(priors=uncertain_beliefs())))
+    assert all(one.strength == 0.0 for one in graph.links), "every arrow pushes nothing"
+    target = _a_claim_with_causes(data, graph)
+    causes = _causes_of(graph, target)
+
+    base = _folded(graph, **FULL)
+    learned = _folded(graph, Observe(target=target, value=True), **FULL)
 
     assert any(learned.beliefs[one] != base.beliefs[one] for one in causes)
 

@@ -29,11 +29,15 @@ only how steady the numbers are, and these tests are about what the arithmetic
 budget on the worked example.
 """
 
+import importlib
 import re
 from datetime import date, timedelta
+from decimal import Decimal
 from itertools import pairwise
 
 import networkx
+import numpy
+import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
@@ -60,10 +64,28 @@ from katalyst.domain import (
     introduced_by,
     propagate,
     sensitivity,
+    versions_of,
 )
-from katalyst.domain.diff import PROVENANCE_WEIGHT, SWEEP_VERSIONS, SWEEP_WORLDS
+from katalyst.domain.diff import (
+    AGREEING_AT_LEAST,
+    MOVED_AT_LEAST,
+    PROVENANCE_WEIGHT,
+    SWEEP_VERSIONS,
+    SWEEP_WORLDS,
+    _agreement_on,
+    _counting_for,
+    _read_on,
+    _two_figures,
+)
+from katalyst.domain.propagation import Numbers, Versions
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
 from tests.strategies import branches, graphs
+
+# The package re-exports the `diff` function under the name of the file it lives
+# in, so plain `import katalyst.domain.diff` hands back the function rather than
+# the file. One test replaces something inside that file, so it asks for the file
+# by name.
+diff_module = importlib.import_module("katalyst.domain.diff")
 
 many = settings(max_examples=20, deadline=None)
 a_few = settings(max_examples=8, deadline=None)
@@ -87,9 +109,22 @@ DAY_ZERO = date(2026, 1, 1)
 SEED = 20261001
 """The seed the worked example's demo uses, so a test and a screenshot agree."""
 
+A_LIKELIHOOD = r"[<>]?\.\d+"
+"""How this product writes a likelihood, as a pattern: a point, then digits.
+
+Either of the two guard words, `<.01` and `>.99`, or a plain decimal with the
+nought before the point dropped. Never an exponent, never a digit before the
+point. The sentence pattern below is built out of this one so that the two cannot
+drift, and `test_a_likelihood_is_written_as_a_plain_decimal` checks it on its own
+over every likelihood there is.
+"""
+
+WRITTEN_LIKELIHOOD = re.compile(f"^{A_LIKELIHOOD}$")
+"""The same pattern, anchored, for checking one written likelihood by itself."""
+
 FIRST_SENTENCE = re.compile(
-    r'^".+" moves .+ from [<>]?\.\d+ to [<>]?\.\d+ by \d{4}-\d{2}-\d{2} '
-    r"and leaves \d+ claims? untouched\.$"
+    rf'^".+" moves .+ from {A_LIKELIHOOD} to {A_LIKELIHOOD} by '
+    r"\d{4}-\d{2}-\d{2} and leaves \d+ claims? untouched\.$"
 )
 """The sentence a difference uses when something at an ending moved."""
 
@@ -254,6 +289,30 @@ def _may_move(graph: Graph, branch: Branch) -> set[str] | None:
         here, _ = folded
         reached |= _affected_from_the_shape(here, edit)
     return reached
+
+
+def _weights_the_number_was_read_with(behind: Versions, claim_id: str) -> Numbers:
+    """How much each version counted when this world read this claim's own number.
+
+    Written out from the chapter rather than taken from the code, so the two agree
+    by arithmetic and not by sharing a line. Every version counts the same, unless
+    what was observed is evidence about this claim — then each version counts by
+    the share of its worlds that survived what was observed.
+    """
+    if claim_id in behind.reweighted:
+        return behind.weights
+    return numpy.ones_like(behind.weights)
+
+
+def _one_number(per_version: Numbers, counting: Numbers) -> float:
+    """Average one claim's version-by-version answers the way a world reads its number."""
+    return float(numpy.clip((per_version * counting).sum() / counting.sum(), 0.0, 1.0))
+
+
+def _count_every_version_the_same(behind_a: Versions, behind_b: Versions, claim_id: str) -> Numbers:
+    """Stand in for the weights so that every version counts 1, whatever was observed."""
+    del behind_b, claim_id
+    return numpy.ones_like(behind_a.weights)
 
 
 def _weakest_on_the_best_route(graph: Graph, subjects: set[str], target: str) -> float:
@@ -624,6 +683,301 @@ def test_a_supposed_ending_is_written_as_nearly_certain_rather_than_as_one() -> 
     assert "<.01" in _compared(graph, ruled_out, _branch()).summary
 
 
+# --- The direction is read with the number's own weights -------------------
+
+
+def _observing(target: str) -> Branch:
+    """A branch of one edit: this claim actually came true."""
+    return _branch(Observe(target=target, value=True), identifier=f"br_observe_{target.lower()}")
+
+
+def test_an_observation_puts_a_row_on_the_rail() -> None:
+    """Saying Brent settled below $68 puts the two tradeable endings on the change list.
+
+    This is the button that used to look as if it did nothing. An observation is
+    made by throwing away the worlds it did not happen in, and on the worked
+    example some versions of the map lose every one of their eight worlds. Such a
+    version weighs nothing in the number, so it must weigh nothing in the
+    direction; counting it anyway dragged both endings a hair under the 90% bar and
+    emptied the rail. Read the direction with the weights the number was read with
+    and both endings are on the rail, rising, with the fixed sentence beside them.
+
+    Directions and orderings only. The example map is a curated one whose
+    illustrative inputs may be tuned, so nothing here pins a value.
+    """
+    base = _hormuz_world(None)
+    learned = _hormuz_world(_observing("B"))
+    answer = diff(base, learned, edit_in_words="Brent settled below $68")
+    assert not isinstance(answer, list), answer
+
+    behind = versions_of(learned)
+    assert bool((behind.weights == 0.0).any()), "this observation empties some versions"
+
+    assert [one.target for one in answer.rows] == ["M1", "M2"]
+    for row in answer.rows:
+        assert answer.claims[row.target].state == "shifted"
+        assert row.peak_delta > 0.0, "cheap Brent is evidence for both market claims"
+        assert row.agreement >= AGREEING_AT_LEAST
+    assert FIRST_SENTENCE.match(answer.summary), answer.summary
+
+
+def test_a_dead_version_does_not_vote() -> None:
+    """A version left with no surviving world weighs nothing, so it says nothing about direction.
+
+    Such a version reports no number at all, and its weight is zero, so letting it
+    argue about which way the number moved would let a version that contributed
+    nothing to either answer outvote the ones that did. The test hands every dead
+    version the loudest opinion it could have — each one made to point the opposite
+    way — and the answer does not move by a bit.
+    """
+    base = _hormuz_world(None)
+    learned = _hormuz_world(_observing("B"))
+    behind_a, behind_b = versions_of(base), versions_of(learned)
+    dead = behind_b.weights == 0.0
+    assert bool(dead.any()), "this observation empties some versions"
+
+    for claim in learned.graph.propositions:
+        before = behind_a.likelihood[claim.id][:, _read_on(base, claim)]
+        after = behind_b.likelihood[claim.id][:, _read_on(learned, claim)]
+        move = learned.beliefs[claim.id].p - base.beliefs[claim.id].p
+        counting = _counting_for(behind_a, behind_b, claim.id)
+        assert bool((counting[dead] == 0.0).all()), claim.id
+
+        shouting = after.copy()
+        shouting[dead] = before[dead] - move
+        assert _agreement_on(before, shouting, move, counting) == _agreement_on(
+            before, after, move, counting
+        ), claim.id
+
+    # And the corner where nothing at all survived anywhere: every version counts
+    # the same again, which is exactly what the band does in the same corner, so
+    # the number and its direction stay read the same way and nothing is divided
+    # by nothing. The world already carries a loud warning about it.
+    impossible = _map(
+        (
+            _claim("top", kind="hypothesis", prior=(0.0, 0.0, 0.0)),
+            _claim("ending", kind="market"),
+        ),
+        (_arrow("top", "ending"),),
+    )
+    gone = _compared(impossible, _branch(identifier="base"), _observing("top"))
+    assert all(
+        one.agreement is None or 0.0 <= one.agreement <= 1.0 for one in gone.claims.values()
+    ), gone.claims
+
+
+def test_direction_is_read_with_the_numbers_own_weights() -> None:
+    """One rule: the direction is read with the same weights the number was read with.
+
+    The test finds out from the engine which weights each number was read with,
+    rather than being told: it rebuilds each world's own likelihood for each claim
+    from that world's version-by-version answers — every version counting the same
+    for a claim the observation is not evidence about, each version counting by the
+    share of its worlds that survived for a claim it is — and checks the world's own
+    number comes back. Then it checks the same-direction share is counted with those
+    very weights, a version counting for the move by as much as it counted in both
+    numbers. The last line is the teeth: on this observation at least one claim has
+    to read differently when every version is counted the same, or the rule would
+    be about nothing.
+    """
+    base = _hormuz_world(None)
+    learned = _hormuz_world(_observing("B"))
+    answer = diff(base, learned, edit_in_words="Brent settled below $68")
+    assert not isinstance(answer, list), answer
+    behind_a, behind_b = versions_of(base), versions_of(learned)
+
+    read_another_way = 0
+    for claim in learned.graph.propositions:
+        before = behind_a.likelihood[claim.id][:, _read_on(base, claim)]
+        after = behind_b.likelihood[claim.id][:, _read_on(learned, claim)]
+        in_a = _weights_the_number_was_read_with(behind_a, claim.id)
+        in_b = _weights_the_number_was_read_with(behind_b, claim.id)
+        assert _one_number(before, in_a) == pytest.approx(base.beliefs[claim.id].p), claim.id
+        assert _one_number(after, in_b) == pytest.approx(learned.beliefs[claim.id].p), claim.id
+
+        counting = _counting_for(behind_a, behind_b, claim.id)
+        assert bool((counting == numpy.minimum(in_a, in_b)).all()), claim.id
+
+        move = learned.beliefs[claim.id].p - base.beliefs[claim.id].p
+        assert answer.claims[claim.id].agreement == _agreement_on(before, after, move, counting)
+        evenly = _agreement_on(before, after, move, numpy.ones_like(counting))
+        read_another_way += evenly != answer.claims[claim.id].agreement
+
+    assert read_another_way, "counting every version the same has to give a different answer here"
+
+
+def test_an_edit_that_is_not_an_observation_is_unchanged_by_the_weights(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Five of the six edits weight nothing, so the difference is the same read either way.
+
+    Only an observation makes a version count for less than another, so under every
+    other edit reading the direction with the weights has to be the very same
+    arithmetic as reading it without them — not close, the same bytes. Nothing here
+    is compared against a number somebody typed: the whole difference is computed
+    twice, once as the code does it and once with every version forced to count the
+    same, and the two are asked to serialize identically.
+    """
+    base = _hormuz_world(None)
+    for branch in (HORMUZ_THEN_STRIKE, _branch(Do(target="H", value=True, at=FIXTURE_DATE))):
+        second = _hormuz_world(branch)
+        behind = versions_of(second)
+        assert not behind.reweighted, "nothing on this branch was observed"
+        assert bool((behind.weights == 1.0).all())
+
+        as_built = diff(base, second, edit_in_words=branch.label)
+        assert not isinstance(as_built, list), as_built
+
+        with monkeypatch.context() as forced:
+            forced.setattr(diff_module, "_counting_for", _count_every_version_the_same)
+            evenly = diff(base, second, edit_in_words=branch.label)
+        assert not isinstance(evenly, list), evenly
+        assert evenly.model_dump_json() == as_built.model_dump_json(), branch.label
+
+
+def test_a_claim_moved_only_by_reweighting_says_so() -> None:
+    """A claim with no causes moves under an observation only by how much each version counts.
+
+    Learning that the insurance premium fell moves the strait's own claim — the
+    hypothesis, which nothing on this map causes. Inside one version that claim is
+    its own prior in every world, so throwing worlds away cannot change what the
+    version says about it, and every version that counts gives exactly the same
+    number in both worlds. The whole move is the reweighting; the same-direction
+    share is zero by construction, not by disagreement. The four states are left
+    alone and the difference says so in one field of its own, which the Inspector
+    turns into one sentence.
+    """
+    base = _hormuz_world(None)
+    learned = _hormuz_world(_observing("C"))
+    answer = diff(base, learned, edit_in_words="the premium fell")
+    assert not isinstance(answer, list), answer
+
+    strait = answer.claims["H"]
+    assert strait.moved_only_by_reweighting
+    assert strait.state == "unchanged", "the four states are untouched"
+    assert strait.delta is not None and abs(strait.delta) >= MOVED_AT_LEAST
+    assert strait.agreement == 0.0, "no version that counts moved at all, either way"
+
+    # It is a claim with no causes, read off the map rather than asserted, and it
+    # is the only claim on this map in that position.
+    into_it = [one for one in learned.graph.links if one.target == "H" and not one.reflexive]
+    assert not into_it, "the strait's own claim has no causes on this map"
+    assert [one for one in answer.claims.values() if one.moved_only_by_reweighting] == [strait]
+
+    # No edit that is not an observation can ever set it: with every version
+    # counting the same, identical version-by-version answers give identical
+    # numbers, so the move is exactly nothing and lands below the floor.
+    struck = diff(base, _hormuz_world(HORMUZ_THEN_STRIKE), edit_in_words=HORMUZ_THEN_STRIKE.label)
+    assert not isinstance(struck, list), struck
+    assert not any(one.moved_only_by_reweighting for one in struck.claims.values())
+
+
+# --- Two corners where the weights run out ---------------------------------
+
+
+def test_a_world_that_kept_nothing_does_not_erase_the_other_worlds_weights() -> None:
+    """Each world falls back on its own, and only then are the two counted together.
+
+    A world in which nothing at all survived what was observed reads every version
+    the same, because there is no surviving share left to weigh anything by. That
+    fallback belongs to **that world**. Take the smaller of the two worlds' weights
+    before letting either of them fall back, and the one that did keep survivors
+    has its weights thrown away too — every version counts the same, which is what
+    *neither* of the two numbers was read with, and the one sentence this whole
+    rule rests on is broken in a corner.
+
+    Reachable only branch against branch, which is why it went unseen: with a base
+    world on one side that world is unweighted anyway, so the two readings happen
+    to agree. Here one branch observes something that keeps some worlds and the
+    other observes something that can keep none.
+    """
+    graph = _map(
+        (
+            _claim("top", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("seen", kind="market", prior=(0.4, 0.2, 0.6)),
+            _claim("impossible", kind="market", prior=(0.0, 0.0, 0.0)),
+        ),
+        (_arrow("top", "seen"), _arrow("top", "impossible")),
+    )
+    kept_some = _world(graph, _branch(Observe(target="seen", value=True), identifier="kept-some"))
+    kept_none = _world(
+        graph, _branch(Observe(target="impossible", value=True), identifier="kept-none")
+    )
+    behind_a, behind_b = versions_of(kept_some), versions_of(kept_none)
+
+    # The corner is only the corner if one world really kept nothing, the other
+    # really is weighted, and the claim is one both observations are evidence about.
+    assert behind_b.weights.sum() == 0.0, "this observation was meant to keep nothing"
+    assert behind_a.weights.sum() > 0.0
+    assert not bool((behind_a.weights == 1.0).all()), "this observation was meant to weigh"
+    assert "top" in behind_a.reweighted and "top" in behind_b.reweighted
+
+    # The starved world counts every version the same — on its own, which is what
+    # its own number was read with — and never hands back nothing at all.
+    assert bool((behind_b.counting_for("top") == 1.0).all())
+    assert behind_a.counting_for("top").sum() > 0.0
+
+    # So the direction keeps the surviving world's own weights instead of losing
+    # them, which is what taking the smaller of the two first would have done.
+    counting = _counting_for(behind_a, behind_b, "top")
+    assert bool((counting == behind_a.counting_for("top")).all())
+    assert not bool((counting == 1.0).all()), "the weights of the world that kept some survived"
+
+    answer = diff(kept_some, kept_none, edit_in_words="what cannot have happened")
+    assert not isinstance(answer, list), answer
+    assert answer.claims["top"].agreement is not None
+
+
+def test_no_direction_at_all_when_no_version_counted_in_both_numbers() -> None:
+    """Two branches can keep disjoint versions alive, and then there is no direction.
+
+    Every version counted in one of the two numbers or the other and in neither
+    pair, so the paired difference this whole file is built on has no pair left.
+    Counting every version equally instead would report a direction read off
+    versions that contributed to neither reading — a number nobody computed, which
+    is the one state this product refuses to show. So the share comes back as
+    nothing at all and no claim can be `shifted`. Reject, never repair.
+
+    The map is built for it rather than waited for: one claim whose stated range
+    spans nearly the whole scale, so that at two versions of two worlds each
+    version draws a prior near one end or the other and comes out the same way in
+    both of its worlds. Observing it true then keeps one version and observing it
+    false keeps the other. Nothing here is typed in but the shape of the map; which
+    version survives which observation is the engine's own answer, and the test
+    asserts the disjointness it found rather than a number.
+    """
+    graph = _map(
+        (
+            _claim("either-way", kind="hypothesis", prior=(0.5, 1e-9, 1.0 - 1e-9)),
+            _claim("ending", kind="market", prior=(0.5, 0.25, 0.75)),
+        ),
+        (_arrow("either-way", "ending", strength=0.5),),
+    )
+    two_of_two = {"versions": 2, "worlds": 2}
+    said_true = _world(
+        graph, _branch(Observe(target="either-way", value=True), identifier="yes"), **two_of_two
+    )
+    said_false = _world(
+        graph, _branch(Observe(target="either-way", value=False), identifier="no"), **two_of_two
+    )
+    behind_a, behind_b = versions_of(said_true), versions_of(said_false)
+
+    # Each world kept something of its own, and between them they kept nothing in
+    # common. Without all three of those this is not the corner being tested.
+    assert behind_a.counting_for("either-way").sum() > 0.0
+    assert behind_b.counting_for("either-way").sum() > 0.0
+    assert _counting_for(behind_a, behind_b, "either-way").sum() == 0.0
+
+    answer = diff(said_true, said_false, edit_in_words="the other way round")
+    assert not isinstance(answer, list), answer
+    for claim_id, one in answer.claims.items():
+        assert one.agreement is None, claim_id
+        assert one.state != "shifted", claim_id
+        assert not one.moved_only_by_reweighting, claim_id
+    assert answer.rows == (), "no ending can be listed as moved when no direction can be read"
+    assert SECOND_SENTENCE.match(answer.summary), answer.summary
+
+
 # --- Locality, seen from the difference ------------------------------------
 
 
@@ -650,6 +1004,132 @@ def test_diff_states_respect_locality(data: st.DataObject) -> None:
             continue
         assert one.state == "unchanged", claim_id
         assert one.delta == 0.0, claim_id
+
+
+# --- How a likelihood is written ------------------------------------------
+
+
+WRITTEN_BY_THE_RULE: tuple[tuple[float, str], ...] = (
+    (0.0, "<.01"),
+    (1e-09, "<.01"),
+    (0.00012, "<.01"),
+    (0.0035, "<.01"),
+    (0.0099, "<.01"),
+    (0.00995, ".010"),
+    (0.01, ".010"),
+    (0.0105, ".011"),
+    (0.0999, ".10"),
+    (0.06, ".060"),
+    (0.35, ".35"),
+    (0.99, ".99"),
+    (0.994, ".99"),
+    (0.995, ">.99"),
+    (1.0, ">.99"),
+)
+"""The rule, written out on the cases that decide it.
+
+The right-hand column is not a measurement and nothing computed it: it is the
+rule's own definition — *round to two significant figures, then use a guard word
+exactly when it is true of the rounded number* (Kent, 2026-09-20) — worked out by
+hand for each input on the left. Every awkward case is here on purpose:
+
+* **both guards' own numbers print**, because neither `.010` nor `.99` is below or
+  above its own guard, which is the whole of where the boundary sits;
+* **both guards catch a rounding that carries across them** — `.00995` rounds up
+  to `.010` and prints, `.0099` does not and is guarded; `.994` rounds to `.99`
+  and prints, `.995` rounds to one and is guarded;
+* `.0999`, whose rounding carries into the next place and gives `.10`, not `.100`;
+* `.060`, which keeps the trailing nought it earned;
+* a billionth and a ten-thousandth, which are now guarded and which used to print
+  `1.0e-09` and `.00012` — the first put an exponent in a sentence, and the second
+  stated a likelihood more precisely than this product is willing to;
+* nothing at all and one, the two values the guards exist for.
+
+**The browser writes this same rule as `toTwoFigures` in
+`frontend/src/components/BeliefChip.tsx`**, and the two are one rule written
+twice. When the two stacks meet, run this table through both and require the same
+answer for every row — that cross-check is the thing that keeps one number from
+reading two ways on one screen, and a table stated from the rule cannot do it
+alone.
+"""
+
+
+@given(st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False))
+@settings(max_examples=500, deadline=None)
+def test_a_likelihood_is_written_as_a_plain_decimal(likelihood: float) -> None:
+    """However small it is, a likelihood is written as a decimal a person can read aloud.
+
+    Four things at once, for every likelihood there is. It never carries an
+    exponent — *"moves this claim from `>.99` to `1.0e-09`"* is not a sentence
+    anybody can read aloud, and it is what this function used to produce below a
+    ten thousandth. It always matches the shape the summary sentence's own pattern
+    expects, which is the same pattern this checks against, so the two cannot
+    drift. Where it is not one of the two guards it reads back within half a unit
+    of its second figure — which is what *two significant figures* means, and is
+    worked out from the answer rather than typed in — and it lands between the two
+    guards' own numbers, which is where the rule says the figures live.
+
+    **The two guards are checked by what their words claim**, which is the whole
+    reason the boundary sits where it does (Kent, 2026-09-20): `<.01` is written
+    only for a likelihood that really is below a hundredth, and `>.99` only for one
+    that really is above ninety-nine hundredths. A guard beside a number those
+    words are false of would be the product lying in two characters.
+    """
+    written = _two_figures(likelihood)
+
+    assert "e" not in written.lower(), written
+    assert WRITTEN_LIKELIHOOD.match(written), written
+
+    if written == "<.01":
+        assert likelihood < 0.01, "the words say it is below a hundredth, so it has to be"
+    elif written == ">.99":
+        assert likelihood > 0.99, (
+            "the words say it is above ninety-nine hundredths, so it has to be"
+        )
+    else:
+        # Half a unit of the second figure: the most that rounding to two of them
+        # can move a number. Both sides are read as exact decimals so that the
+        # comparison needs no slack of its own.
+        half_the_second_figure = Decimal(1).scaleb(Decimal(written).adjusted() - 1) / 2
+        assert abs(Decimal(repr(likelihood)) - Decimal(written)) <= half_the_second_figure, written
+        # And the printed figures always land between the two guards' own numbers,
+        # because anything below rounds under `<.01` and anything above rounds to
+        # one. Read off the guard words themselves so the bounds cannot drift.
+        assert Decimal("0.01") <= Decimal(written) <= Decimal("0.99"), written
+
+
+def test_a_likelihood_is_written_by_the_rule_on_the_cases_that_decide_it() -> None:
+    """The boundary, pinned on every case that decides where it sits.
+
+    *Round to two significant figures, then use a guard word exactly when it is
+    true of the rounded number.* Everything a careless reading of that sentence
+    gets wrong is in the table: whether the guards' own numbers print, what happens
+    when rounding carries across a guard, what happens when it carries into the
+    next place, and the two ends of the scale.
+
+    The browser writes the same rule as `toTwoFigures` in
+    `frontend/src/components/BeliefChip.tsx`. This table states the rule, so it
+    catches the engine drifting from it — it cannot catch the two implementations
+    drifting from each other, and running the same rows through both is still owed
+    where the two stacks meet.
+    """
+    for likelihood, expected in WRITTEN_BY_THE_RULE:
+        assert _two_figures(likelihood) == expected, likelihood
+
+
+def test_a_likelihood_that_is_not_a_number_is_refused_rather_than_written() -> None:
+    """ "Not a number" and the infinities raise; they are never quietly written `<.01`.
+
+    Neither can be rounded to two significant figures, and writing a modest `<.01`
+    for one would put a likelihood on screen that nothing computed — the one state
+    this product refuses to show, arrived at by repairing rather than rejecting.
+    Neither can reach here from a world either: a likelihood that is not a real
+    number between 0 and 1 cannot be built into a `Belief` at all. So one arriving
+    is a broken promise between two pieces of our own code, and it is said out loud.
+    """
+    for not_a_number in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError, match="real number"):
+            _two_figures(not_a_number)
 
 
 # --- The one sentence beside the list --------------------------------------
