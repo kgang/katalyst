@@ -469,6 +469,59 @@ Selecting the receipt strip opens it at the top. Both strips, and the shape of t
 them, are [`streaming-growth.md`](streaming-growth.md)'s; this chapter owns only what the panel does
 with them, and INV-workbench.72 there pins the receipt's own fields.
 
+**And one control, in the panel, that appears only once there is a working** *(2026-09-21)*. *Read
+the working of this run* used to be drawn from the run's first event. The working itself is read back
+from the server **when the run stops** — the server writes it from the same pass that writes the
+stream, and a half-read one would be a second, staler copy — so a reader who pressed it during the
+two minutes they were most likely to press it was left with *Reading the working of this run…* until
+the run ended. A control that cannot do what it says is worse than no control, so it is not drawn
+until the run has stopped, whichever way it stopped. A run whose stream was cut has a working and
+gets the control.
+
+### B8 — Run details: where this map is coming from
+
+*(Added 2026-09-21, decision record 0023, which brings decision R16 forward from a later stack.)*
+
+**A plain section, always in the panel while there is a run**, carrying three readings and one
+sentence: the route the map is arriving on, the run's own name, the seed every likelihood in it will
+be worked out from, and *nothing on this map is typed in*.
+
+```
+RUN DETAILS
+  route        /api/generate
+  generation   <GenerationStarted.generation_id>
+  seed         <GenerationStarted.seed, as its digits>
+
+  Nothing on this map is typed in: every claim and every arrow on it was proposed by
+  the model and accepted by the map's own rules.
+
+  No likelihood has been worked out yet: the engine works them through the whole map
+  at once, when the map is finished.          ← until the numbers land, and then it goes
+```
+
+**Where it came from, and why it moved.** It was an always-on strip of prose at the foot of the map,
+reading *"Every claim and arrow on this map arrived from /api/generate, in generation …, at seed
+…"*, and it was written from the run's **first** event — that is, **over a map with nothing on it
+yet**. It asserted arrivals that had not happened; it was the third of three stacked strips at the
+foot of a screen whose reader could not tell whether anything was happening at all; and Kent asked
+for it to be *"hidden, deprioritized in terms of importance"*. Moving it here is what made it safe to
+print the run's own sentence at the foot instead, because with this gone nothing down there repeats
+it ([`streaming-growth.md`](streaming-growth.md) B11).
+
+**What it says is true from the first frame.** *Nothing here was typed in* is a fact about how the
+map is built rather than about how much of it has arrived, so it is true of an empty map and of a
+finished one. The second sentence is true only until the numbers land, so it is printed only until
+then.
+
+**It is never a dialog, and it does not fold.** This panel is always here and nothing in this product
+opens over the map. Folding the panel's sections behind their summaries is a later stack's work;
+this section is written to be folded and is not folded yet.
+
+**The run's own name is the one identifier this product prints.** Every other identifier on a
+generated map — a claim's, an arrow's — is twenty-six characters of the engine's bookkeeping and a
+reader learns nothing from one, so none of them reaches the screen. This one is how somebody asks for
+the same answer again, and how the working is asked for, so it is printed here and nowhere else.
+
 ---
 
 ## INVARIANTS
