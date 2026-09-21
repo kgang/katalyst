@@ -1,0 +1,745 @@
+Could you please read these docs and other files in this repo to hydrate your context?
+
+
+
+<pasted_content id="a2a1">
+/Users/kentgang/git3/katalyst/plans/STATUS.md
+/Users/kentgang/git3/katalyst/plans/PLAN.md
+/Users/kentgang/git3/katalyst/plans/README.md
+/Users/kentgang/git3/katalyst/plans/HANDOFF.md
+/Users/kentgang/git3/katalyst/plans/design-after-midpoint-review.md
+</pasted_content id="a2a1">
+
+
+Your job this session is to do some of the work in stacks 5 and 6 for the purpose of making progress faster and completing this project. Here is a description of some work that'd make sense
+
+
+
+<pasted_content id="a2a1">
+ Start now: a session for stack 05's opening spike (05-0). It needs no file in the repo, no pull request, no money and nothing from the stack-04 tail, so it cannot collide with this session. It is also the gate on almost everything after it: it settles how This happened is computed and sets the tolerance that goes into record 0016. That session can also draft record 0016 and record 0017 (events and states) as proposed, for you to read while the tail lands.
+
+      One thing must wait. Those records rewrite propagation.md and diff.md, and the unlanded evals branch has just rewritten both. The stack-05 docs pull request therefore waits until the evals branch is on main.
+
+      Soon, and lower priority: a session for the front of stack 06.
+      - It would draft records 0018–0020 and the short thesis chapters, and do the half-hour Polymarket look (R11).
+      - Once you accept those records, it can build 06-1, the quote and the edge. That lives in new packages (thesis/, grounding/) that nothing else touches, and it needs only Suppose, which the red team measured as exact to four decimal places in the prototypes.
+      - It must stop there. 06-2 onward depends on the spike's answer and on the engine flip. 06-4 edits the Inspector, panel and tile, which the growth branch and the polish pull request are about to change.
+</pasted_content id="a2a1">
+
+
+Please do a principled analysis on what work can be done right now on stack 5 and 6. Another agent right now is working on the completion of stack 4. Use opus 5 sub-agents to execute your work.
+
+---
+
+<task-notification>
+<task-id>af9cc1b157d2587d4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/af9cc1b157d2587d4.output</output-file>
+<status>completed</status>
+<summary>Agent "Polymarket contract look (R11)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me by opening, in order:** `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-polymarket-look.md` · then `/Users/kentgang/git3/katalyst/plans/analysis/scripts/polymarket-look/commands.sh` and re-run it (it needs `--resolve`; see below) · then `event-hormuz-oct31.json` and `clob-book-hormuz-oct31-yes.json` in that directory. `git status` is clean — I changed no tracked file.
+
+**What I did.** About twenty-five keyless calls to Polymarket's Gamma, CLOB and docs hosts, all raw responses saved, no key, no cookie, $0. **Network gotcha:** Kent's LAN resolver answers NXDOMAIN for every `polymarket.com` host; 1.1.1.1 answers normally, so every call carries `--resolve`. A live read will fail on this machine as configured.
+
+**The answer.** **No Brent contract exists on Polymarket** — every hit for *brent* is a person's name or Brentford FC; crude is WTI-only, daily/weekly/current-month. So `M1`'s stand-in can never be made real. **But the map's hypothesis has one:** *"Strait of Hormuz traffic returns to normal by October 31?"* — bid .06 / offer .08 / **mid .07**, $119k resting, $755k traded, settling 2026-11-01, **the same day claim `H` resolves**. Different counter (IMF PortWatch, not Lloyd's List) and an easier test (one 7-day-average print ≥ 60 vs fourteen consecutive days), so: near miss on the words, exact on subject and date. Recommended: rewrite `H`'s criteria to the venue's words, add a `market` ending off `H` naming the contract, keep `M1` as the honest *"no contract quotes this claim"* path.
+
+**Not optional, whatever Kent picks:** `N1.not_tradeable_reason` ("no venue quotes a contract on a diplomatic round") is **false** — *"US x Iran diplomatic meeting by October 31, 2026?"* trades .33/.35 on $184k, and its rules explicitly admit mediated indirect talks.
+
+**Two corrections to accepted docs.** ADR-0010's rate limits ("4,000 per 10 s…") appear **nowhere** in today's 178-page docs — it states a number nobody can cite. And "the quoted spread becomes the range" is wrong in kind: a bid-offer spread is a cost, not an interval; the venue publishes no interval, so the fixture's `market=Belief(.48, .45, .52)` traces to nothing.
+
+**Owed once stack 04 has landed:** the `hormuz.py` and ADR-0010 edits above — both files are on the do-not-touch list; exact replacement wording is in the report.
+
+**Unsure / unresolved:** I could **not** read Polymarket's terms of use (client-rendered page). Somebody must, before a dated quote file is committed. Also unchecked: fees, Kalshi, the POST batch endpoints, geoblock.</result>
+<usage><subagent_tokens>132448</subagent_tokens><tool_uses>38</tool_uses><duration_ms>478374</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8323a482b9c1132</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aa8323a482b9c1132.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0016, 0017, 0021" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me, in order:** `sh /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/rerun-the-evidence.sh` (~4 min, no key, no money — re-runs every number in the records; saved output beside it) · `cd /Users/kentgang/git3/katalyst-wt/adr-05-sound-numbers &amp;&amp; git status --short` (should show exactly 3 new + 3 modified files under `docs/adr/`) · then read `docs/adr/0016-…md`, `0017-…md`, `0021-…md`.
+
+**What I did.** Three `proposed` records and three dated amendments in the worktree, plus the owed list. Git untouched.
+
+| File | |
+|---|---|
+| `docs/adr/0016-a-claims-number-is-the-chance-it-happens-by-its-deadline.md` | 302 lines. Three defects with reproductions, four options costed, the decision, what `series` now means, the `p = 1.0` readers, the two oracles, staging, honest cost, the path-product replacement as a section, *If the spike's kill criterion fires* |
+| `docs/adr/0017-a-claim-is-an-event-or-a-state-and-nothing-retracts-itself.md` | 182. Reverses 0014 decision A; amends 0005's `mode` table |
+| `docs/adr/0021-what-version-one-does-not-build.md` | 134. Each cut quoted in its own words; says in one line why the number is 0021 |
+| Amendments appended to `0005`, `0014` (a *Second amendment*), `0009` | 0009's is in force now; the other two take effect on acceptance, and each carries a pointer blockquote under the title so a reader cannot read a reversed decision as live |
+| `plans/notes/2026-09-21-stack-05-docs-owed.md` | 200 lines: PRD (INV-8, FR-11, FR-31, UX-14, anti-pattern 12, the seven cuts, FR-8's dead reopening condition, §12's stale rows), `ARCHITECTURE.md` (8 passages), `vocabulary.md` (9 entries), the index rows, and heading-by-heading outlines of `propagation.md` and `diff.md` with R15's cuts folded in |
+
+**What I measured** (all re-run today, all in the saved output): defect 1 — `.3000` where exact is `.4562`, and `Suppose` prints the same `.3000`; defect 2 — supposing the premium moves Brent `.3925 → .4759` and both endings by `0.0000`; defect 3 — a `.001` claim with a `−0.01` arrow leaves a supposed claim reading `withdrawn` from day zero; the band `.1571` wide with every prior frozen; `66.3 ms` per propagate; `sustain` and `trigger` both `0.442471`; four state maps giving `.1483 … .8269`; the recording's **19 accepted arrows, 6 `sustain`, 3 `impulse`, all six leaving `kind: event`**. Everything else is quoted from the engine digest or the red team with its table named.
+
+**16 `&lt;&lt;SPIKE: …&gt;&gt;` tokens.** `0016`: lines 15, 137, 138, 139, 140, 141, 142, 156, 216, 225, 258 (139/216/225/258 are the same value — the *This happened* tolerance). `0017`: 15, 71, 72, 73, 144. Owed note: 108, 114, 122, 125, 147, 150.
+
+**Unsure what Kent decided, resolved and flagged:** whether `persistence` may have a default (design says *default to `event`*, R2 says *the model says which kind*) → Open for Kent in 0017, no default recommended; the field-name collision → Open for Kent, recommending `persistence: once | while`; FR-29's reason (nobody wrote one) → I supplied record 0010's grounding plus the measured base-rate thinness; which half of FR-24 is cut → the last three quantities, with record 0019 named as owner of the rest; the `series` grid question (12–24 points vs `SERIES_CAP = 180`) → resolved as read-off-the-integral with a cost token that **may be outside the spike's scope**; `sustain_without_a_state` is my proposed code name, in the pattern of the existing twenty.
+
+**Not checked:** no test suite, linter or browser run. `attack3.py` prints a stale hard-coded line, *"Spread 0.31"* — the true spread of its own four printed numbers is `.68`, which is what record 0017 quotes.</result>
+<usage><subagent_tokens>264177</subagent_tokens><tool_uses>67</tool_uses><duration_ms>1038699</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b1xi5igep</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/b1xi5igep.output</output-file>
+<status>completed</status>
+<summary>Background command "Re-run the evidence script behind the stack-05 records, in the background" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae7ac9a335781e12f</task-id>
+<tool-use-id>toolu_01QrGYpgSME8PPhPTY3xopiw</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/ae7ac9a335781e12f.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0018-0020, thesis chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me, in this order**
+
+1. `cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync python /Users/kentgang/git3/katalyst/plans/analysis/scripts/finance/check_stop_claims.py` — prints every measured number in record 0019.
+2. `git -C /Users/kentgang/git3/katalyst-wt/adr-06-the-trade status --short` and `git diff spec/graph/belief.md` (10 lines, two dated amendments).
+3. Read `docs/adr/0019-…`, then `0018-…`, `0020-…`, then `spec/thesis/README.md` and its five chapters.
+4. `plans/notes/2026-09-21-stack-06-docs-owed.md`.
+
+**Written** — records `0018-an-edge-is-computed-from-the-unsupposed-world.md`, `0019-a-stop-is-a-price-the-reader-owns.md`, `0020-a-quote-is-recorded-first-and-fetched-second.md`, all `proposed`; chapters `edge.md`, `quotes.md`, `position.md`, `what-takes-you-out.md`, `card-and-export.md`; `spec/thesis/README.md` rewritten (the "derived, not guessed" sentence withdrawn with a dated note). **Kept all five proposed chapters, no merge or split**: each is one record's idea or one pull request's surface, and splitting card from export would leave two chapters that only reference each other.
+
+**Measured myself** (script above, `main` = 48eb562): the only claim resolving strictly before the contract ending is B, the step the thesis rests on; all seven claims sit below one half so all seven sweep rows flip *to true*; the recorded map's payoff kinds are `{'price': 11}`. I also re-checked every Polymarket figure I quote against the raw files and corrected P once — the first bid is `.01`, not `.04`.
+
+**Tokens left** — three, all the same spike: `docs/adr/0019-…:87`, `spec/thesis/position.md:28`, `spec/thesis/what-takes-you-out.md:26`. Every `&lt;&lt;R11&gt;&gt;` is filled from P's report. 0019 says it cannot be accepted in full until the spike lands, and marks which parts are independent of it.
+
+**Resolved by me** — the digest defines break-even two incompatible ways (`quote + costs`, and "worth buying below 44¢"). I took the second: a *price*, from the model and costs alone, so it survives the missing-quote case. Flagged in 0018 with the rejected reading.
+
+**Open for Kent** — 0019: greyed Kelly ceiling (recommend: out). 0020: rewrite the hypothesis to the venue's test and add a contract ending (recommend: yes; fixture edit, engine lane); and **a person must read Polymarket's terms before any quote file is committed**.
+
+**Owed** (not applied): nine PRD edits word for word, `vocabulary.md` additions, `ARCHITECTURE.md`, three index rows, `diff.md`'s two stop-loss passages, five fixture fixes, plus "06-1, ready to build" — new packages and tests only, **no route**, because a route regenerates `schema.ts`.
+
+**Not checked**: I ran no test suite and no linter; the named tests do not exist yet.</result>
+<usage><subagent_tokens>284125</subagent_tokens><tool_uses>93</tool_uses><duration_ms>1349101</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7897833f7b834f11</task-id>
+<tool-use-id>toolu_016D9Kzs4RnGkaACkG9KPzvs</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a7897833f7b834f11.output</output-file>
+<status>completed</status>
+<summary>Agent "Review records 0016, 0017, 0021" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Report:** `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-review-adr-05.md`
+
+**Counts: 17 must-fix · 25 should-fix · 10 nits · a per-section cut list for each record.**
+
+### Must fix, in full
+
+**Numbers and sources (checks 1)**
+
+1. **0016:82** — `0.25`/`0.01` called a *spread*; the engine digest says **variance** (a coin flip's spread is `0.5`). Cited to `recheck.py` §5, which prints only timings.
+2. **0016:82, :142** — `66.3 ms` / `8.6 ms`. D5's own saved output says **65.7 ms / 8.4 ms**. `66.3` appears nowhere under `plans/`.
+3. **0016:85** — `0.5 ms` / `1.7 ms` were measured at **200 versions**, not today's 2 000; the qualifier is dropped, so it is compared like-for-like against a 2 000-version 66 ms. The design page flags this explicitly; the record's own spike token says the count is unmeasured.
+4. **0017:69** — record says `.68`; D5's saved output prints **`Spread 0.31`**. That `0.31` is a hard-coded string literal in `attack3.py:106`. The rerun script offered as proof contradicts the record.
+5. **0017:115** — the six illegal `sustain` arrows are justified by **`kind: event`**, the wrong field. The recording carries **no `persistence` at all**; the record's own *Open for Kent* §1 says `kind` and `persistence` are different. The real consequence is broader (all 18 claims, not 6 arrows).
+6. **0016:19** — "on `main` (`48eb562`)". `main` is **`6afff5c`**.
+7. **0016:244** — "nine or ten sessions … the adversarial pass's estimate". The pass says 5–7 for 0016 and the digest 1.3 for 0017; `9.5` is the *whole stack*. Line 289 says "five to ten".
+8. **0021:132** — "the list of cuts he named" — the decisions note records them under *"What the coordinator decided **without asking**"*. FR-17 and FR-29 appear on no list at all (FR-29 isn't even in design §7).
+9. **0017:144** — *Open for Kent* §1 recommends renaming Kent's own words (`event|state` → `once|while`, R2), and hides a name behind a `&lt;&lt;SPIKE:…&gt;&gt;` token no spike can fill.
+
+**Owed list (check 6)**
+
+10. **§3:113** — a paraphrase printed as a quotation; the quoted `ARCHITECTURE.md` passage does not exist (the real bullet is at :297, and its last sentence is the one R3 drops).
+11. **§3** — heading says "Six passages", table lists eight.
+12. **§3/§2 missing** — `ARCHITECTURE.md:133` (INV-8/INV-10 clause, stale stack numbers), `ARCHITECTURE.md:295` ("never deeper than four"), and **FR-15 (P0)** (`sustain` links retract).
+13. **§4 missing** — every `spec/vocabulary.md` entry 0021 falsifies: `Probe`, `Value of information`, `Provenance` (`historical`, `simulated`), `Thesis` (CVaR₅, max drawdown, P(ruin)). 0021's `spec-impact` names neither vocabulary.md nor FR-8.
+14. **§2.5** — UX-14 quoted with its last sentence silently dropped (0017 quotes the same line *with* an ellipsis — the two disagree).
+
+**Rest**
+
+15. **0021:99** — "five to six sessions" is unsourced; the nearest figure (red team S5) prices a different set of cuts.
+16. **0016:217** — "four orders of magnitude of headroom": 1.7 ms against the record's own 300 ms budget is ~180×.
+17. **0021:108** — `grep -rn "ensemble" backend/src` is stated as a passing check; it hits `engine/expand.py:26`.
+
+**Sound:** every code citation except `apiSource.ts:263` (points at a comment; the line is 266); every Context measurement against the saved output; the whole accuracy table against the red team's; every PRD quotation in 0021 verbatim; both chapter outlines complete, no section missed; the 0009 amendment correct throughout; each amendment's in-force sentence right; `git status` clean at exactly 3 new + 3 modified, all under `docs/adr/`.
+
+**Length:** 0016 is 6 138 words. The two largest cuts, ~780 words, lose nothing: move *Chains are worked out, not multiplied* (381) into its own record — R3 permits it and 0016's own landing table already puts it on a separate pull request — and cut *What this record amends, sentence by sentence* (480) to four lines, since the two dated amendments in the same pull request say it all again in more detail.</result>
+<usage><subagent_tokens>222962</subagent_tokens><tool_uses>39</tool_uses><duration_ms>947595</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a41ce01f319d0bf5c</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a41ce01f319d0bf5c.output</output-file>
+<status>completed</status>
+<summary>Agent "Review records 0018-0020, thesis chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The worktree is untouched (`plans/` is git-ignored, so the main repo reads clean). Report written.
+
+**Check me, in order:**
+```
+cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync python /Users/kentgang/git3/katalyst/plans/analysis/scripts/finance/review/mixture_seeds.py
+cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync python /Users/kentgang/git3/katalyst/plans/analysis/scripts/finance/review/first_touch_reflection.py
+```
+
+**Report:** `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-review-adr-06.md`
+**18 must fix · 21 should fix · 17 nits · cut list ≈ 5,900 words.**
+
+**Must fix, in full:**
+
+1. **Edge sign convention makes costs help a short.** `edge = p − q − c` is right for a buy, wrong for a sell (p .40 / mid .48 / c .01 → stated −.09, true short profit +.07). Four files. State the formula and make costs follow the side.
+2. **Break-even double-counts the half-spread** — never says whether it bounds the mid or the executable price; the two differ by a whole half-spread.
+3. **"Break-even band" named two ways; `test_costs_only_ever_narrow_the_break_even_band` asserts the opposite of its own description** (more costs *widen* the no-trade band).
+4. **A price-ending break-even is not a defined quantity.** `PricePayoff` holds instrument/direction/`move` (a fraction); ADR-0013 says `move` "is not a return, because a return needs an entry price". Entry is on `Position` (06-2). So `INV-thesis.3` and `test_a_missing_quote_still_prints_a_break_even` are unbuildable over `graphs()` — on the ending kind all eleven recorded endings use.
+5. **Mixture: wrong condition, and measured it fails.** Criterion is confounding (a cause reaching the ending by another route), not "has causes". Measured: hypothesis gap flips sign across seeds at ±6e-4 (noise); supposing **B** — whose causes reach M1/M2 *only through B* — is −0.0028…−0.0044, same sign every seed. Cause is the *date* `Do` pins, never mentioned. Also: "explains, never computes" vs a test asserting equality — pick one.
+6. **"Ratio within three standard errors of two" is a test that fails.** Daily monitoring, not continuous: measured ratio 1.66–1.71, failing by 3.1σ at 2,000 draws and 28σ at 200,000; passes only at the 200-draw floor where the test asserts nothing. `digest-finance.md:180` already named the Broadie–Glasserman–Kou barrier shift; the chapters dropped it.
+7. **Lift:** numerator lost "before the stop" (inflates lift, makes median-days negative); a Wilson interval is for a share, not a ratio of two *dependent* shares, and no coverage is stated; `weight` is ignored.
+8. **Paths double-count the claim's impact** against a spot that already prices it (free alpha, in the flattering direction), and the path is undefined/unsound for a contract ending (Gaussian walk leaves [0,1]; truth already in `when`).
+9. **A number typed into the spec that traces to nothing:** "a seven-point interval built from a two-point spread" — the fixture has no two-point spread. In `belief.md`, 0020 and `quotes.md`, inside the paragraph condemning untraceable numbers.
+10. **The model's own range is absent from the edge.** A tick rule but no band rule: .456 vs .48 inside a .28–.55 band.
+11. **`different_question` cannot appear anywhere** — it prices claim H, which has no payoff and so no card row. Stated as a demonstrated fact in four files.
+12. **"One real, liquid price" is not on the map**: the real contract *is* the different-question one, and the walk runs on the recorded map (11 price endings, no contract). `quotes.md:58` contradicts `0018:66`.
+13. **A reader's typed price is called an *edge***, a word reserved for model-vs-venue; this is user-minus-model.
+14. **`priced()` undefined for six cases** (no payoff, `not_tradeable`, price ending with a quote, settled market — with no room in the closed reason list, quote=None mapping, how `conditional_world` is detected) and **no input can carry `different_question`**.
+15. **Five of 06-1's tests need a renderer, card, route or module 06-1 forbids or does not own** (`fred.py` absent from the owned files).
+16. **`test_market_belief_never_merged` does not exist** — it is `test_beliefs_never_merged`.
+17. **Record 0016 does not exist**, and two tests are written "to record 0016's tolerance" (an output of the 05-0 spike).
+18. **`Draws` carries only `when`, which cannot describe a state** — R2 (binding) says a state needs an on-time and an off-time. This is the one shape that couples the trade layer to the engine.</result>
+<usage><subagent_tokens>263465</subagent_tokens><tool_uses>64</tool_uses><duration_ms>1023291</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8323a482b9c1132</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aa8323a482b9c1132.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0016, 0017, 0021" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me, in order:** `sh /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/rerun-the-evidence.sh` (re-run just now; saved output beside it — it now has a **section 6** that *computes* the state spread, and a **section 5** that prints `persistence` per claim) · `git -C /Users/kentgang/git3/katalyst-wt/adr-05-sound-numbers status --short` (4 new + 3 modified, all `docs/adr/`) · read `0016`, `0022`, `0017`, `0021`.
+
+**Must-fixes, all 17 closed.** MF1 *variance*, cited to engine digest §3a; `recheck.py` §5 kept only for the timings. MF2 the saved run now prints **66.4 ms / 8.4 ms** — both quoted, with one clause saying a wall-clock timing is a run-to-run band (two runs today: 65.7, 66.4). MF3 every `0.5 ms / 1.7 ms` now carries *"measured with 200 versions, not today's 2 000"*. MF4 section 6 computes **`.6787`** from the four printed values; the record cites it and says the red team's summary line is a stale literal — their file untouched. MF5 rewritten: the recording **states no `persistence` at all** (all 18 claims), so no default ⇒ every claim refused, default `event` ⇒ the six `sustain` arrows; `kind` demoted to a side note. MF6 `main` = **`d44634a`**; measured at `48eb562`; I verified `git diff 48eb562 d44634a -- backend/src/katalyst/domain` is empty. MF7 five-to-seven (M5) + 1.3 (digest §5.3) = six-to-nine; stack 05 ≈ 9.5 (S4); the second figure now agrees. MF8 authority stated up front — Kent decided FR-31 only; the rest are coordinator proposals; **FR-17 and FR-29 flagged as new with no prior decision**. MF9 token deleted; **Kent's `event | state` is the recommendation**, `once | while` the alternative with its cost. MF10 real bullet quoted, and deleted rather than deferred. MF11 nine rows, counted. MF12 `ARCHITECTURE.md:133`, `:295` and **FR-15** added. MF13 all four vocabulary entries added; `spec-impact` now names `spec/vocabulary.md` and FR-8. MF14 UX-14 quoted whole; the replacement says what becomes of the insert-outranks rule; 0017 uses an explicit ellipsis. MF15 session figure deleted. MF16 *"about a hundred and eighty times inside the 300 ms budget"*, cited. MF17 grep replaced by a check that passes, with the docstring hit named.
+
+**Should-fixes:** all 25 taken. Nits: 1–10 taken except 7 (already gone with the rewrite).
+
+**Word counts** (`wc -w`, the reviewer's method): 0016 **4 098** · 0017 **2 814** · 0021 **2 349** · 0022 **1 373**. 0016 was 6 138 and is −33% with §*Chains* moved to 0022; **I did not reach 3 200 / 2 200 / 1 500** — the residue is measurement payload plus the required MADR sections, and I judged further cuts would drop cited numbers. The reviewer itself called 0021 "about right" at 2 320. Say the word and I will cut 0016 further by dropping the option glosses and the *If the kill criterion fires* paragraph.
+
+**Remaining tokens (13 in records, 7 in the owed list):** `0016` lines 93, 94, 95, 96, 97, 98, 106, 123, 132, 157 (123/132/157 reuse *the measured tolerance for This happened*); `0017` lines 65, 66, 67 (S2's three); owed list lines 121, 129, 140, 164 ×2, 167 ×2.</result>
+<usage><subagent_tokens>413718</subagent_tokens><tool_uses>60</tool_uses><duration_ms>1164625</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a0c9bdeb30d32977a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a0c9bdeb30d32977a.output</output-file>
+<status>completed</status>
+<summary>Agent "Spike: This happened" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is measured, written and clean. The repository proper is untouched (`git status` empty); the red team's and engine analyst's scripts still carry their original timestamps.
+
+**Check me, in this order:**
+1. Open `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-spike-05-observe.md`
+2. `cat /Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/observe/logs/baseline-redteam-attack2.log` — the red team's own unmodified script, re-run
+3. `.../logs/{selfcheck,candidates,timing20,versions,midpoint,when_table}.log`
+4. `/Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/observe/README.md` — one command per table
+
+**What I did.** Reproduced the red team's sweep exactly (no edit `.00027/.0046/.0175/0.9%`; *Suppose* `.00007/.0015/.0259/0.2%`; *This happened* `.00127/.0151/.2043/6.6%`), then measured four candidates against `exact_over_times` on the same 140 maps, and costed each on a 20-claim map with a range.
+
+**The verdict is a kill, and not for the reason expected.** Accuracy has a clear winner: the weighted forward sample with the exact solve as a control variate holds `.005` on **100.00%** of *This happened* numbers at 200 000 worlds (99.98% at 50 000), worst `.0020`, effective sample size 96.7% of worlds drawn. Candidate (b) fails at 93.4%; (c) per evidence day 95.6%; (c) widened to the evidence's whole read reach passes at 99.93% but is the rejected exact-over-times cost.
+
+**The clock kills all of them.** At 20 claims and 200 versions the *shared* forward pass — calibration plus the conditional tables, which every candidate pays before anyone asks a question — is **2.9 s**. The sampler is 0.11 s. Nearest miss: candidate (a) at **3.0 s**, ten times the budget. The 0.5 ms the design was sold on measured the elimination only: `ve_cost.py:238-239` builds factors from a random logistic before the clock starts at `:205`.
+
+**Two findings beyond the brief.** Representing an arrival by its slice's *middle* rather than its *end* cuts the 24-slice grid error from worst `.0290` to `.0027` — one line, free, and 12 slices middle-day beats 60 slices last-day. And 2 000 versions is right, not 200: at 200 the band's ends wander a tenth of the band's width.
+
+**Unsure, resolved:** whether the grid convention changed the ranking — re-ran every candidate under it; it does not.
+
+**Owed once stack 04 lands:** nothing.
+
+**Not checked:** accuracy above four claims (judge not computable); the correction's version-to-version movement on a *hard* map; fewer integration points per slice (cost only); state claims; the stop-versus-target number itself.</result>
+<usage><subagent_tokens>356735</subagent_tokens><tool_uses>118</tool_uses><duration_ms>3538252</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae7ac9a335781e12f</task-id>
+<tool-use-id>toolu_01Tbgq1TaF6kTAD3NkRGSiPS</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/ae7ac9a335781e12f.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0018-0020, thesis chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me:** `git -C /Users/kentgang/git3/katalyst-wt/adr-06-the-trade diff spec/graph/belief.md` (3 dated notes), then read 0018 §*The arithmetic*, 0019 §*What was measured* + *Open for Kent*, 0020 §*Open for Kent*, `spec/thesis/edge.md` §*What `priced` does in every case*, and Part 2 of `plans/notes/2026-09-21-stack-06-docs-owed.md`.
+
+**Must-fixes, by number.** **1** two edges — buying = model − offer − fee, selling = bid − model − fee, formulas in the record, both chapters, README and the owed vocabulary entry. **2/3** break-even = model ± fee, stated once as bounding the *executable* price; one name, **no-trade band**; test renamed `test_more_fees_widen_the_no_trade_band`. **4** a price ending returns `no_contract` with `break_even = None`; INV-thesis.3 restricted to contract endings; the spot-anchor paragraph deleted. **5** mixture is an explanation with a measured residual; real condition (another route) plus the date-pinning cause; the review's measurements quoted; equality test deleted, replaced by `test_the_mixture_terms_weigh_to_one`. **6** ratio-two withdrawn by name; inequality kept; barrier shift named and explained. **7** lift numerator restored to *before the stop*; Wilson on the numerator share only, no coverage claimed for the ratio; both shares weighted; floor counts effective draws. **8** contract endings refuse first touch by name; double-counting is Open for Kent #1 in 0019. **9** "seven-point from a two-point spread" gone from all three files; only the fixture's own value cited, with line. **10** edge computed at both ends of the model's range; sign flip ⇒ not ranked; card says which threshold bit. **11** `different_question` dropped; kept as a curation rule in 0020. **12** README and quotes.md now say two things, not three, and name the recorded map. **13** a `user` quote is the reader's *report of a venue price*; edge labelled *against a price you entered*; never the market slot. **14** total decision table in edge.md, seven rows, plus `settled_market`; `conditional_world` decided by `base.assignments`. **15** four tests moved to 06-3, FRED test to 06-2, `fred.py` out of 06-1. **16** `test_beliefs_never_merged` everywhere. **17** 0016/0017 called forthcoming; no 06-1 test depends on a tolerance. **18** `Draws` carries on **and** off times, with a token.
+
+All 21 should-fixes and 15 of 17 nits taken (skipped: nit 16 *unhedgeable*, pre-existing; nit 17 is an owed correction to P's report).
+
+**Word counts** — 0018 2,239 · 0019 2,457 · 0020 2,429 · edge 1,678 · quotes 1,723 · position 1,704 · what-takes-you-out 1,585 · card-and-export 1,593 · README 680. Records are at or near 2,200; chapters land ~1,600 against 1,200 — I cut everything the cut list named, and the must-fixes (decision table, barrier shift, lift interval, tie rule, contract refusal) put words back.
+
+**Tokens** — `0019:89`, `0019:90`, `position.md:21`, `position.md:22`, `what-takes-you-out.md:30`.
+
+**Open for Kent** — 0018: none, stated. 0019: (1) the path double-counts what the spot prices — recommended: the reader states how much is priced; (2) a greyed quarter-Kelly ceiling — recommended: leave out. 0020: (1) which map carries a venue price on the walk — recommended: honest with none, let the freeze try; (2) may a dated quote file be committed — recommended: a person reads the terms first.</result>
+<usage><subagent_tokens>438430</subagent_tokens><tool_uses>79</tool_uses><duration_ms>1233412</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aaf8e6bf59e28ad96</task-id>
+<tool-use-id>toolu_012eysG6e2g7C6k2GdKFxyxt</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aaf8e6bf59e28ad96.output</output-file>
+<status>completed</status>
+<summary>Agent "Spike: what a state costs" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>All numbers reproduce. The work is complete.
+
+## What the coordinator must run or open to check me
+
+```
+open  /Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-spike-05-states.md      # the report
+open  /Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/states/README.md  # what each script is
+cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY nice -n 10 uv run --no-sync python -u \
+  /Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/states/check_judge.py   #  ~1 min
+  ...                                                 /states/hormuz.py                 #  ~2 min
+  ...                                                 /states/cost.py                   #  ~1 min
+  ...                                                 /states/rules.py                  #  seconds
+  ...                                                 /states/sweep.py                  # ~12 min (--quick: 4)
+```
+`*.log` beside each script is the run the report quotes. Repo working tree untouched; `git status` clean.
+
+**What I did.** Extended the red team's exact-over-times enumerator so a state carries an `(on, off)` pair on the same grid, built the design engine beside it with five codings of a state, and measured.
+
+**The definition.** A state has two times. Its **on-rate** works exactly as an event's rate; its **off-rate starts at zero** and is the sum of its ending causes — so no second elicited number, and a state nothing can end is an event (identical to 1.1e-16, `check_judge.py`). **The sign decides which rate an arrow bends** — no new field. **One interval.** The number answers *is it holding on its deadline*. `sustain` reads the source's interval, `trigger` its on time alone. **One new validity rule**, `sustain_from_an_event`.
+
+**The measurements.** The judge reproduces `rt_core.exact_over_times` to 1.1e-16 (829 numbers). `sustain` vs `trigger` out of a state: .2822 vs .3059, where the red team had six decimal places of nothing. Over 240 adversarial maps (3,322 numbers, no edit and every *Suppose*), the one-bit coding gives mean .00013, p99 .0032, worst .0104, **99.5 % within .005** (99.2 % on endings). On 82 skeletons measured **twice**, states-on gives 99.6 % and all-events 99.8 % — a state costs what the engine already pays. The *ever held* bit fails as predicted: 6.9 % of endings over .005, worst .0712, worse at a finer grid. Cost: identical factors/entries/time to an all-event map (64 / 150 / 2 ms).
+
+**Hormuz, illustrative inputs.** Both events stand at 1.0000; the state falls .6133 → .1675; the ending .2920 → .2590. No retraction machinery. The .001-prior defect: supposed claim 1.0000 on all 30 days.
+
+**Unsure, resolved:** my first control was weaker than the red team's, so I rebuilt it on their recipe with the same skeletons both ways. One generator choice is mine and flagged in §9.
+
+**Two things for Kent, not decided here:** the `kind="event", persistence="state"` collision (recommend renaming `kind`'s `event` to `middle`), and R6's arrow wording — **14.8 % of 8,082 ending arrows could not reach their elicited number**; a six-day spike bites harder than a permanent step.
+
+**Owed once stack 04 lands** — §8 tables nine files with passage and replacement. **Not checked:** *This happened* (S1's lane), maps above four claims, what a state does to the band.</result>
+<usage><subagent_tokens>354980</subagent_tokens><tool_uses>165</tool_uses><duration_ms>4837941</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aaf8e6bf59e28ad96</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aaf8e6bf59e28ad96.output</output-file>
+<status>completed</status>
+<summary>Agent "Spike: what a state costs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Those are just the shells running the check itself — no spike processes are left. Nothing new happened: the notification was the wait-loop I had set on the sweep regeneration, which I already verified reproduces the reported numbers exactly.
+
+Final state, unchanged from my report:
+
+- **Report:** `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-spike-05-states.md`
+- **Scripts + logs:** `/Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/states/` — `README.md`, `st_core.py`, `maps.py`, `check_judge.py`, `sweep.py`, `hormuz.py`, `cost.py`, `rules.py`, each with the `.log` the report quotes.
+- **Repository working tree: clean** (`git status --short` returns nothing). No product code written, no file in the repo or any worktree changed, no git command that changes anything run, $0 spent.
+
+The regenerated `sweep.log` matches the reported figures line for line: `hold` at mean .00013 / p99 .0032 / worst .0104 / 99.5 % within .005 across 3,322 numbers, the 82-skeleton control at 99.8 %, `ever` at 6.9 % of endings over .005, and 1,194 of 8,082 ending arrows (14.8 %) clamped.</result>
+<usage><subagent_tokens>353747</subagent_tokens><tool_uses>167</tool_uses><duration_ms>4857277</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8323a482b9c1132</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aa8323a482b9c1132.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0016, 0017, 0021" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me:** `git -C /Users/kentgang/git3/katalyst-wt/adr-05-sound-numbers status --short` (4 new + 3 modified, all `docs/adr/`) · read `0017` · `sh /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/rerun-the-evidence.sh` (unchanged this round) · I re-ran the spike's `check_judge.py` and re-measured the collision counts myself on `main`.
+
+**Tokens filled — all three of 0017's, none of 0016's.**
+
+| Was | Now | Source |
+|---|---|---|
+| what a state's number answers | *the chance it is holding on its deadline* — on by the deadline, not yet off; with both tile sentences | spike §1/§7; `sweep.py` |
+| how on/off are represented, and the variable count | forward pass carries the 13 × 13 joint of the two times; the solve's table carries **one bit** | spike §2.3/§4 |
+| the cost on a 20-claim map | 20 claims, 5 states: largest factor **64**, entries **150**, **2 ms** — identical to the same maps with no state | `cost.py`, `cost.log` |
+
+**Re-run by me, not just quoted:** `check_judge.py` — a state nothing can end equals the same claim as an event to `1.1 × 10⁻¹⁶`; `sustain` `.2822` vs `trigger` `.3059`. The name-collision counts reproduce exactly: **42** code lines, **17** doc lines. *(`rules.py` §A could not run — it reads the now-deleted `feat-04b-recordings` worktree; the recording is on `main` and my own evidence script already measures it there, giving the same 18/19/6/no-`persistence`.)*
+
+**Code name:** `sustain_without_state`, everywhere. All twenty existing codes are article-free and twelve are `&lt;subject&gt;_without_&lt;required&gt;`; the spike's `sustain_from_an_event` has an article and a preposition no code uses. Noted in the record and the owed list.
+
+**Caveat stated** in the record's opening blockquote: measured under the prototype's rate model; if 0016's second round changes it, the sweep is re-run before acceptance.
+
+**0017's *Open for Kent*, final:** **1. The name** — (A) rename `kind`'s `event` → `middle`, recommended, with the 42/17 cost and "no second re-recording"; (C) leave both, free, misreading ships; (B) `one_off | ongoing`. **2. The R6 ending-arrow wording** — the four-row half-life table, `.5110/.1018/.1373/.1642` non-monotone against `.6829/.6478/.5050/.4132`, and **14.8% of 8 082 ending arrows clamped**; recommended: one prompt sentence in the freeze, ending arrows only. **3.** Whether a hand-written map may omit `persistence`.
+
+**Quotations corrected — 7.** 0017, 0021, 0022 and 0009 each had a condensed paraphrase of a decisions-note row in quotation marks attributed to Kent; 0016 had three (one with quote marks, two italicised). All now read *"Kent's decision, recorded as row Rn of the dated decisions note"*, with *"those are the decisions note's words for his choice, not a transcript of his own"*. The quotes that remain are verbatim from a named file (ADR-0005's *"best idea in the brainstorm"*, `spec/graph/proposition.md:328`, record 0014's own bullets, the recording's model sentence).
+
+**Owed note:** spike §8 merged into §7 as a table with the rename's starting point (`spec/graph/proposition.md`), `link.md`'s two modes, the code name ruling, `TILE_MAX_HEIGHT`, and the `_fixed_days` caution. The two state tokens there are gone.
+
+**Word counts: 0016 4 137 · 0017 4 013 · 0021 2 362 · 0022 1 392.** I again missed the targets (0017 asked ≤2 600) and will not pretend otherwise — the spike's evidence is dense and I chose not to drop cited numbers. Concrete way to close it if you want: move 0017's *How a state is carried, and at what accuracy* (~330 words) into `propagation.md` and leave only the `.005`/99% line in *Confirmation*; that alone is ~2 600 achievable with nothing lost but a pointer.
+
+**Remaining tokens — 10, all 0016's, all the *This happened* half:** `0016` lines 93, 94, 95, 96, 97, 98, 106, 123, 132, 157 · owed list lines 121, 129, 140, 167.</result>
+<usage><subagent_tokens>484073</subagent_tokens><tool_uses>29</tool_uses><duration_ms>425159</duration_ms></usage>
+</task-notification>
+
+---
+
+What are the outstanding decisions that require my input or judgement?
+
+---
+
+<task-notification>
+<task-id>a0c9bdeb30d32977a</task-id>
+<tool-use-id>toolu_01TLBRiEEtW3LQNu9nkSzoZv</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a0c9bdeb30d32977a.output</output-file>
+<status>completed</status>
+<summary>Agent "Spike: This happened" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Round two is complete. The repository is untouched (`git status` empty); round one's scripts and the red team's carry their original timestamps.
+
+**Check me, in this order:**
+1. Open `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-spike-05-observe-round-2.md`
+2. `.../scripts/spike-05/observe/round2/logs/{check,timing_add,candidates_add,hardmap,model_diff,inhibitors}.log`
+3. `.../scripts/spike-05/observe/round2/README.md` — one command per table
+
+**Your hypothesis is right about the arithmetic, and the measurement is decisive.** The forward pass on the twenty-claim map at 200 versions goes from **2 879 ms to 27 ms** (round one's figure at 24 slices was 9 578 ms for *fifty* versions). `check.py` proves the two load-bearing claims exactly: averaging one cause at a time equals averaging the full table to **4.4e-16**, and many versions in one pass equals one at a time to **0.0**.
+
+**Still a kill, but the miss is 1.2× rather than 10×.** At 2 000 versions — the count round one found a range needs — the winning candidate is **360 ms** (538 ms at a real inhibitor density). At 200 versions it is **97 ms and passes both halves**. Named relaxations that buy it: a 600 ms budget, or 200 versions, or a band printed to one significant figure. Unmeasured headroom: the solve runs twenty elimination passes where a junction tree needs two (80 ms of the 360).
+
+**Where the hypothesis is wrong.** (1) Closed-form calibration holds for arrows that *help*, at every shape — not for arrows that hold a claim back; I used a linear-in-shape scaling that is closed form, and **30.0%** of such arrows still saturate. (2) Cost goes as causes × slices for helpers only; arrows that hold back still force enumeration — three cost 1.8× the forward pass, the generator's ten cost 70×. (3) Version-independence: right, confirmed from `_draw` and by measurement. (4) The sampler was **slower** (355 ms vs round one's 222) until I took the exponentials once up front; then 215 ms, and 55 ms at the 50 000 worlds accuracy needs. (5) R6 fixes what is *asked*, not how two causes combine — that is a separate decision.
+
+**Two findings beyond the brief.** The additive rate also shrinks the error the spike exists for: the design's worst *This happened* gap falls `.2043 → .0420` (still 5.36% over `.005`, so the sampler stays). And it closes round one's open item: on trial 33 the shared correction moves `.0805` per version under the multiplicative rate — round one's assumption fails there — against `.0020` under the additive one.
+
+**The cost Kent must see:** two causes each taking a claim 10%→40% give **59%** together, not **91%**.</result>
+<usage><subagent_tokens>488950</subagent_tokens><tool_uses>49</tool_uses><duration_ms>2132251</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae7ac9a335781e12f</task-id>
+<tool-use-id>toolu_014ukAzQrkkRRZW3vG6Kh7J6</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/ae7ac9a335781e12f.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0018-0020, thesis chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me:** 0018 §*The shape* point 3 (R20), 0019 §*Where the event days come from* and §*What this record still waits for*, `spec/thesis/position.md` §*Data model*, and §1.11 of the owed note.
+
+**Tokens — all five filled, none left.**
+
+| Was at | Filled with | Source |
+|---|---|---|
+| `0019:89` *(distribution)* | §*Where the event days come from* — the engine's weighted forward sample; `.0023` mean / `.0064` worst total variation against the exact answer; median day moves ≤1 slice (2.5 days) vs ten days for the alternative; caveats (four-claim maps, multiplicative rate, round two did not re-run the day table); `weight` real; effective draws 96.7% mean / 41.8% worst | `spike-05-observe.md` §7 (`when_table.py`), §(a) for the effective share; round two verdict 3 and §5 |
+| `0019:90` *(states)* | folded into the same section: `Draws` carries on and off days; the states sweep is being re-run under the additive rate and the shape does not depend on it | `spike-05-states.md` §1, §2.5 |
+| `position.md:21,22` | §*Data model* — two days per claim with the reasoning, plus a four-sentence *Where the days come from* pointing at 0019 | same |
+| `what-takes-you-out.md:30` | the weighted forward sample named inline, with `.0064` and the 2.5-day bound; effective-draw share attached to the 200 floor | same |
+
+**R20 in 0018.** Point 3 now states the decision: any fixed value in `base`, from either button, refuses the edge; the cost accepted (a reader who records a real public fact loses the edge on that map until they start from one without it, even though a later quote reflects it); the alternative declined (allow an observation when the quote is dated on or after it). *Open for Kent* now reads **nothing**, and says which question R20 closed.
+
+**Quotations corrected — four.** Three paraphrases were in quotation marks attributed to Kent (R10 twice in 0019, R11 in 0020); all three are now stated as his decision with the row cited, no quote marks. One misattribution: 0020 and my `belief.md` amendment put *"where the venue publishes a spread, that becomes `lo` and `hi`"* in record 0010's mouth — 0010 says *"an interval where the venue gives one"*; the spread reading is `spec/graph/belief.md`'s and the fixture's. Both now say so.
+
+**Word counts** — 0018 2,377 · 0019 2,703 · 0020 2,468 · edge 1,623 · quotes 1,667 · position 1,684 · what-takes-you-out 1,600 · card-and-export 1,568 · README 680. 0019 grew by the spike section (476 words of measured evidence the record exists to hold); chapters sit ~10% over 1,500 with the decision table, barrier correction and lift interval kept intact as instructed.
+
+**Open for Kent, final.** 0018: **none**. 0019: (1) the path double-counts what the spot already prices — recommended, the reader states how much is priced; (2) a greyed quarter-Kelly ceiling — recommended, leave out. 0020: (1) which map carries a venue price on the walk — recommended, honest with none and let the freeze try; (2) may a dated quote file be committed — recommended, a person reads the terms first.
+
+**Owed list** gained §1.11's second paragraph: `spec/graph/belief.md` is also on the evals lane's paused number sweep, my amendment is twelve lines in two adjacent passages with no numbers, and whoever lands second rebases that file by hand.</result>
+<usage><subagent_tokens>488065</subagent_tokens><tool_uses>32</tool_uses><duration_ms>307840</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8323a482b9c1132</task-id>
+<tool-use-id>toolu_01ByzF1X9c3WFyz1jyqNNfqH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aa8323a482b9c1132.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0016, 0017, 0021" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me:** `git -C /Users/kentgang/git3/katalyst-wt/adr-05-sound-numbers status --short` (4 new + 3 modified, all `docs/adr/`) · read `0016`, then `0017` · the owed note.
+
+**All ten of 0016's tokens filled**, plus R18, R19, R21.
+
+| Was (0016 line) | Now | Source |
+|---|---|---|
+| which candidate | a weighted forward sample with the exact yes/no solve as a **control variate** (line 74) | round one §2(a), round two §2 |
+| tolerance, *Suppose* / *This happened* / share | **`.005` per verb** with the sample size named: worsts `.0025`/`.0027`/`.0042` at 50 000 worlds, `.0013`/`.0014`/`.0020` at 200 000; **0.00% over `.005`** (lines 130–131) | `candidates_add.py`; round one §8 |
+| versions per range | **2 000** — `.0086` wander vs `.0275` at 200 (line 100) | `versions.py` |
+| milliseconds | **97 ms** at 200 versions, **360 ms** at 2 000, **113/538 ms** with three holding-back arrows (line 96) | `timing_add.py` |
+| 180 displayed days | dropped; days between grid points are read off the same added-up rate | — |
+
+**The middle is rewritten, not patched.** New: *How two causes combine* (R18, the `.590`/`.910` table, the given-up amplification) · the corrected option-C row — **the digest's 0.5 ms timed the elimination only**, `ve_cost.py:133-135` builds tables from a random logistic before the clock at `:205` (I re-read those lines on `main`) · the kill criterion applied literally in **both rounds**, in one table, saying plainly it fired twice and that **R19 relaxed the budget to 600 ms** · the additive rate with its exactness proofs (`4.4e-16`, `2.1e-15`, `0.0`) and the 2.9 s → 27 ms result · the middle-of-the-slice convention (`.0290 → .0027`) · the `when`-table result (one slice vs **four slices, ten days**) · *If the kill criterion fires* **deleted**, replaced by the two rounds. *Still open* carries the inhibitor cost (1.8× / 5.4× / **70×**, 15.9 s), **30.0%** saturating, four-claim-only accuracy, and the junction-tree headroom (~295 ms).
+
+**R21 folded in.** 0017 now states the rename as decided — the clash (`kind: event, persistence: state`), `hypothesis · step · market · not_tradeable`, `persistence: event | state` keeping Kent's words, `middle` rejected, and the note that `shape`'s `step` is on an arrow not a claim — with the measured 42/17 and "no second re-recording". One sentence says that where the record describes today's code the word is still `event`. Owed note: the rename's starting point is `spec/graph/proposition.md`, with the grep that measured it.
+
+**Open for Kent — final.** 0016: one item, what the screen says about *This happened* being a sample. 0017: two — how an arrow that **ends** a state is asked about (R6, the half-life table, **14.8% of 8 082 clamped**), and whether a hand-written map may omit `persistence`. 0021: FR-17 and FR-29, cut there for the first time. 0022: none.
+
+**Tokens remaining: exactly two.** `0016:84` `&lt;&lt;COMPOSITION: …&gt;&gt;`; `0017:18` `&lt;&lt;SPIKE: states sweep under the additive rate&gt;&gt;`. The owed note's five stale tokens are now filled from the reports.
+
+**Word counts: 0016 4 660 · 0017 3 954 · 0021 2 338 · 0022 1 345** — over target again, and I will not pretend otherwise. What I would cut next, in order: 0016's *three defects* table (~400) into `propagation.md`, leaving three one-line statements with their numbers; 0017's *Hormuz strike, worked* series paragraph; 0021's *Cut in the same pass* list.
+
+**Inconsistencies between the two rounds** — three, all resolved in the record's favour of the later measurement, and stated there: round one's timings are at **12** slices and round two's at **24**, so the 2.9 s → 27 ms comparison crosses grids (round two says so; it is the conservative direction). Round one needed **200 000** worlds for 100.00%, round two **50 000** — the rate model changed, and round two says so. Round two's §2 table uses the **fast end** of the sampler's run-to-run band; `timing_add.log` actually spans **52–95 ms** at 50 000 worlds, so I state the band and the slow-end totals (399 / 578 ms), both still inside 600 ms.</result>
+<usage><subagent_tokens>571455</subagent_tokens><tool_uses>38</tool_uses><duration_ms>557684</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aad37528bffa93c9c</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aad37528bffa93c9c.output</output-file>
+<status>completed</status>
+<summary>Agent "Analyse how causes combine" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me, in order:**
+
+```
+cat /Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-composition-of-causes.md
+cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync python \
+  /Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/composition/{classify,compose,cost}.py
+```
+Logs already there: `plans/analysis/scripts/spike-05/composition/logs/` (+ `README.md`).
+
+**What I did.** Read the round-two spike, round one, states §1, R1/R2/R5/R6/R7, design §4, `prompt.py`, `proposal.py`, and every real map. Wrote four scripts that import the round-two core unedited.
+
+**What I measured.**
+
+- **The census.** 65 claims, 75 arrows across the three kept runs, the recording and the fixture. 13 claims have ≥2 causes; only **8** have ≥2 causes *pushing*. Five are one pusher + one holder — a settled question, not this one.
+- **The finding that decides it: 8 of 8.** On every one of those eight, a pushing cause **already reaches the claim a second way**, through another of its causes. So the additive rate counts one route twice on every real multi-cause claim. Worth **.003–.075**, median **.049** — first printed figure on four of eight, ten times the `.005` tolerance.
+- **But the mechanism is already a claim, every time.** The fix is deleting a shortcut arrow, not adding a rule. Deleting them on the twenty-claim map: 40.1 → **29.9 ms**, width 4 → 3, and the 2 000-version row goes inside 300 ms for the first time.
+- **Naming the mechanism reproduces the right number** (one cause equal by construction; both causes `.593` adding vs `.488` named — capped, because a claim happens once). +16 ms where the mechanism is new.
+- **A *needs both* gate is cheap and exact**: it turns on at the *latest* arrival, whose spread is a product — checked against full enumeration, worst difference `3.2e-15`. +5 ms. It is an ordinary claim, not a new shape.
+- **One number per pair is the only option that fails**: 27 → 260 ms at 200 versions, 238 → 2 511 ms at 2 000 (8.6× over), plus a clamp.
+
+**Recommendation:** adding only, plus one prompt paragraph (draw through the mechanism, not past it) and two Inspector lines. Zero engine code, and it makes the engine faster. *Needs both* as a second paragraph if he wants it — one case in eight today.
+
+**Unsure, resolved:** today's maps carry `strength`, not R6's probability, so `q1` is read through the prompt's own anchor (`+1 triples the odds`), stated in `classify.py`.
+
+**Owed once stack 04 lands:** record 0016 section, the `prompt.py` paragraph (freeze only), `spec/workbench/inspector.md` §B2 lines — all drafted in §D.
+
+**Not checked:** whether a model can state a pair number; a gate built into `add_core`; anything above four claims; real lags/shapes in §A.4. $0, no paid call, nothing changed outside `plans/`.</result>
+<usage><subagent_tokens>222829</subagent_tokens><tool_uses>78</tool_uses><duration_ms>973344</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8323a482b9c1132</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aa8323a482b9c1132.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0016, 0017, 0021" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me:** read `docs/adr/0016-…md` lines **84–95** (the replacement), then `grep -rno "&lt;&lt;[A-Z]*:" docs/adr/` (one hit), then the owed note's new **§8**.
+
+**The `&lt;&lt;COMPOSITION&gt;&gt;` token is filled** — `0016:84`, inside *How two causes combine*, immediately after the additive-rate decision and its worked `.590`/`.910` table. Structure: one lead-in sentence, a three-row table, then three short paragraphs.
+
+| In the passage | Source |
+|---|---|
+| 65 claims, 75 arrows; eight with two or more **pushing** causes; **8 of 8** carry a shortcut | `classify.py`, **re-run by me 2026-09-21** — the census prints `8` and `8` |
+| three *same route* · one *needs both* · four *cannot tell*, **none cleanly independent**, labelled as one analyst's reading of the arrows' own stated reasons | report §A.3 |
+| `.003`–`.075`, median **`.049`**, first printed figure on half | `compose.py` §2b |
+| **the condition**: an upper estimate, because these maps predate R6, whose wording asks for exactly the direct effect — *"Nobody has measured how much R6 alone repairs"* | report §A.4's honesty note and its `q1`-from-`strength` caveat |
+| the remedy (R22): mechanism already a claim ⇒ one fewer arrow, not one more rule; **no new field, no new arrow type, no engine code**; the two freeze paragraphs amending 0006 *there, not here*; two Inspector lines | §C.1, §C.2, §D |
+| *needs both* as an ordinary claim switching on at the **latest** of its causes' days — exact to **`3.220e-15`**, `+5 ms` at 200 versions | `compose.py` §3 (`compose.log:151`) |
+| deleting shortcut arrows: `40.1 → 29.9 ms` at 200 versions, `321.0 → 228.2` at 2 000, width **4 → 3** | `cost.py` (`cost.log:4,6,10,12`) |
+| declined: one number per pair, **8.6× over budget** at 2 000 versions (`2 590.4 ms`); and a label on every multi-cause claim | `cost.log:14`; §C.3–4 |
+| **not repaired by any of it: a shared cause nobody drew** | §A.1 |
+
+**Owed note gains a §8** carrying both freeze paragraphs **verbatim** and marked as drafts nobody has run, the note that **no validity rule goes with them** (it would refuse the fixture's own `H → B`), the two Inspector lines for stack 06, and the free post-freeze check: re-run `classify.py` over the four new recordings and see whether 8 of 8 falls.
+
+**Tokens remaining: one** — `0017:18`, `&lt;&lt;SPIKE: states sweep under the additive rate&gt;&gt;`. The owed note has none.
+
+**Word counts: 0016 5 052 · 0017 3 954 · 0021 2 338 · 0022 1 345.** Two honest flags for the reviewer round. The passage itself is **395 words excluding table separators, not under 300** — the table is ~155 and irreducible (it carries fact, judgement and size), and the remaining ~240 of prose holds the R6 condition, the remedy and why it is this one, the gate figure, both cost effects, the declined option and the unhandled case, each with its script. I could not drop one of those without dropping something you asked for; cutting to 300 means losing either the cost effects or the declined option, and that is your call, not mine. And 0016 is now 5 052 words against the 3 600 target, up from 4 660, because this section grew by ~400.</result>
+<usage><subagent_tokens>603916</subagent_tokens><tool_uses>14</tool_uses><duration_ms>158836</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>abd1741963a8be33a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/abd1741963a8be33a.output</output-file>
+<status>completed</status>
+<summary>Agent "Final review of records 0016, 0017" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Report:** `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-review-adr-05-final.md`
+
+**To check me first:** `cat plans/analysis/scripts/spike-05/observe/round2/logs/timing_add.log` (MF1), `sed -n '155,180p' plans/analysis/2026-09-21-spike-05-observe.md` + `sed -n '35,45p' plans/analysis/scripts/spike-05/observe/logs/midpoint.log` (MF2, MF3), `awk 'NR&gt;=44&amp;&amp;NR&lt;=63' backend/src/katalyst/domain/validity.py | grep -c _without_` (MF8).
+
+## Must fix (10)
+
+1. **0016:109 — "the sampler's own run-to-run band" is two different samplers.** `timing_add.log`'s 50 000-world figures of 89–95 ms are the sampler *before* "the exponentials taken once up front"; the chosen sampler's four measurements are 52.2–58.0 ms. The log's own slow-end totals are 393.8 ms and **598.5 ms**, not the 399 and 578 quoted — and 598.5 is inside Kent's 600 ms by 1.5 ms.
+2. **0016:109 — "Round one's miss was 10×; round two's is 1.2×"** compares 200 versions at 12 slices against 2 000 versions at 24. Both conditions belong in the sentence.
+3. **0016:59, :104 — `.2043` is the last-day convention, `.0420` the middle-day one.** The same-convention figure exists: `midpoint.log` §B gives worst **`.2095`**, **6.07%** over `.005`.
+4. **0016:144 — the tolerance sentence mixes the additive rate at 50 000 worlds with the multiplicative rate at 200 000.** Round two's own 200 000 row is in `candidates_add.log`: `.0012 / .0021 / .0017`.
+5. **0016:88 — "12–24 slices"** names a configuration that fails the accuracy half; everything measured is at 24.
+6. **0016 *Still open* — omits `check.log`'s measured error at the design's own 24 slices × 8 points:** calibration `1.8e-2`, rate `1.9e-2`, against a record that says "within `.005` everywhere measured".
+7. **0016:117 — the golden test is quoted as pinning `.36`;** lines 117-120 pin `0.25 &lt; x &lt; 0.45`.
+8. **0017:103 — "twelve are already `&lt;subject&gt;_without_&lt;required thing&gt;`" is six** of the twenty codes.
+9. **0022:47 — the `0.5 ms` solve contradicts 0016,** which exists partly to correct that figure; the spike measured 12.4 ms at 200 versions and 80.4 ms at 2 000.
+10. **0005 amendment — a quotation attributed to record 0005 is not in record 0005** (*"log-odds is the scale on which independent influences add instead of multiply"*).
+
+**Should fix: 15. Nits: 6.** Also in the report: the four *In short* boxes ready to paste (each under 200 words, every number from its own record), a per-record cut list (0016 −1 100 words, 0017 −950, 0021 −220, 0022 −150, all below the box and none of it a cited measurement), what I checked and found sound, and what I did not check.
+
+Sound and worth saying: the `ve_cost.py` correction is exactly right (factors built at `:238`, clock starts at `:205`); every timing cell, the additive-exactness figures, the 30.0% clamp, the inhibitor multipliers, hardmap, event days and all the code citations on `main` check out; 0017 copies the states definition faithfully and writes R21 down as decided without re-arguing it; the kill criterion is told straight, with all four overstatement traps closed in the record's own words; no sentence anywhere is in quotation marks and attributed to Kent; and no amendment still describes the multiplicative picture.</result>
+<usage><subagent_tokens>243681</subagent_tokens><tool_uses>48</tool_uses><duration_ms>902478</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aaf8e6bf59e28ad96</task-id>
+<tool-use-id>toolu_01QujJCN9CLJT5ZafFZj6gTc</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aaf8e6bf59e28ad96.output</output-file>
+<status>completed</status>
+<summary>Agent "Spike: what a state costs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Every number in the report reproduces. Round two is complete.
+
+## What the coordinator must run or open to check me
+
+```
+open  /Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-spike-05-states-round-2.md
+open  /Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/states/round2/README.md
+cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY nice -n 10 uv run --no-sync python -u \
+  .../spike-05/states/round2/check2.py    #  ~2 min — the soundness checks
+  .../spike-05/states/round2/hormuz2.py   #  ~3 min — Hormuz, the wording, the sign rule
+  .../spike-05/states/round2/cost2.py     #  ~2 min — the cost
+  .../spike-05/states/round2/sweep2.py    # ~17 min (--quick: 4) — the error tables
+  .../spike-05/states/rules.py            #  seconds — repointed at main
+```
+
+**The caveat is discharged: nothing in the §1 definition or the §7 record sentences changes.** All eight lines stand. The off-rate was already "the sum of its ending causes", so both sides of a state are now the same arithmetic.
+
+**The judge reproduces `observe/round2/add_engine.judge` to 4.4e-16** on maps with no state — the two halves of the spike are provably one engine. A state nothing can end is still an event (1.4e-16); `sustain` ≠ `trigger` (.3026 vs .3182).
+
+**A state gets more accurate, not less.** Same 240 maps, same seeds, same 110 states: the one-bit coding goes mean .00013 → **.00008**, p99 .00318 → **.00198**, worst .01041 → **.00835**, within .005 **99.5% → 99.8%** (endings 99.2% → **99.9%**). Same-skeleton control moves down with it, so the round-one conclusion holds. *ever held* still fails identically (93.3% of endings). Round one's `bins2` upgrade should be **withdrawn** — `hold` now reaches what it cost five values to buy.
+
+**Hormuz is unmoved.** Both events 1.0000; state .6219 → .1661 (−.4558 vs −.4458); ending .2991 → .2613. Third defect dead. Sign rule: off-rate −.7732 vs the alternative's −.1842, and the alternative is *worse* under the additive rate, because scaling an on-rate that has already fired does nothing.
+
+**Deliverable 4, two halves.** R6's non-monotone table **survives** (.4929, .1037, .1375, .1613 — a six-day spike still bites harder than a permanent step). But the clamping is largely repaired: **14.8% → 1.3%**. And *the chance it stops* is **closed form** — `−ln(1−stops)/area`, the helper's own formula — with **0 root finds and 0 clamps** where R6's wording needs 2,106 and clamps 2.6%.
+
+**Cost — one honest new finding.** The solve is unchanged (64/150/2 ms). The forward pass on 20 claims with 5 states: **26.9 → 55.7 ms** at 200 versions (passes), **224.4 → 508.9 ms** at 2,000 (does not). The expensive piece is the on/off joint, versions × slices **cubed**, needed only when a `sustain` arrow leaves the state — this design's analogue of round two's inhibitor.
+
+**Not checked:** *This happened* on a state; which of the two changed conventions moved what; `sustain_average` is timed, not verified; §5's totals are a sum of measured pieces, not one stopwatch; the band.</result>
+<usage><subagent_tokens>472675</subagent_tokens><tool_uses>39</tool_uses><duration_ms>1612473</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8323a482b9c1132</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aa8323a482b9c1132.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0016, 0017, 0021" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me:** `sh /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/rerun-the-evidence.sh` (re-run; saved output current) · `grep -rno "&lt;&lt;[A-Z]*:" docs/adr/` (**no hits — both tokens filled**) · read each record's *In short* box · `git status --short` (4 new + 3 modified, all `docs/adr/`).
+
+**Must-fix, all ten, with the log line each now cites.**
+
+| | Change | Cites |
+|---|---|---|
+| MF1 | One sampler's band: **52–58 ms**. The 89–95 ms figures were the sampler *before* the exponentials were taken up front — not run-to-run noise — and are gone. The margin is stated: **538 ms** (`404.5` + `81.6` + `52.2`) to about **568 ms** (slowest of each: `427.9`, `81.6`, `58.0`), inside 600 by roughly 5–10% | `timing_add.log`, the *"with the exponentials taken once up front"* block |
+| MF2 | *"Round one missed by 10× at 200 versions and 12 slices; round two by 1.2× at the 2 000 versions a range needs, and at 24 slices"*, plus round one's own 2 000-version cell, **29 527 ms** | round one §3 table |
+| MF3 | Model comparison now uses the same-convention pair: **`.2095`, 6.07%**; the options table is labelled *24 slices, arrival at the slice's last day* | `midpoint.log` §B, observe row |
+| MF4 | Round two's own 200 000 row: **`.0012` / `.0021` / `.0017`** | `candidates_add.log:14, 21, 28` |
+| MF5 | **24 slices**, with the clause: 12 puts **2.50%** of *This happened* over `.005` against a fine reference, 24-middle puts 0.00% | `midpoint.log` §A observe rows |
+| MF6 | New *Still open* bullet: 24 slices × **eight integration points**, calibration `1.81e-2`, rate `1.88e-2`; 32 points ≈ `5e-3`, uncosted; and why `.005` is the distance to an enumerator on the same grid, not to the truth | `check.log:3-4` |
+| MF7 | The golden test quoted as a band: `1.0` → between `.25` and `.45` → the same again → below `.10` | the four asserts |
+| MF8 | **Six of the twenty** codes are `&lt;subject&gt;_without_&lt;required&gt;`; all twenty are article-free. I counted the Literal block myself: 6 | `validity.py:44-63` |
+| MF9 | 0022 no longer quotes `0.5 ms`; it quotes the measured solve, **`12.4 ms` / `80.4 ms`**, with one clause on what the digest excluded | `timing_add.log` |
+| MF10 | The 0005 amendment now quotes only what is in 0005 — its own Consequences line about correlated causes being double-counted | `0005:74` |
+
+All 15 should-fix and nits N1–N6 applied (conventions and models named in the same sentence, `ve_cost.py:135-145`, `feat-04b-evals` named for the browser and decimal counts, the `.600`/`.590` clause, *stops holding*, `sweep.log:114-115`, 77/18, "one number per arrow plus the claim's own").
+
+**Both late decisions folded in.** 0017 now carries the states re-run as its own numbers — judge against record 0016's additive judge `4.4 × 10⁻¹⁶`, a state-with-no-ending-cause `1.4 × 10⁻¹⁶`, one-bit coding `.00008 / .00198 / .00835`, **99.8% within `.005`**, *ever held* still failing, the sign rule `−.7732` vs `−.1842`, `sustain` `.3026` vs `trigger` `.3182`, the Hormuz table and the third defect re-measured, `bins2` withdrawn, rename counts 42→**46** and 17→**21**. 0016 tells the budget straight: **met on all-event maps with a thin margin, not met on the benchmark with states (644 ms)**, with the new *Open for Kent* — (A) make 600 ms the gate on the flip against a named benchmark, (B) another spike round, (C) raise it to about 700 ms — and the staging says the gate conditionally.
+
+**One thing I disagreed with:** the states round-two report calls 200 versions *"the version count the other half of the spike recommends"*. It is not — round one recommends 2 000 and R19 fixes 2 000, so I did not repeat it. Also, the fixture timing moved again on this run (**61.1 / 7.7 ms**), so 0016 now quotes the saved run and names all three: 65.7, 66.4, 61.1.
+
+**Word counts: 0016 6 031 · 0017 4 228 · 0021 2 521 · 0022 1 540.** All four are over target, and up rather than down, because this round added four boxes (~800 words) and two late decisions (~700). I applied the cut list to 0021 and 0022 only; **0016's and 0017's cut lists are not done** — that is the honest state, and it is the next thing I would do.</result>
+<usage><subagent_tokens>689097</subagent_tokens><tool_uses>236</tool_uses><duration_ms>468232</duration_ms></usage>
+</task-notification>
+
+---
+
+On the terms of service, we can commit a dated quote for research and development purposes. Can you explain the other decisions that need my input to me in simple terms and explain your recommended choice? Use the question tool then incorporate my responses into the appropriate places after
+
+---
+
+<task-notification>
+<task-id>a8d683dc44ff898c9</task-id>
+<tool-use-id>toolu_01VKRsRuq4s6joucWXvPyiSp</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a8d683dc44ff898c9.output</output-file>
+<status>completed</status>
+<summary>Agent "Trim records 0016 and 0017" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me with:** `python3 /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/numbers_kept.py` (and `--sections`), then `git diff` in `/Users/kentgang/git3/katalyst-wt/adr-05-sound-numbers`, then §10 and §11 of `plans/notes/2026-09-21-stack-05-docs-owed.md`.
+
+**Kent's decisions, folded in.** R24 → 0016 *The kill criterion, and the time target it became* (new heading) + box + *Consequences* + *How it lands* step 2 + *Confirmation* ("no test gates on the clock"); his two typed sentences quoted verbatim, attributed to the decisions note. Per-claim target **30 ms a claim**, labelled derived (600 ms ÷ 20 claims); prototype stated honestly at 538–568 ms all-event and 644 ms with states. Speed-ups built into the core PR: cheap path (`236.8` of `508.9 ms`), two-pass solve (80 ms → ~295 ms), shortcut arrows (`321.0 → 228.2 ms`); coarser grid listed *investigate only*. R25 → 0016 *Decision Outcome*, sentence fixed to "on the four-claim maps the judge can check". R26 → 0017 *How an ending arrow is asked about* (new heading). R27 → 0017 *The two new rules…*, new code **`claim_without_persistence`** (twenty-second, article-free) + a new named test. R31 → 0021 *Who decided what*, both FR entries, box, *Open for Kent*.
+
+**Final *Open for Kent* lines:** all three read **"Nothing."** — 0016 (R24, R25), 0017 (R26, R27), 0021 (R31).
+
+**Word counts (`wc -w`).** 0016 6031 → **5585**; 0017 4228 → **4200**; 0021 2521 → **2496**. Per-section before/after is in `--sections`. **I missed the 3 800 / 2 800 targets and want to be plain about why:** measured, the bodies already run at **5–10 words per cited figure** (Context 5.5, kill criterion 6.0, Considered Options 7.5); 0016 holds 227 distinct numeric tokens in 465 occurrences, so the repetition is of *conditions* ("2 000 versions" 22×, "`.005`" 12×), not of facts. Reaching 3 800 needs ~1 800 further words, which at that density means deleting evidence. Closing most of it, if you authorise it: pointer-only for *How it is worked out* (−367), *How a state is carried* (−231), the Hormuz prose (−187), *Honest cost*'s inventory (−105). One edit each.
+
+**Moved to the owed note** (§11, verbatim, each labelled with its source): 0016's *How it is worked out*, the two constants, the first design's M1 table, the `series` mechanics; 0017's two-rates calibration, *How a state is carried*, *The Hormuz strike, worked*. §10 adds NFR-7 (quoted, `feat-04b-evals` line 185), the Inspector sentence, the *chance it stops* freeze draft, the `persistence` refusal, the R31 page entries.
+
+**Four flagged tokens, all justified:** `700`/`700 ms` and `66.4 ms` were in *Open for Kent* option (C), which R24 removes; `66.4` survives in option A. `` `228.2 ms` `` changed backtick shape; `228.2` appears twice.
+
+**Not fixed, not mine:** the final review's paste-ready box for 0017 carries superseded numbers (`.6133/.1675/.2920/.2590`); the record's own box matches its body. I *did* fix one drift I own: the owed note said twelve existing codes are `&lt;subject&gt;_without_&lt;required thing&gt;`; it is six, as the records say.</result>
+<usage><subagent_tokens>299280</subagent_tokens><tool_uses>62</tool_uses><duration_ms>1963959</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a8d683dc44ff898c9</task-id>
+<tool-use-id>toolu_016B1oHLpEDfypQZE4gDH8RT</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a8d683dc44ff898c9.output</output-file>
+<status>completed</status>
+<summary>Agent "Trim records 0016 and 0017" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me with:** `python3 /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/numbers_kept.py` (and `--sections`), then `git diff` in the worktree, then §11 of `plans/notes/2026-09-21-stack-05-docs-owed.md`.
+
+**`numbers_kept.py` output — unchanged, the same four tokens:**
+
+```
+0016  6031 words before,  5436 after
+    MISSING number (1):        700
+    MISSING number+unit (2):   66.4 ms · 700 ms
+    MISSING backticked (1):    228.2 ms
+0017  4228 words before,  4121 after
+0021  2521 words before,  2496 after
+4 token(s) present before and absent after
+```
+
+All four are option (C) of the old *Open for Kent* item 1, which R24 removes; `66.4` and `228.2` still appear in the body, only without their unit or backticks.
+
+**Final word counts (`wc -w`).** 0016 **5436** (was 6031), 0017 **4121** (4228), 0021 **2496** (2521).
+
+**The four passages are now pointer-only.** Each keeps its heading, the result a decision rests on with its figures and conditions, and one line saying the full working is held for the `spec/multiverse/propagation.md` rewrite, which cannot be edited until stack 04 lands.
+
+| Section | before → after | what stays in the record |
+|---|---|---|
+| 0016 *How it is worked out* | 441 → **299** | exact to `4.4e-16`; middle-of-slice `.0290 → .0027` at 24 slices; 24 not 12 (2.50% against 0.00%); locality and the width shares; undated observations |
+| 0016 *Honest cost* | 219 → **201** | the session estimates, `1 335 insertions across 12 files`, the four items named, 259 and 189 on `feat-04b-evals` |
+| 0017 *How a state is carried* | 236 → **242** | `64, 150 and 2 ms` unchanged by a state; `.00835` against `.00794` over 82 skeletons; `224.4 → 508.9 ms` and `26.9 → 55.7` |
+| 0017 *The Hormuz strike, worked* | 308 → **267** | the four-row table the box quotes, both events at `1.0000`, the third defect's `.001` / thirty days |
+
+0017's carrying section is six words longer than committed, not shorter: the committed text had no pointer line and did not yet name R24's target. Its *working* is gone; only the results remain.
+
+**I added §11.8 to the owed note** — the *Honest cost* file-and-line inventory, verbatim from `HEAD`. It was the one authorised passage not already there, so the five browser citations, `1 459`, `34 of 46`, and the `main` decimal counts 239 and 166 now have their home before the record dropped them.
+
+**0016's kill-criterion section: the history is now three sentences of dated fact** — the two misses with their conditions (10× at 200 versions and 12 slices; 1.2× at 2 000 and 24 slices; 29 527 ms like for like), R19's fixed 600 ms, then R24's proportional target with Kent's quoted words. The standalone *misses* paragraph is gone, folded into that. The section is 868 words: a 250-word evidence table and a 150-word speed-up table, with about 250 of prose around them — structural rather than fat, so I stopped there as instructed.</result>
+<usage><subagent_tokens>317038</subagent_tokens><tool_uses>73</tool_uses><duration_ms>2144801</duration_ms></usage>
+</task-notification>
