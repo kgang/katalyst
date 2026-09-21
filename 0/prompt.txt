@@ -237,3 +237,36 @@ cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u 
 **Remaining tokens (13 in records, 7 in the owed list):** `0016` lines 93, 94, 95, 96, 97, 98, 106, 123, 132, 157 (123/132/157 reuse *the measured tolerance for This happened*); `0017` lines 65, 66, 67 (S2's three); owed list lines 121, 129, 140, 164 ×2, 167 ×2.</result>
 <usage><subagent_tokens>413718</subagent_tokens><tool_uses>60</tool_uses><duration_ms>1164625</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a0c9bdeb30d32977a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a0c9bdeb30d32977a.output</output-file>
+<status>completed</status>
+<summary>Agent "Spike: This happened" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is measured, written and clean. The repository proper is untouched (`git status` empty); the red team's and engine analyst's scripts still carry their original timestamps.
+
+**Check me, in this order:**
+1. Open `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-21-spike-05-observe.md`
+2. `cat /Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/observe/logs/baseline-redteam-attack2.log` — the red team's own unmodified script, re-run
+3. `.../logs/{selfcheck,candidates,timing20,versions,midpoint,when_table}.log`
+4. `/Users/kentgang/git3/katalyst/plans/analysis/scripts/spike-05/observe/README.md` — one command per table
+
+**What I did.** Reproduced the red team's sweep exactly (no edit `.00027/.0046/.0175/0.9%`; *Suppose* `.00007/.0015/.0259/0.2%`; *This happened* `.00127/.0151/.2043/6.6%`), then measured four candidates against `exact_over_times` on the same 140 maps, and costed each on a 20-claim map with a range.
+
+**The verdict is a kill, and not for the reason expected.** Accuracy has a clear winner: the weighted forward sample with the exact solve as a control variate holds `.005` on **100.00%** of *This happened* numbers at 200 000 worlds (99.98% at 50 000), worst `.0020`, effective sample size 96.7% of worlds drawn. Candidate (b) fails at 93.4%; (c) per evidence day 95.6%; (c) widened to the evidence's whole read reach passes at 99.93% but is the rejected exact-over-times cost.
+
+**The clock kills all of them.** At 20 claims and 200 versions the *shared* forward pass — calibration plus the conditional tables, which every candidate pays before anyone asks a question — is **2.9 s**. The sampler is 0.11 s. Nearest miss: candidate (a) at **3.0 s**, ten times the budget. The 0.5 ms the design was sold on measured the elimination only: `ve_cost.py:238-239` builds factors from a random logistic before the clock starts at `:205`.
+
+**Two findings beyond the brief.** Representing an arrival by its slice's *middle* rather than its *end* cuts the 24-slice grid error from worst `.0290` to `.0027` — one line, free, and 12 slices middle-day beats 60 slices last-day. And 2 000 versions is right, not 200: at 200 the band's ends wander a tenth of the band's width.
+
+**Unsure, resolved:** whether the grid convention changed the ranking — re-ran every candidate under it; it does not.
+
+**Owed once stack 04 lands:** nothing.
+
+**Not checked:** accuracy above four claims (judge not computable); the correction's version-to-version movement on a *hard* map; fewer integration points per slice (cost only); state claims; the stop-versus-target number itself.</result>
+<usage><subagent_tokens>356735</subagent_tokens><tool_uses>118</tool_uses><duration_ms>3538252</duration_ms></usage>
+</task-notification>
