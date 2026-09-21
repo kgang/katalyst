@@ -24,11 +24,14 @@ budget; only how steady the numbers are, and these tests are about what the
 arithmetic *is*.
 """
 
+import importlib
 import math
+from collections.abc import Sequence
 from datetime import date, timedelta
 from itertools import pairwise
 
 import networkx
+import numpy
 import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
@@ -43,9 +46,11 @@ from katalyst.domain import (
     Do,
     Graph,
     Insert,
+    Intervention,
     Link,
     Observe,
     Proposition,
+    PropositionId,
     Resolution,
     Retune,
     World,
@@ -55,8 +60,14 @@ from katalyst.domain import (
     validate,
     versions_of,
 )
+from katalyst.domain.propagation import SERIES_CAP
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ
 from tests.strategies import branches, graphs, interventions, seeds, uncertain_beliefs
+
+# The package re-exports `propagate` under the name of the file it lives in, so
+# plain `import katalyst.domain.propagation` hands back the function. One test
+# reaches for a private seam inside that file, so it asks for the file by name.
+propagation_module = importlib.import_module("katalyst.domain.propagation")
 
 many = settings(max_examples=25, deadline=None)
 a_few = settings(max_examples=12, deadline=None)
@@ -566,6 +577,322 @@ def test_an_observation_moves_a_cause_even_when_no_arrow_pushes(data: st.DataObj
     assert any(learned.beliefs[one] != base.beliefs[one] for one in causes)
 
 
+def _two_pieces() -> Graph:
+    """A map in two halves with nothing joining them: `near -> far`, and `other -> beyond`.
+
+    Nothing here is typed for effect: every arrow pushes nothing at all, so the
+    only thing that can move a claim is how the versions are counted.
+    """
+    return _map(
+        (
+            _claim("near", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("far", kind="market", prior=(0.4, 0.2, 0.6)),
+            _claim("other", kind="event", prior=(0.5, 0.25, 0.75)),
+            _claim("beyond", kind="market", prior=(0.4, 0.2, 0.6)),
+        ),
+        (_arrow("near", "far", strength=0.0), _arrow("other", "beyond", strength=0.0)),
+    )
+
+
+def test_an_observation_in_one_piece_moves_nothing_in_another() -> None:
+    """Observing something in one half of a map moves nothing in the other half.
+
+    Two halves, no arrow and no cause between them. Observing `near` is evidence
+    about `near` and `far` and about nothing else; observing `other` is evidence
+    about `other` and `beyond`. Under the model the engine draws from those two
+    halves are independent — no arrow ties a draw for one to a draw for the other —
+    so conditioning on one of them says nothing whatever about the other's piece.
+
+    It used to say something. The worlds thrown away were pooled across **every**
+    observation on the branch, so a claim that *some* observation was evidence
+    about was read through *all* of them: observing `other` threw away worlds, that
+    changed how much each version counted, and `far` — which only the first
+    observation reaches — moved with it. Measured before the fix, on the sequence a
+    state machine shrank to: a claim in the far piece moved by **`.083`**, sixteen
+    times the floor at which this product calls anything a move.
+
+    The order the two observations are made in must not matter either, and the test
+    says so: an edit that changes nothing cannot change something by being made
+    second.
+    """
+    graph = _two_pieces()
+    alone = _folded(graph, Observe(target="near", value=True))
+    with_the_other = _folded(
+        graph, Observe(target="near", value=True), Observe(target="other", value=True)
+    )
+    other_first = _folded(
+        graph, Observe(target="other", value=True), Observe(target="near", value=True)
+    )
+
+    for claim_id in ("near", "far"):
+        assert with_the_other.beliefs[claim_id] == alone.beliefs[claim_id], claim_id
+        assert other_first.beliefs[claim_id] == alone.beliefs[claim_id], claim_id
+    # And the other way round, so neither half is special.
+    only_other = _folded(graph, Observe(target="other", value=True))
+    for claim_id in ("other", "beyond"):
+        assert with_the_other.beliefs[claim_id] == only_other.beliefs[claim_id], claim_id
+
+
+def test_two_observations_in_one_piece_are_both_evidence_about_it() -> None:
+    """A claim both observations reach is read through the worlds that survived both.
+
+    The mirror of the test above, and the reason it is not merely convenient to
+    keep observations apart: where two observations really are both evidence about
+    a claim, both must still count. Here they are on one chain, so the claim
+    downstream of both is read through the worlds that survived both — and adding
+    the second observation moves it, as it should.
+    """
+    graph = _map(
+        (
+            _claim("top", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("middle", prior=(0.5, 0.25, 0.75)),
+            _claim("ending", kind="market", prior=(0.4, 0.2, 0.6)),
+        ),
+        (_arrow("top", "middle", strength=1.5), _arrow("middle", "ending", strength=1.5)),
+    )
+    one = _folded(graph, Observe(target="top", value=True))
+    both = _folded(graph, Observe(target="top", value=True), Observe(target="middle", value=True))
+
+    assert both.beliefs["ending"] != one.beliefs["ending"], "the second observation is evidence too"
+    assert 0.0 <= both.beliefs["ending"].p <= 1.0
+
+
+def test_an_observation_a_later_supposition_cuts_off_stops_being_evidence() -> None:
+    """Supposing a claim cuts its causes off, and an observation upstream stops reaching past it.
+
+    A `do` cuts every arrow into its target, so what was upstream of the observed
+    claim is no longer joined to it — and an observation's reach is read off the map
+    the edits leave behind, not off the map as written. So the claim above the
+    supposition goes back to being read off every world.
+    """
+    graph = _map(
+        (
+            _claim("cause", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("seen", prior=(0.5, 0.25, 0.75)),
+            _claim("ending", kind="market", prior=(0.4, 0.2, 0.6)),
+        ),
+        (_arrow("cause", "seen", strength=1.5), _arrow("seen", "ending", strength=1.5)),
+    )
+    reaching = _folded(graph, Observe(target="seen", value=True))
+    cut = _folded(graph, Observe(target="seen", value=True), Do(target="seen", value=True, at=None))
+
+    assert "cause" in versions_of(reaching).reweighted
+    assert "cause" not in versions_of(cut).reweighted
+    assert cut.beliefs["cause"] == _folded(graph).beliefs["cause"]
+
+
+def test_a_claim_one_observation_reaches_is_read_through_that_one_alone() -> None:
+    """A claim downstream of a claim two observations reach, but reached by only one.
+
+    The case that looks like it should be pooled and must not be. `shared` is
+    reached by both observations — it is upstream of `seen` and upstream of the
+    other piece's `also_seen` is not, so read carefully: here `only_a` hangs off
+    `seen` alone, so only the first observation is evidence about it, while `seen`
+    itself is reached by the first only and `shared` by the first only. The claim
+    to watch is `only_a`: adding an observation in the other piece must leave it
+    exactly where it was, even though the branch now carries two observations.
+    """
+    graph = _map(
+        (
+            _claim("shared", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
+            _claim("seen", prior=(0.5, 0.25, 0.75)),
+            _claim("only_a", kind="market", prior=(0.4, 0.2, 0.6)),
+            _claim("apart", prior=(0.5, 0.25, 0.75)),
+            _claim("also_seen", kind="market", prior=(0.4, 0.2, 0.6)),
+        ),
+        (
+            _arrow("shared", "seen", strength=1.5),
+            _arrow("seen", "only_a", strength=1.5),
+            _arrow("apart", "also_seen", strength=1.5),
+        ),
+    )
+    one = _folded(graph, Observe(target="seen", value=True))
+    two = _folded(
+        graph, Observe(target="seen", value=True), Observe(target="also_seen", value=True)
+    )
+
+    for claim_id in ("shared", "seen", "only_a"):
+        assert two.beliefs[claim_id] == one.beliefs[claim_id], claim_id
+    # And the second observation did reach its own piece.
+    assert two.beliefs["also_seen"] != one.beliefs["also_seen"]
+
+
+def test_an_observation_a_later_supposition_overrode_throws_no_world_away() -> None:
+    """ "This happened", then "suppose it did not": the second word is the one in force.
+
+    A later edit on the same claim ends an earlier one's stretch, and where it lands
+    on the same day the earlier stretch covers no day at all. An observation in that
+    position must discard nothing — the user withdrew the news — and it used to
+    discard worlds anyway, which leaked: the worlds an observation throws away are
+    how much every version it is evidence about counts, so a withdrawn observation
+    was still moving claims in a piece of the map nothing connected it to.
+
+    The check is the sharp one: every number the world reports is byte-identical
+    to the one the supposition alone produces. The two differ in `assignments`
+    alone, and rightly — that is the record of what the user did, and they did make
+    two edits.
+    """
+    graph = _two_pieces()
+    withdrawn = _folded(
+        graph,
+        Observe(target="near", value=True),
+        Do(target="near", value=False, at=None),
+    )
+    only_supposed = _folded(graph, Do(target="near", value=False, at=None))
+
+    answers = {"exclude": {"assignments"}}
+    assert withdrawn.model_dump_json(**answers) == only_supposed.model_dump_json(**answers)
+    # And in particular the far piece, which the observation never had business with.
+    for claim_id in ("other", "beyond"):
+        assert withdrawn.beliefs[claim_id] == _folded(graph).beliefs[claim_id], claim_id
+
+
+def _every_shape_on_a_long_window() -> Graph:
+    """One map carrying every shape a push can have, judged across a long window.
+
+    Long on purpose: past 180 days the engine works out fewer days than the window
+    has, so this is a map on which the thinning actually happens. And one of every
+    shape, because a day-to-day dependence — a running total, a "has fired by now",
+    a retraction that holds from a day onward — would hide in whichever shape
+    carries state, and there is no way to know in advance which that would be.
+    """
+    return _map(
+        (
+            _claim("cause", kind="hypothesis", prior=(0.5, 0.25, 0.75), days=0),
+            _claim("spike", prior=(0.4, 0.2, 0.6), days=40),
+            _claim("held", prior=(0.45, 0.25, 0.7), days=120),
+            _claim("climbing", prior=(0.35, 0.15, 0.6), days=300),
+            _claim("sustained", prior=(0.5, 0.25, 0.75), days=500),
+            _claim("striker", prior=(0.4, 0.2, 0.6), days=700),
+            _claim("ending", kind="market", prior=(0.4, 0.2, 0.6), days=900),
+        ),
+        (
+            _arrow("cause", "spike", strength=1.6, shape="impulse", lag=3.0, half_life=9.0),
+            _arrow("cause", "held", strength=1.2, shape="step", lag=7.0),
+            _arrow("spike", "climbing", strength=0.9, shape="ramp", lag=11.0),
+            _arrow("held", "sustained", strength=1.4, mode="sustain", lag=2.0),
+            _arrow("striker", "cause", strength=-1.9, shape="step", lag=4.0),
+            _arrow("sustained", "ending", strength=1.1, shape="impulse", half_life=30.0),
+            _arrow("climbing", "ending", strength=0.7, shape="step", lag=5.0),
+        ),
+    )
+
+
+def _agrees_on_every_shared_day(world: World, claims: Sequence[PropositionId]) -> tuple[int, int]:
+    """Work one world out twice — thinned and on every day — and compare the days both hold.
+
+    The thinned run is the engine's own, exactly as it ships. The full run comes
+    through `_versions_on_every_day`, a private seam that exists for this and
+    nothing else. **Both are taken before anything is compared**: a check that
+    recomputed one side after reading the other would be comparing a run with
+    itself, which is how the first version of this test came to pass on an engine
+    that was broken.
+
+    Every day the thinned run worked out must be a day the full run worked out too —
+    the thinned grid is a subset, never a shifted one — and on each of those days
+    every number behind every claim must match bit for bit.
+
+    Returns:
+        How many days each run worked out, thinned first, so a caller can insist
+        that the thinning it meant to exercise actually happened.
+    """
+    thinned, whole = versions_of(world), propagation_module._versions_on_every_day(world)
+    where = {day: index for index, day in enumerate(whole.days)}
+    missing = [day for day in thinned.days if day not in where]
+    assert not missing, ("a day was worked out thinly but not fully", missing)
+
+    for claim_id in claims:
+        assert numpy.array_equal(thinned.counting_for(claim_id), whole.counting_for(claim_id)), (
+            claim_id
+        )
+        for here, day in enumerate(thinned.days):
+            there = where[day]
+            assert numpy.array_equal(
+                thinned.likelihood[claim_id][:, here], whole.likelihood[claim_id][:, there]
+            ), (claim_id, day)
+            assert numpy.array_equal(
+                thinned.inner_spread[claim_id][:, here], whole.inner_spread[claim_id][:, there]
+            ), (claim_id, day)
+    return len(thinned.days), len(whole.days)
+
+
+@pytest.mark.parametrize(
+    ("what", "edits"),
+    [
+        ("the map as written", ()),
+        ("a supposition", (Do(target="cause", value=True, at=DAY_ZERO),)),
+        ("an observation", (Observe(target="spike", value=True),)),
+        (
+            "a supposition something later undermines",
+            (
+                Do(target="cause", value=True, at=DAY_ZERO),
+                Do(target="striker", value=True, at=DAY_ZERO + timedelta(days=5)),
+            ),
+        ),
+        (
+            "an observation and a supposition together",
+            (
+                Observe(target="held", value=True),
+                Do(target="cause", value=True, at=DAY_ZERO + timedelta(days=2)),
+            ),
+        ),
+    ],
+)
+def test_a_days_answer_does_not_depend_on_which_other_days_were_worked_out(
+    what: str, edits: tuple[Intervention, ...]
+) -> None:
+    """A claim's answer on a day comes from that day and the map's timings, never the grid.
+
+    **This is the invariant the whole thinning rests on.** The engine works out
+    fewer days than a long window has — the days it sends, plus the handful the
+    arithmetic must land on exactly — and that is only safe if working out *more*
+    days would give the very same numbers on the days both have. If anything
+    carried state from one worked-out day to the next — a running maximum, a
+    cumulative hazard, a "has fired by now", a retraction that holds from a day
+    onward — then the thinned grid and the full one would part company somewhere,
+    and the grid would be deciding an answer instead of deciding where to look.
+
+    So the same map is worked out twice and every number behind every claim is
+    required to agree **bit for bit** on every day the two share: each version's
+    answer, the spread inside each version, and how much each version counts. Over
+    a map carrying every shape a push can have — a spike with a half-life, a step,
+    a ramp, a sustaining arrow, lags on all of them — and under each of the edits
+    that could plausibly carry a day's state into the next, the undermined
+    supposition most of all.
+
+    Failing this would not mean the test is too strict. It would mean the grid
+    matters, and every day it decides to skip is a day the engine is guessing at.
+    """
+    graph = _every_shape_on_a_long_window()
+    world = _folded(graph, *edits)
+    assert world.days > SERIES_CAP, ("this map's window was meant to outrun the cap", world.days)
+
+    thin, full = _agrees_on_every_shared_day(world, [one.id for one in graph.propositions])
+    assert full == world.days + 1, ("the full run is every day of the window", full, what)
+    assert thin < full, ("so the engine's own run was meant to be thinner", thin, full, what)
+
+
+@given(st.data())
+@a_few
+def test_the_grid_is_safe_on_maps_nobody_wrote_by_hand(data: st.DataObject) -> None:
+    """The same invariant, over maps and runs of edits nobody wrote by hand.
+
+    One map carrying every shape is the case a person can reason about; this is the
+    case nobody thought of. It matters because the leak this guards against was a
+    rounding one: it needed a firing day that the thinned grid happened to miss,
+    and whether a grid misses a day depends on how the map's own dates fall. One
+    map is one arrangement of dates. The generator brings hundreds.
+
+    Nothing is assumed away and nothing is required of the map: a window too short
+    to be thinned still has to agree with itself, and the parametrised test above
+    is what insists the thinning is really exercised.
+    """
+    graph = data.draw(graphs(priors=uncertain_beliefs()))
+    branch = data.draw(branches(graph))
+    world = _folded_if_it_applies(graph, branch)
+    _agrees_on_every_shared_day(world, [one.id for one in graph.propositions])
+
+
 def test_observe_warns_below_two_percent_survival() -> None:
     """When almost no world survives an observation, the world says the *range* is unreliable.
 
@@ -988,6 +1315,41 @@ def test_a_long_window_is_drawn_at_a_manageable_number_of_points() -> None:
     assert world.series_days[0] == 0
     assert world.series_days[-1] == 900
     assert any("180" in one for one in world.warnings), world.warnings
+
+
+def test_the_long_window_warning_says_what_the_engine_actually_does() -> None:
+    """The sentence a reader is shown about a long window has to be true of the engine.
+
+    This one is drawn verbatim in the browser, so it is the whole of what a reader
+    is ever told about the thinning, and it has already been wrong once: it used to
+    say *every day is still worked out*, which stopped being true the moment the
+    engine started working out only the days it sends plus the days the arithmetic
+    must land on exactly. A number the reader can see is a promise, and so is a
+    sentence.
+
+    The engine's own answer for how many days it works out is compared against the
+    promise rather than typed in: if the two ever part company again, this fails.
+    """
+    graph = _map(
+        (
+            _claim("top", kind="hypothesis", days=5),
+            _claim("ending", kind="market", days=900),
+        ),
+        (_arrow("top", "ending"),),
+    )
+
+    world = _folded(graph)
+    about_the_window = [one for one in world.warnings if str(SERIES_CAP) in one]
+
+    assert about_the_window == [
+        f"This map runs for {world.days} days, so each claim's series is drawn at "
+        f"{SERIES_CAP} evenly spaced points rather than one for every day. Every day a "
+        "push fires or a claim is judged is worked out exactly; the days between are "
+        "not needed."
+    ], world.warnings
+    # And the sentence is not merely well written: the engine really does work out
+    # fewer days than the window has, so "the days between" is the truth about it.
+    assert len(versions_of(world).days) < world.days + 1
 
 
 @given(st.data())

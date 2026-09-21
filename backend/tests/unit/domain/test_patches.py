@@ -58,6 +58,7 @@ from katalyst.fixtures.hormuz import (
     STRIKE_TO_HORMUZ,
     STRIKE_TO_PREMIUM,
 )
+from tests.comparisons import every_version_answered_the_same
 from tests.strategies import beliefs, branches, graphs, interventions, separated_pair
 
 # Building a whole random map is slow enough that a per-example time limit would
@@ -551,6 +552,200 @@ def test_affected_set_matches_the_table() -> None:
     ) == frozenset({"second"})
 
 
+def _wide(identifier: str, kind: str, middle: float) -> Proposition:
+    """One claim judged on day zero, whose stated range spans the whole scale.
+
+    Two things this map needs that the ordinary builder does not give. A claim
+    every version of the map gives the same number to cannot be moved by counting
+    the versions differently, and these tests are about exactly that — so the
+    stated range is the whole scale and the versions really do disagree. And every
+    claim is judged on **day zero**, so no push has had time to fade: what the
+    arrow does, it does where the numbers are read.
+    """
+    spread = Belief(p=middle, lo=0.0, hi=1.0, owner="model")
+    plain = _example_claim(identifier, kind=kind)
+    return plain.model_copy(
+        update={
+            "prior": spread,
+            "beliefs": Beliefs(model=spread),
+            "resolution": plain.resolution.model_copy(update={"by": DAY_ZERO}),
+        }
+    )
+
+
+def _one_cause_one_effect() -> Graph:
+    """A cause, the effect it does not yet push, and a pair joined to neither.
+
+    The arrow starts at no strength at all, so turning it up is a change to what
+    the map says rather than a nudge — the case the affected-set table used to get
+    wrong. The push is a spike that fades by half in a day.
+
+    The claims keep the plain numbered names the generators use, and that is not
+    cosmetic: **each claim's draws are keyed by its own identifier**, so renaming
+    them draws different numbers, and an effect that is plain on one map can be too
+    small to see on another. These are the names the failing sequence was found
+    under, and the numbers below are that map's.
+    """
+    spike = _example_arrow("claim-0", "claim-1").model_copy(
+        update={"strength": 0.0, "shape": "impulse", "half_life": 1.0}
+    )
+    apart = _example_arrow("claim-2", "claim-3").model_copy(
+        update={"strength": 0.0, "shape": "impulse", "half_life": 1.0}
+    )
+    return Graph(
+        id="map-0",
+        propositions=(
+            _wide("claim-0", "hypothesis", 0.0),
+            _wide("claim-1", "market", 0.5),
+            _wide("claim-2", "event", 0.0),
+            _wide("claim-3", "event", 0.0),
+        ),
+        links=(spike, apart),
+        hypothesis_id="claim-0",
+    )
+
+
+EVIDENCE_BUDGET = {"versions": 2_000, "worlds": 8}
+"""The shipped budget, for the handful of tests that are about a number that moved.
+
+The tiny budget elsewhere is enough to check *which* claims an edit may touch. It
+is not enough to check *how far* one moved.
+"""
+
+
+def _after(graph: Graph, *edits: Intervention) -> World:
+    """Fold the edits on in order and work the numbers through, at the shipped budget."""
+    branch = _branch(*edits)
+    folded = apply(graph, branch)
+    assert not isinstance(folded, list), folded
+    left_behind, fixed = folded
+    return propagate(
+        left_behind,
+        fixed,
+        as_of=DAY_ZERO,
+        seed=SEED,
+        introduced_by=introduced_by(branch),
+        **EVIDENCE_BUDGET,
+    )
+
+
+def _permitted(graph: Graph, first: Intervention, second: Intervention) -> frozenset[str]:
+    """What the second edit is allowed to move, with the first already in force."""
+    mid, mid_fixed = apply(graph, _branch(first))  # type: ignore[misc]
+    left, _ = apply(mid, _branch(second), mid_fixed)  # type: ignore[misc]
+    return affected_set(left, second, mid_fixed, before=mid)
+
+
+@pytest.mark.parametrize(
+    ("what", "second"),
+    [
+        ("changing how hard the cause pushes", Retune(link="claim-0->claim-1", strength=1.0)),
+        ("supposing the cause", Do(target="claim-0", value=True, at=DAY_ZERO)),
+        (
+            "supposing the very claim that was reported",
+            Do(target="claim-1", value=True, at=DAY_ZERO),
+        ),
+    ],
+)
+def test_an_edit_under_an_observation_may_move_what_the_observation_is_about(
+    what: str, second: Intervention
+) -> None:
+    """An edit that touches a reported claim can move everything the report is about.
+
+    An observation is not a number stored once. It is a filter re-read through the
+    map every time the map changes, so an edit that can move the claim somebody
+    reported changes which worlds survive — and every number the report touches is
+    read off the survivors. The **cause** of a reported claim is the surprising
+    one, because nothing structural joins the edit to it: no arrow was added, none
+    removed, and the reach of the observation is the same set of claims as before.
+
+    Each of these three really does move the cause, and each is permitted. The old
+    table permitted none of them, which would have let a tile read *untouched* over
+    a number that had moved by `.070`.
+
+    Supposing the reported claim is the third, and it moves the cause the other way
+    about: a later edit on a claim overrides an earlier one, so the observation
+    stops holding, the worlds it was throwing away come back, and the cause goes to
+    what it said before the report arrived.
+    """
+    graph = _one_cause_one_effect()
+    watched = Observe(target="claim-1", value=False)
+
+    alone = _after(graph, watched)
+    then_edited = _after(graph, watched, second)
+
+    assert then_edited.beliefs["claim-0"] != alone.beliefs["claim-0"], what
+    assert "claim-0" in _permitted(graph, watched, second), what
+    # And the claim joined to nothing is still joined to nothing.
+    assert then_edited.beliefs["claim-2"] == alone.beliefs["claim-2"], what
+    assert "claim-2" not in _permitted(graph, watched, second), what
+
+
+def test_a_retune_under_an_observation_moves_the_arrows_source() -> None:
+    """The measured case, kept by name because it is what the table used to deny.
+
+    Observe that a claim did not happen, then change how hard its one cause pushes
+    it. The arrow's **source** moves — measured, `.5020` to `.4317` — and nothing
+    on the far side of the map does. Directions and a permission only: the example
+    map may be tuned, so what is pinned is that the source moves at all and that
+    the rule allows it.
+    """
+    graph = _one_cause_one_effect()
+    watched = Observe(target="claim-1", value=False)
+    weaker = Retune(link="claim-0->claim-1", strength=1.0)
+
+    alone = _after(graph, watched)
+    retuned = _after(graph, watched, weaker)
+
+    assert abs(retuned.beliefs["claim-0"].p - alone.beliefs["claim-0"].p) > 0.005
+    assert "claim-0" in _permitted(graph, watched, weaker)
+    assert retuned.beliefs["claim-2"] == alone.beliefs["claim-2"]
+
+
+def test_an_edit_that_cannot_touch_the_reported_claim_reaches_nothing_of_its() -> None:
+    """An observation standing elsewhere does not widen an edit that cannot reach it.
+
+    The rule says an edit which can move a **reported** claim can move everything
+    that report is about. The other half of the same sentence is that an edit which
+    cannot is not widened at all — otherwise a standing observation anywhere on a
+    map would make every later edit touch everything, and the locality claim would
+    say nothing.
+
+    So: report one claim, then change an arrow in the other piece entirely. The
+    reported claim and its cause stay exactly where they were, and the rule permits
+    nothing of theirs.
+    """
+    graph = _one_cause_one_effect()
+    watched = Observe(target="claim-1", value=False)
+    far_away = Retune(link="claim-2->claim-3", strength=1.0)
+
+    alone = _after(graph, watched)
+    also = _after(graph, watched, far_away)
+
+    for claim_id in ("claim-0", "claim-1"):
+        assert also.beliefs[claim_id] == alone.beliefs[claim_id], claim_id
+    assert _permitted(graph, watched, far_away) == frozenset({"claim-3"})
+
+
+def test_a_belief_of_your_own_never_reaches_through_an_observation() -> None:
+    """Writing your own number cannot change which worlds survive, so it reaches nothing.
+
+    The one edit that does not trigger the rule above, and the reason is the reason
+    `believe` has its own row at all: the user's number sits beside the model's and
+    is not pushed through the map, so it cannot move the claim that was reported
+    and cannot change what the report says about anything.
+    """
+    graph = _one_cause_one_effect()
+    watched = Observe(target="claim-1", value=False)
+    mine = Believe(target="claim-1", belief=Belief(p=0.9, lo=0.8, hi=0.95, owner="user"))
+
+    alone = _after(graph, watched)
+    with_mine = _after(graph, watched, mine)
+
+    assert with_mine.beliefs["claim-0"] == alone.beliefs["claim-0"]
+    assert _permitted(graph, watched, mine) == frozenset({"claim-1"})
+
+
 def test_affected_set_is_empty_when_the_map_has_no_such_subject() -> None:
     """An edit that cannot be applied moves nothing, so it is allowed to move nothing."""
     graph = _two_piece_map()
@@ -978,20 +1173,28 @@ def _world_of(graph: Graph, *edits: Intervention) -> World:
 
 
 def _same_on_the_days_they_share(base: World, branched: World, claim_id: str) -> None:
-    """Check one claim reads the same in two worlds, on every day both of them carry.
+    """Check one claim reads the same word on every day two worlds both carry.
 
     Two worlds of the same map are drawn at the same days. Two worlds a claim was
     added between can be drawn at slightly different ones, because past the
     180-point cap every claim's own resolve-by day is kept among the points and a
     new claim brings a new one. Comparing the days they share is the whole of what
     can be compared, and it is every day the two would be shown side by side on.
+
+    Both the number and the word, exactly: nothing about how a number is worked
+    out depends on how long the window is, so two worlds agree to the bit about a
+    claim neither of them touched. `tests/comparisons.py` says why that is now
+    askable and what it used to cost.
     """
     where = {day: index for index, day in enumerate(base.series_days)}
+    shared = 0
     for index, day in enumerate(branched.series_days):
         if day not in where:
             continue
-        assert branched.series[claim_id][index] == base.series[claim_id][where[day]], day
+        shared += 1
         assert branched.states[claim_id][index] == base.states[claim_id][where[day]], day
+        assert branched.series[claim_id][index] == base.series[claim_id][where[day]], day
+    assert shared, "the two worlds drew no day in common"
 
 
 def _has_no_loops(graph: Graph) -> bool:
@@ -1039,12 +1242,17 @@ def test_intervention_locality(kind: str, data: st.DataObject) -> None:
     may_move = _affected_from_the_shape(after, edit)
 
     assert pinned not in may_move
-    assert branched.beliefs[pinned] == base.beliefs[pinned]
-    for claim_id, belief in branched.beliefs.items():
-        if claim_id in may_move:
-            continue
+    untouched = [one for one in branched.beliefs if one not in may_move]
+    for claim_id in untouched:
         assert claim_id in base.beliefs, "an edit added a claim outside its own reach"
-        assert belief == base.beliefs[claim_id], claim_id
+    # Everything the engine worked out about each of them, bit for bit: every
+    # version's answer, the spread inside each version, and how much each version
+    # counts. `tests/comparisons.py` says why the reported likelihood is the one
+    # thing that cannot be asked for exactly.
+    every_version_answered_the_same(base, branched, untouched)
+    # And the reported numbers, exactly.
+    for claim_id in untouched:
+        assert branched.beliefs[claim_id] == base.beliefs[claim_id], claim_id
     # A claim added by an `insert` brings its own resolve-by day, and past the
     # 180-point cap that day joins the points every series is drawn at — so the two
     # worlds can be drawn at slightly different days. They are compared on the days
@@ -1076,31 +1284,50 @@ def _observation_reach(graph: Graph, fixed: tuple[object, ...]) -> set[str]:
 
 
 def _evidence_moved(
-    before: Graph, before_fixed: tuple[object, ...], after: Graph, after_fixed: tuple[object, ...]
+    before: Graph,
+    before_fixed: tuple[object, ...],
+    after: Graph,
+    after_fixed: tuple[object, ...],
+    own_reach: set[str],
 ) -> set[str]:
-    """Which claims an edit may move by changing what the evidence on the map is about.
+    """Which claims an edit may move by changing what an observation says.
 
     The affected-set table says what one edit does to a map on its own. It does
-    not cover one thing a *run* of edits can do: change what an earlier
-    observation is evidence about.
+    not cover what a *run* of edits can do: change what an earlier observation is
+    evidence about. Evidence is the one thing on a map that is not local, which is
+    exactly why observing and supposing are two different verbs.
 
-    Two ways that happens, and both are honest rather than a hole in the rule.
-    Putting a lever on a claim somebody had reported — a `do` over an earlier
-    `observe` — **takes the evidence off the map**, and the claims that evidence
-    reached go back to what they said before it arrived. And attaching a new claim
-    to one that was reported widens what the evidence is about, because the new
-    arrows carry it further. Evidence is the one thing on a map that is not local,
-    which is exactly why observing and supposing are two different verbs.
+    **Three ways it happens, and all three are honest rather than a hole in the
+    rule.** Putting a lever on a claim somebody had reported — a `do` over an
+    earlier `observe` — takes the evidence off the map, and the claims it reached
+    go back to what they said before it arrived. Attaching a new claim to one that
+    was reported widens what the evidence is about, because the new arrows carry
+    it further. And — the one this test missed for a whole stack — **changing
+    anything that can move a claim somebody reported changes what the report
+    says about everything it touches**, without the evidence or its reach moving
+    an inch: observe that a claim did not happen, then change how hard its one
+    cause pushes it, and the cause moves, because how much news about an effect
+    says about a cause depends on how hard that cause was pushing.
 
-    So when the evidence in force changes, or the claims it reaches change, those
-    claims are allowed to move as well — and when neither changes, they are not.
+    So the claims an observation reaches are allowed to move when the evidence in
+    force changes, when the claims it reaches change, or when this edit could move
+    the very claim that was reported. When none of the three holds, they are not.
+
+    This is worked out here from the shape of the map and the edits in force, and
+    never by asking `affected_set` — a test that agreed with the code it checks
+    would pass by agreeing with itself.
     """
     was, now = _in_force(before_fixed), _in_force(after_fixed)
     was_evidence = {one: was[one] for one in was if was[one][0] == "observe"}
     now_evidence = {one: now[one] for one in now if now[one][0] == "observe"}
     reached_before = _observation_reach(before, before_fixed)
     reached_after = _observation_reach(after, after_fixed)
-    if was_evidence == now_evidence and reached_before == reached_after:
+    reported = set(was_evidence) | set(now_evidence)
+    if (
+        was_evidence == now_evidence
+        and reached_before == reached_after
+        and not (reported & own_reach)
+    ):
         return set()
     return reached_before | reached_after
 
@@ -1142,9 +1369,8 @@ class GraphEditMachine(RuleBasedStateMachine):
         assert _has_no_loops(after)
         for belief in world.beliefs.values():
             assert 0.0 <= belief.lo <= belief.p <= belief.hi <= 1.0
-        may_move = _affected_from_the_shape(after, edit) | _evidence_moved(
-            self.graph, self.fixed, after, fixed
-        )
+        own_reach = _affected_from_the_shape(after, edit)
+        may_move = own_reach | _evidence_moved(self.graph, self.fixed, after, fixed, own_reach)
         for claim_id, belief in world.beliefs.items():
             if claim_id in may_move:
                 continue
@@ -1153,5 +1379,20 @@ class GraphEditMachine(RuleBasedStateMachine):
         self.graph, self.fixed, self.world = after, fixed, world
 
 
-GraphEditMachine.TestCase.settings = settings(max_examples=15, stateful_step_count=4, deadline=None)
+# **What this catches, honestly.** It walks sequences of edits looking for a claim
+# that moved outside what the rules allow, and it is the only test here that tries
+# *runs* rather than single edits — which is how the two leaks in this file's
+# history were found at all. But finding them took six hundred runs of ten steps
+# and most of a minute, because the shapes that break are rare: a sequence has to
+# reach two observations, or an observation and then an edit that touches it.
+#
+# At two hundred runs of eight steps it costs about six seconds and does **not**
+# reliably reach those shapes — measured, the old code passes it eight times out
+# of eight. So it is exploration, not the guard. The guard is the named tests
+# above, which build exactly those shapes and are fast and certain; this is here
+# to find the shape nobody has thought of yet, and to be turned up by hand when
+# somebody is hunting.
+GraphEditMachine.TestCase.settings = settings(
+    max_examples=200, stateful_step_count=8, deadline=None
+)
 TestGraphEditMachine = GraphEditMachine.TestCase

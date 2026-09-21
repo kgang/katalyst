@@ -259,7 +259,44 @@ def introduced_by(edits: Branch | Sequence[Intervention]) -> Mapping[LinkId, int
     }
 
 
-def affected_set(graph: Graph, intervention: Intervention) -> frozenset[PropositionId]:
+def _evidence_reach(
+    walkable: "networkx.DiGraph[PropositionId]", observed: PropositionId
+) -> set[PropositionId]:
+    """List everything one observation is evidence about: up, down, and down again.
+
+    Learning something is done by throwing away the worlds it did not happen in,
+    and that changes what the survivors say about the claim's causes as much as
+    about what it causes. So an observation reaches the claim observed, everything
+    it leads to, everything that leads to it, and everything those causes go on to
+    lead to — and nothing else.
+    """
+    reached = {observed} | networkx.descendants(walkable, observed)
+    for cause in networkx.ancestors(walkable, observed):
+        reached |= {cause} | networkx.descendants(walkable, cause)
+    return reached
+
+
+def _observed_and_still_in_force(
+    fixed: Sequence[Assignment],
+) -> tuple[PropositionId, ...]:
+    """Name the claims an observation currently speaks about, in a settled order.
+
+    A later edit on the same claim overrides an earlier one, so the last word on a
+    claim is the one in force: "this happened" followed by "suppose it did not" is
+    a supposition, and the observation throws no world away any more.
+    """
+    last: dict[PropositionId, str] = {}
+    for one in fixed:
+        last[one.target] = one.kind
+    return tuple(sorted(target for target, kind in last.items() if kind == "observe"))
+
+
+def affected_set(
+    graph: Graph,
+    intervention: Intervention,
+    fixed: Sequence[Assignment] = (),
+    before: Graph | None = None,
+) -> frozenset[PropositionId]:
     """Say which claims an edit is allowed to move, from the shape of the map alone.
 
     One principle: an edit changes only what is still connected to its subject in
@@ -278,6 +315,37 @@ def affected_set(graph: Graph, intervention: Intervention) -> frozenset[Proposit
     | `refine` | the finer claims that stand in for the target |
     | `believe` | the target alone — the user's own number is not pushed through the map |
 
+    **And one addition, which is not an exception but the same principle read
+    through an observation already in force.** An observation is not a number
+    stored once; it is a filter re-read through the map every time the map
+    changes. So: **an edit that can move a claim some observation was made about
+    can move everything that observation is evidence about** — because changing
+    that claim changes which worlds survive, and every number the observation
+    touches is read off the survivors. And that applies again to any further
+    observation whose own claim has just been brought in, so the set is grown
+    until it stops growing.
+
+    It is not a corner, and two quite different edits reach it.
+
+    *Changing what the news says.* Observe *"the premium did not fall"* and then
+    change how hard its one cause pushes it, and the **cause** moves — how much
+    news about an effect says about a cause depends on how hard that cause was
+    pushing. Measured: the arrow's source goes from `.5020` to `.4317`. The old
+    table said a `retune` moves the claim the arrow points at and its descendants,
+    which would have let a tile say *untouched* over a number that had moved by
+    `.070`.
+
+    *Withdrawing the news.* Suppose the very claim that was observed, and the
+    observation stops holding — a later edit on a claim overrides an earlier one —
+    so the worlds it was throwing away come back and everything it was evidence
+    about moves again. **That is why the reach of a standing observation is read
+    off the map the edit started from, not the one it left behind:** a `do` cuts
+    the arrows into its target, so on the map it leaves behind the causes it just
+    stopped saying anything about are no longer even connected to it.
+
+    A `believe` never triggers any of this: the user's own number is not pushed
+    through the map, so it cannot change which worlds survive.
+
     **Feedback arrows are set aside**, exactly as the map's loop check sets them
     aside. In this version a feedback arrow is carried as data and never worked
     through, so nothing an edit does can travel along one, and a claim reachable
@@ -293,6 +361,14 @@ def affected_set(graph: Graph, intervention: Intervention) -> frozenset[Proposit
             map it started from. An `insert`'s new claim is only on the second of
             those, and its descendants cannot be read off the first.
         intervention: The edit.
+        fixed: Every value the branch had already fixed **before this edit**, in
+            the order the edits were made — what `apply` returned beside the map
+            one step earlier. Leaving it out says no observation was in force,
+            which is right for a lone edit on an untouched map and wrong for a
+            branch that has already observed something.
+        before: The map this edit started from, for reading the reach of an
+            observation that was already in force. Leaving it out says the edit
+            cut no arrow, which is true of five of the six; only `do` cuts.
 
     Returns:
         The identifiers of every claim the edit may move. Empty when the edit's
@@ -311,8 +387,24 @@ def affected_set(graph: Graph, intervention: Intervention) -> frozenset[Proposit
 
     reached = {subject} | networkx.descendants(walkable, subject)
     if isinstance(intervention, Observe):
-        for cause in networkx.ancestors(walkable, subject):
-            reached |= {cause} | networkx.descendants(walkable, cause)
+        reached |= _evidence_reach(walkable, subject)
+
+    # Every observation still in force is re-read through the map this edit
+    # leaves behind. One that was made about a claim this edit can move now says
+    # something different about everything it is evidence about — and that can
+    # bring in a claim a *further* observation was made about, so this is grown
+    # until it stops growing rather than swept once.
+    was = _walkable(before) if before is not None else walkable
+    standing = [one for one in _observed_and_still_in_force(fixed) if one in was]
+    growing = True
+    while growing:
+        growing = False
+        for observed in standing:
+            if observed in reached:
+                widened = _evidence_reach(was, observed) & set(walkable)
+                if not widened <= reached:
+                    reached |= widened
+                    growing = True
     return frozenset(reached)
 
 

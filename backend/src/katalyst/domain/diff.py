@@ -237,13 +237,18 @@ class DeltaRow(BaseModel):
     before: float = Field(description="The first world's likelihood on the day below.")
     after: float = Field(description="The second world's likelihood on the day below.")
     peak_delta: float = Field(
-        description="The move on that day, signed: the largest the two worlds ever differ."
+        description=(
+            "The move on that day, signed: the largest the two worlds differ on any day "
+            "the series carries — which past 180 days is not every day there is."
+        )
     )
     at_day: date = Field(
         description=(
             "The day the two worlds are furthest apart. Always one of the days the series "
             "actually carries, which matters once a window longer than 180 days has been "
-            "drawn at fewer points."
+            "drawn at fewer points: the peak of a continuous curve can fall between two "
+            "drawn days, so an edit that lengthens the window can move this date and the "
+            "rank with it, without moving the claim's numbers at all. `diff.md` B4."
         )
     )
     range_width: float = Field(
@@ -554,11 +559,19 @@ def _days_both_worlds_drew(
 ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
     """Find the days both worlds drew, and where each day sits in each world's own series.
 
-    The two are almost always the same days. They can differ by a day or two when
-    a branch adds a claim whose own resolve-by day joins the points a long window
-    is drawn at — a window past 180 days is drawn at fewer, unevenly spaced days,
-    and every claim's resolve-by day is always kept among them. Comparing the days
-    they share is every day either of them would show side by side.
+    The two are the same days whenever the two worlds' windows are, which is every
+    edit but one. An `insert` can make the window longer — the window runs to the
+    last day anything is judged — and past 180 days a series is drawn at evenly
+    spaced points, so **the two can then share very few days indeed**: measured on
+    the two-piece map of `test_a_longer_window_moves_nothing_it_cannot_reach`, a
+    31-day window drawn at 32 points and a 365-day one drawn at 178 share 18. How
+    few depends entirely on the map's own dates, so that figure is an illustration
+    of the shape of the problem and not a property of the engine.
+
+    Both worlds are still worked out on every day their own arithmetic reads by
+    name; it is the *drawing* that parts company. Comparing the days they share is
+    every day either of them would show side by side, and it is the whole of what a
+    change list can honestly read.
 
     Args:
         world_a: The world to compare from.

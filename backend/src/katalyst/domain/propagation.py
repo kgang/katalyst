@@ -108,7 +108,20 @@ NINETIETH_PERCENTILE = 1.2816
 """How many standard deviations out a bell curve's 10th and 90th percentiles sit."""
 
 SERIES_CAP = 180
-"""The most points a claim's series ever carries, however long the window is."""
+"""The most **evenly spaced** points a series is drawn at, however long the window is.
+
+A cap on the evenly spaced points alone, and on both counts it is not a ceiling:
+**every claim's resolve-by day is kept whatever the cap says**, because a tile's
+headline is read on that day and it has to be a point of the line drawn beneath
+it. A map with more than 180 claims judged on 180 different days therefore sends
+one point per judged day and no more — more than this number, and every one of
+them earning its place. See `_days_to_send`.
+
+It bounds what is **worked out** as well, because the days worked out are the
+days sent plus the handful the arithmetic must land on exactly. What it must
+never do is decide the *timing* of anything: every day a push fires on is on the
+grid exactly, whatever this number is and however long the window runs.
+"""
 
 LOWEST_SURVIVAL = 0.02
 """Below this share of worlds surviving an observation, the world warns loudly."""
@@ -215,7 +228,8 @@ class World(BaseModel):
     days: int = Field(
         description=(
             "How long the window is, in whole days. Not the number of points in a series: "
-            "a window longer than 180 days is drawn at 180 evenly spaced points."
+            "past 180 days a series is drawn at 180 evenly spaced points, plus every claim's "
+            "own resolve-by day, which is always kept."
         )
     )
     graph: Graph = Field(description="The map the branch's edits left behind.")
@@ -292,20 +306,25 @@ class Versions:
     days: tuple[int, ...]
     """Which day of the window each column is."""
 
-    weights: Numbers
-    """How much each version counts, one per version.
+    weights: Mapping[PropositionId, Numbers]
+    """How much each version counts, **per claim**: one vector of one number per version.
 
     Every version counts the same unless something was observed, in which case a
-    version counts by the share of its worlds that survived the observation — and
-    then only for the claims in `reweighted`.
+    version counts by the share of its worlds that survived — and it survives the
+    observations that are evidence about **that claim**, never every observation on
+    the branch. Two observations in pieces of the map that share no arrow and no
+    cause are independent under the model the engine draws from, so one pooled
+    share would let an observation weigh a claim it says nothing about.
     """
 
     reweighted: frozenset[PropositionId]
-    """The claims the weights above apply to: the ones an observation is evidence about.
+    """The claims some observation is evidence about, and so counts the versions of.
 
     Every other claim is read with every version counting the same, because an
     observation joined to it by no chain of arrows and sharing no cause with it
-    changes nothing about it at all.
+    changes nothing about it at all. Which observations reach which claim is what
+    `weights` above is worked out from; this is the set of claims any of them
+    reaches, for a reader who only wants to know whether a claim was weighed.
     """
 
     priors: Mapping[PropositionId, Numbers]
@@ -330,7 +349,8 @@ class Versions:
         its direction has to obey the same one.** Every version counts the same,
         unless what was observed is evidence about this claim — the claims in
         `reweighted` — and then each version counts by the share of its worlds that
-        survived. The likelihood, the band, the width a change list reports on
+        survived **the observations that are evidence about this claim**, and no
+        others. The likelihood, the band, the width a change list reports on
         another day and the direction of a move are all read with the vector this
         gives back, so none of them can be counted one way and another of them
         another way.
@@ -349,10 +369,11 @@ class Versions:
             How much each version counts, one number per version. Never all
             zeroes, so anything dividing by its total is safe.
         """
-        evenly: Numbers = numpy.ones_like(self.weights)
+        counting = self.weights[claim_id]
+        evenly: Numbers = numpy.ones_like(counting)
         if claim_id not in self.reweighted:
             return evenly
-        return self.weights if self.weights.sum() > 0.0 else evenly
+        return counting if counting.sum() > 0.0 else evenly
 
 
 def propagate(
@@ -396,9 +417,10 @@ def propagate(
 
     Returns:
         One world: a likelihood and a range for every claim on the day it is
-        judged, a likelihood and a named state for every day of the window, every
-        supposition that was undermined, and a sentence for anything the reader
-        should be told.
+        judged, a likelihood and a named state for every day the series is drawn
+        at — every day of the window until the window outruns the cap, and then
+        the days `series_days` names — every supposition that was undermined, and
+        a sentence for anything the reader should be told.
 
     Raises:
         ValueError: If a supposition was undermined by an arrow that `introduced_by`
@@ -440,6 +462,39 @@ def versions_of(world: World) -> Versions:
     return _versions_from(setup, sample)
 
 
+def _versions_on_every_day(world: World) -> Versions:
+    """The same world's numbers, worked out on **every** day of the window.
+
+    Not how the engine runs and not reachable through `propagate`: the days worked
+    out are ordinarily the days sent plus the handful the arithmetic must land on
+    exactly, which past 180 days is far fewer than the window has. This exists so
+    that the licence for working out fewer days can be **checked** rather than
+    asserted — work a map out both ways and require the days they share to agree to
+    the bit. `test_a_days_answer_does_not_depend_on_which_other_days_were_worked_out`
+    is the only caller, and it is private because nothing that ships should want it.
+
+    Args:
+        world: The world to work out again, on every day.
+
+    Returns:
+        The version-by-version numbers, one column per day of the window.
+    """
+    setup = _prepare(world.graph, world.assignments, world.day_zero, every_day=True)
+    sample = _draw(setup, seed=world.seed, versions=world.versions, worlds=world.worlds)
+    return _versions_from(setup, sample)
+
+
+def _sent_days(setup: "_Setup") -> NDArray[numpy.int64]:
+    """Where the days a reader is given sit among the days worked out.
+
+    The days worked out are the days sent plus the handful the arithmetic must land
+    on exactly, so every sent day is among them and this is a lookup rather than a
+    search for a near miss. Worked out once, when the map is prepared, because a
+    world asks for it twice.
+    """
+    return numpy.searchsorted(setup.points, setup.sent).astype(numpy.int64)
+
+
 def _versions_from(setup: "_Setup", sample: "_Sample") -> Versions:
     """Gather the version-by-version numbers a run produced into one record.
 
@@ -456,13 +511,18 @@ def _versions_from(setup: "_Setup", sample: "_Sample") -> Versions:
     Returns:
         One record of the version-by-version numbers.
     """
+    # Thinned to the days a reader is given, so that a difference between two
+    # worlds compares exactly the days the two of them show and nothing else.
+    sent = _sent_days(setup)
     return Versions(
-        days=tuple(int(one) for one in setup.points),
+        days=tuple(int(setup.points[one]) for one in sent),
         weights=sample.weights,
-        reweighted=setup.observation_reach,
+        reweighted=frozenset().union(*setup.observation_reach.values())
+        if setup.observation_reach
+        else frozenset(),
         priors=sample.priors,
-        likelihood=sample.likelihood,
-        inner_spread=sample.inner_spread,
+        likelihood={one: row[:, sent] for one, row in sample.likelihood.items()},
+        inner_spread={one: row[:, sent] for one, row in sample.inner_spread.items()},
     )
 
 
@@ -503,14 +563,20 @@ class _Setup:
     day_zero: date
     days: int
     points: NDArray[numpy.int64]
+    sent: NDArray[numpy.int64]
     read_at: Mapping[PropositionId, int]
     shape_rows: Mapping[LinkId, Numbers]
-    observation_reach: frozenset[PropositionId]
+    observation_reach: Mapping[PropositionId, frozenset[PropositionId]]
     states: Mapping[PropositionId, tuple[SeriesState, ...]]
     warnings: tuple[str, ...]
 
 
-def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> _Setup:
+def _prepare(
+    graph: Graph,
+    assignments: tuple[Assignment, ...],
+    as_of: date,
+    every_day: bool = False,
+) -> _Setup:
     """Work out everything about a world that chance has no say in.
 
     The window, the order claims are worked through in, the day each claim's clock
@@ -523,6 +589,10 @@ def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> 
         graph: The map a fold left behind.
         assignments: Every value that fold fixed, in order.
         as_of: Day zero.
+        every_day: Work every day of the window out rather than the days a
+            reader is sent plus the ones the arithmetic must land on exactly.
+            Nothing that ships passes this; `_versions_on_every_day` does, so that
+            working out fewer days can be checked against working out all of them.
 
     Returns:
         Everything the draw below needs and nothing that depends on a seed.
@@ -541,17 +611,52 @@ def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> 
     settled = _settled_days(order, arrows_into, fixed_on, as_of)
 
     days = _window_length(graph, as_of)
-    points = _days_to_work_out(claims, as_of, days)
-    read_at = {
-        claim_id: int(numpy.searchsorted(points, _day_index(one.resolution.by, as_of, days)))
-        for claim_id, one in claims.items()
-    }
-
-    shape_rows = {one.id: _shape_row(one, settled[one.source], points) for one in ordinary}
     spells = {
         claim_id: _spells_on(fixed_on[claim_id], arrows_into[claim_id], settled, as_of)
         for claim_id in claims
     }
+
+    # **The days the numbers are worked out on.** Two kinds, and the difference is
+    # the whole of what makes an edit local.
+    #
+    # The days a reader is *sent* — at most 180 of them, evenly spaced, with every
+    # claim's resolve-by day always among them. These move when the window's length
+    # moves, and that is allowed: they decide where a line is *drawn*, nothing more.
+    #
+    # And the days the arithmetic must land on **exactly**: the day each claim's
+    # clock starts, because a one-off push fires then, and the day each observation
+    # speaks, because that is when worlds are thrown away. Reading either off the
+    # nearest drawn day is what used to let the window's length re-time a push, so
+    # that an inserted claim at one end of a map moved a claim at the other by
+    # `.096`. They are put on the grid instead, and every lookup is then exact.
+    #
+    # Adding them cannot move anything, and that is why this is safe rather than
+    # merely cheaper: a claim's answer on a given day is a function of that day and
+    # of the map's own timings, never of which *other* days happen to be worked
+    # out. So the grid decides only where the series is evaluated.
+    sent = (
+        numpy.arange(days + 1, dtype=numpy.int64)
+        if every_day
+        else _days_to_send(claims, as_of, days)
+    )
+    must_be_exact = {min(max(0, one), days) for one in settled.values()}
+    # An observation carries no date today — `Observe` has no `at`, so it always
+    # speaks on day zero, which is already on the grid as the first sent day. This
+    # term is therefore dead, and it is written anyway: the day an observation
+    # speaks is a day the arithmetic reads by name, and the moment `Observe` grows
+    # a date the grid must already be landing on it. Adding it later, after the
+    # field existed, would be a defect waiting to be found twice.
+    for stretches in spells.values():
+        must_be_exact |= {
+            min(max(0, one.starts), days) for one in stretches if one.kind == "observe"
+        }
+    points = numpy.union1d(sent, numpy.array(sorted(must_be_exact), dtype=numpy.int64))
+    read_at = {
+        claim_id: _point_of(points, _day_index(one.resolution.by, as_of, days))
+        for claim_id, one in claims.items()
+    }
+
+    shape_rows = {one.id: _shape_row(one, settled[one.source], points) for one in ordinary}
 
     return _Setup(
         claims=claims,
@@ -562,6 +667,7 @@ def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> 
         day_zero=as_of,
         days=days,
         points=points,
+        sent=sent,
         read_at=read_at,
         shape_rows=shape_rows,
         observation_reach=_observation_reach(claims, ordinary, spells),
@@ -650,17 +756,33 @@ def _window_length(graph: Graph, day_zero: date) -> int:
     return max(_day_index(one.resolution.by, day_zero) for one in graph.propositions)
 
 
-def _days_to_work_out(
+def _days_to_send(
     claims: Mapping[PropositionId, Proposition], day_zero: date, days: int
 ) -> NDArray[numpy.int64]:
-    """Choose which days of the window to work the numbers out on.
+    """Choose which days of the window a claim's series carries to the reader.
 
-    Ordinarily every day. Past 180 days that is more points than anybody scrubs
-    through, so the series is drawn at 180 evenly spaced days instead — **and every
-    claim's own resolve-by day is always among them**. That is not a nicety: a
+    **A cap on the evenly spaced points alone**, and never a decision about timing.
+    Ordinarily every day of the window. Past 180 days that is more points than
+    anybody scrubs through, so a series is drawn at 180 evenly spaced days instead
+    — **and every claim's own resolve-by day is kept whatever the cap says**, so a
+    map judged on more than 180 different days sends one point per judged day,
+    which is more than the cap and is the honest answer. That is not a nicety: a
     tile's headline number is read on the claim's own resolve-by day, and if that
     day were not on the claim's own series the number on the tile would not be a
     point of the line drawn beneath it.
+
+    These days are not, by themselves, the days the engine works out: `_prepare`
+    adds to them every day the arithmetic must land on exactly. So the cap does
+    bound the work — the days worked out are these plus that handful — but it is
+    never what decides when a push fires.
+
+    It was once the whole grid the engine worked on, and that was a defect. A push
+    fires on the day its cause is settled, read off the days worked out — so
+    thinning them made that day depend on how long the window was, and an edit at
+    one end of a map could re-time a claim at the other end that nothing connected
+    it to. Measured before it was separated: an inserted claim that stretched a
+    window from 31 days to 365 moved a claim in a wholly separate piece of the map
+    by `.096`.
 
     Args:
         claims: Every claim on the map, by identifier.
@@ -668,7 +790,7 @@ def _days_to_work_out(
         days: How long the window is.
 
     Returns:
-        The days to work out, in order.
+        The days to send, in order.
     """
     judged = numpy.array(
         sorted({_day_index(one.resolution.by, day_zero, days) for one in claims.values()}),
@@ -941,14 +1063,14 @@ def _observation_reach(
     claims: Mapping[PropositionId, Proposition],
     arrows: Sequence[Link],
     spells: Mapping[PropositionId, Sequence[_Spell]],
-) -> frozenset[PropositionId]:
-    """List the claims an observation is evidence about.
+) -> Mapping[PropositionId, frozenset[PropositionId]]:
+    """List, for **each** observed claim, the claims that one observation is evidence about.
 
     Observing something is done by throwing away the worlds it did not happen in,
     and that changes what the survivors say about the claim's **causes** as much as
     about what it causes — which is why observing reaches upstream and supposing
-    does not. It reaches the observed claim, everything it leads to, everything
-    that leads to it, and everything those causes lead to.
+    does not. One observation reaches the observed claim, everything it leads to,
+    everything that leads to it, and everything those causes lead to.
 
     **And nothing else, on purpose.** A claim joined to the observed one by no
     chain of arrows in either direction, and sharing no cause with it, is
@@ -958,32 +1080,51 @@ def _observation_reach(
     failing by sampling noise rather than by intent — so those claims are read off
     every world instead.
 
+    **One reach per observation, never the pool of them all.** Two observations in
+    pieces of the map that share no arrow and no cause are independent under the
+    very model the engine draws from — nothing in the map ties a draw for one piece
+    to a draw for the other — so conditioning on one of them says nothing whatever
+    about the other's piece. Pooling the reaches would say otherwise: a claim that
+    *some* observation is evidence about would be read through *every*
+    observation's surviving worlds, and an observation at one end of a map would
+    move a claim at the other end that nothing connects it to, by a wash of
+    sampling noise. Measured before this was separated: on a map in two pieces,
+    observing a claim in one piece moved a claim in the other by **`.083`**.
+
     Args:
         claims: Every claim on the map, by identifier.
         arrows: The ordinary arrows.
         spells: Which stretch of days each fixed value holds over, per claim.
 
     Returns:
-        The claims an observation is evidence about. Empty when nothing was
-        observed.
+        For each observed claim, the claims that observation is evidence about.
+        Empty when nothing was observed.
     """
     observed = [
         claim_id
         for claim_id, stretches in spells.items()
-        if any(one.kind == "observe" for one in stretches)
+        if any(one.kind == "observe" and _still_holds(one) for one in stretches)
     ]
     if not observed:
-        return frozenset()
+        return MappingProxyType({})
     walkable: networkx.DiGraph[PropositionId] = networkx.DiGraph()
     walkable.add_nodes_from(sorted(claims))
     walkable.add_edges_from((one.source, one.target) for one in arrows)
-    reached: set[PropositionId] = set()
+    each: dict[PropositionId, frozenset[PropositionId]] = {}
     for claim_id in sorted(observed):
         causes = networkx.ancestors(walkable, claim_id)
-        reached |= {claim_id} | networkx.descendants(walkable, claim_id) | causes
+        reached = {claim_id} | networkx.descendants(walkable, claim_id) | causes
         for cause in causes:
             reached |= networkx.descendants(walkable, cause)
-    return frozenset(reached)
+        each[claim_id] = frozenset(reached)
+    return MappingProxyType(each)
+
+
+def _evidence_about(
+    reach: Mapping[PropositionId, frozenset[PropositionId]], claim_id: PropositionId
+) -> tuple[PropositionId, ...]:
+    """Name the observations that are evidence about one claim, in a settled order."""
+    return tuple(observed for observed in sorted(reach) if claim_id in reach[observed])
 
 
 def _warnings_about(
@@ -1012,7 +1153,8 @@ def _warnings_about(
     if days + 1 > SERIES_CAP:
         said.append(
             f"This map runs for {days} days, so each claim's series is drawn at {SERIES_CAP} "
-            "evenly spaced points rather than one for every day."
+            "evenly spaced points rather than one for every day. Every day a push fires or "
+            "a claim is judged is worked out exactly; the days between are not needed."
         )
     return tuple(said)
 
@@ -1027,7 +1169,7 @@ class _Sample:
     priors: Mapping[PropositionId, Numbers]
     likelihood: Mapping[PropositionId, Numbers]
     inner_spread: Mapping[PropositionId, Numbers]
-    weights: Numbers
+    weights: Mapping[PropositionId, Numbers]
     survival: float
 
 
@@ -1219,19 +1361,28 @@ def _draw(setup: _Setup, *, seed: int, versions: int, worlds: int) -> _Sample:
         for claim_id in setup.order
     }
 
-    alive = numpy.ones((versions, worlds), dtype=bool)
+    alive: Mapping[PropositionId, Flags] = {}
     if setup.observation_reach:
         _, _, alive = _one_pass(setup, priors, coins, versions, worlds, alive, reduce=False)
     likelihood, inner, _ = _one_pass(setup, priors, coins, versions, worlds, alive, reduce=True)
 
-    kept = alive.sum(axis=1)
-    weights = kept.astype(numpy.float64) / worlds
+    # How much each version counts, **per claim**: the share of its worlds that
+    # survived the observations that are evidence about that claim, and no others.
+    # One pooled share would let an observation weigh a claim it says nothing about.
+    counting: dict[PropositionId, Numbers] = {}
+    survived_all = numpy.ones((versions, worlds), dtype=bool)
+    for observed in sorted(alive):
+        survived_all = survived_all & alive[observed]
+    for claim_id in setup.order:
+        about = _evidence_about(setup.observation_reach, claim_id)
+        kept = _surviving_both(alive, about, versions, worlds).sum(axis=1)
+        counting[claim_id] = kept.astype(numpy.float64) / worlds
     return _Sample(
         priors=priors,
         likelihood=likelihood,
         inner_spread=inner,
-        weights=weights,
-        survival=float(kept.sum()) / float(versions * worlds),
+        weights=MappingProxyType(counting),
+        survival=float(survived_all.sum()) / float(versions * worlds),
     )
 
 
@@ -1241,10 +1392,10 @@ def _one_pass(
     coins: Mapping[PropositionId, Draws],
     versions: int,
     worlds: int,
-    alive: Flags,
+    alive: Mapping[PropositionId, Flags],
     *,
     reduce: bool,
-) -> tuple[dict[PropositionId, Numbers], dict[PropositionId, Numbers], Flags]:
+) -> tuple[dict[PropositionId, Numbers], dict[PropositionId, Numbers], dict[PropositionId, Flags]]:
     """Walk every claim once, causes first, working out its likelihood in every draw.
 
     Args:
@@ -1270,7 +1421,7 @@ def _one_pass(
     fired: dict[PropositionId, Flags] = {}
     answered: dict[PropositionId, Numbers] = {}
     spread: dict[PropositionId, Numbers] = {}
-    surviving = alive.copy()
+    surviving: dict[PropositionId, Flags] = dict(alive)
 
     for claim_id in setup.order:
         baseline = _log_odds(priors[claim_id]).astype(DRAWING)
@@ -1294,9 +1445,15 @@ def _one_pass(
 
         starts = _point_of(setup.points, setup.settled[claim_id])
         for spell in setup.spells[claim_id]:
-            if spell.kind == "observe":
+            if spell.kind == "observe" and _still_holds(spell):
                 at = _point_of(setup.points, spell.starts)
-                surviving &= came_true[:, :, at] == spell.value
+                # This observation's own worlds, kept apart from every other
+                # observation's. Pooling them is what let an observation in one
+                # piece of a map move a claim in another.
+                kept = came_true[:, :, at] == spell.value
+                surviving[claim_id] = (
+                    kept if claim_id not in surviving else surviving[claim_id] & kept
+                )
         held, word = _fixed_days(setup, claim_id)
         if held.any():
             answer = numpy.where(held[None, None, :], word[None, None, :], answer)
@@ -1305,22 +1462,85 @@ def _one_pass(
         truth[claim_id] = came_true
         fired[claim_id] = came_true[:, :, starts]
         if reduce:
-            weighted = claim_id in setup.observation_reach
-            answered[claim_id], spread[claim_id] = _per_version(answer, surviving, weighted)
+            # Read through the worlds that survived **the observations this claim
+            # is evidence of**, and no others. A claim no observation is evidence
+            # about is read off every world, which is both exact and what keeps a
+            # coin flip somewhere else from moving a number nobody touched.
+            about = _evidence_about(setup.observation_reach, claim_id)
+            answered[claim_id], spread[claim_id] = _per_version(
+                answer, _surviving_both(surviving, about, versions, worlds), bool(about)
+            )
 
     return answered, spread, surviving
+
+
+def _still_holds(spell: _Spell) -> bool:
+    """Say whether a stretch of days is one this edit's word actually covers.
+
+    A later edit on the same claim ends an earlier one's stretch, and where the
+    later edit lands on the very same day the earlier stretch covers no day at all.
+    **An observation no longer in force throws no world away**: the user said "this
+    happened" and then said "suppose it did not", and the second word is the one in
+    force. Discarding worlds for the first would be reading news the user has
+    withdrawn — and it leaked, because the worlds an observation discards are how
+    much every version it is evidence about counts.
+    """
+    return spell.ends is None or spell.ends > spell.starts
+
+
+def _surviving_both(
+    surviving: Mapping[PropositionId, Flags],
+    about: Sequence[PropositionId],
+    versions: int,
+    worlds: int,
+) -> Flags:
+    """Which worlds survived **every** observation that is evidence about one claim.
+
+    A claim two observations are both evidence about is read through the worlds
+    that survived both of them: each one really is news about it, and a world that
+    contradicts either is not a world this claim can be read in. A claim only one
+    of them reaches is read through that one alone. A claim neither reaches is read
+    through every world there is.
+
+    Args:
+        surviving: Which worlds survived each observation, by the claim observed.
+        about: The observations that are evidence about the claim being read.
+        versions: The outer loop.
+        worlds: The inner loop.
+
+    Returns:
+        One flag per version per world.
+    """
+    kept = numpy.ones((versions, worlds), dtype=bool)
+    for observed in about:
+        kept = kept & surviving[observed]
+    return kept
 
 
 def _point_of(points: NDArray[numpy.int64], day: int) -> int:
     """Find where one day of the window sits among the days actually worked out.
 
-    Every day is worked out unless the window runs past 180 days, when the series
-    is drawn at evenly spaced points instead; a day falling between two of those
-    is read at the next one along, and a day past the end of the window at the last
-    one. Only a claim whose clock starts outside the window can land there, and
-    such a claim is not doing anything inside it.
+    **Exact, and it has to be.** Every day the arithmetic reads by name — the day a
+    claim's clock starts, so a one-off push fires then, and the day an observation
+    speaks — is put on the grid when the grid is built, precisely so that this can
+    never round. Rounding here to the next drawn day along is what once let the
+    length of the window decide the timing of a push, and so let an edit at one end
+    of a map move a claim at the other; see `_days_to_send` and `_prepare`.
+
+    A day past the end of the window is read at the last one, which only a claim
+    whose clock starts outside the window can be, and such a claim is not doing
+    anything inside it.
+
+    Args:
+        points: The days worked out, in order.
+        day: The day wanted.
+
+    Returns:
+        Where that day sits among them.
     """
-    return min(int(numpy.searchsorted(points, day)), len(points) - 1)
+    if day >= points[-1]:
+        return len(points) - 1
+    return int(numpy.searchsorted(points, max(0, day)))
 
 
 def _fixed_days(setup: _Setup, claim_id: PropositionId) -> tuple[Flags, Draws]:
@@ -1388,8 +1608,20 @@ def _per_version(answer: Draws, surviving: Flags, weighted: bool) -> tuple[Numbe
 
 
 def _weighted_mean(values: Numbers, weights: Numbers) -> Numbers:
-    """Average one number per version, counting each version by how much it survived."""
-    return (values * weights[:, None]).sum(axis=0) / weights.sum()
+    """Average one number per version, counting each version by how much it survived.
+
+    **Added up along the versions, which is the axis laid out end to end**, so that
+    the order the numbers are added in depends on how many versions there are and
+    on nothing else. Adding along the other axis lets the array library pick its
+    order by the shape of the block, and floating-point addition is not
+    associative: the same sixteen numbers then total `11.689481994806576` in an
+    array one day wide and `11.689481994806577` in a wider one. That is nothing a
+    reader could see, and it is enough to stop two worlds of one map agreeing to
+    the bit about a claim neither of them touched — which is the sharpest way there
+    is to state locality, so it is worth one transpose to keep.
+    """
+    along_versions = numpy.ascontiguousarray(values.T)
+    return (along_versions * weights[None, :]).sum(axis=1) / weights.sum()
 
 
 def _weighted_percentiles(
@@ -1533,6 +1765,7 @@ def _world_from(
     # own numbers and the difference between two worlds then count the versions
     # the same way by construction rather than by two copies of one line agreeing.
     behind = _versions_from(setup, sample)
+    sent = _sent_days(setup)
     for claim_id in setup.order:
         counting = behind.counting_for(claim_id)
         middle, bottom, top = _band(
@@ -1545,15 +1778,36 @@ def _world_from(
             hi=float(numpy.clip(top[read], 0.0, 1.0)),
             owner="model",
         )
-        series[claim_id] = tuple(float(one) for one in middle)
-        drawn[claim_id] = setup.states[claim_id]
+        series[claim_id] = tuple(float(middle[one]) for one in sent)
+        drawn[claim_id] = tuple(setup.states[claim_id][one] for one in sent)
 
     said = list(setup.warnings)
-    if setup.observation_reach and sample.survival < LOWEST_SURVIVAL:
+    # **The warning is about a claim's reading, not about the map.** Each claim is
+    # read through the worlds that survived the observations that are evidence
+    # about *it*, so how thin that reading is differs from claim to claim: two
+    # observations can each keep plenty of worlds while almost none survive both,
+    # and a claim in a piece of the map neither of them touches is read off every
+    # world and is perfectly well supported. Saying "x per cent of the worlds
+    # survived" about the whole map would be true of no claim in particular.
+    starved = sorted(
+        (float(sample.weights[claim_id].mean()), claim_id)
+        for claim_id in setup.order
+        if _evidence_about(setup.observation_reach, claim_id)
+        and float(sample.weights[claim_id].mean()) < LOWEST_SURVIVAL
+    )
+    if starved:
+        thinnest, claim_id = starved[0]
+        others = (
+            ""
+            if len(starved) == 1
+            else f", and {len(starved) - 1} other claim{'' if len(starved) == 2 else 's'} "
+            "{is_are} as thinly supported".format(is_are="is" if len(starved) == 2 else "are")
+        )
+        numbers = "that number" if len(starved) == 1 else "those numbers"
         said.append(
-            f"Only {sample.survival * 100:.1f} per cent of the simulated worlds match what was "
-            "observed, so the range on every number here is unreliable — not just the number "
-            "itself."
+            f"Only {thinnest * 100:.1f} per cent of the simulated worlds match everything "
+            f"observed about {_name_of(setup.claims, claim_id)}{others}, so the range on "
+            f"{numbers} is unreliable — not just the number itself."
         )
 
     return World(
@@ -1564,7 +1818,7 @@ def _world_from(
         worlds=worlds,
         day_zero=setup.day_zero,
         days=setup.days,
-        series_days=tuple(int(one) for one in setup.points),
+        series_days=tuple(int(setup.points[one]) for one in sent),
         graph=graph,
         assignments=assignments,
         retractions=retractions,

@@ -79,6 +79,7 @@ from katalyst.domain.diff import (
 )
 from katalyst.domain.propagation import Numbers, Versions
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
+from tests.comparisons import every_version_answered_the_same
 from tests.strategies import branches, graphs
 
 # The package re-exports the `diff` function under the name of the file it lives
@@ -300,8 +301,8 @@ def _weights_the_number_was_read_with(behind: Versions, claim_id: str) -> Number
     the share of its worlds that survived what was observed.
     """
     if claim_id in behind.reweighted:
-        return behind.weights
-    return numpy.ones_like(behind.weights)
+        return behind.weights[claim_id]
+    return numpy.ones_like(behind.weights[claim_id])
 
 
 def _one_number(per_version: Numbers, counting: Numbers) -> float:
@@ -311,8 +312,8 @@ def _one_number(per_version: Numbers, counting: Numbers) -> float:
 
 def _count_every_version_the_same(behind_a: Versions, behind_b: Versions, claim_id: str) -> Numbers:
     """Stand in for the weights so that every version counts 1, whatever was observed."""
-    del behind_b, claim_id
-    return numpy.ones_like(behind_a.weights)
+    del behind_b
+    return numpy.ones_like(behind_a.weights[claim_id])
 
 
 def _weakest_on_the_best_route(graph: Graph, subjects: set[str], target: str) -> float:
@@ -620,7 +621,7 @@ def test_delta_row_reads_the_peak_day(data: st.DataObject) -> None:
             for day in in_b
             if day in in_a
         ]
-        assert abs(row.peak_delta) >= max(gaps) - 1e-12
+        assert abs(row.peak_delta) >= max(gaps)
         assert row.before == before.series[row.target][in_a[named]]
         assert row.after == after.series[row.target][in_b[named]]
         assert row.peak_delta == row.after - row.before
@@ -711,7 +712,7 @@ def test_an_observation_puts_a_row_on_the_rail() -> None:
     assert not isinstance(answer, list), answer
 
     behind = versions_of(learned)
-    assert bool((behind.weights == 0.0).any()), "this observation empties some versions"
+    assert bool((behind.weights["M1"] == 0.0).any()), "this observation empties some versions"
 
     assert [one.target for one in answer.rows] == ["M1", "M2"]
     for row in answer.rows:
@@ -733,7 +734,7 @@ def test_a_dead_version_does_not_vote() -> None:
     base = _hormuz_world(None)
     learned = _hormuz_world(_observing("B"))
     behind_a, behind_b = versions_of(base), versions_of(learned)
-    dead = behind_b.weights == 0.0
+    dead = behind_b.weights["M1"] == 0.0
     assert bool(dead.any()), "this observation empties some versions"
 
     for claim in learned.graph.propositions:
@@ -823,7 +824,7 @@ def test_an_edit_that_is_not_an_observation_is_unchanged_by_the_weights(
         second = _hormuz_world(branch)
         behind = versions_of(second)
         assert not behind.reweighted, "nothing on this branch was observed"
-        assert bool((behind.weights == 1.0).all())
+        assert all(bool((one == 1.0).all()) for one in behind.weights.values())
 
         as_built = diff(base, second, edit_in_words=branch.label)
         assert not isinstance(as_built, list), as_built
@@ -907,9 +908,9 @@ def test_a_world_that_kept_nothing_does_not_erase_the_other_worlds_weights() -> 
 
     # The corner is only the corner if one world really kept nothing, the other
     # really is weighted, and the claim is one both observations are evidence about.
-    assert behind_b.weights.sum() == 0.0, "this observation was meant to keep nothing"
-    assert behind_a.weights.sum() > 0.0
-    assert not bool((behind_a.weights == 1.0).all()), "this observation was meant to weigh"
+    assert behind_b.weights["top"].sum() == 0.0, "this observation was meant to keep nothing"
+    assert behind_a.weights["top"].sum() > 0.0
+    assert not bool((behind_a.weights["top"] == 1.0).all()), "this observation was meant to weigh"
     assert "top" in behind_a.reweighted and "top" in behind_b.reweighted
 
     # The starved world counts every version the same — on its own, which is what
@@ -997,13 +998,102 @@ def test_diff_states_respect_locality(data: st.DataObject) -> None:
     reach = _may_move(graph, branch)
     assume(reach is not None)
     assert reach is not None
-    answer = _compared(graph, _branch(identifier="base"), branch)
+    base = _world(graph, _branch(identifier="base"))
+    branched = _world(graph, branch)
+    answer = diff(base, branched, edit_in_words=branch.label)
+    assert not isinstance(answer, list), answer
 
+    # What the engine worked out about each unreachable claim, exactly: every
+    # version of the map, on every day both worlds drew. `tests/comparisons.py`
+    # says why the reported average is not the thing to ask for to the bit.
+    every_version_answered_the_same(
+        base, branched, [one for one in answer.claims if one not in reach]
+    )
     for claim_id, one in answer.claims.items():
         if claim_id in reach:
             continue
         assert one.state == "unchanged", claim_id
+        # And the reported number itself, exactly. Nothing about how the numbers
+        # are worked out depends on how long the window is any more, so this is
+        # bit-for-bit whatever the edit did to the window.
         assert one.delta == 0.0, claim_id
+
+
+def test_a_longer_window_moves_nothing_it_cannot_reach() -> None:
+    """Inserting a claim at one end of a map moves nothing at the other end.
+
+    Two pieces with nothing joining them. In the second piece `cause` triggers
+    `effect` through an arrow with a three-day delay, so `effect`'s clock starts on
+    day 3, and `effect` in turn pushes `ending`. The edit inserts a claim in the
+    **first** piece, judged a year out, which stretches the window from a month to a
+    year. Nothing on the second piece is connected to what was inserted.
+
+    But past 180 days a series is drawn at evenly spaced points instead of every
+    day, and a day between two of them is read at the next one along — so day 3 is
+    drawn on the short window and is not on the long one, and the push into `ending`
+    starts reading `effect` on day 4 instead. `ending` moves, and no edit reached it.
+
+    It used to. Measured before the fix: `.096` on the version-by-version answers,
+    a tenth of a likelihood, because the push into `ending` started reading `effect`
+    on day 4 instead of day 3. That was the product's central correctness claim
+    (INV-4, locality: an edit changes only what is still connected to its subject)
+    failing through the sampling grid rather than along the arrows.
+
+    The fix is the one rule in `propagation.md` B5: **the day cap decides where a
+    series is drawn, never when a push fires.** Every day the arithmetic reads by
+    name — the day each claim's clock starts, the day each observation speaks — is
+    on the grid exactly, so a push fires on the true day its cause settles.
+    Re-spacing the drawn points by lengthening a window then re-times nothing,
+    because nothing that fires was ever read off them.
+
+    **The repair that looks obvious is not the repair**, and was tried: keeping
+    every settled day among the days a reader is *sent* makes the drawn points
+    depend on the settled days, so a supposition — which cuts arrows and so moves
+    them — re-spaces the series and shifts a claim's own ancestors, breaking INV-3,
+    assert is not observe.
+
+    *(Amended 2026-09-21. This docstring first said every day of the window is
+    worked out, which was true of the engine that shipped the repair. Two sets of
+    days have to be told apart and were not: the days a reader is **drawn** a line
+    through, which move when the window's length moves and may, and the days the
+    numbers are **computed** on, which must land exactly on every day the
+    arithmetic names and must not. The first repair made both sets every day of
+    the window, which was correct and cost 5 892 MB on a five-year map; the grid
+    is now the sent days plus the named ones, at 958 MB, and the narrow difference
+    from the rejected repair above is which of the two sets the settled days join.)*
+    """
+    far_side = (
+        _claim("cause", kind="event", prior=(0.5, 0.25, 0.75), days=0),
+        _claim("effect", kind="event", prior=(0.5, 0.25, 0.75), days=0),
+        _claim("ending", kind="market", prior=(0.3, 0.2, 0.45), days=0),
+    )
+    near_side = (_claim("start", kind="hypothesis", prior=(0.4, 0.2, 0.6), days=31),)
+    delayed = _arrow("cause", "effect").model_copy(
+        update={"lag": 3.0, "shape": "impulse", "half_life": 1.0}
+    )
+    graph = _map(near_side + far_side, (delayed, _arrow("effect", "ending", strength=1.5)))
+
+    a_year_out = _claim("claim-newcomer", kind="event", prior=(0.3, 0.2, 0.45), days=365)
+    stretches_the_window = _branch(
+        Insert(proposition=a_year_out, links=(_arrow("start", "claim-newcomer", strength=0.0),)),
+        identifier="a-year-out",
+    )
+
+    base = _world(graph, _branch(identifier="base"))
+    stretched = _world(graph, stretches_the_window)
+    assert len(base.series_days) != len(stretched.series_days), "the window was meant to grow"
+
+    # `ending` is in the other piece; nothing the edit did can reach it.
+    every_version_answered_the_same(base, stretched, ["cause", "effect", "ending"])
+    behind_base, behind_stretched = versions_of(base), versions_of(stretched)
+    where = {day: index for index, day in enumerate(behind_base.days)}
+    for index, day in enumerate(behind_stretched.days):
+        if day not in where:
+            continue
+        assert numpy.array_equal(
+            behind_stretched.likelihood["ending"][:, index],
+            behind_base.likelihood["ending"][:, where[day]],
+        ), day
 
 
 # --- How a likelihood is written ------------------------------------------
