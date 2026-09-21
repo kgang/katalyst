@@ -586,6 +586,41 @@ def keep(run: Run, faults: tuple[str, ...], *, folder: Path | None = None) -> Pa
     return written
 
 
+class NotSomethingARecordingHolds(Exception):
+    """A run was asked to become a recording and carries something a recording may not.
+
+    Today there is exactly one such thing: an `activity` line, which says what a
+    live call was doing at a moment that has passed. Nothing in this program puts
+    one on a run — activity never goes through the follower a run's events come
+    from — so this is a guard against a future change rather than a thing that
+    happens, and it is the reason the guard is cheap to keep.
+    """
+
+
+def nothing_a_recording_may_not_hold(run: Run) -> None:
+    """Refuse to write a recording that holds a line a recording may never hold.
+
+    **The recorder never writes an `activity` line.** A recording is the stream of
+    what a generation decided, line for line; activity is what a call was doing
+    while it decided, it is true only for the second it was said, and playing one
+    back would be a replay pretending to be working (record 0027, 2026-09-22).
+
+    Args:
+        run: What the run produced.
+
+    Raises:
+        NotSomethingARecordingHolds: If it holds one.
+    """
+    said = [one for one in run.events if events.name_of(one) == events.ACTIVITY]
+    if said:
+        raise NotSomethingARecordingHolds(
+            f"{run.example} would have written {len(said)} activity "
+            f"{'lines' if len(said) > 1 else 'line'} into a recording. Activity is "
+            "what a live run is doing this second: it is never written down, never "
+            "played back and never invented."
+        )
+
+
 def write_recording(run: Run, *, folder: Path | None = None) -> Path:
     """Write the recording a keyless clone plays back.
 
@@ -602,7 +637,12 @@ def write_recording(run: Run, *, folder: Path | None = None) -> Path:
 
     Returns:
         The file that was written.
+
+    Raises:
+        NotSomethingARecordingHolds: If the run carries a line a recording may
+            never hold.
     """
+    nothing_a_recording_may_not_hold(run)
     where = folder or where_they_live()
     where.mkdir(parents=True, exist_ok=True)
     written = where / f"{run.example}.jsonl"

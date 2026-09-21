@@ -22,6 +22,11 @@ What this file must never do
   pipeline to report.
 - Never declare a place to run code beside the search tool, and never declare a
   tool that fetches a page of our choosing. Both were decided in record 0006.
+- Never let saying what a call is doing change what a call is. `on_activity` is
+  optional, the recorder and every recorded exchange leave it out — so their
+  requests are byte for byte what they have always been — and anything that goes
+  wrong while saying it is swallowed and logged. A run must be able to finish
+  with nobody listening and with a listener that throws.
 - Never take the search tool **out** of the list to stop a run searching. The
   tool list is the very front of a request, so removing it throws away the
   prefix the service has been reading back at a tenth of the price; forbidding
@@ -34,10 +39,12 @@ our own shapes with a plain sentence on it. Nothing above this file should ever
 have to know whose exception it was.
 """
 
+import logging
 import time
 from collections.abc import Sequence
 from importlib import import_module
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
+from urllib.parse import urlsplit
 
 import anthropic
 from anthropic import Omit, omit
@@ -52,6 +59,7 @@ from anthropic.types import (
     OutputConfigParam,
     ParsedMessage,
     TextBlockParam,
+    ThinkingConfigParam,
     ToolChoiceParam,
     WebSearchTool20260209Param,
 )
@@ -137,6 +145,77 @@ Changing this between calls leaves the remembered prefix — the tools and the
 standing text — intact, which is the whole reason it is done this way rather than
 by taking the tool out of the list.
 """
+
+THINKING_OUT_LOUD: ThinkingConfigParam = {"type": "adaptive", "display": "summarized"}
+"""How the model is asked to think **on a live call that somebody is watching**.
+
+The same adaptive thinking every other call asks for, plus one field: `display`,
+set to `summarized`. Left alone, this model returns its thinking blocks with the
+text emptied out, so a stream carries the shape of the thinking and none of the
+words; asked for a summary, it writes a readable one. The raw chain of thought is
+never returned by anything, at any setting, and nothing here asks for it.
+
+**Live calls only.** The recorder sends `{"type": "adaptive"}` and nothing else,
+which is what every committed recording and every recorded exchange under
+`tests/cassettes/` was made with, and those are matched on the whole request
+body. Asking for the summary there would rewrite nine of them for a line nobody
+would ever read back (record 0027; R34 is the precedent for the live request
+differing from the recorder's).
+
+Read off the `claude-api` reference bundle on 2026-09-22, for this model at this
+effort. **Never verified against the service** — no live call has been made since
+this line was written.
+"""
+
+HOW_MANY_RESULTS_ARE_WORTH_SAYING = 1
+"""How many of a search's results are said out loud: the first one.
+
+A search returns ten pages and the strip shows one line. Saying all ten would put
+nine of them straight in the bin, because only the newest line of each kind
+survives the pace below.
+"""
+
+
+WhatOneCallIsDoing = Literal["searching", "found", "thinking"]
+"""The three things a live call can be caught doing, as the stream's own words for them."""
+
+
+class WhatItIsDoing(BaseModel):
+    """One thing a live call is doing this second, on its way to the stream.
+
+    Ours, not the library's, so nothing above this file meets a vendor type — and
+    deliberately **not** the stream's own `activity` event: this file must not
+    import `engine/events.py`, which reads the walk, which reads this file.
+
+    It carries the question the call was put with, because that is the only thing
+    this file knows about *which* claim is being worked on. Whoever built the
+    callback decides what to do with it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: WhatOneCallIsDoing = Field(description="Which of the three this is.")
+    text: str = Field(description="The model's own words, or the search tool's own, verbatim.")
+    question: str = Field(
+        description="The varying half of the request this call was put with. Identifies the call."
+    )
+
+
+class SayWhatItIsDoing(Protocol):
+    """Whatever wants to be told what a call is doing while it is happening.
+
+    Optional everywhere. The recorder, the cassette tests and every hand-written
+    answerer pass nothing, which is what keeps their requests byte for byte what
+    they have always been.
+
+    It must never raise and must never block: it is called from the thread making
+    the model call, between two chunks of the answer.
+    """
+
+    def __call__(self, doing: WhatItIsDoing) -> None:
+        """Take one thing a call is doing. Return at once, whatever happens."""
+        ...
+
 
 STANDING_BLOCK: list[TextBlockParam] = [
     {
@@ -378,6 +457,7 @@ class Model:
         *,
         model: str | None = None,
         effort: str | None = None,
+        on_activity: SayWhatItIsDoing | None = None,
     ) -> None:
         """Wrap a client.
 
@@ -388,8 +468,15 @@ class Model:
             effort: How hard it should try. The one the settings name when not
                 said, and nothing at all when neither says — which leaves the
                 service's own default and puts no field in the request.
+            on_activity: Somewhere to say what each call is doing while it is
+                doing it. **Nothing at all is the default, and it is what the
+                recorder and every recorded exchange use**: with nothing here the
+                request is byte for byte the one this program has always sent.
+                Given one, the call is streamed and asks for summarised thinking,
+                which is a live-only difference (record 0027).
         """
         self._client = client
+        self._on_activity = on_activity
         settings = get_settings()
         self._model = model or settings.KATALYST_MODEL
         chosen: Any = effort if effort is not None else settings.KATALYST_EFFORT
@@ -452,6 +539,15 @@ class Model:
         `messages.parse` merges the two itself. **Do not "fix" this to the other
         spelling** — record 0006 names this call.
 
+        **Two ways of putting the same question, and the difference is one
+        argument.** With nowhere to say what it is doing, the question is put the
+        way it has always been put and the whole answer arrives at the end. With
+        somewhere to say it, the same question is put through the streaming
+        helper — which takes the same `output_format` and hands back the same
+        validated answer — and every block is read out loud as it lands. Nothing
+        else about the request moves except the summarised thinking that makes
+        the third line possible, and neither reaches the recorder.
+
         Args:
             question: The varying half of the request.
             shape: What an answer must fit — a starting claim, or a proposal.
@@ -470,20 +566,24 @@ class Model:
         started = time.monotonic()
         for _ in range(ROUNDS_OF_RESEARCH):
             try:
-                answer = self._client.messages.parse(
-                    model=self._model,
-                    max_tokens=ROOM_FOR_AN_ANSWER,
-                    # The model decides for itself how long to think. How hard it
-                    # tries is left at the service's own default, which is the
-                    # setting we want; naming it would add a knob that changes
-                    # nothing and a second place for two settings to disagree.
-                    thinking={"type": "adaptive"},
-                    system=STANDING_BLOCK,
-                    tools=[SEARCH_TOOL],
-                    tool_choice=MAY_SEARCH if may_search else MAY_NOT_SEARCH,
-                    messages=conversation,
-                    output_format=shape,
-                    output_config=self._trying,
+                answer = (
+                    self._streamed(conversation, shape, question, may_search=may_search)
+                    if self._on_activity is not None
+                    else self._client.messages.parse(
+                        model=self._model,
+                        max_tokens=ROOM_FOR_AN_ANSWER,
+                        # The model decides for itself how long to think. How hard it
+                        # tries is left at the service's own default, which is the
+                        # setting we want; naming it would add a knob that changes
+                        # nothing and a second place for two settings to disagree.
+                        thinking={"type": "adaptive"},
+                        system=STANDING_BLOCK,
+                        tools=[SEARCH_TOOL],
+                        tool_choice=MAY_SEARCH if may_search else MAY_NOT_SEARCH,
+                        messages=conversation,
+                        output_format=shape,
+                        output_config=self._trying,
+                    )
                 )
             except ValidationError as did_not_fit:
                 raise AnswerWeCouldNotRead(_did_not_fit_the_shape(did_not_fit)) from did_not_fit
@@ -501,6 +601,96 @@ class Model:
             # "carry on" of our own would only confuse it.
             conversation = [*conversation, {"role": "assistant", "content": answer.content}]
         return what_it_said(rounds, seconds=time.monotonic() - started)
+
+    def _streamed(
+        self,
+        conversation: list[MessageParam],
+        shape: Any,
+        question: str,
+        *,
+        may_search: bool,
+    ) -> ParsedMessage[Any]:
+        """Put one round of a question, reading it out loud as the answer arrives.
+
+        The same request as the one above with two live-only differences: it is
+        streamed, and it asks for the thinking to be summarised so there is
+        something to read out. The shape still goes on `output_format` and the
+        answer that comes back is the same validated shape, which is what lets
+        one translation serve both ways of asking (`sdk-upgrade.md` in the
+        `claude-api` reference bundle, read 2026-09-22).
+
+        Args:
+            conversation: The turns so far, which is one turn on the first round
+                and grows by the service's own turn on every hand-back.
+            shape: What an answer must fit.
+            question: The varying half of the request, passed on unchanged so
+                whoever is listening can tell one call from another.
+            may_search: Whether the search tool may be used on this call.
+
+        Returns:
+            The whole answer, once it has finished arriving.
+        """
+        with self._client.messages.stream(
+            model=self._model,
+            max_tokens=ROOM_FOR_AN_ANSWER,
+            thinking=THINKING_OUT_LOUD,
+            system=STANDING_BLOCK,
+            tools=[SEARCH_TOOL],
+            tool_choice=MAY_SEARCH if may_search else MAY_NOT_SEARCH,
+            messages=conversation,
+            output_format=shape,
+            output_config=self._trying,
+        ) as arriving:
+            said = ""
+            for happening in arriving:
+                said = self._say(happening, question, said)
+            return arriving.get_final_message()
+
+    def _say(self, happening: Any, question: str, said: str) -> str:
+        """Hand on what one piece of an arriving answer is doing, if anything.
+
+        The reading itself is `what_it_is_doing`, which is pure. This is only the
+        part that talks to whoever is listening — and it never lets either half
+        stop the call.
+
+        Args:
+            happening: One thing the streaming helper handed over.
+            question: The varying half of the request this call was put with.
+            said: The last line of thinking this call has already said, so the
+                same sentence is not said twice.
+
+        Returns:
+            The last line of thinking said so far, for the next piece to compare
+            against.
+        """
+        try:
+            reading = what_it_is_doing(happening, said)
+        except Exception:
+            # Saying what a call is doing may never stop the call. The run goes
+            # on and the screen simply says one thing less.
+            logging.getLogger(__name__).exception("reading what a call was doing went wrong")
+            return said
+        if reading is None:
+            return said
+        kind, text = reading
+        self._tell(kind, text, question)
+        return text if kind == "thinking" else said
+
+    def _tell(self, kind: WhatOneCallIsDoing, text: str, question: str) -> None:
+        """Hand one line to whoever is listening, and never let it fail the call.
+
+        Args:
+            kind: Which of the three this is.
+            text: The words themselves, already the model's or the tool's own.
+            question: The varying half of the request this call was put with.
+        """
+        listening = self._on_activity
+        if listening is None:  # pragma: no cover - only reached if called wrongly
+            return
+        try:
+            listening(WhatItIsDoing(kind=kind, text=text, question=question))
+        except Exception:
+            logging.getLogger(__name__).exception("saying what a call was doing went wrong")
 
     def _out_of_money(self, rounds: Sequence[ParsedMessage[Any]]) -> bool:
         """Say whether the rounds so far have taken the run past what it may spend.
@@ -569,6 +759,146 @@ def what_it_said(rounds: Sequence[ParsedMessage[Any]], *, seconds: float = 0.0) 
         ),
         seconds=seconds,
     )
+
+
+def what_it_is_doing(happening: Any, said: str) -> tuple[WhatOneCallIsDoing, str] | None:
+    """Read one piece of an arriving answer and say what it is doing, if anything.
+
+    The other half of the translation, and pure for the same reason `what_it_said`
+    is: a test hands it the library's own blocks and they go through exactly what
+    a real call's go through.
+
+    **A piece this does not recognise says nothing at all.** Nothing above cares
+    whether a line was said, so the safe answer to anything unexpected is silence
+    rather than a guess. That matters more here than usual: the blocks themselves
+    are documented but the shape they arrive in has never met the service from
+    this program, so the reading is written to shrug.
+
+    Three things are worth saying, and each is somebody else's words:
+
+    * a search the model just issued — the query it wrote, verbatim;
+    * one thing that search returned — the title the tool gave, with its host;
+    * the model's own summarised thinking — its most recent whole sentence.
+
+    Args:
+        happening: One thing the streaming helper handed over.
+        said: The last line of thinking this call has already said, so that the
+            same sentence is not said twice while it is still the newest one.
+
+    Returns:
+        Which of the three and the words, or nothing at all.
+    """
+    if happening.type == "thinking":
+        return _a_new_thought(happening.snapshot, said, ended=False)
+    if happening.type != "content_block_stop":
+        return None
+    block = happening.content_block
+    if block.type == "thinking":
+        return _a_new_thought(block.thinking, said, ended=True)
+    if block.type == "server_tool_use" and block.name == "web_search":
+        asked = block.input.get("query")
+        if isinstance(asked, str) and asked.strip():
+            return ("searching", asked.strip())
+        return None
+    if block.type == "web_search_tool_result" and isinstance(block.content, list):
+        # A search that failed comes back as one error object where a list of
+        # results would be, which reads here as nothing found — the same reading
+        # `_pages_the_search_returned` gives it.
+        for result in block.content[:HOW_MANY_RESULTS_ARE_WORTH_SAYING]:
+            if result.type == "web_search_result":
+                return ("found", _one_page(result.title, result.url))
+    return None
+
+
+def _a_new_thought(so_far: str, said: str, *, ended: bool) -> tuple[WhatOneCallIsDoing, str] | None:
+    """The model's newest whole sentence of thinking, when there is a new one.
+
+    Args:
+        so_far: The summarised thinking of this block as it stands.
+        said: The last line of thinking already said on this call.
+        ended: True once the block has finished, which is when a sentence that
+            never got its full stop is worth saying anyway.
+
+    Returns:
+        The line to say, or nothing at all.
+    """
+    line = _a_line_of_thinking(so_far, ended=ended)
+    return ("thinking", line) if line and line != said else None
+
+
+AS_MUCH_THINKING_AS_FITS = 160
+"""How many characters of the model's thinking one line may carry.
+
+One line of a strip at the foot of a map. A sentence longer than this is shown
+from its end rather than its start, because the end is the part that just
+arrived. The figure is the shapes sheet's, agreed with the browser before either
+half was built (record 0027).
+"""
+
+ENDS_A_SENTENCE = (".", "!", "?")
+"""What the end of a sentence looks like, for the purpose of showing the last whole one."""
+
+
+def _a_line_of_thinking(so_far: str, *, ended: bool) -> str:
+    """Pick the one line of the model's thinking worth showing right now.
+
+    The most recent **whole** sentence, so nothing is shown half written. Until
+    the first full stop there is nothing whole to show and this says nothing —
+    unless the thinking has finished without one, at which point its tail is the
+    truest thing there is.
+
+    Args:
+        so_far: The summarised thinking as it stands.
+        ended: True once no more of it is coming.
+
+    Returns:
+        The line, or nothing at all when there is nothing whole to say.
+    """
+    text = so_far.strip()
+    if not text:
+        return ""
+    ends_at = max(text.rfind(one) for one in ENDS_A_SENTENCE)
+    if ends_at < 0:
+        return _the_last_of_it(text) if ended else ""
+    before = text[:ends_at]
+    starts_after = max(before.rfind(one) for one in ENDS_A_SENTENCE)
+    return _the_last_of_it(text[starts_after + 1 : ends_at + 1])
+
+
+def _the_last_of_it(text: str) -> str:
+    """Cut a run of words down to what one line holds, keeping the end of it.
+
+    Cut at a space, so no word is shown in halves.
+
+    Args:
+        text: Whatever the model wrote.
+
+    Returns:
+        The last words of it, at most one line's worth.
+    """
+    trimmed = text.strip()
+    if len(trimmed) <= AS_MUCH_THINKING_AS_FITS:
+        return trimmed
+    last = trimmed[-AS_MUCH_THINKING_AS_FITS:]
+    at_a_space = last.find(" ")
+    return (last[at_a_space + 1 :] if at_a_space >= 0 else last).strip()
+
+
+def _one_page(title: str, url: str) -> str:
+    """Name one thing a search returned: its own title, and where it came from.
+
+    Both are the search tool's, neither is ours. The host is worth saying because
+    a title alone does not say whether it came from a wire service or a forum.
+
+    Args:
+        title: The page's title, as the tool gave it.
+        url: The page's address, as the tool gave it.
+
+    Returns:
+        The title, with the host after it when the address has one.
+    """
+    host = (urlsplit(url).hostname or "").removeprefix("www.")
+    return f"{title} · {host}" if host else title
 
 
 def _pages_the_search_returned(rounds: Sequence[ParsedMessage[Any]]) -> tuple[FoundPage, ...]:
@@ -696,6 +1026,7 @@ def live_answerer(
     effort: str | None = None,
     model: str | None = None,
     when_nothing_is_said: str = EFFORT_WHEN_RECORDING,
+    on_activity: SayWhatItIsDoing | None = None,
 ) -> Model | None:
     """Build the live answerer, or say plainly that there is no key for one.
 
@@ -713,6 +1044,11 @@ def live_answerer(
             sends nothing and takes the service's own; a live run and the
             scorecard ask for `medium` (Kent, G13 and its extension,
             2026-09-21).
+        on_activity: Somewhere to say what each call is doing while it is doing
+            it, or nothing at all. **The recorder passes nothing**, which is what
+            keeps its request byte for byte the one every recording was made
+            with; the stream route passes one, which is a live-only difference
+            (record 0027, R34's precedent).
 
     Returns:
         A live answerer, or nothing at all when no key is configured.
@@ -728,4 +1064,5 @@ def live_answerer(
         ),
         effort=effort or get_settings().KATALYST_EFFORT or when_nothing_is_said,
         model=model,
+        on_activity=on_activity,
     )
