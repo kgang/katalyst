@@ -1,0 +1,9 @@
+Please read
+
+
+<pasted_content id="5ced">
+/Users/kentgang/git3/katalyst/plans/RESUME-ux-round.md
+</pasted_content id="5ced">
+
+
+Read other high level planning docs, specs, code, and any other files to hydrate your context. Use opus sub-agent to structure and parallelize and execute the work specified in RESUME-ux-round.md. Afterwards create PRs, do moderate reviews of code (this is an experimental prototype where . alot can change) and update docs where appropriate and relevant.
