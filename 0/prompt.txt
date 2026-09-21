@@ -281,3 +281,69 @@ Verification tails: `14 passed (27.3s)` · `Test Files 41 passed · Tests 350 pa
 `pr-faster-run-body.md` and `merge-faster-run.txt` updated (new before/after, the assertion change and why, fifty-two minutes, the interception finding). Not pushed, no PR.</result>
 <usage><subagent_tokens>433324</subagent_tokens><tool_uses>168</tool_uses><duration_ms>1226250</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>af4e5e0965268a5a0</task-id>
+<tool-use-id>toolu_01EKfkdZReudvyZ1kwUJnAk6</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/86beda38-90c4-4207-9a6f-61a8688db3b5/tasks/af4e5e0965268a5a0.output</output-file>
+<status>completed</status>
+<summary>Agent "Build: ADR 0008 amendment + faster browser run" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>Done. Three commits on the branch, tree clean.
+
+## Which test, and when
+
+Not the one suspected. **It is not `lateLayout.spec.ts`'s injected stall, and it needs no parallel load.** Same replay, same file, one worker, four stall sizes:
+
+| stall | complaints | at |
+|---|---|---|
+| **0 ms** (no stall at all) | **1** | t=1548 ms, 5 nodes on screen |
+| 200 ms | 0 | — |
+| 900 ms (what the test uses) | 0 | — |
+| 1500 ms | **1** | t=6377 ms, 16 nodes |
+
+It tracks **how many boxes the map happens to draw in one frame**, and nothing my branch injects. It is intermittent: zero in 6 of my kept logs, 1–3 in others. It does correlate with my branch only because my branch adds a fourteenth test that watches a recording arrive — one more growing map per suite.
+
+## Which observer
+
+Ten `ResizeObserver`s on a page: **six are the drawing library's** (`@xyflow/react` — its node observer, its pane observer, `XYPanZoom`), **four are ours** — `useTheEdges.ts:114` and the stage's in `Canvas.tsx`, each doubled by strict mode. **Neither of ours can feed itself**: both draw their rule with an absolutely positioned pseudo-element (`.canvas::after`, `.dock-frame::before/::after`) that takes no space. So this is not a feedback loop in product code — there is nothing to fix at the root.
+
+## What a reader sees
+
+**Nothing wrong.** Caught in-page at the instant the browser gave up, twice:
+
+- `stageSaid` == `stageTruly` on all four edges (`{left:no,right:no,above:yes,below:no}` and `{left:yes,right:no,above:yes,below:yes}`)
+- `panelSaid` == `panelTruly` both times
+- `hidden: 0` nodes, wires present (2 of 2, then 14 of 14)
+- settled at the end: 18 nodes, 0 hidden, 19 wires, edges true
+
+That is `graph/toFlow.ts` working — every tile's box and both ends of every wire are **declared**, not measured.
+
+## What I did
+
+`frontend/e2e/theSuite.ts`: the `test` every browser spec now takes. A test that meets the message **fails**, in the browser's own words, unless it called `aDroppedFrameIsExpectedHere(why)`. `generate.spec.ts` and `lateLayout.spec.ts` say so once per file with the whole argument written out; `hormuz.spec.ts` says nothing (its tests watch no recording arrive) — **its one changed line is the import**, so the guard has no hole. I touched it because polish has landed and a guard some tests skip is not a guard.
+
+Two findings were needed to make it work, both measured:
+
+- **`page.on("pageerror")` never sees this message.** My first guard used it and was a complete no-op — 3 complaints, 15 passed. Chromium delivers this one to the *page*, not the driver. The listener now lives in the page via `addInitScript`, which is how the dev server sees it too.
+- What it hears is kept in the page's **session store**, so the "cut run" test's `page.reload()` does not lose what came before.
+
+**Shown to bite**, not assumed: a test that meets the message and says nothing → `Error: The browser abandoned a frame's size notifications 1 time(s) during this test, and this test did not say it expected that:` → **1 failed**. (My first two provocations were wrong — one resize per frame is not a loop — which is itself why the wiring needed proving rather than asserting.)
+
+All probes were throwaway and are gone; `frontend/e2e/` holds only the seven real files.
+
+## Tails
+
+```
+npx playwright test        14 passed (26.4s)      # wall 27 s, guard installed, one real complaint in the log and correctly allowed
+guard wiring proof         1 failed               # the deliberate message, unannotated
+npx biome check .          Checked 169 files. No fixes applied.
+npx tsc --noEmit           clean
+```
+Server suite and `npm run check` unchanged by this commit (572 / 350, both green earlier on this tree; only `frontend/e2e/` changed since).
+
+Both message files updated. Not pushed.</result>
+<usage><subagent_tokens>501181</subagent_tokens><tool_uses>231</tool_uses><duration_ms>2098093</duration_ms></usage>
+</task-notification>
