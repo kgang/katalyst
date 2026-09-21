@@ -627,13 +627,13 @@ export interface components {
             after: number;
             /**
              * Peak Delta
-             * @description The move on that day, signed: the largest the two worlds ever differ.
+             * @description The move on that day, signed: the largest the two worlds differ on any day the series carries — which past 180 days is not every day there is.
              */
             peak_delta: number;
             /**
              * At Day
              * Format: date
-             * @description The day the two worlds are furthest apart. Always one of the days the series actually carries, which matters once a window longer than 180 days has been drawn at fewer points.
+             * @description The day the two worlds are furthest apart. Always one of the days the series actually carries, which matters once a window longer than 180 days has been drawn at fewer points: the peak of a continuous curve can fall between two drawn days, so an edit that lengthens the window can move this date and the rank with it, without moving the claim's numbers at all. `diff.md` B4.
              */
             at_day: string;
             /**
