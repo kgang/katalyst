@@ -1,0 +1,44 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M326KZMXXHG06ZQES2RQB6KF",
+  "session_id": "b614e696-28f8-496c-b341-dd2bd0ba2a74",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-21T14:41:17.491575Z",
+  "branch": "feat/04b-recordings",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "backend/tests/api/test_health.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "deed27cae74c",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 8,
+    "cache_creation_tokens": 98828,
+    "cache_read_tokens": 221847,
+    "output_tokens": 1499,
+    "api_call_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-21T14:41:17.447801Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 34,
+    "human_modified": 3,
+    "human_removed": 0,
+    "total_committed": 37,
+    "total_lines_changed": 37,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

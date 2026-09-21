@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M326KZMXXHG06ZQES2RQB6KF",
+  "strategy": "manual-commit",
+  "branch": "feat/04b-recordings",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "backend/tests/api/test_health.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 8,
+    "cache_creation_tokens": 98828,
+    "cache_read_tokens": 221847,
+    "output_tokens": 1499,
+    "api_call_count": 4
+  }
+}
