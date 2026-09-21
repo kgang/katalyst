@@ -1,5 +1,5 @@
 ---
-# ADR-0008: Four test layers (five since the 2026-09-17 amendment); the LLM boundary is tested with committed cassettes and CI needs no API key
+# ADR-0008: Four test layers (five since the 2026-09-17 amendment); the LLM boundary is tested with committed cassettes and CI needs no API key; three tiers of browser testing (2026-09-21)
 status: accepted
 date: 2026-09-16
 decision-makers: Kent Gang
@@ -10,7 +10,7 @@ superseded-by: none
 spec-impact: spec/generation/ (Testing), spec/graph/ and spec/multiverse/ (Invariants → test names)
 ---
 
-# ADR-0008: Four test layers (five since the 2026-09-17 amendment); the LLM boundary is tested with committed cassettes and CI needs no API key
+# ADR-0008: Four test layers (five since the 2026-09-17 amendment); the LLM boundary is tested with committed cassettes and CI needs no API key; three tiers of browser testing (2026-09-21)
 
 ## Context and Problem Statement
 
@@ -54,9 +54,9 @@ Chosen option: "A", because it puts the weight where the claims are (the domain)
 
 **Layer 5 — worked examples (`backend/tests/unit/fixtures/`, added by amendment 2026-09-17).** The stored example maps — today the Strait of Hormuz map and its strike branch — are tested as data: each validates clean, exercises every shape the rules layer defines, and survives the trip to the browser. They are example tests, not property tests, and they are the golden inputs the engine and canvas stacks build on.
 
-**Layer 4 — frontend.** vitest with Testing Library for the layout-pinning logic, the diff-state reducer, and the intervention-panel reducer. One end-to-end browser test (ADR-0007 Confirmation).
+**Layer 4 — frontend.** vitest with Testing Library for the layout-pinning logic, the diff-state reducer, and the intervention-panel reducer, and a small suite of end-to-end browser tests that start both halves and drive the real app (ADR-0007 Confirmation). *(This said "One end-to-end browser test" until the 2026-09-21 amendment below; how many there are is deliberately not written here, because it moves with nearly every browser pull request. How much of the suite a change has to run is the thing worth recording, and the amendment says.)*
 
-**Deliberately skipped in v1:** a model grading narrative quality; image snapshot comparisons; contract tests between services; load tests; mutation testing (breaking code on purpose to see whether tests notice); more than one end-to-end test; coverage thresholds outside `domain/`.
+**Deliberately skipped in v1:** a model grading narrative quality; image snapshot comparisons; contract tests between services; load tests; mutation testing (breaking code on purpose to see whether tests notice); coverage thresholds outside `domain/`. *("More than one end-to-end test" was on this list until the 2026-09-21 amendment.)*
 
 ### Consequences
 
@@ -102,3 +102,37 @@ Chosen option: "A", because it puts the weight where the claims are (the domain)
 ## Amendment (2026-09-17)
 
 Stack 02 added a fifth kind of test that the four layers above did not name: the worked-example tests under `backend/tests/unit/fixtures/`, which check the stored example maps as data. Layer 5 above describes it. The four original layers, the cassette rules, and the keyless build are unchanged. Amended in place at Kent's request rather than superseded, because nothing in the decision changed — one layer was missing from the list.
+
+## Amendment (2026-09-21) — how much browser testing a change needs
+
+Kent asked on 2026-09-21 where the standing bar — *run the end-to-end tests twenty times from cold before a pull request* — was written down. **Nowhere in the committed repository.** No decision record, no spec chapter, no `Makefile` target, no line in the build: a search of everything committed found it in none of them. It was one coordinator's habit, kept only in git-ignored working notes, and it had grown out of five tests in stack 04 that were called flaky and were each a real defect a reader could hit.
+
+**What was measured that day.** The twenty-three-minute bar was run twice in full and a third time to five runs of twenty — **about fifty-two minutes**, read off the queue's own log rather than multiplied out — and caught nothing that one run plus the build would not have caught.
+
+* A wording mismatch between two branches failed **seventeen cold runs of seventeen**. One run finds that.
+* A layout race passed **twenty cold runs of twenty** on the developer's machine and failed the build's **first** run on a slower one. Throttling the processor did not reproduce it — that slows the page, not the layout's background thread. Starting that thread nine hundred milliseconds late reproduced it at once, and it is now pinned by a test with no browser that runs in milliseconds.
+* The same day a generated numbers file matched **byte for byte** across macOS/Arm and Linux/x86-64 and still failed its own margin test on Linux. With about two hundred and eighty numbers, some value sits on a rounding boundary on some machine at any digit count, so that check now compares numbers within a stated tolerance and every word exactly.
+
+Nothing in the decision above changes — the layers, the recorded responses, the keyless build. What follows is how much of layer 4's browser suite a change has to run.
+
+**Tier 1 — every pull request that touches the browser.** One run of the end-to-end tests from cold on the developer's machine, and the build. The build is a second machine, slower and different **on purpose**: it is the cheapest way there is to run the same tests under a different set of timings, and it is what found the layout race that twenty local runs missed.
+
+**Tier 2 — a change to timing-sensitive code**: the canvas, the layout, the stream, the growing map, keyboard focus. Tier 1, and a test **with no browser** that injects the bad timing deliberately — a late layout answer, a dropped size notification. Two exist and are the pattern to copy:
+
+| The bad timing | The test with no browser |
+|---|---|
+| The layout's background thread answers after the map has already moved on | `frontend/src/graph/__tests__/onTheGlass.test.ts` — walks two real runs on a machine whose first layout answer is thrown away |
+| The browser abandons a tile's size notification when too many fall due in one frame, so a wire's ends are never measured | `frontend/src/graph/__tests__/ports.test.tsx` — every wire's two ends are declared rather than measured. Its end-to-end twin, `test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification` in `frontend/e2e/hormuz.spec.ts`, makes the browser drop them on purpose |
+
+**Tier 3 — a repeat bar, and only when a specific rare failure has been seen.** Then it is *that one test*, not the suite, and it is sized to the failure's own rate rather than to a round number.
+
+Where the size comes from, in words: a fault that shows once in every thousand runs survives one clean run with a chance of 0.999, and survives *n* clean runs with 0.999 multiplied by itself *n* times. That falls under five per cent at about three thousand runs — so three thousand clean runs is what it costs to be ninety-five per cent sure it is gone. The same arithmetic at any rate: **a fault that shows once in every k runs costs about three times k.** Twenty runs, then, say almost nothing about anything rarer than one in ten. **And a rare failure is a bug until the evidence says otherwise**: five times in stack 04 "flaky" was a real defect.
+
+**Two rules came with this.**
+
+* A test that reads a **moment** — what stood on screen at the instant something arrived — gets a no-browser twin that injects the adverse timing on purpose. That is what pinned both of 2026-09-21's real races, in milliseconds.
+* A check that compares **numbers** uses a stated tolerance, never text.
+
+**And one correction.** Layer 4 above said "One end-to-end browser test", and "more than one end-to-end test" sat on the deliberately-skipped list. Both were out of date: there is a small suite now. Neither line carries a count, because the count moves with nearly every browser pull request and a number nobody updates is worse than no number.
+
+Amended in place rather than superseded, because nothing in the decision changed — the layers, the cassettes and the keyless build stand exactly as they were, and this adds the one thing the record never said: how much of the browser suite a change owes.

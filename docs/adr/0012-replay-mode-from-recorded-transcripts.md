@@ -114,3 +114,7 @@ If accepted, the rules are:
 **What this changes elsewhere in this record.** The `recordings` job keeps two of its three checks — every file parses, and every prompt hash equals the current prompt's — and **loses the refusal check**; a recording with no refusal in it is green. The *Consequences* bullet that says the one-rejection rule takes away "a standing temptation to record only the runs that went well" now rests on two different rules: a recording is exactly what `make record-demo` wrote, and the screen states what the recording contains, including the one-line sentence when nothing was refused. The *Pros and Cons* line "rejections included" reads as *every rejection that occurred, included*.
 
 Amended in place rather than superseded, because nothing in the decision changed: replay still plays the real stream through the real canvas, and the one rule that moved was a rule about what a recording must contain, which measurement showed we cannot honestly require.
+
+## Amendment (2026-09-21)
+
+The `instant` flag named in *Decision Outcome* above is now one setting, `KATALYST_REPLAY_PACE`, the pause between two events in seconds, where `0` means no pause at all — a length and a switch that means *none* are two answers to one question. Pacing is otherwise exactly as decided: cosmetic, fixed on the server, never a field on the request.
