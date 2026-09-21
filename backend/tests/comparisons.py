@@ -110,8 +110,6 @@ def every_version_answered_the_same(first: World, second: World, claims: Iterabl
         assert numpy.array_equal(
             behind_second.counting_for(claim_id), behind_first.counting_for(claim_id)
         ), f"{claim_id}: the two worlds count the versions differently"
-        if not on_one_grid:
-            continue
         for here, there in shared:
             day = behind_second.days[here]
             assert numpy.array_equal(

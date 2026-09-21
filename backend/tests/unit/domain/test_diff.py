@@ -1006,32 +1006,21 @@ def test_diff_states_respect_locality(data: st.DataObject) -> None:
     # What the engine worked out about each unreachable claim, exactly: every
     # version of the map, on every day both worlds drew. `tests/comparisons.py`
     # says why the reported average is not the thing to ask for to the bit.
-    on_one_grid = every_version_answered_the_same(
+    every_version_answered_the_same(
         base, branched, [one for one in answer.claims if one not in reach]
     )
     for claim_id, one in answer.claims.items():
         if claim_id in reach:
             continue
         assert one.state == "unchanged", claim_id
-        # And the reported number itself, exactly — but only where exactly is a
-        # thing that can be asked. On one grid every reduction behind it is over
-        # arrays of the same shape, so it is identical to the bit.
-        if on_one_grid:
-            assert one.delta == 0.0, claim_id
+        # And the reported number itself, exactly. Nothing about how the numbers
+        # are worked out depends on how long the window is any more, so this is
+        # bit-for-bit whatever the edit did to the window.
+        assert one.delta == 0.0, claim_id
 
 
-@pytest.mark.xfail(
-    reason=(
-        "known defect: a one-off push fires on the day its cause is settled, read off "
-        "the days actually drawn. Past the 180-point cap those days are spaced out, so "
-        "an edit that lengthens the window re-spaces the grid for the whole map and a "
-        "push anywhere on it can start reading its cause a day later — moving a claim "
-        "the edit cannot reach. Reported to the coordinator with this reproducer."
-    ),
-    strict=True,
-)
-def test_a_longer_window_moves_a_claim_it_cannot_reach() -> None:
-    """Inserting a claim at one end of a map moves a claim at the other end. It must not.
+def test_a_longer_window_moves_nothing_it_cannot_reach() -> None:
+    """Inserting a claim at one end of a map moves nothing at the other end.
 
     Two pieces with nothing joining them. In the second piece `cause` triggers
     `effect` through an arrow with a three-day delay, so `effect`'s clock starts on
@@ -1044,18 +1033,22 @@ def test_a_longer_window_moves_a_claim_it_cannot_reach() -> None:
     drawn on the short window and is not on the long one, and the push into `ending`
     starts reading `effect` on day 4 instead. `ending` moves, and no edit reached it.
 
-    Measured when this was written: `.096` on the version-by-version answers, a
-    tenth of a likelihood. That is the product's central correctness claim (INV-4,
-    locality: an edit changes only what is still connected to its subject) failing
-    through the sampling grid rather than along the arrows.
+    It used to. Measured before the fix: `.096` on the version-by-version answers,
+    a tenth of a likelihood, because the push into `ending` started reading `effect`
+    on day 4 instead of day 3. That was the product's central correctness claim
+    (INV-4, locality: an edit changes only what is still connected to its subject)
+    failing through the sampling grid rather than along the arrows.
 
-    **The obvious repair is not the repair.** Keeping every settled day among the
-    drawn points was tried: it makes the grid depend on the settled days, so a
-    supposition — which cuts arrows and so moves settled days — then re-spaces the
-    grid and shifts a claim's own ancestors. That breaks INV-3, assert is not
-    observe, which is worse than what it cures. The fix has to read a push's firing
-    day somewhere other than off the drawn grid, and that is a design decision about
-    `propagation.md`'s 180-point cap rather than a patch.
+    The fix is the one rule in `propagation.md` B5: **the day cap is a cap on what
+    is sent, never on what is computed.** Every day of the window is worked out, so
+    a push fires on the true day its cause settles; only the series handed to a
+    reader is thinned. Lengthening a window then adds days at the end, where they
+    can re-time nothing that was already happening.
+
+    **The repair that looks obvious is not the repair**, and was tried: keeping
+    every settled day among the drawn points makes the grid depend on the settled
+    days, so a supposition — which cuts arrows and so moves them — re-spaces the grid
+    and shifts a claim's own ancestors, breaking INV-3, assert is not observe.
     """
     far_side = (
         _claim("cause", kind="event", prior=(0.5, 0.25, 0.75), days=0),
@@ -1076,7 +1069,7 @@ def test_a_longer_window_moves_a_claim_it_cannot_reach() -> None:
 
     base = _world(graph, _branch(identifier="base"))
     stretched = _world(graph, stretches_the_window)
-    assert len(base.series_days) != len(stretched.series_days), "the grid was meant to move"
+    assert len(base.series_days) != len(stretched.series_days), "the window was meant to grow"
 
     # `ending` is in the other piece; nothing the edit did can reach it.
     every_version_answered_the_same(base, stretched, ["cause", "effect", "ending"])

@@ -78,7 +78,7 @@ class World(BaseModel):                                   # frozen
     retractions: tuple[Retraction, ...]
     beliefs: Mapping[PropositionId, Belief]               # owner "model", read on each claim's resolve-by day
     series_days: tuple[int, ...]                          # which day of the window each point of every series
-                                                          # sits on; evenly spaced unless the 180-point cap
+                                                          # sits on; every day unless the 180-point send cap
                                                           # fired, which keeps every claim's resolve-by day
     series: Mapping[PropositionId, tuple[float, ...]]     # one likelihood per day above, for the time axis
     states: Mapping[PropositionId, tuple[SeriesState, ...]]  # one named state per day, same length as the series
@@ -109,7 +109,20 @@ def propagate(
 
 Sixteen thousand worlds in total, and the two numbers are not interchangeable: they measure two different kinds of not-knowing, and B5 below says which is which.
 
-**What it costs, measured on the shipped engine.** The Hormuz strike branch — eight claims over a sixty-one-day window — takes **67 milliseconds**. A sixty-claim map read on a single day takes **41 milliseconds**; over a sixty-one-day window, **544 milliseconds**; over a year capped at 180 points, **1.4 seconds**. The cost is claims × days × 16 000 worlds, so the window is the term that grows, not the map. (The plan's "about ten milliseconds at sixty claims" measured one day in a prototype and is not what the shipped engine does over a window.)
+**What it costs, measured on the shipped engine** *(re-measured 2026-09-21, after every day of the window started being worked out; the figures before that date are kept in the row beside each)*. The cost is claims × days × 16 000 worlds, so the **window** is the term that grows, not the map.
+
+| Map | Before | Now |
+|---|---|---|
+| Hormuz, the base world — seven claims over sixty days | 60 ms | **62 ms** |
+| Hormuz, the strike branch — eight claims over sixty days | 68 ms | **72 ms** |
+| A whole Hormuz difference — two worlds and the versions behind each | 73 ms | **78 ms** |
+| Sixty claims over a sixty-one-day window | 510 ms | **542 ms** |
+| Sixty claims over a year | 1.2 s | **2.7 s** |
+| Sixty claims over two years | — | **5.4 s** |
+| Sixty claims over five years | — | **15.2 s** |
+| Thirty claims over five years | — | **7.5 s** |
+
+**Nothing under 180 days moved**, because such a window was already worked out at every day — which is every map this product has drawn, the worked example included. Past 180 days the cost now grows with the window instead of flattening at the cap, which is the price of the rule above: a year doubles, five years is about eight times a year's old cost. A five-year map of sixty claims is **outside a ten-second budget**; a five-year map of thirty — the most claims a generated map carries — is inside it. If a longer horizon is ever wanted, the answer is not to thin the grid again but to thin it by a rule that reads only the day number and never the window's length: every day for the first stretch, every so-many-days after. That keeps the property this rule bought. (The plan's "about ten milliseconds at sixty claims" measured one day in a prototype and is not what the shipped engine does over a window.)
 
 **Three things that are deliberately absent.** There is no `strength_lo` and no `strength_hi`, now or ever: link strengths are **fixed numbers in stack 03a** and only priors vary between versions. Widening an arrow is derived from its `provenance` — "how well-backed" becomes "how wide" — and that ships in stack 04, where arrows finally differ from one another; every arrow in today's fixture is hand-written `argued` or `asserted`, so doing it now would widen everything by the same amount and teach nobody anything. There is no `scipy`: the Latin hypercube — a way of spreading draws evenly instead of letting them clump — is three lines of `numpy`, and the percentiles are one. And there is no module-level random generator — see B7.
 
@@ -148,7 +161,13 @@ Every number below is **illustrative**, exactly as the fixture's are, and pull r
 
 **Being settled is not being true.** A claim with no assignment is sampled from its own `prior`, every draw, exactly as always; nothing is ever forced true because its clock started. The two ideas are separate and conflating them is the mistake this paragraph exists to prevent. It follows that the settled day — call it `t_source` — is **one schedule, computed once from the shape of the map**, the same in every draw, while **truth is per draw**: an arrow's term is non-zero only in those draws where its source came out true. One schedule, sixteen thousand different worlds running along it.
 
-**The window is capped at 180 points.** If the window is longer than 180 days the series is sampled down to 180 points and a sentence in `warnings` says so. The sampling is not blindly even: **every claim's resolve-by day is kept among the points**, and the rest are spread evenly around them. A tile's headline is read on the claim's own resolve-by day, so without that guarantee the headline could be a number that appears nowhere on the sparkline underneath it — the same guarantee [`diff.md`](diff.md) gives a delta row's `at_day`.
+**The window is capped at 180 points — and the cap is on what is *sent*, never on what is *computed*** *(amended 2026-09-21; the paragraph after this one says what was measured)*. **Every day of the window is always worked out.** If the window is longer than 180 days the series handed to a reader is sampled down to 180 points and a sentence in `warnings` says so. The sampling is not blindly even: **every claim's resolve-by day is kept among the points**, and the rest are spread evenly around them. A tile's headline is read on the claim's own resolve-by day, so without that guarantee the headline could be a number that appears nowhere on the sparkline underneath it — the same guarantee [`diff.md`](diff.md) gives a delta row's `at_day`.
+
+**Why the cap cannot be allowed near the arithmetic** *(amended 2026-09-21)*. A one-off push fires on the day its cause is **settled**, and that day has to be read off the days actually worked out. While the thinned grid *was* the grid the engine worked on, that reading rounded the settled day up to the next drawn day — so the timing of a push depended on how long the window happened to be, and the window is a property of the **whole map**. A claim added at one end could then re-time a claim at the other end that nothing connected it to. **Measured before this was separated:** an inserted claim judged a year out, stretching a window from 31 days to 365, moved a claim in a **wholly separate piece of the map by `.096`** — a tenth of a likelihood — because a push started reading its cause on day 4 instead of day 3. That is INV-4, locality — *an edit changes only what is still connected to its subject*, the product's central correctness claim — failing through the sampling grid rather than along the arrows.
+
+The one rule, and it is the whole of the repair: **every push fires on the true day its cause settles, read off a grid that does not depend on how long the window is.** Every day of the window is that grid, and it is the simplest one with the property: lengthening a window only adds days at the **end**, where they can re-time nothing that was already happening. Only the series is thinned, at the moment the world is built. `test_a_longer_window_moves_nothing_it_cannot_reach` is the reproducer, and both locality property tests now compare two worlds' answers for an untouched claim **bit for bit**, which is the sharpest form the claim has.
+
+*The repair that looks obvious is not the repair, and was tried: keeping every settled day among the drawn points makes the grid depend on the settled days, so a supposition — which cuts arrows and so moves them — re-spaces the grid and shifts a claim's own ancestors, breaking INV-3 (assert is not observe). It is worse than what it cures.*
 
 Which is why the world carries **`series_days`**: one entry per point, saying which day of the window that point stands for. On a window of 180 days or fewer it is simply every day, and reading it is the same as counting. Past that the points are unevenly spaced, and `series_days` is then the only thing that says where they sit — a sparkline drawn as though they were evenly spaced would quietly misplace every date on the axis. `states` and every claim's `series` are always the same length as `series_days`.
 

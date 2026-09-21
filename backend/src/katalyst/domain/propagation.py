@@ -108,7 +108,11 @@ NINETIETH_PERCENTILE = 1.2816
 """How many standard deviations out a bell curve's 10th and 90th percentiles sit."""
 
 SERIES_CAP = 180
-"""The most points a claim's series ever carries, however long the window is."""
+"""The most points a claim's series ever carries, however long the window is.
+
+A cap on what is sent to a reader, never on what is worked out. Every day of
+the window is always worked out; see `_days_to_send`.
+"""
 
 LOWEST_SURVIVAL = 0.02
 """Below this share of worlds surviving an observation, the world warns loudly."""
@@ -440,6 +444,18 @@ def versions_of(world: World) -> Versions:
     return _versions_from(setup, sample)
 
 
+def _sent_days(setup: "_Setup") -> NDArray[numpy.int64]:
+    """Which of the days worked out a reader is given, as positions in the full window.
+
+    Every day of the window is worked out; at most 180 of them are handed on. The
+    positions are the days themselves, because the days worked out are 0, 1, 2 and
+    so on — but they are looked up rather than assumed, so that this keeps working
+    if the days worked out ever stop being every day.
+    """
+    wanted = _days_to_send(setup.claims, setup.day_zero, setup.days)
+    return numpy.searchsorted(setup.points, wanted).astype(numpy.int64)
+
+
 def _versions_from(setup: "_Setup", sample: "_Sample") -> Versions:
     """Gather the version-by-version numbers a run produced into one record.
 
@@ -456,13 +472,16 @@ def _versions_from(setup: "_Setup", sample: "_Sample") -> Versions:
     Returns:
         One record of the version-by-version numbers.
     """
+    # Thinned to the days a reader is given, so that a difference between two
+    # worlds compares exactly the days the two of them show and nothing else.
+    sent = _sent_days(setup)
     return Versions(
-        days=tuple(int(one) for one in setup.points),
+        days=tuple(int(setup.points[one]) for one in sent),
         weights=sample.weights,
         reweighted=setup.observation_reach,
         priors=sample.priors,
-        likelihood=sample.likelihood,
-        inner_spread=sample.inner_spread,
+        likelihood={one: row[:, sent] for one, row in sample.likelihood.items()},
+        inner_spread={one: row[:, sent] for one, row in sample.inner_spread.items()},
     )
 
 
@@ -541,10 +560,17 @@ def _prepare(graph: Graph, assignments: tuple[Assignment, ...], as_of: date) -> 
     settled = _settled_days(order, arrows_into, fixed_on, as_of)
 
     days = _window_length(graph, as_of)
-    points = _days_to_work_out(claims, as_of, days)
+    # **Every day of the window, always.** The 180-point cap is a cap on what is
+    # *sent*, never on what is worked out: a push fires on the day its cause is
+    # settled, and reading that day off a thinned grid would make it depend on how
+    # long the window happens to be — so a claim added at one end of a map could
+    # re-time something at the other end that nothing connects it to. The days
+    # here depend on the window's length and on nothing else, and lengthening a
+    # window only adds days at the end, where they can re-time nothing that was
+    # already happening.
+    points = numpy.arange(days + 1, dtype=numpy.int64)
     read_at = {
-        claim_id: int(numpy.searchsorted(points, _day_index(one.resolution.by, as_of, days)))
-        for claim_id, one in claims.items()
+        claim_id: _day_index(one.resolution.by, as_of, days) for claim_id, one in claims.items()
     }
 
     shape_rows = {one.id: _shape_row(one, settled[one.source], points) for one in ordinary}
@@ -650,17 +676,27 @@ def _window_length(graph: Graph, day_zero: date) -> int:
     return max(_day_index(one.resolution.by, day_zero) for one in graph.propositions)
 
 
-def _days_to_work_out(
+def _days_to_send(
     claims: Mapping[PropositionId, Proposition], day_zero: date, days: int
 ) -> NDArray[numpy.int64]:
-    """Choose which days of the window to work the numbers out on.
+    """Choose which days of the window a claim's series carries to the reader.
 
-    Ordinarily every day. Past 180 days that is more points than anybody scrubs
-    through, so the series is drawn at 180 evenly spaced days instead — **and every
+    **A cap on what is sent, never on what is worked out.** Every day of the window
+    is worked out, always; this only decides which of those days a series carries.
+    Ordinarily all of them. Past 180 days that is more points than anybody scrubs
+    through, so a series is drawn at 180 evenly spaced days instead — **and every
     claim's own resolve-by day is always among them**. That is not a nicety: a
     tile's headline number is read on the claim's own resolve-by day, and if that
     day were not on the claim's own series the number on the tile would not be a
     point of the line drawn beneath it.
+
+    It was once the grid the whole engine worked on, and that was a defect. A push
+    fires on the day its cause is settled, read off the days worked out — so
+    thinning them made that day depend on how long the window was, and an edit at
+    one end of a map could re-time a claim at the other end that nothing connected
+    it to. Measured before it was separated: an inserted claim that stretched a
+    window from 31 days to 365 moved a claim in a wholly separate piece of the map
+    by `.096`.
 
     Args:
         claims: Every claim on the map, by identifier.
@@ -668,7 +704,7 @@ def _days_to_work_out(
         days: How long the window is.
 
     Returns:
-        The days to work out, in order.
+        The days to send, in order.
     """
     judged = numpy.array(
         sorted({_day_index(one.resolution.by, day_zero, days) for one in claims.values()}),
@@ -1012,7 +1048,8 @@ def _warnings_about(
     if days + 1 > SERIES_CAP:
         said.append(
             f"This map runs for {days} days, so each claim's series is drawn at {SERIES_CAP} "
-            "evenly spaced points rather than one for every day."
+            "evenly spaced points rather than one for every day. Every day is still worked "
+            "out; it is the drawing that is thinned."
         )
     return tuple(said)
 
@@ -1314,13 +1351,14 @@ def _one_pass(
 def _point_of(points: NDArray[numpy.int64], day: int) -> int:
     """Find where one day of the window sits among the days actually worked out.
 
-    Every day is worked out unless the window runs past 180 days, when the series
-    is drawn at evenly spaced points instead; a day falling between two of those
-    is read at the next one along, and a day past the end of the window at the last
-    one. Only a claim whose clock starts outside the window can land there, and
-    such a claim is not doing anything inside it.
+    **Exact, because every day of the window is worked out.** A day is at its own
+    position, and a day past the end of the window is read at the last one — only a
+    claim whose clock starts outside the window can land there, and such a claim is
+    not doing anything inside it. This used to round a day up to the next drawn one,
+    which is how the length of the window leaked into the timing of a push; see
+    `_days_to_send`.
     """
-    return min(int(numpy.searchsorted(points, day)), len(points) - 1)
+    return min(max(0, day), len(points) - 1)
 
 
 def _fixed_days(setup: _Setup, claim_id: PropositionId) -> tuple[Flags, Draws]:
@@ -1388,8 +1426,20 @@ def _per_version(answer: Draws, surviving: Flags, weighted: bool) -> tuple[Numbe
 
 
 def _weighted_mean(values: Numbers, weights: Numbers) -> Numbers:
-    """Average one number per version, counting each version by how much it survived."""
-    return (values * weights[:, None]).sum(axis=0) / weights.sum()
+    """Average one number per version, counting each version by how much it survived.
+
+    **Added up along the versions, which is the axis laid out end to end**, so that
+    the order the numbers are added in depends on how many versions there are and
+    on nothing else. Adding along the other axis lets the array library pick its
+    order by the shape of the block, and floating-point addition is not
+    associative: the same sixteen numbers then total `11.689481994806576` in an
+    array one day wide and `11.689481994806577` in a wider one. That is nothing a
+    reader could see, and it is enough to stop two worlds of one map agreeing to
+    the bit about a claim neither of them touched — which is the sharpest way there
+    is to state locality, so it is worth one transpose to keep.
+    """
+    along_versions = numpy.ascontiguousarray(values.T)
+    return (along_versions * weights[None, :]).sum(axis=1) / weights.sum()
 
 
 def _weighted_percentiles(
@@ -1533,6 +1583,7 @@ def _world_from(
     # own numbers and the difference between two worlds then count the versions
     # the same way by construction rather than by two copies of one line agreeing.
     behind = _versions_from(setup, sample)
+    sent = _sent_days(setup)
     for claim_id in setup.order:
         counting = behind.counting_for(claim_id)
         middle, bottom, top = _band(
@@ -1545,8 +1596,8 @@ def _world_from(
             hi=float(numpy.clip(top[read], 0.0, 1.0)),
             owner="model",
         )
-        series[claim_id] = tuple(float(one) for one in middle)
-        drawn[claim_id] = setup.states[claim_id]
+        series[claim_id] = tuple(float(middle[one]) for one in sent)
+        drawn[claim_id] = tuple(setup.states[claim_id][one] for one in sent)
 
     said = list(setup.warnings)
     if setup.observation_reach and sample.survival < LOWEST_SURVIVAL:
@@ -1564,7 +1615,7 @@ def _world_from(
         worlds=worlds,
         day_zero=setup.day_zero,
         days=setup.days,
-        series_days=tuple(int(one) for one in setup.points),
+        series_days=tuple(int(setup.points[one]) for one in sent),
         graph=graph,
         assignments=assignments,
         retractions=retractions,

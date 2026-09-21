@@ -987,10 +987,10 @@ def _same_on_the_days_they_share(base: World, branched: World, claim_id: str) ->
     new claim brings a new one. Comparing the days they share is the whole of what
     can be compared, and it is every day the two would be shown side by side on.
 
-    The **word** each day carries is compared here and the number is not, because
-    the number is an average and an average can be reassociated by the array it
-    sits in — `tests/comparisons.py` explains that, and
-    `every_version_answered_the_same` is what checks the numbers exactly.
+    Both the number and the word, exactly: nothing about how a number is worked
+    out depends on how long the window is, so two worlds agree to the bit about a
+    claim neither of them touched. `tests/comparisons.py` says why that is now
+    askable and what it used to cost.
     """
     where = {day: index for index, day in enumerate(base.series_days)}
     shared = 0
@@ -999,8 +999,7 @@ def _same_on_the_days_they_share(base: World, branched: World, claim_id: str) ->
             continue
         shared += 1
         assert branched.states[claim_id][index] == base.states[claim_id][where[day]], day
-        if base.series_days == branched.series_days:
-            assert branched.series[claim_id][index] == base.series[claim_id][where[day]], day
+        assert branched.series[claim_id][index] == base.series[claim_id][where[day]], day
     assert shared, "the two worlds drew no day in common"
 
 
@@ -1056,12 +1055,10 @@ def test_intervention_locality(kind: str, data: st.DataObject) -> None:
     # version's answer, the spread inside each version, and how much each version
     # counts. `tests/comparisons.py` says why the reported likelihood is the one
     # thing that cannot be asked for exactly.
-    on_one_grid = every_version_answered_the_same(base, branched, untouched)
-    # And the reported numbers, exactly — where exactly is a thing that can be
-    # asked. `tests/comparisons.py` says when it is not, and why.
-    if on_one_grid:
-        for claim_id in untouched:
-            assert branched.beliefs[claim_id] == base.beliefs[claim_id], claim_id
+    every_version_answered_the_same(base, branched, untouched)
+    # And the reported numbers, exactly.
+    for claim_id in untouched:
+        assert branched.beliefs[claim_id] == base.beliefs[claim_id], claim_id
     # A claim added by an `insert` brings its own resolve-by day, and past the
     # 180-point cap that day joins the points every series is drawn at — so the two
     # worlds can be drawn at slightly different days. They are compared on the days
