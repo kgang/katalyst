@@ -7,9 +7,73 @@
  * at a tenth of the text colour.
  */
 
+/*
+ * **The first screen is wider than the column the page centres.**
+ *
+ * That column is 660 pixels, which was right when this screen was a list of
+ * examples and a status strip. It now also holds the four sentences from the
+ * brief and the field you type your own into, and stacking all of that in one
+ * narrow column pushes the field — the point of the whole screen — below the
+ * fold on the window this interface is designed against.
+ *
+ * So the launchpad takes its own width and centres itself inside the column it
+ * sits in, which is itself centred on the page. The masthead above it and the
+ * status strip below it keep the narrow measure, because a heading and a
+ * footnote read better short.
+ */
+.column--launchpad {
+  max-width: min(1180px, calc(100vw - 2 * var(--space-6)));
+}
+
 .launchpad {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* Two rows on the left, each as tall as what is in it, and a third that takes
+   * whatever is left — so the left column reads top to bottom with no pool of
+   * air in the middle of it while the right column is the tall one. */
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+  column-gap: var(--space-5);
   row-gap: var(--space-5);
+}
+
+/* The two doors, the map that is already drawn and the field you type your own
+ * event into stack down the left; the four sentences from the brief take the
+ * right. */
+.launchpad__doors {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.launchpad__drawn {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.launchpad__yours {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.launchpad__build {
+  grid-column: 2;
+  grid-row: 1 / -1;
+}
+
+/* On a narrow window there is one column and everything stacks, in the order it
+ * is written. */
+@media (width < 1100px) {
+  .launchpad {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .launchpad__doors,
+  .launchpad__drawn,
+  .launchpad__yours,
+  .launchpad__build {
+    grid-column: 1;
+    grid-row: auto;
+  }
 }
 
 /* ---- The two doors ------------------------------------------------------ */
@@ -133,4 +197,43 @@
  * which is the order that makes the cascade easy to follow. */
 .examples > li + li {
   border-top: 1px solid var(--hairline);
+}
+
+/* The one sentence a copy with no model key says about itself, under the four
+ * cards and again under the field. It sits in the ordinary text colour rather
+ * than in a warning hue: it is a fact about this copy, not a problem with it. */
+.launchpad__keyless {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+/* A card that is going to play a recording rather than call a model says so on
+ * its own face, beside the day it was made. */
+.example[data-state="replay"] .example__badge {
+  color: var(--text-muted);
+}
+
+.example--live[data-state] .example__action {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+/* The section that builds a map holds a form as well as a list, so it needs a
+ * gap between the two that a bare section does not. Its rows sit at the top of
+ * the column rather than stretching to fill it: a list of two doors with a
+ * hundred pixels of air inside it reads as a mistake. */
+.launchpad > section {
+  display: grid;
+  align-content: start;
+  row-gap: var(--space-2);
+}
+
+/* The second of the two sentences under the four cards: what *not yet live*
+ * means, said once in full. Quieter than the first, because the first is about
+ * this copy and this one is about a word on a card. */
+.launchpad__keyless--quiet {
+  color: var(--text-muted);
 }

@@ -1,0 +1,59 @@
+/*
+ * The mark beside the map's name saying this run is a recording.
+ *
+ * **In the bar, never over the map.** Nothing in this product sits on top of the
+ * canvas: a mark floating over it covers a tile the moment the map is bigger than
+ * three claims, and the map is the thing the reader came for. So it is a word and
+ * a day, up with the title, and the sentence explaining it is in the line under
+ * the map where every other sentence about where this map came from lives.
+ */
+
+.replay-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: 0 var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.replay-badge__word {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+/* The day the recording was made, in the number face because it is a reading off
+ * the receipt rather than a word. */
+.replay-badge__day {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* The two sources disagreed. A doubled left edge rather than a colour, so it
+ * survives a grey print, and the sentence under the map says what happened. */
+.replay-badge[data-disagreed="yes"] {
+  border-left-width: 4px;
+  border-left-style: double;
+}
+
+/* Read out loud, never drawn: the badge is two words on the glass and a whole
+ * sentence to a reader who is listening. The same sentence is printed in full
+ * under the map, so nobody is told it only one way. */
+.replay-badge__spoken {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

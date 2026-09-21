@@ -1,0 +1,217 @@
+/*
+ * The way in, on the first screen.
+ *
+ * Fields drawn as lines rather than as boxes: one hairline under each, no fill,
+ * no rounded corner, no shadow. A form that looks like a form from a component
+ * library is the first thing a reader recognises and the first thing that makes a
+ * tool look like a template, so this one looks like the rest of the product — a
+ * label, a rule, and the words you typed.
+ */
+
+.input-bar {
+  display: grid;
+  row-gap: var(--space-2);
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.input-bar__field {
+  display: grid;
+  row-gap: var(--space-hair);
+}
+
+.input-bar__label {
+  padding: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* One line to type on. The rule under it is the field; there is no box. */
+.input-bar__text {
+  width: 100%;
+  padding: var(--space-1) 0;
+  font-family: var(--font-interface);
+  font-size: var(--text-md);
+  color: var(--text);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.input-bar__text::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.input-bar__text:focus-visible {
+  outline: none;
+  border-bottom-color: var(--focus);
+  box-shadow: 0 1px 0 0 var(--focus);
+}
+
+.input-bar__text:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.input-bar__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* ---- The reader's own likelihood ---------------------------------------- */
+
+.input-bar__belief {
+  display: grid;
+  row-gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.input-bar__unsaid,
+.input-bar__track {
+  display: grid;
+  row-gap: var(--space-1);
+}
+
+/* The reading, in the same one-line form the belief chip uses, in the number
+ * face with fixed-width digits so the figures do not jump as a handle moves. */
+.input-bar__reading {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+.input-bar__reading[data-reading="unsaid"] {
+  font-family: var(--font-interface);
+  font-size: var(--text-md);
+  color: var(--text-muted);
+}
+
+.input-bar__handle {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ---- The three handles on one track -------------------------------------- *
+ * Drawn rather than left to the browser. A browser's own slider is a rounded
+ * pill with a shadow under a round grip, which is the one look this product
+ * cannot have: it is the same look on every website, and the first thing a
+ * reader recognises as somebody else's component. So the track is a hairline and
+ * the grip is a small square in the text colour, like every other mark here. */
+
+.input-bar__handle input[type="range"] {
+  width: 100%;
+  height: var(--space-2);
+  margin: 0;
+  background: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.input-bar__handle input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--hairline);
+}
+
+.input-bar__handle input[type="range"]::-moz-range-track {
+  height: 2px;
+  background: var(--hairline);
+}
+
+/* Twelve pixels square, lifted five so it sits centred on a two-pixel track. */
+.input-bar__handle input[type="range"]::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -5px;
+  border: none;
+  border-radius: 2px;
+  background: var(--text);
+  appearance: none;
+}
+
+.input-bar__handle input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 2px;
+  background: var(--text);
+}
+
+.input-bar__handle input[type="range"]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.input-bar__say {
+  justify-self: start;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.input-bar__say:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* ---- The one button ------------------------------------------------------ */
+
+.input-bar__go {
+  display: grid;
+  row-gap: var(--space-hair);
+}
+
+/* The one control on this screen with an outline round it, because it is the one
+ * thing that starts something. Still no fill: a filled button would be the
+ * loudest thing on a quiet page, and the map is what is loud here. */
+.input-bar__build {
+  justify-self: start;
+  padding: var(--space-1) var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  background: none;
+  border: 1px solid var(--text);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.input-bar__build:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.input-bar__build:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.input-bar__build:disabled {
+  border-color: var(--hairline);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.input-bar__why {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}

@@ -212,18 +212,19 @@ describe("the six things you can do", () => {
     expect(screen.getByText(/Take this as given/)).toBeInTheDocument();
   });
 
-  it("test_add_a_claim_says_what_it_needs_rather_than_half_doing_it", () => {
+  it("test_add_a_claim_opens_the_one_field_that_needs_the_model", () => {
     // A claim is not its wording: it is the wording plus the test that settles
-    // it, who judges it and by when. Nothing in this build drafts those, and a
-    // branch holding a half-written claim could not be folded onto the map at
-    // all — so the button says so and records nothing.
+    // it, who judges it and by when. Those are drafted by the one part of this
+    // product that calls the model, and this is the one control that asks it.
+    // Nothing is recorded by pressing the button — a sentence has to be typed
+    // first, and what comes back has to pass the same rules as any proposal.
     const made = open();
     const add = screen.getByRole("button", { name: /^Add a claim/ });
-    expect(add).toHaveTextContent("needs the part that drafts a claim");
+    expect(add).toHaveTextContent("…but this also happens");
     expect(add).not.toBeDisabled();
     fireEvent.click(add);
     expect(made).toEqual([]);
-    expect(screen.getByText(/no edit was recorded/)).toBeInTheDocument();
+    expect(screen.getByLabelText("…but this also happens")).toBeInTheDocument();
     // And no stack number on screen: a reader does not know what a stack is.
     expect(screen.queryByText(/stack \d/i)).toBeNull();
     expect(screen.queryByText(/pull request/i)).toBeNull();
@@ -238,6 +239,32 @@ describe("the six things you can do", () => {
     expect(screen.getByText(/is not built yet/)).toBeInTheDocument();
     // And no stack number on screen: a reader does not know what stack six is.
     expect(screen.queryByText(/stack \d/i)).toBeNull();
+  });
+
+  it("test_an_arrow_is_named_by_the_claims_at_its_two_ends_never_by_an_identifier", () => {
+    open("wire");
+    const panel = screen.getByRole("region", { name: "Change this claim" });
+    const subject = panel.querySelector(".intervene__subject")?.textContent ?? "";
+
+    // Which arrow a reader is about to change is said in the two claims' own
+    // words, the way the Inspector's head says it.
+    expect(subject).toContain("The Strait of Hormuz reopens.");
+    expect(subject).toContain("→");
+    expect(subject).toContain("Brent crude settles below $68");
+    // An identifier is never words on the screen — and "H->B" is one.
+    expect(subject).not.toContain("H->B");
+    expect(subject).not.toMatch(/\bH\b|\bB\b/);
+    // It is carried where a test or a tool can read it, the way a tile carries
+    // its own: the end-to-end suite asks the panel which arrow it is open on.
+    expect(panel).toHaveAttribute("data-about", "H->B");
+  });
+
+  it("test_the_panel_says_which_claim_it_is_open_on", () => {
+    open("claim");
+    expect(screen.getByRole("region", { name: "Change this claim" })).toHaveAttribute(
+      "data-about",
+      "B",
+    );
   });
 
   it("test_change_this_push_asks_for_an_arrow_instead_of_going_inert", () => {

@@ -16,7 +16,7 @@ It does **not** settle what the model is asked or what a proposal may contain �
 
 ### The eight events
 
-One file defines them: `backend/src/katalyst/engine/events.py`. The browser mirrors the same eight by hand in `frontend/src/stream/events.ts`, exactly as stack 03b hand-typed its view of a world, and a type-level test (`frontend/src/stream/__tests__/eventsMatchSchema.test-d.ts`) fails the build if the two ever drift.
+One file defines them: `backend/src/katalyst/engine/events.py`. The browser mirrors the same eight by hand in `frontend/src/stream/events.ts`, exactly as stack 03b hand-typed its view of a world, and a type-level test, `frontend/src/stream/__tests__/eventsMatchSchema.test-d.ts`, fails the build when the two drift. It cannot pin the eight envelopes — server-sent events have no body OpenAPI can describe — so it pins every piece they are built from (those are aliased to the generated types rather than retyped) and the four shapes that do travel as JSON: the receipt, the request, the drafted insert and the working. The eight names themselves are guarded twice over instead: the browser counts and shows an event name it does not know, and `test_the_stream_ends_with_done_or_failed` and its neighbours here hold the server to the eight.
 
 Each event is one name and one payload. The name is what the wire's `event:` line carries; the payload is what its `data:` line carries.
 

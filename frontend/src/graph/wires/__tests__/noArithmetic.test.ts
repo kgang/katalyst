@@ -24,6 +24,17 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
+ * Every module in the tree, read as text by the build tool rather than off the
+ * disk — so this test needs nothing but the browser types the rest of the app is
+ * written against.
+ */
+const SOURCE = import.meta.glob("/src/**/*.{ts,tsx}", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+/**
  * Every file that touches one of the map's numbers and draws it.
  *
  * Deliberately not the whole tree: the file that works out where a wire goes
@@ -37,18 +48,20 @@ const DRAWS_THE_MAPS_NUMBERS = [
   "/src/components/Inspector.tsx",
   "/src/components/PathBar.tsx",
   "/src/components/OriginMark.tsx",
+  // A generation's own numbers arrive on events and are printed straight onto
+  // the screen. The reducer that folds them holds a likelihood, a route's
+  // multiplied-out likelihood and a receipt, and combines not one of them.
+  "/src/components/VerdictCard.tsx",
+  "/src/components/ReceiptStrip.tsx",
+  // **Add a claim** draws a receipt of its own and the working that produced
+  // it, so it holds every field the strip holds and the transcript's own
+  // counts besides. A file that prints a cost is a file that could add one up.
+  "/src/components/AddAClaim.tsx",
+  "/src/components/TheWorking.tsx",
+  ...Object.keys(SOURCE).filter(
+    (path) => path.startsWith("/src/stream/") && !path.includes("__tests__"),
+  ),
 ];
-
-/**
- * Every module in the tree, read as text by the build tool rather than off the
- * disk — so this test needs nothing but the browser types the rest of the app is
- * written against.
- */
-const SOURCE = import.meta.glob("/src/**/*.{ts,tsx}", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-}) as Record<string, string>;
 
 /**
  * The names a number off the map goes by.
@@ -58,6 +71,18 @@ const SOURCE = import.meta.glob("/src/**/*.{ts,tsx}", {
  * taken into account; `weight` is how much a piece of evidence counts. If an
  * expression combines two of anything, and either side reads one of these, the
  * canvas has started doing the engine's job.
+ *
+ * **The second group is the stream's own**, and it is the reason this list grew
+ * when the walk did. Adding `frontend/src/stream/` to the files walked, and
+ * leaving the names alone, checked those files for arithmetic on fields none of
+ * them has: `receipt.input_tokens + receipt.output_tokens` — the exact sum the
+ * receipt strip exists to refuse — would have walked straight past. A guard
+ * pointed at the right files and the wrong names is a guard that always passes,
+ * and INV-workbench.68 names this test by name.
+ *
+ * `product` is a route's multiplied-out likelihood; `versions` is how many
+ * versions of the map the engine ran; `at` is a place in a transcript, and two
+ * of those added together would be a place in nothing.
  */
 const A_NUMBER_OFF_THE_MAP = new Set([
   "p",
@@ -69,6 +94,18 @@ const A_NUMBER_OFF_THE_MAP = new Set([
   "pathProduct",
   "conditional",
   "reading",
+  // The receipt's own readings, by the names they travel under.
+  "dollars",
+  "seconds",
+  "input_tokens",
+  "output_tokens",
+  "cache_read_tokens",
+  "calls",
+  "searches",
+  // And the three other numbers a generation puts on the wire.
+  "product",
+  "versions",
+  "at",
 ]);
 
 /** The four operators that would combine two numbers into a third. */

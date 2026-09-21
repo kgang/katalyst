@@ -47,8 +47,12 @@ this stack's server half; this chapter says what the browser does with them.
 //
 // Written by hand, exactly as `WorldView` was, because the server's description of
 // itself and this canvas are built at the same time. The server's own copy is
-// `backend/src/katalyst/engine/events.py`; a type-level test on the server's side
-// fails if the two ever drift.
+// `backend/src/katalyst/engine/events.py`. A type-level test,
+// `frontend/src/stream/__tests__/eventsMatchSchema.test-d.ts`, fails the build when
+// the two drift. It cannot pin the eight envelopes — server-sent events have no body
+// OpenAPI can describe — so it pins every piece they are built from, which are
+// aliased to the generated types below rather than retyped, and the four shapes that
+// do travel as JSON: the receipt, the request, the drafted insert and the working.
 
 import type { components } from "../api/schema";
 
@@ -71,8 +75,26 @@ export interface GenerationStarted {
    * reads it: the one the request sent, or the one `engine/ids.py` minted when it
    * sent none, or, on a replay, the one in the recording's header, which wins over
    * both. The browser prints what this says and never works out which case it was.
+   *
+   * **And by the time it is a number here it may already be wrong.** A seed is
+   * up to nineteen digits and a browser holds a whole number exactly only up to
+   * sixteen, so `JSON.parse` has rounded it before any of our code sees it.
+   * Nothing computes with a seed — it is printed under the map so a reader can
+   * ask for the same one again — and a rounded seed printed there is a number
+   * on screen that is simply wrong, in the one place that exists so an answer
+   * can be had twice.
    */
   readonly seed: number;
+  /**
+   * The same seed, exactly as it was written on the wire: its digits, not a
+   * number.
+   *
+   * Read off the raw text of the `data:` line by the reader, because that is
+   * the last moment the digits exist. Absent only when a caller handed the
+   * events over by hand, and then the parsed number is the whole of what is
+   * known.
+   */
+  readonly seed_as_written?: string;
   /** The sentence the reader typed, in their own words. */
   readonly hypothesis: string;
   /** The Verify door's destination, in their words. Null when they used the Explore door. */
@@ -147,6 +169,14 @@ export interface Receipt {
   readonly seconds: number;
   /** Live, or played from a recording. The only place in the stream this is said. */
   readonly mode: "live" | "replay";
+  /**
+   * How hard the model was asked to try, as a plain word: `default` when
+   * nothing was asked for and the service's own applied, otherwise `low`,
+   * `medium`, `high`, `xhigh` or `max`. A recording is made rich and a live run
+   * is made fast (Kent, G13), so two maps of the same sentence at the same seed
+   * can differ for a reason that has nothing to do with the sentence.
+   */
+  readonly effort: string;
   /** The day the recording was made, as the map writes a day: `2026-09-18`. Null when live. */
   readonly recording_date: string | null;
   /** A hash of the prompt this run was made against. Null never; it is always known. */
@@ -225,10 +255,14 @@ export interface GenerateRequest {
   readonly user_belief?: Ranged;
   /** Only when reproducing a run we were given a seed for. See below. */
   readonly seed?: number;
-  /** Upper-bounded on the route. Left out, the engine uses its own. */
-  readonly versions?: number;
-  readonly worlds?: number;
 }
+
+// The route takes `versions` and `worlds` too, both upper-bounded on it, and the
+// browser sends neither: the engine's own are what every map in this product is
+// worked out with, and a screen that could ask for fewer would be a screen that
+// could quietly make one answer cheaper and less certain than the one beside it.
+// If a reason to send them ever appears it will be a control a reader can see,
+// not a default they cannot.
 
 /** One async generator over the stream. No component talks to the network. */
 export async function* generate(request: GenerateRequest): AsyncGenerator<StreamEvent>;
@@ -284,12 +318,21 @@ export interface Skeleton {
 }
 
 /** Where a generation is. Each is a different thing on screen, and none is a spinner. */
-export type Phase = "waiting" | "growing" | "settled" | "stopped" | "failed";
+export type Phase = "waiting" | "growing" | "settled" | "stopped" | "failed" | "ended_early";
 
 export interface Growth {
   readonly phase: Phase;
   /** The engine's name for this run. Null until `generation_started`. */
   readonly generationId: string | null;
+  /**
+   * The seed every likelihood in this run was worked out from, as its digits.
+   * Null until the run has started, and never worked out here.
+   */
+  readonly seed: string | null;
+  /** The sentence the reader typed, as the run's first event repeated it back. */
+  readonly hypothesis: string;
+  /** The destination the reader named, or null on the Explore door. */
+  readonly target: string | null;
   /**
    * The map as far as it has been built, in the same view model the canvas already
    * draws. Every number slot the engine has not spoken about reads its absence, so
@@ -456,13 +499,17 @@ A skeleton tile is **a reserved rectangle**. Not a shimmer, not a pulse, not a g
 across a card.
 
 * **Its box is a tile's box.** 280 pixels wide (`TILE_WIDTH`), 152 tall (`TILE_MIN_HEIGHT`, the floor
-  of the tile's own clamp), on the eight-pixel grid, with one hairline border at `--hairline`. It is
-  drawn on `--surface`, not on `--surface-raised`, so it reads as a space held open rather than as a
-  card with nothing in it.
-* **It carries one line and nothing else.** The first one carries the reader's own sentence. Every
-  later one carries *one step on from "…"*, quoting the open claim it hangs off — so the reader can
-  see not just that more is coming but *where from*. No chips, no dates, no clippings, no kind
-  silhouette, no badge.
+  of the tile's own clamp), on the eight-pixel grid, with one border at `--hairline`. It is drawn on
+  `--surface`, not on `--surface-raised`, so it reads as a space held open rather than as a card with
+  nothing in it. **The border is dashed** — a solid hairline is what a claim's tile has, and a box
+  the same weight as a tile beside a tile reads as a tile whose text has not loaded.
+* **It carries two things and nothing else** *(amended 2026-09-21: this said "one line", and the code
+  draws two)*. A mark reading **held open**, in the smallest type this product allows and no smaller,
+  so that what the box is is readable rather than inferred — a reader meeting an empty dashed box for
+  the first time has no way to know it is a promise rather than a fault. And one line: the first
+  rectangle carries the reader's own sentence, every later one carries *one step on from "…"*,
+  quoting the open claim it hangs off — so the reader can see not just that more is coming but *where
+  from*. No chips, no dates, no clippings, no kind silhouette, no badge, and no number of any kind.
 * **Its only movement is opacity, at most `--duration-fast`.** Nothing scales, pulses, sweeps or
   loops. An animated placeholder is a tool pretending to be busy; a held rectangle is a tool saying
   where the next thing goes.
@@ -476,6 +523,8 @@ across a card.
 | `proposal_accepted` | One skeleton per claim named in `frontier`, each hanging off that claim. The set is **rebuilt**, so a claim that has left the frontier loses its rectangle in the same frame |
 | `proposal_rejected` | The same, from the same field. A claim closed by its third refusal in a row is gone from `frontier` here, so its rectangle comes down on the refusal rather than waiting for an accepted proposal that may never come |
 | `beliefs_propagated` | **Every skeleton goes.** The frontier is empty by definition once the map is finished, so there is nothing left for one to stand for |
+| `failed` | **Every skeleton goes** *(added 2026-09-21)*. A rectangle is a promise that a claim is coming, and after a run breaks nothing is. The claims that were still open are in the working either way, so nothing is lost by taking the boxes down; what is lost by leaving them up is a reader waiting for a claim for ever |
+| *the body ending with no terminator at all* | **Every skeleton goes** *(added 2026-09-21)*. The same rule, for the case that is not an event: see B3's *a stream that simply stops*, below |
 
 So the skeletons on screen are the **frontier, drawn** — rebuilt from whichever growth event arrived
 last, and emptied when the world lands. That is a fact the stream states, never a guess the browser
@@ -561,6 +610,33 @@ downstream of the map so far — a `ClaimProposal` brings one claim and the one 
 arrow's source is always a claim that already exists — which is exactly the precondition
 INV-workbench.22 names. A late arrival finds a gap; nothing above it, beside it or before it shifts.
 
+**The layout answers later, and a box waits for its place rather than borrowing one** *(added
+2026-09-21)*. The layout runs on a background thread, so between a claim arriving on the stream and
+that claim being drawn there is always a gap — a frame on this machine, most of a second on a tired
+one. What the map does in that gap is the whole of `frontend/src/graph/onTheGlass.ts`, and it is one
+rule: **a box is drawn where the layout put it, and a reserved rectangle stands until the claim it
+was holding a place for is drawn.** Not until the event carrying that claim arrived — those are two
+different moments, and everything between them would otherwise be a map with a claim on its way and
+no rectangle anywhere, which is a growing map that has stopped saying where it is going. It is not a
+corner case: a generated map's frontier is usually one claim wide, so it turns over completely every
+few proposals, and each turnover is one of these moments.
+
+The rectangle goes the instant the map is whole again, so this can never become a way of leaving one
+up: a rectangle whose claim closed with nothing coming after it — a third refusal, a broken run, the
+likelihoods landing — goes at once, because then nothing on the map is waiting for a place.
+
+**The one box the map places itself is a rectangle, and it is the first.** Before the layout has
+answered even once the origin is nobody's place: there is nothing to be drawn on top of, and a
+generation's first paint may not be an empty stage (B1). So the map puts the rectangle held open for
+the reader's own sentence there itself. It was *the first box* rather than *the first rectangle*
+until 2026-09-21, and on a machine where the first answer lost its race to the first proposal that
+box was the claim. Two promises broke at once. The growing edge went quiet, which is what continuous
+integration read. And the claim was drawn at the origin, which is not where the layout puts the first
+box of a map — the layout leaves a margin of its own around what it lays out, so the tile then moved
+by that margin, and *nothing already drawn moves* is the loudest promise this part makes. How far it
+moved was read off the page by the end-to-end test itself, which is what caught it: it holds the
+first tile's place and compares it with itself at the end of the run.
+
 **A wire draws only after both of its ends exist.** In practice the engine makes this true by
 construction, twice over: a `ClaimProposal` brings the claim and the arrow into it in one event, and
 an arrows-only proposal names two claims that are already on the map. The reducer does not rely on
@@ -584,7 +660,33 @@ anyway. But an arrows-only proposal whose source happens to sit *right* of its t
 pointing backwards, which is honest about where the tiles are and misleading about the argument. The
 trade is the one [`layout-and-zoom.md`](layout-and-zoom.md) anti-pattern 7 makes: the map should be
 still while you read it, and losing your place is the worse failure. Whether the map re-lays out once
-when the run finishes is Open question 2.
+when the run finishes is Open question 2, **answered below**.
+
+**A stream that simply stops** *(added 2026-09-21)*. Every stream a reader stayed for ends in exactly
+one `done` or one `failed`. A body that ends with neither is a dropped connection —
+[`spec/generation/streaming.md`](../generation/streaming.md): *"a dropped stream is a finished
+generation with no terminator. The browser says the stream ended early and offers to run it again."*
+A server restarted, a proxy gave up on a connection it thought was idle, a laptop slept during a
+ten-minute run: none of those is a fault anybody on this side can name, and none is a `failed` event,
+because none of them is the run saying anything at all.
+
+What the browser does is three things and no more. **The rectangles come down**, which is the other
+half of *no rectangle ever stands where nothing is coming* — after this, nothing is, and a map left
+growing for ever is the one screen in this product that lies without saying a word: it is drawn
+exactly as a map about to change and it is never going to change again. **The map is kept**, every
+claim and arrow that arrived, with nothing invented to fill the gap and nothing greyed. And **one
+plain sentence**, in the same line under the map that says why any other run ended, with **the offer
+to run the same sentence again beside it** — an offer that says on its face what pressing it costs:
+*run it again — this asks the model again, and spends again* on a copy with a key, and *play it again
+— this plays the recording again, and spends nothing* on one without. A control that quietly spends
+money the second time it is pressed is the one control in this product that must say so before it is
+pressed.
+
+It is not folded from an event, because there is no event: the reader of the stream is the only thing
+that can notice a body ending, and it hands the reducer that fact by name (`theStreamEnded`) rather
+than by inventing a ninth event the server never sent. The working as far as it got is still readable
+at `GET /api/generate/{generation_id}/transcript`, which is the whole reason this state keeps the map
+rather than clearing it.
 
 ### B4 — Chips resolve last, and they resolve once
 
@@ -674,10 +776,36 @@ THIS GENERATION
   tokens out       <Receipt.output_tokens>
   read from cache  <Receipt.cache_read_tokens>
   web searches     <Receipt.searches>
-  cost             <Receipt.dollars>
-  took             <Receipt.seconds>
+  cost             <Receipt.dollars>, in the two places money has
+  took             <Receipt.seconds> — "the replay took", on a replay
+  how hard the
+    model tried    <Receipt.effort>
   mode             live
 ```
+
+**Money has two places** *(coordinator, 2026-09-21)*. It printed up to four — `$0.6132` — which is
+the same fake precision checklist line 4 exists to stop, in the place a reader is most likely to
+compare two runs: the fourth place is a rounding of a price table, and four places read as a
+measurement. **And a guard word exactly when it is true** (K2): a run that spent nothing prints
+`$0.00`, which is a computed zero and reads as one, and a run that spent something and less than a
+cent prints `<$0.01`, because `$0.00` there would say a run was free when it was not. One function,
+used by the generation's strip and the insert's alike, so the two cannot come to write a cost two
+ways.
+
+**And `took` says whose clock it is.** On a live run it is how long the run took. On a replay it is
+how long the **replay** took — a few seconds of paced playback beside a map that took eleven minutes
+to make — so the row reads *the replay took*. A reader comparing the two figures without that word
+would conclude this product is two hundred times faster than it is. The recorded run's own duration
+is not on the wire; when it is, this row can carry it and say which is which.
+
+**Amended 2026-09-21 — there are ten readings, and the tenth is how hard the model tried.** A plain
+word: `default` when nothing was asked for and the service's own applied, otherwise `low`, `medium`,
+`high`, `xhigh` or `max`. One setting with two pinned defaults behind it — **a recording is made rich
+and a live run is made fast** (Kent, G13) — so two maps of the same sentence at the same seed can
+differ for a reason that has nothing to do with the sentence, and a reader comparing one with the
+other is entitled to see which they are looking at. It is the word the service takes rather than a
+number, because a number would be this browser translating one thing into another and printing the
+translation.
 
 Four things about it.
 
@@ -699,13 +827,17 @@ Four things about it.
 * **Before the receipt arrives the strip is not there.** No running estimate, no ticking cost, no
   progress bar. A cost nobody has totalled is a number nobody computed.
 
-**The transcript lives in the Inspector, and it is the panel's third subject.** Until now the
-Inspector opened on a claim or an arrow. It now also opens on the generation itself, and that section
-holds: the receipt's own numbers, repeated with their labels; the mode, and in replay the recording's
-date and the prompt hash; the whole transcript, one line per proposal in order, accepted or refused,
-each accepted one naming the claim it became and each refused one carrying every sentence the
-validator wrote; and, at the end, a line per event name this build did not know, with how many of
-each arrived. It is read from `GET /api/generate/{generation_id}/transcript`, which the server holds
+**The working lives in the Inspector, and it is the panel's third subject.** Until now the Inspector
+opened on a claim or an arrow. It now also opens on the generation itself, and that section holds
+*(amended 2026-09-21)*: the seed the run drew with and the prompt's fingerprint, whole, each with the
+sentence saying what it is for; the whole transcript, one line per proposal in order, accepted or
+refused, each accepted one naming the claim it became and each refused one carrying every sentence
+the validator wrote; a line per event name this build did not know, with how many of each arrived;
+and one sentence pointing at the strip for what the run cost. **It carries no copy of the receipt's
+ten readings.** It is drawn from the moment there is a generation, with whatever has arrived in it
+and an em dash in each slot that has not — a section that appeared only once everything had landed
+would be a panel that is empty exactly while a reader is most likely to open it. The transcript is
+read from `GET /api/generate/{generation_id}/transcript`, which the server holds
 in memory for the life of the process — there is no storage in this stack, and a transcript outliving
 the process is stack 05's question (FR-31).
 
@@ -731,7 +863,18 @@ beside it (INV-8), the number taken from `Verdict.product` and multiplied by nob
 word for word, the same wart the Inspector's path bar prints, because there is one wording and one
 place it is written ([`inspector.md`](inspector.md) B5): the factors are each read on their own
 resolve-by day, so the product multiplies numbers read on different days, and **it is not a joint
-probability**. The card and the path bar draw the same component.
+probability**. The card and the path bar share the sentence, not the component *(corrected
+2026-09-21)*: one exported constant, `PATH_PRODUCT_WART`, which the card prints and the bar prints.
+They are two different components — the bar is a claim's own route with its chips, the card is the
+Verify door's answer with its steps and its control — and saying they are one would have somebody
+look for a shared component that does not exist. What must not drift is the wording, and a constant
+is what stops wording drifting.
+
+**How long the route is is printed, never counted** *(added 2026-09-21)*. `Verdict.why` is the
+engine's own sentence and it already says it — *"…reaches it in 2 steps"*. The card used to say it
+again underneath, worked out as one fewer than the claims on `Verdict.path`: two derivations of one
+fact, agreeing exactly until the day the engine counts a step differently, and then the card
+contradicts itself in two adjacent paragraphs with nothing on screen to say which is right.
 
 **`kind: "no_path"` — a finding, drawn as a finding.** This is not a failure state and it does not
 look like one. The card carries `Verdict.why` — the engine's own plain sentence — and names
@@ -813,13 +956,50 @@ one of those is true.
 
 **Add a claim** — *"…but this also happens"* — is the one intervention that calls the model (PRD §10
 anti-pattern 2's single exception: re-prompt only for an insert, and only over the affected subtree).
-It posts to `POST /api/generate/insert` — `{base_id, branch, claim_in_words, position}` — and gets
-back **one** intervention: a claim and its arrows, already drafted and already validated by the same
-rules everything else passes. **The field is `position`, not `at`:** `at` already means a transcript
-position on a stream event and a date on an edit, and a word that means three things is a word that
-means none. The browser appends the intervention to the branch like any other edit, and the branch
-panel shows it immediately ([`diff-view.md`](diff-view.md) B7). It is not a generation: no stream, no
-skeleton, no receipt, and what it cost is not on screen (Open question 3).
+It posts to `POST /api/generate/insert` — `{base_id, branch, claim_in_words}` — and gets back **one**
+intervention: a claim and its arrows, already drafted and already validated by the same rules
+everything else passes. The browser appends the intervention to the branch like any other edit, and
+the branch panel shows it immediately ([`diff-view.md`](diff-view.md) B7).
+
+**The branch is one of the three fields and it is sent** *(2026-09-21)*: the claim is drafted and
+checked against the map the reader is actually looking at, which is the base map with the branch
+folded onto it. Leaving it out asks the rules about a map nobody has in front of them, and a claim
+that contradicts an edit made two minutes ago comes back accepted and then breaks the branch it is
+added to.
+
+**And there is no `position`** *(Kent, 2026-09-21; this paragraph used to argue for the name)*. **A
+drafted edit goes at the end of the branch**, which is the only place this product ever puts one — a
+branch is append-only everywhere else in it. The field was read by nothing, and while it was there a
+reader who sent something other than the end got a 200 for an edit the world route then refused: a
+field that changes the answer's shape and not its content is worse than no field, because it makes a
+promise the next route breaks.
+
+It is not a generation — no stream and no reserved rectangle — but **it is several model calls, so it
+carries a receipt of its own**: the route answers a `DraftedInsert`, the edit and its `Receipt`
+together, and the cost is drawn by the same strip a generation's receipt is drawn by, with the same
+ten readings.
+
+**It carries its working too, and the working is in the answer because there is nowhere else it
+could be** *(2026-09-21)*. An insert is one request and one answer: nothing about it is remembered on
+the server, so there is no identifier to ask by and no route to ask at — and filing it in the
+generation store instead made every insert unfindable, because nobody was ever told the identifier,
+while eight of them evicted the map they were being added to. So `DraftedInsert` carries
+`working`: one line per call, in the same shape a generation's transcript lines take, drawn by the
+**same component** the generation's working is drawn by. A reader who has learned to read one has
+learned to read the other, and the two cannot come to disagree about what a refusal looks like. Two
+things a line says that a generation's rarely does are drawn when they are there: an address the
+model cited that the search never returned, named rather than silently dropped — otherwise an arrow
+that says it *argued* looks like one that says it *documented* — and a reference class offered with
+nothing behind it, said as a class **with no number beside it**, because a figure with no page behind
+it reads as measured however it is marked. **That closes Open question 3** (settled 2026-09-20 in
+[`spec/generation/streaming.md`](../generation/streaming.md), drawn 2026-09-21 here). What made it
+answerable was learning that an insert is *several* calls rather than one — the starting-claim shape
+drafts the reader's sentence, then the ordinary walk proposes its arrows, one call each. A single
+cheap call might fairly have been folded into the map's own transcript; several are not, and the
+person pressing the button is the person who should see the bill. The two alternatives lost on the
+same ground: folding it into the generation's transcript files this spend under a different run, and
+a running total in the browser is a number added up by something other than the engine, which also
+vanishes on a page reload.
 
 The other five operations — **Suppose this is true**, **This happened**, **Change this push**,
 **Split this claim**, **My own number** — call no model at all and never have. They are arithmetic in
@@ -843,6 +1023,17 @@ recording, or it reads *not yet live*. That third one now means one thing only �
 recording**, an example nobody has recorded yet — which is an honest state rather than the
 catch-all it was.
 
+**A recording that would not play is named, quietly, under the cards** *(2026-09-21)*. The readiness
+answer lists only the recordings that would actually play, and carries beside them one plain sentence
+per file in the folder this engine could not read. Both halves matter. **A bad file never hides the
+good ones** — the cards with recordings still run, because a recording is a committed file that
+outlives the code that wrote it and meeting an old one is ordinary rather than exceptional. And **it
+never hides itself either**: a reviewer who put a file in the recordings folder and then counts three
+cards where they expected four is owed the reason rather than left to wonder whether they put it in
+the wrong place. The sentence is the server's own, printed word for word, in the quiet type the
+*not yet live* explanation uses — it is a fact about this copy rather than about any map, so it sits
+under the cards and touches none of them.
+
 **Where the date comes from.** Not from the stream: S3 put the recording's date on `Receipt`, and the
 receipt arrives at the *end* of a run, long after the launchpad needs to print this sentence. So the
 readiness answer carries it. `GET /api/readyz` says `status` and `model_key_present` today, and gains
@@ -860,8 +1051,10 @@ interface RecordingSummary {
 interface Readiness {
   readonly status: "ready" | "not_ready";
   readonly model_key_present: boolean;
-  /** Empty when nothing has been recorded. */
+  /** Only the ones that would actually play. Empty when nothing has been recorded. */
   readonly replayable: readonly RecordingSummary[];
+  /** One plain sentence per file in the folder this engine could not read. */
+  readonly unreadable: readonly string[];
 }
 ```
 
@@ -878,13 +1071,22 @@ its own beneath, so the sentence is never more current than the oldest thing it 
 key but four recordings can do everything a reviewer came to see, and a card greyed out because the
 whole server called itself `not_ready` would be the most misleading screen in the product.
 
-**A replay says it is a replay, twice, from two sources that must agree.** The badge is on the canvas
-for the whole session, from the moment the run starts, set from `model_key_present` — the browser
-knows before the stream does. When `receipt` arrives it carries `mode` and the recording's date, and
-**the receipt is the authority**: it names the day on the badge, and if it ever says `live` where the
-badge says replay, the badge takes the receipt's word and the strip says that the two disagreed. Two
-derivations again, and this is the one place both are needed — the badge has to be there before the
-receipt exists — so the rule is written down rather than left to luck.
+**A replay says it is a replay, twice, from two sources.** The badge is in the bar for the whole
+session, from the moment the run starts, set from `model_key_present` — the browser knows before the
+stream does. When `receipt` arrives it carries `mode` and the recording's date, and it **names the
+day**, because the day is a fact only the receipt has. Two derivations again, and this is the one
+place both are needed — the badge has to be there before the receipt exists — so the rule is written
+down rather than left to luck.
+
+**When the two disagree, neither wins: the disagreement is the finding** *(corrected 2026-09-21;
+this said the badge takes the receipt's word, and the code has never done that — rightly)*. A
+session with no key that gets a receipt saying `live` is a copy that has done something nobody can
+account for, and the honest screen shows both readings and says they differ, in the line under the
+map where every other sentence about where this map came from lives. The badge stays, marked as
+disagreed, because it is still true that this session had no key; the receipt stays, because it is
+still true that the run reported itself live. Resolving it in favour of either would be the screen
+deciding which of two things it was told to believe, which is the one decision it must not make on a
+reader's behalf. The reasoning lives beside the code that does it, in `ReplayBadge.tsx`.
 
 **One recorded intervention per recording.** Each file carries the scripted *"…but Iran is struck
 the next day"* its card offers, so **Add a claim** works once on a replayed map — the route matches
@@ -927,7 +1129,7 @@ names below: **growth** is `frontend/src/stream/__tests__/growth.test.ts`, **rea
 `frontend/src/stream/__tests__/noSpinner.test.ts`, **strip**
 `frontend/src/stream/__tests__/strips.test.tsx`.
 
-Local numbers in this part are `INV-workbench.<n>`. This chapter holds **60 – 74**;
+Local numbers in this part are `INV-workbench.<n>`. This chapter holds **60 – 79**;
 [`tiles-ports-wires.md`](tiles-ports-wires.md) holds 1 – 12,
 [`color-motion-type.md`](color-motion-type.md) 13 – 19, [`layout-and-zoom.md`](layout-and-zoom.md)
 20 – 30, [`keyboard-and-access.md`](keyboard-and-access.md) 31 – 39,
@@ -956,16 +1158,24 @@ growth › `test_a_skeleton_carries_no_number_and_no_identifier`. **Also: visual
 every event in it, the set of skeletons on screen is exactly the set named by the most recent
 `frontier` the stream carried — from `proposal_accepted` or from `proposal_rejected`, whichever came
 last — and is empty from `beliefs_propagated` onward. In particular a claim closed by its third
-refusal loses its rectangle on that refusal, not on the next accepted proposal. *Tests:* growth ›
-`test_a_closed_claim_loses_its_skeleton_on_the_event_that_closed_it`,
-`test_every_skeleton_goes_when_the_beliefs_arrive`.
+refusal loses its rectangle on that refusal, not on the next accepted proposal. **And the set is
+empty from `failed` onward, and from the moment a body ends with no terminator at all** *(added
+2026-09-21)*: a rectangle is a promise that a claim is coming, and in both of those nothing is.
+*Tests:* growth › `test_a_closed_claim_loses_its_skeleton_on_the_event_that_closed_it`,
+`test_every_skeleton_goes_when_the_beliefs_arrive`, `test_every_skeleton_goes_when_a_run_breaks`; the
+run › `test_a_stream_that_just_stops_takes_the_rectangles_down`.
 
 **INV-workbench.64 — nothing already placed moves.** For every stream and every event in it, every
 tile that had a position before the event has the identical position after it. That the layout
 machinery guarantees this is [`layout-and-zoom.md`](layout-and-zoom.md)'s INV-workbench.22; this is
-the same promise stated over a stream rather than over one added claim. *Tests:* growth ›
-`test_a_tile_keeps_its_place_when_a_later_tile_arrives`; `frontend/e2e/generate.spec.ts`. **Also:
-visual review checklist line 13.**
+the same promise stated over a stream rather than over one added claim. **`beliefs_propagated` is an
+event in it** *(2026-09-21)*: it replaces the world wholesale, every claim comes back carrying its
+likelihood, every tile gains a chip and so every tile can change height — and a box whose height
+changed drops its pin. It is the one event that could move a tile a reader is already looking at, and
+it was the one event the walks stopped short of. *Tests:* growth ›
+`test_a_tile_keeps_its_place_when_a_later_tile_arrives`; layout ›
+`test_no_two_tiles_in_a_column_collide`; `frontend/e2e/generate.spec.ts`. **Also: visual review
+checklist line 13.**
 
 **INV-workbench.65 — a wire draws only after both ends exist.** For every stream, including one built
 so that an arrow arrives before one of its ends, no wire is rendered unless both of the claims it
@@ -1016,13 +1226,26 @@ receipt's mode and the badge's source disagree, the receipt wins and the disagre
 *Tests:* strip › `test_the_replay_badge_names_the_recording_date`;
 `frontend/src/components/__tests__/launchpad.test.tsx` › `test_the_keyless_sentence_is_word_for_word`.
 
-**INV-workbench.72 — the receipt is the engine's, whole (NFR-6).** For every `receipt` event, the
-strip renders `model`, `calls`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `searches`,
-`dollars`, `seconds` and `mode` — nine fields, each labelled, none omitted and none derived — and
-before the event arrives no cost, token count, search count or elapsed time is rendered anywhere.
-The same statement holds for the Inspector's copy of it ([`inspector.md`](inspector.md) B7), and one
-test covers both renderings: *Test:* strip ›
-`test_the_receipt_strip_prints_every_field_and_adds_nothing_up`.
+**INV-workbench.72 — the receipt is the engine's, whole, and drawn once (NFR-6).** For every
+`receipt` event, the strip renders `model`, `calls`, `input_tokens`, `output_tokens`,
+`cache_read_tokens`, `searches`, `dollars`, `seconds`, `effort` and `mode` — **ten** fields *(amended
+2026-09-21: `effort` is the tenth)*, each labelled, none omitted and **none derived, which includes
+none shortened** — and before the event arrives no cost, token count, search count or elapsed time is
+rendered anywhere. **None derived** means none worked out from the others and none shortened to
+something a reader cannot check: a fingerprint is printed whole. The two roundings that do happen
+are roundings of one field for the page — dollars to the two places money has, seconds to one — with
+the value itself untouched and nothing downstream reading the string; and an amount above nothing
+and below a cent prints `<$0.01`, a bound stated where there is a bound to state and never in place
+of a figure that exists. The same ten are drawn for an insert's own receipt, by the same strip.
+**The ten are rendered in exactly one place on any screen** *(amended 2026-09-21)*: the Inspector's
+view of the generation holds the working and points at the strip, and renders no copy of them. *Tests:* strip ›
+`test_the_receipt_strip_prints_every_field_and_adds_nothing_up`,
+`test_the_cost_is_drawn_in_one_place_and_the_panel_points_at_it`,
+`test_the_mode_row_says_the_mode_and_the_day_and_nothing_else`,
+`test_the_strip_says_how_hard_the_model_tried`,
+`test_the_panel_prints_the_prompt_fingerprint_whole`; canvas ›
+`test_canvas_never_combines_two_model_numbers`, which walks every module under
+`frontend/src/stream/` for arithmetic on any of the receipt's own field names.
 
 **INV-workbench.73 — growth spends the animations already budgeted.** For every animation a
 generation causes, it is the propagation wave or an opacity change of at most 120 milliseconds, and
@@ -1038,9 +1261,69 @@ nothing added to it. *Test:* `frontend/src/styles/__tests__/motionBudget.test.ts
 claim** — whenever the thing it would do cannot be done (no key, for anything the reader typed; no
 key **and** no recording, for a card; no key and no recorded intervention, for **Add a claim**) the
 control is visibly disabled and carries a sentence saying why. There is no control anywhere that
-accepts an interaction and does nothing. *Test:*
+accepts an interaction and does nothing. **A control that has been pressed and whose request comes
+back a rejection comes back to life and says so** *(added 2026-09-21)*: **Add a claim** leaving its
+button disabled and reading *Drafting the claim* for as long as the tab is open is the same fault
+with a different first frame. *Tests:*
 `frontend/src/components/__tests__/launchpad.test.tsx` ›
-`test_nothing_is_silently_inert_without_a_key`.
+`test_nothing_is_silently_inert_without_a_key`; `frontend/e2e/generate.spec.ts` ›
+*add a claim on a generated map declines in the server's own words*.
+
+**INV-workbench.75 — one press asks for one generation** *(added 2026-09-21)*. For every press of a
+launchpad card or of **Build the map**, exactly one `POST /api/generate` is made — including under
+React's strict mode, which mounts every screen, unmounts it and mounts it again on purpose. The
+request is therefore made **inside the press**, which is an event and fires once, and never from a
+render or an effect, which do not. There is nothing to guard and no window in which a second request
+can be made, because the only code that makes one runs inside a click. Letting go of a run is a press
+for the same reason: a development-mode unmount must not stop a run nobody left. *Test:* the run ›
+`test_one_press_makes_one_request_under_strict_mode`.
+
+**INV-workbench.76 — a stream that ends without a terminator says so, and offers to run it again**
+*(added 2026-09-21)*. For every generation whose body ends with neither `done` nor `failed`: every
+reserved rectangle comes down, every claim and arrow that arrived stays exactly where it is, nothing
+is invented in the gap, one plain sentence says the stream ended before the run said it had finished,
+and one control offers the same sentence again **with what pressing it costs written on its face** —
+spending on a copy with a key, spending nothing on a copy playing recordings. It is not drawn as a
+failure, because nothing on this side failed. *Tests:* the run ›
+`test_a_stream_that_just_stops_takes_the_rectangles_down`,
+`test_a_body_that_ends_after_done_is_a_body_ending_normally`,
+`test_the_screen_says_the_stream_ended_and_offers_to_run_it_again`.
+
+**INV-workbench.77 — a box that holds more than it shows says which edge** *(added 2026-09-21)*. For
+the panel beside the map and for the stage the map sits on, a two-pixel rule in `--text-muted` is
+drawn at each edge that has content beyond it and at no edge that has not. The two measure themselves
+differently — one is scrolled, one is panned — and draw the same rule, because *there is more this
+way* is one fact. A scrollbar does not discharge this: on a Mac it is an overlay that appears on a
+gesture, so it speaks only to somebody already scrolling, and a panned map has none at all. *Test:*
+`frontend/e2e/generate.spec.ts`, which compares what the stage says about its edges with where the
+tiles actually are.
+
+**INV-workbench.78 — the live region says what changed** *(added 2026-09-21)*. For every event folded
+into a generation, the polite line a screen reader speaks is about **that event** — a claim arrived,
+a proposal was refused with the rule's own sentence, the likelihoods landed, this is why it stopped —
+said once, at the moment it became true, and never repeated on a later event. A region that re-reads
+the whole run announces every refusal again on every arrival, so a listener hears the thing that just
+happened last, after a minute of things they already knew. *Tests:*
+`frontend/src/a11y/__tests__/growth.test.ts` › `test_a_refusal_is_read_out_once_and_not_again`,
+`test_every_claim_that_arrives_is_announced_by_its_own_words`.
+
+**INV-workbench.79 — a box waits for its place, and a rectangle waits for its claim** *(added
+2026-09-21)*. For every stream and every moment in it, including the moments between an event
+arriving and the layout answering for it: every box on the map is drawn at the place the layout gave
+it and at no other place; no claim is drawn that the layout has not placed; while any box on the map
+is still waiting for a place, every reserved rectangle that was standing goes on standing where it
+stood; and once no box is waiting, the rectangles are exactly the ones the frontier asks for — so a
+map that is still growing always has one, and a map that is finished, broken or ended early has none.
+The one box the map places itself is the rectangle held open for the reader's own sentence, at the
+origin, before the layout has answered anything at all; it is never a claim. *Test:*
+`frontend/src/graph/__tests__/onTheGlass.test.ts` ›
+`test_a_rectangle_stands_at_every_moment_the_map_is_still_growing`,
+`test_no_rectangle_stands_once_nothing_more_is_coming`,
+`test_a_claim_is_only_ever_drawn_where_the_layout_put_it`,
+`test_the_first_rectangle_keeps_the_readers_own_words_until_the_layout_answers`,
+`test_no_two_boxes_are_ever_drawn_in_one_place`, each walked over two runs with the layout answering
+late; `frontend/e2e/generate.spec.ts`, whose `heldWhenEachClaimArrived` is the same statement read off
+a real browser.
 
 ---
 
@@ -1102,6 +1385,13 @@ accepts an interaction and does nothing. *Test:*
     for the rest of the session. **Instead:** send no user belief at all, and let the slot read its
     own absence.
 
+12. **Do not give a box a place because the layout has not answered yet** *(added 2026-09-21)*.
+    *Because* the only place available to give is the map's origin, which either belongs to a box
+    already standing there or is about to belong to this one at coordinates the layout chose — so the
+    box lands where it does not belong and then moves, on the one screen whose whole promise is that
+    nothing already drawn moves. **Instead:** draw nothing that has no place, and let the rectangle
+    already standing go on saying where the claim is going until the claim itself is drawn.
+
 ---
 
 ## Open questions
@@ -1114,19 +1404,39 @@ accepts an interaction and does nothing. *Test:*
    the first event that carries no decision, only activity, which is a different kind of thing to put
    on a stream. **Owner:** `spec/generation/streaming.md`, if anyone ever wants the count on screen.
 
-2. **Does the map re-lay out once when the run finishes?** Today it does not: the map you watched
-   grow is the map you keep, because the pin is absolute. A single re-layout on `done` would tidy any
-   arrow that ended up pointing backwards, at the cost of moving every tile once at the moment the
-   reader starts reading. Nothing the engine produces should create such an arrow, so this is a
-   question about robustness rather than about the normal case. **Owner:** this chapter, once there
-   are screenshots of a thirty-claim generated map to look at.
+2. **Does the map re-lay out once when the run finishes?** **Answered 2026-09-21: no — and the real
+   question turned out to be a different one.**
 
-3. **What does an `insert` cost, and where does that show?** **Add a claim** calls the model and
-   `POST /api/generate/insert` answers once with an intervention rather than a stream, so there is no
-   `receipt` event for it and the cost of an insert appears nowhere. Either the route answers with a
-   receipt beside the intervention, or the session grows a running total — which would be the first
-   number in this product added up by something other than the engine.
-   **Owner:** `spec/generation/streaming.md`, with NFR-6.
+   The measurement, taken on the coordinator's ten-claim run at 1600 × 1000, the size the whole
+   interface is designed against: the stage is **1264 × 801**, the map is framed at **0.85** — the
+   floor below which a tile would have to become a summary — and at that framing **six of the ten
+   tiles are whole on the glass, four are wholly below it and none is cut**. No arrow points
+   backwards, on this run or on the chapter's own, so the thing a re-layout would have tidied did not
+   happen; what did happen is that **a third of the map was off the screen with nothing saying so**,
+   which is far worse and is not a layout problem at all. A map that is cut with nothing saying so is
+   read as a map that ends there, and for a causal map that is the worst thing it can be read as: the
+   reader concludes the argument stops where the window does.
+
+   So the answer is the one that costs the reader nothing: **the map is never re-laid out, and the
+   stage says where it is cut.** A two-pixel rule in `--text-muted` sits at whichever edge has map
+   beyond it and at no edge that has not — the same rule, the same weight and the same colour the
+   panel beside it already uses for the same fact, drawn as the four sides of one box so a corner
+   reads as a corner. The stage measures it about itself, because the two boxes are measured
+   differently: a panel is scrolled and a stage is panned.
+
+   Re-laying out would still move every tile once at the moment the reader starts reading, and it
+   would still not put the four tiles on the glass — there is no zoom that fits ten tiles in 1264 ×
+   801 and keeps them readable, which is exactly why the zoom floor exists. **Owner:** closed.
+
+3. **What does an `insert` cost, and where does that show?** **Answered 2026-09-20 by
+   [`spec/generation/streaming.md`](../generation/streaming.md), drawn 2026-09-21, and nothing is
+   open.** The route answers a `DraftedInsert` — the edit and its own `Receipt` — and the cost is
+   drawn beside the drafted claim by the same strip, with the same ten readings, that a generation's
+   receipt is drawn by. What made it answerable was learning that an insert is **several** calls
+   rather than one: the starting-claim shape drafts the reader's sentence, and then the ordinary walk
+   proposes its arrows, one call each. A running total in the browser lost on two counts — it is a
+   number added up by something other than the engine, and it vanishes on a page reload. **Owner:**
+   closed. See B8.
 
 4. **Where does a replayed run's pacing come from, and is it the same on every machine?**
    **Answered 2026-09-17 by `spec/generation/replay.md`, and nothing is open.** The delay is fixed on

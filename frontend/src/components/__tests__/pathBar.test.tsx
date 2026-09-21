@@ -82,8 +82,14 @@ describe("what the bar says", () => {
     const world = hormuzish();
     const { container } = render(<PathBar world={world} claimId="M1" />);
 
-    // The route by name, and the absence where the number will go.
-    expect(screen.getByText("H → B → M1")).toBeInTheDocument();
+    // How long the route is, and the absence where the number will go. The route
+    // itself is the numbered list under it, each claim in its own words: an
+    // identifier is never printed, because on a generated map it is
+    // twenty-six characters of the engine's own bookkeeping.
+    expect(screen.getByText("two steps from the hypothesis")).toBeInTheDocument();
+    expect([...container.querySelectorAll(".path-bar__step-id")].map((o) => o.textContent)).toEqual(
+      ["start", "1", "2"],
+    );
     expect(screen.getByText("no engine yet")).toBeInTheDocument();
     expect(screen.getByText(/Nothing has worked it out/)).toBeInTheDocument();
     // No number was invented to stand in for the missing one.

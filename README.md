@@ -143,13 +143,15 @@ Re-run `make record-demo` whenever a prompt changes: a recording made against di
 | `KATALYST_RECORDINGS` | Where recorded generations are read from. Empty means the folder that ships here. Point it elsewhere to play a recording back through the real route before committing it |
 | `KATALYST_RUNS` | Where a paid run is written. Empty means `backend/.runs/` |
 
-The three end-to-end tests are not in `make test`, because they want a browser downloaded first. They start both halves themselves, so there is nothing to have running:
+The end-to-end tests are not in `make test`, because they want a browser downloaded first. They start both halves themselves, so there is nothing to have running:
 
 ```sh
 cd frontend
 npx playwright install chromium   # once
 npm run e2e
 ```
+
+**They never attach to a server that is already up.** If you have two worktrees of this repository open, the second run stops at once and names the port it wanted rather than quietly testing the branch checked out in the first — which has happened, in both directions, with neither side able to tell from the output. Give it ports of its own with `KATALYST_E2E_BACKEND_PORT` and `KATALYST_E2E_FRONTEND_PORT`; the defaults are the two numbers continuous integration uses.
 
 ## Tests
 

@@ -65,6 +65,7 @@ vi.mock("./graph/Canvas", () => ({
 
 import { App } from "./App";
 import { readAbout, readHealth, readReadiness } from "./api/client";
+import { absence } from "./world/absence";
 
 /** Set the three stand-ins to answer the way a healthy server with no key would. */
 function serverAnswersNormally() {
@@ -101,9 +102,9 @@ const WORLD: WorldView = aWorld({
       kind: "hypothesis",
       beliefs: {
         model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-        user: { absence: { kind: "not_said", words: "\u2014", reason: "You have not said." } },
+        user: { absence: absence("not_said", "You have not said.") },
         market: {
-          absence: { kind: "no_market", words: "no market", reason: "No venue quotes this claim." },
+          absence: absence("no_market", "No venue quotes this claim."),
         },
       },
     }),
@@ -114,9 +115,9 @@ const WORLD: WorldView = aWorld({
       resolutionSource: "ICE Brent front-month settlement prices.",
       beliefs: {
         model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
-        user: { absence: { kind: "not_said", words: "\u2014", reason: "You have not said." } },
+        user: { absence: absence("not_said", "You have not said.") },
         market: {
-          absence: { kind: "no_market", words: "no market", reason: "No venue quotes this claim." },
+          absence: absence("no_market", "No venue quotes this claim."),
         },
       },
     }),
@@ -182,17 +183,20 @@ describe("the launchpad", () => {
       screen.getByText("If the Strait of Hormuz reopens, what happens to crude?"),
     ).toBeInTheDocument();
 
-    // The other three are the examples from the brief, each one saying plainly
-    // that it is not built yet — never silently doing nothing.
+    // The four sentences from the brief each build a map. This server has no key
+    // and nothing recorded, so all four say plainly that there is nothing they
+    // could honestly show — never silently doing nothing.
     expect(
       screen.getByText("Photonic chips get adopted faster than expected."),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("not yet live")).toHaveLength(3);
+    expect(document.querySelectorAll(".example__badge")).toHaveLength(4);
     expect(
-      await screen.findAllByText(
-        "Turning your own words into a map needs the model, and this server has no key for one.",
-      ),
-    ).toHaveLength(3);
+      await screen.findAllByText("no model key, and nothing recorded for this one"),
+    ).toHaveLength(4);
+    // And what those four words mean, said once in full under them.
+    expect(screen.getByText(/A card reads/).textContent).toContain(
+      "nobody has recorded that example",
+    );
 
     // Both doors are named and explained.
     expect(screen.getByText("Explore")).toBeInTheDocument();
@@ -384,7 +388,7 @@ describe("the strip at the foot of the launchpad", () => {
     expect(await screen.findByText("reachable")).toBeInTheDocument();
     expect(screen.getByText("0.1.0")).toHaveClass("status-value");
     expect(
-      screen.getByText("no key configured — generating a map is not built yet"),
+      screen.getByText("no key configured, and nothing recorded to play instead"),
     ).toBeInTheDocument();
   });
 });

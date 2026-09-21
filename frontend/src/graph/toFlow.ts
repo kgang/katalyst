@@ -8,6 +8,7 @@
 
 import type { Node } from "@xyflow/react";
 import type { ClaimView, WorldView } from "../world";
+import { NOT_ON_THIS_MAP } from "../world/naming";
 import type { LayoutEdge, LayoutTile } from "./elkGraph";
 import { TILE_MIN_HEIGHT, TILE_WIDTH, tileHeight } from "./geometry";
 import { assignLayers, capLayers } from "./layers";
@@ -23,8 +24,27 @@ export type ClaimNode = Node<
 /** A tile standing for the claims a column had no room for. */
 export type OverflowNode = Node<{ count: number }, "overflow">;
 
+/** A rectangle held open where a claim is about to arrive. Never a claim. */
+export type SkeletonNode = Node<{ words: string }, "skeleton">;
+
 /** Everything the canvas draws as a box. */
-export type MapNode = ClaimNode | OverflowNode;
+export type MapNode = ClaimNode | OverflowNode | SkeletonNode;
+
+/**
+ * One rectangle the map is holding open, reduced to what drawing one needs.
+ *
+ * Stated here rather than imported from the reducer that produces them, so that
+ * the picture depends on no part of the machinery that reads a stream: this is
+ * the whole of what the canvas needs to know about a thing that is not a claim.
+ */
+export interface ReservedBox {
+  /** The rectangle's name. A box's name, never a claim's. */
+  readonly id: string;
+  /** The one line it carries. */
+  readonly words: string;
+  /** The open claim it hangs off, so the layout puts it one column further right. */
+  readonly after: string | null;
+}
 
 /**
  * A wire, carrying everything it needs to say its five things at once.
@@ -72,6 +92,15 @@ function overflowId(layer: number): string {
 }
 
 /**
+ * What every reserved rectangle's name starts with.
+ *
+ * It is how the canvas tells a box from a claim without asking the reducer:
+ * nothing may be selected, focused or asked about under one of these names,
+ * because there is nothing there yet.
+ */
+export const RESERVED_PREFIX = "skeleton:";
+
+/**
  * Work out the tiles, the wires, and what the layout gets to see.
  *
  * @param world The world as the source handed it over.
@@ -81,8 +110,17 @@ function overflowId(layer: number): string {
  *   grows badges when an edit touched it — so the box is reserved for the taller
  *   of the two and neither painting moves anything. Left out, each tile is as
  *   tall as its own content.
+ * @param reserved The rectangles being held open at the growing edge of a map
+ *   that is still being built. Empty on every finished map. Each one is drawn at
+ *   a tile's floor height and is pulled into the column after the claim it hangs
+ *   off by an arrow the layout sees and nobody draws — the same trick the tile
+ *   standing in for a full column already uses.
  */
-export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>): MapDrawing {
+export function toFlow(
+  world: WorldView,
+  heights?: ReadonlyMap<string, number>,
+  reserved: readonly ReservedBox[] = [],
+): MapDrawing {
   const ids = world.claims.map((claim) => claim.id);
   const { shown, overflows } = capLayers(assignLayers(ids, world.links));
   const drawn = new Set(shown.map((one) => one.id));
@@ -138,8 +176,8 @@ export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>):
         // What a reader who never sees the picture hears instead. Everything
         // the stroke says, said in words.
         ariaLabel:
-          `arrow from ${claimWords.get(link.source) ?? link.source} ` +
-          `to ${claimWords.get(link.target) ?? link.target}`,
+          `arrow from ${claimWords.get(link.source) ?? NOT_ON_THIS_MAP} ` +
+          `to ${claimWords.get(link.target) ?? NOT_ON_THIS_MAP}`,
         data: {
           shape: link.shape,
           strength: link.strength,
@@ -177,6 +215,31 @@ export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>):
     }
   }
 
+  // The rectangles held open at the growing edge. They are boxes, not claims:
+  // they never join `world.claims`, never reach the network, and carry nothing a
+  // reader could mistake for a reading. Each is pulled into the column after the
+  // claim it hangs off by an arrow the layout sees and nobody draws.
+  for (const box of reserved) {
+    nodes.push({
+      id: box.id,
+      type: "skeleton",
+      position: { x: 0, y: 0 },
+      draggable: false,
+      // A rectangle is not a thing you can be on or ask about: it stands for a
+      // claim that does not exist yet, and there is nothing to read out.
+      selectable: false,
+      focusable: false,
+      data: { words: box.words },
+    });
+    if (box.after !== null && drawn.has(box.after)) {
+      layoutEdges.push({
+        id: `holding-open:${box.after}->${box.id}`,
+        source: box.after,
+        target: box.id,
+      });
+    }
+  }
+
   // **Every tile is told how big it is and where its ports are, and the layout,
   // the tile and the drawing library are all told the same numbers.**
   //
@@ -205,6 +268,13 @@ export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>):
   // onto the element it draws — so what is declared here is what the browser
   // would have measured, and the library correcting itself afterwards from its
   // own measurement changes nothing. Nothing downstream reads any of it back.
+  //
+  // **A reserved rectangle says how big it is too**, and it is the box that
+  // needs saying most: it stands where a claim is about to arrive, so it is on
+  // screen at the exact moment the page is busiest and the browser is likeliest
+  // to drop an observation — and a rectangle nobody can see is a growing edge
+  // that has stopped saying where the map is going. It declares no port: nothing
+  // is at the end of an arrow until the claim itself arrives.
   const tiles: LayoutTile[] = [];
   const sized = nodes.map((node) => {
     const height = node.type === "claim" ? node.data.height : TILE_MIN_HEIGHT;
@@ -212,7 +282,8 @@ export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>):
     const box = { ...node, initialWidth: TILE_WIDTH, initialHeight: height };
     // Only a claim's tile has ports, because only a claim is ever at the end of
     // an arrow. The tile standing in for a column's collapsed claims has none,
-    // and is told none.
+    // and neither has a rectangle held open where a claim is about to arrive:
+    // both are told none rather than told the wrong ones.
     return node.type === "claim" ? { ...box, handles: portsOf(height) } : box;
   }) as MapNode[];
 

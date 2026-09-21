@@ -13,6 +13,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Known, Ranged } from "../../world";
+import { absence } from "../../world/absence";
 import {
   BeliefChip,
   toMovement,
@@ -96,11 +97,10 @@ describe("a belief chip", () => {
       <BeliefChip
         owner="market"
         slot={{
-          absence: {
-            kind: "no_market",
-            words: "no market",
-            reason: "No venue quotes this claim, so there is no price to read.",
-          },
+          absence: absence(
+            "no_market",
+            "No venue quotes this claim, so there is no price to read.",
+          ),
         }}
       />,
     );
@@ -119,11 +119,7 @@ describe("a belief chip", () => {
       <BeliefChip
         owner="user"
         slot={{
-          absence: {
-            kind: "not_said",
-            words: "—",
-            reason: "You have not put your own number on this yet.",
-          },
+          absence: absence("not_said", "You have not put your own number on this yet."),
         }}
       />,
     );

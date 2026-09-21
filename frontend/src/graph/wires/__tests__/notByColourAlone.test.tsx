@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { DirectionReadout } from "../../../components/DirectionReadout";
 import { OriginMark } from "../../../components/OriginMark";
 import type { LinkShape } from "../../../world";
+import { absence } from "../../../world/absence";
 import { CausalWire, type WireData } from "../CausalWire";
 
 /** The stroke's pattern for one kind of push, with everything else held still. */
@@ -30,7 +31,7 @@ function patternFor(shape: LinkShape) {
     reflexive: false,
     provenance: "argued",
     conditional: {
-      absence: { kind: "no_engine", words: "no engine yet", reason: "Nothing has worked it out." },
+      absence: absence("no_engine", "Nothing has worked it out."),
     },
   };
   const { container } = render(

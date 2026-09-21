@@ -1,0 +1,117 @@
+/*
+ * The list of proposals the rules turned down, beside a growing map.
+ *
+ * A plain list of rows with one hairline between them — the same shape as every
+ * other list in this product. The quoted words are set apart from the rule's own
+ * sentence by the face they are set in rather than by a colour: what the model
+ * wrote is a quotation, and what the rule said is the interface talking.
+ */
+
+.refusal-strip {
+  /* One section of the panel beside the map, as tall as what is in it. The panel
+   * itself scrolls; the hairline between one section and the next is the panel's
+   * own gap showing through. */
+  flex: 0 0 auto;
+  display: grid;
+  align-content: start;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface-raised);
+}
+
+.refusal-strip__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.refusal-strip__line {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.refusal-strip__rows {
+  display: grid;
+  row-gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.refusal-strip__row + .refusal-strip__row {
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--hairline);
+}
+
+/* The head of a row answers to a press: it opens the working of the run at this
+ * line. It is a row of text rather than a button with a fill — a fill would be
+ * the loudest thing in the panel, and what it opens is the point. */
+.refusal-strip__open {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: var(--space-1);
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.refusal-strip__open[data-open="yes"] {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.refusal-strip__at {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.refusal-strip__verdict {
+  justify-self: start;
+  padding: 0 var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* What the model wrote. A quotation, marked as one, and never given a box, a
+ * shape or a name of its own. */
+.refusal-strip__words {
+  grid-column: 1 / -1;
+  margin-top: var(--space-hair);
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.refusal-strip__reasons {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: var(--space-hair) 0 0;
+  padding: 0 0 0 var(--space-2);
+  list-style: none;
+  border-left: 2px solid var(--hairline);
+}
+
+/* The rule's own sentence. The interface talking, so it is set in the interface
+ * face and in the ordinary text colour. */
+.refusal-strip__reason {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}

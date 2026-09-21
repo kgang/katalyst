@@ -59,7 +59,6 @@ export function Outline({ items, only, filter, onPick, focused }: OutlineProps) 
             data-level={Math.min(item.level, 5)}
           >
             <button className="outline__line" type="button" onClick={() => onPick(item.id)}>
-              <span className="outline__id">{item.id}</span>
               <span className="outline__sentence">{item.sentence}</span>
             </button>
           </li>

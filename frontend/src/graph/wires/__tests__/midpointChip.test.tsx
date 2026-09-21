@@ -11,15 +11,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Known, Ranged } from "../../../world";
+import { absence } from "../../../world/absence";
 import { WireChip } from "../WireChip";
 
 /** The absence every arrow carries in this build, and the reason beside it. */
 const NO_ENGINE: Known<Ranged> = {
-  absence: {
-    kind: "no_engine",
-    words: "no engine yet",
-    reason: "Nothing has worked this number through the map yet.",
-  },
+  absence: absence("no_engine", "Nothing has worked this number through the map yet."),
 };
 
 describe("the plate in the middle of a wire", () => {

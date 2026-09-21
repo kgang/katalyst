@@ -1,0 +1,136 @@
+/*
+ * "…but this also happens", beside a generated map.
+ *
+ * The same shape as the field on the first screen: a label, a rule to type on,
+ * and one control. No box, no fill, no shadow.
+ */
+
+.add-a-claim {
+  flex: 0 0 auto;
+  display: grid;
+  align-content: start;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface-raised);
+}
+
+.add-a-claim__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.add-a-claim__form {
+  display: grid;
+  row-gap: var(--space-hair);
+}
+
+.add-a-claim__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.add-a-claim__text {
+  width: 100%;
+  padding: var(--space-hair) 0;
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  color: var(--text);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.add-a-claim__text::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.add-a-claim__text:focus-visible {
+  outline: none;
+  border-bottom-color: var(--focus);
+  box-shadow: 0 1px 0 0 var(--focus);
+}
+
+.add-a-claim__ask {
+  justify-self: start;
+  margin-top: var(--space-hair);
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.add-a-claim__ask:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.add-a-claim__line {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* A refusal is an event, not a breakage: the reasons are a plain list with a
+ * rule down the left, the same way every other refusal in this product is
+ * drawn. */
+.add-a-claim__refused {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.add-a-claim__reasons {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: var(--space-hair) 0 0;
+  padding: 0 0 0 var(--space-2);
+  list-style: none;
+  border-left: 2px solid var(--hairline);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* What drafting a claim cost, under the sentence saying it was drafted. The same
+ * strip a generation's receipt is drawn in, so the two cannot drift; it sits
+ * inside this section rather than beside it, because it is about this one edit
+ * and not about the run. */
+.add-a-claim__drafted {
+  margin: 0;
+  color: var(--text);
+}
+
+.add-a-claim [data-answer="drafted"] .receipt-strip {
+  padding: var(--space-1) 0 0;
+  background: none;
+}
+
+/* Every call the drafting took, under what it cost.
+ *
+ * It is the same list a generation's working is drawn in, so it needs no rules
+ * of its own beyond a heading and the room to hold it: a reader who has learned
+ * to read one has learned to read the other, and two lists with two looks would
+ * be two things to learn. */
+.add-a-claim__working {
+  display: grid;
+  row-gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--hairline);
+}
+
+.add-a-claim__working-heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}

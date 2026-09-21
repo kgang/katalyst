@@ -341,14 +341,21 @@ reader can act on. *"no engine yet"* means the engine has not run. *"no market"*
 quotes this, which is a finding about the world. A dash in the user's slot is an invitation, not an
 error. None of these opens a window: the panel is always there, and selecting changes what is in it.
 
-### B7 — This generation: the receipt and the transcript
+### B7 — This generation: the working
 
-*(Decided 2026-09-17, stack 04a; this closes open question 2 below.)*
+*(Decided 2026-09-17, stack 04a; this closes open question 2 below. **Amended 2026-09-21**: the
+receipt's ten readings left this section — see below.)*
 
 NFR-6 says every generation records the model, the tokens, the cache reads, the searches and the
 dollars, and shows them in the Inspector's transcript view. Nothing generated in the stack that wrote
 this chapter, so nothing was specified and nothing was drawn. A generation now exists, and this is
-where it is read.
+where its **working** is read: what it was run against, and every proposal it made, in order.
+
+**What it cost is not here, and this section points at where it is** *(2026-09-21)*. The ten
+readings were drawn twice — on the strip beside the map and again here — one above the other in a
+320-pixel column. Two copies of one cost read, to somebody scrolling past, as two costs, and this was
+the copy no number on screen could be traced to: the strip is what the `receipt` event fills in. So
+the strip keeps them, in one place, and this section carries one sentence saying so.
 
 **The generation is the panel's third subject.** Until now the panel opened on a claim or an arrow.
 It also opens on the run that produced them — `{ kind: "generation", id }`, where `id` is the
@@ -357,31 +364,40 @@ it gets its own section rather than being squeezed into one:
 
 ```
 THIS GENERATION
-  model            <Receipt.model>
-  calls            <Receipt.calls>
-  tokens in        <Receipt.input_tokens>
-  tokens out       <Receipt.output_tokens>
-  read from cache  <Receipt.cache_read_tokens>
-  web searches     <Receipt.searches>
-  cost             <Receipt.dollars>
-  took             <Receipt.seconds>
-  mode             replay · recorded <Receipt.recording_date> · prompt <Receipt.prompt_hash>
+  the run that built this map
 
-TRANSCRIPT
+WHAT IT WAS RUN AGAINST
+  seed                 <GenerationStarted.seed, as its digits>
+  prompt fingerprint   <Receipt.prompt_hash, whole>
+
+  The prompt fingerprint says which wording of our instructions produced this run:
+  two runs with the same fingerprint were asked the same way, and two with different
+  ones were not, however alike their maps look. It is printed whole because half a
+  fingerprint cannot be compared with anything.
+
+  What this run cost is on the strip beside the map, in ten readings, every one of
+  them a field the engine sent.
+
+EVERY PROPOSAL, IN ORDER
   0   accepted   The Strait of Hormuz is open to unrestricted commercial transit for
-                 14 consecutive days                                                  → H
+                 14 consecutive days
   …
   6   refused    "cheaper crude reduces the incentive to close the strait"
                  These claims form a loop with no delay in it: … Mark the arrow where a
                  market feeds back on the world as reflexive and give it a delay, or
                  remove one arrow.
   7   accepted   The energy fund XLE underperforms the S&P 500 fund SPY by more than
-                 3% over 20 trading days                                             → M2
+                 3% over 20 trading days
   —   stopped    Nothing further to add on "Lloyd's war-risk insurance premium for Gulf
                  transits falls below 0.4%"
   —   stopped    Nothing further to add on "Brent crude settles below $68 for five
                  sessions"
 ```
+
+*(The `→ H` and `→ M2` this sketch used to carry are gone, corrected 2026-09-21: the code has never
+drawn them and must not. On a generated map an identifier is twenty-six characters of the engine's
+own bookkeeping, and a reader learns nothing from one — INV-workbench.55. An accepted line names the
+claim it became by quoting the claim.)*
 
 **Three kinds of line, not two.** A proposal was accepted, a proposal was refused, or the model
 answered *Stop* on a line and it closed with nothing added. The third is the one a reader would
@@ -391,7 +407,10 @@ proposed, and a stop proposed nothing — so the positions in this list have gap
 are the stops. Printing them as a dash rather than renumbering is what keeps `at` meaning the same
 thing here as it does on the stream and in the refusal strip.
 
-Five rules, and four of them are rules this panel already obeys.
+Five rules, and four of them are rules this panel already obeys. *(Two of them have moved with the
+readings: what follows about the cost and the mode is now the strip's, in
+[`streaming-growth.md`](streaming-growth.md) B6, and is kept here because it is still what a reader
+of this chapter needs to know about a number they clicked through from.)*
 
 * **Every number is a field, and the panel adds nothing up.** It does not total the two token counts,
   does not work a cost out of a token count and a price, and does not time anything. Searches have
@@ -403,13 +422,21 @@ Five rules, and four of them are rules this panel already obeys.
   one per rule broken, with nothing added; a stopped line carries the model's own one-sentence reason.
   The panel composes no sentence about any of the three, and a refused claim is quoted rather than
   given an identifier or a tile.
-* **The mode is read first.** In a replay the row says `replay`, names the day the recording was made
-  and the prompt it was made against, and the cost reads what the rebuilt receipt carries — zero,
-  because the recording was played and nothing was called. That zero is a computed zero, printed
-  rather than hidden (record 0012).
-* **Before the receipt arrives, the section is not drawn.** No running estimate, no partial total, no
-  ticking cost. A cost nobody has totalled is a number nobody computed, which is the same rule as the
-  reserved band slot's in B3.
+* **The mode is read first.** On the strip, in a replay, the row says `replay` and names the day the
+  recording was made — and **nothing else** *(amended 2026-09-21)*: it also carried the first eight
+  characters of the prompt's fingerprint, which is a reading the browser derived on a strip whose
+  whole promise is that none of them is, and is in any case a fingerprint nobody can check against
+  anything. The fingerprint is printed whole here, with the sentence saying what it is for. The cost
+  reads what the rebuilt receipt carries — zero, because the recording was played and nothing was
+  called. That zero is a computed zero, printed rather than hidden (record 0012).
+* **Before the receipt arrives, no cost is drawn anywhere.** No running estimate, no partial total,
+  no ticking cost. A cost nobody has totalled is a number nobody computed, which is the same rule as
+  the reserved band slot's in B3. **This section, though, is drawn from the moment there is a
+  generation** *(corrected 2026-09-21: this said the section is not drawn, and stood above a section
+  the code drew anyway, with *no engine yet* in it)*. It holds the working, not the cost, and the
+  working is the thing a reader opens the panel for while a run is still going. Each slot that has
+  not arrived reads an em dash. A section that appeared only once everything had landed would be a
+  panel that is empty exactly while a reader is most likely to open it.
 * **The two-significant-figures rule is about likelihoods.** A token count, a call count, a duration
   and a dollar figure are counts and measurements: they are printed whole, in `--font-mono` with
   fixed-width digits, and they carry no range because nothing sampled them. INV-workbench.36 is

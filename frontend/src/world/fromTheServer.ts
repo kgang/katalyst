@@ -17,6 +17,7 @@
  */
 
 import type { components } from "../api/schema";
+import { absence } from "./absence";
 import type {
   Absence,
   AbsenceKind,
@@ -66,10 +67,15 @@ export function filled(belief: Belief): Known<Ranged> {
   return { reading: { p: belief.p, lo: belief.lo, hi: belief.hi } };
 }
 
-/** Turn "there is no number here" into the words and the reason for them. */
-export function missing(kind: AbsenceKind, words: string, reason: string): Known<Ranged> {
-  const absence: Absence = { kind, words, reason };
-  return { absence };
+/**
+ * Turn "there is no number here" into the words and the reason for them.
+ *
+ * The words are not this caller's to choose: they come from the one module that
+ * holds the vocabulary's five, so that *"change them here first"* is a thing a
+ * person can actually do. The kind decides the words; the caller says why.
+ */
+export function missing(kind: AbsenceKind, reason: string): Known<Ranged> {
+  return { absence: absence(kind, reason) };
 }
 
 /**
@@ -126,11 +132,10 @@ function source(item: Source): SourceView {
     retrieved:
       item.retrieved === null || item.retrieved === undefined
         ? {
-            absence: {
-              kind: "not_said",
-              words: "—",
-              reason: "nobody fetched this; a person put the address in by hand",
-            },
+            absence: absence(
+              "not_said",
+              "nobody fetched this; a person put the address in by hand",
+            ),
           }
         : { day: item.retrieved },
   };
@@ -151,11 +156,7 @@ function baseRate(
   const stored = proposition.base_rate;
   if (stored === null || stored === undefined) {
     return {
-      absence: {
-        kind: "not_said",
-        words: "—",
-        reason: "no reference class recorded for this claim",
-      },
+      absence: absence("not_said", "no reference class recorded for this claim"),
     };
   }
   return {
@@ -192,13 +193,9 @@ function marketAbsence(proposition: Proposition): Known<Ranged> {
     // A dead end says why it is a dead end, in the map's own words. This is the
     // one reason a tile prints for itself, because it is an answer rather than
     // an apology.
-    return missing(
-      "no_market",
-      "no market",
-      proposition.not_tradeable_reason ?? NO_MARKET_REASON.event,
-    );
+    return missing("no_market", proposition.not_tradeable_reason ?? NO_MARKET_REASON.event);
   }
-  return missing("no_market", "no market", NO_MARKET_REASON[proposition.kind]);
+  return missing("no_market", NO_MARKET_REASON[proposition.kind]);
 }
 
 /**
@@ -209,13 +206,11 @@ function marketAbsence(proposition: Proposition): Known<Ranged> {
  * together. The engine will carry it; until it does the slot says so, because
  * working it out here would put a second answer on the map beside the engine's.
  */
-export const NO_PATH_PRODUCT: Absence = {
-  kind: "no_engine",
-  words: "no engine yet",
-  reason:
-    "Nothing has multiplied this chain out. The likelihood of a whole route is worked out " +
+export const NO_PATH_PRODUCT: Absence = absence(
+  "no_engine",
+  "Nothing has multiplied this chain out. The likelihood of a whole route is worked out " +
     "where the map's numbers are, and the engine does not carry one yet.",
-};
+);
 
 /**
  * Turn one claim from the server into the claim a tile draws.
@@ -241,7 +236,7 @@ export function toClaim(proposition: Proposition): ClaimView {
       model: filled(beliefs.model),
       user: beliefs.user
         ? filled(beliefs.user)
-        : missing("not_said", "—", "You have not put your own number on this claim yet."),
+        : missing("not_said", "You have not put your own number on this claim yet."),
       market: beliefs.market ? filled(beliefs.market) : marketAbsence(proposition),
     },
     // At most two clippings on a tile; every one of them in the panel beside
@@ -260,14 +255,12 @@ export function toClaim(proposition: Proposition): ClaimView {
  * whole extra run of the map, so it is worked out one arrow at a time, when a
  * reader asks about that arrow and not before.
  */
-export const NOT_ASKED_FOR_YET: Absence = {
-  kind: "no_engine",
-  words: "no engine yet",
-  reason:
-    "Nothing has worked this number through the map yet. The likelihood with this arrow's " +
+export const NOT_ASKED_FOR_YET: Absence = absence(
+  "no_engine",
+  "Nothing has worked this number through the map yet. The likelihood with this arrow's " +
     "cause supposed true costs a whole extra run of the map, so it is worked out one arrow " +
     "at a time — select this arrow and it is asked for.",
-};
+);
 
 /** Turn one arrow from the server into the arrow a wire draws. */
 export function toLink(link: Link): LinkView {

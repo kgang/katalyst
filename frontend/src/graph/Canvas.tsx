@@ -37,13 +37,17 @@ import {
   useReactFlow,
   useStore,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/base.css";
+import { SkeletonTile } from "../components/SkeletonTile";
 import { Tile } from "../components/Tile";
 import { TileOverflow } from "../components/TileOverflow";
+import type { Edges } from "../components/useTheEdges";
+import { edgeMarks, NOTHING_BEYOND } from "../components/useTheEdges";
 import type { MapKeys } from "../keyboard/useMapKeys";
 import { useMapKeys } from "../keyboard/useMapKeys";
 import type { Selection, WorldView } from "../world";
+import { NOT_ON_THIS_MAP } from "../world/naming";
 import {
   firstFrame,
   LARGEST_ZOOM,
@@ -53,6 +57,7 @@ import {
 } from "./geometry";
 import { assignLayers } from "./layers";
 import { useLayout } from "./layoutRunner";
+import { type PlacedBox, whatIsOnTheGlass } from "./onTheGlass";
 import { mayLandAgain } from "./theKeyboard";
 import {
   type ClaimNode,
@@ -60,6 +65,9 @@ import {
   type MapNode,
   OVERFLOW_PREFIX,
   type OverflowNode,
+  RESERVED_PREFIX,
+  type ReservedBox,
+  type SkeletonNode,
   toFlow,
 } from "./toFlow";
 import { CausalWire } from "./wires/CausalWire";
@@ -81,6 +89,7 @@ const TILE_TYPES = {
     />
   ),
   overflow: ({ data }: { data: OverflowNode["data"] }) => <TileOverflow count={data.count} />,
+  skeleton: ({ data }: { data: SkeletonNode["data"] }) => <SkeletonTile words={data.words} />,
 };
 
 /** One kind of wire, ours, saying five things at once. */
@@ -130,6 +139,34 @@ interface SurfaceProps {
    * time. Under reduced motion the ordering survives and the drawing goes.
    */
   readonly arriving: boolean;
+  /**
+   * The rectangles the map is holding open at its growing edge, while a map is
+   * still being built.
+   *
+   * Empty on every finished map, which is every map this canvas drew before
+   * generation existed — so nothing about a stored example changes.
+   */
+  readonly reserved?: readonly ReservedBox[];
+  /**
+   * What the canvas says about the session it is in, such as that this run is a
+   * recording being played back. Drawn in the corner of the surface, over
+   * nothing.
+   */
+  readonly badge?: ReactNode;
+  /**
+   * A word that changes when the map should be framed again.
+   *
+   * The map is framed once, when it is first drawn, and never again — losing
+   * your place because the map was rearranged is the most disorienting thing a
+   * canvas can do. A map that **builds itself** has one more moment worth
+   * framing: the one where it stops. Nothing on it moves then, the reader is
+   * about to start reading, and a four-column map framed for its first single
+   * rectangle is a map they would otherwise have to hunt around.
+   *
+   * It is a word rather than a flag so that the effect has something to compare:
+   * the map is framed once for each value it has ever had.
+   */
+  readonly frameAgainOn?: string;
 }
 
 /** The surface itself. Lives inside the provider so it can move the view. */
@@ -145,12 +182,15 @@ function MapSurface({
   onStatus,
   onOverflow,
   arriving,
+  reserved,
+  badge,
+  frameAgainOn,
 }: SurfaceProps) {
   const flow = useReactFlow();
   const surface = useRef<HTMLDivElement>(null);
   const [pointingAt, setPointingAt] = useState<string | null>(null);
 
-  const drawing = useMemo(() => toFlow(world, heights), [world, heights]);
+  const drawing = useMemo(() => toFlow(world, heights, reserved), [world, heights, reserved]);
   const layout = useLayout(drawing.tiles, drawing.layoutEdges, mapKey);
 
   // How far the map is zoomed out. Below the threshold a wire's plate would
@@ -179,10 +219,22 @@ function MapSurface({
   // looks like when the reader is not pointing at anything. The claim the
   // keyboard is on counts as being pointed at, so the lens is not a mouse-only
   // feature.
-  const lens = useMemo(
-    () => onThePathFrom(pointingAt ?? focused, world.links),
-    [pointingAt, focused, world.links],
-  );
+  const lens = useMemo(() => {
+    // **The lens only ever reads a claim that is on the map.** A box can leave
+    // under the pointer — a reserved rectangle becomes a tile, a claim is
+    // dropped by a branch — and the mouse never leaves it, because there is
+    // nothing left to leave. What was pointed at is then a name the map does not
+    // hold, nothing is on its path, and the whole map dims to fifteen per cent
+    // with nothing lit. That is the lens answering a question about something
+    // that is not there.
+    const under = world.claims.some((claim) => claim.id === pointingAt) ? pointingAt : null;
+    // **While a map is still arriving the lens is off unless the reader points
+    // at something.** Focus moves by itself on a map that is building — every
+    // claim that arrives takes it, so the view can follow the growing edge — and
+    // dimming the rest of the map because the machine moved is the lens
+    // answering a question nobody asked. Pointing at a tile still works.
+    return onThePathFrom(under ?? (arriving ? null : focused), world.links);
+  }, [pointingAt, focused, world.claims, world.links, arriving]);
 
   // Which column each claim sits in, for the one animation this map spends on
   // causality: the wires arrive in the order the argument runs, a column at a
@@ -198,27 +250,50 @@ function MapSurface({
     return placed;
   }, [world]);
 
+  // **Which boxes are on the glass, and where.** The rule is `onTheGlass.ts`'s
+  // and the whole of it is there: a box is drawn where the layout put it, a
+  // reserved rectangle stands until the claim it was holding a place for is
+  // drawn, and before the layout has answered anything the map puts its own
+  // first rectangle at the origin.
+  //
+  // **The rectangles standing are carried from one answer to the next**, which
+  // is why a ref and not a piece of state: it is not something the screen reacts
+  // to, it is the last answer being handed back to work out the next one, and
+  // asking for a second render to do it would paint the wrong frame first.
+  const standing = useRef<readonly PlacedBox[]>([]);
+  const glass = useMemo(
+    () => whatIsOnTheGlass(drawing.nodes, layout.positions, standing.current),
+    [drawing, layout],
+  );
+  standing.current = glass.rectangles;
+
   const nodes: MapNode[] = useMemo(
     () =>
-      drawing.nodes.map((node) => {
+      glass.boxes.map((node) => {
         const ghost = node.type === "claim" && node.data.claim.ghost === true;
         return {
           ...node,
-          position: layout.positions.get(node.id) ?? { x: 0, y: 0 },
           selected: selection?.kind === "claim" && selection.id === node.id,
           // Two classes and not one: the hover lens and the other world are both
           // opacity, and a tile that is off the hovered path *and* in the other
           // world has to land at the two multiplied together rather than at
           // whichever rule happened to win. `canvas.css` multiplies them.
           className: [
-            lens !== null && !lens.claims.has(node.id) ? "is-dimmed" : "",
+            // A rectangle held open for a claim that has not arrived is never
+            // dimmed by the lens. The lens answers "what does this have to do
+            // with anything", and a box standing for a claim that does not exist
+            // yet is not on anybody's path — dimming it would hide the one thing
+            // a reader watching a map build itself is waiting for.
+            lens !== null && !lens.claims.has(node.id) && !node.id.startsWith(RESERVED_PREFIX)
+              ? "is-dimmed"
+              : "",
             ghost ? "is-ghost" : "",
           ]
             .filter((one) => one !== "")
             .join(" "),
         };
       }),
-    [drawing, layout, lens, selection],
+    [glass, lens, selection],
   );
 
   const edges: MapEdge[] = useMemo(() => {
@@ -293,6 +368,94 @@ function MapSurface({
   const justFramed = useRef(false);
   const centredOn = useRef<string | null>(null);
 
+  // **Which edges of the stage have map beyond them.**
+  //
+  // A ten-claim map framed so its tiles stay readable does not fit: two tiles
+  // end up wholly off the glass and the bottom row is clipped. A map that is cut
+  // with nothing saying so is read as a map that ends there, which for a causal
+  // map is the worst thing it can be read as — the reader concludes the argument
+  // stops where the window does.
+  //
+  // So the stage says it, with the same two-pixel rule the panel beside it uses
+  // for the same fact (`useTheEdges.ts`). The measurement is different because
+  // the box is: the panel is scrolled and the stage is panned, so this compares
+  // where the tiles are, in the map's own coordinates, against what the viewport
+  // is showing of them.
+  const [beyond, setBeyond] = useState<Edges>(NOTHING_BEYOND);
+  const measureTheEdges = useCallback(() => {
+    const frame = mapBounds();
+    const room = surface.current?.getBoundingClientRect();
+    if (frame === null || room === undefined) {
+      setBeyond((was) => (was === NOTHING_BEYOND ? was : NOTHING_BEYOND));
+      return;
+    }
+    // A pixel of slack at each edge: a tile that ends exactly on the edge is not
+    // beyond it, and a rule drawn for half a pixel of rounding would be the map
+    // claiming something a reader can check by looking.
+    const view = flow.getViewport();
+    const onTheGlass = {
+      left: frame.x * view.zoom + view.x,
+      top: frame.y * view.zoom + view.y,
+      right: (frame.x + frame.width) * view.zoom + view.x,
+      bottom: (frame.y + frame.height) * view.zoom + view.y,
+    };
+    const next: Edges = {
+      left: onTheGlass.left < -1,
+      above: onTheGlass.top < -1,
+      right: onTheGlass.right > room.width + 1,
+      below: onTheGlass.bottom > room.height + 1,
+    };
+    setBeyond((was) =>
+      was.left === next.left &&
+      was.right === next.right &&
+      was.above === next.above &&
+      was.below === next.below
+        ? was
+        : next,
+    );
+  }, [flow, mapBounds]);
+
+  // Measured whenever the map is laid out again, whenever a tile arrives,
+  // whenever the reader pans or zooms — which is `onMove`, below — **and
+  // whenever the stage itself changes size**. Missing any one of the four
+  // leaves a rule at an edge with nothing beyond it, or none at an edge that
+  // has plenty.
+  //
+  // The fourth is the window. A map framed at 1600 × 1000 and then given a
+  // bigger window has its whole self on the glass while the rule below is still
+  // drawn, and a map given a smaller one loses two tiles off the right with
+  // nothing saying so. Neither pans and neither re-lays out, so nothing else
+  // here would ever hear about it.
+  //
+  // **It measures and changes nothing it measures.** The rule it decides is
+  // drawn by `.canvas::after`, which is absolutely positioned and takes no
+  // space, so this observer cannot feed itself — the lesson the panel beside it
+  // paid for, stated here so the next person to add a box does not pay it
+  // again. One observer for the life of the surface.
+  //
+  // The measuring is read through a ref rather than captured, so that the
+  // observer is built once and never rebuilt: asking the browser to watch a box
+  // it is already watching makes it re-deliver that box's size, and rebuilding
+  // this on every arrival would re-deliver it once per claim. That is the storm
+  // that starved the drawing library's own measuring, and it is not being
+  // started again here.
+  const howToMeasure = useRef(measureTheEdges);
+  howToMeasure.current = measureTheEdges;
+
+  useEffect(() => {
+    measureTheEdges();
+  }, [measureTheEdges]);
+
+  useEffect(() => {
+    const it = surface.current;
+    if (it === null || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const watching = new ResizeObserver(() => howToMeasure.current());
+    watching.observe(it);
+    return () => watching.disconnect();
+  }, []);
+
   // Frame the map when it is a different map — the first time it is drawn, and
   // again when a branch adds a claim to it. Panning, zooming and walking around
   // never re-frame: losing your place because the map was rearranged is the most
@@ -301,7 +464,14 @@ function MapSurface({
     // Only once the positions really are this map's. Framing from the positions
     // worked out for the map before the branch would frame the wrong thing, and
     // the right thing would then arrive underneath it.
-    if (layout.runs === 0 || layout.laidOutFor !== mapKey || framed.current === mapKey) {
+    // Which framing this would be. While a map is being asked to frame again —
+    // which is only ever when a generation has stopped — the layout's own run
+    // count is part of the answer, so that a frame taken while the last claims
+    // were still being placed is taken again when they have been. Nothing lays a
+    // finished map out again, so this settles after one or two.
+    const frameFor =
+      frameAgainOn === undefined ? mapKey : `${mapKey}:${frameAgainOn}:${layout.runs}`;
+    if (layout.runs === 0 || layout.laidOutFor !== mapKey || framed.current === frameFor) {
       return;
     }
     const frame = mapBounds();
@@ -316,14 +486,22 @@ function MapSurface({
     flow.setViewport(firstFrame(frame, { width: room.width, height: room.height }), {
       duration: 0,
     });
-    framed.current = mapKey;
+    framed.current = frameFor;
     justFramed.current = true;
-  }, [layout.runs, layout.laidOutFor, flow, mapBounds, mapKey]);
+  }, [layout.runs, layout.laidOutFor, flow, mapBounds, mapKey, frameAgainOn]);
 
   // The view follows whatever the keyboard is on, so a step along a wire never
-  // walks off the edge of the glass. It does not fight the framing above: when a
-  // branch has just arrived and moved focus to the claim it added, the whole map
-  // has already been framed and that claim is in it.
+  // walks off the edge of the glass — and so that a map building itself does not
+  // build its fourth column off the side of the window while the reader watches
+  // an empty one. Every claim that arrives takes focus, which is the rule
+  // `layout-and-zoom.md` already states for a newly created claim; this is the
+  // other half of the same rule, that the focused tile stays in the viewport.
+  //
+  // **It brings the tile in rather than centring on it.** The promise is that
+  // the focused tile is on the glass, not that it is in the middle of it, and a
+  // view that recentred on every arrival would yank the map out from under
+  // somebody reading a tile that was perfectly visible. So: already on the
+  // glass, nothing happens; off the edge, it is brought to the middle, once.
   useEffect(() => {
     if (focused === null || layout.runs === 0 || centredOn.current === focused) {
       // Only when the keyboard has actually moved. Flipping between the two
@@ -337,16 +515,36 @@ function MapSurface({
       centredOn.current = focused;
       return;
     }
-    const node = flow.getNode(focused);
-    if (node === undefined) {
+    // Where the layout put it, not where the drawing library thinks it is: a
+    // tile that has just arrived is in the layout's answer a render before the
+    // library has it, and reading the library's copy too early gave the origin
+    // — which is how a map ended up centred on an empty corner.
+    const at = layout.positions.get(focused);
+    const room = surface.current?.getBoundingClientRect();
+    if (at === undefined || room === undefined) {
+      // Not placed yet. The layout runs again and this runs with it.
       return;
     }
     centredOn.current = focused;
-    flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + heightOf(focused) / 2, {
-      zoom: flow.getZoom(),
-      duration: 0,
-    });
-  }, [focused, flow, heightOf, layout.runs]);
+
+    const middle = { x: at.x + TILE_WIDTH / 2, y: at.y + heightOf(focused) / 2 };
+    const view = flow.getViewport();
+    const onTheGlass = {
+      x: at.x * view.zoom + view.x,
+      y: at.y * view.zoom + view.y,
+      width: TILE_WIDTH * view.zoom,
+      height: heightOf(focused) * view.zoom,
+    };
+    const inside =
+      onTheGlass.x >= 0 &&
+      onTheGlass.y >= 0 &&
+      onTheGlass.x + onTheGlass.width <= room.width &&
+      onTheGlass.y + onTheGlass.height <= room.height;
+    if (inside) {
+      return;
+    }
+    flow.setCenter(middle.x, middle.y, { zoom: view.zoom, duration: 0 });
+  }, [focused, flow, heightOf, layout]);
 
   /** Show the claims a column had no room for, as a list. */
   const openColumn = useCallback(
@@ -375,7 +573,10 @@ function MapSurface({
       return { kind: "wire", id: wire.dataset.id };
     }
     const tile = target?.closest<HTMLElement>(".react-flow__node");
-    if (tile?.dataset.id !== undefined) {
+    // A rectangle held open for a claim that has not arrived is a box, not a
+    // claim: there is nothing behind it to read out, so pressing it does nothing
+    // and the panel is left where it was.
+    if (tile?.dataset.id !== undefined && !tile.dataset.id.startsWith(RESERVED_PREFIX)) {
       return { kind: "claim", id: tile.dataset.id };
     }
     return null;
@@ -530,7 +731,7 @@ function MapSurface({
   }, [layout, heightOf]);
 
   const claimWords = useCallback(
-    (id: string) => world.claims.find((claim) => claim.id === id)?.claim ?? id,
+    (id: string) => world.claims.find((claim) => claim.id === id)?.claim ?? NOT_ON_THIS_MAP,
     [world],
   );
 
@@ -626,10 +827,13 @@ function MapSurface({
       className="canvas"
       ref={surface}
       data-arriving={arriving ? "yes" : "no"}
+      {...edgeMarks(beyond)}
       onFocusCapture={onFocus}
       onPointerDownCapture={onPointAt}
     >
       <WireMarks />
+
+      {badge}
 
       <ReactFlow
         nodes={nodes}
@@ -658,6 +862,9 @@ function MapSurface({
         elevateNodesOnSelect={false}
         onNodeMouseEnter={(_, node) => setPointingAt(node.id)}
         onNodeMouseLeave={() => setPointingAt(null)}
+        // Panning and zooming both move what is on the glass, so both change
+        // which edges have map beyond them.
+        onMove={measureTheEdges}
         // As far out as the map goes, and no further: past this the summary
         // tile's words would be drawn smaller than anything in this product is
         // allowed to be.

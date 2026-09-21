@@ -40,6 +40,8 @@ import {
   pushInWords,
   shapeInWords,
 } from "../graph/wires/encodings";
+import type { UnreadLine } from "../stream/growth";
+import type { Working } from "../stream/transcript";
 import type {
   BeliefOwner,
   ClaimKind,
@@ -50,10 +52,20 @@ import type {
   Selection,
   WorldView,
 } from "../world";
+import { inFewWords, NOT_ON_THIS_MAP } from "../world/naming";
 import { toMovement, toReading, toShare, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
+import { TheWorking } from "./TheWorking";
 import "./inspector.css";
+
+/**
+ * What stands where a fact about the run will go, before it has arrived.
+ *
+ * The em dash the rest of this product uses for a slot with nothing in it, so
+ * that an empty slot never reads as a value of its own — and never as a zero.
+ */
+const NOT_YET = "—";
 
 /**
  * What the panel needs to draw itself.
@@ -68,6 +80,40 @@ export interface InspectorProps {
   readonly world: WorldView;
   /** What is selected. */
   readonly selection: Selection;
+  /**
+   * The run that produced this map, when there was one.
+   *
+   * Absent on a stored example, which nobody generated. Present on a generated
+   * map, and then the panel's third subject is readable: what the run cost, and
+   * every proposal it made.
+   */
+  readonly generation?: GenerationDetail;
+}
+
+/** Everything the panel knows about the run that produced this map. */
+export interface GenerationDetail {
+  /**
+   * The seed every likelihood in this run was worked out from, as its digits.
+   *
+   * Digits rather than a number because a seed can be nineteen of them and a
+   * browser holds a whole number exactly only up to sixteen. Null until the run
+   * has started.
+   */
+  readonly seed: string | null;
+  /**
+   * Which wording of our instructions produced this run, whole.
+   *
+   * Null until the receipt arrives, and **never shortened**: a fingerprint cut
+   * to its first eight characters is a fingerprint nobody can check against
+   * anything, and cutting one is the browser deriving a reading.
+   */
+  readonly promptFingerprint: string | null;
+  /** The working of the run, or the plain reason it could not be read. */
+  readonly working: Working;
+  /** Every line the reader could not act on, by name, with how many and which kind. */
+  readonly unknown: ReadonlyMap<string, UnreadLine>;
+  /** Which line of the working the panel was opened at, when it was opened at one. */
+  readonly openAt: number | null;
 }
 
 /** What each kind of claim is called on screen. No underscores and no code names. */
@@ -225,6 +271,7 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
   const pushes = into.filter((wire) => !wire.reflexive);
   const fedBackBy = into.filter((wire) => wire.reflexive);
   const result = claim.beliefs.model;
+  const byId = new Map(world.claims.map((one) => [one.id, one]));
 
   return (
     <Section title="Why this number">
@@ -276,8 +323,11 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
         ) : (
           pushes.map((wire) => (
             <Fragment key={wire.id}>
+              {/* The cause, named by its own words. Never by its identifier:
+                  on a generated map that is twenty-six characters nobody can
+                  read (`world/naming.ts`). */}
               <dt className="inspector__step-label">
-                <span className="inspector__mono">{wire.source}</span> pushes
+                {inFewWords(byId.get(wire.source)?.claim ?? NOT_ON_THIS_MAP)} pushes
               </dt>
               <dd className="inspector__step">
                 <span className="inspector__mono">{pushAsNumber(wire.strength)}</span>
@@ -294,7 +344,7 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
                     arrive. */}
                 {wire.conditional.reading === undefined ? null : (
                   <span className="inspector__reason">
-                    {`with ${wire.source} supposed true this claim reads ${toReading(
+                    {`with that cause supposed true this claim reads ${toReading(
                       wire.conditional.reading.p,
                       wire.conditional.reading.lo,
                       wire.conditional.reading.hi,
@@ -312,9 +362,14 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
             out from the fact that the arrow is in a different place. */}
         {fedBackBy.map((wire) => (
           <Fragment key={wire.id}>
+            {/* Named by its own words, like every other claim on every other
+                surface: on a generated map an identifier is twenty-six
+                characters of the engine's own bookkeeping (`world/naming.ts`). */}
             <dt className="inspector__step-label">fed back into by</dt>
             <dd className="inspector__step">
-              <span className="inspector__mono">{wire.source}</span>
+              <span className="inspector__words">
+                {inFewWords(byId.get(wire.source)?.claim ?? NOT_ON_THIS_MAP)}
+              </span>
               <span className="inspector__reason">
                 {`a market acting back on the world it measures, ${
                   wire.lag === 0 ? "the same day" : `after ${inDays(wire.lag)}`
@@ -544,15 +599,11 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
   return (
     <>
       <header className="inspector__head">
-        <p className="inspector__claim">
-          <span className="inspector__mono">{wire.source}</span> {from?.claim ?? wire.source}
-        </p>
+        <p className="inspector__claim">{from?.claim ?? NOT_ON_THIS_MAP}</p>
         <p className="inspector__arrow" aria-hidden="true">
           →
         </p>
-        <p className="inspector__claim">
-          <span className="inspector__mono">{wire.target}</span> {to?.claim ?? wire.target}
-        </p>
+        <p className="inspector__claim">{to?.claim ?? NOT_ON_THIS_MAP}</p>
       </header>
 
       <Section title="Why">
@@ -607,9 +658,9 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
               <span className="inspector__owner"> model</span>
             </p>
             <p className="inspector__reason">
-              {`What ${wire.target} comes to when ${wire.source} is taken as given — supposed, ` +
-                `never observed, because an arrow claims a mechanism and how often two things ` +
-                `show up together is a different question.`}
+              {`What the claim this arrow ends at comes to when the one it starts at is taken ` +
+                `as given — supposed, never observed, because an arrow claims a mechanism and ` +
+                `how often two things show up together is a different question.`}
             </p>
           </>
         )}
@@ -679,16 +730,150 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
   );
 }
 
+/**
+ * The run that produced this map: **its working**, and what it was run against.
+ *
+ * **The panel's third subject.** Until now it opened on a claim or an arrow; it
+ * also opens on the run behind them, which is neither, and so gets a section of
+ * its own rather than being squeezed into one.
+ *
+ * **What it cost is not here.** The ten readings are drawn once, on the strip
+ * beside the map, and this section points at it. They used to be drawn in both
+ * places, one above the other in a 320-pixel column, which reads to somebody
+ * scrolling past as two costs — and the second copy was the one no number on
+ * screen could be traced to, because the strip is what the receipt event fills
+ * in.
+ *
+ * **The section is drawn from the moment there is a generation**, with whatever
+ * has arrived in it. The working arrives when the run stops and the fingerprint
+ * arrives with the receipt, and each says which of those it is waiting for. A
+ * section that appeared only once everything had landed would be a panel that is
+ * empty exactly while a reader is most likely to open it.
+ *
+ * **Every line of the working is in the engine's own words.** An accepted line
+ * names the claim it became; a refused line quotes what the model wrote and then
+ * carries the validator's own sentence, one per rule broken, with nothing added;
+ * a stopped line carries the model's own one-sentence reason. This panel composes
+ * no sentence about any of the three, and a refused claim is quoted rather than
+ * given an identifier or a tile.
+ *
+ * **Three kinds of line, not two.** A proposal was accepted, a proposal was
+ * refused, or the model answered *Stop* on a line and it closed with nothing
+ * added. The third is the one a reader would otherwise never see: it makes no
+ * event on the stream, because nothing about the map changed. **A stopped line
+ * carries no place in the working** — the count counts what was proposed, and a
+ * stop proposed nothing — so the numbers here have gaps in them, and the gaps are
+ * the stops.
+ */
+function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
+  const { seed, promptFingerprint, working, unknown, openAt } = detail;
+  return (
+    <>
+      <header className="inspector__head">
+        <p className="inspector__claim">This generation</p>
+        <p className="inspector__kind">the run that built this map</p>
+      </header>
+
+      <Section title="What it was run against">
+        <dl className="inspector__pairs inspector__pairs--facts">
+          <dt>seed</dt>
+          {/* The one number every likelihood in this run was worked out from,
+              printed as the digits that came off the wire. Ask for the same
+              sentence at the same seed and the same map comes back. */}
+          <dd className="inspector__mono">{seed ?? NOT_YET}</dd>
+          <dt>prompt fingerprint</dt>
+          <dd className="inspector__mono">{promptFingerprint ?? NOT_YET}</dd>
+        </dl>
+        <p className="inspector__reason">
+          The prompt fingerprint says which wording of our instructions produced this run: two runs
+          with the same fingerprint were asked the same way, and two with different ones were not,
+          however alike their maps look. It is printed whole because half a fingerprint cannot be
+          compared with anything.
+        </p>
+        <p className="inspector__reason">
+          {/* One cost, in one place. A panel that repeated the ten readings
+              would be a second copy of a number nobody could point at. */}
+          What this run cost is on the strip beside the map, in ten readings, every one of them a
+          field the engine sent.
+        </p>
+      </Section>
+
+      <Section title="Every proposal, in order">
+        {working.state === "reading" ? (
+          <p className="inspector__reason">
+            Reading the working of this run back from the server, which holds it for as long as it
+            is running.
+          </p>
+        ) : working.state === "gone" ? (
+          <>
+            <p className="inspector__words">—</p>
+            {/* The route's own sentence, printed as it came. A transcript lives
+                for the life of the process that made it; there is no storage in
+                this build. */}
+            <p className="inspector__reason">{working.reason}</p>
+          </>
+        ) : (
+          // The same list an insert's working is drawn in, and the same
+          // component: a reader who has learned to read one has learned to
+          // read the other.
+          <TheWorking lines={working.transcript.lines} openAt={openAt} />
+        )}
+      </Section>
+
+      {unknown.size === 0 ? null : (
+        <Section title="Lines this build could not act on">
+          {/* Ignored, counted, and said out loud. A browser that crashed on a new
+              event would make the server unable to add one; a browser that
+              dropped one silently would make a missing feature look like a
+              working one.
+              **Two kinds, and they are not told as one.** A name this build has
+              never heard of means the server has learned a word and the map
+              drawn from the rest is a correct map. A name this build knows
+              whose payload could not be read means a broken line, and the map
+              may be missing what that line carried — which is a different thing
+              to be told, and a worse one. Saying "this build has no name for
+              these" over a `done` it could not read would be false. */}
+          <dl className="inspector__pairs">
+            {[...unknown].map(([name, line]) => (
+              <Fragment key={name}>
+                <dt>{name}</dt>
+                <dd className="inspector__mono">{line.howMany}</dd>
+              </Fragment>
+            ))}
+          </dl>
+          {[...unknown].some(([, line]) => !line.unreadable) ? (
+            <p className="inspector__reason">
+              This build has no name for some of these, so it changed nothing when they arrived and
+              counted them here instead. The map it drew is a correct map of the lines it did
+              understand.
+            </p>
+          ) : null}
+          {[...unknown].some(([, line]) => line.unreadable) ? (
+            <p className="inspector__reason">
+              And some of these are names this build does know: the stream sent one and what came
+              with it could not be read, so the line was counted and nothing was changed. This map
+              may be missing whatever that line carried.
+            </p>
+          ) : null}
+        </Section>
+      )}
+    </>
+  );
+}
+
 /** The panel beside the map. */
-export function Inspector({ world, selection }: InspectorProps) {
+export function Inspector({ world, selection, generation }: InspectorProps) {
   const claim =
     selection?.kind === "claim" ? world.claims.find((one) => one.id === selection.id) : undefined;
   const wire =
     selection?.kind === "wire" ? world.links.find((one) => one.id === selection.id) : undefined;
+  const run = selection?.kind === "generation" ? generation : undefined;
 
   return (
     <aside className="inspector" aria-label="Why this number is what it is">
-      {claim !== undefined ? (
+      {run !== undefined ? (
+        <GenerationDetailPanel detail={run} />
+      ) : claim !== undefined ? (
         <ClaimDetail world={world} claim={claim} />
       ) : wire !== undefined ? (
         <WireDetail world={world} wire={wire} />

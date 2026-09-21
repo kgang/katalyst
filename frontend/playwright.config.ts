@@ -21,12 +21,26 @@
  */
 
 import { defineConfig, devices } from "@playwright/test";
+import { assertPortsAreFree, BACKEND_PORT, FRONTEND_PORT } from "./e2e/ports.js";
 
-/** The port the server answers on while this test runs. */
-const SERVER_PORT = 8015;
+/**
+ * **Both ports come from the environment, and nothing is ever reused.**
+ *
+ * Several worktrees of this repository are often open on one machine and every
+ * one of them wants these two numbers. Playwright's `reuseExistingServer` is
+ * worse than a collision: it attaches to whatever is answering, so a run in one
+ * worktree tests the branch checked out in another and reports it green. That
+ * has happened here, in both directions, and neither side could tell from the
+ * output. So the defaults are the numbers continuous integration has always
+ * used, `KATALYST_E2E_BACKEND_PORT` and `KATALYST_E2E_FRONTEND_PORT` override
+ * them, and `e2e/ports.ts` stops the run before the first test if either is
+ * taken — naming the port and the variable that moves it.
+ */
+const SERVER_PORT = BACKEND_PORT;
+const APP_PORT = FRONTEND_PORT;
 
-/** The port the browser app is served on while this test runs. */
-const APP_PORT = 5187;
+// Asked before anything is started, because nothing later is early enough.
+assertPortsAreFree();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -61,16 +75,35 @@ export default defineConfig({
       command: `uv run uvicorn katalyst.api.main:app --port ${SERVER_PORT}`,
       cwd: "../backend",
       url: `http://localhost:${SERVER_PORT}/api/healthz`,
-      reuseExistingServer: !process.env.CI,
+      // Never reused. A run that attaches to somebody else's server tests
+      // somebody else's branch and says it was yours.
+      reuseExistingServer: false,
       timeout: 120_000,
-      env: { ANTHROPIC_API_KEY: "", FRED_API_KEY: "" },
+      env: {
+        ANTHROPIC_API_KEY: "",
+        FRED_API_KEY: "",
+        // **The replay's pacing is left on, and that is deliberate.**
+        //
+        // `KATALYST_REPLAY_INSTANT` exists so a test need not wait out a delay
+        // that is there for a reviewer's benefit, and for most tests it would be
+        // free. It is not free here: `generate.spec.ts`'s whole subject is a map
+        // *arriving* — a rectangle standing before any claim, the growing edge
+        // moving, the chips resolving last and once — and with the pacing off
+        // every event lands in one tick, React folds them into one render, and
+        // the screen goes straight from nothing to a finished map. There is then
+        // no moment at which the thing being tested is true, and the test fails
+        // saying it could not find a rectangle. Turning the pacing off to make a
+        // test faster would be turning off the behaviour the test is for.
+        //
+        // It costs seconds: the whole suite runs in about twenty.
+      },
     },
     {
       // The browser half, told where the server is exactly as the packaged app
       // is told.
       command: `npm run dev -- --port ${APP_PORT} --strictPort`,
       url: `http://localhost:${APP_PORT}/`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120_000,
       env: { KATALYST_API_URL: `http://localhost:${SERVER_PORT}` },
     },

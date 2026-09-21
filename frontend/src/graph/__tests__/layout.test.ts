@@ -15,11 +15,17 @@
 
 import ELK from "elkjs/lib/elk.bundled.js";
 import { describe, expect, it } from "vitest";
+import { A_REAL_RUN } from "../../stream/__tests__/aRealRun";
+import { BELIEFS, THE_GROWTH } from "../../stream/__tests__/aStream";
+import type { StreamEvent } from "../../stream/events";
+import { fold, waitingFor } from "../../stream/growth";
 import { aClaim, aWire } from "../../test/aMap";
 import type { ClaimView, LinkView } from "../../world";
+import { absence } from "../../world/absence";
 import {
   LAYOUT_OPTIONS,
   type LayoutEdge,
+  type PinnedTile,
   type Position,
   pinsFor,
   readPositions,
@@ -40,6 +46,7 @@ import {
   tileHeight,
 } from "../geometry";
 import { assignLayers, capLayers } from "../layers";
+import { toFlow } from "../toFlow";
 
 const engine = new ELK();
 
@@ -174,7 +181,7 @@ describe("how tall a tile is", () => {
       claim: text,
       beliefs: {
         model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-        user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+        user: { absence: absence("not_said", "You have not said.") },
         market: { reading: { p: 0.48, lo: 0.45, hi: 0.52 } },
       },
       ...extra,
@@ -184,9 +191,9 @@ describe("how tall a tile is", () => {
   /** The three slots, with no market number in the market slot. */
   const noMarket = {
     model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-    user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+    user: { absence: absence("not_said", "You have not said.") },
     market: {
-      absence: { kind: "no_market", words: "no market", reason: "no venue quotes this claim" },
+      absence: absence("no_market", "no venue quotes this claim"),
     },
   } as const;
 
@@ -504,6 +511,40 @@ describe("the union of two worlds", () => {
     });
   }
 
+  /**
+   * Lay a growing map out again after every event, exactly as the page does.
+   *
+   * The page folds one event, hands the reducer's world and its reserved
+   * rectangles to `toFlow`, keeps the pins that still hold, lays the result out
+   * and reads it back. This does the same, and hands back where every box ended
+   * up at every step — so a statement of the form *after every event* can be
+   * checked against a real stream rather than against one arrangement.
+   *
+   * @param events The stream to walk.
+   */
+  async function everyStepOf(
+    events: readonly StreamEvent[],
+  ): Promise<{ placed: Map<string, Position>; heights: Map<string, number> }[]> {
+    const steps: { placed: Map<string, Position>; heights: Map<string, number> }[] = [];
+    let growth = waitingFor("a sentence somebody typed", null);
+    let pinned = new Map<string, PinnedTile>();
+
+    for (const event of events) {
+      growth = fold(growth, event);
+      const drawing = toFlow(growth.world, undefined, growth.skeletons);
+      const holding = pinsFor(pinned, drawing.tiles);
+      const placed = await layout(
+        drawing.tiles.map((tile) => [tile.id, tile.height] as const),
+        drawing.layoutEdges,
+        holding,
+      );
+      const heights = new Map(drawing.tiles.map((tile) => [tile.id, tile.height]));
+      pinned = new Map([...placed].map(([id, at]) => [id, { at, height: heights.get(id) ?? 0 }]));
+      steps.push({ placed, heights });
+    }
+    return steps;
+  }
+
   it("test_no_two_tiles_in_a_column_collide", async () => {
     // The map as it was written. Its one crowded column holds the talks, the
     // insurance premium and OPEC's announcement, and the whole gap is left
@@ -557,6 +598,29 @@ describe("the union of two worlds", () => {
     const onTheBranch = await layout(grown, branchArrows, new Map());
     expect(collide(onTheBranch, new Map(grown))).toEqual([]);
     expect(column(onTheBranch, new Map(grown), ["N1", "C", "R"]).at(-1)).toBe(GAP);
+
+    // **And after every single event of a map that builds itself.** This is the
+    // case the rule was written for and the one nothing checked: a claim
+    // arriving keeps every pin, so the tile that arrives has to find a gap
+    // rather than be given one by an engine that was free to move its
+    // neighbours. Both runs are walked — the chapter's three-claim one, and a
+    // real ten-claim run four columns deep — and the reserved rectangles are
+    // counted as boxes, because a rectangle a tile is drawn on top of is the
+    // same mistake as two tiles on top of each other.
+    //
+    // **The chapter's run is walked to the end, likelihoods included.** That
+    // last event is the only one that replaces the world wholesale: every claim
+    // comes back carrying its number, so every tile gains a chip, so every tile
+    // can change height — and a box whose height changed drops its pin. It is
+    // the one event that could move a tile a reader is already looking at, and
+    // it was the one event the walk stopped short of. The real run is walked to
+    // the end of its own events, which is where its recording ends: it closed on
+    // its width cap, and nothing here invents a world it did not send.
+    for (const events of [[...THE_GROWTH, BELIEFS], A_REAL_RUN]) {
+      for (const [step, boxes] of (await everyStepOf(events)).entries()) {
+        expect(collide(boxes.placed, boxes.heights), `after event ${step}`).toEqual([]);
+      }
+    }
   });
 
   it("test_a_pin_is_dropped_when_its_tile_changes_size", async () => {

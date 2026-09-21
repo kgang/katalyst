@@ -234,6 +234,24 @@
   font-size: var(--text-sm);
 }
 
+/* The two facts about a run: the seed it drew with, and which wording of our
+   instructions produced it. Both are one long unbroken run of characters with
+   no space in them to break at, and both are printed **whole** — so the only
+   honest way to fit one in a 336-pixel panel is to let it break anywhere it
+   has to. Cutting it to what fits would be the browser deriving a reading, and
+   half a fingerprint cannot be compared with anything.
+
+   The labels are wider than the ordinary pair's nine characters because
+   "prompt fingerprint" is two words and a label that wraps under itself reads
+   as two labels. */
+.inspector__pairs--facts {
+  grid-template-columns: 17ch 1fr;
+}
+
+.inspector__pairs--facts dd {
+  overflow-wrap: anywhere;
+}
+
 .inspector__pairs--wide {
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--hairline);
@@ -405,4 +423,70 @@
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---- The run that produced this map ------------------------------------- *
+ * Every proposal, in order, with the gaps in the numbering that the stops make.
+ * A list of rows, each a place in the working, what happened to it, and the
+ * words — laid out as three columns so the eye can run down the middle one and
+ * see at a glance how often the rules said no. */
+
+.inspector__transcript {
+  display: grid;
+  row-gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inspector__line {
+  display: grid;
+  grid-template-columns: 2rem 4.5rem minmax(0, 1fr);
+  column-gap: var(--space-1);
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+
+.inspector__line + .inspector__line {
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--hairline);
+}
+
+/* The line the panel was opened at, from a press on the refusal strip. A ring
+ * rather than a fill, like every other thing this product marks as selected. */
+.inspector__line[data-open="yes"] {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.inspector__line-at {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.inspector__line-what {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.inspector__line-words {
+  display: grid;
+  row-gap: var(--space-hair);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+/* What the model wrote on a refused line is a quotation; the rule's own sentence
+ * under it is the interface talking. The two are told apart by the face and the
+ * rule down the left, never by a colour. */
+.inspector__line[data-what="refused"] .inspector__line-words {
+  font-style: italic;
+}
+
+.inspector__line-reason {
+  padding-left: var(--space-1);
+  border-left: 2px solid var(--hairline);
+  font-style: normal;
+  color: var(--text-muted);
 }

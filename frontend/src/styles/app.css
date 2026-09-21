@@ -202,21 +202,144 @@ body {
  * this number what it is" is in the third of them. So each keeps a readable
  * height of its own, shrinks no further than that, and scrolls inside itself.
  * Nothing is ever hidden behind anything else. */
+/* **The panel beside the map scrolls as one, and nothing inside it scrolls on
+   its own.**
+
+   It used to be five boxes, each scrolling inside itself and each cut: on a
+   map with a branch open the six buttons held 403 pixels of content in 177, the
+   branch list 307 in 140 and the panel 2 440 in 288, with nothing on screen
+   saying there was more. A reader looking for a button that is there cannot tell
+   it from a button that is not, and a refusal can scroll out of its own strip
+   while that strip is scrolled out of the panel — a thing hidden twice over.
+
+   Scrolling once means there is one place to be, and everything that arrived is
+   somewhere above or below it. The scrollbar is left showing rather than left to
+   appear on a gesture, because *there is more below* is the whole of what a
+   reader needs to know and a bar that is only there while you scroll says it
+   only to somebody who already knew. */
 .dock {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   /* One hairline between one section and the next, drawn by the column showing
      through a one-pixel gap rather than by a border on each section. A section
-     that is scrolling cuts a line of its text in half at its own bottom edge —
-     every scrolling thing does — and without a line there the cut half and the
-     next section's first line read as one word printed over another. */
+     whose text runs past the fold cuts a line in half at the edge — every
+     scrolling thing does — and without a line there the cut half and the next
+     section's first line read as one word printed over another. */
   gap: 1px;
   width: 336px;
   min-width: 0;
-  overflow: hidden;
+  overflow-y: auto;
   border-left: 1px solid var(--hairline);
+
   background: var(--hairline);
+}
+
+/* **A rule at the edge there is more beyond, and no rule when there is not.**
+   A scrollbar cannot say this: on a Mac it is an overlay that fades in on a
+   gesture, so it tells a reader who is already scrolling something they know and
+   tells the reader who is not looking nothing at all.
+
+   So the panel says it. It measures itself — how far it is scrolled and how much
+   it holds — and writes down whether there is more above and more below; these
+   two rules are drawn from what it wrote.
+
+   **The rules are drawn on the frame around the panel, and never inside it.**
+   They used to be sticky pseudo-elements of the scrolling box itself, which put
+   two more children into a flex column with a one-pixel gap: turning one on
+   changed the scroll height of the very box whose scroll height had just been
+   measured. A measurement that changes the thing measured is a loop, and the
+   browser ends a loop by abandoning the rest of that frame's size observations —
+   *"a ResizeObserver loop completed with undelivered notifications"*. The
+   observations it abandoned were the drawing library's, and a tile the library
+   never measured is a tile it draws `visibility: hidden` for ever.
+
+   Drawn on a frame, each rule is positioned against a box that does not scroll,
+   takes no space in anything, and cannot change a single measurement.
+
+   A line rather than a shadow, like every other separation in this product: a
+   shadow is a veto condition. */
+.dock-frame {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.dock-frame::before,
+.dock-frame::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 2;
+  background: var(--text-muted);
+  pointer-events: none;
+}
+
+.dock-frame::before {
+  top: 0;
+}
+
+.dock-frame::after {
+  bottom: 0;
+}
+
+/* Drawn only where it is true. A rule at an edge with nothing beyond it would be
+   the panel claiming something a reader can check in one gesture. */
+.dock-frame:not([data-more-above="yes"])::before,
+.dock-frame:not([data-more-below="yes"])::after {
+  display: none;
+}
+
+/* **The same rule, at the edges of the map.**
+
+   The stage holds more than it shows for the same reason the panel does, and
+   says so the same way: a two-pixel rule in `--text-muted` at whichever edge has
+   more beyond it. A ten-claim map framed to keep its tiles readable leaves two
+   of them off the glass and clips the bottom row, and a map that is cut with
+   nothing saying so is read as a map that ends there — which is the one thing a
+   causal map must never be read as.
+
+   Four edges rather than two, because a map pans both ways, and drawn as the
+   four sides of one box so that a corner reads as a corner. It is not a scroll
+   shadow and never becomes one: a shadow is a veto condition, and a line says
+   the same thing without pretending to be a depth. */
+.canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 0 solid var(--text-muted);
+  pointer-events: none;
+}
+
+.canvas[data-more-above="yes"]::after {
+  border-top-width: 2px;
+}
+
+.canvas[data-more-below="yes"]::after {
+  border-bottom-width: 2px;
+}
+
+.canvas[data-more-left="yes"]::after {
+  border-left-width: 2px;
+}
+
+.canvas[data-more-right="yes"]::after {
+  border-right-width: 2px;
+}
+
+/* Every section in it is as tall as what is in it. One of them scrolling inside
+   the panel would be a box inside a box, and the reader would have to work out
+   which of the two was under the pointer. */
+.page--map .dock > * {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
 }
 
 /* Which branch you are in, in the bar at the top. The hue is on the chip; the

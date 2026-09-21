@@ -23,6 +23,7 @@
 import { toTwoFigures } from "../components/BeliefChip";
 import { asQuoted, toDay } from "../graph/diff/days";
 import type { ClaimView, Known, LinkView, Ranged, WorldView } from "../world";
+import { NOT_ON_THIS_MAP } from "../world/naming";
 
 /** One claim in the outline, with the claims it causes under it. */
 export interface OutlineItem {
@@ -124,7 +125,7 @@ function asSentence(line: string): string {
 
 /** How one arrow into this claim reads. */
 function incomingInWords(wire: LinkView, from: ClaimView | undefined): string {
-  const source = asQuoted(from?.claim ?? wire.source);
+  const source = asQuoted(from?.claim ?? NOT_ON_THIS_MAP);
   const when = daysInWords(wire.lag);
   if (wire.reflexive) {
     return `Fed back into by: ${source}, ${when}`;
@@ -221,7 +222,7 @@ export function claimSentence(
   }
   for (const wire of repeats) {
     parts.push(
-      `It reaches ${asQuoted(byId.get(wire.target)?.claim ?? wire.target)}, already listed above.`,
+      `It reaches ${asQuoted(byId.get(wire.target)?.claim ?? NOT_ON_THIS_MAP)}, already listed above.`,
     );
   }
 

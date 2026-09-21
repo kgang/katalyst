@@ -30,6 +30,7 @@
  */
 
 import { toMovement, toShare, toTwoFigures } from "../../components/BeliefChip";
+import { absence, inTheEnginesWords, noReadingAtAll } from "../../world/absence";
 import type {
   Absence,
   Badge,
@@ -53,14 +54,12 @@ import type { Arrow } from "./reach";
  * The words are the shared vocabulary's; the sentence says which number is
  * missing and who would have to work it out.
  */
-export const NO_ENGINE: Absence = {
-  kind: "no_engine",
-  words: "no engine yet",
-  reason:
-    "Nothing has worked this number through the map yet. Your edit can reach this claim, so " +
+export const NO_ENGINE: Absence = absence(
+  "no_engine",
+  "Nothing has worked this number through the map yet. Your edit can reach this claim, so " +
     "its likelihood would move — and the part of this product that works out where to is not " +
     "connected. The old number would be the base map's, not this branch's.",
-};
+);
 
 /**
  * Where the engine has got to with this branch.
@@ -226,13 +225,11 @@ export function railRows(painted: WorldView, change: DiffView): readonly DeltaRo
     return {
       ...row,
       move: {
-        absence: {
-          kind: "no_engine" as const,
-          words: word.words,
-          reason:
-            `${word.reason} So there is no likelihood here to compare with the one this ` +
+        absence: inTheEnginesWords(
+          word.words,
+          `${word.reason} So there is no likelihood here to compare with the one this ` +
             `ending had before.`,
-        },
+        ),
       },
     };
   });
@@ -252,32 +249,22 @@ export function railRows(painted: WorldView, change: DiffView): readonly DeltaRo
       label: claim.claim,
       kind: claim.kind,
       move: {
-        absence: {
-          kind: "no_engine" as const,
-          words: NO_CHANGE,
-          // The same sentence the tile carries, and then the one thing that is
-          // true of the rail and not of the tile: why a row that did not move is
-          // in a list of rows that did.
-          reason:
-            `${noChangeReason(change.claims.get(claim.id)?.moved)} It is listed so that holding ` +
+        absence: inTheEnginesWords(
+          NO_CHANGE,
+          `${noChangeReason(change.claims.get(claim.id)?.moved)} It is listed so that holding ` +
             `still cannot be mistaken for not being here.`,
-        },
+        ),
       },
       rangeWidth: {
-        absence: {
-          kind: "no_engine" as const,
-          words: "—",
-          reason: "How firm a number is only says something about a number that moved.",
-        },
+        absence: noReadingAtAll(
+          "How firm a number is only says something about a number that moved.",
+        ),
       },
       agreement: {
-        absence: {
-          kind: "no_engine" as const,
-          words: "—",
-          reason:
-            "Whether the versions of the map agreed on a direction only says something about a " +
+        absence: noReadingAtAll(
+          "Whether the versions of the map agreed on a direction only says something about a " +
             "claim that had a direction.",
-        },
+        ),
       },
       noChange: true,
     }));

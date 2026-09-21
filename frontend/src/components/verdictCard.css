@@ -1,0 +1,140 @@
+/*
+ * The Verify door's answer, at the top of the panel beside the map.
+ *
+ * The two answers are drawn the same way on purpose. "No path reaches this" is a
+ * finding, not a failure, so it takes no warning colour, no icon and no red edge
+ * — it is the same card with a different heading and a different body, because
+ * the day it looks like an error is the day a reader stops reading it.
+ */
+
+.verdict-card {
+  flex: 0 0 auto;
+  display: grid;
+  align-content: start;
+  row-gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface-raised);
+}
+
+.verdict-card__heading {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+/* What the reader typed, quoted back so they can see the door they came in by. */
+.verdict-card__target {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.verdict-card__why {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* The route as a line of identifiers, in the number face, so the shape of the
+ * chain is readable before any of its words are. */
+/* The label over the route, drawn exactly as the label over the likelihood two
+ * rows below it is drawn. Two labels doing the same job in two styles — one
+ * lower-case and in the number face, one upper-case and quiet — made the card
+ * read as two cards that happened to be next to each other. */
+.verdict-card__route {
+  margin: 0;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.verdict-card__steps {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: 0;
+  padding: 0 0 0 var(--space-2);
+  list-style: none;
+  border-left: 2px solid var(--hairline);
+}
+
+.verdict-card__step {
+  font-size: var(--text-sm);
+}
+
+/* A step, and the nearest claim, answer to a press: they put the map and the
+ * panel on that claim. Rows of text rather than buttons with fills. */
+.verdict-card__pick {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  column-gap: var(--space-1);
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.verdict-card__step-id {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.verdict-card__step-claim {
+  text-wrap: pretty;
+}
+
+.verdict-card__pick:hover .verdict-card__step-claim {
+  color: var(--accent);
+}
+
+.verdict-card__nearest {
+  display: grid;
+  row-gap: var(--space-hair);
+  margin: 0;
+}
+
+.verdict-card__label {
+  margin: 0;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The multiplied-out likelihood of the route, in the number face and at the
+ * largest size, because it is the answer the door was opened for. */
+.verdict-card__reading {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+.verdict-card__reading[data-reading="no-number"] {
+  font-size: var(--text-md);
+  color: var(--text-muted);
+}
+
+.verdict-card__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+/* The nearest claim, when nothing reached the destination. A plain row, with no
+ * mark of its own: the card's heading and the engine's sentence say what it is. */
+.verdict-card[data-kind="no_path"] .verdict-card__pick {
+  grid-template-columns: minmax(0, 1fr);
+}

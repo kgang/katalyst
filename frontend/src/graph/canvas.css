@@ -15,6 +15,19 @@
   flex: 1 1 auto;
   min-height: 0;
   background: var(--surface);
+
+  /* A strip along the foot of the surface, kept empty so that the drawing
+   * library's own credit has somewhere to sit that is not on top of a tile.
+   * One row of the eight-pixel grid, which is what thirteen-pixel type with a
+   * hairline of padding above and below comes to. */
+  --credit-strip: var(--space-3);
+}
+
+/* The map itself stops short of the strip. The library places its credit at the
+ * bottom right of *this* element, so making it shorter is what moves the credit
+ * clear of the tiles rather than hiding it. */
+.canvas .react-flow {
+  height: calc(100% - var(--credit-strip));
 }
 
 /* The library's own settings, set to ours. */
@@ -184,12 +197,26 @@
   fill: currentColor;
 }
 
-/* The library asks to be named, and it should be. What it may not do is set the
- * type size: ten pixels is below the smallest size anything in this product is
- * allowed to be drawn at. */
+/* The library asks to be named, and it should be.
+ *
+ * Its licence is the permissive one that asks only for the copyright notice to
+ * travel with the software; the library itself asks that this credit be hidden
+ * only by whoever pays for its paid tier. We pay for nothing and we hide
+ * nothing — so the credit stays, and the fix for it landing on top of a tile at
+ * the bottom right of the map is to give it a row of its own. `.canvas` reserves
+ * that row and the map stops short of it; this drops the credit into it.
+ *
+ * Two other things the library may not do: set the type size, because ten pixels
+ * is below the smallest size anything in this product is drawn at, and paint its
+ * own background, because the strip is already the page.
+ */
 .canvas .react-flow__attribution {
+  bottom: calc(-1 * var(--credit-strip));
+  right: 0;
   font-size: var(--text-sm);
-  padding: var(--space-hair) var(--space-1);
+  line-height: var(--credit-strip);
+  padding: 0 var(--space-2);
+  background: none;
 }
 
 .canvas .react-flow__attribution a {
@@ -203,7 +230,8 @@
 .canvas__failure {
   position: absolute;
   left: var(--space-2);
-  bottom: var(--space-2);
+  /* Above the row the drawing library's credit sits in, never across it. */
+  bottom: calc(var(--credit-strip) + var(--space-1));
   right: var(--space-2);
   margin: 0;
   padding: var(--space-1) var(--space-2);

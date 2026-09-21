@@ -39,7 +39,9 @@ import { readConditional, readDiff, readExample, readWorld } from "../api/client
 import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
 import { NO_CHANGE, noChangeReason } from "../graph/diff/noChange";
+import { inTheEnginesWords, noReadingAtAll } from "./absence";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
+import { NOT_ON_THIS_MAP } from "./naming";
 import type { FixtureBundle, WorldSource } from "./source";
 import type {
   Badge,
@@ -231,13 +233,40 @@ function originOf(world: World, bundle: FixtureBundle, branchLabel: string | nul
 }
 
 /**
+ * The four things about a map that a computed world does not carry.
+ *
+ * A world knows its own numbers and the map the edits left behind; it does not
+ * know what that map is called on screen, where it was read from, or the sentence
+ * that says where its numbers came from. Those come from whoever asked — the
+ * stored-example route here, a generation's own stream in `src/stream/growth.ts`
+ * — which is what lets **one** function turn a world into what the canvas draws.
+ * Two such functions would drift inside a week, and then a generated map and a
+ * fetched map would disagree about a number neither of them computed.
+ */
+export interface WorldSummary {
+  /** What this map is asked for by, such as `hormuz`, or a generation's own name. */
+  readonly id: string;
+  /** What the map is called on screen. */
+  readonly title: string;
+  /** The day the map is set on, as the map writes a day: `2026-10-01`. */
+  readonly day: string;
+  /** One sentence under the map saying where every number on it came from. */
+  readonly origin: string;
+}
+
+/**
  * Turn one computed world into the world the canvas draws.
  *
+ * **This is the only function that does it.** Both callers — the stored-example
+ * source below and the reducer that folds a generation's stream — hand their
+ * world through here, so a map that was fetched and a map that was watched being
+ * built cannot say different things about the same claim.
+ *
  * @param world The world as the engine built it.
- * @param bundle The stored example, for the map's title and its address.
+ * @param from What this map is called and where it came from.
  * @param branch The branch that was folded, or nothing on the base world.
  */
-function toWorldView(world: World, bundle: FixtureBundle, branch?: BranchView): WorldView {
+export function toWorldView(world: World, from: WorldSummary, branch?: BranchView): WorldView {
   // The map the engine's edits left behind, which is the map to draw: a branch
   // that added a claim added it here too.
   const claims = world.graph.propositions.map(toClaim);
@@ -249,9 +278,9 @@ function toWorldView(world: World, bundle: FixtureBundle, branch?: BranchView): 
   const standing = standingFromTheWorld(world, claims, badges);
 
   return {
-    baseId: bundle.id,
-    title: bundle.title,
-    today: bundle.fixture_date,
+    baseId: from.id,
+    title: from.title,
+    today: from.day,
     hypothesisId: world.graph.hypothesis_id,
     claims: claims.map((claim): ClaimView => {
       const computed = world.beliefs[claim.id];
@@ -277,7 +306,7 @@ function toWorldView(world: World, bundle: FixtureBundle, branch?: BranchView): 
     worldsPerVersion: world.worlds,
     seed: world.seed,
     warnings: world.warnings,
-    origin: originOf(world, bundle, branch?.label ?? null),
+    origin: from.origin,
   };
 }
 
@@ -307,13 +336,10 @@ function movement(row: ClaimDiff): Movement | undefined {
     sameDirection:
       agreement === null
         ? {
-            absence: {
-              kind: "no_engine",
-              words: "—",
-              reason:
-                "Only one of the two worlds holds this claim, so there is no direction for the " +
+            absence: noReadingAtAll(
+              "Only one of the two worlds holds this claim, so there is no direction for the " +
                 "versions of the map to have agreed or disagreed about.",
-            },
+            ),
           }
         : { reading: agreement },
     // A claim with no causes of its own can move under **This happened** without
@@ -344,7 +370,7 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
     const claim = byId.get(row.target);
     return {
       claimId: row.target,
-      label: claim?.claim ?? row.target,
+      label: claim?.claim ?? NOT_ON_THIS_MAP,
       kind: claim?.kind ?? "market",
       move: {
         reading: {
@@ -377,33 +403,22 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
       label: claim.claim,
       kind: claim.kind,
       move: {
-        absence: {
-          kind: "no_engine" as const,
-          words: NO_CHANGE,
-          // One sentence for *why the engine says it did not move*, written in
-          // one place and read here, and then the one thing that is true of the
-          // rail alone: why a row that held still is in a list of rows that did
-          // not.
-          reason:
-            `${noChangeReason(changed.get(claim.id)?.moved)} It is listed so that holding still ` +
+        absence: inTheEnginesWords(
+          NO_CHANGE,
+          `${noChangeReason(changed.get(claim.id)?.moved)} It is listed so that holding still ` +
             `cannot be mistaken for not being here.`,
-        },
+        ),
       },
       rangeWidth: {
-        absence: {
-          kind: "no_engine" as const,
-          words: "—",
-          reason: "How firm a number is only says something about a number that moved.",
-        },
+        absence: noReadingAtAll(
+          "How firm a number is only says something about a number that moved.",
+        ),
       },
       agreement: {
-        absence: {
-          kind: "no_engine" as const,
-          words: "—",
-          reason:
-            "Whether the versions of the map agreed on a direction only says something about a " +
+        absence: noReadingAtAll(
+          "Whether the versions of the map agreed on a direction only says something about a " +
             "claim that had a direction.",
-        },
+        ),
       },
       noChange: true,
     }));
@@ -481,7 +496,16 @@ export class ApiWorldSource implements WorldSource {
       branch === undefined ? null : sendable(branch),
       seedFor(bundle),
     );
-    const view = toWorldView(world, bundle, branch);
+    const view = toWorldView(
+      world,
+      {
+        id: bundle.id,
+        title: bundle.title,
+        day: bundle.fixture_date,
+        origin: originOf(world, bundle, branch?.label ?? null),
+      },
+      branch,
+    );
     return branch === undefined ? view : { ...view, branch };
   }
 
