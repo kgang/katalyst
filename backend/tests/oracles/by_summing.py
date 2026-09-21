@@ -131,7 +131,7 @@ def by_summing(tables: Tables, pinned: Mapping[str, Pin] | None = None) -> dict[
             # *Suppose this is true*: the claim's own table goes, and with it every
             # arrow into the claim, because those arrows are what the table is
             # written over. A certainty on the supposed value takes its place.
-            joint = joint * _spread(_certainly(pin.value), lead, (axis_of[name],), len(names))
+            joint = joint * _spread(_certainly(pin.value, lead), lead, (axis_of[name],), len(names))
             continue
         joint = joint * _spread(
             _checked(name, tables),
@@ -144,7 +144,7 @@ def by_summing(tables: Tables, pinned: Mapping[str, Pin] | None = None) -> dict[
         if pin.kind != "observe":
             continue
         # *This happened*: keep only the worlds that agree with the news.
-        joint = joint * _spread(_certainly(pin.value), lead, (axis_of[name],), len(names))
+        joint = joint * _spread(_certainly(pin.value, lead), lead, (axis_of[name],), len(names))
 
     every = tuple(range(first, first + len(names)))
     total = joint.sum(axis=every)
@@ -161,10 +161,15 @@ def by_summing(tables: Tables, pinned: Mapping[str, Pin] | None = None) -> dict[
     return answers
 
 
-def _certainly(value: bool) -> np.ndarray:
-    """A one-claim table holding it to a value: all the weight on one of the two."""
-    row = np.zeros(2, dtype=np.float64)
-    row[int(value)] = 1.0
+def _certainly(value: bool, lead: tuple[int, ...]) -> np.ndarray:
+    """A one-claim table holding it to a value: all the weight on one of the two.
+
+    It is built carrying whatever version axis the tables carry, because a pinned
+    claim is pinned in every version — the same lever, the same news — and every
+    other table laid over the joint has that axis in front of it.
+    """
+    row = np.zeros((*lead, 2), dtype=np.float64)
+    row[..., int(value)] = 1.0
     return row
 
 

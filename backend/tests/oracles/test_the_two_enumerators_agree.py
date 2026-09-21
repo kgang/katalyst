@@ -213,6 +213,39 @@ def test_the_version_axis_is_one_pass_and_not_many() -> None:
                 assert together[claim][which] == alone[claim], (name, which, claim)
 
 
+def test_a_version_axis_answers_both_verbs_too() -> None:
+    """Supposing and reporting hold in every version at once, and version by version.
+
+    The test above stacks versions with nothing edited, and the tests that edit
+    something use a single version, so between them neither ever put a pin and a
+    version axis in the same call. That gap hid a real fault: a pinned claim's
+    certainty was built without the version axis the rest of the joint carries, and
+    the oracle could not answer at all. A claim is pinned in **every** version — it
+    is the same lever and the same news whatever numbers were drawn — so a stack of
+    versions has to give, bit for bit, what each version alone gives.
+    """
+    rng = np.random.default_rng(20260923)
+    for name, graph in generated.adversarial_events()[:4]:
+        versions = [_redrawn(graph, rng) for _which in range(3)]
+        stacked = _as_yes_no_tables(graph, versions)
+        for claim in stacked.order:
+            for kind in ("do", "observe"):
+                for value in (True, False):
+                    pinned = {claim: Pin(value, kind)}
+                    together = by_summing(stacked, pinned)
+                    for which, one in enumerate(versions):
+                        alone = by_summing(_as_yes_no_tables(one), pinned)
+                        for other in alone:
+                            assert together[other][which] == alone[other], (
+                                name,
+                                claim,
+                                kind,
+                                value,
+                                which,
+                                other,
+                            )
+
+
 def _redrawn(graph: integrating.Map, rng: np.random.Generator) -> integrating.Map:
     """One version of a map: every stated chance redrawn, nothing else touched.
 
