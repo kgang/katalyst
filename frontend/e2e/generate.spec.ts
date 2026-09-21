@@ -57,6 +57,14 @@ async function whatCanBeReplayed(page: Page): Promise<{ example: string }[]> {
 interface WhatItSaw {
   /** True when, at some moment, a rectangle stood and not one claim had arrived. */
   readonly rectangleBeforeAnyClaim: boolean;
+  /**
+   * The words on the first rectangle, read at a moment when no claim had
+   * arrived — so it is the one held open for the reader's own sentence and not
+   * one of the frontier's, which carry *one step on from "…"*.
+   *
+   * Empty when no such moment was seen.
+   */
+  readonly firstRectangleSaid: string;
   /** The most rectangles that stood at once. */
   readonly mostRectangles: number;
   /**
@@ -115,6 +123,7 @@ async function startWatching(page: Page): Promise<void> {
   await page.evaluate(() => {
     const record = {
       rectangleBeforeAnyClaim: false,
+      firstRectangleSaid: "",
       mostRectangles: 0,
       claimsWentOn: [] as number[],
       whenTheNumbersCame: { claims: 0, numbers: 0 },
@@ -131,6 +140,13 @@ async function startWatching(page: Page): Promise<void> {
 
       if (held > 0 && claims === 0) {
         record.rectangleBeforeAnyClaim = true;
+        // **Read here, and never again from the live page.** What the first
+        // rectangle says is true of one moment: the moment after it is drawn
+        // and before the first claim replaces it with the frontier's. Reading
+        // it in a second round trip asks a screen that has moved on — and on a
+        // cold machine the whole run can finish in between, so the rectangle is
+        // not merely different, it is gone.
+        record.firstRectangleSaid = document.querySelector(".skeleton-tile")?.textContent ?? "";
       }
       record.mostRectangles = Math.max(record.mostRectangles, held);
       if (record.claimsWentOn[record.claimsWentOn.length - 1] !== claims) {
@@ -252,10 +268,12 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   await expect(card).toBeFocused();
   await page.keyboard.press("Enter");
 
-  // **The first paint is a reserved rectangle, not a spinner**, and it carries
-  // the reader's own sentence.
+  // **The first paint is a reserved rectangle, not a spinner.** That it appeared
+  // at all is asked of the live page; **what it said is read off the record the
+  // page kept of itself**, at the bottom of this test, because the words on the
+  // first rectangle are true of exactly one moment — after it is drawn and
+  // before the first claim replaces it with the frontier's.
   await expect(page.locator(".skeleton-tile").first()).toBeVisible();
-  await expect(page.locator(".skeleton-tile").first()).toContainText(THE_SENTENCE);
 
   // The badge says this session is a replay, from the first frame, before the
   // receipt that also says so has arrived — and it is beside the map's name
@@ -408,8 +426,11 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // kept of itself.
   const saw = await whatItSaw(page);
   // A rectangle stood before any claim had arrived: the first paint is the shape
-  // of the thing being waited for, not a spinner.
+  // of the thing being waited for, not a spinner — and it carried the reader's
+  // own sentence, which is what makes it the shape of *this* wait rather than of
+  // waiting in general.
   expect(saw.rectangleBeforeAnyClaim).toBe(true);
+  expect(saw.firstRectangleSaid).toContain(THE_SENTENCE);
   // Rectangles stood at the growing edge all the way through.
   expect(saw.mostRectangles).toBeGreaterThan(0);
   // **The claims arrived one at a time.** The count went 0, 1, 2, … and reached
