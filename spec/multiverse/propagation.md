@@ -109,7 +109,7 @@ Worked on the Strait of Hormuz map. Its claims and their stated chances are the 
 | **N1** | *Omani-mediated United States-Iran talks resume publicly.* — real, and no venue prices it | event |
 | **S** | *A confirmed military strike on Iranian territory.* — on the branch only | event |
 
-<!-- VERIFY AT FLIP: the state claim O's identifier, its exact wording, its deadline and its arrows, all of which the fixture gains in the flip. Every line name below of the form `O · … ` depends on it. -->
+<!-- VERIFY AT FLIP: the state claim O's identifier, its exact wording, its deadline and its arrows, all of which the fixture gains in the flip; and H's own wording, which the flip rewrites to the venue's own test (Kent, R30). Every line name below of the form `O · … ` depends on the first. -->
 
 Every number fed into that map is **illustrative**, exactly as the fixture says of its own, and the flip may tune it to make the example richer — each tuned value carrying a comment saying what it was, what it is and why. So the tests that guard this example assert **directions and orderings**, never values.
 
@@ -308,6 +308,8 @@ The first two keep the jobs they had. The third has changed jobs rather than gon
 * **R is identical to the byte** between the two worlds, because the only arrow into it is a feedback arrow, which the engine sets aside. That is the feedback rule doing its work rather than a coincidence.
 * **N1 goes up** on the branch that makes everything else worse. `H → N1` is a `trigger`: the reopening was supposed true, the arrow fired, and a `trigger` keeps pushing whatever its cause does afterwards. What already rose stays risen.
 * **N1's range is the widest on the map**, because the only arrow into it is the fixture's one `asserted` arrow — the spread saying, in the one place on this map where it is entitled to, *we cannot vouch for this arrow*.
+
+<!-- VERIFY AT FLIP: all three bullets are orderings rather than values, but all three are engine results on a fixture the flip rebuilds — that R stays byte-identical, that N1 still rises on the strike branch, and that N1's range is still the widest. Read them off the regenerated numbers file before this lands. -->
 
 ### What it costs, and the target it is read against
 
