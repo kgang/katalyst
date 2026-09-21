@@ -211,3 +211,30 @@ I ran the app for real — uvicorn + Vite from the `feat-04a-growth` worktree in
 **Fairness:** the claim and link Inspectors are the best audit UI I've seen in a tool of this kind, and `Known&lt;T&gt;`/`Absence`, the `WorldSource` port and the AST-walking architectural tests are genuinely excellent. The problem is allocation — 99k words of spec, ~6 per line of shipping TypeScript, almost all about the map, while the thesis, position, payoff and inverse query (three brief clauses) don't exist.</result>
 <usage><subagent_tokens>194188</subagent_tokens><tool_uses>50</tool_uses><duration_ms>782237</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a8bd90e018e0e713e</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/e67b8794-4b80-4089-b123-fa56cf9e1b66/tasks/a8bd90e018e0e713e.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit probability engine rigor" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Audit written to `/Users/kentgang/git3/katalyst/plans/review2/audit-D-probability-engine.md` (`plans/` is gitignored; no git mutations, no network, read-only elsewhere). Scripts: `…/scratchpad/audit_d.py`, `audit_d2.py`, `mini_engine.py`.
+
+**Summary**
+
+In standard terms this is a discrete-time, log-odds-additive causal Bayesian network over binary propositions, solved by ancestral Monte Carlo with Rao-Blackwellised estimates inside a second-order (2 000 × 8) parameter loop with a law-of-total-variance correction. I built an independent exact enumerator for the shipped Hormuz map and **the forward engine passes**: point estimates match to ≤5×10⁻⁴, bands to ~10⁻². `do()` is real graph surgery and matches exact do-calculus to 1.5×10⁻³. That deserves credit — most tools of this shape get this wrong.
+
+Three things do not hold.
+
+**Critical: `observe` performs no Bayesian update upstream.** Averaging the Rao-Blackwellised `p_i(pa_i)` over surviving worlds is only valid when the evidence has no descendant of *i*; for ancestors it returns the prior. Measured: `observe(B=true)` leaves A at 0.3500 where exact Bayes gives 0.5025; on Hormuz `observe(C=true)` moves H by +0.009 against an exact +0.144, and 512 inner worlds converge to the same wrong answer. The product's second verb is, measurably, near-inert.
+
+**High: rejection sampling starves silently** (209/2000 versions empty on `Observe(B)`, reproducing STATUS.md exactly) and no warning fires, because the threshold keys off pooled survival. **High: the band is biased** — the noise correction divides by `worlds` not survivors, and the clamp-then-sqrt shrink reports 0.024–0.157 of band width where every prior is a point, so INV-12 holds only for shallow maps.
+
+Also: the time model never compounds (grid-invariant because nothing is integrated), so the headline is an instantaneous probability read on a deadline, and the fixture was tuned around it; `prior` is a leak term displayed as a marginal (B .28 → .40); no test compares the engine to an exact answer.
+
+A 79-line exact engine reproduces everything, in 17 ms vs 60 ms, and gets `observe` right.</result>
+<usage><subagent_tokens>226976</subagent_tokens><tool_uses>40</tool_uses><duration_ms>1007924</duration_ms></usage>
+</task-notification>
