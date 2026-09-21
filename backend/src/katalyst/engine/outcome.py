@@ -301,17 +301,17 @@ class Caps(BaseModel):
     )
     at_once: int = Field(default=3, description="How many lines are expanded at the same time.")
     searches: int = Field(
-        default=150,
+        default=750,
         description=(
-            "How many web searches the whole run may make. Counting a reference "
-            "class means finding the cases, so one search a claim was nowhere near "
-            "enough — the first measured run (2026-09-17) came back with eight "
-            "counts and no sources at all. At the price a search is billed at, 150 "
-            "is about a tenth of what a run may spend, which leaves the rest for "
-            "the tokens; over the dozen or so calls a map takes it is roughly ten "
-            "a call, while the per-call ceiling lets an early claim research hard "
-            "and a later one coast. Reaching it turns searching off; it never ends "
-            "the run. The first run under it resets this number."
+            "How many web searches the whole run may make: the claims cap times "
+            "one call's research budget, which is the floor `proposals.md` sets "
+            "and the number this picks. It is deliberately loose. Set lower it "
+            "would bind before the research caps do and starve the base rates it "
+            "exists to pay for — which is what 150 did, turning searching off at "
+            "125 of them for a reason nobody chose. **The spending cap is what "
+            "protects the bill**, and it is checked between the rounds inside a "
+            "call as well as between calls. Reaching this one turns searching "
+            "off; it never ends the run."
         ),
     )
     dollars: float = Field(
