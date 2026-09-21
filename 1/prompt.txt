@@ -402,3 +402,57 @@ Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
 **Item 5:** 0019's words name the base world's likelihood, but the same paragraph's no-drift guarantee is true only of the sample's arrival share (measured drift +0.16 pts otherwise). Today the code takes `q` on trust and does neither. Take the builder's recommendation, amend 0019 in the same PR, split `MarketChanceFrom`'s `model`, and close must-fix 3 first.</result>
 <usage><subagent_tokens>240758</subagent_tokens><tool_uses>54</tool_uses><duration_ms>1184094</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a5ce355daa417b56b</task-id>
+<tool-use-id>toolu_012QNPwKvL88pmo6P6cmbytS</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a5ce355daa417b56b.output</output-file>
+<status>completed</status>
+<summary>Agent "E1: oracles and defect tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Final verification: lint, format, mypy, the owned tests, and the whole suite through the queue — all green.
+
+**Run, in order, from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`:** `uv run ruff check tests/oracles &amp;&amp; uv run ruff format --check tests/oracles` · `env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest tests/oracles tests/unit/domain/test_the_engine_is_right.py -q --no-cov` · the same with `--runxfail --tb=line` to see the three defects fail on their assertions · `uv run mypy src`. Long version: `plans/analysis/2026-09-22-E1-report.md`.
+
+**What I built.** `tests/oracles/by_summing.py` — the whole joint multiplied out over somebody else's yes/no tables and added up; both verbs; an optional version axis; blind to a wrong table and saying so. `by_integrating.py` — forbidden every table the core builds, enumerating the joint of event times from the arrow parameters alone, events and states, 24 slices, arrival at the middle of its slice, both conditions in one docstring sentence. Lifted from the spike's `st2_core.exact_over_times`; the two branches Kent has since decided (R26, record 0017) are dropped rather than carried, so the bisection goes too. `maps.py` — the three seeded recipes on the spike's own seeds (140 event maps, 82 skeletons both ways, 150 hard), holding an impulse, a diamond and states; a plain generator, no `assume()`. `test_the_two_enumerators_agree.py` — nine tests, 7.3 s.
+
+**Measured.** The committed maps are the spike's maps field for field. `by_integrating` against the scratch judge: **worst gap `0.000e+00`** over 264 questions on 16 maps. The two enumerators agree to `1e-12` at one slice, where an event map's factors *are* yes/no tables. A `prepare()` step cut the oracle from 59 s to 5.9 s and moved no number.
+
+**The three defect tests fail today on their own assertions**, not exceptions: `.30000001` before and after observing; the ending unmoved at `.44634187` while the middle moves; day-states reading `['pushed']`. Suite: **653 passed, 4 xfailed** (mine; no other xfail exists).
+
+**Deviations.** The scratch judge is compared through a committed, script-written JSON rather than a git-ignored path import — otherwise the test is green here and red everywhere else. The enumerator agreement is at one slice; states are excluded there and the docstring says why.
+
+**`test_a_claim_cut_off_from_the_evidence_is_bit_for_bit` needs no mark — today's engine already passes it byte-identically.**
+
+**Owed outside my files:** E2 needs a `Graph → by_integrating.Map` adapter (the oracles import no `katalyst` on purpose); it needs `rates.stated_chance_with`. `test_the_elimination_is_exact` must run on ≤12 claims. Stack plan §4 still cites `redteam/attack2.py`; M12's wording is what I built to.
+
+**Files touched:** `tests/oracles/**` (new, 1 634 lines + 36K JSON), `test_the_engine_is_right.py` (new, 310), `test_propagation.py` +51, `test_patches.py` +47.
+
+**Commit message:**
+
+```
+test(oracles): two enumerators that judge the engine, and its three defects written down
+
+Record 0016 asks for two oracles because they see different things. `by_summing`
+adds the whole joint up over the engine's own yes/no tables, proves the
+elimination and both verbs, and is blind to a wrong table. `by_integrating` is
+forbidden every table the engine builds: from the arrow parameters alone it
+enumerates the full joint of event times, events and states, at the engine's own
+24 slices with an arrival taken at the middle of its slice. It reproduces the
+spike's own judge to 0.000e+00 on 264 questions over sixteen seeded adversarial
+maps carrying an impulse, a diamond and states.
+
+The three defects are three xfail(strict) tests against today's public
+`propagate`, each naming its record row and each failing on its own assertion.
+The observation test record 0016 reverses gains its reversal beside it, also
+xfail(strict); the flip deletes the first and unmarks the second. The locality
+oracle is restated for evidence alone, bit for bit — and today's engine passes it.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+```
+
+(The attribution line above follows this session's reminder; `04-common.md` names a different one — your call.)</result>
+<usage><subagent_tokens>285138</subagent_tokens><tool_uses>111</tool_uses><duration_ms>2105907</duration_ms></usage>
+</task-notification>
