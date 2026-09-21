@@ -35,7 +35,6 @@ What this file must never do
 """
 
 import asyncio
-import logging
 import time
 from collections.abc import AsyncIterator, Generator
 from datetime import UTC, date, datetime
@@ -59,19 +58,17 @@ from katalyst.engine.events import (
     ProposalAccepted,
     ProposalRejected,
     Receipt,
-    growth_event,
 )
 from katalyst.engine.expand import add_a_claim
-from katalyst.engine.grow import Finished, grow
+from katalyst.engine.following import WENT_WRONG, Following, receipt_event
+from katalyst.engine.grow import grow
 from katalyst.engine.ids import BIGGEST_SEED, mint_id, mint_seed
 from katalyst.engine.outcome import Caps
-from katalyst.engine.prompt import prompt_hash
+from katalyst.engine.receipt import nothing_spent_yet
 from katalyst.engine.transcript import (
     Transcript,
     TranscriptLine,
     held,
-    line_for,
-    makes_an_event,
 )
 from katalyst.engine.verify import Verdict, verdict
 from katalyst.settings import Settings, get_settings
@@ -356,17 +353,6 @@ async def _pause(replaying: bool) -> None:
         await asyncio.sleep(waiting)
 
 
-WENT_WRONG = (
-    "This run stopped before it finished, and not for a reason anybody chose. "
-    "Nothing was lost that had already been drawn; try it again."
-)
-"""What a person is told when a bug of ours ends a generation.
-
-One plain sentence. The exception's name, its message and its stack go to the
-server's own log, where somebody can act on them, and nowhere near the screen.
-"""
-
-
 def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None, None]:
     """Run a generation against a model, writing the transcript as it goes."""
     generation_id = mint_id()
@@ -385,48 +371,29 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         generation_id=generation_id, seed=seed, hypothesis=asked.hypothesis, target=asked.target
     )
 
-    started = time.monotonic()
-    at = 0
+    watching = Following(working)
     walking = grow(
         asked.hypothesis,
         target=asked.target,
         answerer=answerer,
         on=today,
         caps=Caps(),
+        never_seen=watching.never_seen,
     )
-    finished: Finished | None = None
-    broke: str | None = None
     try:
-        for step in walking:
-            if isinstance(step, Finished):
-                finished = step
-                break
-            working = working.plus(line_for(step, at if makes_an_event(step) else None))
-            held.remember(working, None)
-            if not makes_an_event(step):
-                continue
-            yield growth_event(step, at)
-            at += 1
-    except Exception:
-        # Everything the model can do to a run is already an outcome by the time
-        # it reaches here, so this is for a bug of our own. A bug is not a reason
-        # to hang up on somebody mid-map: the stream ends where it is, with a
-        # plain sentence and whatever the run had spent (Kent, 2026-09-20).
-        logging.getLogger(__name__).exception("a generation stopped where it should not have")
-        broke = WENT_WRONG
+        for event in watching.follow(walking):
+            held.remember(watching.working, None)
+            yield event
     finally:
+        # The reader may have gone away. Whatever this run paid for is on the
+        # working before it is let go of, which is what makes "a run that broke
+        # after ten calls still cost ten calls" true of every ending there is.
         walking.close()
+        held.remember(watching.ended(), None)
 
+    finished, broke = watching.finished, watching.broke
     if finished is None or finished.graph is None:
-        working = working.model_copy(
-            update={
-                "receipt": None if finished is None else finished.receipt,
-                "reason": None if finished is None else finished.reason,
-                "why": None if finished is None else finished.why,
-            }
-        )
-        held.remember(working, None)
-        yield _receipt_for(finished, "live", time.monotonic() - started)
+        yield watching.receipt()
         if broke is None and finished is not None and finished.reason == "spend_cap":
             # **Stopping because the money ran out is a decision, not a fault**,
             # whether it runs out on call forty or call one — `events.py` says so
@@ -451,21 +418,18 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         yield Failed(message=broke or (finished.why if finished is not None else WENT_WRONG))
         return
 
-    working = working.model_copy(
-        update={"receipt": finished.receipt, "reason": finished.reason, "why": finished.why}
-    )
-    held.remember(working, finished.graph)
+    held.remember(watching.working, finished.graph)
     world = engine.build_world(
         finished.graph.id, None, seed, versions=asked.versions, worlds=asked.worlds
     )
     if world is None or isinstance(world, list):  # pragma: no cover - our own map, just built
-        yield _receipt_for(finished, "live", time.monotonic() - started)
+        yield watching.receipt()
         yield Failed(message="The map was built but its likelihoods could not be worked through.")
         return
     yield BeliefsPropagated(world=world)
     if finished.destination is not None:
         yield verdict(finished.graph, finished.destination, beliefs=world.beliefs)
-    yield _receipt_for(finished, "live", time.monotonic() - started)
+    yield watching.receipt()
     yield Done(
         reason=finished.reason,
         claims=finished.claims,
@@ -476,8 +440,14 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
 
 def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
     """Play a committed recording back, matched on the person's own sentence."""
+    started = time.monotonic()
     recording = replay.find(asked.hypothesis)
     if recording is None:
+        # A receipt comes before every ending, this one included: the grammar
+        # puts it second to last in **both** endings, and a receipt of zeroes is
+        # the truth here. A stream with no receipt at all says nothing, and a
+        # reader cannot tell it from one that forgot (2026-09-20).
+        yield _nothing_spent(time.monotonic() - started)
         yield Failed(
             message=(
                 "This copy of Katalyst has no model key and no recording of that "
@@ -487,7 +457,6 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
         )
         return
 
-    started = time.monotonic()
     # Filed under the identifier the stream *announces*, not the map's. They are
     # two different things, and keying it by the map meant every replayed run's
     # transcript answered 404 to the identifier the browser had just been handed.
@@ -546,27 +515,9 @@ def _line_from(event: ProposalAccepted | ProposalRejected, at: int) -> Transcrip
     )
 
 
-def _receipt_for(finished: Finished | None, mode: str, seconds: float) -> Receipt:
-    """Build the receipt event from what the run spent.
-
-    A run that broke before its first call still emits one, of zeroes, which is
-    also true: the promise that every generation records what it cost has no
-    exception for runs that went wrong.
-    """
-    spent = None if finished is None else finished.receipt
-    return Receipt(
-        model="" if spent is None else spent.model,
-        calls=0 if spent is None else spent.calls,
-        input_tokens=0 if spent is None else spent.input_tokens,
-        output_tokens=0 if spent is None else spent.output_tokens,
-        cache_read_tokens=0 if spent is None else spent.cache_read_tokens,
-        searches=0 if spent is None else spent.searches,
-        dollars=0.0 if spent is None else spent.dollars,
-        seconds=seconds,
-        mode="live" if mode == "live" else "replay",
-        recording_date=None,
-        prompt_hash=prompt_hash(),
-    )
+def _nothing_spent(seconds: float) -> Receipt:
+    """The receipt of a replay that had nothing to play: zeroes, and honestly so."""
+    return receipt_event(nothing_spent_yet(), seconds=seconds, mode="replay")
 
 
 def _scripted_insert(claim_in_words: str) -> Insert | None:

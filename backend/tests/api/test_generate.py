@@ -184,8 +184,10 @@ def test_a_sentence_with_no_recording_says_so_rather_than_guessing() -> None:
     """Playing one map back at somebody who asked about something else is worse than no."""
     read = stream(hypothesis="Photonic chips get adopted faster than expected.")
 
-    assert [name for name, _ in read] == ["failed"]
-    assert "no recording of that sentence" in read[0][1]["message"]
+    # The receipt comes before it, as it does before every ending: grammar rule 2
+    # puts it second to last in both, and zero is the honest answer here.
+    assert [name for name, _ in read] == ["receipt", "failed"]
+    assert "no recording of that sentence" in read[-1][1]["message"]
 
 
 def test_the_receipt_says_the_run_was_a_replay_and_cost_nothing() -> None:
@@ -577,3 +579,94 @@ def test_a_run_that_empties_the_purse_before_it_has_a_map_still_says_done(
     assert "failed" not in names
     assert read[-1][1]["reason"] == "spend_cap"
     assert read[-1][1]["claims"] == 0
+
+
+# --- Nothing a run paid for is lost, whatever ends it ----------------------
+
+
+class AnswersThenBreaks:
+    """A stand-in that answers a few questions for real money and then fails.
+
+    What a bug of ours looks like from the far side of the seam: everything up
+    to the break was asked, answered and billed.
+    """
+
+    def __init__(self, *, after: int) -> None:
+        """Set out how many questions to answer before failing."""
+        self._story = a_story()
+        self._after = after
+        self.calls = 0
+
+    def watching(self, spent: object, cap: float) -> None:
+        """Take note of nothing."""
+
+    def starting_claim(self, question: str, *, may_search: bool = True) -> Any:
+        """Answer, or break."""
+        return self._maybe(lambda: self._story.starting_claim(question, may_search=may_search))
+
+    def proposal(self, question: str, *, may_search: bool) -> Any:
+        """Answer, or break."""
+        return self._maybe(lambda: self._story.proposal(question, may_search=may_search))
+
+    def _maybe(self, answering: Any) -> Any:
+        """Count the call, break on the one after the last it may answer."""
+        self.calls += 1
+        if self.calls > self._after:
+            raise RuntimeError("a bug nobody wrote a sentence for")
+        return answering()
+
+
+def test_a_run_that_breaks_still_says_what_it_spent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`streaming.md` rule 2: a run that broke after ten calls still cost ten calls.
+
+    The receipt came out of a run that had made four billed calls reading
+    `calls: 0, dollars: 0.0, model: ""`, because the only receipt anybody had was
+    the one the walk hands back at the end — and a walk that breaks hands nothing
+    back. The running total has to leave the walk as it goes (2026-09-20).
+    """
+    answerer = AnswersThenBreaks(after=4)
+    monkeypatch.setattr(generate, "live_answerer", lambda: answerer)
+
+    read = stream(hypothesis="A sentence with no recording behind it.")
+
+    names = [name for name, _ in read]
+    assert names[-1] == "failed"
+    paid = next(payload for name, payload in read if name == "receipt")
+    assert paid["calls"] == 4
+    assert paid["dollars"] > 0
+    assert paid["model"]
+
+
+def test_a_run_that_breaks_leaves_its_working_behind_too(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The transcript is a product artifact and it is read after the fact."""
+    answerer = AnswersThenBreaks(after=4)
+    monkeypatch.setattr(generate, "live_answerer", lambda: answerer)
+
+    read = stream(hypothesis="A sentence with no recording behind it.")
+    announced = next(
+        payload["generation_id"] for name, payload in read if name == "generation_started"
+    )
+
+    working = client().get(f"/api/generate/{announced}/transcript").json()
+
+    assert working["receipt"] is not None
+    assert working["receipt"]["calls"] == 4
+    assert working["lines"]
+
+
+def test_a_replay_with_nothing_to_play_still_says_what_it_spent() -> None:
+    """Grammar rule 2 and INV-generation.16: `receipt` is second-to-last in both endings.
+
+    Nothing was spent, and a receipt of zeroes says exactly that. A stream that
+    simply has no receipt says nothing at all, and a reader cannot tell it from
+    one that forgot.
+    """
+    read = stream(hypothesis="A sentence nothing was ever recorded for.")
+
+    names = [name for name, _ in read]
+    assert names[-1] == "failed"
+    assert names[-2] == "receipt"
+    assert read[-2][1]["calls"] == 0
+    assert read[-2][1]["dollars"] == 0.0

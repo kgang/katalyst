@@ -54,9 +54,9 @@ from katalyst.engine.events import (
     ProposalAccepted,
     ProposalRejected,
     Receipt,
-    growth_event,
 )
 from katalyst.engine.expand import add_a_claim
+from katalyst.engine.following import Following, receipt_event
 from katalyst.engine.grow import Finished, grow
 from katalyst.engine.ids import mint_id, mint_seed
 from katalyst.engine.outcome import Caps, Outcome
@@ -65,7 +65,7 @@ from katalyst.engine.receipt import Receipt as RunningTotal
 from katalyst.engine.receipt import fold, nothing_spent_yet
 from katalyst.engine.replay import faults_in, where_they_live
 from katalyst.engine.replay import read as read_recording
-from katalyst.engine.transcript import Transcript, line_for, makes_an_event
+from katalyst.engine.transcript import Transcript, TranscriptLine
 from katalyst.engine.verify import verdict
 from katalyst.settings import get_settings
 
@@ -268,36 +268,32 @@ def run_one(
         GenerationStarted(generation_id=working.generation_id, seed=its_seed, hypothesis=hypothesis)
     ]
 
-    at = 0
-    broke: str | None = None
-    finished: Finished | None = None
-    walking = grow(hypothesis, answerer=answerer, on=today, caps=Caps(dollars=ceiling))
+    # The same follower the route uses. One loop, one running receipt, one
+    # answer to "what did this cost" (2026-09-20).
+    watching = Following(working)
+    walking = grow(
+        hypothesis,
+        answerer=answerer,
+        on=today,
+        caps=Caps(dollars=ceiling),
+        never_seen=watching.never_seen,
+    )
     try:
-        for step in walking:
-            if isinstance(step, Finished):
-                finished = step
-                break
-            so_far = fold(so_far, step)
-            working = working.plus(line_for(step, at if makes_an_event(step) else None))
-            if not makes_an_event(step):
-                telling("     ·      the model had nothing more to say about that line")
-                continue
-            grown = growth_event(step, at)
-            written.append(grown)
-            telling(_progress(grown, step))
-            at += 1
-            if at % DOLLARS_EVERY == 0:
-                telling(_so_far(so_far, working, time.monotonic() - started))
-    except Exception as went_wrong:
-        # A paid run is never discarded, and a crash is no exception. What was
-        # spent is on disk a few lines below, whatever happened here; the whole
-        # traceback goes to the terminal, where somebody can act on it, and one
-        # plain sentence goes in the file (Kent, 2026-09-20).
-        broke = _in_one_plain_sentence(went_wrong)
-        telling("  the run stopped for a reason nobody chose:")
-        traceback.print_exc(file=sys.stderr)
+        for event in watching.follow(walking):
+            written.append(event)
+            telling(_progress(event, watching.working.lines[-1]))
+            if watching.at % DOLLARS_EVERY == 0:
+                telling(_so_far(watching.spent, watching.working, watching.seconds))
     finally:
         walking.close()
+    if watching.broke is not None:
+        telling("  the run stopped for a reason nobody chose; see the log above.")
+    working, so_far, finished, broke = (
+        watching.working,
+        watching.spent,
+        watching.finished,
+        watching.broke,
+    )
 
     # **The generation is on disk before anything else is asked for.** A paid run
     # is never discarded, and a crash is no exception: everything from here on is
@@ -309,7 +305,7 @@ def run_one(
         its_seed,
         today,
         started,
-        (*written, *_closing_events(finished, started)),
+        (*written, *_closing_events(finished, so_far, started)),
         _with_the_ending(working, finished),
         finished,
     ).model_copy(update={"broke": broke})
@@ -329,6 +325,10 @@ def run_one(
                 answerer=answerer,
                 on=today,
                 width=Caps().width,
+                # **What is left of this run's ceiling**, not a fresh one. It was
+                # called with no ceiling at all, so `--cap 5` bought a generation
+                # of five dollars and then an insert of fifteen (2026-09-20).
+                dollars=max(ceiling - so_far.dollars, 0.0),
             )
         except Exception as went_wrong:
             telling("    it stopped for a reason nobody chose while drafting:")
@@ -337,8 +337,10 @@ def run_one(
                 update={"broke": _in_one_plain_sentence(went_wrong), "seconds": _since(started)}
             )
         for one in its_calls:
-            so_far = fold(so_far, one)
-            working = working.plus(line_for(one, None))
+            # Through the same follower, so the insert's calls reach the working
+            # and the running total by the one path everything else does.
+            watching.never_seen(one)
+        so_far, working = watching.spent, watching.working
         telling("    drafted" if drafted is not None else "    it could not be drafted")
         finished = finished.model_copy(
             update={"receipt": _with_the_insert(finished.receipt, its_calls)}
@@ -350,13 +352,15 @@ def run_one(
         its_seed,
         today,
         started,
-        (*written, *_closing_events(finished, started)),
+        (*written, *_closing_events(finished, so_far, started)),
         _with_the_ending(working, finished),
         finished,
     ).model_copy(update={"scripted_insert": drafted, "kept_at": kept_at})
 
 
-def _closing_events(finished: Finished | None, started: float) -> tuple[Event, ...]:
+def _closing_events(
+    finished: Finished | None, spent: RunningTotal, started: float
+) -> tuple[Event, ...]:
     """The events that close a generation: the verdict, the receipt and the ending.
 
     Built twice on purpose — once the moment the generation ends, and once more
@@ -367,6 +371,8 @@ def _closing_events(finished: Finished | None, started: float) -> tuple[Event, .
 
     Args:
         finished: What the walk handed back, or nothing when it never got there.
+        spent: The running total, which is what the receipt is built from — a
+            walk that broke hands nothing back, and what it spent is still spent.
         started: When the clock was started.
 
     Returns:
@@ -378,7 +384,7 @@ def _closing_events(finished: Finished | None, started: float) -> tuple[Event, .
     closing: list[Event] = []
     if finished.graph is not None and finished.destination is not None:
         closing.append(verdict(finished.graph, finished.destination))
-    closing.append(_receipt_of(finished, _since(started)))
+    closing.append(receipt_event(spent, seconds=_since(started)))
     closing.append(
         Done(
             reason=finished.reason,
@@ -626,14 +632,18 @@ def _telling(say: "Callable[[str], None] | None") -> "Callable[[str], None]":
     return to_the_terminal
 
 
-def _progress(grown: ProposalAccepted | ProposalRejected, outcome: Outcome) -> str:
+def _progress(grown: Event, line: TranscriptLine) -> str:
     """One line saying what just landed, in enough words to follow along."""
     if isinstance(grown, ProposalAccepted):
         claim = grown.proposition.claim if grown.proposition is not None else ""
         what = _trimmed(claim) if claim else "an arrow between two claims already on the map"
-        return f"  {grown.at:>3}  accepted  {what}  ({outcome.seconds:.0f}s)"
-    codes = ", ".join(one.code for one in grown.violations) or "the model gave us nothing to check"
-    return f"  {grown.at:>3}  refused   {codes}  ({outcome.seconds:.0f}s)"
+        return f"  {grown.at:>3}  accepted  {what}  ({line.seconds:.0f}s)"
+    if isinstance(grown, ProposalRejected):
+        codes = (
+            ", ".join(one.code for one in grown.violations) or "the model gave us nothing to check"
+        )
+        return f"  {grown.at:>3}  refused   {codes}  ({line.seconds:.0f}s)"
+    return f"  an event of a kind this line did not expect: {type(grown).__name__}"
 
 
 def _so_far(so_far: RunningTotal, working: Transcript, seconds: float) -> str:
@@ -704,23 +714,6 @@ def what_it_cost(run: Run) -> list[str]:
             f"{done.rejected} refused",
         ]
     return lines
-
-
-def _receipt_of(finished: Finished, seconds: float) -> Receipt:
-    """Turn what the walk spent into the receipt event."""
-    spent = finished.receipt
-    return Receipt(
-        model=spent.model,
-        calls=spent.calls,
-        input_tokens=spent.input_tokens,
-        output_tokens=spent.output_tokens,
-        cache_read_tokens=spent.cache_read_tokens,
-        searches=spent.searches,
-        dollars=spent.dollars,
-        seconds=seconds,
-        mode="live",
-        prompt_hash=prompt_hash(),
-    )
 
 
 def _trimmed(claim: str) -> str:

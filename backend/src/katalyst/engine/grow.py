@@ -137,6 +137,7 @@ def grow(
     answerer: Answerer,
     on: date,
     caps: Caps | None = None,
+    never_seen: Callable[[Outcome], None] | None = None,
 ) -> Generator[Outcome | Finished, None, None]:
     """Walk the frontier, one round at a time, until every line has closed.
 
@@ -157,6 +158,10 @@ def grow(
         on: The day this run is happening. Passed in rather than read, which is
             what lets a recorded run and a live one be compared.
         caps: Every limit this run has. The defaults are in `Caps`.
+        never_seen: Told about an answer that was paid for and that nobody will
+            ever be handed, because the reader went away while its round was in
+            flight. The money was spent and the working is still owed
+            (2026-09-20).
 
     Yields:
         Each call's outcome in the order it was folded, then one `Finished`.
@@ -245,9 +250,22 @@ def grow(
                 on=on,
                 searches_left=caps.searches - walk.receipt.searches,
             )
-            for claim_id, answer in zip(asking, answers, strict=True):
+            waiting = list(zip(asking, answers, strict=True))
+            while waiting:
+                claim_id, answer = waiting.pop(0)
                 graph, outcome = walk.fold(graph, claim_id, answer)
-                yield outcome.model_copy(update={"frontier": tuple(walk.frontier)})
+                try:
+                    yield outcome.model_copy(update={"frontier": tuple(walk.frontier)})
+                except GeneratorExit:
+                    # The reader went away mid-round. Every call of this round was
+                    # made and billed before the first of them was folded, so the
+                    # rest are folded here — nobody will see them, and they are
+                    # still owed to the working and to the bill (2026-09-20).
+                    for left_over, its_answer in waiting:
+                        graph, its_outcome = walk.fold(graph, left_over, its_answer)
+                        if never_seen is not None:
+                            never_seen(its_outcome)
+                    raise
 
         # One last call per open line, asking only for an ending. A cap that
         # stopped the walk is exactly when this is wanted; only the money running
