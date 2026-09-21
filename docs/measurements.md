@@ -14,7 +14,7 @@
 
 <!-- NEXT ENTRY GOES HERE — newest first. Add above the rule below; change nothing beneath it. -->
 
-## `<<HORMUZ RECORDING: the day it was made>>` — the committed Strait of Hormuz recording
+## 2026-09-21 — the committed Strait of Hormuz recording
 
 The generation a keyless clone plays back, made by `make record-demo ONLY=hormuz`. It is the only
 committed recording; the other three example sentences have none, and each would cost about the same
@@ -22,17 +22,17 @@ again.
 
 | | |
 |---|---|
-| Model and effort | `<<HORMUZ RECORDING: model and effort>>` |
-| Calls | `<<HORMUZ RECORDING: calls>>` |
-| Searches | `<<HORMUZ RECORDING: searches>>` |
-| Dollars | `<<HORMUZ RECORDING: dollars>>` |
-| Wall clock | `<<HORMUZ RECORDING: minutes>>` |
-| Map reached | `<<HORMUZ RECORDING: claims and arrows>>` |
-| Refusals | `<<HORMUZ RECORDING: refusals>>` |
-| Claims with a sourced base rate | `<<HORMUZ RECORDING: sourced base rates>>` |
-| Stopped because | `<<HORMUZ RECORDING: stop reason>>` |
+| Model and effort | claude-sonnet-5, effort left at the service's default |
+| Calls | 29 |
+| Searches | 93 |
+| Dollars | $4.04 |
+| Wall clock | 36 m 19 s |
+| Map reached | 18 claims, 19 arrows |
+| Refusals | 3 proposals refused by the rules, each kept in the recording in the validator's own words |
+| Claims with a sourced base rate | 5 of 18 |
+| Stopped because | `width_cap` — the last open claim already had as many children as the run allowed |
 | Committed as | `backend/recordings/hormuz.jsonl` |
-| Raw record | `<<HORMUZ RECORDING: the kept run under backend/.runs/>>` |
+| Raw record | not on disk. The run was kept under `backend/.runs/` in the working copy that made it, and that copy has since been removed; the two Hormuz runs kept in the main copy carry other identifiers. The committed recording is complete — every event, and the receipt these figures were read from — so nothing on this table rests on the missing file |
 
 **Why this entry carries no figure from an earlier attempt.** A recording is re-made whenever the
 words this program sends the model change, and the shapes it asks the model to fill changed after the

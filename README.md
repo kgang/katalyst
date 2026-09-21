@@ -170,7 +170,7 @@ They run side by side, five browsers at a time here and two on the build machine
 make test
 ```
 
-No network, no key, and the same checks a pull request runs. On 2026-09-21 that was **`<<COUNT: server>>` tests on the server and `<<COUNT: browser>>` in the browser app**, plus `<<COUNT: end-to-end>>` end-to-end tests. The figures are dated because they move with every round; what does not move is that all of them run with no key and no network:
+No network, no key, and the same checks a pull request runs. On 2026-09-21 that was **630 tests on the server and 356 in the browser app**, plus 13 end-to-end tests. The figures are dated because they move with every round; what does not move is that all of them run with no key and no network:
 
 - **The rules, checked against maps nobody wrote by hand.** Hundreds of random maps per test, built by the generators in `backend/tests/strategies.py` — some correct by construction, some damaged on exactly one rule — and when one fails, the `hypothesis` library shrinks it to the smallest map that still breaks. Every line and every branch of `backend/src/katalyst/domain/` is run.
 - **The engine.** Folding a branch onto a map, working every likelihood through time, and saying what moved — including a state machine that re-checks *only what is still connected to the edit may move* after every step of a generated sequence of edits.
