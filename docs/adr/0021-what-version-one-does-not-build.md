@@ -22,13 +22,13 @@ spec-impact: PRODUCT_REQUIREMENTS.md FR-8, FR-17, FR-18, FR-20, FR-24, FR-29, FR
 >
 > **What it costs.** Nothing here is started. Cutting FR-30 removes the one condition that could have reopened an ensemble, so none is built in version one.
 >
-> **Open for Kent.** **FR-17 and FR-29** are cut here for the first time, with no earlier decision behind them.
+> **Open for Kent.** Nothing. **FR-17 and FR-29** reached this page with no earlier decision behind them, and Kent has now cut both himself (R31); each goes on the *what I would do next* page.
 
 ## Context and Problem Statement
 
 This project's finishing checklist requires **every decision, including every requirement cut, to have an accepted record.** Six functional requirements and one invariant are cut, and one requirement shrunk, and until this record exists all seven are cut nowhere and built nowhere. A reader comparing `PRODUCT_REQUIREMENTS.md` against what ships would find them simply missing — the same shape of dishonesty as a number nobody computed.
 
-**Who decided what, exactly.** **Kent decided FR-31's shrink** (2026-09-21). **Everything else on this page is the coordinator's call, written `proposed` here so that Kent accepts it or names one back.** Two of them — **FR-17 and FR-29** — appear on this page for the first time and have no prior decision behind them at all; their reasons below are the coordinator's, offered as proposals, and both are put to Kent under *Open for Kent*.
+**Who decided what, exactly.** **Kent decided three of these himself** (2026-09-21): FR-31's shrink (R12), and the cuts of **FR-17** and **FR-29** (R31) — the two that reached this page with no prior decision behind them at all, and which now go on the *what I would do next* page. **Everything else on this page is the coordinator's call, written `proposed` here and accepted only when Kent accepts this record**; the reasons below for those are the coordinator's, offered as proposals.
 
 This record is short on purpose: one entry each, the requirement in its own words and one sentence of reason.
 
@@ -45,12 +45,12 @@ This record is short on purpose: one entry each, the requirement in its own word
 
 ## Decision Outcome
 
-Chosen option: **A**, because the cuts share one reason — they are research projects or dashboards competing with the three things the brief actually asks for — and seven records would make a reader read seven pages to learn it once; and because C is the traceability veto in its plainest form.
+Chosen option: **A**, because the cuts share one reason — they are research projects or dashboards competing with the three things the brief actually asks for — and **B** would make a reader read seven pages to learn it once, while **C** is the traceability veto in its plainest form. A's own cost is that superseding one line at a time is harder: a later record naming the requirement it revives is the answer.
 
 ### The cuts
 
 **FR-17 (P1)** — *"Compare ≥3 branches as small multiples; at most 4 branches visible, rest collapsed to a list; branches must be named."*
-**Not built** *(coordinator's proposal; no prior decision).* Three or more branches side by side is a dashboard, the ranked change list already answers that question two worlds at a time, and how one ranking is read across three lists is undesigned — an open question in the diff chapter rather than a plan item.
+**Not built** *(Kent, R31; it reached this page with no prior decision behind it).* Three or more branches side by side is a dashboard, the ranked change list already answers that question two worlds at a time, and how one ranking is read across three lists is undesigned — an open question in the diff chapter rather than a plan item.
 
 **FR-18 (P1)** — *"`refine`: expand a proposition into sub-propositions; the children's combined likelihood must equal the parent's — they marginalize back (INV-10). This is the brainstorm's 'search deeper lines'."*
 **Not built.** Making finer claims add back up to the claim they replace means re-deriving the parent's number by summing the children out of the joint, every time either changes — a research project on top of an exact core — and nothing in the brief asks for it.
@@ -65,7 +65,7 @@ Chosen option: **A**, because the cuts share one reason — they are research pr
 **The three emphasised quantities are not built.** Each needs a capital base and a portfolio — how much the reader has, and what else they hold — and the product asks for neither, so all three would be arithmetic dressed as risk management. The percentile outcomes stay and are built in stack 06 from the reader's own position.
 
 **FR-29 (P2)** — *"Historical-analog panel: for a link, past instances and how prices moved around them, with an uncertainty band (an event study)."*
-**Not built** *(coordinator's proposal; no prior decision).* It needs dated past instances **and** the price history around them; record 0010's grounding has a live prediction-market read and a public economic-data read and nothing historical. The base-rate work shows how thin the ground is: 93 searches across eighteen claims bought **five base rates**, three of them counts of *0 of 2*, *2 of 3* and *1 of 1*.
+**Not built** *(Kent, R31; it reached this page with no prior decision behind it).* It needs dated past instances **and** the price history around them; record 0010's grounding has a live prediction-market read and a public economic-data read and nothing historical. The base-rate work shows how thin the ground is: 93 searches across eighteen claims bought **five base rates**, three of them counts of *0 of 2*, *2 of 3* and *1 of 1*.
 
 **FR-30 (P2)** — *"Pastcast self-test: run a chain on a resolved 2024–25 event with a date-frozen corpus and show the Brier score (the standard accuracy score for probability forecasts; lower is better), including when it is bad."* (The gloss of the Brier score is the requirement's own.)
 **Not built.** It needs the evidence frozen as it stood before each event, which the pipeline cannot do — it searches the live web — and one resolved event is not a track record. One honest sentence about it goes on the *what I would do next* page.
@@ -84,12 +84,14 @@ A kept run already writes that file and the replay path already reads it. Anti-p
 
 ### Cut in the same pass, touching no requirement
 
-* **Undoing an edit (*Release*)** — in no requirement, no invariant and no clause of the brief; a change to the domain, the wire and the generated types wearing a button.
-* **A probability slider** — every edit appends to an audit trail with no undo, so scrubbing writes thirty edits or opens a second, unaudited path.
-* **Drafting a whole map in one streamed call** — a speed idea, and the demonstration runs from a recording.
-* **Unrolling feedback arrows over time** — INV-6's checkable half stands and is tested; unrolling is asked for nowhere.
-* **A fifth, price-valued kind of claim, and two-sided payoffs** — a position already carries the spot price, the volatility and the horizon, none of which a model can supply; and the losing leg *is* the stop.
-* **Screenshot baselines and a wall-clock gate in the build** — two reliable sources of failures that mean nothing.
+| | |
+|---|---|
+| **Undoing an edit (*Release*)** | in no requirement, no invariant and no clause of the brief; a change to the domain, the wire and the generated types wearing a button |
+| **A probability slider** | every edit appends to an audit trail with no undo, so scrubbing writes thirty edits or opens a second, unaudited path |
+| **Drafting a whole map in one streamed call** | a speed idea, and the demonstration runs from a recording |
+| **Unrolling feedback arrows over time** | INV-6's checkable half stands and is tested; unrolling is asked for nowhere |
+| **A fifth, price-valued kind of claim, and two-sided payoffs** | a position already carries the spot price, the volatility and the horizon, none of which a model can supply; and the losing leg *is* the stop |
+| **Screenshot baselines and a wall-clock gate in the build** | two reliable sources of failures that mean nothing |
 
 ### Cut nowhere, and belonging elsewhere
 
@@ -112,18 +114,10 @@ So this record cannot be read as the complete list of everything absent. **The p
 
 ## Open for Kent
 
-**FR-17 and FR-29 are cut on this page for the first time**, with no earlier decision behind them. Both are P1/P2 and neither is scheduled anywhere.
-
-* *Recommended:* accept both cuts as written. Cost: nothing is started, and the reasons above are the whole case.
-* Alternative, FR-17: build the small multiples anyway. Cost: an undesigned ranking across three lists, plus a dashboard on a screen that has no spare room.
-* Alternative, FR-29: keep it open rather than cut. Cost: a P2 that is scheduled nowhere still looks like a promise, which is what this record exists to stop.
-
-## Pros and Cons of the Options
-
-One line: **A** is chosen because the cuts share one reason and a reader should learn it once; **B** hides that reason across seven pages; **C** leaves a requirement that vanishes with nothing to trace it to. A's own cost is that superseding one line at a time is harder — a later record naming the requirement it revives is the answer.
+**Nothing.** The one item this record carried — **FR-17 and FR-29**, cut on this page for the first time with no earlier decision behind them — is decided: Kent cut both (**R31**), and both go on the *what I would do next* page. Every other cut here is still the coordinator's proposal and is accepted only when Kent accepts this record.
 
 ## More Information
 
-* **Kent's decision, 2026-09-21**, recorded as row R12 of the dated decisions note kept locally under `plans/notes/`: shrink FR-31 to the file we already write — a finished generation served back by its id from the same line-by-line file a recording is; one format, one loader, no database. *(The decisions note's words for his choice, not a transcript of his own.)*
+* **Kent's decisions, 2026-09-21**, in the dated decisions note kept locally under `plans/notes/`: **R12** — shrink FR-31 to the file we already write, a finished generation served back by its id from the same line-by-line file a recording is, one format, one loader, no database; and **R31** — cut **FR-17** and **FR-29** for version one, both onto the *what I would do next* page. *(The decisions note's words for his choices, not a transcript of his own.)*
 * **What prompted this record**: the adversarial pass of 2026-09-21, finding S6 — six functional requirements cut with no record at all, against a checklist requiring one for every decision.
 * **Related.** ADR-0015 (no ensemble; this record removes the one condition that would have reopened it) · ADR-0013 · ADR-0010 (why the analog panel has nothing to read) · ADR-0012 (the file FR-31 now uses) · proposed ADR-0016, 0017 and 0022 (which replace rather than cut) · 0018–0020, reserved for stack 06.
