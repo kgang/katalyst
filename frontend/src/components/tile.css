@@ -444,6 +444,12 @@
 }
 
 .tile[data-detail="summary"] .tile__beliefs {
+  /* One line per owner, stacked. The row above makes its columns from the
+   * chips themselves, so out here the flow has to be turned back to rows as
+   * well — otherwise a second chip takes a column of its own beside the first
+   * and the two lines are printed over each other (Kent saw exactly that on the
+   * one tile holding a venue's number, 2026-09-22). */
+  grid-auto-flow: row;
   grid-template-columns: minmax(0, 1fr);
   row-gap: var(--space-hair);
 }
@@ -458,7 +464,12 @@
    * has to be set at that size before the column is worked out. */
   font-size: var(--text-lg);
   grid-template-rows: auto;
-  grid-template-columns: 4.4em auto auto;
+  /* The owner's column is as wide as the longest owner, *market*, and no wider.
+   * It was a fifth wider than that, and the line then ran past the row by 5
+   * pixels on an ordinary tile and by 17 on the two whose outline cuts into one
+   * side — far enough that the end of the range was cut off (measured on the
+   * stored example at the furthest zoom, 2026-09-22). */
+  grid-template-columns: 3.5em auto auto;
   grid-auto-flow: column;
   justify-items: start;
   align-items: baseline;
