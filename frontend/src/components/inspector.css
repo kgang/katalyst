@@ -76,6 +76,33 @@
   color: var(--text-muted);
 }
 
+/* The way from what you are reading to what you can do about it.
+ *
+ * A word with a hairline round it, which is what a button is in this product —
+ * the same shape as *Start a branch* and *Change it to that* in
+ * `branchPanel.css`, and for the same reason: a filled rounded button would be
+ * the loudest thing in a panel whose whole job is the reading beside it. It sits
+ * at the left edge of the head rather than stretching across it, because it is
+ * one control and not a bar. */
+.inspector__change {
+  justify-self: start;
+  margin: var(--space-hair) 0 0;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.inspector__change:hover {
+  border-color: var(--text-muted);
+}
+
 /* ---- Sections ------------------------------------------------------------ */
 
 .inspector__section {

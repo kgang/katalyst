@@ -18,6 +18,12 @@
  * the map is what makes the detail mean anything. Selecting changes what is in
  * the panel; nothing ever opens over the canvas.
  *
+ * **Its head carries the one control in it**: *Change this claim* on a claim,
+ * *Change this push* on an arrow, both opening the panel of things you can do.
+ * Until it was here, that panel opened from the `E` key and the command palette
+ * and nowhere else, so somebody working the screen with a mouse could read the
+ * whole argument and never find a verb on it.
+ *
  * **Where a value does not exist the panel says so in words, with a reason** —
  * never a blank, never a zero, never a stand-in. In this build that reason is
  * usually *"no engine yet"*, which is an honest sentence rather than a hole.
@@ -81,6 +87,19 @@ export interface InspectorProps {
   /** What is selected. */
   readonly selection: Selection;
   /**
+   * Open the panel of things you can do to what is selected — the mouse's way
+   * to it.
+   *
+   * **Absent means there is nothing to open, and then no control is drawn.**
+   * Two callers leave it out and both are right to: the screen that watches a
+   * map build itself has no branch to edit, and the map screen leaves it out
+   * while the panel is already open, because a way in that is already in is not
+   * a control. That second one is also what keeps *Change this push* from
+   * appearing twice on one screen — once here and once as the button inside the
+   * panel that actually changes the number.
+   */
+  readonly onChangeThis?: () => void;
+  /**
    * The run that produced this map, when there was one.
    *
    * Absent on a stored example, which nobody generated. Present on a generated
@@ -130,6 +149,39 @@ const OWNER_WORDS: Record<BeliefOwner, string> = {
   user: "user",
   market: "market",
 };
+
+/**
+ * The way from what you are reading to what you can do about it.
+ *
+ * **The whole of this product's central interaction used to be behind one
+ * key.** The panel of operations opened from `E` and from the command palette
+ * and from nowhere else, so a reader who works a screen with a mouse could
+ * click every tile, read the whole argument, find no verb anywhere on it and
+ * conclude the tool is a viewer.
+ *
+ * It sits in the panel's head rather than on the tile, because a tile's height
+ * is reserved before the browser has drawn one (`graph/geometry.ts`), and a new
+ * row on a tile lays the whole map out again — which is the one thing the diff
+ * view promises never to do.
+ *
+ * It is a word with a hairline round it, which is what a button is in this
+ * product; it is never a filled rounded button, and the words are the shared
+ * vocabulary's, never this component's own.
+ *
+ * @param words What this control is called on the subject it is on.
+ * @param onOpen What it opens, or nothing at all — in which case nothing is
+ *   drawn, because a control that does nothing is not a control.
+ */
+function ChangeThis({ words, onOpen }: { words: string; onOpen?: (() => void) | undefined }) {
+  if (onOpen === undefined) {
+    return null;
+  }
+  return (
+    <button className="inspector__change" type="button" onClick={onOpen}>
+      {words}
+    </button>
+  );
+}
 
 /** A heading inside the panel: small, spaced out, and never a border of its own. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -480,7 +532,15 @@ function WhatYourEditDid({ claim }: { claim: ClaimView }) {
 }
 
 /** A claim, top to bottom. */
-function ClaimDetail({ world, claim }: { world: WorldView; claim: ClaimView }) {
+function ClaimDetail({
+  world,
+  claim,
+  onChangeThis,
+}: {
+  world: WorldView;
+  claim: ClaimView;
+  onChangeThis?: (() => void) | undefined;
+}) {
   const baseRate = claim.baseRate;
 
   return (
@@ -488,6 +548,7 @@ function ClaimDetail({ world, claim }: { world: WorldView; claim: ClaimView }) {
       <header className="inspector__head">
         <p className="inspector__claim">{claim.claim}</p>
         <p className="inspector__kind">{KIND_WORDS[claim.kind]}</p>
+        <ChangeThis words="Change this claim" onOpen={onChangeThis} />
       </header>
 
       {/* Criteria, the source that adjudicates, and the date — all three, on
@@ -592,7 +653,15 @@ function ClaimDetail({ world, claim }: { world: WorldView; claim: ClaimView }) {
 }
 
 /** An arrow, read back in words. */
-function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
+function WireDetail({
+  world,
+  wire,
+  onChangeThis,
+}: {
+  world: WorldView;
+  wire: LinkView;
+  onChangeThis?: (() => void) | undefined;
+}) {
   const from = world.claims.find((claim) => claim.id === wire.source);
   const to = world.claims.find((claim) => claim.id === wire.target);
 
@@ -604,6 +673,11 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
           →
         </p>
         <p className="inspector__claim">{to?.claim ?? NOT_ON_THIS_MAP}</p>
+        {/* The vocabulary's own words for the one thing you can do to an arrow.
+            They are the same words as the button inside the panel this opens,
+            and the two are never on screen together: the map screen stops
+            passing this the moment the panel is open. */}
+        <ChangeThis words="Change this push" onOpen={onChangeThis} />
       </header>
 
       <Section title="Why">
@@ -862,7 +936,7 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
 }
 
 /** The panel beside the map. */
-export function Inspector({ world, selection, generation }: InspectorProps) {
+export function Inspector({ world, selection, generation, onChangeThis }: InspectorProps) {
   const claim =
     selection?.kind === "claim" ? world.claims.find((one) => one.id === selection.id) : undefined;
   const wire =
@@ -874,9 +948,9 @@ export function Inspector({ world, selection, generation }: InspectorProps) {
       {run !== undefined ? (
         <GenerationDetailPanel detail={run} />
       ) : claim !== undefined ? (
-        <ClaimDetail world={world} claim={claim} />
+        <ClaimDetail world={world} claim={claim} onChangeThis={onChangeThis} />
       ) : wire !== undefined ? (
-        <WireDetail world={world} wire={wire} />
+        <WireDetail world={world} wire={wire} onChangeThis={onChangeThis} />
       ) : (
         <div className="inspector__empty">
           <h2 className="inspector__empty-heading">Nothing selected</h2>

@@ -235,6 +235,27 @@ describe("the rail beside the map", () => {
     expect(screen.getByText(/written from the numbers/)).toBeInTheDocument();
   });
 
+  it("test_the_rows_are_the_first_thing_in_the_rail", () => {
+    // **What did my edit do, ranked** is the best artefact in this product and
+    // it was the last thing a reader landed on: heading, then a summary four or
+    // five lines long at this width, then a three-line note about how the order
+    // was arrived at, and only then the rows. The rows come first now; the note
+    // is the caption it always read like, and the summary closes.
+    const { container } = render(<DeltaRail rows={RANKED} ranked={true} summary={SUMMARY} />);
+    const rail = container.querySelector(".delta-rail") as HTMLElement;
+    const where = (selector: string): number =>
+      [...rail.children].findIndex((child) => child.matches(selector));
+
+    expect(where(".delta-rail__heading")).toBe(0);
+    expect(where(".delta-rail__table")).toBe(1);
+    expect(where(".delta-rail__table")).toBeLessThan(where(".delta-rail__order"));
+    expect(where(".delta-rail__table")).toBeLessThan(where(".delta-rail__summary"));
+    // And none of the three went missing in the move.
+    for (const part of [".delta-rail__order", ".delta-rail__summary", ".delta-rail__reason"]) {
+      expect(where(part)).toBeGreaterThan(1);
+    }
+  });
+
   it("test_an_empty_rail_says_what_to_do_about_it", () => {
     render(<DeltaRail rows={[]} ranked={false} summary={SUMMARY} />);
     expect(screen.getByText(/No ending on this map is reachable/)).toBeInTheDocument();

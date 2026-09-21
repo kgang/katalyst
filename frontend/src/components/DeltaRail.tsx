@@ -23,6 +23,12 @@
  * The two columns are never folded into any ordering. They answer different
  * questions and a trader weighs them separately; folding the width into a rank
  * would sink exactly the claims that most deserve a second look.
+ *
+ * **The rows are the first thing in it.** The heading is followed by the table
+ * and nothing else; the note saying whose order this is reads as a caption and
+ * sits under the rows as one, and the one-line summary of what the edit did
+ * closes. It was the other way round, and a reader scrolled past seven lines of
+ * prose to reach the artefact the rail exists for.
  */
 
 import { useId, useState } from "react";
@@ -130,35 +136,47 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
   const [reason, setReason] = useState<string | null>(null);
   const headingId = useId();
 
+  // The one line saying what the edit did to the trades. The engine writes it
+  // from a fixed template with its own numbers in the blanks; before it has, the
+  // slot says why there is none. It is written here rather than twice below
+  // because it is the same line in both of the rail's two states.
+  const theSummary = (
+    <p className="delta-rail__summary">
+      {summary.reading ?? summary.absence.words}
+      {summary.reading === undefined ? (
+        <span className="delta-rail__summary-reason">{summary.absence.reason}</span>
+      ) : null}
+    </p>
+  );
+
   return (
     <section className="delta-rail" aria-labelledby={headingId}>
       <h2 className="delta-rail__heading" id={headingId}>
         Where this edit ends up
       </h2>
 
-      {/* The one line saying what the edit did to the trades. The engine writes
-          it from a fixed template with its own numbers in the blanks; before it
-          has, the slot says why there is none. */}
-      <p className="delta-rail__summary">
-        {summary.reading ?? summary.absence.words}
-        {summary.reading === undefined ? (
-          <span className="delta-rail__summary-reason">{summary.absence.reason}</span>
-        ) : null}
-      </p>
-
       {rows.length === 0 ? (
-        <p className="delta-rail__empty">
-          No ending on this map is reachable from your edits yet. Make one — press E on a claim —
-          and the endings it can reach are listed here.
-        </p>
+        <>
+          <p className="delta-rail__empty">
+            No ending on this map is reachable from your edits yet. Make one — press E on a claim,
+            or open a claim in the panel and take up <b>Change this claim</b> — and the endings it
+            can reach are listed here.
+          </p>
+          {theSummary}
+        </>
       ) : (
         <>
-          <p className="delta-rail__order">
-            {ranked
-              ? "In the order the engine put them in: the size of the move times the weakest arrow on the best-backed route behind it. Endings that did not move follow, and are not ranked."
-              : "In map order. Nothing has ranked these, because nothing has worked out a number to rank them by."}
-          </p>
-
+          {/* **The rows come first, and everything else is written under
+              them.** The heading used to be followed by the summary — four or
+              five lines at this width — and then by the note saying whose
+              order this is, three more. Seven lines of prose stood between a
+              reader and the one artefact that answers *what did my edit do,
+              ranked*, which is the thing this product is best at and the last
+              thing you landed on. The note reads as a caption, so it is one;
+              the summary is a sentence about the whole edit, so it closes.
+              Nothing about what the rail may honestly say has changed: ranked
+              against unranked, the *no change* row and the reason line are all
+              exactly as they were. */}
           <div className="delta-rail__table">
             <div className="delta-rail__labels" aria-hidden="true">
               <span>change</span>
@@ -195,6 +213,14 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
               ))}
             </ul>
           </div>
+
+          <p className="delta-rail__order">
+            {ranked
+              ? "In the order the engine put them in: the size of the move times the weakest arrow on the best-backed route behind it. Endings that did not move follow, and are not ranked."
+              : "In map order. Nothing has ranked these, because nothing has worked out a number to rank them by."}
+          </p>
+
+          {theSummary}
 
           <p className="delta-rail__reason">
             {reason ??

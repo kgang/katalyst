@@ -607,7 +607,20 @@ export function MapScreen({
               summary={computed === undefined ? NO_SUMMARY_YET : computed.change.summary}
             />
           )}
-          <Inspector world={world} selection={selection} />
+          {/* The mouse's way to the six things you can do. The keyboard has
+              `E` and the palette has a command; without this a reader working
+              the screen with a mouse could click every tile, read the whole
+              argument and never find a verb on it.
+
+              **It is handed over only while the panel is shut.** A way in that
+              is already in is not a control, and on an arrow it would put two
+              buttons reading *Change this push* on one screen — this one, and
+              the one inside the panel that changes the number. */}
+          <Inspector
+            world={world}
+            selection={selection}
+            {...(intervening ? {} : { onChangeThis: keys.intervene })}
+          />
         </>
       )}
     </>
