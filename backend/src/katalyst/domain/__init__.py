@@ -50,10 +50,16 @@ What is being built beside it
 Five modules — `rates.py`, `states.py`, `forward.py`, `solving.py` and
 `sampling.py` — are the new arithmetic of decision record 0016, in which a claim's
 number is **the chance it happens by its deadline** rather than a likelihood read
-on one day. They are **stubs today**: every shape, name and docstring is settled so
-that the people writing the arithmetic can build against each other, and every body
-raises. Nothing runs them yet. `propagate` takes an `engine` argument naming which
-arithmetic to use, and it defaults to the one this layer has always run.
+on one day. `rates.py` turns the chances a person stated into rates; `states.py`
+gives a claim that can stop a second time; `forward.py` works out **when** every
+claim happens in one pass; `solving.py` answers **whether**, exactly; `sampling.py`
+draws weighted worlds where something was reported to have happened, and hands the
+days a later stack reads.
+
+`propagate` takes an `engine` argument naming which arithmetic to use, and **it
+still defaults to the one this layer has always run**. The two stand side by side
+while the second is checked against the first; which one every world on this server
+uses is one constant in one file, `ENGINE` in `katalyst.engine.worlds`.
 """
 
 from katalyst.domain.belief import Belief, Beliefs, two_figures
@@ -126,7 +132,12 @@ from katalyst.domain.rates import (
     window_of,
 )
 from katalyst.domain.sampling import Ready, Sample, ready_to_sample, sample_forward
-from katalyst.domain.solving import all_marginals, elimination_order, solve
+from katalyst.domain.solving import (
+    ImpossibleObservation,
+    all_marginals,
+    elimination_order,
+    solve,
+)
 from katalyst.domain.states import (
     NEVER,
     STILL_HOLDING,
@@ -167,6 +178,7 @@ __all__ = [
     "Evidence",
     "Forward",
     "Graph",
+    "ImpossibleObservation",
     "Insert",
     "Intervention",
     "Link",

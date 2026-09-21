@@ -14,6 +14,49 @@
 
 <!-- NEXT ENTRY GOES HERE — newest first. Add above the rule below; change nothing beneath it. -->
 
+## 2026-09-22 — the by-deadline engine, first timings
+
+**Why an engine timing is in this file at all.** The note at the top says engine timings live in `spec/multiverse/propagation.md`, and they do — for the engine that is still the default. This entry is the **other** one: decision record 0016's core, landed beside the old engine behind a flag that still says `today`, so the chapter cannot own its numbers yet without describing an engine no screen runs. They move into that chapter when it is rewritten, at the flip. Until then they live here, dated.
+
+**What was run.** `backend/benchmarks/by_deadline.py`, which is recorded and never gated: no test fails because a reading here is large. Code at `a5551f7`, before the performance work on `domain/forward.py` and `domain/states.py` that started the same day — **so the states rows below will be re-measured and this entry will get a successor**. Machine: Apple M3 Max, 14 cores, 38.65 GB, macOS 26.6.2, Python 3.12.4, numpy 2.5.3, nothing else of ours running. Raw output under `plans/analysis/scripts/stack-05-core/E/` (`bench-states.log`, `bench-events.log`, `bench-hormuz.log`, `the-strike-branch.log`), kept locally.
+
+**What each clock covers.** *The forward pass* is working out when every claim happens — one pass over the whole map, causes before effects, rates and shapes and all — at every version. *The exact solve* is one elimination per claim over the yes/no tables that pass leaves, at every version. *The weighted sample* is fifty thousand worlds drawn forward at **one** version, with one claim reported to have happened, and the correction it hands back. Nothing here times the drawing of the versions, which both engines share. *The whole world* is the sum of the three.
+
+### The generated map, twenty claims
+
+Every row: twenty claims, up to three causes each, 2 000 versions, 24 slices, seed 7, two repeats, one claim reported to have happened. The three arrows that hold a claim back sit on **three different claims**, which is the arrangement record 0016 measured.
+
+| | forward pass | exact solve | weighted sample | the whole world | peak memory |
+|---|---|---|---|---|---|
+| no states, nothing holding a claim back | 261.9 ms | 32.5 ms | 189.3 ms | **483.7 ms** | 0.92 GB |
+| no states, three arrows holding a claim back | 752.4 ms | 31.7 ms | 194.1 ms | **978.2 ms** | 2.77 GB |
+| five states with a `sustain` arrow leaving each, three arrows holding a claim back | 7 226.0 ms | 33.8 ms | 231.0 ms | **7 490.8 ms** | 8.03 GB |
+
+Each figure is the fastest of the two repeats; the slowest were 280.2 / 823.2 / 7 759.0 ms on the forward pass and 505.6 / 1 056.7 / 8 024.9 ms on the whole world.
+
+**Read against the target**, which is thirty milliseconds a claim at 2 000 versions — a target somebody chose, proportional to the map, and not a gate: **600 ms for twenty claims**. The all-event map with nothing holding a claim back meets it. Three arrows holding a claim back is 1.6× over. **Five states is 12.5× over**, and that row is the one the performance work exists for; record 0017 measured the same shape at 644 ms in the stack-05 spike, so the gap is this implementation's and not the design's.
+
+**The solve is not the problem.** Thirty-two milliseconds whatever the map is, against record 0016's 80.4 ms — which is why the two-pass solve was cut (R40 (2)) and why the seam, `all_marginals`, is all that was kept.
+
+### The committed worked example
+
+The base map, seven claims, end to end through `propagate(engine="by_deadline")` at 2 000 versions and 24 slices, three repeats: **380.1 ms** fastest, 443.6 ms slowest, 1.36 GB. The target for seven claims is 210 ms, so it is 1.8× over.
+
+**The strike branch does not run at the shipped budget, and this is the finding of the day.** Folding *Hormuz opens, then Iran is struck* puts a **second** arrow that holds a claim back onto Brent — the base map's `R->B` and the branch's `S->B` — and the work multiplies out over every *combination* of the two arrivals. Two such arrows cost twenty-five times one rather than twice it:
+
+| | claims | the widest claim's combinations | numbers the added-up rates need at 2 000 versions |
+|---|---|---|---|
+| the base map | 7 | 25 | 66.3 million, **0.53 GB** |
+| the strike branch | 8 | **625** | 1 566.2 million, **12.53 GB** |
+
+Measured, at version counts small enough to finish: 0.15 s at 25 versions, 0.31 s at 50, 0.56 s at 100, **1.28 s at 200**, with the process's high-water memory climbing 0.51 → 6.00 GB across those four runs. Every array is linear in the versions, so 2 000 is about thirteen seconds and well past what this machine has. **The engine's own tests therefore run the strike branch at a handful of versions and say so.** Three ways out exist and none is decided here: keep the added-up rates factored, so the version axis multiplies in only where a version is read; run the pass in blocks of versions; or take record 0017's fixture item 7 and re-examine whether `S->B` should be a holding-back arrow at all.
+
+### The oracles
+
+Not a timing, but measured the same day and on the same code, because a cost is only worth reading beside what it buys. Sixteen seeded maps from `tests/oracles/maps.py`, 24 slices of each claim's own window, eight points inside each slice, an arrival taken at the middle of its slice, one version whose stated range is a point, and *This happened* answered by a seeded sample of 50 000 worlds — judged by `tests/oracles/by_integrating.py`, which is forbidden the engine's tables and is built from the arrow parameters alone. **Every one of 1 030 numbers sat within `.005`**: worst `.0015` with no edit over 62 numbers, `.0014` under *Suppose this is true* over 484, `.0049` under *This happened* over 484.
+
+**And the sample earns its place only where something was reported.** With the correction applied in every world instead, the same maps at the same seed and the same grid move the other way — worst `.0018` with no edit and `.0031` under *Suppose this is true* — so the correction is applied only where *This happened* is in force. Logs: `agreement.log` and `agreement-correction-always.log`, same directory.
+
 ## 2026-09-21 — `make eval ONLY=hormuz`, twice: once at each effort
 
 The first two rounds the scorecard ever ran against a real key, side by side on one sentence, one model, one prompt and one evening. **They are the measurement behind Kent's decision that development runs at `medium`** (2026-09-21): only the recorder sends no effort; a live run and `make eval` ask for `medium`. What each scored is in [`evals/runs/2026-09-21.tsv`](../evals/runs/2026-09-21.tsv), which owns those figures; this entry is what each cost.
