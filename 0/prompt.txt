@@ -634,3 +634,39 @@ cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u 
 **Not checked:** *This happened* on a state; which of the two changed conventions moved what; `sustain_average` is timed, not verified; §5's totals are a sum of measured pieces, not one stopwatch; the band.</result>
 <usage><subagent_tokens>472675</subagent_tokens><tool_uses>39</tool_uses><duration_ms>1612473</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>aa8323a482b9c1132</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/aa8323a482b9c1132.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0016, 0017, 0021" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me:** `sh /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/rerun-the-evidence.sh` (re-run; saved output current) · `grep -rno "&lt;&lt;[A-Z]*:" docs/adr/` (**no hits — both tokens filled**) · read each record's *In short* box · `git status --short` (4 new + 3 modified, all `docs/adr/`).
+
+**Must-fix, all ten, with the log line each now cites.**
+
+| | Change | Cites |
+|---|---|---|
+| MF1 | One sampler's band: **52–58 ms**. The 89–95 ms figures were the sampler *before* the exponentials were taken up front — not run-to-run noise — and are gone. The margin is stated: **538 ms** (`404.5` + `81.6` + `52.2`) to about **568 ms** (slowest of each: `427.9`, `81.6`, `58.0`), inside 600 by roughly 5–10% | `timing_add.log`, the *"with the exponentials taken once up front"* block |
+| MF2 | *"Round one missed by 10× at 200 versions and 12 slices; round two by 1.2× at the 2 000 versions a range needs, and at 24 slices"*, plus round one's own 2 000-version cell, **29 527 ms** | round one §3 table |
+| MF3 | Model comparison now uses the same-convention pair: **`.2095`, 6.07%**; the options table is labelled *24 slices, arrival at the slice's last day* | `midpoint.log` §B, observe row |
+| MF4 | Round two's own 200 000 row: **`.0012` / `.0021` / `.0017`** | `candidates_add.log:14, 21, 28` |
+| MF5 | **24 slices**, with the clause: 12 puts **2.50%** of *This happened* over `.005` against a fine reference, 24-middle puts 0.00% | `midpoint.log` §A observe rows |
+| MF6 | New *Still open* bullet: 24 slices × **eight integration points**, calibration `1.81e-2`, rate `1.88e-2`; 32 points ≈ `5e-3`, uncosted; and why `.005` is the distance to an enumerator on the same grid, not to the truth | `check.log:3-4` |
+| MF7 | The golden test quoted as a band: `1.0` → between `.25` and `.45` → the same again → below `.10` | the four asserts |
+| MF8 | **Six of the twenty** codes are `&lt;subject&gt;_without_&lt;required&gt;`; all twenty are article-free. I counted the Literal block myself: 6 | `validity.py:44-63` |
+| MF9 | 0022 no longer quotes `0.5 ms`; it quotes the measured solve, **`12.4 ms` / `80.4 ms`**, with one clause on what the digest excluded | `timing_add.log` |
+| MF10 | The 0005 amendment now quotes only what is in 0005 — its own Consequences line about correlated causes being double-counted | `0005:74` |
+
+All 15 should-fix and nits N1–N6 applied (conventions and models named in the same sentence, `ve_cost.py:135-145`, `feat-04b-evals` named for the browser and decimal counts, the `.600`/`.590` clause, *stops holding*, `sweep.log:114-115`, 77/18, "one number per arrow plus the claim's own").
+
+**Both late decisions folded in.** 0017 now carries the states re-run as its own numbers — judge against record 0016's additive judge `4.4 × 10⁻¹⁶`, a state-with-no-ending-cause `1.4 × 10⁻¹⁶`, one-bit coding `.00008 / .00198 / .00835`, **99.8% within `.005`**, *ever held* still failing, the sign rule `−.7732` vs `−.1842`, `sustain` `.3026` vs `trigger` `.3182`, the Hormuz table and the third defect re-measured, `bins2` withdrawn, rename counts 42→**46** and 17→**21**. 0016 tells the budget straight: **met on all-event maps with a thin margin, not met on the benchmark with states (644 ms)**, with the new *Open for Kent* — (A) make 600 ms the gate on the flip against a named benchmark, (B) another spike round, (C) raise it to about 700 ms — and the staging says the gate conditionally.
+
+**One thing I disagreed with:** the states round-two report calls 200 versions *"the version count the other half of the spike recommends"*. It is not — round one recommends 2 000 and R19 fixes 2 000, so I did not repeat it. Also, the fixture timing moved again on this run (**61.1 / 7.7 ms**), so 0016 now quotes the saved run and names all three: 65.7, 66.4, 61.1.
+
+**Word counts: 0016 6 031 · 0017 4 228 · 0021 2 521 · 0022 1 540.** All four are over target, and up rather than down, because this round added four boxes (~800 words) and two late decisions (~700). I applied the cut list to 0021 and 0022 only; **0016's and 0017's cut lists are not done** — that is the honest state, and it is the next thing I would do.</result>
+<usage><subagent_tokens>689097</subagent_tokens><tool_uses>236</tool_uses><duration_ms>468232</duration_ms></usage>
+</task-notification>
