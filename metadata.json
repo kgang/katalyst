@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M3274VHPZDXNP65NVD4X7XNV",
+  "strategy": "manual-commit",
+  "branch": "fix/04-vanishing-wire",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 73745,
+    "cache_read_tokens": 836308,
+    "output_tokens": 31390,
+    "api_call_count": 6,
+    "subagent_tokens": {
+      "input_tokens": 128,
+      "cache_creation_tokens": 528602,
+      "cache_read_tokens": 5571594,
+      "output_tokens": 21584,
+      "api_call_count": 64
+    }
+  }
+}
