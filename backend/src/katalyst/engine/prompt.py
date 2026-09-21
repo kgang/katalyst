@@ -42,6 +42,7 @@ import json
 from datetime import date
 
 from katalyst.domain import Graph, PropositionId
+from katalyst.domain.validity import TERMINAL_KINDS
 
 STANDING_TEXT = """\
 You are helping somebody think through what an event they expect would set off,
@@ -432,12 +433,69 @@ def expanding_question(
             "this claim, say that this part of the story is finished.",
         ]
     else:
+        if _at_the_very_start(graph, frontier):
+            lines += ["", ASK_FOR_A_STEP_FIRST]
         lines += [
             "",
             "Answer with the one next piece, or with a note that this part of the "
             "story is finished.",
         ]
     return "\n".join(lines)
+
+
+ASK_FOR_A_STEP_FIRST = (
+    "Nothing on the map carries the story on from this claim yet, and it sits at "
+    "the very start of the story. **A step is what would help most here**: "
+    "something that happens on the way, which causes the next thing. A map that "
+    "goes from the first claim straight to something you could trade has skipped "
+    "the argument that makes the trade worth anything, and the argument is the "
+    "whole of what we are building. If the honest next piece really is an ending, "
+    "give that instead — and once one step leaves this claim, an ending here is "
+    "welcome too."
+)
+"""What the question adds while a claim at the very start of the story has no step yet.
+
+**Measured, 2026-09-20.** A run on the new prompt answered the hypothesis three
+times running with a tradeable ending — Brent, TTF, JKM — and since an ending
+never joins the frontier, the frontier emptied and the map stopped at four claims
+and one layer. The model was not confusing a step for an ending: the standing
+half says what an ending *is* with more precision than it says anything else, so
+"propose a tradeable ending" is the clearest task on offer, and nothing in the
+varying half said it was not this call's task.
+
+So the correction goes in the varying half, where it costs no cached prefix and
+can depend on the map. **It is a preference, not a rule.** Nothing in `expand.py`
+refuses an early ending, and an ending straight off the hypothesis is sometimes
+the right arrow — the first Opus run's `Hormuz -> Brent` was one. What this
+stops is an early ending being the *obvious* move three times over.
+"""
+
+
+def _at_the_very_start(graph: Graph, frontier: PropositionId) -> bool:
+    """Say whether this claim is near the start of the story and leads nowhere onward.
+
+    Two conditions, and both must hold. **Near the start**: the claim is the one
+    the map began from, or one arrow away from it. **Leading nowhere onward**: no
+    arrow out of it reaches a claim the story could carry on through — an ending
+    is not a step, which is the whole point.
+
+    Args:
+        graph: The map as it stands.
+        frontier: The claim being asked about.
+
+    Returns:
+        True while a step would help this claim more than an ending would.
+    """
+    kinds = {one.id: one.kind for one in graph.propositions}
+    near_the_start = frontier == graph.hypothesis_id or any(
+        arrow.source == graph.hypothesis_id and arrow.target == frontier for arrow in graph.links
+    )
+    if not near_the_start:
+        return False
+    return not any(
+        arrow.source == frontier and kinds.get(arrow.target) not in TERMINAL_KINDS
+        for arrow in graph.links
+    )
 
 
 def _map_as_text(graph: Graph) -> str:
