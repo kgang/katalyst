@@ -86,8 +86,20 @@ world is replayable from a map, a branch and this, so writing it down once here 
 what makes every figure below reproducible.
 """
 
-WHERE = Path(__file__).resolve().parents[4] / "docs" / "worked-numbers.txt"
-"""The one file this writes: `docs/worked-numbers.txt`, four directories up from here."""
+CHECKOUT = Path(__file__).resolve().parents[4]
+"""The checkout this file was read out of: four directories up from here.
+
+`src/katalyst/engine/…` sits inside `backend/`, which sits in the checkout. That
+holds because the server is installed so that it runs from its own source rather
+than from a copy — which is how `uv run` installs it and how every other task in
+the `Makefile` already depends on it working. `main` says so out loud rather than
+trusting it, because the way this would fail otherwise is by quietly writing the
+file somewhere nobody looks, and then the build saying it is stale while
+regenerating it changes nothing.
+"""
+
+WHERE = CHECKOUT / "docs" / "worked-numbers.txt"
+"""The one file this writes: `docs/worked-numbers.txt`."""
 
 DIGITS = 6
 """How many decimal places the full-precision column prints.
@@ -809,8 +821,22 @@ def main(arguments: Sequence[str]) -> int:
 
     Returns:
         0 when the file is written.
+
+    Raises:
+        ValueError: If the committed file's place cannot be found. Writing it
+            somewhere else would leave the build calling it stale for ever while
+            regenerating it changed nothing.
     """
-    where = Path(arguments[0]) if arguments else WHERE
+    if arguments:
+        where = Path(arguments[0])
+    else:
+        where = WHERE
+        if not (CHECKOUT / "backend" / "src" / "katalyst").is_dir():
+            raise ValueError(
+                f"this file was read from {Path(__file__).resolve()}, which is not inside a "
+                "checkout of Katalyst, so there is nowhere to put docs/worked-numbers.txt. "
+                "Run it from the checkout, or name a path to write to."
+            )
     where.parent.mkdir(parents=True, exist_ok=True)
     where.write_text(text(), encoding="utf-8", newline="\n")
     print(f"worked-numbers: wrote {where}")
