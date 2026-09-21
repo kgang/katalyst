@@ -36,6 +36,7 @@
  * union's, and that is exactly what this needs.
  */
 
+import { DOWN_THE_TILE, PORT_STANDOFF } from "../ports";
 import { lagInWords, pushAsNumber, pushInWords } from "./encodings";
 import {
   type Box,
@@ -48,21 +49,6 @@ import {
 
 /* ---- Where a wire leaves and arrives ------------------------------------- */
 
-/**
- * How far down its tile each socket sits, and how far the socket stands off the
- * tile's edge.
- *
- * These three numbers are `Tile.tsx`'s — the sockets are drawn at 38% and 62% of
- * the tile's own height — and they are written down again here because a plate
- * has to be placed before a single wire is drawn, and at that point the only
- * thing that knows where a wire will start is this. A test pins the two files
- * together, so the day the tile moves a socket this stops agreeing loudly rather
- * than quietly.
- */
-const TRIGGER_DOWN_THE_TILE = 0.38;
-const SUSTAIN_DOWN_THE_TILE = 0.62;
-const SOCKET_STANDOFF = 8;
-
 /** Where a wire leaves its cause and where it arrives at its effect. */
 export interface Sockets {
   readonly sourceX: number;
@@ -74,6 +60,13 @@ export interface Sockets {
 /**
  * Where this wire's two ends are, from the layout alone.
  *
+ * **No port is measured to work this out, and none could be.** A plate has to
+ * be placed before a single wire has been drawn, so the only thing that can say
+ * where a wire will start is the arithmetic in `ports.ts` — the same arithmetic
+ * the tile is drawn from and the drawing library is handed. A wire attaches a
+ * clear `PORT_STANDOFF` outside the tile's edge, at the share of the tile's own
+ * height its socket sits at.
+ *
  * @param wire The arrow.
  * @param boxes Where the layout put each tile, by identifier.
  */
@@ -83,11 +76,11 @@ export function socketsFor(wire: RoutableWire, boxes: ReadonlyMap<string, Box>):
   if (from === undefined || to === undefined) {
     return null;
   }
-  const down = wire.handle.endsWith("sustain") ? SUSTAIN_DOWN_THE_TILE : TRIGGER_DOWN_THE_TILE;
+  const down = wire.handle.endsWith("sustain") ? DOWN_THE_TILE.sustain : DOWN_THE_TILE.trigger;
   return {
-    sourceX: from.x + from.width + SOCKET_STANDOFF,
+    sourceX: from.x + from.width + PORT_STANDOFF,
     sourceY: from.y + from.height * down,
-    targetX: to.x - SOCKET_STANDOFF,
+    targetX: to.x - PORT_STANDOFF,
     targetY: to.y + to.height * down,
   };
 }

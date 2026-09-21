@@ -7,10 +7,11 @@
  */
 
 import type { Node } from "@xyflow/react";
-import type { ClaimView, LinkMode, WorldView } from "../world";
+import type { ClaimView, WorldView } from "../world";
 import type { LayoutEdge, LayoutTile } from "./elkGraph";
 import { TILE_MIN_HEIGHT, TILE_WIDTH, tileHeight } from "./geometry";
 import { assignLayers, capLayers } from "./layers";
+import { portsForAWire, portsOf } from "./ports";
 import type { CausalEdge } from "./wires/CausalWire";
 
 /** A tile standing for one claim. */
@@ -54,13 +55,6 @@ export interface MapDrawing {
    * lands in the column it belongs to.
    */
   readonly layoutEdges: readonly LayoutEdge[];
-}
-
-/** Which socket a wire of this kind leaves from, and which it arrives at. */
-function sockets(mode: LinkMode): { source: string; target: string } {
-  return mode === "sustain"
-    ? { source: "out-sustain", target: "in-sustain" }
-    : { source: "out-trigger", target: "in-trigger" };
 }
 
 /**
@@ -130,7 +124,7 @@ export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>):
   const edges: MapEdge[] = world.links
     .filter((link) => drawn.has(link.source) && drawn.has(link.target))
     .map((link) => {
-      const { source, target } = sockets(link.mode);
+      const { source, target } = portsForAWire(link.mode);
       return {
         id: link.id,
         source: link.source,
@@ -183,8 +177,8 @@ export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>):
     }
   }
 
-  // **Every tile is told how big it is, and the layout and the drawing library
-  // are told the same number.**
+  // **Every tile is told how big it is and where its ports are, and the layout,
+  // the tile and the drawing library are all told the same numbers.**
   //
   // A tile's box is not something to be discovered: it is 280 pixels wide
   // (`TILE_WIDTH`) and exactly as tall as the height this file worked out from
@@ -192,26 +186,34 @@ export function toFlow(world: WorldView, heights?: ReadonlyMap<string, number>):
   // layout engine has always been told. The drawing library was not — it was
   // left to measure each tile with a `ResizeObserver`, and **it draws nothing
   // it has not measured**: a node with no size is rendered `visibility:
-  // hidden`.
+  // hidden`, and a wire with no measured port at either end is not rendered at
+  // all.
   //
   // That is a promise the browser does not keep. When too many size
   // observations fall due in one frame the browser abandons the rest of them —
   // *"a ResizeObserver loop completed with undelivered notifications"* — and an
   // abandoned one is never delivered. A tile whose box then never changes size
   // again is never observed again, so it stays invisible for the life of the
-  // page: the map holds its claims, in their places, and a reader cannot see
-  // them. It is reachable today, on a cold machine, on the stored example.
+  // page, and its arrows stay off the glass for the life of the page: the map
+  // holds its claims, in their places, and says nothing about how they are
+  // joined. Both halves are reachable today, on a busy machine, on the stored
+  // example.
   //
-  // Saying the size is not a guess and not a duplicate: it is the one number,
-  // handed to both of the things that need it, from the one place that worked
-  // it out. The library still measures afterwards and still corrects itself —
-  // `initialWidth` and `initialHeight` are what it asks for exactly so that a
-  // caller who knows can say — and nothing downstream reads these back.
+  // Saying it is not a guess and not a duplicate: it is the one set of numbers,
+  // handed to every thing that needs them, from the one place that worked them
+  // out. A port's box comes from `ports.ts`, which is also what the tile writes
+  // onto the element it draws — so what is declared here is what the browser
+  // would have measured, and the library correcting itself afterwards from its
+  // own measurement changes nothing. Nothing downstream reads any of it back.
   const tiles: LayoutTile[] = [];
   const sized = nodes.map((node) => {
     const height = node.type === "claim" ? node.data.height : TILE_MIN_HEIGHT;
     tiles.push({ id: node.id, height });
-    return { ...node, initialWidth: TILE_WIDTH, initialHeight: height };
+    const box = { ...node, initialWidth: TILE_WIDTH, initialHeight: height };
+    // Only a claim's tile has ports, because only a claim is ever at the end of
+    // an arrow. The tile standing in for a column's collapsed claims has none,
+    // and is told none.
+    return node.type === "claim" ? { ...box, handles: portsOf(height) } : box;
   }) as MapNode[];
 
   return { nodes: sized, edges, layoutEdges, tiles };

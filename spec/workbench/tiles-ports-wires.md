@@ -175,6 +175,8 @@ And one state that replaces the number entirely: **while an edit has fixed a cla
 
 One **input group** and one **output group** per tile, drawn as small sockets on the left and right edges. Within each group, `trigger` and `sustain` attach to **distinct handle identifiers** — `in-trigger`, `in-sustain`, `out-trigger`, `out-sustain` *(names proposed here; that the identifiers are distinct is settled, what they are called is not)* — so a wire's meaning is visible at the socket before you follow it. `trigger` is a domino — it fires once when its cause becomes true and the effect stays pushed, fading on its own. `sustain` is an apple on a desk — the push exists only while its cause holds, and vanishes the moment it stops.
 
+**The ports' places are declared, not discovered** — worked out from the tile's own height and handed to the drawing library along with the tile's box, exactly as that height is. A wire is drawn between two ports, and a library left to find them by measuring the drawn page draws no wire at all on the day the browser drops that measurement: the map then holds every claim, in its place, and says nothing about how they are joined. So nothing about a port is ever read back off a drawn tile, and one set of numbers places the socket, places the wire's end and places the plate beside it.
+
 ### The wire, and its five encodings
 
 ```ts

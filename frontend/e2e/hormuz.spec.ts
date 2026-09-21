@@ -91,6 +91,33 @@ async function waitForTheLayout(page: Page, tiles: number): Promise<void> {
 }
 
 /**
+ * Every arrow the stored example has, on the glass, by name.
+ *
+ * **A causal map is its arrows.** A map that drew every claim and none of the
+ * arrows between them is the wrong picture of the argument, and a silent one —
+ * every tile is there, in its place, and nothing says how they are joined. The
+ * suite met exactly that in the wild. On the stored example the only arrow ever
+ * checked for was `H->C`, the one an edit is made to, so the other seven could
+ * have gone without a word.
+ *
+ * By name rather than by count, because a map drawing six of the eight is the
+ * same fault arriving quieter.
+ *
+ * @param page The page the map is on.
+ */
+async function everyArrowIsDrawn(page: Page): Promise<void> {
+  const eight = ["B->M1", "B->M2", "B->R", "C->B", "H->B", "H->C", "H->N1", "R->B"];
+  await expect(page.locator(".react-flow__edge")).toHaveCount(eight.length);
+  await expect
+    .poll(() =>
+      page
+        .locator(".react-flow__edge")
+        .evaluateAll((wires) => wires.map((wire) => (wire as HTMLElement).dataset.id).sort()),
+    )
+    .toEqual(eight);
+}
+
+/**
  * Read one value off the screen, once the screen has settled on it.
  *
  * The shape is not decoration: it is what "settled" means here. A chip holds an
@@ -302,17 +329,17 @@ async function openThePanelOnTheArrow(page: Page, id: string): Promise<void> {
   const panel = page.locator(".intervene");
   const wanted = `The arrow from ${id.replace("->", " to ")}.`;
   const tried: string[] = [];
+  // **The arrow is on the glass, or this fails here and says which arrow.**
+  // This used to wait the missing arrow out and report what each attempt saw,
+  // because the map really did lose one under load — a tile whose ports the
+  // drawing library never measured has no arrows drawn to it. The ports are
+  // declared rather than measured now, so the waiting is gone: if it ever comes
+  // back, this is where it says so, by name, in fifteen seconds rather than
+  // forty-five.
+  await expect(arrow).toHaveCount(1);
+
   const until = Date.now() + 45_000;
   while (Date.now() < until) {
-    // The arrow has to be on the glass before it can be pointed at. It is not
-    // always: under load the map has been seen without it for long enough to
-    // matter, and blocking on the locator here spends the whole test's time in
-    // one call and reports nothing useful. So this asks, and waits, and says so.
-    if ((await arrow.count()) === 0) {
-      tried.push("the arrow was not on the glass at all");
-      await page.waitForTimeout(250);
-      continue;
-    }
     const on = await arrow.evaluate((group, which) => {
       const line = group.querySelector("path") as SVGPathElement | null;
       const toTheScreen = line?.getScreenCTM();
@@ -388,6 +415,10 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(page.locator(".map-origin")).toContainText("/api/worlds");
   await expect(page.locator(".map-origin")).toContainText("versions of the map");
   await waitForTheLayout(page, 7);
+
+  // And every arrow, by name. The map's claims are only half of what it says;
+  // the other half is what points at what.
+  await everyArrowIsDrawn(page);
 
   // Every tile is a whole tile on the first frame, not a summary. The zoom is
   // held at the point where a tile's smallest words land at eleven pixels, and
@@ -897,4 +928,86 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
   await expect
     .poll(() => tile.evaluate((el) => (el as HTMLElement).offsetHeight))
     .toBe(whileWaiting);
+});
+
+/**
+ * The map keeps its arrows when the browser drops the tiles' size notifications.
+ *
+ * **This is the browser's own failure mode, made total and deterministic.** A
+ * `ResizeObserver` is how the drawing library learns how big a thing is, and
+ * when too many observations fall due in one frame the browser abandons the
+ * rest — *"a ResizeObserver loop completed with undelivered notifications"* —
+ * and an abandoned one is never delivered. #37 met that as tiles that never
+ * appeared, and fixed it by telling the library each tile's box outright.
+ *
+ * **A wire needs more than a box.** It is drawn between two ports — the sockets
+ * on a tile's edges — and where a port sits inside a tile used to be measured
+ * through the very same notification. So with the tiles' notifications dropped
+ * the map drew every claim, in its place, visible — and not one arrow. A causal
+ * map is its arrows: what is left is the wrong picture of the argument, and a
+ * silent one.
+ *
+ * **It is per tile, which is why it shows up as one missing arrow rather than
+ * an empty map.** Measured, dropping one tile's notifications and keeping every
+ * other: deafen the insurance premium and the two arrows that touch it go, and
+ * only those; deafen the strait and its three go. An arrow is not drawn when
+ * *either* end was never measured. That is the shape the end-to-end suite met
+ * in the wild — `H->C` absent from the glass, everything else in place — about
+ * once in two hundred runs at six workers on a loaded machine.
+ *
+ * **Why it passes now, and why nothing is retried to make it pass.** Every
+ * tile hands the drawing library its box and its four ports outright, worked
+ * out by `graph/ports.ts` and written onto the tile in the same numbers, so
+ * both ends of every arrow are known before the page has been measured once.
+ * With the tiles deaf, this map is drawn exactly as it is drawn with them
+ * hearing — which is the strongest form of the claim, and the reason nothing
+ * here waits or asks again.
+ *
+ * The shim below drops only the tiles' notifications and lets the glass's own
+ * through, because the library needs that one to draw anything at all.
+ */
+test("test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification", async ({ page }) => {
+  await page.addInitScript(() => {
+    const Real = window.ResizeObserver;
+    // Written as a plain function rather than a class on purpose: a private
+    // field here is compiled to a helper the page has never heard of.
+    function DropsTilesNotifications(given: ResizeObserverCallback) {
+      const real = new Real((entries, observer) => {
+        const kept = entries.filter((one) => one.target.closest(".react-flow__node") === null);
+        if (kept.length > 0) {
+          given(kept, observer);
+        }
+      });
+      return {
+        observe: (target: Element, options?: ResizeObserverOptions) =>
+          real.observe(target, options),
+        unobserve: (target: Element) => real.unobserve(target),
+        disconnect: () => real.disconnect(),
+      };
+    }
+    window.ResizeObserver = DropsTilesNotifications as unknown as typeof ResizeObserver;
+  });
+
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: /Strait of Hormuz/ })
+    .first()
+    .click();
+  await waitForTheLayout(page, 7);
+
+  // Every claim, visible — which is #37's half of this, and still holding.
+  await expect
+    .poll(() =>
+      page
+        .locator(".react-flow__node")
+        .evaluateAll(
+          (tiles) => tiles.filter((tile) => getComputedStyle(tile).visibility === "hidden").length,
+        ),
+    )
+    .toBe(0);
+
+  // And every arrow, by name — the same check the stored example gets with the
+  // browser behaving, so that this test says *nothing changes* rather than
+  // merely *something was drawn*.
+  await everyArrowIsDrawn(page);
 });
