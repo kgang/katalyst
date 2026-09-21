@@ -58,6 +58,7 @@ from katalyst.fixtures.hormuz import (
     STRIKE_TO_HORMUZ,
     STRIKE_TO_PREMIUM,
 )
+from tests.comparisons import every_version_answered_the_same
 from tests.strategies import beliefs, branches, graphs, interventions, separated_pair
 
 # Building a whole random map is slow enough that a per-example time limit would
@@ -978,20 +979,29 @@ def _world_of(graph: Graph, *edits: Intervention) -> World:
 
 
 def _same_on_the_days_they_share(base: World, branched: World, claim_id: str) -> None:
-    """Check one claim reads the same in two worlds, on every day both of them carry.
+    """Check one claim reads the same word on every day two worlds both carry.
 
     Two worlds of the same map are drawn at the same days. Two worlds a claim was
     added between can be drawn at slightly different ones, because past the
     180-point cap every claim's own resolve-by day is kept among the points and a
     new claim brings a new one. Comparing the days they share is the whole of what
     can be compared, and it is every day the two would be shown side by side on.
+
+    The **word** each day carries is compared here and the number is not, because
+    the number is an average and an average can be reassociated by the array it
+    sits in — `tests/comparisons.py` explains that, and
+    `every_version_answered_the_same` is what checks the numbers exactly.
     """
     where = {day: index for index, day in enumerate(base.series_days)}
+    shared = 0
     for index, day in enumerate(branched.series_days):
         if day not in where:
             continue
-        assert branched.series[claim_id][index] == base.series[claim_id][where[day]], day
+        shared += 1
         assert branched.states[claim_id][index] == base.states[claim_id][where[day]], day
+        if base.series_days == branched.series_days:
+            assert branched.series[claim_id][index] == base.series[claim_id][where[day]], day
+    assert shared, "the two worlds drew no day in common"
 
 
 def _has_no_loops(graph: Graph) -> bool:
@@ -1039,12 +1049,19 @@ def test_intervention_locality(kind: str, data: st.DataObject) -> None:
     may_move = _affected_from_the_shape(after, edit)
 
     assert pinned not in may_move
-    assert branched.beliefs[pinned] == base.beliefs[pinned]
-    for claim_id, belief in branched.beliefs.items():
-        if claim_id in may_move:
-            continue
+    untouched = [one for one in branched.beliefs if one not in may_move]
+    for claim_id in untouched:
         assert claim_id in base.beliefs, "an edit added a claim outside its own reach"
-        assert belief == base.beliefs[claim_id], claim_id
+    # Everything the engine worked out about each of them, bit for bit: every
+    # version's answer, the spread inside each version, and how much each version
+    # counts. `tests/comparisons.py` says why the reported likelihood is the one
+    # thing that cannot be asked for exactly.
+    on_one_grid = every_version_answered_the_same(base, branched, untouched)
+    # And the reported numbers, exactly — where exactly is a thing that can be
+    # asked. `tests/comparisons.py` says when it is not, and why.
+    if on_one_grid:
+        for claim_id in untouched:
+            assert branched.beliefs[claim_id] == base.beliefs[claim_id], claim_id
     # A claim added by an `insert` brings its own resolve-by day, and past the
     # 180-point cap that day joins the points every series is drawn at — so the two
     # worlds can be drawn at slightly different days. They are compared on the days
