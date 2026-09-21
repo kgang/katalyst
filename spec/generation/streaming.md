@@ -221,7 +221,7 @@ All under `/api/`, like everything else, in `backend/src/katalyst/api/generate.p
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed`. **A live run here asks the model for `medium` effort** unless `KATALYST_EFFORT` says otherwise (Kent, G13): a reader is waiting, and the `receipt` event says which effort made the map |
+| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?, start?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed`. **`start` says how the run starts** — `live` calls a model, `replay` plays the committed recording of that sentence, and the route does what it was asked or says plainly why it cannot; left out it plays a recording, because a request that did not ask to spend money must never spend it (record 0012, amended 2026-09-21). **A live run here asks the model for `medium` effort** unless `KATALYST_EFFORT` says otherwise (Kent, G13): a reader is waiting, and the `receipt` event says which effort made the map |
 | `POST /api/generate/insert` | `{base_id, branch?, claim_in_words}` | A `DraftedInsert`: one `Insert` intervention — a claim and its arrows, drafted and already validated — **its own small receipt, and its own working** |
 | `GET /api/generate/{generation_id}/transcript` | — | The transcript of a generation this process still holds; `404` with a plain sentence when it does not |
 

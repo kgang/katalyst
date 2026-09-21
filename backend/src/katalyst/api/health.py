@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from katalyst.engine.replay import RecordingSummary, readable
+from katalyst.engine.replay import RecordingSummary, readable, summary_of
 from katalyst.settings import Settings, get_settings
 
 router = APIRouter(tags=["health"])
@@ -50,10 +50,12 @@ class Readiness(BaseModel):
     replayable: tuple[RecordingSummary, ...] = Field(
         default=(),
         description=(
-            "The examples this copy can play back from a committed recording, and "
-            "the day each one was made. The first screen reads it before anything "
-            "runs, which is the only way it can name a date at all: the day a "
-            "recording was made travels on the receipt, and the receipt arrives last."
+            "The examples this copy can play back from a committed recording, the "
+            "day each one was made, and what making it cost — the recorded run's "
+            "own calls, seconds and dollars, read off the file's own receipt. The "
+            "first screen reads it before anything runs, which is the only way it "
+            "can name a date or a price at all: both travel on the receipt, and "
+            "the receipt arrives last."
         ),
     )
     unreadable: tuple[str, ...] = Field(
@@ -103,10 +105,10 @@ def readyz(settings: Annotated[Settings, Depends(get_settings)]) -> Readiness:
     # An empty string counts as no key: copying .env.example unfilled must not read as ready.
     model_key_present = bool(settings.ANTHROPIC_API_KEY)
     good, unreadable = readable()
-    replayable = tuple(
-        RecordingSummary(example=one.example, recording_date=one.header.recording_date)
-        for one in good
-    )
+    # **One builder, in the engine**, so that what a recording costs is described
+    # in exactly one place. This route used to assemble the summary itself, which
+    # made it a second answer waiting to disagree with the first.
+    replayable = tuple(summary_of(one) for one in good)
     return Readiness(
         status="ready" if model_key_present or replayable else "not_ready",
         model_key_present=model_key_present,

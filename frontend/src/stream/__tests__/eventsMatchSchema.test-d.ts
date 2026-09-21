@@ -68,7 +68,7 @@ pinned<Agree<Omit<Receipt, "event">, components["schemas"]["katalyst__engine__ev
 
 /* ---- What the browser asks for -------------------------------------------
  *
- * The browser sends four of the six the route takes. `versions` and `worlds`
+ * The browser sends five of the seven the route takes. `versions` and `worlds`
  * are deliberately never sent — the engine's own are what every map in this
  * product is worked out with — so this one is a *subset* check rather than an
  * agreement: every field the browser sends must be a field the route takes.
