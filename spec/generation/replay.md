@@ -4,7 +4,7 @@
 
 Someone from the Catalyst team clones this repository, runs `docker compose up`, opens the browser — and has no reason to spend money on a model key. Everything this prototype is judged on lives past that point: a map drawing itself claim by claim, the validator refusing the model in public, a step changed and the trades moving.
 
-**Replay puts all of it in front of them.** With no key, the four example hypotheses from `ASSIGNMENT.md` play from committed recordings, through the same route, the same stream and the same canvas the live path uses. The only substitution anywhere is where the bytes came from, and the screen says so.
+**Replay puts all of it in front of them.** With no key, an example hypothesis from `ASSIGNMENT.md` plays from a committed recording, through the same route, the same stream and the same canvas the live path uses. The only substitution anywhere is where the bytes came from, and the screen says so. Four sentences are offered; **one, the Strait of Hormuz, is recorded today**, and the other three cards say so rather than failing. Every rule below is written for four because the machinery does not count — it reads the folder — and a card with nothing behind it is a state this chapter names rather than an accident.
 
 This is decision record 0012, accepted by Kent on 2026-09-17, made concrete: the file format, what is stored and what is deliberately not, how a recording is written, the one scripted intervention each one carries, how a run's refusals are shown honestly whether there were any or none, and the build check that keeps them from going stale in silence.
 
@@ -137,11 +137,11 @@ One name for the day a recording was made — **`recording_date`**, here, on the
 
 With no key, and recordings on disk:
 
-* The four launchpad cards are offered as replays, and the screen says so, **word for word**:
+* Every launchpad card the folder has a recording for is offered as a replay, and the screen says so, **word for word**:
 
   > **No model key configured — these four run from recordings made on \<date\>.**
 
-  The date comes from `replayable`, and from nowhere else.
+  The date comes from `replayable`, and from nowhere else. **That exact sentence is printed only when it is true** — when all four can be played and all four were made on one day. With fewer, the screen says how many of the four run and that the rest have nothing recorded yet; with more than one day, it names the **oldest**, so the sentence is never more current than the oldest thing it describes. A screen claiming four replays above three cards reading *not yet live* would be the product caught out in the one place it exists to be honest.
 
 * The free-text hypothesis field is **visibly disabled, carrying that same sentence** — never silently inert, which teaches the user that the product is broken rather than that this copy of it is unconfigured.
 * A `replay` badge sits on the canvas for the whole session.
@@ -268,9 +268,9 @@ Kent settled this on 2026-09-17 (G6), and it is an order chosen to spend the lea
 
 1. **All four run once through the structure-only eval as soon as the pipeline is green** — no recording written. A prompt that fails on the midterm example or the photonics one is found while it is cheap to fix. See [`evaluation.md`](evaluation.md).
 2. **Hormuz is recorded as soon as the pipeline runs.** It is the map every chapter in this book works its examples on, so a bad prompt shows up against a map the reader already knows by heart — and it unblocks the browser test and the growing canvas.
-3. **All four are recorded once the prompt is frozen**, at the end of the stream pull request.
+3. **The rest are recorded once the prompt is frozen, and one at a time, when somebody chooses to pay.** *(Kent, 2026-09-21: keep the recordings to Hormuz until he says otherwise — four of them take too long.)* `make record-demo ONLY=<example>` writes one. Nothing in the product waits on them: a card with no recording is an honest state and says so.
 
-Every re-record is money, and the first Hormuz generation is also a measurement: its true cost, thinking tokens and web searches included, goes into [`../../docs/measurements.md`](../../docs/measurements.md) before anything larger is run.
+Every re-record is money, and every Hormuz generation is also a measurement: its true cost, thinking tokens and web searches included, goes into [`../../docs/measurements.md`](../../docs/measurements.md) before anything larger is run.
 
 ---
 

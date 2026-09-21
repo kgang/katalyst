@@ -258,7 +258,7 @@ The chip at the middle of a wire shows the **conditional likelihood**: the targe
 
 That number is **not computed here and is not on the world.** It is computed lazily by the engine, one arrow at a time, because computing every one of them costs a whole extra propagation per arrow. The canvas asks for it when a wire is hovered or selected, and caches the answer.
 
-**Until it has one — and always, in this stack, because the route does not exist yet — the chip reads the arrow's push back in words**, from data already on the link:
+**Until the answer arrives — and wherever no engine can be reached — the chip reads the arrow's push back in words**, from data already on the link:
 
 ```
 +1.6 · a strong push toward

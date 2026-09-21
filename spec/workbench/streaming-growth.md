@@ -17,8 +17,8 @@ watching: our own rules turning the model down.
 Three things a reader can do after this chapter that they could not before. **Type any sentence and
 watch what it would cause.** **Name a destination and get a graded path to it, or an honest "no path
 reaches this" naming the nearest claim that was reached** (FR-7, UX-13). And, **with no model key at
-all, watch the same four examples run from recordings** (record 0012) — the same stream, the same
-canvas, the same refusals, labelled as a replay everywhere a reader looks.
+all, watch a recorded example run** (record 0012) — the same stream, the same canvas, the same
+refusals, labelled as a replay everywhere a reader looks.
 
 This chapter owns the eight stream events as the browser types them, the `growth` reducer that folds
 them into a world, the skeleton tile, the refusal strip, the receipt strip, the Verify door's two
@@ -451,10 +451,12 @@ The map that grows is the one the rest of this part works on — the cast is in
 settles below $68, **R** OPEC+ announces restraint, **M1** a Polymarket contract, **M2** an
 energy-fund claim, **N1** talks resume. B7 uses the Verify door instead, with M1 as the destination.
 
-**No number in this chapter is a measurement of a generation, because no generation has been run
-yet.** The recordings are made in this stack's server half. Where a run's own number would go — a
-token count, a cost, how long it took, a likelihood — this chapter says which field it comes from
-and prints nothing.
+**No number in this chapter is a measurement of a generation, and that is on purpose.** Real runs
+have been made and what they cost is written down, dated, in
+[`../../docs/measurements.md`](../../docs/measurements.md), which owns those figures. Where a run's
+own number would go here — a token count, a cost, how long it took, a likelihood — this chapter says
+which field it comes from and prints nothing, so a chapter about a screen never goes stale because a
+model got cheaper.
 
 ### B1 — The first second: a rectangle, never a spinner
 
@@ -483,9 +485,8 @@ token"*, and this pipeline has no first token to be within a second of: the mode
 measured from the first token would be a budget nothing could ever miss, because the thing it starts
 timing from arrives at the same moment as the thing it times. So the budget is measured from the
 request being accepted, and what has to be on screen within the second is a skeleton at its column —
-which is the honest reading of what UX-8 promises anyway. The sentence `PRODUCT_REQUIREMENTS.md`
-should carry instead is in this pull request's report; the requirement itself is not this chapter's
-to edit.
+which is the honest reading of what UX-8 promises anyway. **NFR-7 now reads that way**, amended
+2026-09-20 in `PRODUCT_REQUIREMENTS.md` itself, so the two no longer disagree.
 
 **There is no spinner anywhere in this product** — not here, not on the launchpad, not on the
 `insert` route, not while a lazily fetched midpoint chip is in flight. Waiting is always shown as the
@@ -1006,19 +1007,29 @@ The other five operations — **Suppose this is true**, **This happened**, **Cha
 the engine's pure core, which is why a reader with no key still gets the whole multiverse at full
 fidelity.
 
-### B9 — With no key: the replay badge, and the four cards
+### B9 — With no key: the replay badge, and the cards
 
-**The launchpad's four cards all open a map**, and the three that today read *not yet live* stop
-doing so. With a key they run live. With no key they run from recordings, through the same route, the
-same eight events, the same canvas, at a fixed pacing that is cosmetic and never changes content or
-order (record 0012).
+**With a key, all four cards run live.** With no key, a card runs from a recording — through the same
+route, the same eight events, the same canvas, at a fixed pacing that is cosmetic and never changes
+content or order (record 0012) — or **it is not drawn at all**: no key and no recording means an
+example nobody has recorded yet, and a card a reader cannot take up is not a card. So an example is
+live, replayed or named in a sentence, and each of the three is a fact about this copy rather than a
+guess.
 
-**The launchpad says so, word for word:**
+**The launchpad says which, and it never says more than is true.** Record 0012's sentence —
 
 > No model key configured — these four run from recordings made on \<date\>.
 
-The sentence sits under the cards and again beneath the free-text field, which is visibly
-disabled with it.
+— is printed **only when all four can be played and all four were made on one day**. Fewer than four,
+and the screen says how many of the four run and that the rest have nothing recorded yet. More than
+one day, and it names the **oldest**, so the sentence is never more current than the oldest thing it
+describes. Whichever it is, the sentence sits under the cards and again beneath the free-text field,
+which is visibly disabled with it. **Today one example is recorded**, the Strait of Hormuz, so a
+keyless reviewer reads the *fewer than four* form: *No model key configured — one of these four
+runs from recordings, made on \<date\>; the midterms, export controls and photonic chips have
+nothing recorded yet.* A screen promising four replays above
+one card that plays is the most misleading thing this product could put on its first screen, which is
+why the wording is chosen from what the folder holds rather than from what the design hoped for.
 
 **A card is only ever something a reader can take up** *(2026-09-21)*. It runs live or it runs from
 a recording — and a sentence this copy can do neither with gets **no card at all**. With one
@@ -1078,13 +1089,13 @@ the same day the `receipt` event carries, so it keeps one name in all three plac
 word, nothing to translate between.
 
 The browser reads the day from that field and never from a file name, a build date or its own clock.
-When the four were not all recorded on one day — G6 records them together once the prompt is frozen,
-so they normally are — the shared sentence prints the **oldest** day in the set and each card carries
-its own beneath, so the sentence is never more current than the oldest thing it describes.
+When the recordings were not all made on one day, the shared sentence prints the **oldest** day in the
+set and each card carries its own beneath, so the sentence is never more current than the oldest
+thing it describes.
 
 **The launchpad reads `replayable` and `model_key_present`, and ignores `status`.** A program with no
-key but four recordings can do everything a reviewer came to see, and a card greyed out because the
-whole server called itself `not_ready` would be the most misleading screen in the product.
+key but a recording can do everything a reviewer came to see, and a card greyed out because the whole
+server called itself `not_ready` would be the most misleading screen in the product.
 
 **A replay says it is a replay, twice, from two sources.** The badge is in the bar for the whole
 session, from the moment the run starts, set from `model_key_present` — the browser knows before the
@@ -1103,8 +1114,9 @@ still true that the run reported itself live. Resolving it in favour of either w
 deciding which of two things it was told to believe, which is the one decision it must not make on a
 reader's behalf. The reasoning lives beside the code that does it, in `ReplayBadge.tsx`.
 
-**One recorded intervention per recording.** Each file carries the scripted *"…but Iran is struck
-the next day"* its card offers, so **Add a claim** works once on a replayed map — the route matches
+**One recorded intervention per recording.** Each file carries the scripted "…but this also happens"
+sentence its card offers — for the Strait of Hormuz, *"…but Iran is struck the next day"* — so **Add
+a claim** works once on a replayed map. The route matches
 the sentence against the recording's own, exactly after trimming surrounding spaces, the same rule
 that chose which recording to play. There is no fuzzy matching and there will not be: a similarity
 score doing the model's job badly is a piece of state nobody could trace to an input, a rule or a

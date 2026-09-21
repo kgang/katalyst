@@ -216,17 +216,15 @@ A claim sitting behind a **"+n more"** tile (`layout-and-zoom.md`) still gets it
 
 When a branch re-propagates, an `aria-live="polite"` region speaks one line. Polite means it waits for a pause rather than cutting across what is being read.
 
-Once the engine is connected, that line is:
+**The line is said twice, because the two facts arrive at different moments.** What the edit did to the *shape* of the map is known the instant the branch opens; what it did to the *numbers* comes back from the engine seconds later. A reader who cannot see the screen needs both, and needs to be told that the second is coming rather than left wondering whether it is missing.
 
-> *"Branch created. Six claims changed, one retracted."*
+> *"Branch created. One claim added, <n> claims your edit can reach, one supposition retracted. The numbers are on their way from the engine."*
 
-**In this stack there is no engine, so no claim has changed, because nothing computed a change.** Saying "six claims changed" would be inventing exactly the state the second veto exists to stop. What *is* real is structure — which claims arrived, which your edit can reach, which it provably cannot — computed from the branch by the reducer in `diff-view.md` and needing no arithmetic at all. So today the line is:
+> *"Branch created. One claim added, <n> claims moved, one supposition retracted."*
 
-> *"Branch created. One claim added, six claims your edit can reach, one supposition retracted. No numbers yet."*
+**Every count comes from somewhere nameable.** The **added** count and the **your edit can reach** count are structure, computed from the branch by the reducer in `diff-view.md` with no arithmetic at all — on the strike branch that is S added, and R left out, because the only wire that could carry the edit to R is a feedback arrow and the diff sets those aside. The **moved** count is the engine's own word, one per claim, read off its difference. The **retracted** count is UX-14's, which `tiles-ports-wires.md` renders on H's tile.
 
-Every count comes from somewhere nameable: the **added** and **downstream** counts from `diff-view.md`'s reducer — on the strike branch that is S added, six claims downstream (H, C, B, N1, M1, M2), and R `untouched`, because the only wire that could carry the edit to R is reflexive and the diff sets those aside; the **retracted** count from UX-14, which `tiles-ports-wires.md` renders on H's tile; and **no numbers yet** said out loud rather than left as a silence.
-
-When `ApiWorldSource` lands, "your edit can reach" becomes "changed" and the count becomes a computed one. Nothing is deleted at that point, because nothing false was said.
+**The browser never counts moved claims by comparing two numbers.** It reads how many claims the engine called `shifted`. That is why the two lines can differ — a claim the edit can reach is a claim that *could* move, and the engine decides whether it did — and why a reader hearing a smaller second number is hearing a real finding rather than a bug.
 
 ### B9 — Focus, contrast, and nothing by hue alone
 
@@ -268,7 +266,7 @@ Each is *for all X, statement P holds*, and each names what checks it. "Visual r
 4. **Do not round in the view model**, because the Inspector needs the precision the chip threw away, and a number rounded twice drifts a whole step. Carry the full number; round once, in the chip, at paint.
 5. **Do not drop the range when the space is tight**, because a bare `.40` is the fake-precise number this product exists to argue against. Widen the space.
 6. **Do not print `1.0` or `.0` on a chip**, because a likelihood of one is a claim that something cannot fail and this product does not make that claim. Print `>.99` and `<.01`, on the range's ends as well as on the number.
-7. **Do not say "six claims changed" before anything computed a change**, because a count nobody computed is a state nobody can trace. Say what is true — added, reachable, retracted — and say "no numbers yet" out loud.
+7. **Do not say a claim changed before the engine has said it did, and do not count the ones that did by comparing two numbers**, because a count nobody computed is a state nobody can trace, and a second count is a second answer. While the engine is being asked, say what is true — added, reachable, retracted — and say out loud that the numbers are coming. Afterwards, count the claims the engine itself called moved.
 8. **Do not build the outline from the tiles on screen**, because a claim behind a "+n more" tile would silently vanish for the reader who needs the outline most. Build it from the world.
 9. **Do not lean on hue for anything**, because roughly one reader in twelve will not see the difference and a greyscale screenshot is line 3 of the visual review checklist. Every direction gets a glyph, every tail a texture, every provenance a mark.
 10. **Do not write `outline: none`**, anywhere, for any reason. A focus ring you cannot see is a keyboard interface you cannot use. Restyle the ring with `--focus`; never remove it.
