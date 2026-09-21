@@ -3,7 +3,8 @@
 # so the claim says nothing about how it would be settled. Everything else — the
 # request, the search results, the counters, the headers — is that recording's,
 # untouched. Diff the two files to see the whole of the change.
-# `make record-cassettes` leaves this one alone.
+# `make record-cassettes` leaves this one alone; it is remade by
+# tests/boundary/remake_handmade_cassettes.py.
 interactions:
 - request:
     body: "{\"max_tokens\":16000,\"messages\":[{\"role\":\"user\",\"content\":\"Today is 2026-09-17.\\\

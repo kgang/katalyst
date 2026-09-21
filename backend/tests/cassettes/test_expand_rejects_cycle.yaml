@@ -3,7 +3,8 @@
 # (its arrow). The request is the first file's, untouched. The answer is an arrow
 # proposal drawn from B back to H, which closes H -> C -> B -> H. The search results,
 # the counters and the headers are the first file's. Diff them to see the whole of
-# the change. `make record-cassettes` leaves this one alone.
+# the change. `make record-cassettes` leaves this one alone; it is remade by
+# tests/boundary/remake_handmade_cassettes.py.
 interactions:
 - request:
     body: "{\"max_tokens\":16000,\"messages\":[{\"role\":\"user\",\"content\":\"Today is 2026-09-17.\\\
