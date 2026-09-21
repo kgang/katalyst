@@ -425,7 +425,7 @@ For every tile: the chips rendered are exactly the model's, plus the reader's an
 
 Two halves, and the second is the amendment. The voices are never merged, and a voice with nothing to say takes no column: on the recorded generation that is 36 of 54 cells, and the map reads as numbers rather than as apologies.
 
-- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_draws_one_chip_per_voice_and_never_a_fourth`, and `test_a_belief_column_with_no_number_is_not_drawn` — which is run over the claims folded out of `backend/recordings/hormuz.jsonl` by the app's own stream reducer, because the curated example is the one map where a reader's number and a venue's quote both exist and it hid this from every test in the tree. `test_a_belief_column_with_a_number_is_still_drawn` holds the other half.
+- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_draws_one_chip_per_voice_and_never_a_fourth`, and `test_a_belief_column_with_no_number_is_not_drawn` — which is run over the claims folded out of `backend/recordings/hormuz.jsonl` by the app's own stream reducer, because the curated example is the one map where a reader's number and a venue's quote both exist and it hid this from every test in the tree. `test_a_belief_column_with_a_number_is_still_drawn` holds the other half, and `test_the_reserved_height_is_the_same_whether_one_column_is_drawn_or_three` holds the tile to its box over every claim on that same map.
 - **Also:** visual review checklist `VR14` — does any tile draw a belief column with no number in it?
 
 ### INV-workbench.7 — A claim whose value an edit fixed shows the word
