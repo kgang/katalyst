@@ -140,7 +140,7 @@ Five things to read off that:
 * **The model row here is the prior's own numbers, and that is not a coincidence.** Every
   `beliefs.model` in the fixture equals its `prior`, because nothing has been computed into it — so
   the stated sentence describes exactly what the row holds. Run the engine over this map and B comes
-  out `.40 (.25–.55)`, which is the number the computed sentence above would be about.
+  out `.40 (.24–.56)`, which is the number the computed sentence above would be about.
 * **Four things are genuinely absent on B, and each absence says which kind it is.** The **tile**
   shows `no market` and nothing else; **this panel is where the reason is read** — chosen by the
   claim's `kind` and written once in [`../vocabulary.md`](../vocabulary.md). B is an `event`, so it
@@ -228,7 +228,7 @@ there is a slot directly under it, and **in this stack nothing ever draws it**, 
 computed yet. What it will hold, in stack 06, is one sentence naming the claim whose own prior
 explains most of the band:
 
-> **65% of this band is B's own prior; pin that down and the band goes from 30 points to 12.**
+> **57% of this band is B's own prior; pin that down and the band goes from 31 points to 16.**
 
 That sentence is computed from `World.range_shares` — each stated range's share of this claim's
 band, which the engine gets out of the same two thousand versions of the map it already runs, at no
@@ -294,6 +294,13 @@ WHERE IT CAME FROM
 The weakest arrow on the map is H → N1, and it says so: **●** `asserted`, with a rationale admitting
 it cannot tell which way the causality runs. It is kept rather than deleted, because the ending it
 reaches — a real outcome nobody can trade — is worth saying out loud.
+
+**One mark, two things, and the second is new.** The mark says how well-backed the arrow is, and the
+engine now reads the same word as *how unsure we are of its push*: each version of the map draws a
+`documented` arrow's push close to what the map states and an `asserted` one's far from it
+([`../multiverse/propagation.md`](../multiverse/propagation.md) owns the table). N1's only incoming
+arrow is this one, and on the strike branch N1 has the widest band of the eight claims because of it:
+`.38 (.17–.61)`. A reader who sees one dot is being told both things at once.
 
 ### B5 — The path-product bar (INV-8)
 

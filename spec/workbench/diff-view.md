@@ -133,6 +133,14 @@ export interface ClaimDiffView {
       (`spec/multiverse/diff.md`); the Inspector turns it into one sentence and nothing
       in the browser ever works it out. */
   movedOnlyByReweighting: boolean;
+  /** Which half of the `unchanged` test the claim failed, in the engine's own plain word:
+      `under_the_floor` (it barely moved) or `versions_disagree` (it moved, and the versions
+      of the map did not agree which way). The engine reads the floor first, so a claim that
+      failed both says `under_the_floor`. Null on any claim that is not `unchanged`, and on an
+      `unchanged` claim with no move to measure. The browser prints the sentence that goes with
+      the word and works nothing out: the floor and the bar are constants inside the engine and
+      are on no wire. The server's name is `unchanged_because`. */
+  unchangedBecause: "under_the_floor" | "versions_disagree" | null;
 }
 
 export interface DeltaRow {
@@ -274,7 +282,7 @@ line each, in the order the engine gave them:
 M1  A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.
     tradeable
     down · largest on 2026-10-04
-    .50 ▼ .42        .27        97%
+    .49 ▼ .42        .27        95%
 ```
 
 The ending's own words and what kind of ending it is; then which way it went and
@@ -284,12 +292,18 @@ rather than after them, so the row reads as one number becoming another, and the
 direction is a word as well as a glyph because a glyph read aloud is nothing at
 all.
 
-The engine writes every part of that row. On the Hormuz strike branch (seed 20261001) the three rows
-it gives are: the Polymarket Brent contract · `.50 → .42` ▼ · largest on Oct 4; the energy-shares
-claim · `.43 → .36` ▼ · largest on Oct 6; the talks that cannot be traded · `.28 → .37` ▲ · largest
-on Oct 11 — the biggest move on the map, and last, because the only arrow into it is a bare assertion
-([`../multiverse/diff.md`](../multiverse/diff.md) has the arithmetic). This stack draws none of those
-numbers; it asks for none.
+The engine writes every part of that row. On the Hormuz strike branch (seed 20261001) it gives
+**two** rows: the Polymarket Brent contract · `.49 → .42` ▼ · largest on Oct 4; and the energy-shares
+claim · `.43 → .36` ▼ · largest on Oct 6. This stack draws neither number; it asks for neither.
+
+**The third ending is the one worth reading.** N1, the talks that cannot be traded, makes the biggest
+move on the map — `.28 → .38` — and the engine still calls it `unchanged`, so it is **not** a ranked
+row. Its only incoming arrow is the map's one bare assertion, `H → N1`, and a bare assertion is drawn
+so wide that only 88 of every 100 versions of the map agree the talks go *up* at all — under the 90
+in 100 the engine needs before it will say a claim moved
+([`../multiverse/diff.md`](../multiverse/diff.md) owns that bar). A big move nobody can agree the
+direction of is exactly what the bar is for, and the rail still lists N1: greyed, beneath the two
+ranked rows, reading **no change**. That is the case B5's greyed row was written for, arriving.
 
 That order is the size of the move times the **weakest arrow on the best-backed route** from any of
 the branch's edits to that ending — the route whose weakest arrow is strongest. Two factors and no
@@ -320,6 +334,17 @@ numbers — that would be the browser re-running the shifted test, with its own 
 90% bar, and two answers to that question is one too many. The two numbers behind a greyed row are
 still one click away in the Inspector; the row itself says the thing that is true, which is that
 nothing here moved.
+
+**And the row now says which half of the test it failed.** *Barely moved* and *moved, but the
+versions disagreed which way* are two different findings, and a reader given only "no change" cannot
+tell them apart. The engine writes the word — `under_the_floor` or `versions_disagree` — on the
+claim's own row, and the browser picks the sentence that goes with it. It still works nothing out:
+the floor and the bar are constants inside the engine and are on no wire, so the browser could not
+re-run the test if it wanted to. On the Hormuz strike branch the two claims that moved and still came
+out `unchanged`, B and N1, read `versions_disagree`; R, which did not move at all, reads
+`under_the_floor`. Where a claim fails both halves the engine names the floor, because a move nobody
+would notice needs no second sentence about its direction —
+[`../multiverse/diff.md`](../multiverse/diff.md) owns that rule and the two constants.
 
 **Before the engine — this stack — the rail does not rank and does not compute.** It lists the
 terminals the edit can reach, in **map order**, each with an absence and a reason where the number
@@ -373,10 +398,10 @@ series is data, never inference** — and this stack has some of it and not the 
 | **Supposed · Oct 1** | Oct 1; H shows the word, not a number | The assignment itself: an earlier supposition on H, with its date | **No** — the branch carries it |
 | **Retracted · Oct 2 · by "…"** | Oct 2 | **The world's own `retractions`**, once there is a world; derived from the branch until then | **Yes, once there is one** — see below |
 | **withdrawn** | Oct 2 – Oct 4, `.36`, labelled *"withdrawn — no live push yet"* | The `states` series: the cause of the opposing arrow became true on the 2nd, so we stop taking the user's word; S → H's three-day delay has not run, so H reads its own prior again | **Yes** |
-| **pushed** | Oct 5 onward, about `.080` | The `states` series: the delay has run and S → H's −1.9 push lands on that prior | **Yes** |
+| **pushed** | Oct 5 onward, `.086` | The `states` series: the delay has run and S → H's −1.9 push lands on that prior | **Yes** |
 
 So in this stack H's tile carries the badge pair and its order, its number slot reads *"no engine
-yet"*, and the series is absent with its reason. (`.080`, not `.08`: two significant figures on
+yet"*, and the series is absent with its reason. (`.086` and not `.09`: two significant figures on
 every number, the rule [`keyboard-and-access.md`](keyboard-and-access.md)
 owns. And `.36` rather than H's stated prior of `.35` — reading a prior back through the engine
 lands a hair above the middle for a likelihood under a half, which decision record 0014 predicts and
@@ -496,8 +521,11 @@ stores them, independent of every number on the world. Once the engine ranks the
 terminal is still on the rail — one the engine reported as `shifted` in the order the engine gave,
 and one it did not as a greyed row reading *no change*, in map order beneath them — and the
 `shifted` flag on every row is read off the engine's `ClaimDiff`, never derived by comparing two
-numbers in the browser. *Tests:* deltaRail › `test_lists_reachable_terminals_in_map_order`,
-`test_the_rail_keeps_the_engines_order`, `test_an_unmoved_terminal_is_a_greyed_row_not_a_missing_one`.
+numbers in the browser. A greyed row's sentence is picked by the engine's own word for which half of
+the test failed, and by no other route: no floor and no bar is written down in the browser. *Tests:*
+deltaRail › `test_lists_reachable_terminals_in_map_order`, `test_the_rail_keeps_the_engines_order`,
+`test_an_unmoved_terminal_is_a_greyed_row_not_a_missing_one`,
+`test_the_no_change_sentence_comes_from_the_engines_own_word`.
 
 **INV-workbench.47 — how firm and same direction are never folded into the rank.** For every rail
 row the two are rendered as their own columns, and no ordering function reads either. *Test:*
