@@ -455,7 +455,7 @@ export function MapScreen({
   useEffect(() => {
     if (wasOpen.current && !intervening) {
       const back = cameFrom.current;
-      if (back !== null && back.isConnected) {
+      if (back?.isConnected) {
         back.focus();
       } else {
         theWayIn.current?.focus();
