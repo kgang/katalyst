@@ -46,3 +46,29 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* One way into the working of this run, always there.
+ *
+ * It is a row of its own in the panel rather than a link inside the receipt
+ * strip, because the receipt arrives at the end and a run whose stream was cut
+ * never gets one — and the working is the only record of how far that run got.
+ * Drawn like the strip's own link, because it opens the same thing. */
+.generation-working {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-raised);
+}
+
+.generation-working__open {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+}
+
+.generation-working__open:hover {
+  text-decoration: underline;
+}

@@ -104,13 +104,27 @@ export function useTheEdgesOfThePanel(): {
     );
   }, []);
 
-  // One observer for the life of the screen. A page that cannot watch a box
-  // change size — a simulated one in a test — still gets the scrolling half
-  // rather than nothing at all.
-  const [watching] = useState<ResizeObserver | null>(() =>
-    typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure),
-  );
-  const watched = useRef(new Set<Element>());
+  /**
+   * One observer for the life of the screen, **and the list of what it watches
+   * lives exactly as long as it does.**
+   *
+   * The two used to be separate — the observer in state, the list in a ref —
+   * and they came apart in the one mode this product is developed and reviewed
+   * in. React's strict mode mounts every screen, unmounts it and mounts it
+   * again; the unmount really does disconnect the observer, while a ref
+   * survives it. The effect below then looked at a list that said every box was
+   * already watched, watched none of them, and the panel measured itself once
+   * and never again: a section could grow past the fold with no rule to say so.
+   * Holding them in one object means the disconnect takes the list with it.
+   */
+  const [watcher] = useState(() => {
+    const watched = new Set<Element>();
+    return {
+      watched,
+      observer: typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => measure()),
+    };
+  });
+  const watching = watcher.observer;
 
   // Which boxes are being watched is settled after every render, because the
   // panel's sections come and go — but a box already being watched is left
@@ -121,16 +135,16 @@ export function useTheEdgesOfThePanel(): {
       return;
     }
     const wanted = new Set<Element>([it, ...it.children]);
-    for (const box of watched.current) {
+    for (const box of watcher.watched) {
       if (!wanted.has(box)) {
         watching.unobserve(box);
-        watched.current.delete(box);
+        watcher.watched.delete(box);
       }
     }
     for (const box of wanted) {
-      if (!watched.current.has(box)) {
+      if (!watcher.watched.has(box)) {
         watching.observe(box);
-        watched.current.add(box);
+        watcher.watched.add(box);
       }
     }
   });
@@ -146,7 +160,15 @@ export function useTheEdgesOfThePanel(): {
     return () => it.removeEventListener("scroll", measure);
   }, [measure]);
 
-  useEffect(() => () => watching?.disconnect(), [watching]);
+  // Going away takes the list with it, so a screen that comes back watches
+  // everything again from nothing.
+  useEffect(
+    () => () => {
+      watcher.observer?.disconnect();
+      watcher.watched.clear();
+    },
+    [watcher],
+  );
 
   return { panel, edges };
 }

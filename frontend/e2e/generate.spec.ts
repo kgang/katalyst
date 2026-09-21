@@ -68,6 +68,20 @@ interface WhatItSaw {
   /** The most rectangles that stood at once. */
   readonly mostRectangles: number;
   /**
+   * True when, at some moment, two boxes on the map stood in the same place.
+   *
+   * The place they would share is the map's origin, where the hypothesis is:
+   * a box the layout has not placed yet used to be drawn there, so every
+   * arriving claim sat on top of the first one until the layout answered.
+   */
+  readonly everStacked: boolean;
+  /**
+   * True when, at some moment, a rectangle stood at every step before the last
+   * claim arrived — the growing edge saying where the map is going, all the way
+   * through rather than only at the start.
+   */
+  readonly rectanglesAllTheWay: boolean;
+  /**
    * How many claims were on the map, every time that number changed.
    *
    * The sequence rather than the largest of them: the largest is whatever the
@@ -125,6 +139,8 @@ async function startWatching(page: Page): Promise<void> {
       rectangleBeforeAnyClaim: false,
       firstRectangleSaid: "",
       mostRectangles: 0,
+      everStacked: false,
+      rectanglesAllTheWay: true,
       claimsWentOn: [] as number[],
       whenTheNumbersCame: { claims: 0, numbers: 0 },
     };
@@ -150,7 +166,22 @@ async function startWatching(page: Page): Promise<void> {
       }
       record.mostRectangles = Math.max(record.mostRectangles, held);
       if (record.claimsWentOn[record.claimsWentOn.length - 1] !== claims) {
+        // **A rectangle stood at every step, not merely at some of them.** The
+        // growing edge is what says where the map is going; a step with no
+        // rectangle is a map that has stopped saying. The last claim is the
+        // exception and the only one: after it the frontier is empty.
+        if (claims > 0 && held === 0) {
+          record.rectanglesAllTheWay = false;
+        }
         record.claimsWentOn.push(claims);
+      }
+      // Two boxes in one place. The place they would share is the map's origin,
+      // where a box the layout has not placed yet used to be drawn.
+      const places = [...document.querySelectorAll(".react-flow__node")].map(
+        (one) => (one as HTMLElement).style.transform,
+      );
+      if (new Set(places).size !== places.length) {
+        record.everStacked = true;
       }
       if (numbers > 0 && record.whenTheNumbersCame.numbers === 0) {
         record.whenTheNumbersCame = { claims, numbers };
@@ -331,12 +362,13 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
     /^(default|low|medium|high|xhigh|max)$/,
   );
   // A replay calls nothing and spends nothing, and that zero is printed rather
-  // than hidden — as money, which is two places at the least.
+  // than hidden — as money, which has two places, and as an exact zero rather
+  // than as the bound a run that spent less than a penny would print.
   await expect(receipt.locator('[data-field="mode"] .receipt-strip__reading')).toContainText(
     "replay",
   );
   await expect(receipt.locator('[data-field="dollars"] .receipt-strip__reading')).toHaveText(
-    /^\$0\.00$/,
+    "$0.00",
   );
 
   // The likelihoods land once, at the end, all together: every claim on the map
@@ -431,8 +463,14 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // waiting in general.
   expect(saw.rectangleBeforeAnyClaim).toBe(true);
   expect(saw.firstRectangleSaid).toContain(THE_SENTENCE);
-  // Rectangles stood at the growing edge all the way through.
+  // Rectangles stood at the growing edge all the way through — which is what
+  // this now says, rather than "at some point there was one".
   expect(saw.mostRectangles).toBeGreaterThan(0);
+  expect(saw.rectanglesAllTheWay).toBe(true);
+  // **And no box was ever drawn in another box's place.** A box the layout has
+  // not placed is not drawn at all: it used to be drawn at the map's origin, on
+  // top of the hypothesis, for as long as the layout took to answer.
+  expect(saw.everStacked).toBe(false);
   // **The claims arrived one at a time.** The count went 0, 1, 2, … and reached
   // the number on screen by rising by exactly one each time: a map that appeared
   // all at once would have gone 0 and then that number, and a map that redrew

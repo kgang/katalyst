@@ -27,7 +27,7 @@
  * sink exactly the claims that most deserve a second look.
  */
 
-import { absence } from "../../world/absence";
+import { absence, noReadingAtAll } from "../../world/absence";
 import type { Absence, DeltaRow, Known, WorldView } from "../../world/types";
 
 /** Where the change itself will go. */
@@ -38,23 +38,17 @@ const NO_CHANGE_YET: Absence = absence(
 );
 
 /** Where **how firm** will go. */
-const NO_WIDTH_YET: Absence = {
-  kind: "no_engine",
-  words: "—",
-  reason:
-    "How firm a number is, is the width of this world's own range on the claim — the same " +
+const NO_WIDTH_YET: Absence = noReadingAtAll(
+  "How firm a number is, is the width of this world's own range on the claim — the same " +
     "range the tile shows. There is no number yet, so there is no range around it.",
-};
+);
 
 /** Where **same direction** will go. */
-const NO_AGREEMENT_YET: Absence = {
-  kind: "no_engine",
-  words: "—",
-  reason:
-    "Whether an ending points the same way whatever numbers we started from is read across two " +
+const NO_AGREEMENT_YET: Absence = noReadingAtAll(
+  "Whether an ending points the same way whatever numbers we started from is read across two " +
     "thousand versions of the map — each one a coherent set of numbers this model would have " +
     "stood behind. Nothing has run one yet.",
-};
+);
 
 /** Where the one-line summary of the whole edit will go. */
 export const NO_SUMMARY_YET: Known<string> = {

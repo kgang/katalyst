@@ -142,12 +142,26 @@ describe("an event name this build does not know", () => {
 
     // And the reducer counts it and changes nothing else.
     const folded = read.reduce(fold, waitingFor(THE_SENTENCE, null));
-    expect(folded.unknown.get("a_call_went_out")).toBe(1);
+    expect(folded.unknown.get("a_call_went_out")).toEqual({ howMany: 1, unreadable: false });
     expect(folded.done?.reason).toBe("reached_terminal");
   });
 
   it("test_a_payload_that_cannot_be_read_is_counted_rather_than_thrown", () => {
-    expect(joined("receipt", "{not json")).toEqual({ event: "unknown", name: "receipt" });
+    // **And it is marked as the other kind.** `receipt` is a name this build
+    // knows, so a `receipt` it cannot read is a broken line rather than a
+    // server that has learned a word — and the map on screen may be missing
+    // what that line carried, which is a different thing to tell a reader.
+    expect(joined("receipt", "{not json")).toEqual({
+      event: "unknown",
+      name: "receipt",
+      unreadable: true,
+    });
+    // A name this build has never heard of is not marked, because nothing
+    // about it is broken.
+    expect(joined("a_call_went_out", '{"about":"H"}')).toEqual({
+      event: "unknown",
+      name: "a_call_went_out",
+    });
   });
 });
 

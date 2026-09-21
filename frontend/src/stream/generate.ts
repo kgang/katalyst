@@ -102,9 +102,14 @@ export function joined(name: string, data: string): ReadEvent {
   try {
     payload = JSON.parse(data);
   } catch {
-    // A payload this reader cannot read is a name it cannot act on, which is the
-    // same situation as a name it does not know: count it, change nothing.
-    return { event: "unknown", name };
+    // A payload this reader cannot read is a name it cannot act on, so it is
+    // counted and nothing is changed — the same handling as a name this build
+    // does not know, and **not the same sentence**. The name was one of the
+    // eight: this build knows what a `done` is and could not read the one that
+    // arrived, which means the map may be missing something, where an unknown
+    // name means only that the server has learned a word since this build was
+    // made. `growth.ts` keeps them apart.
+    return { event: "unknown", name, unreadable: true };
   }
   const joinedOn = { ...(payload as object), event: name } as ReadEvent;
   if (joinedOn.event !== "generation_started") {

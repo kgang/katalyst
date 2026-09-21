@@ -65,6 +65,7 @@ vi.mock("./graph/Canvas", () => ({
 
 import { App } from "./App";
 import { readAbout, readHealth, readReadiness } from "./api/client";
+import { absence } from "./world/absence";
 
 /** Set the three stand-ins to answer the way a healthy server with no key would. */
 function serverAnswersNormally() {
@@ -101,9 +102,9 @@ const WORLD: WorldView = aWorld({
       kind: "hypothesis",
       beliefs: {
         model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-        user: { absence: { kind: "not_said", words: "\u2014", reason: "You have not said." } },
+        user: { absence: absence("not_said", "You have not said.") },
         market: {
-          absence: { kind: "no_market", words: "no market", reason: "No venue quotes this claim." },
+          absence: absence("no_market", "No venue quotes this claim."),
         },
       },
     }),
@@ -114,9 +115,9 @@ const WORLD: WorldView = aWorld({
       resolutionSource: "ICE Brent front-month settlement prices.",
       beliefs: {
         model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
-        user: { absence: { kind: "not_said", words: "\u2014", reason: "You have not said." } },
+        user: { absence: absence("not_said", "You have not said.") },
         market: {
-          absence: { kind: "no_market", words: "no market", reason: "No venue quotes this claim." },
+          absence: absence("no_market", "No venue quotes this claim."),
         },
       },
     }),

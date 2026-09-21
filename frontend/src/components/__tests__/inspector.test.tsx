@@ -10,6 +10,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
 import type { Provenance, WorldView } from "../../world";
+import { absence } from "../../world/absence";
 import { Inspector } from "../Inspector";
 
 /** The map these tests read, with the two claims and the arrow they need. */
@@ -35,11 +36,7 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
           model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
           user: { reading: { p: 0.55, lo: 0.4, hi: 0.7 } },
           market: {
-            absence: {
-              kind: "no_market",
-              words: "no market",
-              reason: "no venue quotes this claim",
-            },
+            absence: absence("no_market", "no venue quotes this claim"),
           },
         },
         evidenceInFull: [
@@ -57,13 +54,9 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
         claim: "Brent crude settles below $68 for five sessions.",
         beliefs: {
           model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
-          user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+          user: { absence: absence("not_said", "You have not said.") },
           market: {
-            absence: {
-              kind: "no_market",
-              words: "no market",
-              reason: "no venue quotes this claim",
-            },
+            absence: absence("no_market", "no venue quotes this claim"),
           },
         },
       }),
@@ -79,11 +72,10 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
             title: "The Strait of Hormuz is the world's most important oil transit chokepoint",
             host: "eia.gov",
             retrieved: {
-              absence: {
-                kind: "not_said",
-                words: "—",
-                reason: "nobody fetched this; a person put the address in by hand",
-              },
+              absence: absence(
+                "not_said",
+                "nobody fetched this; a person put the address in by hand",
+              ),
             },
           },
         ],

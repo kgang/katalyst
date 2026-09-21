@@ -67,10 +67,15 @@ export function filled(belief: Belief): Known<Ranged> {
   return { reading: { p: belief.p, lo: belief.lo, hi: belief.hi } };
 }
 
-/** Turn "there is no number here" into the words and the reason for them. */
-export function missing(kind: AbsenceKind, words: string, reason: string): Known<Ranged> {
-  const absence: Absence = { kind, words, reason };
-  return { absence };
+/**
+ * Turn "there is no number here" into the words and the reason for them.
+ *
+ * The words are not this caller's to choose: they come from the one module that
+ * holds the vocabulary's five, so that *"change them here first"* is a thing a
+ * person can actually do. The kind decides the words; the caller says why.
+ */
+export function missing(kind: AbsenceKind, reason: string): Known<Ranged> {
+  return { absence: absence(kind, reason) };
 }
 
 /**
@@ -188,13 +193,9 @@ function marketAbsence(proposition: Proposition): Known<Ranged> {
     // A dead end says why it is a dead end, in the map's own words. This is the
     // one reason a tile prints for itself, because it is an answer rather than
     // an apology.
-    return missing(
-      "no_market",
-      "no market",
-      proposition.not_tradeable_reason ?? NO_MARKET_REASON.event,
-    );
+    return missing("no_market", proposition.not_tradeable_reason ?? NO_MARKET_REASON.event);
   }
-  return missing("no_market", "no market", NO_MARKET_REASON[proposition.kind]);
+  return missing("no_market", NO_MARKET_REASON[proposition.kind]);
 }
 
 /**
@@ -235,7 +236,7 @@ export function toClaim(proposition: Proposition): ClaimView {
       model: filled(beliefs.model),
       user: beliefs.user
         ? filled(beliefs.user)
-        : missing("not_said", "—", "You have not put your own number on this claim yet."),
+        : missing("not_said", "You have not put your own number on this claim yet."),
       market: beliefs.market ? filled(beliefs.market) : marketAbsence(proposition),
     },
     // At most two clippings on a tile; every one of them in the panel beside

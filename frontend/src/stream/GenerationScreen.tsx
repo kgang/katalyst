@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { outlineOf } from "../a11y/sentences";
 import { AddAClaim } from "../components/AddAClaim";
+import { type Command, CommandPalette } from "../components/CommandPalette";
 import { DoneLine } from "../components/DoneLine";
 import { IfTheScreenBreaks } from "../components/IfTheScreenBreaks";
 import { Inspector } from "../components/Inspector";
@@ -76,7 +77,7 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
   const { growth, saying } = useTheRun(run);
   const [selection, setSelection] = useState<Selection>(null);
   const [focused, setFocused] = useState<string | null>(null);
-  const [overlay, setOverlay] = useState<"sheet" | null>(null);
+  const [overlay, setOverlay] = useState<"sheet" | "palette" | null>(null);
   const [dock, setDock] = useState<"panel" | "outline">("panel");
   const [openAt, setOpenAt] = useState<number | null>(null);
   const [status, setStatus] = useState(
@@ -168,6 +169,65 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
 
   // Nothing on this screen is bound to the map's own six operations yet, so the
   // keys that open them say so rather than doing nothing.
+  /**
+   * Every command this screen has, by name.
+   *
+   * **It is a screen's own list, not a copy of the stored map's.** A generated
+   * map has no branches to open and none of the six things you can do to a
+   * claim, so offering them here would be a palette full of commands that
+   * explain why they cannot run. What it does have is the four ways around it
+   * and the two things it can do, and each one is also a key or a control on
+   * the screen — which is the palette's whole promise.
+   *
+   * Before this, ⌘K on this screen opened the shortcuts sheet: a key that
+   * silently does something else is the one thing this product's keyboard is
+   * not allowed to do.
+   */
+  const commands: Command[] = useMemo(
+    () => [
+      {
+        name: "Read the map as a list",
+        does: "The same as pressing O. Every claim, one sentence each, in the order they arrived.",
+        run: () => {
+          setDock("outline");
+          setStatus("the map as a list");
+        },
+      },
+      {
+        name: "Read the panel beside the map",
+        does: "The same as pressing O again. What this run refused, what it cost, and why.",
+        run: () => {
+          setDock("panel");
+          setStatus("the panel beside the map");
+        },
+      },
+      ...(generationId === null
+        ? []
+        : [
+            {
+              name: "Read the working of this run",
+              does: "Every call it made, in order. The same as the control in the panel.",
+              run: () => {
+                setOpenAt(null);
+                setDock("panel");
+                setSelection({ kind: "generation", id: generationId });
+              },
+            },
+          ]),
+      {
+        name: "Every key",
+        does: "The sheet of every key on this map. The same as pressing ?.",
+        run: () => setOverlay("sheet"),
+      },
+      {
+        name: "Back to the launchpad",
+        does: "Let this run go and start again. The same as the control at the top left.",
+        run: onLeave,
+      },
+    ],
+    [generationId, onLeave],
+  );
+
   const keys: MapKeys = useMemo(
     () => ({
       intervene: () => setStatus("a generated map takes edits through Add a claim, beside the map"),
@@ -180,7 +240,7 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
           return next;
         }),
       panel: () => setStatus("the panel is beside the map"),
-      palette: () => setOverlay("sheet"),
+      palette: () => setOverlay("palette"),
     }),
     [],
   );
@@ -238,6 +298,9 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
               // the reader is about to start reading it.
               frameAgainOn={finished ? "the run stopped" : undefined}
             />
+            {overlay === "palette" ? (
+              <CommandPalette open={true} onClose={() => setOverlay(null)} commands={commands} />
+            ) : null}
             {overlay === "sheet" ? (
               <ShortcutsSheet open={true} onClose={() => setOverlay(null)} />
             ) : null}
@@ -286,14 +349,35 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
                     }}
                   />
 
-                  {growth.receipt === null ? null : (
-                    <ReceiptStrip
-                      receipt={growth.receipt}
-                      onOpen={() => {
-                        setOpenAt(null);
-                        setSelection({ kind: "generation", id: generationId ?? "" });
-                      }}
-                    />
+                  {growth.receipt === null ? null : <ReceiptStrip receipt={growth.receipt} />}
+
+                  {/* **One way into the working that is always there.**
+                      The panel's view of the run used to be reachable only from
+                      a refusal row or from the receipt strip's link — so a run
+                      that refused nothing had one way in, and only at the end,
+                      and a run whose stream was cut had none at all. That last
+                      one is the worst of the three: the working is the only
+                      record of how far a cut run got, the screen fetches it for
+                      exactly that reason, and then offered the reader no way to
+                      read it.
+                      It is here from the moment there is a generation, which is
+                      what both chapters already say the panel's section is
+                      drawn from, and it carries the same words the receipt
+                      strip's link carries because it opens the same thing. */}
+                  {generationId === null ? null : (
+                    <section className="generation-working" aria-label="The working of this run">
+                      <button
+                        className="generation-working__open"
+                        type="button"
+                        onClick={() => {
+                          setOpenAt(null);
+                          setDock("panel");
+                          setSelection({ kind: "generation", id: generationId });
+                        }}
+                      >
+                        Read the working of this run <span aria-hidden="true">→</span>
+                      </button>
+                    </section>
                   )}
 
                   {finished && growth.world.baseId !== "" ? (

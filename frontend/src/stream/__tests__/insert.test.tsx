@@ -98,6 +98,67 @@ describe("what Add a claim sends", () => {
   });
 });
 
+describe("the branch the claim is judged against", () => {
+  it("test_the_open_branch_is_sent_with_the_claim", async () => {
+    // The route drafts and judges the new claim against the map **with the
+    // branch folded on**, which is the map the reader is looking at. Leaving it
+    // out asks the rules about a map nobody has in front of them: a claim that
+    // contradicts an edit made two minutes ago comes back accepted, and then
+    // breaks the branch it is added to.
+    const sentToTheRoute: DraftRequest[] = [];
+    const branch = {
+      id: "01M3BRANCH",
+      label: "Brent settled below $68",
+      interventions: [{ kind: "observe", target: "B", value: true }],
+    } as unknown as NonNullable<DraftRequest["branch"]>;
+
+    render(
+      <AddAClaim
+        baseId="a-map"
+        branch={branch}
+        andThen="It goes on a branch."
+        draft={async (request) => {
+          sentToTheRoute.push(request);
+          return { state: "drafted" as const, insert: DRAFTED, receipt: RECEIPT, working: [] };
+        }}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("…but this also happens"), {
+      target: { value: "…but Iran is struck the next day" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Draft this claim" }));
+    await waitFor(() => expect(sentToTheRoute).toHaveLength(1));
+
+    // Sent whole, in the engine's own shape, with every edit in it.
+    expect(sentToTheRoute[0]?.branch).toEqual(branch);
+  });
+
+  it("test_a_branch_that_cannot_be_written_down_sends_none", async () => {
+    // A branch holding an edit this build cannot write the engine's way cannot
+    // be folded, and half a branch is worse than none: the rules would judge
+    // the claim against a map that is neither the one on screen nor the one
+    // underneath it.
+    const sentToTheRoute: DraftRequest[] = [];
+    render(
+      <AddAClaim
+        baseId="a-map"
+        andThen="It goes on a branch."
+        draft={async (request) => {
+          sentToTheRoute.push(request);
+          return { state: "drafted" as const, insert: DRAFTED, receipt: RECEIPT, working: [] };
+        }}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("…but this also happens"), {
+      target: { value: "…but Iran is struck the next day" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Draft this claim" }));
+    await waitFor(() => expect(sentToTheRoute).toHaveLength(1));
+
+    expect(sentToTheRoute[0]).not.toHaveProperty("branch");
+  });
+});
+
 describe("what Add a claim shows of the answer", () => {
   it("test_every_call_it_took_is_shown_from_the_answer_itself", async () => {
     await draftOne(async () => ({

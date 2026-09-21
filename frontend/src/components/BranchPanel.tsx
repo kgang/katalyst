@@ -36,6 +36,7 @@
  */
 
 import { useState } from "react";
+import type { components } from "../api/schema";
 import { toDay } from "../graph/diff/days";
 import { pushAsNumber, pushInWords } from "../graph/wires/encodings";
 import type { BranchView, Edit, Selection, WorldView } from "../world";
@@ -257,6 +258,18 @@ export function BranchPanel({
 export interface InterventionPanelProps {
   /** The world on screen. */
   readonly world: WorldView;
+  /**
+   * The open branch in the engine's own shape, when it can be written down.
+   *
+   * **Add a claim needs it and nothing else on this panel does.** The route
+   * drafts and judges the new claim against the map with the branch folded on —
+   * which is the map the reader is looking at — so a claim that contradicts an
+   * edit made two minutes ago comes back refused in the validator's own
+   * sentence rather than accepted and then breaking the branch it is added to.
+   * Absent when the branch cannot be written down in full, which is exactly
+   * when there is nothing honest to send.
+   */
+  readonly branch?: components["schemas"]["Branch"];
   /** What the map is open on: the claim or the arrow the buttons act on. */
   readonly selection: Selection;
   /** Append an edit to the open branch. */
@@ -271,7 +284,13 @@ export interface InterventionPanelProps {
  * Never a pop-up: it appears in the panel, the map keeps drawing beside it, and
  * closing it loses nothing because nothing is left half-done.
  */
-export function InterventionPanel({ world, selection, onEdit, onClose }: InterventionPanelProps) {
+export function InterventionPanel({
+  world,
+  branch,
+  selection,
+  onEdit,
+  onClose,
+}: InterventionPanelProps) {
   const [ownNumber, setOwnNumber] = useState(false);
   const [reading, setReading] = useState({ p: "", lo: "", hi: "" });
   const [pushing, setPushing] = useState(false);
@@ -399,6 +418,7 @@ export function InterventionPanel({ world, selection, onEdit, onClose }: Interve
         {adding ? (
           <AddAClaim
             baseId={world.baseId}
+            {...(branch === undefined ? {} : { branch })}
             andThen="It is on your branch, like every other edit."
             onDrafted={(drafted) => {
               setAdding(false);

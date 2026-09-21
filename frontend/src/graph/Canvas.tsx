@@ -249,13 +249,31 @@ function MapSurface({
     return placed;
   }, [world]);
 
+  // **A box the layout has not placed is not drawn.**
+  //
+  // It used to be drawn at the map's origin, which is where the hypothesis is:
+  // every arriving claim was painted on top of the first one for as long as the
+  // layout took to answer. Unthrottled that is less than a frame and invisible;
+  // at six times slower it is thirty-seven to ninety milliseconds of one tile
+  // sitting on another, on the one screen whose whole promise is that nothing
+  // already placed ever moves.
+  //
+  // Nothing is lost by waiting. The reserved rectangle for that claim is
+  // already standing in the column the claim is about to land in — it is the
+  // whole reason the rectangles exist — so the growing edge keeps saying where
+  // the map is going while the layout works, and the claim appears where it
+  // belongs rather than appearing somewhere else first.
   const nodes: MapNode[] = useMemo(
     () =>
-      drawing.nodes.map((node) => {
+      drawing.nodes.flatMap((node) => {
+        const at = layout.positions.get(node.id);
+        if (at === undefined) {
+          return [];
+        }
         const ghost = node.type === "claim" && node.data.claim.ghost === true;
         return {
           ...node,
-          position: layout.positions.get(node.id) ?? { x: 0, y: 0 },
+          position: at,
           selected: selection?.kind === "claim" && selection.id === node.id,
           // Two classes and not one: the hover lens and the other world are both
           // opacity, and a tile that is off the hovered path *and* in the other
@@ -398,12 +416,46 @@ function MapSurface({
     );
   }, [flow, mapBounds]);
 
-  // Measured whenever the map is laid out again, whenever a tile arrives and
-  // whenever the reader pans or zooms — which is `onMove`, below. Missing any
-  // one of the three leaves a rule at an edge with nothing beyond it.
+  // Measured whenever the map is laid out again, whenever a tile arrives,
+  // whenever the reader pans or zooms — which is `onMove`, below — **and
+  // whenever the stage itself changes size**. Missing any one of the four
+  // leaves a rule at an edge with nothing beyond it, or none at an edge that
+  // has plenty.
+  //
+  // The fourth is the window. A map framed at 1600 × 1000 and then given a
+  // bigger window has its whole self on the glass while the rule below is still
+  // drawn, and a map given a smaller one loses two tiles off the right with
+  // nothing saying so. Neither pans and neither re-lays out, so nothing else
+  // here would ever hear about it.
+  //
+  // **It measures and changes nothing it measures.** The rule it decides is
+  // drawn by `.canvas::after`, which is absolutely positioned and takes no
+  // space, so this observer cannot feed itself — the lesson the panel beside it
+  // paid for, stated here so the next person to add a box does not pay it
+  // again. One observer for the life of the surface.
+  //
+  // The measuring is read through a ref rather than captured, so that the
+  // observer is built once and never rebuilt: asking the browser to watch a box
+  // it is already watching makes it re-deliver that box's size, and rebuilding
+  // this on every arrival would re-deliver it once per claim. That is the storm
+  // that starved the drawing library's own measuring, and it is not being
+  // started again here.
+  const howToMeasure = useRef(measureTheEdges);
+  howToMeasure.current = measureTheEdges;
+
   useEffect(() => {
     measureTheEdges();
   }, [measureTheEdges]);
+
+  useEffect(() => {
+    const it = surface.current;
+    if (it === null || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const watching = new ResizeObserver(() => howToMeasure.current());
+    watching.observe(it);
+    return () => watching.disconnect();
+  }, []);
 
   // Frame the map when it is a different map — the first time it is drawn, and
   // again when a branch adds a claim to it. Panning, zooming and walking around

@@ -40,6 +40,7 @@ import {
   pushInWords,
   shapeInWords,
 } from "../graph/wires/encodings";
+import type { UnreadLine } from "../stream/growth";
 import type { Working } from "../stream/transcript";
 import type {
   BeliefOwner,
@@ -109,8 +110,8 @@ export interface GenerationDetail {
   readonly promptFingerprint: string | null;
   /** The working of the run, or the plain reason it could not be read. */
   readonly working: Working;
-  /** Event names this build did not know, and how many of each arrived. */
-  readonly unknown: ReadonlyMap<string, number>;
+  /** Every line the reader could not act on, by name, with how many and which kind. */
+  readonly unknown: ReadonlyMap<string, UnreadLine>;
   /** Which line of the working the panel was opened at, when it was opened at one. */
   readonly openAt: number | null;
 }
@@ -820,23 +821,40 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
       </Section>
 
       {unknown.size === 0 ? null : (
-        <Section title="Events this build does not know">
+        <Section title="Lines this build could not act on">
           {/* Ignored, counted, and said out loud. A browser that crashed on a new
               event would make the server unable to add one; a browser that
               dropped one silently would make a missing feature look like a
-              working one. */}
+              working one.
+              **Two kinds, and they are not told as one.** A name this build has
+              never heard of means the server has learned a word and the map
+              drawn from the rest is a correct map. A name this build knows
+              whose payload could not be read means a broken line, and the map
+              may be missing what that line carried — which is a different thing
+              to be told, and a worse one. Saying "this build has no name for
+              these" over a `done` it could not read would be false. */}
           <dl className="inspector__pairs">
-            {[...unknown].map(([name, count]) => (
+            {[...unknown].map(([name, line]) => (
               <Fragment key={name}>
                 <dt>{name}</dt>
-                <dd className="inspector__mono">{count}</dd>
+                <dd className="inspector__mono">{line.howMany}</dd>
               </Fragment>
             ))}
           </dl>
-          <p className="inspector__reason">
-            This build has no name for these, so it changed nothing when they arrived and counted
-            them here instead.
-          </p>
+          {[...unknown].some(([, line]) => !line.unreadable) ? (
+            <p className="inspector__reason">
+              This build has no name for some of these, so it changed nothing when they arrived and
+              counted them here instead. The map it drew is a correct map of the lines it did
+              understand.
+            </p>
+          ) : null}
+          {[...unknown].some(([, line]) => line.unreadable) ? (
+            <p className="inspector__reason">
+              And some of these are names this build does know: the stream sent one and what came
+              with it could not be read, so the line was counted and nothing was changed. This map
+              may be missing whatever that line carried.
+            </p>
+          ) : null}
         </Section>
       )}
     </>

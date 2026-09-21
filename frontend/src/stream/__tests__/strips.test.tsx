@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { outlineOf } from "../../a11y/sentences";
 import { toTwoFigures } from "../../components/BeliefChip";
 import { Inspector } from "../../components/Inspector";
-import { ReceiptStrip } from "../../components/ReceiptStrip";
+import { asMoney, ReceiptStrip } from "../../components/ReceiptStrip";
 import { RefusalStrip } from "../../components/RefusalStrip";
 import { ReplayBadge } from "../../components/ReplayBadge";
 import { VerdictCard } from "../../components/VerdictCard";
@@ -213,8 +213,36 @@ describe("the receipt", () => {
 
     const cost = container.querySelector('[data-field="dollars"] .receipt-strip__reading');
     // A computed zero — the recording was played, nothing was called, nothing was
-    // spent — printed rather than hidden.
-    expect(cost?.textContent).toMatch(/^\$0\.0+$/);
+    // spent — printed rather than hidden, and printed as an exact zero rather
+    // than as a bound: `<$0.01` here would say a free run cost something.
+    expect(cost?.textContent).toBe("$0.00");
+  });
+
+  it("test_money_prints_in_the_two_places_money_has", () => {
+    // It printed up to four — `$0.6132` — which is the same fake precision the
+    // two-significant-figures rule exists to stop, in the place a reader is
+    // most likely to compare two runs.
+    const spent = render(<ReceiptStrip receipt={RECEIPT} />);
+    const said =
+      spent.container.querySelector('[data-field="dollars"] .receipt-strip__reading')
+        ?.textContent ?? "";
+    expect(said).toMatch(/^\$\d+\.\d\d$/);
+    // Rounded for the page, never for the arithmetic: the figure on the receipt
+    // is untouched, and the string is worked out from it here.
+    expect(said).toBe(asMoney(RECEIPT.dollars));
+    expect(RECEIPT.dollars.toString()).not.toBe(said);
+  });
+
+  it("test_a_run_that_spent_less_than_a_penny_says_so_rather_than_saying_nothing", () => {
+    // **A guard word exactly when it is true.** `$0.00` on a run that spent a
+    // third of a penny would be the strip saying a run was free when it was
+    // not; the `<` is the whole of the difference between a figure and a bound,
+    // and it is used only where there is a bound to state.
+    expect(asMoney(0)).toBe("$0.00");
+    expect(asMoney(0.0001)).toBe("<$0.01");
+    expect(asMoney(0.009)).toBe("<$0.01");
+    expect(asMoney(0.01)).toBe("$0.01");
+    expect(asMoney(1.32289925)).toBe("$1.32");
   });
 
   it("test_the_strip_says_how_hard_the_model_tried", () => {

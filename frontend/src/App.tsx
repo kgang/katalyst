@@ -857,6 +857,13 @@ function MapScreen({
                   {intervening ? (
                     <InterventionPanel
                       world={world}
+                      // The open branch in the engine's own shape, so that a
+                      // claim the reader asks for is drafted and judged against
+                      // the map they are looking at rather than against the one
+                      // underneath it. Absent when the branch cannot be written
+                      // down in full, which is exactly when there is nothing
+                      // honest to send.
+                      {...(open?.wire === undefined ? {} : { branch: open.wire })}
                       selection={selection}
                       onEdit={edit}
                       onClose={() => setIntervening(false)}

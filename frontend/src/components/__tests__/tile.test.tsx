@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import { TILE_MIN_HEIGHT, TILE_WIDTH, tileHeight } from "../../graph/geometry";
 import { aClaim } from "../../test/aMap";
 import type { ClaimView } from "../../world";
+import { absence } from "../../world/absence";
 import { SkeletonTile } from "../SkeletonTile";
 import { Tile } from "../Tile";
 
@@ -41,9 +42,9 @@ const MOVED: ClaimView = aClaim({
   diff: "shifted",
   beliefs: {
     model: { reading: { p: 0.414, lo: 0.284, hi: 0.553 } },
-    user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+    user: { absence: absence("not_said", "You have not said.") },
     market: {
-      absence: { kind: "no_market", words: "no market", reason: "no venue quotes this claim" },
+      absence: absence("no_market", "no venue quotes this claim"),
     },
   },
   moved: {
@@ -159,13 +160,9 @@ describe("what a tile draws, and what it never draws", () => {
       kind: "not_tradeable",
       beliefs: {
         model: { reading: { p: 0.3, lo: 0.16, hi: 0.45 } },
-        user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+        user: { absence: absence("not_said", "You have not said.") },
         market: {
-          absence: {
-            kind: "no_market",
-            words: "no market",
-            reason: "No venue quotes whether talks resume.",
-          },
+          absence: absence("no_market", "No venue quotes whether talks resume."),
         },
       },
     }),

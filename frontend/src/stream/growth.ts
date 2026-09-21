@@ -55,6 +55,22 @@ export interface Refusal {
   readonly reasons: readonly string[];
 }
 
+/**
+ * One kind of line the reader could not act on, and how often it arrived.
+ *
+ * It is counted rather than dropped because a browser that swallows a line
+ * makes a missing feature look like a working one — and it is counted **as one
+ * of two kinds**, because *we have no name for this* and *we know that name and
+ * could not read what came with it* are different facts about the map on
+ * screen.
+ */
+export interface UnreadLine {
+  /** How many arrived under this name. */
+  readonly howMany: number;
+  /** True when the name was one of the eight and its payload could not be read. */
+  readonly unreadable: boolean;
+}
+
 /** One reserved rectangle at the growing edge of the map. Never a claim. */
 export interface Skeleton {
   /** `skeleton:<claim id>`, or `skeleton:hypothesis` for the first one. A box's name. */
@@ -146,8 +162,16 @@ export interface Growth {
    * thing that is not true.
    */
   readonly waitingWires: readonly Link[];
-  /** Event names this build does not know, and how many of each arrived. */
-  readonly unknown: ReadonlyMap<string, number>;
+  /**
+   * Every line the reader could not act on, and how many of each arrived.
+   *
+   * Two kinds, kept apart because they say different things to a reader. A name
+   * this build has never heard of is a server that has learned a word, and the
+   * map drawn from the rest is a correct map. A name this build knows whose
+   * payload could not be read is a broken line, and the map may be missing what
+   * that line carried.
+   */
+  readonly unknown: ReadonlyMap<string, UnreadLine>;
 }
 
 /**
@@ -215,7 +239,7 @@ export function waitingFor(hypothesis: string, target: string | null = null): Gr
     done: null,
     failure: null,
     waitingWires: [],
-    unknown: new Map(),
+    unknown: new Map<string, UnreadLine>(),
   };
 }
 
@@ -455,7 +479,13 @@ export function fold(was: Growth, event: ReadEvent): Growth {
 
     case "unknown": {
       const counted = new Map(was.unknown);
-      counted.set(event.name, (counted.get(event.name) ?? 0) + 1);
+      const before = counted.get(event.name);
+      counted.set(event.name, {
+        howMany: (before?.howMany ?? 0) + 1,
+        // Once a name has arrived unreadable it stays marked so: a name that
+        // came through twice, once broken, is a name that broke.
+        unreadable: (before?.unreadable ?? false) || event.unreadable === true,
+      });
       return { ...was, unknown: counted };
     }
   }

@@ -53,6 +53,11 @@ const DRAWS_THE_MAPS_NUMBERS = [
   // multiplied-out likelihood and a receipt, and combines not one of them.
   "/src/components/VerdictCard.tsx",
   "/src/components/ReceiptStrip.tsx",
+  // **Add a claim** draws a receipt of its own and the working that produced
+  // it, so it holds every field the strip holds and the transcript's own
+  // counts besides. A file that prints a cost is a file that could add one up.
+  "/src/components/AddAClaim.tsx",
+  "/src/components/TheWorking.tsx",
   ...Object.keys(SOURCE).filter(
     (path) => path.startsWith("/src/stream/") && !path.includes("__tests__"),
   ),

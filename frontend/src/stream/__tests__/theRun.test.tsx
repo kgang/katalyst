@@ -179,6 +179,60 @@ describe("a stream that ends without saying why", () => {
     vi.unstubAllGlobals();
   });
 
+  it("test_a_cut_run_still_offers_its_working", async () => {
+    // **The working is the only record of how far a cut run got**, and the
+    // screen fetches it for exactly that reason. It used to be reachable only
+    // from a refusal row or from a link inside the receipt strip — and a cut
+    // run has neither: it refused nothing and it never got a receipt. So the
+    // reader was handed a map that stops in the middle, with the one document
+    // that says why sitting fetched and unreadable.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (where: string | URL | Request) =>
+        String(where).includes("/transcript")
+          ? new Response("{}", { status: 404 })
+          : aBodyThatJustStops([STARTED]),
+      ),
+    );
+
+    render(<App />);
+    const field = await screen.findByLabelText("An event you think will happen");
+    fireEvent.change(field, { target: { value: THE_SENTENCE } });
+    fireEvent.click(screen.getByRole("button", { name: "Build the map" }));
+    await waitFor(() => {
+      expect(document.querySelector('.done-line[data-kind="ended_early"]')).not.toBeNull();
+    });
+
+    // One control, in the panel, in the same words the receipt's link used to
+    // carry — and pressing it opens the run rather than a claim or an arrow.
+    const read = screen.getByRole("button", { name: /Read the working of this run/ });
+    fireEvent.click(read);
+    expect(await screen.findByText("the run that built this map")).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("test_the_working_can_be_opened_from_the_moment_there_is_a_generation", async () => {
+    // Not only at the end: both chapters say the panel's view of the run is
+    // drawn from the moment there is one, and a reader watching a nine-minute
+    // run is exactly the reader who wants to see what it has asked so far.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => aBodyThatJustStops([STARTED])),
+    );
+    render(<App />);
+    const field = await screen.findByLabelText("An event you think will happen");
+    fireEvent.change(field, { target: { value: THE_SENTENCE } });
+    fireEvent.click(screen.getByRole("button", { name: "Build the map" }));
+
+    // The run has a name and no receipt, no refusal and no claim yet.
+    await screen.findByRole("button", { name: /Read the working of this run/ });
+    expect(document.querySelector(".receipt-strip")).toBeNull();
+    expect(document.querySelector(".refusal-strip__open")).toBeNull();
+
+    vi.unstubAllGlobals();
+  });
+
   it("test_letting_go_of_a_run_folds_nothing_more", async () => {
     // Walking away stops the reading, which is what stops the spending — and a
     // run that was let go must not then draw itself as a run that broke.

@@ -39,6 +39,7 @@ import { readConditional, readDiff, readExample, readWorld } from "../api/client
 import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
 import { NO_CHANGE, noChangeReason } from "../graph/diff/noChange";
+import { inTheEnginesWords, noReadingAtAll } from "./absence";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
 import { NOT_ON_THIS_MAP } from "./naming";
 import type { FixtureBundle, WorldSource } from "./source";
@@ -335,13 +336,10 @@ function movement(row: ClaimDiff): Movement | undefined {
     sameDirection:
       agreement === null
         ? {
-            absence: {
-              kind: "no_engine",
-              words: "—",
-              reason:
-                "Only one of the two worlds holds this claim, so there is no direction for the " +
+            absence: noReadingAtAll(
+              "Only one of the two worlds holds this claim, so there is no direction for the " +
                 "versions of the map to have agreed or disagreed about.",
-            },
+            ),
           }
         : { reading: agreement },
     // A claim with no causes of its own can move under **This happened** without
@@ -405,33 +403,22 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
       label: claim.claim,
       kind: claim.kind,
       move: {
-        absence: {
-          kind: "no_engine" as const,
-          words: NO_CHANGE,
-          // One sentence for *why the engine says it did not move*, written in
-          // one place and read here, and then the one thing that is true of the
-          // rail alone: why a row that held still is in a list of rows that did
-          // not.
-          reason:
-            `${noChangeReason(changed.get(claim.id)?.moved)} It is listed so that holding still ` +
+        absence: inTheEnginesWords(
+          NO_CHANGE,
+          `${noChangeReason(changed.get(claim.id)?.moved)} It is listed so that holding still ` +
             `cannot be mistaken for not being here.`,
-        },
+        ),
       },
       rangeWidth: {
-        absence: {
-          kind: "no_engine" as const,
-          words: "—",
-          reason: "How firm a number is only says something about a number that moved.",
-        },
+        absence: noReadingAtAll(
+          "How firm a number is only says something about a number that moved.",
+        ),
       },
       agreement: {
-        absence: {
-          kind: "no_engine" as const,
-          words: "—",
-          reason:
-            "Whether the versions of the map agreed on a direction only says something about a " +
+        absence: noReadingAtAll(
+          "Whether the versions of the map agreed on a direction only says something about a " +
             "claim that had a direction.",
-        },
+        ),
       },
       noChange: true,
     }));

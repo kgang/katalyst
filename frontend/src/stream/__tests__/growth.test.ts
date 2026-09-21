@@ -280,6 +280,23 @@ describe("the chips", () => {
 });
 
 describe("an event this build does not know", () => {
+  it("test_a_known_name_this_build_could_not_read_says_which_it_was", () => {
+    // Two kinds, counted apart: a name nobody here has ever heard of, and a
+    // name this build knows whose payload could not be read. The first means
+    // the server has learned a word and the map drawn from the rest is correct;
+    // the second means a broken line, and a map that may be missing what it
+    // carried. Telling a reader they are the same would be telling them
+    // something false.
+    const grown = foldAll(fresh(), THE_GROWTH);
+    const after = foldAll(grown, [
+      { event: "unknown", name: "a_call_went_out" },
+      { event: "unknown", name: "done", unreadable: true },
+    ]);
+
+    expect(after.unknown.get("a_call_went_out")?.unreadable).toBe(false);
+    expect(after.unknown.get("done")).toEqual({ howMany: 1, unreadable: true });
+  });
+
   it("test_an_unknown_event_leaves_everything_else_alone", () => {
     const grown = foldAll(fresh(), THE_GROWTH);
     const after = foldAll(grown, [
@@ -287,7 +304,7 @@ describe("an event this build does not know", () => {
       { event: "unknown", name: "a_call_went_out" } as never,
     ]);
 
-    expect(after.unknown.get("a_call_went_out")).toBe(2);
+    expect(after.unknown.get("a_call_went_out")).toEqual({ howMany: 2, unreadable: false });
     // Everything else is exactly as it was.
     expect({ ...after, unknown: grown.unknown }).toEqual(grown);
   });

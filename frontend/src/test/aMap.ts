@@ -16,6 +16,7 @@
  */
 
 import type { ClaimView, LinkView, WorldView } from "../world";
+import { absence } from "../world/absence";
 
 /** One claim, complete, with anything the test cares about written over the top. */
 export function aClaim(over: Partial<ClaimView> = {}): ClaimView {
@@ -28,23 +29,19 @@ export function aClaim(over: Partial<ClaimView> = {}): ClaimView {
     resolutionCriteria: "The test, written so that two people reading it would agree.",
     prior: { p: 0.28, lo: 0.15, hi: 0.42 },
     baseRate: {
-      absence: {
-        kind: "not_said",
-        words: "—",
-        reason: "no reference class recorded for this claim",
-      },
+      absence: absence("not_said", "no reference class recorded for this claim"),
     },
     beliefs: {
       model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-      user: { absence: { kind: "not_said", words: "—", reason: "You have not said." } },
+      user: { absence: absence("not_said", "You have not said.") },
       market: {
-        absence: { kind: "no_market", words: "no market", reason: "no venue quotes this claim" },
+        absence: absence("no_market", "no venue quotes this claim"),
       },
     },
     evidence: [],
     evidenceInFull: [],
     pathProduct: {
-      absence: { kind: "no_engine", words: "no engine yet", reason: "Nothing has worked it out." },
+      absence: absence("no_engine", "Nothing has worked it out."),
     },
     ...over,
   };
@@ -67,7 +64,7 @@ export function aWire(over: Partial<LinkView> = {}): LinkView {
     sources: [],
     provenance: "argued",
     conditional: {
-      absence: { kind: "no_engine", words: "no engine yet", reason: "Nothing has worked it out." },
+      absence: absence("no_engine", "Nothing has worked it out."),
     },
     reflexive: false,
     ...over,

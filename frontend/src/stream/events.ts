@@ -240,6 +240,18 @@ export interface UnknownEvent {
   readonly event: "unknown";
   /** The name the wire carried. */
   readonly name: string;
+  /**
+   * True when the **name** was one of the eight and its payload could not be
+   * read.
+   *
+   * Two different things end up here, and a screen that told a reader they were
+   * the same would be telling them something false. *This build has no name for
+   * that* is a browser older than its server, and the map it drew is a correct
+   * map of the events it understood. *This build knows that name and could not
+   * read what came with it* is a broken line on the wire, and the map may be
+   * missing a claim — which is a different thing to be told, and a worse one.
+   */
+  readonly unreadable?: boolean;
 }
 
 /** Everything the reader can hand back: one of the eight, or a name it does not know. */

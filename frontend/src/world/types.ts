@@ -92,6 +92,17 @@ export type AbsenceKind = "no_engine" | "no_market" | "not_said" | "refused" | "
  * means nothing was computed, and neither of those is a refusal or an ask that
  * did not come back.
  */
+/**
+ * The mark that says an absence came from the one place absences are made.
+ *
+ * It is a symbol declared here and exported only to `world/absence.ts`, so a
+ * hand-built `{ kind, words, reason }` does not compile anywhere else. The
+ * vocabulary says *"these are the words; change them here first"*, and that
+ * instruction means nothing while a seventh spelling is one object literal
+ * away — as six files proved by holding one each.
+ */
+export declare const WRITTEN_HERE: unique symbol;
+
 export interface Absence {
   /** Which absence this is. */
   readonly kind: AbsenceKind;
@@ -99,6 +110,8 @@ export interface Absence {
   readonly words: string;
   /** Why there is no number, in plain words. */
   readonly reason: string;
+  /** Made by `absence()` or `noReadingAtAll()`, and by nothing else. */
+  readonly [WRITTEN_HERE]: true;
 }
 
 /**

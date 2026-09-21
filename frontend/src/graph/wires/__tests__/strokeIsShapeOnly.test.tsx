@@ -12,6 +12,7 @@ import { render } from "@testing-library/react";
 import { Position, ReactFlowProvider } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import type { Provenance } from "../../../world";
+import { absence } from "../../../world/absence";
 import { CausalWire, type WireData } from "../CausalWire";
 
 const ALL_RECEIPTS: Provenance[] = [
@@ -35,7 +36,7 @@ function strokeOf(provenance: Provenance) {
     reflexive: false,
     provenance,
     conditional: {
-      absence: { kind: "no_engine", words: "no engine yet", reason: "Nothing has worked it out." },
+      absence: absence("no_engine", "Nothing has worked it out."),
     },
   };
   const { container } = render(
