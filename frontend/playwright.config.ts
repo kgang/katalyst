@@ -66,15 +66,20 @@ export default defineConfig({
       env: {
         ANTHROPIC_API_KEY: "",
         FRED_API_KEY: "",
-        // **A replay is paced on purpose, and a test is the one place that
-        // pacing is not wanted.** The delay exists so that a reviewer watching a
-        // recording sees a map arrive rather than appear — a replay that raced
-        // would teach them the product is faster than it is — and it is fixed on
-        // the server precisely so that no client can ask to skip it. A test run
-        // is not a client: it sets the setting, in the environment, where the
-        // person running the suite can see it.
+        // **The replay's pacing is left on, and that is deliberate.**
         //
-        KATALYST_REPLAY_INSTANT: "true",
+        // `KATALYST_REPLAY_INSTANT` exists so a test need not wait out a delay
+        // that is there for a reviewer's benefit, and for most tests it would be
+        // free. It is not free here: `generate.spec.ts`'s whole subject is a map
+        // *arriving* — a rectangle standing before any claim, the growing edge
+        // moving, the chips resolving last and once — and with the pacing off
+        // every event lands in one tick, React folds them into one render, and
+        // the screen goes straight from nothing to a finished map. There is then
+        // no moment at which the thing being tested is true, and the test fails
+        // saying it could not find a rectangle. Turning the pacing off to make a
+        // test faster would be turning off the behaviour the test is for.
+        //
+        // It costs seconds: the whole suite runs in about twenty.
       },
     },
     {
