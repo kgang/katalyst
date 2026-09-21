@@ -13,17 +13,26 @@ Three routes and nothing else
 that needs a model. `GET /api/generate/{id}/transcript` hands back the working of
 a generation this process is still holding.
 
-The same route serves a live run and a replay
-----------------------------------------------
-With a key it calls a model; with none it plays a committed recording back
-through the same events, the same framing and the same canvas. The only
-substitution anywhere is where the bytes came from. There is **no fallback
-between them**: a live run that fails is a live run that failed and says so,
-because showing somebody a recorded map labelled as an answer to their question
-is worse than showing them nothing.
+The same route serves a live run and a replay, and the request says which
+--------------------------------------------------------------------------
+A live run calls a model; a replay plays a committed recording back through the
+same events, the same framing and the same canvas. The only substitution anywhere
+is where the bytes came from. **Which of the two happens is named in the request**
+— `start`, either `live` or `replay` — and this route does what it was asked or
+says plainly why it cannot. There is **no fallback between them**: a live run
+that fails is a live run that failed and says so, because showing somebody a
+recorded map labelled as an answer to their question is worse than showing them
+nothing. And there is no substitution the other way either: a recording asked for
+plays even with a key configured.
 
 What this file must never do
 ----------------------------
+- **Never read the key to decide what a reader gets.** The key says whether a
+  live run is *possible*; the request says which of the two was *asked for*.
+  Reading the key to choose leaves the reader with no say in either direction —
+  the recording unreachable with a key, a live run unaskable without one — and
+  the only control anybody has is deleting a line from a file (Kent,
+  2026-09-21; record 0012, amended the same day).
 - Never send a heartbeat, a comment line or anything that is not one of the eight
   events. A recording is this stream line for line, and a line carrying no event
   is a line somebody eventually parses as one.
@@ -39,7 +48,7 @@ import logging
 import time
 from collections.abc import AsyncIterator, Generator
 from datetime import UTC, date, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -82,6 +91,20 @@ NO_KEY_FOR_A_NEW_CLAIM = "drafting a new claim needs a model key."
 
 Not an error, not a stack trace, not a button that does nothing without saying
 why. It is the one thing in a replayed flow that genuinely needs a key.
+"""
+
+NO_KEY_FOR_A_LIVE_RUN = (
+    "This copy of Katalyst has no model key, so it cannot call a model — and it "
+    "will not play a recording in place of the run you asked for. Ask for a "
+    "recording by name instead: the examples it can play are listed on the first "
+    "screen."
+)
+"""What the stream says when a live run was asked for and there is no key, word for word.
+
+Two halves, and the second is the one that matters. It says what is missing, and
+it says out loud that nothing was quietly put in its place — because a recorded
+map handed back as the answer to somebody's own question is the one change that
+would make this product lie (record 0012, amended 2026-09-21).
 """
 
 STREAM_HEADERS = {"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
@@ -142,6 +165,29 @@ class GenerateRequest(BaseModel):
         gt=1,
         le=engine.MOST_WORLDS,
         description="How many worlds to run under each version. Bounded at both ends.",
+    )
+    start: Literal["replay", "live"] = Field(
+        default="replay",
+        description=(
+            "How this run starts. `replay` plays the committed recording of this "
+            "sentence back, through the same events and the same canvas, spending "
+            "nothing and reading no key. `live` calls a model. **The server does "
+            "what it was asked, or says plainly why it cannot, and never "
+            "substitutes one for the other**: a recording asked for plays even "
+            "with a key configured, and a live run asked for with no key is "
+            "refused in one sentence rather than quietly replaced by a recording. "
+            "**It defaults to `replay` because a request that did not ask to spend "
+            "money must never spend it** — what the other reading of a silent "
+            "request could cost is on the recorded run's own receipt, which the "
+            "readiness route serves beside each recording rather than this "
+            "description typing it in. That "
+            "default is not the server choosing on anybody's behalf: it is a "
+            "property of this shape, published in this description and identical "
+            "on every copy of the program, and it reads no key, no environment and "
+            "no folder. A third value is reserved for a finished generation served "
+            "back by its identifier, which belongs here rather than on a route of "
+            "its own."
+        ),
     )
 
 
@@ -226,13 +272,15 @@ async def generate(
 ) -> StreamingResponse:
     """Build a map from one sentence, and write it out as it is built.
 
-    With a key this calls a model; with none it plays a committed recording back
-    through the same events. Either way the answer is one long response the
-    browser reads as it arrives.
+    **The request says how the run starts.** Asked for a live run this calls a
+    model, or refuses in one sentence when there is no key; asked for a recording
+    it plays the committed one back through the same events, whether or not a key
+    is configured. Either way the answer is one long response the browser reads as
+    it arrives.
 
     Args:
         request: The request itself, so the run can stop when the client goes.
-        asked: The sentence, and everything optional beside it.
+        asked: The sentence, how the run starts, and everything optional beside it.
         settings: The program's settings, which say whether a key is configured.
 
     Returns:
@@ -403,6 +451,12 @@ async def _written_out(request: Request, asked: GenerateRequest) -> AsyncIterato
     away — **before the next model call**, which is the whole reason the behaviour
     is written down rather than left to chance.
 
+    **What was asked for picks the path, and the key only says whether a live run
+    is possible.** Asking for a recording never reads the key at all, which is
+    what makes a recording reachable on a machine that has one; asking for a live
+    run without one ends in a receipt of zeroes and a sentence, and never in a
+    recording nobody asked for.
+
     Args:
         request: The request, which knows whether the client is still there.
         asked: What was asked for.
@@ -410,8 +464,14 @@ async def _written_out(request: Request, asked: GenerateRequest) -> AsyncIterato
     Yields:
         The wire's lines, one event at a time.
     """
-    answerer = live_answerer(when_nothing_is_said=EFFORT_WHEN_LIVE)
-    stepping = _replayed(asked) if answerer is None else _lived(asked, answerer)
+    replaying = asked.start == "replay"
+    answerer = None if replaying else live_answerer(when_nothing_is_said=EFFORT_WHEN_LIVE)
+    if replaying:
+        stepping = _replayed(asked)
+    elif answerer is None:
+        stepping = _no_key_for_a_live_run()
+    else:
+        stepping = _lived(asked, answerer)
     try:
         while True:
             if await request.is_disconnected():
@@ -423,7 +483,7 @@ async def _written_out(request: Request, asked: GenerateRequest) -> AsyncIterato
                 return
             yield events.framed(event)
             if events.name_of(event) not in (events.NAMES[Done], events.NAMES[Failed]):
-                await _pause(answerer is None)
+                await _pause(replaying)
     finally:
         stepping.close()
 
@@ -445,6 +505,27 @@ async def _pause(replaying: bool) -> None:
     waiting = replay.seconds_between()
     if waiting > 0:
         await asyncio.sleep(waiting)
+
+
+def _no_key_for_a_live_run() -> Generator[Event, None, None]:
+    """Refuse a live run this copy cannot make, in one sentence, and play nothing instead.
+
+    **The case that could not arise before the request named its own start.** It
+    is not an error and not a status code: the answer is the ordinary stream,
+    ending the way every ending ends — a receipt, then one plain sentence — so a
+    browser reading the stream needs to know nothing new to print it.
+
+    The receipt says `live` and zeroes. That is the honest pair: this was a live
+    run that was asked for, and it cost nothing because it never happened. Saying
+    `replay` here would file a run that played no recording under the word for
+    playing one.
+
+    Yields:
+        A receipt of zeroes, then the sentence.
+    """
+    started = time.monotonic()
+    yield _nothing_spent(time.monotonic() - started, mode="live")
+    yield Failed(message=NO_KEY_FOR_A_LIVE_RUN)
 
 
 def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None, None]:
@@ -677,9 +758,20 @@ def _line_from(event: ProposalAccepted | ProposalRejected, at: int) -> Transcrip
     )
 
 
-def _nothing_spent(seconds: float) -> Receipt:
-    """The receipt of a replay that had nothing to play: zeroes, and honestly so."""
-    return receipt_event(nothing_spent_yet(), seconds=seconds, mode="replay")
+def _nothing_spent(seconds: float, *, mode: str = "replay") -> Receipt:
+    """The receipt of a run that spent nothing: zeroes, and honestly so.
+
+    Args:
+        seconds: How long it took to get nowhere, wall clock.
+        mode: Which of the two the reader asked for. A replay that had nothing to
+            play is still a replay; a live run refused for want of a key is still
+            a live run, and filing it under the word for playing a recording would
+            say it played one.
+
+    Returns:
+        The receipt.
+    """
+    return receipt_event(nothing_spent_yet(), seconds=seconds, mode=mode)
 
 
 def _scripted_insert(claim_in_words: str) -> Insert | None:

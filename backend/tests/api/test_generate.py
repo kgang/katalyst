@@ -1,10 +1,16 @@
 """The three routes a generation is asked for, watched and read back through.
 
-Every test here runs with **no key**, which is the point: with none configured
-the route plays a recording back, and the recording is written into a throwaway
-directory from the fake answers the pipeline's own tests use. So the whole stream
-— its grammar, its terminator, its refusals, its receipt — is provable today
-without a model, a network or a penny.
+Every test here runs with **no key**, which is the point: the recording is written
+into a throwaway directory from the fake answers the pipeline's own tests use, so
+the whole stream — its grammar, its terminator, its refusals, its receipt — is
+provable today without a model, a network or a penny.
+
+**The request says how a run starts**, and these tests say it too. `stream` asks
+for the default, which is a recording; `live_stream` asks for a live run, and the
+tests that use it hand the seam a script instead of a model. A test that wants a
+live run therefore says so rather than relying on a key being configured — which
+is what the route used to read and deliberately no longer does (record 0012,
+amended 2026-09-21).
 """
 
 import json
@@ -110,6 +116,15 @@ def stream(**asked: Any) -> list[tuple[str, dict[str, Any]]]:
                 read.append((name, json.loads(line.removeprefix("data: "))))
                 name = None
         return read
+
+
+def live_stream(**asked: Any) -> list[tuple[str, dict[str, Any]]]:
+    """Ask for a run that calls a model, and read every event off the wire.
+
+    The same reader as `stream`, with the start named. Whoever calls this has
+    handed the seam a script, so nothing is asked of a model and nothing is spent.
+    """
+    return stream(start="live", **asked)
 
 
 def test_generate_needs_no_key_in_replay_mode() -> None:
@@ -352,6 +367,24 @@ def test_readyz_says_what_can_be_replayed_before_anything_runs() -> None:
     assert ready["model_key_present"] is False
     assert [one["example"] for one in ready["replayable"]] == ["hormuz"]
     assert ready["replayable"][0]["recording_date"]
+    # And what the recorded run cost, which is the only measured price and the
+    # only measured duration this product owns — read off the file's own receipt
+    # line, so the route quotes a measurement rather than restating a number.
+    # The first screen prints it beside a live run **before** the press.
+    recorded_receipt = next(
+        payload
+        for name, payload in replay.find(THE_SENTENCE).lines  # type: ignore[union-attr]
+        if name == "receipt"
+    )
+    assert (
+        ready["replayable"][0]["calls"],
+        ready["replayable"][0]["seconds"],
+        ready["replayable"][0]["dollars"],
+    ) == (
+        recorded_receipt["calls"],
+        recorded_receipt["seconds"],
+        recorded_receipt["dollars"],
+    )
     # A copy that can replay is not "not ready": it can do almost everything.
     assert ready["status"] == "ready"
 
@@ -374,7 +407,7 @@ def test_a_live_run_streams_the_same_grammar_the_replay_does(
     """One route, one grammar, whichever side the bytes came from."""
     a_scripted_run(monkeypatch, a_story())
 
-    names = [name for name, _ in stream(hypothesis="Something a person expects.")]
+    names = [name for name, _ in live_stream(hypothesis="Something a person expects.")]
 
     assert names[0] == "generation_started"
     assert names[-2:] == ["receipt", "done"]
@@ -389,7 +422,7 @@ def test_a_live_runs_receipt_says_it_was_live_and_what_it_cost(
 
     receipt = next(
         payload
-        for name, payload in stream(hypothesis="Something a person expects.")
+        for name, payload in live_stream(hypothesis="Something a person expects.")
         if name == "receipt"
     )
 
@@ -407,7 +440,7 @@ def test_the_seed_is_minted_when_the_request_leaves_it_out(
 
     started = next(
         payload
-        for name, payload in stream(hypothesis="Something a person expects.")
+        for name, payload in live_stream(hypothesis="Something a person expects.")
         if name == "generation_started"
     )
 
@@ -423,7 +456,7 @@ def test_a_seed_that_was_sent_is_the_seed_that_is_used(
 
     started = next(
         payload
-        for name, payload in stream(hypothesis="Something a person expects.", seed=4242)
+        for name, payload in live_stream(hypothesis="Something a person expects.", seed=4242)
         if name == "generation_started"
     )
 
@@ -437,7 +470,7 @@ def test_the_transcript_records_the_seconds_and_the_thinking_behind_every_call(
     told = a_story()
     a_scripted_run(monkeypatch, told)
 
-    read = stream(hypothesis="Something a person expects.")
+    read = live_stream(hypothesis="Something a person expects.")
     generation_id = next(
         payload["generation_id"] for name, payload in read if name == "generation_started"
     )
@@ -455,7 +488,7 @@ def test_a_line_the_model_had_nothing_more_to_say_about_makes_no_event(
     told = a_story()
     a_scripted_run(monkeypatch, told)
 
-    read = stream(hypothesis="Something a person expects.")
+    read = live_stream(hypothesis="Something a person expects.")
     generation_id = next(
         payload["generation_id"] for name, payload in read if name == "generation_started"
     )
@@ -499,13 +532,78 @@ def test_the_stream_stops_calling_the_model_when_the_client_goes_away(
     assert asked_before_it_went > 0
 
 
+# --- The request names the start, and the server never substitutes ----------
+#
+# Two cases that could not arise while the key decided which path ran. With a key
+# the committed recording was unreachable; with none a live run could not even be
+# asked for. Record 0012, amended 2026-09-21: the server does what it was asked,
+# or says plainly why it cannot, and never swaps one for the other.
+
+
+def test_a_recording_plays_when_the_request_asks_for_one_and_a_key_is_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A reviewer with a key can still watch the recording, and nothing is called.
+
+    Kent's own question on 2026-09-21 — *"How can i test out all the functionality
+    if I run it with a valid anthropic key?"* — had no answer before this: with a
+    key every card ran live and `backend/recordings/hormuz.jsonl` was reachable
+    only by deleting the key from a file.
+
+    A key is configured here **and** the seam is handed a script, so the two
+    things this asserts are both real: the program reports a key present, and the
+    script was never asked a single question.
+    """
+    told = a_story()
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "a key that is present and never used")
+    get_settings.cache_clear()
+    a_scripted_run(monkeypatch, told)
+
+    read = stream()
+
+    assert client().get("/api/readyz").json()["model_key_present"] is True
+    receipt = next(payload for name, payload in read if name == "receipt")
+    assert receipt["mode"] == "replay"
+    assert receipt["calls"] == 0
+    assert receipt["dollars"] == 0.0
+    assert [name for name, _ in read][-1] == "done"
+    assert told.asked == []
+
+
+def test_a_live_run_with_no_key_is_refused_in_words() -> None:
+    """Asked to call a model with none to call, it says so — and plays nothing instead.
+
+    It ends the way every other ending ends: a receipt, then one plain sentence,
+    so a browser reading the stream needs to know nothing new to print it. The
+    receipt says `live` and zeroes, which is the honest pair — a live run that was
+    asked for and never happened.
+
+    The last two lines are the whole point. The recording of this very sentence is
+    on disk, and the same request with the start left alone plays it. Handing that
+    back here would be the one change that makes this product lie.
+    """
+    read = live_stream()
+
+    assert [name for name, _ in read] == ["receipt", "failed"]
+    receipt, failed = read[0][1], read[1][1]
+    assert receipt["mode"] == "live"
+    assert receipt["calls"] == 0
+    assert receipt["dollars"] == 0.0
+    assert failed["message"] == generate.NO_KEY_FOR_A_LIVE_RUN
+    # In words: it names what is missing and what can be asked for instead.
+    assert "model key" in failed["message"]
+    assert "recording" in failed["message"]
+
+    assert [name for name, _ in stream()][-1] == "done"
+
+
 # --- A live run that breaks still ends in one plain sentence ---------------
 
 
 def a_live_run(monkeypatch: pytest.MonkeyPatch, answerer: object) -> list[tuple[str, Any]]:
     """Stream one generation against a stand-in answerer rather than a recording."""
     monkeypatch.setattr(generate, "live_answerer", lambda **_: answerer)
-    return stream(hypothesis="A sentence with no recording behind it.")
+    return live_stream(hypothesis="A sentence with no recording behind it.")
 
 
 def test_a_live_run_the_model_never_answers_ends_with_one_plain_sentence(
@@ -577,7 +675,7 @@ def test_a_run_that_empties_the_purse_before_it_has_a_map_still_says_done(
     monkeypatch.setattr(generate, "live_answerer", lambda **_: Scripted(starting=[expensive]))
     monkeypatch.setattr(generate, "Caps", lambda: Caps(dollars=1.0))
 
-    read = stream(hypothesis="A sentence with no recording behind it.")
+    read = live_stream(hypothesis="A sentence with no recording behind it.")
 
     names = [name for name, _ in read]
     assert names[-1] == "done"
@@ -634,7 +732,7 @@ def test_a_run_that_breaks_still_says_what_it_spent(monkeypatch: pytest.MonkeyPa
     answerer = AnswersThenBreaks(after=2)
     monkeypatch.setattr(generate, "live_answerer", lambda **_: answerer)
 
-    read = stream(hypothesis="A sentence with no recording behind it.")
+    read = live_stream(hypothesis="A sentence with no recording behind it.")
 
     names = [name for name, _ in read]
     assert names[-1] == "failed"
@@ -652,7 +750,7 @@ def test_a_run_that_breaks_leaves_its_working_behind_too(
     answerer = AnswersThenBreaks(after=2)
     monkeypatch.setattr(generate, "live_answerer", lambda **_: answerer)
 
-    read = stream(hypothesis="A sentence with no recording behind it.")
+    read = live_stream(hypothesis="A sentence with no recording behind it.")
     announced = next(
         payload["generation_id"] for name, payload in read if name == "generation_started"
     )
@@ -697,7 +795,7 @@ def test_a_reader_who_goes_away_mid_round_still_leaves_the_bill_behind(
     monkeypatch.setattr(generate, "live_answerer", lambda **_: told)
 
     with client().stream(
-        "POST", "/api/generate", json={"hypothesis": STARTED_AT, **SMALL}
+        "POST", "/api/generate", json={"hypothesis": STARTED_AT, "start": "live", **SMALL}
     ) as answer:
         assert answer.status_code == 200
         announced = None
@@ -884,7 +982,7 @@ def test_the_readers_own_likelihood_is_stamped_on_the_hypothesis(
     """
     monkeypatch.setattr(generate, "live_answerer", lambda **_: a_story())
 
-    read = stream(
+    read = live_stream(
         hypothesis=STARTED_AT,
         user_belief={"p": 0.7, "lo": 0.5, "hi": 0.9, "owner": "user"},
     )
@@ -901,7 +999,7 @@ def test_saying_nothing_stamps_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     """ "I don't know" is an answer, and it is not a likelihood of one half."""
     monkeypatch.setattr(generate, "live_answerer", lambda **_: a_story())
 
-    read = stream(hypothesis=STARTED_AT)
+    read = live_stream(hypothesis=STARTED_AT)
 
     world = next(payload for name, payload in read if name == "beliefs_propagated")
     started = world["world"]["graph"]["hypothesis_id"]

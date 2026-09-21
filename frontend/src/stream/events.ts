@@ -284,4 +284,13 @@ export interface GenerateRequest {
    * and the number on screen is still the engine's.
    */
   readonly seed?: number;
+  /**
+   * How this run starts: `live` calls a model, `replay` plays the committed
+   * recording of this sentence back.
+   *
+   * **The caller says which, and the server never chooses** (record 0012,
+   * amended 2026-09-21). Left out, the server plays a recording, because a
+   * request that did not ask to spend money must never spend it.
+   */
+  readonly start?: "replay" | "live";
 }
