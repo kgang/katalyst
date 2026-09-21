@@ -63,7 +63,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from types import MappingProxyType
-from typing import Literal
+from typing import Final, Literal
 
 import networkx
 import numpy
@@ -76,6 +76,7 @@ from katalyst.domain.ids import BranchId, LinkId, PropositionId
 from katalyst.domain.link import Link, Provenance
 from katalyst.domain.patch import Assignment
 from katalyst.domain.proposition import Proposition
+from katalyst.domain.rates import SLICES
 from katalyst.domain.validity import _name_of
 
 Numbers = NDArray[numpy.float64]
@@ -107,6 +108,30 @@ tile shows a word rather than a number.
 `withdrawn` — the supposition has been undermined and no opposing push has
 arrived yet, so the claim reads its own prior again.
 `pushed` — an opposing push is live.
+"""
+
+Engine = Literal["today", "by_deadline"]
+"""Which arithmetic works the map through.
+
+`today` — the two nested loops this file has held since the engine was first
+written: versions of the map on the outside, worlds of dice on the inside.
+`by_deadline` — decision record 0016's core: one forward pass that works out when
+each claim happens, one exact solve for whether it happens, and one weighted sample
+of worlds where something was observed.
+
+The two stand side by side while the second is written and checked against the
+first. Which one runs is one constant in one file, `ENGINE` in
+`katalyst.engine.worlds`, and never a setting read out of the environment: a screen
+whose numbers depend on how a machine was started is exactly the state nobody can
+trace back to an input, a rule or a source.
+"""
+
+SAMPLED_WORLDS: Final = 50_000
+"""How many worlds the by-deadline engine draws when something has been observed.
+
+Nothing is thrown away: every one of them is kept and weighted by how well it
+matches what was seen. Ignored entirely by the `today` engine, which has its own
+inner loop.
 """
 
 PARAMS_STREAM = 1
@@ -487,6 +512,9 @@ def propagate(
     versions: int = 2_000,
     worlds: int = 8,
     introduced_by: Mapping[LinkId, int] = NOTHING_ADDED,
+    engine: Engine = "today",
+    slices: int = SLICES,
+    sampled_worlds: int = SAMPLED_WORLDS,
 ) -> World:
     """Work every likelihood on a map through time, and say how sure we are of each.
 
@@ -516,6 +544,13 @@ def propagate(
             it out is only safe when no supposition can be undermined; when one is,
             and its arrow is not in here, that is a broken promise between our own
             two pieces of code and it is said out loud rather than guessed at.
+        engine: Which arithmetic to use. `today` is the two nested loops below;
+            `by_deadline` is decision record 0016's core, which is being written
+            beside it. The default changes once, in one place, at the flip.
+        slices: How many equal pieces the by-deadline engine cuts the window into.
+            Ignored by `today`.
+        sampled_worlds: How many worlds the by-deadline engine draws when something
+            has been observed. Ignored by `today`, which has its own inner loop.
 
     Returns:
         One world: a likelihood and a range for every claim on the day it is
@@ -529,6 +564,17 @@ def propagate(
             does not account for. The one thing this file raises for, and why is in
             `_retractions`.
     """
+    if engine == "by_deadline":
+        return _by_deadline(
+            graph,
+            assignments,
+            as_of=as_of,
+            seed=seed,
+            versions=versions,
+            introduced_by=introduced_by,
+            slices=slices,
+            sampled_worlds=sampled_worlds,
+        )
     return _propagated(
         graph,
         assignments,
@@ -539,6 +585,51 @@ def propagate(
         introduced_by=introduced_by,
         spreads=PROVENANCE_SPREAD,
     )
+
+
+def _by_deadline(
+    graph: Graph,
+    assignments: tuple[Assignment, ...],
+    *,
+    as_of: date,
+    seed: int,
+    versions: int,
+    introduced_by: Mapping[LinkId, int],
+    slices: int,
+    sampled_worlds: int,
+) -> World:
+    """Work the map through as decision record 0016 says, and build a world out of it.
+
+    **Not written yet.** This is the seam the new core is assembled behind, and it
+    raises until the four modules under it are finished.
+
+    Three things belong here and in none of those four modules:
+
+    1. **Where a claim's range comes from.** The six lines that split a claim's
+       range across the claims that caused it keep today's meaning and today's
+       shape, read off the exact per-version numbers rather than an average over
+       eight sampled worlds. It needs both the drawn priors and the per-version
+       answers, and this is the only place that holds both.
+    2. **The warnings about arrows that fell short.** An arrow whose push covers
+       only part of the window cannot always hold a claim back as far as its number
+       asks; each one that could not gets a plain sentence naming the arrow and both
+       numbers, beside the warning about a loud push that is already here.
+    3. **`World.worlds = 0`**, which means *there is no inner loop*.
+
+    Args:
+        graph: The map a fold left behind.
+        assignments: Every value that fold fixed, in order.
+        as_of: Day zero — the day the window starts on.
+        seed: The one number every random draw comes from.
+        versions: How many versions of the map to try.
+        introduced_by: Which edit added each arrow, by position in the branch.
+        slices: How many equal pieces to cut the window into.
+        sampled_worlds: How many worlds to draw where something was observed.
+
+    Returns:
+        One world, with every claim's number read on its own resolve-by day.
+    """
+    raise NotImplementedError
 
 
 def _propagated(

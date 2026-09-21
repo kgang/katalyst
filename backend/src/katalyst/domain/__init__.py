@@ -44,6 +44,16 @@ between, and a named state for each of those days. `diff.py` compares two such
 worlds: what happened to every claim, which endings moved and in what order, and
 one fixed sentence saying so; it also sweeps a world one claim at a time, to see
 what each flip would move.
+
+What is being built beside it
+-----------------------------
+Five modules — `rates.py`, `states.py`, `forward.py`, `solving.py` and
+`sampling.py` — are the new arithmetic of decision record 0016, in which a claim's
+number is **the chance it happens by its deadline** rather than a likelihood read
+on one day. They are **stubs today**: every shape, name and docstring is settled so
+that the people writing the arithmetic can build against each other, and every body
+raises. Nothing runs them yet. `propagate` takes an `engine` argument naming which
+arithmetic to use, and it defaults to the one this layer has always run.
 """
 
 from katalyst.domain.belief import Belief, Beliefs, two_figures
@@ -58,6 +68,7 @@ from katalyst.domain.diff import (
     diff,
     sensitivity,
 )
+from katalyst.domain.forward import Forward, forward_pass
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import BranchId, LinkId, PropositionId
 from katalyst.domain.intervention import (
@@ -78,6 +89,8 @@ from katalyst.domain.patch import (
     introduced_by,
 )
 from katalyst.domain.propagation import (
+    SAMPLED_WORLDS,
+    Engine,
     Retraction,
     SeriesState,
     Versions,
@@ -94,9 +107,45 @@ from katalyst.domain.proposition import (
     Proposition,
     Resolution,
 )
+from katalyst.domain.rates import (
+    POINTS_IN_A_SLICE,
+    SLICES,
+    AddedUp,
+    ClaimShapes,
+    Clamp,
+    Drawn,
+    Persistence,
+    Pin,
+    Rates,
+    Window,
+    added_up,
+    clamped,
+    rates_of,
+    shapes_of,
+    stated_chance_with,
+    window_of,
+)
+from katalyst.domain.sampling import Ready, Sample, ready_to_sample, sample_forward
+from katalyst.domain.solving import all_marginals, elimination_order, solve
+from katalyst.domain.states import (
+    NEVER,
+    STILL_HOLDING,
+    Times,
+    as_joint,
+    holding_curve,
+    is_true_on_its_deadline,
+    needs_the_joint,
+    on_and_off,
+)
 from katalyst.domain.validity import Violation, ViolationCode, validate
 
 __all__ = [
+    "NEVER",
+    "POINTS_IN_A_SLICE",
+    "SAMPLED_WORLDS",
+    "SLICES",
+    "STILL_HOLDING",
+    "AddedUp",
     "Assignment",
     "BaseRate",
     "Belief",
@@ -105,13 +154,18 @@ __all__ = [
     "Branch",
     "BranchId",
     "ClaimDiff",
+    "ClaimShapes",
     "ClaimState",
+    "Clamp",
     "ContractPayoff",
     "Days",
     "DeltaRow",
     "Diff",
     "Do",
+    "Drawn",
+    "Engine",
     "Evidence",
+    "Forward",
     "Graph",
     "Insert",
     "Intervention",
@@ -119,30 +173,54 @@ __all__ = [
     "LinkId",
     "Observe",
     "Payoff",
+    "Persistence",
+    "Pin",
     "PricePayoff",
     "Proposition",
     "PropositionId",
     "Provenance",
+    "Rates",
+    "Ready",
     "Refine",
     "Resolution",
     "Retraction",
     "Retune",
+    "Sample",
     "SensitivityRow",
     "SeriesState",
     "Source",
+    "Times",
     "UnchangedBecause",
     "Versions",
     "Violation",
     "ViolationCode",
+    "Window",
     "World",
+    "added_up",
     "affected_set",
+    "all_marginals",
     "apply",
+    "as_joint",
+    "clamped",
     "diff",
+    "elimination_order",
     "flatten",
+    "forward_pass",
+    "holding_curve",
     "introduced_by",
+    "is_true_on_its_deadline",
+    "needs_the_joint",
+    "on_and_off",
     "propagate",
+    "rates_of",
+    "ready_to_sample",
+    "sample_forward",
     "sensitivity",
+    "shapes_of",
+    "solve",
+    "stated_chance_with",
     "two_figures",
     "validate",
     "versions_of",
+    "window_of",
 ]

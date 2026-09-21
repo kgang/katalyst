@@ -478,7 +478,6 @@ def sensitivity(
     # each of those names both the arrow and the edit. So a sweep can work the
     # same map through again without being handed the branch a second time.
     told = {one.by_link: one.by for one in world.retractions}
-    budget = {"versions": versions, "worlds": worlds}
 
     start = propagate(
         world.graph,
@@ -486,7 +485,8 @@ def sensitivity(
         as_of=world.day_zero,
         seed=world.seed,
         introduced_by=told,
-        **budget,
+        versions=versions,
+        worlds=worlds,
     )
 
     swept: list[SensitivityRow] = []
@@ -516,7 +516,8 @@ def sensitivity(
             as_of=world.day_zero,
             seed=world.seed,
             introduced_by=told,
-            **budget,
+            versions=versions,
+            worlds=worlds,
         )
         swept.append(
             SensitivityRow(

@@ -38,6 +38,7 @@ What this file must never do
 """
 
 from collections.abc import Mapping
+from typing import Final
 
 from katalyst.domain import (
     Assignment,
@@ -45,6 +46,7 @@ from katalyst.domain import (
     Branch,
     Diff,
     Do,
+    Engine,
     Graph,
     Intervention,
     Link,
@@ -72,6 +74,25 @@ WORLDS = 8
 """How many worlds run under each version when a request does not say.
 
 The inner loop: how the dice fall. The same number `propagate` defaults to.
+"""
+
+ENGINE: Final[Engine] = "today"
+"""Which arithmetic every world on this server is worked out with.
+
+Two exist side by side while the second is written and checked against the first:
+`today` is the pair of nested loops the engine has always run, and `by_deadline` is
+decision record 0016's core, where a claim's number is the chance it happens by its
+deadline. **The flip changes this one word, in this one place.**
+
+It is a constant here and never a setting read out of the environment. A screen
+whose numbers depend on how a machine happened to be started is exactly the state
+nobody can trace back to an input, a rule or a cited source — and two people
+looking at the same map, the same branch and the same seed must see the same
+numbers. No route exposes it, and nothing outside this file names it.
+
+All three ways into the engine — `build_world`, `difference` and `conditional` —
+reach `propagate` through `_worked_through` below, which is the one place it is
+passed.
 """
 
 MOST_VERSIONS = 2_400
@@ -442,5 +463,6 @@ def _worked_through(
         versions=versions,
         worlds=worlds,
         introduced_by=told,
+        engine=ENGINE,
     )
     return world.model_copy(update={"branch_id": branch.id if branch is not None else None})
