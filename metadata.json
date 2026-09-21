@@ -3,7 +3,7 @@
   "checkpoint_id": "01M32ENF4R10QARW40Z1QHBGH5",
   "strategy": "manual-commit",
   "branch": "adr/05-sound-numbers",
-  "checkpoints_count": 2,
+  "checkpoints_count": 5,
   "files_touched": null,
   "sessions": [
     {
@@ -19,20 +19,27 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 16,
-    "cache_creation_tokens": 19133,
-    "cache_read_tokens": 2638448,
-    "output_tokens": 11546,
-    "api_call_count": 7,
+    "input_tokens": 42,
+    "cache_creation_tokens": 39030,
+    "cache_read_tokens": 5825884,
+    "output_tokens": 20961,
+    "api_call_count": 16,
     "subagent_tokens": {
-      "input_tokens": 278,
-      "cache_creation_tokens": 294906,
-      "cache_read_tokens": 24336924,
-      "output_tokens": 119905,
-      "api_call_count": 139
+      "input_tokens": 352,
+      "cache_creation_tokens": 1403859,
+      "cache_read_tokens": 41195619,
+      "output_tokens": 179415,
+      "api_call_count": 176
     }
   }
 }
