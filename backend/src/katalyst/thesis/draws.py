@@ -172,12 +172,95 @@ class Draws:
                 whatever built it built it wrongly — so it is said out loud here
                 rather than read as a number somewhere above.
         """
-        raise NotImplementedError
+        if self.days < 1:
+            raise ValueError(f"a window has to run for at least one day; got {self.days}")
+        if len(set(self.claims)) != len(self.claims):
+            raise ValueError("a claim may name only one column, and one of these names two")
+        _two_dimensions_of_whole_days(self.on_day, "on_day")
+        _two_dimensions_of_whole_days(self.off_day, "off_day")
+        if self.on_day.shape != self.off_day.shape:
+            raise ValueError(
+                "the day a claim came on and the day it went off are one array each of the "
+                f"same shape; got {self.on_day.shape} against {self.off_day.shape}"
+            )
+        if self.on_day.shape[1] != len(self.claims):
+            raise ValueError(
+                f"there are {len(self.claims)} claims, so each array has that many columns; "
+                f"got {self.on_day.shape[1]}"
+            )
+        if self.on_day.shape[0] < 1:
+            raise ValueError("a set of draws with no worlds in it answers nothing")
+        self._the_days_are_readable()
+        self._the_weights_are_usable()
+
+    def _the_days_are_readable(self) -> None:
+        """Check every day is inside the window or is one of the two markers.
+
+        And that the two arrays tell the same story: a claim that never came on
+        never went off, and a claim that came on did not go off before it did.
+
+        Raises:
+            ValueError: If a day is outside the window and is not a marker, if one
+                array says a claim never came on where the other says it ended, or
+                if a claim went off before it came on.
+        """
+        came_on = self.on_day != NEVER
+        if bool(((self.on_day < 0) & (self.on_day != NEVER)).any()) or bool(
+            (self.on_day > self.days).any()
+        ):
+            raise ValueError(
+                f"the day a claim came on is 0 to {self.days}, or {NEVER} for never; "
+                f"got days from {int(self.on_day.min())} to {int(self.on_day.max())}"
+            )
+        marked = (self.off_day == NEVER) | (self.off_day == STILL_HOLDING)
+        if bool(((self.off_day < 0) & ~marked).any()) or bool((self.off_day > self.days).any()):
+            raise ValueError(
+                f"the day a claim went off is 0 to {self.days}, {STILL_HOLDING} for still "
+                f"holding, or {NEVER} where it never came on; got days from "
+                f"{int(self.off_day.min())} to {int(self.off_day.max())}"
+            )
+        if bool((came_on != (self.off_day != NEVER)).any()):
+            raise ValueError(
+                "a claim that never came on never went off, and one that came on did not "
+                f"never come on; {NEVER} has to stand in both arrays or in neither"
+            )
+        ended = came_on & (self.off_day != STILL_HOLDING)
+        if bool((self.off_day[ended] < self.on_day[ended]).any()):
+            raise ValueError("a claim cannot go off before the day it came on")
+
+    def _the_weights_are_usable(self) -> None:
+        """Check the weights are one per world, none negative, not all zero, and counted right.
+
+        Raises:
+            ValueError: If the weights are not one per drawn world, if any is
+                negative or not a real number, if no world carries any weight, or
+                if the effective count is not the one these weights imply.
+        """
+        if self.weight.ndim != 1 or not numpy.issubdtype(self.weight.dtype, numpy.floating):
+            raise ValueError(
+                f"the weights are one ordinary number per drawn world; got a {self.weight.ndim}"
+                f"-dimensional array of {self.weight.dtype}"
+            )
+        if self.weight.shape[0] != self.on_day.shape[0]:
+            raise ValueError(
+                f"there are {self.on_day.shape[0]} drawn worlds and {self.weight.shape[0]} "
+                "weights, and there has to be one weight for each world"
+            )
+        if not bool(numpy.isfinite(self.weight).all()) or bool((self.weight < 0.0).any()):
+            raise ValueError("a world's weight is a real number and is never below nothing")
+        counted = effective_draws(self.weight)
+        if counted <= 0.0:
+            raise ValueError("no drawn world carries any weight, so there is nothing to count")
+        if abs(self.effective - counted) > 1e-9 * counted:
+            raise ValueError(
+                f"these weights are worth {counted} equally-weighted worlds, and the count "
+                f"handed in says {self.effective}; it is some other sample's count"
+            )
 
     @property
     def worlds(self) -> int:
         """How many worlds were drawn."""
-        raise NotImplementedError
+        return int(self.on_day.shape[0])
 
     def column(self, claim: PropositionId) -> int:
         """Which column of the two day arrays stands for a claim.
@@ -191,7 +274,12 @@ class Draws:
         Raises:
             KeyError: If the claim is not in this set of draws at all.
         """
-        raise NotImplementedError
+        try:
+            return self.claims.index(claim)
+        except ValueError:
+            raise KeyError(
+                f"'{claim}' is not one of the claims these worlds were drawn for"
+            ) from None
 
     def holding_on(self, day: int) -> Flags:
         """Which claims were holding, in which worlds, on a given day.
@@ -209,7 +297,9 @@ class Draws:
         Returns:
             One true-or-false value per drawn world and claim.
         """
-        raise NotImplementedError
+        started: Flags = self.came_on_by(day)
+        running: Flags = (self.off_day == STILL_HOLDING) | (self.off_day > day)
+        return started & running
 
     def came_on_by(self, day: int) -> Flags:
         """Which claims had come on at all by a given day, in which worlds.
@@ -224,7 +314,25 @@ class Draws:
         Returns:
             One true-or-false value per drawn world and claim.
         """
-        raise NotImplementedError
+        started: Flags = (self.on_day != NEVER) & (self.on_day <= day)
+        return started
+
+
+def _two_dimensions_of_whole_days(days: Days, called: str) -> None:
+    """Check one of the two day arrays is a grid of whole days.
+
+    Args:
+        days: The array to check.
+        called: Which of the two it is, so a reader of the failure knows.
+
+    Raises:
+        ValueError: If it is not two-dimensional, or does not hold whole numbers.
+    """
+    if days.ndim != 2 or not numpy.issubdtype(days.dtype, numpy.integer):
+        raise ValueError(
+            f"`{called}` is a whole day per drawn world per claim; got a {days.ndim}"
+            f"-dimensional array of {days.dtype}"
+        )
 
 
 def effective_draws(weight: Weights) -> float:
@@ -244,7 +352,11 @@ def effective_draws(weight: Weights) -> float:
         The effective count, which is never more than the number of worlds handed
         in. Nothing at all where no world carries any weight.
     """
-    raise NotImplementedError
+    total = float(weight.sum())
+    squared = float((weight * weight).sum())
+    if squared <= 0.0:
+        return 0.0
+    return total * total / squared
 
 
 def weighted_share(flags: Flags, weight: Weights) -> float:
@@ -264,4 +376,12 @@ def weighted_share(flags: Flags, weight: Weights) -> float:
         ValueError: If the two do not have one entry each per drawn world, or if no
             world carries any weight.
     """
-    raise NotImplementedError
+    if flags.shape != weight.shape:
+        raise ValueError(
+            "a share is counted over one answer per drawn world; got "
+            f"{flags.shape} answers against {weight.shape} weights"
+        )
+    total = float(weight.sum())
+    if total <= 0.0:
+        raise ValueError("no drawn world carries any weight, so there is no share to take")
+    return float(weight[flags].sum()) / total
