@@ -362,7 +362,7 @@ class _Walk:
         exception inside a fold used to take the rest of the round off the
         receipt; billing the whole round up front fixed that, and billing each
         call as it returns fixes it the same way while letting each answer reach
-        the reader as soon as it exists (Kent, 2026-09-21; Kent, 2026-09-22).
+        the reader as soon as it exists (Kent, 2026-09-21 and 2026-09-22).
 
         Args:
             answer: What one call came back with.
@@ -901,13 +901,13 @@ def _why_it_stopped(walk: _Walk, graph: Graph) -> StoppingReason:
 
     **"Last" means last as the reader watched it close**, which since Kent's
     answer of 2026-09-22 is the order the calls came back in rather than the
-    order the questions went out. So a round whose answers close two lines at once — one by
-    a cap, one by a `Stop` — names whichever of them landed second, and running
-    the very same answers again could name the other. Both sentences are true of
-    the run that happened, and each names the line that closed last on the screen
-    somebody was watching. Nothing in production asks the same answers twice: the
-    answers come from a model, and a replay plays a recording back rather than
-    walking again.
+    order the questions went out. So a round whose answers close two lines at
+    once — one by a cap, one by a `Stop` — names whichever of them landed second,
+    and the very same answers arriving in the other order would name the other.
+    Both sentences are true of the run that happened, and each names the line
+    that closed last on the screen somebody was watching. Nothing in production
+    asks the same answers twice: they come from a model, and a replay plays a
+    recording back rather than walking again.
 
     Args:
         walk: What this walk remembers, including what closed the last claim.
