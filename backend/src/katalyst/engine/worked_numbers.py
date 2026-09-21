@@ -79,6 +79,10 @@ from katalyst.domain import (
 # `diff.py` is touched for another reason, this is the line that asks for it to
 # be made public.
 from katalyst.domain.diff import _two_figures
+
+# The one rule for writing how hard an arrow pushes, borrowed for the same reason
+# and from the layer that owns the number.
+from katalyst.domain.propagation import _push_as_written
 from katalyst.engine.worlds import VERSIONS, WORLDS, build_world, conditional, difference
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
 
@@ -591,7 +595,7 @@ def _input_lines(claims: Sequence[Proposition], arrows: Sequence[Link]) -> list[
                     f"{arrow.source} → {arrow.target}",
                     arrow.mode,
                     arrow.shape,
-                    f"strength {arrow.strength:+.1f}",
+                    f"strength {_push_as_written(arrow.strength)}",
                     f"delay {_in_days(arrow.lag)}",
                     "half-life " + (_in_days(arrow.half_life) if arrow.half_life else NOTHING),
                     arrow.provenance,

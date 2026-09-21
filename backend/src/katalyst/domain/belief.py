@@ -60,11 +60,46 @@ class Belief(BaseModel):
         ),
     )
 
+    def _as_written(self) -> tuple[str, str, str]:
+        """Give this belief's three numbers the way the product writes a likelihood.
+
+        Two significant figures, in the order low, likelihood, high. Nothing that
+        reaches a reader — a chip on the canvas, a sentence in a refusal, the body
+        of a rejected request — quotes a likelihood at the precision a computer
+        happens to hold it at, because `0.30000000000000004` is not a number
+        anybody wrote or could act on.
+
+        **A number outside 0 to 1 is said to be outside 0 to 1**, and is not put
+        through the likelihood rule. The fields on this class cannot hold such a
+        number, but the rule in `domain/validity.py` that re-checks a map which
+        arrived some other way can meet one, and it reports the fault in words
+        this method writes. The likelihood rule answers `>.99` for 1.4 and `<.01`
+        for -0.3, and either word inside a sentence saying the number is out of
+        range would tell the reader the opposite of the truth.
+
+        The likelihood rule itself lives in `domain/diff.py`, which is where the
+        sentences beside a change list are written. It is fetched when it is needed
+        rather than at the top of this file: that module reads whole maps, and
+        reading a map needs this one, so naming it up here would leave the two
+        modules waiting on each other before either had finished loading.
+
+        Returns:
+            The low, the likelihood and the high, each as text.
+        """
+        from katalyst.domain.diff import _two_figures
+
+        def written(number: float) -> str:
+            return _two_figures(number) if 0.0 <= number <= 1.0 else "outside 0 to 1"
+
+        return written(self.lo), written(self.p), written(self.hi)
+
     @model_validator(mode="after")
     def _range_is_ordered(self) -> "Belief":
         """Check that low is at most the likelihood, which is at most high.
 
-        The field bounds above already cover 0 and 1; this covers the order.
+        The field bounds above already cover 0 and 1; this covers the order. So by
+        the time this runs all three numbers are real likelihoods, and the sentence
+        it raises can write them the way the product writes every likelihood.
 
         Returns:
             This same belief, once the order has been checked.
@@ -73,9 +108,10 @@ class Belief(BaseModel):
             ValueError: If the three numbers are not in order.
         """
         if not (self.lo <= self.p <= self.hi):
+            low, likelihood, high = self._as_written()
             raise ValueError(
                 "a belief must satisfy low <= likelihood <= high; got "
-                f"low={self.lo}, likelihood={self.p}, high={self.hi}"
+                f"low={low}, likelihood={likelihood}, high={high}"
             )
         return self
 

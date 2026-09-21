@@ -230,15 +230,21 @@ def test_a_number_that_really_moved_fails_the_check_and_names_its_line(tmp_path:
     line = next(
         one for one in committed.splitlines() if one.startswith("M1 · strike · change list rank")
     )
-    moved = line.replace("0.04746", "0.04756")
-    assert moved != line, "the committed rank is no longer the number this test moves"
+    fact = _read_line(line)
+    assert fact is not None, line
+    # The number to move by is this test's own; the number it moves is the file's.
+    # Typing the second one in is what went stale the last time the engine's
+    # arithmetic changed, and it is the same mistake this whole file exists to stop.
+    nudge = 0.0001
+    moved = _line(fact.name, fact.printed, f"{float(fact.value) + nudge:.5f}")
+    assert moved != line, "the nudge left the line as it was, so it proves nothing"
     written = tmp_path / "worked-numbers.txt"
     written.write_text(committed.replace(line, moved), encoding="utf-8")
 
     finished = _run("--check", str(written))
 
     assert finished.returncode == 1
-    assert "M1 · strike · change list rank moved by 0.0001" in finished.stdout
+    assert f"{fact.name} moved by {nudge:.4f}" in finished.stdout
     assert "Run `make numbers` and commit the result" in finished.stdout
 
 
@@ -252,21 +258,35 @@ def test_a_fact_in_words_that_changed_fails_the_check() -> None:
     """
     committed = WHERE.read_text(encoding="utf-8")
 
-    state = next(
-        one for one in committed.splitlines() if one.startswith("B · strike · what happened")
-    )
-    assert faults_against(committed.replace(state, state.replace("shifted", "unchanged"))) == [
-        "B · strike · what happened says 'unchanged' in the file and 'shifted' now."
+    # Which state each claim ended in is the engine's to say, so the word this test
+    # swaps in is taken from another claim's line rather than typed here. The
+    # earlier version typed both words, and went stale the day the engine moved one.
+    states = [
+        one for one in facts_in(committed) if one.name.endswith(" · what happened") and one.value
+    ]
+    was = next(one for one in states if one.name == "B · strike · what happened")
+    other = next(one.value for one in states if one.value != was.value)
+    line = next(one for one in committed.splitlines() if one.startswith(was.name))
+    swapped = _line(was.name, was.printed, other)
+    assert faults_against(committed.replace(line, swapped)) == [
+        f"{was.name} says '{other}' in the file and '{was.value}' now."
     ]
 
     sentence = next(
         one for one in committed.splitlines() if one.startswith("strike · the sentence beside")
     )
-    reworded = sentence.replace("moves A Polymarket", "shifts A Polymarket")
+    reworded = sentence.replace(" moves ", " shifts ", 1)
+    assert reworded != sentence, sentence
     assert len(faults_against(committed.replace(sentence, reworded))) == 1
 
     # …and a two-figure number inside it rounding the other way is not a change.
-    rounded = sentence.replace("from .50 to .42", "from .51 to .42")
+    rounded = re.sub(
+        r"from \.(\d\d) to",
+        lambda found: f"from .{int(found.group(1)) + 1:02d} to",
+        sentence,
+        count=1,
+    )
+    assert rounded != sentence, sentence
     assert faults_against(committed.replace(sentence, rounded)) == []
 
 

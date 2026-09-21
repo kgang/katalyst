@@ -1560,6 +1560,35 @@ def test_an_arrow_that_pushes_harder_than_a_near_certainty_is_called_out() -> No
     assert any("second look" in one for one in world.warnings), world.warnings
 
 
+def test_the_warning_writes_the_push_the_way_the_product_does() -> None:
+    """The sentence quotes the push to one place, with its sign, and never sixteen digits.
+
+    This warning is read by a person, beside the map. A push arithmetic worked out
+    rather than a person typed is held by the computer as 5.199999999999999, and a
+    number nobody wrote and nobody could act on is exactly the state this product
+    refuses to put on screen.
+
+    A push is **not** a likelihood and is deliberately not written as one. It runs
+    from minus infinity to plus infinity on the log-odds scale, so the likelihood
+    rule — two significant figures with a guard at each end — would answer `>.99`
+    for this push, which says the opposite of what the sentence means.
+    """
+    worked_out = 0.1 + 5.1
+    assert repr(worked_out) == "5.199999999999999"
+
+    graph = _map(
+        (_claim("top", kind="hypothesis"), _claim("ending", kind="market")),
+        (_arrow("top", "ending", strength=worked_out),),
+    )
+
+    world = _folded(graph)
+
+    loud = [one for one in world.warnings if "second look" in one]
+    assert len(loud) == 1, world.warnings
+    assert "5.199999999999999" not in loud[0], loud[0]
+    assert "pushes by +5.2," in loud[0], loud[0]
+
+
 def test_a_ramp_with_no_rise_time_arrives_at_once() -> None:
     """A ramp climbs across its delay, and a ramp with no delay has nothing to climb.
 

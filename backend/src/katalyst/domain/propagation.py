@@ -206,6 +206,32 @@ NOTHING_ADDED: Mapping[LinkId, int] = MappingProxyType({})
 LOUD_STRENGTH = 5.0
 """A push beyond this is roughly 1% to 99% on a coin flip, and is worth a second look."""
 
+
+def _push_as_written(strength: float) -> str:
+    """Write how hard an arrow pushes, the way this product writes every push.
+
+    One place after the point, and always with its sign, because a push's sign is
+    half of what it says: `+0.9` takes the claim at the arrow's head toward coming
+    true and `-2.4` takes it away. Both figures are printed even when the second is
+    a nought, so `+2.0` does not read as a number somebody measured more loosely
+    than its neighbours.
+
+    This is deliberately **not** the rule for a likelihood. A likelihood runs from
+    0 to 1 and is written `.40` or `<.01`; a push runs from minus infinity to plus
+    infinity on the log-odds scale and has no such bounds, so sending one through
+    the likelihood rule would print `>.99` for a push of 5.2 — a sentence that says
+    the opposite of the truth. Two quantities, two rules, and each says what it
+    means.
+
+    Args:
+        strength: How hard an arrow pushes, on the log-odds scale.
+
+    Returns:
+        The push as text: `+0.9`, `-2.4`, `+5.2`.
+    """
+    return f"{strength:+.1f}"
+
+
 RANGE_BINS = 20
 """How many groups the versions are sorted into when working out where a band's width comes from."""
 
@@ -1324,9 +1350,9 @@ def _warnings_about(
         ends = f"from {_name_of(named, link.source)} to {_name_of(named, link.target)}"
         if abs(link.strength) > LOUD_STRENGTH:
             said.append(
-                f"The arrow {ends} pushes by {link.strength}, which is past the point where a "
-                "coin flip becomes a near certainty. The map is still legal; the number is "
-                "worth a second look."
+                f"The arrow {ends} pushes by {_push_as_written(link.strength)}, which is past "
+                "the point where a coin flip becomes a near certainty. The map is still "
+                "legal; the number is worth a second look."
             )
     if days + 1 > SERIES_CAP:
         said.append(

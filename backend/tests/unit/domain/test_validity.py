@@ -282,6 +282,51 @@ def test_validate_rejects_belief_out_of_range(graph: Graph) -> None:
     assert "not a range around that number between 0 and 1" in faults[0].message
 
 
+@given(graphs())
+@settings(max_examples=5, deadline=None)
+def test_a_refused_likelihood_is_quoted_the_way_the_product_writes_one(graph: Graph) -> None:
+    """This sentence reaches the browser, so it quotes two figures and never sixteen.
+
+    A refused request comes back with this message in its body and the refusal
+    strip shows it word for word. A computer holds a tenth plus two tenths as
+    0.30000000000000004, and a number nobody wrote and nobody could act on is
+    exactly the kind of state this product refuses to put in front of a reader.
+
+    The second half is the other way the same sentence could lie. A number outside
+    0 and 1 is not a likelihood at all — that is the fault being reported — so it
+    is named as what it is. Writing it the way a likelihood is written would answer
+    `>.99` for 1.4, inside a sentence saying the number is out of range.
+    """
+    awkward = 0.1 + 0.2
+    assert repr(awkward) == "0.30000000000000004"
+
+    out_of_order = _with_one_belief(
+        graph, Belief.model_construct(p=0.1, lo=awkward, hi=0.9, owner="model")
+    )
+    said = validate(out_of_order)[0].message
+    assert "0.30000000000000004" not in said, said
+    assert "is .10, with a range of .30 to .90" in said, said
+
+    past_one = _with_one_belief(graph, Belief.model_construct(p=1.4, lo=0.2, hi=0.5, owner="model"))
+    said = validate(past_one)[0].message
+    assert ">.99" not in said, said
+    assert "is outside 0 to 1, with a range of .20 to .50" in said, said
+
+
+def _with_one_belief(graph: Graph, belief: Belief) -> Graph:
+    """Put one model belief on the map's first claim, leaving everything else alone."""
+    victim = graph.propositions[0]
+    spoiled = victim.beliefs.model_copy(update={"model": belief})
+    return graph.model_copy(
+        update={
+            "propositions": (
+                victim.model_copy(update={"beliefs": spoiled}),
+                *graph.propositions[1:],
+            )
+        }
+    )
+
+
 # --- Every fault at once, in an order that never moves ---------------------
 
 
