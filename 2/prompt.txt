@@ -553,3 +553,33 @@ Three survivors trace to one gap: no `no`-side contract card exists anywhere in 
 &gt; *This happened* moves numbers upstream as well as down. This one is worked out by a seeded sample of 50 000 worlds; on the four-claim maps our own enumerator can check, no number was off by more than `.005`.</result>
 <usage><subagent_tokens>320470</subagent_tokens><tool_uses>103</tool_uses><duration_ms>1116632</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ace5bdcb8b3b8f796</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ace5bdcb8b3b8f796.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer D: states" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Run to check me** (from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`):
+```
+uv run pytest tests/unit/domain/test_states.py --cov=src/katalyst/domain/states --cov-branch --cov-report=term-missing
+uv run mypy --strict src/katalyst/domain/states.py &amp;&amp; uv run ruff check src/katalyst/domain/states.py tests/unit/domain/test_states.py &amp;&amp; uv run ruff format --check src/katalyst/domain/states.py tests/unit/domain/test_states.py
+uv run --no-sync python -u /Users/kentgang/git3/katalyst/plans/analysis/scripts/stack-05-core/D/check_states.py
+```
+
+**Signature changes (mine, in `states.py`).** `Times` now carries three arrays: `spread` is **always** `(V, S+1)` — the slice it came on in, for both kinds; new `holding` `(V, S)`; new `pairs: NDArray|None`, the flattened `(on, off)` square, `None` on the cheap path. A state's joint could not live in `spread`, because the cheap path must answer `holding_curve` without building the square. `on_and_off` gained keyword-only `window: Window` (the off-rate accrues from `Window.middle_day`, which nothing else carries) and `persistence` (`ClaimShapes` has no such field, and an empty `ends` does not mean *event*). `as_joint` gained a second named refusal: a state whose pair was never built. **Writer A's `forward.py` has already converged on exactly these** — no fix owed.
+
+**Consumed as landed, not as planned:** `AddedUp` entries are running totals already multiplied by their rate, so nothing is summed twice. Combination order and `carried`'s flattened arrival axes match `rates.added_up` (`numpy.indices`, on-slice slowest).
+
+**Tails.** `11 passed`; `states.py 137 stmts 0 miss 24 branch 0 partial 100%`; `Success: no issues found`; `All checks passed!` / `2 files already formatted`. Evidence (`D/check_states.log`): against a scalar reference written from record 0017 that enumerates causes jointly — came-on `4.996e-15`, holding `3.386e-15`, pair `3.345e-15`, cheap-vs-pair `1.110e-16`; through real `shapes_of`/`rates_of`/`added_up` with a 7-combination holding-back axis, `1.110e-16`. Separately, my `holding` equals `forward._holding_from_the_pairs` to `1.110e-16`.
+
+**Owed / phase 2.** `test_a_states_range_is_measured_and_written_down` needs `Drawn` + `all_marginals`; it is not written and not skipped.
+
+**Not checked.** The whole suite; `numpy.einsum` cost at 24 slices; an *ending* arrow that is also `sustain` (supported by flattening, untimed).
+
+**Commit:** `feat(engine): a state's two times — on at most once, off at most once, and a cheap path for the ones nobody reads the stretch of`</result>
+<usage><subagent_tokens>238731</subagent_tokens><tool_uses>61</tool_uses><duration_ms>1242911</duration_ms></usage>
+</task-notification>
