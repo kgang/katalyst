@@ -19,10 +19,21 @@
  * what moved. Nothing on this side works out a number — appending an edit is the
  * whole of what a button does.
  *
- * **One of the six says what it cannot do rather than doing it quietly.**
- * *Split this claim* is not built. It is not greyed out: a disabled control says
+ * **One of the six is not on the panel at all.** *Split this claim* is not
+ * built, so it is not offered. It was never greyed out — a disabled control says
  * "not for you" and nothing else, and cannot even be asked about with the
- * keyboard.
+ * keyboard — but a row that takes a press and then explains that it can do
+ * nothing is still a seventh of this menu spent on an absence. What it would do
+ * is written where the rest of the unbuilt work is written, in
+ * `spec/multiverse/interventions.md`.
+ *
+ * **The two that are easiest to confuse say the difference before you press
+ * them.** *Suppose this is true* and *This happened* both fix a claim's value,
+ * and they differ in what else may move: one cuts the claim loose from its
+ * causes and one leaves them connected. That is the distinction this product
+ * beats every competitor on, and it used to be spoken only *after* the press.
+ * Each now carries the shared vocabulary's own meaning as a subtitle, word for
+ * word from the *Interface words* table.
  *
  * **One of the six needs the model, and only that one.** *Add a claim* sends the
  * sentence you type to the part of this product that drafts a whole claim — the
@@ -35,7 +46,7 @@
  * the fields below appear inside this panel, beside the map, which stays live.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { components } from "../api/schema";
 import { toDay } from "../graph/diff/days";
 import { pushAsNumber, pushInWords } from "../graph/wires/encodings";
@@ -60,6 +71,25 @@ const BUTTONS = {
   changePush: "Change this push",
   splitClaim: "Split this claim",
   ownNumber: "My own number",
+} as const;
+
+/**
+ * What the two headline operations **mean**, as the shared vocabulary's
+ * *Interface words* table states it, for the subtitle under each button.
+ *
+ * Copied from that table's last column word for word, and kept here beside the
+ * buttons they belong to so the two cannot drift. They say the difference
+ * *before* the press: *Suppose this is true* cuts the claim loose from its
+ * causes, so only what it causes may move; *This happened* leaves its causes
+ * connected, so what we believe about them is read again too.
+ *
+ * **They state the operation's meaning, not this build's arithmetic.** That is
+ * the promise the product makes and the one the engine is held to; where the
+ * engine falls short of it, the engine is what is repaired.
+ */
+const MEANS = {
+  supposeTrue: "Take this as given, and do not tell me what caused it",
+  happened: "This is news — update what came before it too",
 } as const;
 
 /** How one edit reads in the list: which button made it, and what it was about. */
@@ -299,6 +329,31 @@ export function InterventionPanel({
   const [push, setPush] = useState("");
   const [said, setSaid] = useState<string | null>(null);
 
+  /**
+   * The panel takes the keyboard when it opens, and that is the reader's own
+   * act rather than a theft.
+   *
+   * `graph/theKeyboard.ts` states the rule the map obeys: **the map takes the
+   * keyboard back from nowhere, and never from somewhere.** It is about who
+   * decided. A map that pulled a reader out of the palette would be taking a
+   * decision they had already taken; this is the opposite — the reader pressed
+   * `E`, or took up *Change this claim*, and the one thing they can have meant
+   * by it is that they want to be in here.
+   *
+   * **Without it the keyboard is simply dropped.** The way in from the panel's
+   * head unmounts the instant it is pressed, so Tab to it, press Enter, and the
+   * keyboard is on nothing at all: the next Tab starts again at the top of the
+   * page. The section takes focus rather than the first button, because landing
+   * on *Suppose this is true* would put a reader one stray Space away from an
+   * edit they did not ask for. Where the keyboard goes when this closes is the
+   * screen's to answer, not this panel's, because the thing it came from may no
+   * longer exist.
+   */
+  const panel = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    panel.current?.focus();
+  }, []);
+
   const claim =
     selection?.kind === "claim" ? world.claims.find((one) => one.id === selection.id) : undefined;
   const wire =
@@ -336,6 +391,10 @@ export function InterventionPanel({
   return (
     <section
       className="intervene"
+      ref={panel}
+      // Reachable by script and never a tab stop of its own: the reader tabs
+      // through the controls inside it, not through the box round them.
+      tabIndex={-1}
       aria-label="Change this claim"
       // What the panel is open on, by its identifier — for a test or a tool to
       // read, the way a tile and a wire already carry theirs. An identifier is
@@ -374,6 +433,7 @@ export function InterventionPanel({
           }}
         >
           {BUTTONS.supposeTrue}
+          <span className="intervene__hint">{MEANS.supposeTrue}</span>
         </button>
         <button
           className="intervene__button"
@@ -400,6 +460,7 @@ export function InterventionPanel({
           }}
         >
           {BUTTONS.happened}
+          <span className="intervene__hint">{MEANS.happened}</span>
         </button>
         {/* **Add a claim** is the one of the six that needs the model, and it
             is now connected: the sentence goes to the one route that drafts a
@@ -458,20 +519,16 @@ export function InterventionPanel({
             }}
           />
         ) : null}
-        <button
-          className="intervene__button"
-          type="button"
-          data-live="no"
-          onClick={() =>
-            say(
-              "Splitting a claim into finer claims that add back up to it is not built yet. " +
-                "Nothing here pretends otherwise, and no edit was recorded.",
-            )
-          }
-        >
-          {BUTTONS.splitClaim}
-          <span className="intervene__hint">not yet built</span>
-        </button>
+        {/* **Split this claim is not here at all, and that is the whole of what
+            this panel says about it.** It was a row that took a press and then
+            explained that it could do nothing. That was honest, and it was
+            still a seventh of the one menu this product is demonstrated from
+            spent on something a reader cannot take up. A control that is not
+            built is not a control: what it would do is written where the other
+            unbuilt things are written, in the `refine` row of
+            `spec/multiverse/interventions.md`. It comes back as a button on the
+            day it does something, with the vocabulary's words already waiting
+            for it above. */}
         <button
           className="intervene__button"
           type="button"

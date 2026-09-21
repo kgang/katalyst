@@ -6,7 +6,8 @@
  * why it is absent. Everything below is one of those two halves.
  */
 
-import { render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
 import type { Provenance, WorldView } from "../../world";
@@ -417,5 +418,87 @@ describe("the panel, on nothing", () => {
     render(<Inspector world={hormuzish()} selection={null} />);
     expect(screen.getByText("Nothing selected")).toBeInTheDocument();
     expect(document.body.textContent).toContain("Choose a claim or an arrow on the map");
+  });
+});
+
+describe("the way from reading to doing", () => {
+  /**
+   * **The panel of operations used to open from one key and one command and
+   * nowhere else.** Somebody working this screen with a mouse could click every
+   * tile, read the whole argument, find no verb anywhere on it and conclude the
+   * tool is a viewer — which is the opposite of what this product is. The head
+   * of the panel now carries the way in, on a claim and on an arrow, in the
+   * shared vocabulary's own words.
+   */
+  it("test_the_head_opens_the_operations_on_a_claim_and_on_an_arrow", () => {
+    const opened: string[] = [];
+    const claim = render(
+      <Inspector
+        world={hormuzish()}
+        selection={{ kind: "claim", id: "H" }}
+        onChangeThis={() => opened.push("claim")}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Change this claim" }));
+    expect(opened).toEqual(["claim"]);
+    claim.unmount();
+
+    render(
+      <Inspector
+        world={hormuzish()}
+        selection={{ kind: "wire", id: "H->B" }}
+        onChangeThis={() => opened.push("arrow")}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Change this push" }));
+    expect(opened).toEqual(["claim", "arrow"]);
+  });
+
+  it("test_with_nothing_to_open_no_control_is_drawn", () => {
+    // Two callers leave it out and both are right to: the screen that watches a
+    // map build itself has no branch to edit, and the map screen leaves it out
+    // while the panel is already open. A control that does nothing is not a
+    // control — and on an arrow, a second one would put two buttons reading
+    // *Change this push* on one screen.
+    for (const subject of [
+      { kind: "claim", id: "H" } as const,
+      { kind: "wire", id: "H->B" } as const,
+    ]) {
+      const { unmount } = render(<Inspector world={hormuzish()} selection={subject} />);
+      expect(screen.queryByRole("button", { name: "Change this claim" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Change this push" })).toBeNull();
+      unmount();
+    }
+  });
+
+  it("test_the_way_in_is_a_word_with_a_hairline_round_it", () => {
+    // **Read off the stylesheet, not off the component.** Asserting the class
+    // the component itself writes would pass with the stylesheet deleted, which
+    // is a test that cannot fail for the thing it is named after. What is
+    // checked is the rule: a hairline round it, the panel's own surface behind
+    // it, the interface face — the shape every button in this product takes —
+    // and no fill drawn from the accent, which is what a template-looking
+    // button is made of.
+    const sheet = readFileSync("src/components/inspector.css", "utf8");
+    const rule = /\.inspector__change \{([^}]*)\}/.exec(sheet)?.[1] ?? "";
+    expect(rule, "inspector.css has no rule for the way in").not.toBe("");
+    expect(rule).toMatch(/border:\s*1px solid var\(--hairline\)/);
+    expect(rule).toMatch(/background:\s*var\(--surface\)/);
+    expect(rule).toMatch(/font-family:\s*var\(--font-interface\)/);
+    expect(rule).not.toMatch(/var\(--accent\)/);
+    expect(rule).not.toMatch(/box-shadow/);
+
+    // And it is in the head, beside what it is about, rather than somewhere
+    // else in the panel.
+    const { container } = render(
+      <Inspector
+        world={hormuzish()}
+        selection={{ kind: "claim", id: "H" }}
+        onChangeThis={() => undefined}
+      />,
+    );
+    const control = screen.getByRole("button", { name: "Change this claim" });
+    expect(control).toHaveClass("inspector__change");
+    expect(container.querySelector(".inspector__head")?.contains(control)).toBe(true);
   });
 });

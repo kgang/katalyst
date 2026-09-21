@@ -8,17 +8,13 @@
  * separation for a list this short.
  */
 
-/* Where the edit ends up. It grows a row per ending the edit can reach, so it
- * is the section most likely to want more room than the column has — and it
- * takes what it can, keeps enough to read two rows, and scrolls the rest. */
+/* Where the edit ends up. It grows a row per ending the edit can reach, and it
+ * is as tall as those rows: the panel beside the map scrolls as one and nothing
+ * in it scrolls on its own, which `.page--map .dock > *` in `styles/app.css`
+ * says once for every section. A `flex`, a `min-height` and an `overflow-y`
+ * sat here sharing the column out, and all three lost to that rule by two
+ * classes to one. */
 .delta-rail {
-  /* A share of the column of its own, rather than whatever the panel below
-     leaves: the panel's content is far longer, so sharing by content would
-     squeeze the rail down to its heading and put its rows — the reason the rail
-     exists — below its own fold. */
-  flex: 1 1 20rem;
-  min-height: 15rem;
-  overflow-y: auto;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);

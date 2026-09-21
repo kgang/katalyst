@@ -1017,11 +1017,26 @@ order (record 0012).
 
 > No model key configured — these four run from recordings made on \<date\>.
 
-The sentence sits under the four cards and again beneath the free-text field, which is visibly
-disabled with it. A card therefore has three states and no others: it runs live, it runs from a
-recording, or it reads *not yet live*. That third one now means one thing only — **no key and no
-recording**, an example nobody has recorded yet — which is an honest state rather than the
-catch-all it was.
+The sentence sits under the cards and again beneath the free-text field, which is visibly
+disabled with it.
+
+**A card is only ever something a reader can take up** *(2026-09-21)*. It runs live or it runs from
+a recording — and a sentence this copy can do neither with gets **no card at all**. With one
+recording committed, the four cards were one door and three headstones taking the whole of the
+right-hand column, which is what a reviewer with thirty minutes met first; and *not yet live* on a
+row that cannot be pressed is a control a reader counted and cannot use. What is left of those
+sentences is the line above, which already named them — *…the other three have nothing recorded
+yet*. With nothing at all to offer there is no list either, because an empty list under a heading
+reading *or watch one build itself* is worse than a sentence saying so, and that sentence points at
+the map that is already drawn, which needs neither a key nor a recording.
+
+**Before the readiness answer arrives, every sentence says that is what is being waited for.**
+Nothing is known about a key or a recording until the server has spoken, and a screen reading *no
+model key* in the meantime is asserting something nobody told it. It is not a spinner: the sentence
+is on screen and the line under it names the two things being waited on.
+
+**With a key, all four are live and all four are offered.** The rule is one rule — *a card for
+everything this copy can do* — and with a key that is everything.
 
 **A recording that would not play is named, quietly, under the cards** *(2026-09-21)*. The readiness
 answer lists only the recordings that would actually play, and carries beside them one plain sentence
@@ -1030,9 +1045,9 @@ good ones** — the cards with recordings still run, because a recording is a co
 outlives the code that wrote it and meeting an old one is ordinary rather than exceptional. And **it
 never hides itself either**: a reviewer who put a file in the recordings folder and then counts three
 cards where they expected four is owed the reason rather than left to wonder whether they put it in
-the wrong place. The sentence is the server's own, printed word for word, in the quiet type the
-*not yet live* explanation uses — it is a fact about this copy rather than about any map, so it sits
-under the cards and touches none of them.
+the wrong place. The sentence is the server's own, printed word for word, quieter than the line
+above it that says what this copy can play — it is a fact about one file rather than about any map,
+so it sits under the cards and touches none of them.
 
 **Where the date comes from.** Not from the stream: S3 put the recording's date on `Receipt`, and the
 receipt arrives at the *end* of a run, long after the launchpad needs to print this sentence. So the
@@ -1257,11 +1272,15 @@ nothing added to it. *Test:* `frontend/src/styles/__tests__/motionBudget.test.ts
 10.**
 
 **INV-workbench.74 — nothing is silently inert without a key.** For every control a generation needs
-— the hypothesis field, the destination field, the likelihood slider, the launchpad's cards, **Add a
-claim** — whenever the thing it would do cannot be done (no key, for anything the reader typed; no
-key **and** no recording, for a card; no key and no recorded intervention, for **Add a claim**) the
+— the hypothesis field, the destination field, the likelihood slider, **Add a claim** — whenever the
+thing it would do cannot be done (no key, for anything the reader typed; no key and no recorded
+intervention, for **Add a claim**) the
 control is visibly disabled and carries a sentence saying why. There is no control anywhere that
-accepts an interaction and does nothing. **A control that has been pressed and whose request comes
+accepts an interaction and does nothing. **A launchpad card is not on that list, because it is never
+disabled** *(amended 2026-09-21)*: no key **and** no recording means there is nothing the card could
+do, so there is no card at all, and one line under the ones that remain names the examples it stands
+for. A control a reader counted and cannot use is the same fault as one that does nothing when
+pressed. **A control that has been pressed and whose request comes
 back a rejection comes back to life and says so** *(added 2026-09-21)*: **Add a claim** leaving its
 button disabled and reading *Drafting the claim* for as long as the tab is open is the same fault
 with a different first frame. *Tests:*

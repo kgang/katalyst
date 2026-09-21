@@ -337,10 +337,18 @@ reachable here, so all three are listed; R is not a terminal and never appears. 
 invented an ordering would be inventing the one thing the rail exists to tell you** — map order is
 visibly arbitrary and says so; a fabricated ranking looks like an answer.
 
-**The one-line summary above the rail** (FR-16) has a fixed second form for the case where the rail
+**The one-line summary** (FR-16) has a fixed second form for the case where the rail
 has nothing to report: *"<edit> moves no ending and leaves <n> claims untouched."* Both forms are
 sentences the world carries. Before the engine the summary is an absence with its reason, like every
 other computed thing on this screen.
+
+**What the rail is read in, top to bottom: the heading, the rows, the note about the order, the
+summary, the reason line.** The rows come straight after the heading because *what did my edit do,
+ranked* is what the rail exists to answer, and it used to sit under seven lines of prose — a
+four-or-five-line summary and a three-line note, at the panel's width. The note about the order
+reads as a caption to the table and is one; the summary is a sentence about the whole edit and
+closes. Nothing about what the rail may honestly *say* moved with it: ranked against unranked, the
+*no change* row and the reason line are exactly as they were.
 
 ### B6 — UX-14: an assertion a later edit overrode says so
 
@@ -432,7 +440,7 @@ Three rules in this stack:
 1. **The buttons build a branch and show it. They do not move a number.** **My own number** and
    **Change this push** append an edit and the panel shows it immediately; the likelihood slots stay
    as they were, reading their absence.
-2. **Split this claim** is **visibly not yet live** and says so (stack 06). Never silently inert.
+2. **Split this claim** is **not offered at all** until it is built (stack 06). It was a row that took a press and then said it could do nothing, which was honest and was still a seventh of this menu spent on something a reader cannot take up. Never silently inert, and now never inert: every control on the panel does something when it is pressed. Its words stay settled in [`../vocabulary.md`](../vocabulary.md) for the day the operation arrives.
 3. **Edits are appended, never edited in place.** The branch is the audit trail, and an audit trail
    you can edit is not one.
 

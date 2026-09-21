@@ -107,10 +107,10 @@ export function forkBranch(shop: Workshop, label: string): Workshop {
  * quietly dropped here:
  *
  * - **Add a claim** brings a whole claim — its wording, how it is judged, by
- *   whom, by when, what it started from — and the part of this product that
- *   drafts one is not connected. The button says so and appends nothing.
- * - **Split this claim** is not built at all. The button says so and appends
- *   nothing.
+ *   whom, by when, what it started from — and it is drafted by the one part of
+ *   this product that calls the model rather than written down here.
+ * - **Split this claim** is not built at all, so there is no button for it: an
+ *   operation that does nothing is not offered.
  *
  * So neither ever reaches this function from the screen. It answers for them
  * anyway, with nothing rather than with a guess, because an edit written down

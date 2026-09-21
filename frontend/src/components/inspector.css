@@ -10,22 +10,20 @@
  * always the loudest thing in its own block.
  */
 
-/* The panel is a section of the column beside the map rather than a column of
- * its own: the six things you can do sit above it, then your branches, then
- * where the edit ends up, then this. It takes whatever height is left and
- * scrolls on its own, so that reading a long rationale never scrolls the branch
- * list out of sight. */
-/* Why this number is what it is. It takes whatever room the other two leave, and
- * never less than a screenful of reading — *never less* being the load-bearing
- * half: the branch panel and the rail above both grow with what the engine has
- * to say, and on a branch with three endings they would fill the column between
- * them. A panel squeezed to nothing means selecting a claim shows the reader an
- * empty strip, which is this product's central answer gone missing. */
+/* Why this number is what it is: a section of the column beside the map rather
+ * than a column of its own — the things you can do sit above it, then your
+ * branches, then where the edit ends up, then this.
+ *
+ * **It is as tall as what is in it and it does not scroll**, and that is said
+ * once, for every section in the panel, by `.page--map .dock > *` in
+ * `styles/app.css`: the panel scrolls as one and marks its own edges. A
+ * `flex: 1 1 18rem`, a `min-height` and an `overflow-y` sat here sharing the
+ * column out between the sections, and all three lost to that rule by two
+ * classes to one — so this box was described twice, in opposite terms, and a
+ * reader could not tell which was true. `min-width: 0` stays, because nothing
+ * else sets it and a long word would otherwise widen the whole panel. */
 .inspector {
-  flex: 1 1 18rem;
   min-width: 0;
-  min-height: 18rem;
-  overflow-y: auto;
   background: var(--surface-raised);
 }
 
@@ -74,6 +72,33 @@
   margin: 0;
   font-size: var(--text-md);
   color: var(--text-muted);
+}
+
+/* The way from what you are reading to what you can do about it.
+ *
+ * A word with a hairline round it, which is what a button is in this product —
+ * the same shape as the panel's own *Start a branch*, *Start this branch* and
+ * *Change it to that*, and for the same reason: a filled rounded button would be
+ * the loudest thing in a panel whose whole job is the reading beside it. It sits
+ * at the left edge of the head rather than stretching across it, because it is
+ * one control and not a bar. */
+.inspector__change {
+  justify-self: start;
+  margin: var(--space-hair) 0 0;
+  padding: var(--space-hair) var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-interface);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.inspector__change:hover {
+  border-color: var(--text-muted);
 }
 
 /* ---- Sections ------------------------------------------------------------ */

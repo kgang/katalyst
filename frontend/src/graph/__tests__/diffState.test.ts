@@ -21,16 +21,18 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { toShare } from "../../components/BeliefChip";
+import { toMovement, toShare } from "../../components/BeliefChip";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
-import type { BranchView, DiffView, Edit, Movement } from "../../world";
+import type { Badge, BranchView, ClaimView, DiffView, Edit, Movement } from "../../world";
 import { disagreements, type EngineState } from "../diff/agreement";
 import { badgesByClaim, standingByClaim } from "../diff/badges";
 import { bothPaintings, branchWorld, railRows } from "../diff/branchWorld";
+import { toDay } from "../diff/days";
 import { readDiff } from "../diff/diffState";
 import { endings } from "../diff/endings";
 import { noChangeReason } from "../diff/noChange";
 import type { Arrow } from "../diff/reach";
+import { badgeLines } from "../geometry";
 
 /** The seven claims of the stored example, in the order the map serves them. */
 const CLAIMS = ["H", "C", "B", "R", "M1", "M2", "N1"] as const;
@@ -384,6 +386,78 @@ describe("the second world", () => {
       expect(held?.move.absence?.words).toBe("no change");
       expect(held?.move.absence?.reason).toContain(noChangeReason(moved));
       expect(line?.reason).toBe(noChangeReason(moved));
+    });
+  });
+
+  /**
+   * **One claim, two pairs of numbers, two different days.**
+   *
+   * The tile's line reads the claim on the day it is judged. The change list
+   * beside the map reads each ending on the day the two maps are furthest
+   * apart, and says so on the row. Somebody who notices that the same claim
+   * carries two different readings, with only one of them dated, concludes that
+   * one of the two is wrong — and neither is.
+   *
+   * So the tile's line names its own day and names the other. **In the sentence
+   * behind it, never in the words it draws**: how many lines the badges take is
+   * what reserves the tile's height before the browser has drawn one, and the
+   * clause takes the line over the width a tile has.
+   */
+  describe("the day the tile's line is read on", () => {
+    /** The engine's answer: B shifted, with these two readings. */
+    function saysShifted(moved: Movement): DiffView {
+      return {
+        claims: new Map([["B", { state: "shifted" as const, moved }]]),
+        rows: [],
+        summary: { reading: "It moves one ending." },
+        warnings: [],
+      };
+    }
+
+    /** B's tile line, as the tile draws it, for one reading of the engine's. */
+    function shiftedLine(moved: Movement) {
+      const now = branchWorld(base(), branch(), {
+        at: "answered",
+        now: base(),
+        change: saysShifted(moved),
+      });
+      const b = now.claims.find((claim) => claim.id === "B");
+      return (b?.badges ?? []).find((badge) => badge.movement === true);
+    }
+
+    /** A move the engine could have read on B. */
+    const MOVED: Movement = {
+      from: 0.5,
+      to: 0.42,
+      way: "down",
+      by: -0.08,
+      sameDirection: { reading: 0.9663 },
+    };
+
+    it("test_the_line_says_which_day_it_is_read_on_and_that_the_rail_reads_another", () => {
+      const line = shiftedLine(MOVED);
+      // The day is the claim's own judging day, written the way every other day
+      // on this canvas is written — read off the claim, never typed in here.
+      const judged = base().claims.find((claim) => claim.id === "B")?.resolvesBy as string;
+      expect(line?.reason).toContain(toDay(judged));
+      expect(line?.reason).toContain("the day this claim is judged");
+      // And it names the other reading rather than leaving a reader to find it.
+      expect(line?.reason).toMatch(/change list/i);
+      expect(line?.reason).toMatch(/furthest apart/i);
+    });
+
+    it("test_the_clause_costs_the_tile_no_height", () => {
+      // The words are the two readings and the chevron between them, and
+      // nothing else — which is one badge line at the width a tile has. Every
+      // other state this line can be in is shorter or the same, so the tile is
+      // the same height whichever answer came back, which is what stops the map
+      // laying itself out again when one lands.
+      const line = shiftedLine(MOVED);
+      expect(line?.words).toBe(toMovement(MOVED.from, MOVED.to, MOVED.by, MOVED.way));
+      expect(line?.words).not.toMatch(/judged|change list/i);
+      expect(badgeLines({ ...(aClaim({ id: "B" }) as ClaimView), badges: [line as Badge] })).toBe(
+        1,
+      );
     });
   });
 

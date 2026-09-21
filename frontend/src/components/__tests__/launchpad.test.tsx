@@ -65,6 +65,17 @@ const ONE_BAD_FILE: Readiness = {
   ],
 };
 
+/**
+ * The section that offers to build a map, on its own.
+ *
+ * The screen holds two lists of the same shape — the maps already drawn, and
+ * the sentences that build one — and counting rows across both couples a claim
+ * about one to the fixture behind the other.
+ */
+function building(container: HTMLElement): HTMLElement {
+  return container.querySelector(".launchpad__build") as HTMLElement;
+}
+
 /** Draw the first screen. */
 function draw(readiness: Readiness) {
   return render(
@@ -102,7 +113,8 @@ describe("with no model key", () => {
     expect(
       screen.getByText(
         "No model key configured — one of these four runs from recordings, made on " +
-          "2026-09-18; the other three have nothing recorded yet.",
+          "2026-09-18; the midterms, export controls and photonic chips have nothing " +
+          "recorded yet.",
       ),
     ).toBeInTheDocument();
 
@@ -133,15 +145,30 @@ describe("with no model key", () => {
     expect(recorded.textContent).toContain("replay");
     expect(recorded.textContent).toContain("2026-09-18");
 
-    // The three with nothing recorded are not buttons at all: they read *not yet
-    // live*, with the reason underneath. There is no control that accepts an
-    // interaction and does nothing.
-    const notYet = container.querySelectorAll('[data-state="not-yet"]');
-    expect(notYet).toHaveLength(STARTING_SENTENCES.length - 1);
-    for (const card of notYet) {
-      expect(card.querySelector("button")).toBeNull();
-      expect(card.textContent).toContain("not yet live");
-      expect(card.textContent).toContain("no model key");
+    // **The three with nothing recorded get no card at all.** They used to be
+    // three rows reading *not yet live*, side by side with the one door, taking
+    // the whole of this column — a graveyard with a door in it. What is left of
+    // them is the line under the card, which already named them: *the other
+    // three have nothing recorded yet*. Nothing on this screen accepts an
+    // interaction and does nothing, and now nothing on it is a row that cannot
+    // be taken up either.
+    expect(container.querySelectorAll('[data-state="not-yet"]')).toHaveLength(0);
+    // Counted inside the section that offers them, so that the list of maps
+    // already drawn — a different section, fed by a different route — cannot
+    // change this number.
+    expect(building(container).querySelectorAll(".example")).toHaveLength(1);
+    expect(container.textContent).not.toContain("not yet live");
+    // **The three with no card are named**, because they are not on the screen
+    // to be counted: a line reading *the other three* points at sentences that
+    // are no longer there. The short name is not the recording's short name —
+    // `export-controls` is an identifier, and an identifier is never words on
+    // the screen.
+    expect(container.textContent).toContain(
+      "the midterms, export controls and photonic chips have nothing recorded yet",
+    );
+    // And the three sentences themselves are not on the screen as dead text.
+    for (const gone of STARTING_SENTENCES.slice(1)) {
+      expect(container.textContent).not.toContain(gone.sentence);
     }
 
     // The field for a sentence of the reader's own is visibly disabled, and it
@@ -156,15 +183,101 @@ describe("with no model key", () => {
     );
   });
 
-  it("test_with_no_key_and_no_recording_every_card_says_so", () => {
+  it("test_with_no_key_and_no_recording_the_section_says_so_in_one_line", () => {
     const { container } = draw(NOTHING);
-    expect(container.querySelectorAll('[data-state="not-yet"]')).toHaveLength(
-      STARTING_SENTENCES.length,
+    // No cards, because there is nothing to offer — and a heading reading *or
+    // watch one build itself* over an empty list is worse than a sentence.
+    expect(container.querySelectorAll("[data-state]")).toHaveLength(0);
+    expect(container.textContent).toContain(
+      "No model key configured, and nothing recorded — so the strait, the midterms, export " +
+        "controls and photonic chips cannot be shown building here.",
     );
+    // It points at the thing that does work with neither, which is the whole
+    // multiverse from a file on disk.
+    expect(container.textContent).toContain("The map above is already drawn and needs neither.");
     // And the shared sentence is not printed, because there is no day to name and
     // nothing it would be true of.
     expect(container.textContent).not.toContain("run from recordings made on");
     expect(screen.getByRole("button", { name: "Build the map" })).toBeDisabled();
+  });
+
+  it("test_nothing_is_claimed_before_the_server_has_answered", () => {
+    // **Null is not "no key".** Until the readiness answer arrives, nothing is
+    // known about a key or a recording, and a screen that reads *no model key*
+    // in the meantime is asserting something nobody told it — which is the
+    // traceability rule, on the first screen a reviewer sees.
+    const { container } = render(
+      <Launchpad
+        examples={EXAMPLES}
+        failure={null}
+        readiness={null}
+        onOpen={() => undefined}
+        onBuild={() => undefined}
+      />,
+    );
+    expect(container.textContent).not.toContain("No model key configured");
+    expect(container.textContent).not.toContain("not yet live");
+    // Every sentence is still on the screen, each saying what is being waited
+    // for — and none of them is a control yet.
+    expect(container.querySelectorAll('[data-state="asking"]')).toHaveLength(
+      STARTING_SENTENCES.length,
+    );
+    for (const one of STARTING_SENTENCES) {
+      expect(container.textContent).toContain(one.sentence);
+    }
+    expect(screen.getByLabelText("An event you think will happen")).toBeDisabled();
+    expect(container.textContent).toContain("Asking the server whether a model key is configured.");
+  });
+
+  it("test_an_ask_that_did_not_come_back_is_not_an_ask_still_in_flight", () => {
+    // **The state this screen got wrong twice.** A request that failed and a
+    // request in flight are both an absent answer, and with them folded into
+    // one the launchpad said *asking the server* for ever over an ask that
+    // ended minutes ago — while the strip below it printed the failure. A
+    // screen asserting a question that is not being asked is a state nobody
+    // can trace to an input, on the first screen a reviewer sees.
+    const said = "Nothing answered at /api/readyz — the server may not be running.";
+    const { container } = render(
+      <Launchpad
+        examples={EXAMPLES}
+        failure={null}
+        readiness={null}
+        readinessFailure={said}
+        onOpen={() => undefined}
+        onBuild={() => undefined}
+      />,
+    );
+
+    // Not a word about a question in flight, because none is.
+    expect(container.textContent).not.toContain("Asking the server");
+    // Nor a word about what this copy can do, because nobody has said.
+    expect(container.textContent).not.toContain("No model key configured");
+    expect(container.textContent).not.toContain("not yet live");
+
+    // Every sentence is still there, each in the vocabulary's own words for an
+    // ask that got no reply, and none of them is a control.
+    const cards = container.querySelectorAll('[data-state="no-answer"]');
+    expect(cards).toHaveLength(STARTING_SENTENCES.length);
+    for (const card of cards) {
+      expect(card.querySelector("button")).toBeNull();
+      expect(card.textContent).toContain("The ask did not come back");
+    }
+
+    // And the server's own sentence, printed as it came, **once under the
+    // cards** rather than on each of them: it is one fact about this copy and
+    // not four facts about four examples. The field below carries it a second
+    // time because the field is a different control with a different reason to
+    // be disabled — which is exactly what record 0012's own sentence does.
+    const section = building(container).textContent ?? "";
+    expect(section).toContain(said);
+    expect(section.split(said).length - 1).toBe(1);
+
+    // The field is disabled and says the same thing, with the one part that is
+    // true of it: nothing recorded can stand in for a sentence nobody has typed.
+    expect(screen.getByLabelText("An event you think will happen")).toBeDisabled();
+    expect(container.textContent).toContain(
+      "whether a sentence of your own could be turned into a map is not known",
+    );
   });
 
   it("test_a_recording_that_would_not_play_is_named_and_hides_nothing", () => {
@@ -205,5 +318,32 @@ describe("with a model key", () => {
     expect(container.querySelectorAll('[data-state="not-yet"]')).toHaveLength(0);
     expect(container.textContent).not.toContain("No model key configured");
     expect(screen.getByLabelText("An event you think will happen")).not.toBeDisabled();
+
+    // **All four are offered, and every one of them is a control.** With a key
+    // there is nothing this copy cannot run, so nothing is collapsed away — the
+    // rule is *a card for everything this copy can do*, and with a key that is
+    // all of them.
+    expect(container.querySelectorAll('[data-state="live"]')).toHaveLength(
+      STARTING_SENTENCES.length,
+    );
+    for (const one of STARTING_SENTENCES) {
+      expect(screen.getByRole("button", { name: new RegExp(one.sentence) })).not.toBeDisabled();
+    }
+  });
+
+  it("test_a_key_and_some_recordings_still_offers_all_four_live", () => {
+    // The fourth case: a key **and** recordings. The key wins — every card runs
+    // live — and nothing says *replay*, because nothing is being replayed.
+    const { container } = draw({
+      status: "ready",
+      model_key_present: true,
+      replayable: [{ example: "hormuz", recording_date: "2026-09-18" }],
+      unreadable: [],
+    });
+    expect(container.querySelectorAll('[data-state="live"]')).toHaveLength(
+      STARTING_SENTENCES.length,
+    );
+    expect(container.textContent).not.toContain("replay");
+    expect(container.textContent).not.toContain("No model key configured");
   });
 });

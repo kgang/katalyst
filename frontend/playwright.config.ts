@@ -1,12 +1,14 @@
 /**
  * How the one end-to-end test runs.
  *
- * There is exactly one, and it drives the real app in a real browser against
- * the real server. Everything else about this product is checked by tests that
- * need neither — the rules of the map in the server's own suite, the components
- * in a simulated page. This one exists for the thing neither can check: that the
- * two halves, started as a person would start them, actually draw the stored
- * example.
+ * There is one job and it drives the real app in a real browser against the real
+ * server. Everything else about this product is checked by tests that need
+ * neither — the rules of the map in the server's own suite, the components in a
+ * simulated page. These exist for the thing neither can check: that the two
+ * halves, started as a person would start them, actually draw the stored
+ * example, that a mouse alone can do the thing the product is for, and that
+ * nothing in the panel beside the map is cut off at any window this interface
+ * is held to.
  *
  * **Both halves are started here rather than by hand**, so that running it is
  * one command and so that the build job is the same command. The server is
@@ -57,7 +59,27 @@ export default defineConfig({
     // The window the whole interface is designed against. Every measurement in
     // the visual review was taken at this size.
     viewport: { width: 1600, height: 1000 },
-    trace: "off",
+    /**
+     * **A trace is kept for every test that fails, and for no test that
+     * passes.**
+     *
+     * This was `off`, and two failures in this suite were lost last week with
+     * nothing kept about either of them: a line of output, no screen, no
+     * network, no console, nothing to look at afterwards. A browser test that
+     * fails on a machine nobody is sitting at and leaves no evidence has to be
+     * reproduced before it can be read, and reproducing a rare one is the
+     * expensive half of chasing it.
+     *
+     * **What it costs, said plainly**: a trace is recorded for every test,
+     * pass or fail — the recording is the only way to have one if it fails —
+     * and the ones that passed are deleted at the end. So a green run pays the
+     * recording (a few per cent of the wall clock, and disk that is freed
+     * again) and uploads nothing, and a red one keeps the whole of the
+     * evidence. `on` would keep the green ones too: megabytes uploaded on every
+     * build and opened by nobody. Worth it either way — two failures were lost
+     * last week for want of this line.
+     */
+    trace: "retain-on-failure",
   },
   projects: [
     {

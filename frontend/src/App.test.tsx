@@ -65,6 +65,7 @@ vi.mock("./graph/Canvas", () => ({
 
 import { App } from "./App";
 import { readAbout, readHealth, readReadiness } from "./api/client";
+import { STARTING_SENTENCES } from "./components/Launchpad";
 import { absence } from "./world/absence";
 
 /** Set the three stand-ins to answer the way a healthy server with no key would. */
@@ -172,7 +173,7 @@ beforeEach(() => {
 });
 
 describe("the launchpad", () => {
-  it("test_the_launchpad_offers_the_one_example_that_opens_and_says_the_rest_are_not_live", async () => {
+  it("test_the_launchpad_offers_the_one_example_that_opens_and_says_what_it_cannot", async () => {
     serverAnswersNormally();
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
 
@@ -183,20 +184,20 @@ describe("the launchpad", () => {
       screen.getByText("If the Strait of Hormuz reopens, what happens to crude?"),
     ).toBeInTheDocument();
 
-    // The four sentences from the brief each build a map. This server has no key
-    // and nothing recorded, so all four say plainly that there is nothing they
-    // could honestly show — never silently doing nothing.
+    // **This server has no key and nothing recorded, so there is nothing the
+    // four sentences could honestly show and none of them is drawn as a card.**
+    // They used to be four rows reading *not yet live* — four things a reader
+    // counted and could not take up, under a heading offering to build them a
+    // map. One sentence says it instead, and points at the thing that does work
+    // with neither a key nor a recording.
     expect(
-      screen.getByText("Photonic chips get adopted faster than expected."),
+      await screen.findByText(/No model key configured, and nothing recorded/),
     ).toBeInTheDocument();
-    expect(document.querySelectorAll(".example__badge")).toHaveLength(4);
-    expect(
-      await screen.findAllByText("no model key, and nothing recorded for this one"),
-    ).toHaveLength(4);
-    // And what those four words mean, said once in full under them.
-    expect(screen.getByText(/A card reads/).textContent).toContain(
-      "nobody has recorded that example",
+    expect(screen.getByText(/No model key configured, and nothing recorded/).textContent).toContain(
+      "The map above is already drawn and needs neither.",
     );
+    expect(screen.queryByText("Photonic chips get adopted faster than expected.")).toBeNull();
+    expect(document.querySelectorAll(".example__badge")).toHaveLength(0);
 
     // Both doors are named and explained.
     expect(screen.getByText("Explore")).toBeInTheDocument();
@@ -205,6 +206,29 @@ describe("the launchpad", () => {
     // Nothing spins and nothing pops up.
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.querySelector("dialog")).toBeNull();
+  });
+
+  it("test_a_readiness_ask_that_failed_is_not_drawn_as_one_still_in_flight", async () => {
+    // **The screen is handed two different absent answers, not one.** Asking
+    // and failed are both "no readiness answer", and folded together the first
+    // screen said *asking the server* for ever over an ask that had ended —
+    // while the strip below it printed the failure's own sentence. This is the
+    // wiring that keeps them apart, from the request to the card.
+    serverAnswersNormally();
+    vi.mocked(readReadiness).mockRejectedValue(
+      new Error("Nothing answered at /api/readyz — the server may not be running."),
+    );
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+
+    expect(await screen.findAllByText(/Nothing answered at \/api\/readyz/)).not.toHaveLength(0);
+    // One row for each starting sentence, counted off the list itself.
+    expect(document.querySelectorAll('[data-state="no-answer"]')).toHaveLength(
+      STARTING_SENTENCES.length,
+    );
+    expect(document.body.textContent).not.toContain("Asking the server");
+    expect(document.body.textContent).not.toContain("No model key configured");
+    // And nothing pops up about it: a failure is printed in the page.
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 
@@ -282,6 +306,38 @@ describe("opening a map", () => {
     // And the second question carries the branch as it now stands.
     const asked = vi.mocked(source.readConditional).mock.calls.at(-1)?.[0];
     expect(asked?.branch?.edits).toHaveLength(1);
+  });
+
+  it("test_the_keyboard_goes_into_the_operations_and_comes_back_out", async () => {
+    // **Both directions of one rule.** The way in from the panel's head
+    // unmounts the instant it is pressed, so without this a reader who tabbed
+    // to *Change this claim* and pressed Enter would be standing on nothing and
+    // the next Tab would start again at the top of the page. The panel takes
+    // the keyboard — the reader's own act, since pressing that control can mean
+    // nothing else — and **Done** puts it back on the control it came from,
+    // which by then is a new element in the same place.
+    serverAnswersNormally();
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    fireEvent.click(screen.getByRole("button", { name: "select claim B" }));
+    const wayIn = await screen.findByRole("button", { name: "Change this claim" });
+    wayIn.focus();
+    expect(document.activeElement).toBe(wayIn);
+
+    fireEvent.click(wayIn);
+    const operations = await screen.findByRole("region", { name: "Change this claim" });
+    expect(document.activeElement).toBe(operations);
+    // And the way in is not on the screen at all while what it opens is open.
+    expect(screen.queryByRole("button", { name: "Change this claim" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    const back = await screen.findByRole("button", { name: "Change this claim" });
+    expect(document.activeElement).toBe(back);
+    // A new element in the same place, which is why the screen has to put the
+    // keyboard back rather than the panel restoring what it remembered.
+    expect(back).not.toBe(wayIn);
   });
 
   it("test_an_ask_that_did_not_come_back_is_asked_again", async () => {
@@ -385,10 +441,20 @@ describe("the strip at the foot of the launchpad", () => {
     serverAnswersNormally();
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
 
-    expect(await screen.findByText("reachable")).toBeInTheDocument();
-    expect(screen.getByText("0.1.0")).toHaveClass("status-value");
+    // **One labelled row, and it is the model key** — the one reading on this
+    // screen that changes what a reader can do.
     expect(
-      screen.getByText("no key configured, and nothing recorded to play instead"),
+      await screen.findByText("no key configured, and nothing recorded to play instead"),
     ).toBeInTheDocument();
+    expect(document.querySelectorAll(".status-row")).toHaveLength(1);
+
+    // Whether the server answered and which build answered are still here, in
+    // one quiet line, still the server's own words and still traceable to the
+    // addresses named under them. Nothing was dropped; it was given the weight
+    // it has.
+    expect(screen.getByText(/Server ok\./).textContent).toContain(
+      "Build 0.1.0, reported by Katalyst.",
+    );
+    expect(document.querySelector(".status-value")?.textContent).toBe("absent");
   });
 });

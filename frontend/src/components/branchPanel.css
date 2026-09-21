@@ -11,14 +11,18 @@
  * will do rather than shouting.
  */
 
-/* Your branches and the edits in the one that is open. It takes the room its
- * list needs and no more, gives up what it has to when the column is full, and
- * scrolls inside itself rather than pushing anything off the bottom. */
+/* Your branches and the edits in the one that is open.
+ *
+ * **Nothing here says how tall it is or whether it scrolls, and that is the
+ * rule.** The panel beside the map scrolls as one and nothing inside it scrolls
+ * on its own — `styles/app.css` says so once, on `.page--map .dock > *`, which
+ * gives every section `max-height: none` and `overflow: visible`. That selector
+ * is two classes to this one's one, so anything written here about height or
+ * overflow loses to it: a `max-height: 28%` and an `overflow-y: auto` sat here
+ * for a while saying the opposite of the rule that was actually in force, and a
+ * reader meeting both could not tell which won. The `flex` and the `min-height`
+ * that shared the column out went the same way and for the same reason. */
 .branch-panel {
-  flex: 0 1 auto;
-  min-height: 8rem;
-  max-height: 28%;
-  overflow-y: auto;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);
@@ -163,9 +167,25 @@
   text-wrap: pretty;
 }
 
+/* A field takes the room it is given and asks for none of its own.
+ *
+ * **`width: 100%` is what does that, and it was always here.** A field whose
+ * width is a percentage counts as needing no room at all when its row is
+ * sized, so three of them share a 303-pixel column evenly. Measured in a real
+ * browser on 2026-09-21 at 1600, 1440 and 1280 wide, with `min-width: 0` and
+ * the `minmax(0, 1fr)` below both taken out: the three fields still sat inside
+ * the panel. So those two lines rescue nothing today. They are kept because
+ * every other row of tracks in this interface carries them, and because a
+ * field that one day loses its percentage width — an `<input>` with no `size`
+ * asks for about 140 pixels, twenty characters of the browser's default —
+ * would otherwise push the row's right-hand edge off the screen. The check
+ * that would catch that is `everyControlInThePanelIsWhole` in
+ * `e2e/hormuz.spec.ts`, which asks the panel whether it is wider inside than
+ * it is on the glass. */
 .branch-panel__field,
 .intervene__field {
   width: 100%;
+  min-width: 0;
   padding: var(--space-hair) var(--space-1);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
@@ -251,12 +271,13 @@
 /* ---- The six things you can do ------------------------------------------ */
 
 /* The six things you can do to a claim. It is opened on purpose and closed
- * again, so it takes the room it needs first and scrolls itself if the column
- * cannot spare it. */
+ * again, so it takes the room it needs and no more — and, like every other
+ * section, it is as tall as what is in it and does not scroll inside itself.
+ * The one scrolling box on this screen is the panel around it, and
+ * `.page--map .dock > *` in `styles/app.css` owns that rule for every section
+ * in it — which is why no `flex`, `min-height`, `max-height` or `overflow` is
+ * written here. */
 .intervene {
-  flex: 0 1 auto;
-  min-height: 11rem;
-  overflow-y: auto;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);
@@ -326,15 +347,9 @@
   border-color: var(--text-muted);
 }
 
-/* A button for something that is not built yet. It is still a button, still
- * reachable, and it says what it would do and that it cannot yet — because a
- * control that is quietly inert is worse than one that explains itself. The
- * dashed edge is the glance; the words under it are the reading. */
-.intervene__button[data-live="no"] {
-  border-style: dashed;
-  color: var(--text-muted);
-}
-
+/* The line under a button's own words: what it means, or what it wants. Quieter
+ * than the button, and never the only thing that says anything — the button's
+ * words stand on their own. */
 .intervene__hint {
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);
@@ -349,9 +364,13 @@
   border-radius: var(--radius);
 }
 
+/* The likelihood, the bottom of its range and the top, side by side. The three
+ * tracks share the room equally and may shrink to nothing, which is what
+ * `minmax(0, 1fr)` says and `1fr` alone does not. A guard, not a fix: see the
+ * note on the field above for what was measured. */
 .intervene__three {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   column-gap: var(--space-hair);
 }
 

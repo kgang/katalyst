@@ -229,6 +229,347 @@ async function openThePanelOnTheArrow(page: Page, id: string): Promise<void> {
 }
 
 /**
+ * Every window this interface is held to.
+ *
+ * The whole of it was measured against the first; the other two are the two
+ * laptop screens a reviewer is most likely to open it on, and every layout
+ * defect the interface audit found showed up at one of them and not at 1600.
+ */
+const WINDOWS = [
+  { width: 1600, height: 1000 },
+  { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
+] as const;
+
+/**
+ * Every control in the panel beside the map can actually be reached and pressed.
+ *
+ * **This is a geometric assertion and never a picture.** A stored screenshot
+ * over a canvas with a background-threaded layout engine, two variable fonts and
+ * an arrival animation is a flake generator, and this project has already paid
+ * for chasing flakes. What it asserts instead is the thing every layout defect
+ * the interface audit found had in common: something in the panel could be seen
+ * in the markup and not used on the screen.
+ *
+ * **Three questions per control, and the third is the one that bites.**
+ *
+ * 1. It is drawn at a size at all.
+ * 2. Scrolled to, it lies inside the panel's **client box** — the part of the
+ *    panel that is actually on the glass, inside its border and beside its
+ *    scrollbar. Scrolled out of view is fine and is why each control is scrolled
+ *    to first: the panel scrolls as one and marks its edges, so below the fold is
+ *    reachable.
+ * 4. **The panel itself does not scroll sideways.** This is a question of its
+ *    own and not a consequence of the second. The panel scrolls up and down, and
+ *    a box that scrolls on one axis scrolls on the other as well unless it is
+ *    told not to — so a field that runs past the right edge makes the panel
+ *    wider inside than it is on the glass, scrolling to that field slides the
+ *    whole panel left, and the field is then measured *inside* the client box.
+ *    The first three questions pass on exactly the defect this helper was
+ *    written for. Asking the panel how wide its content is cannot be fooled by
+ *    where it happens to be scrolled to.
+ * 3. **At its own centre, the topmost thing on the screen is the control** — or
+ *    something inside it. That is the overlap test, and it is the only one of the
+ *    three that catches a sibling drawn over a button, which is what "nothing is
+ *    hidden behind anything" means. An earlier version of this helper asked only
+ *    where boxes were, and against this stylesheet — one scrolling column whose
+ *    sections all read `overflow: visible` — no box could ever land outside the
+ *    content. It could not have failed.
+ *
+ * Each control is scrolled to over the wire and then measured in the page, which
+ * is two round trips each rather than one for the lot. That is the price of
+ * asking a question about what is *on the glass* rather than about what the
+ * layout says.
+ *
+ * @param page The page the map is on.
+ */
+async function everyControlInThePanelIsWhole(page: Page): Promise<void> {
+  const dock = page.locator(".dock");
+  await expect(dock).toBeVisible();
+  const controls = dock.locator("button, a, input");
+  const many = await controls.count();
+  expect(many, "the panel beside the map holds no controls at all").toBeGreaterThan(0);
+
+  const wrong: string[] = [];
+  for (let at = 0; at < many; at += 1) {
+    const control = controls.nth(at);
+    // Brought onto the glass first, because the question is about what a reader
+    // can reach and a reader scrolls. The panel is the only thing that moves.
+    await control.scrollIntoViewIfNeeded();
+    const verdict = await control.evaluate((element) => {
+      const panel = element.closest<HTMLElement>(".dock");
+      if (panel === null) {
+        return "a control left the panel between being counted and being measured";
+      }
+      const name = (element.getAttribute("aria-label") ?? element.textContent ?? "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 60);
+      const box = element.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) {
+        return `"${name}" is drawn at no size at all`;
+      }
+      // The part of the panel that is on the glass: inside its border, and
+      // beside its scrollbar rather than under it.
+      const frame = panel.getBoundingClientRect();
+      const left = frame.left + panel.clientLeft;
+      const top = frame.top + panel.clientTop;
+      const right = left + panel.clientWidth;
+      const bottom = top + panel.clientHeight;
+      if (
+        box.left < left - 1 ||
+        box.right > right + 1 ||
+        box.top < top - 1 ||
+        box.bottom > bottom + 1
+      ) {
+        return (
+          `"${name}" is drawn at ${Math.round(box.left)},${Math.round(box.top)} to ` +
+          `${Math.round(box.right)},${Math.round(box.bottom)}, outside the panel's ` +
+          `${Math.round(left)},${Math.round(top)} to ${Math.round(right)},${Math.round(bottom)} — ` +
+          `and it had already been scrolled to`
+        );
+      }
+      // **What is actually on top at its centre.** A pseudo-element with
+      // `pointer-events: none` — the rules the panel draws at its edges — is
+      // not an answer to this question and the browser does not give one.
+      const onTop = document.elementFromPoint(
+        Math.round(box.left + box.width / 2),
+        Math.round(box.top + box.height / 2),
+      );
+      if (onTop === null || !(onTop === element || element.contains(onTop))) {
+        const over =
+          onTop === null
+            ? "nothing at all"
+            : `<${onTop.tagName.toLowerCase()} class="${onTop.className}">`;
+        return `"${name}" has ${over} drawn over its own middle`;
+      }
+      return null;
+    });
+    if (verdict !== null) {
+      wrong.push(verdict);
+    }
+  }
+  expect(wrong, "controls in the panel a reader cannot reach").toEqual([]);
+
+  // Asked last, and of the panel rather than of any one control: by now every
+  // control has been scrolled to, so anything that could widen the panel has.
+  const sideways = await dock.evaluate((panel) => panel.scrollWidth - panel.clientWidth);
+  expect(
+    sideways,
+    "the panel beside the map is wider inside than it is on the glass, so something in it runs past its edge",
+  ).toBeLessThanOrEqual(1);
+}
+
+/**
+ * The page itself does not scroll sideways.
+ *
+ * **The one assertion here that varies with the window.** The panel is a fixed
+ * 336 pixels whatever the screen is, so nothing measured inside it changes
+ * between 1600 and 1280; the stage beside it takes the rest, and the two of them
+ * together are what can stop fitting. A page that scrolls sideways is the whole
+ * screen cut off rather than one control, and it is the defect a narrow window
+ * produces that a wide one hides.
+ *
+ * @param page The page to measure.
+ */
+async function theScreenFitsItsWindow(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const page_ = document.documentElement;
+          return page_.scrollWidth - window.innerWidth;
+        }),
+      { timeout: 15_000, message: "the page never stopped scrolling sideways" },
+    )
+    .toBeLessThanOrEqual(1);
+}
+
+/**
+ * The map read as a list is a list of sentences, not a list of words.
+ *
+ * **The defect this catches is a column, not a font.** An outline item is a grid
+ * row, and a grid row whose text track has collapsed wraps one word to a line —
+ * which turns a seven-claim map into a tree taller than the window and makes the
+ * no-picture route, the accessibility story, unusable. A third of the outline's
+ * own width is nowhere near a sentence and far away from two and a half
+ * characters, so it catches the collapse without pinning a layout.
+ *
+ * @param page The page the outline is on.
+ */
+async function everyOutlineItemIsASentenceWide(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const outline = document.querySelector<HTMLElement>(".outline");
+          if (outline === null) {
+            return ["the map is not being read as a list"];
+          }
+          const room = outline.clientWidth;
+          if (room === 0) {
+            // A third of nothing is nothing, and every item would pass.
+            return ["the map read as a list is drawn at no width at all"];
+          }
+          const sentences = outline.querySelectorAll<HTMLElement>(".outline__sentence");
+          if (sentences.length === 0) {
+            return ["the map read as a list has no items in it"];
+          }
+          const thin: string[] = [];
+          for (const sentence of sentences) {
+            const width = sentence.getBoundingClientRect().width;
+            if (width < room / 3) {
+              thin.push(
+                `an item is ${Math.round(width)} wide in an outline of ${Math.round(room)}`,
+              );
+            }
+          }
+          return thin;
+        }),
+      { timeout: 15_000, message: "the outline never settled at a readable width" },
+    )
+    .toEqual([]);
+}
+
+/**
+ * Open the stored map and fold the strike branch onto it, with the mouse and
+ * the palette, and wait until the engine has answered.
+ *
+ * @param page The page to do it on.
+ */
+async function theStoredMapWithTheStrikeBranch(page: Page): Promise<void> {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: /Strait of Hormuz/ })
+    .first()
+    .click();
+  await waitForTheLayout(page, 7);
+
+  await page.keyboard.press("Meta+k");
+  await expect(page.getByText(/Every command, by name/)).toBeVisible();
+  await page.keyboard.type("Hormuz opens");
+  await page.keyboard.press("Enter");
+  await waitForTheBranch(page, "Hormuz opens, then Iran is struck", 8);
+  // The engine has answered when the map says what the branch did, with the
+  // counts in it — before that the panel is still holding the answer to the
+  // question before this one.
+  await waitForTheAnswer(
+    page,
+    "Branch created. One claim added, six claims moved, one supposition retracted.",
+  );
+}
+
+/**
+ * The panel holds everything it holds, at every window this interface is held
+ * to, with a branch open and the operations open — which is the panel at its
+ * fullest.
+ */
+for (const window of WINDOWS) {
+  test(`test_nothing_in_the_panel_is_cut_off_at_${window.width}_by_${window.height}`, async ({
+    page,
+  }) => {
+    // Three window sizes, a branch, an engine answer and two states of the
+    // panel: longer than the walk the other tests take.
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: window.width, height: window.height });
+    await theStoredMapWithTheStrikeBranch(page);
+
+    // The panel is a fixed 336 pixels and the stage takes the rest, so this is
+    // the one thing on this screen that a narrow window can break and a wide one
+    // cannot.
+    await theScreenFitsItsWindow(page);
+
+    // Five sections, and the panel at its fullest: your branches, the change
+    // list, the panel that says why a number is what it is — and, opened from
+    // the Inspector's own head with the mouse, the things you can do to a claim.
+    await page.locator('.react-flow__node[data-id="B"]').click();
+    const wayIn = page.getByRole("button", { name: "Change this claim" });
+    await expect(wayIn).toBeVisible();
+    await wayIn.click();
+    // Which claim the operations are open on, read off the panel's own mark
+    // rather than off its sentence: matching a sentence is testing the copy.
+    await expect(page.locator('.intervene[data-about="B"]')).toBeVisible();
+    await everyControlInThePanelIsWhole(page);
+
+    // And the field that opens inside it, which is the widest thing the panel
+    // ever holds.
+    await page.getByRole("button", { name: /^My own number/ }).click();
+    await expect(page.getByLabel(/Your likelihood/)).toBeVisible();
+    await everyControlInThePanelIsWhole(page);
+
+    // Then the same map read as a list, which is the panel's other state and
+    // the one the no-picture route depends on. `O` is a map key, so the
+    // keyboard goes back on the map first — the press is otherwise the
+    // button's, which is the product's rule rather than this test's
+    // convenience.
+    await theScreenFitsItsWindow(page);
+
+    await standOn(page, "B");
+    await page.keyboard.press("O");
+    await expect(page.getByRole("tree")).toBeVisible();
+    await everyOutlineItemIsASentenceWide(page);
+    await everyControlInThePanelIsWhole(page);
+  });
+}
+
+/**
+ * The whole of the brief's core interaction, with the mouse and nothing else.
+ *
+ * **The keyboard walk above is the other half of this claim, not a substitute
+ * for it.** The panel of operations used to open from `E` and from the command
+ * palette and from nowhere else, so somebody working this screen by pointing at
+ * things could click every tile, read the whole argument and never find a verb
+ * on it. Not one key is pressed below.
+ */
+test("test_the_mouse_alone_reaches_the_six_things_you_can_do", async ({ page }) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: /Strait of Hormuz/ })
+    .first()
+    .click();
+  await waitForTheLayout(page, 7);
+
+  // A claim, chosen by pointing at it. No branch is open, so the edit below
+  // starts one of the reader's own — which is this product's own rule, and is
+  // what makes this a journey rather than a button press.
+  await page.locator('.react-flow__node[data-id="B"]').click();
+
+  // The way in, in the panel's head, in the vocabulary's own words. It is not
+  // there at all until something is selected, so waiting for it is waiting for
+  // the pointer to have landed.
+  const wayIn = page.getByRole("button", { name: "Change this claim" });
+  await expect(wayIn).toBeVisible();
+  await wayIn.click();
+
+  // **Which claim the operations are open on is read off the panel's own mark,
+  // never off its sentence.** The panel prints claims in their own words and
+  // arrows as the two claims at their ends, and a test that matched those words
+  // would be a test of the copy — which is how one end-to-end test came to fail
+  // on every cold run after a sentence was improved.
+  const operations = page.locator('.intervene[data-about="B"]');
+  await expect(operations).toBeVisible();
+  // And the difference between the two that are easiest to confuse is on the
+  // screen before the choice rather than after it.
+  await expect(operations).toContainText("Take this as given, and do not tell me what caused it");
+  await expect(operations).toContainText("This is news — update what came before it too");
+
+  await operations.getByRole("button", { name: /^Suppose this is true/ }).click();
+
+  // **The branch gained the edit.** It is listed by the button that made it,
+  // with the badge that button earns, on a branch that did not exist a moment
+  // ago — read off the panel rather than out of this file.
+  const branches = page.locator(".branch-panel");
+  await expect(branches).toContainText("Your own branch");
+  await expect(branches).toContainText("1 edit");
+  await expect(branches.locator(".branch-panel__button-name")).toHaveText("Suppose this is true");
+  await expect(branches.locator(".branch-panel__badge")).toHaveText(/^Supposed · /);
+
+  // And the map says out loud that a branch was created, for a reader who is
+  // not looking at the picture.
+  await expect(page.locator(".map-live")).toContainText("Branch created.");
+});
+
+/**
  * What the hypothesis's tile must read, word for word, once the strike lands.
  *
  * Two badges with an arrow drawn between them, which is what makes the rule read
@@ -738,7 +1079,14 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
 
   // Now change how hard the strait's opening pushes the premium.
   await openThePanelOnTheArrow(page, "H->C");
-  await page.getByRole("button", { name: /^Change this push/ }).click();
+  // Asked for inside the panel of operations, by name. The Inspector's head
+  // carries a control with these same words — it is the way in, and it is not
+  // drawn while the panel it opens is already open — and scoping the ask here
+  // says which of the two this step means whatever that rule becomes.
+  await page
+    .locator(".intervene")
+    .getByRole("button", { name: /^Change this push/ })
+    .click();
   await page.getByLabel(/How hard does this arrow push/).fill("3");
   await page.getByRole("button", { name: "Change it to that" }).click();
 

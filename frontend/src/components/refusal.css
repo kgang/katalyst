@@ -9,10 +9,10 @@
  * because it is a line and not a colour.
  */
 
+/* No `flex`, `min-height` or `overflow` here: the one scrolling box on this
+ * screen is the panel around it, and `.page--map .dock > *` in
+ * `styles/app.css` owns that rule for every section in it. */
 .refusal {
-  flex: 0 1 auto;
-  min-height: 9rem;
-  overflow-y: auto;
   display: grid;
   align-content: start;
   row-gap: var(--space-1);

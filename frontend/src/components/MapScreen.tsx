@@ -433,9 +433,41 @@ export function MapScreen({
     );
   }, []);
 
+  /**
+   * Where the keyboard was when the operations were opened, so it can be put
+   * back when they close.
+   *
+   * **The way in from the panel's head is the case this exists for.** That
+   * control unmounts the instant it is pressed — a way in that is already in is
+   * not a control — so a reader who tabbed to it and pressed Enter would be
+   * left standing on nothing, and the next Tab would start again at the top of
+   * the page. The panel takes the keyboard when it opens, which is the reader's
+   * own act rather than a theft (`graph/theKeyboard.ts` is about who decided,
+   * and here the reader did), and this is the other half of it.
+   *
+   * Two cases, and they are one rule: put it back where it came from, and where
+   * that no longer exists put it on the control that has taken its place. `E`
+   * pressed on a tile comes back to the tile, because the tile is still there.
+   */
+  const cameFrom = useRef<HTMLElement | null>(null);
+  const theWayIn = useRef<HTMLButtonElement | null>(null);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !intervening) {
+      const back = cameFrom.current;
+      if (back?.isConnected) {
+        back.focus();
+      } else {
+        theWayIn.current?.focus();
+      }
+    }
+    wasOpen.current = intervening;
+  }, [intervening]);
+
   const keys: MapKeys = useMemo(
     () => ({
       intervene: () => {
+        cameFrom.current = document.activeElement as HTMLElement | null;
         setDock("panel");
         setIntervening(true);
       },
@@ -607,7 +639,21 @@ export function MapScreen({
               summary={computed === undefined ? NO_SUMMARY_YET : computed.change.summary}
             />
           )}
-          <Inspector world={world} selection={selection} />
+          {/* The mouse's way to the six things you can do. The keyboard has
+              `E` and the palette has a command; without this a reader working
+              the screen with a mouse could click every tile, read the whole
+              argument and never find a verb on it.
+
+              **It is handed over only while the panel is shut.** A way in that
+              is already in is not a control, and on an arrow it would put two
+              buttons reading *Change this push* on one screen — this one, and
+              the one inside the panel that changes the number. */}
+          <Inspector
+            world={world}
+            selection={selection}
+            changeRef={theWayIn}
+            {...(intervening ? {} : { onChangeThis: keys.intervene })}
+          />
         </>
       )}
     </>
