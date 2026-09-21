@@ -89,7 +89,7 @@ const A_NUMBER_OFF_THE_MAP = new Set([
   "pathProduct",
   "conditional",
   "reading",
-  // The receipt's nine readings, by the names they travel under.
+  // The receipt's own readings, by the names they travel under.
   "dollars",
   "seconds",
   "input_tokens",

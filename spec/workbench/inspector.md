@@ -344,14 +344,14 @@ error. None of these opens a window: the panel is always there, and selecting ch
 ### B7 — This generation: the working
 
 *(Decided 2026-09-17, stack 04a; this closes open question 2 below. **Amended 2026-09-21**: the
-receipt's nine readings left this section — see below.)*
+receipt's ten readings left this section — see below.)*
 
 NFR-6 says every generation records the model, the tokens, the cache reads, the searches and the
 dollars, and shows them in the Inspector's transcript view. Nothing generated in the stack that wrote
 this chapter, so nothing was specified and nothing was drawn. A generation now exists, and this is
 where its **working** is read: what it was run against, and every proposal it made, in order.
 
-**What it cost is not here, and this section points at where it is** *(2026-09-21)*. The nine
+**What it cost is not here, and this section points at where it is** *(2026-09-21)*. The ten
 readings were drawn twice — on the strip beside the map and again here — one above the other in a
 320-pixel column. Two copies of one cost read, to somebody scrolling past, as two costs, and this was
 the copy no number on screen could be traced to: the strip is what the `receipt` event fills in. So
@@ -375,7 +375,7 @@ WHAT IT WAS RUN AGAINST
   ones were not, however alike their maps look. It is printed whole because half a
   fingerprint cannot be compared with anything.
 
-  What this run cost is on the strip beside the map, in nine readings, every one of
+  What this run cost is on the strip beside the map, in ten readings, every one of
   them a field the engine sent.
 
 EVERY PROPOSAL, IN ORDER

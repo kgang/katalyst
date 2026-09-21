@@ -292,7 +292,7 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // The rule's stable code is carried on the event and drawn nowhere.
   await expect(strip).not.toContainText("cycle");
 
-  // The receipt: nine labelled readings, every one a field, none of them derived.
+  // The receipt: ten labelled readings, every one a field, none of them derived.
   const receipt = page.locator(".receipt-strip").first();
   await expect(receipt.locator(".receipt-strip__label")).toHaveText([
     "model",
@@ -303,8 +303,15 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
     "web searches",
     "cost",
     "took",
+    "how hard the model tried",
     "mode",
   ]);
+  // How hard the model tried is a plain word, the one the service takes. Two
+  // maps of the same sentence at the same seed can differ because of it alone,
+  // so it is a reading rather than a footnote.
+  await expect(receipt.locator('[data-field="effort"] .receipt-strip__reading')).toHaveText(
+    /^(default|low|medium|high|xhigh|max)$/,
+  );
   // A replay calls nothing and spends nothing, and that zero is printed rather
   // than hidden — as money, which is two places at the least.
   await expect(receipt.locator('[data-field="mode"] .receipt-strip__reading')).toContainText(

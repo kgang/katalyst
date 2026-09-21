@@ -257,8 +257,6 @@ export function BranchPanel({
 export interface InterventionPanelProps {
   /** The world on screen. */
   readonly world: WorldView;
-  /** How many edits the open branch already holds, which is where the next one goes. */
-  readonly editsSoFar?: number;
   /** What the map is open on: the claim or the arrow the buttons act on. */
   readonly selection: Selection;
   /** Append an edit to the open branch. */
@@ -273,13 +271,7 @@ export interface InterventionPanelProps {
  * Never a pop-up: it appears in the panel, the map keeps drawing beside it, and
  * closing it loses nothing because nothing is left half-done.
  */
-export function InterventionPanel({
-  world,
-  selection,
-  editsSoFar = 0,
-  onEdit,
-  onClose,
-}: InterventionPanelProps) {
+export function InterventionPanel({ world, selection, onEdit, onClose }: InterventionPanelProps) {
   const [ownNumber, setOwnNumber] = useState(false);
   const [reading, setReading] = useState({ p: "", lo: "", hi: "" });
   const [pushing, setPushing] = useState(false);
@@ -407,7 +399,6 @@ export function InterventionPanel({
         {adding ? (
           <AddAClaim
             baseId={world.baseId}
-            position={editsSoFar}
             andThen="It is on your branch, like every other edit."
             onDrafted={(drafted) => {
               setAdding(false);

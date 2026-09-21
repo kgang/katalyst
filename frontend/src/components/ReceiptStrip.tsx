@@ -20,7 +20,7 @@
  * are printed whole, in the number face with fixed-width digits, and they carry
  * no range because nothing sampled them.
  *
- * **The nine lines are drawn in exactly one place, and this is it.** They used
+ * **The ten lines are drawn in exactly one place, and this is it.** They used
  * to be drawn twice, one above the other in a 320-pixel column: here, and again
  * in the panel's section for the run. Two copies of one cost is two costs to a
  * reader scrolling past them, and the second was the one nobody could point at.
@@ -61,9 +61,9 @@ interface Line {
 }
 
 /**
- * The nine readings a receipt carries, in the order they are printed.
+ * The ten readings a receipt carries, in the order they are printed.
  *
- * Nine, always, and none of them derived. A receipt with a field left out is a
+ * Ten, always, and none of them derived. A receipt with a field left out is a
  * receipt somebody would have to reconstruct.
  *
  * @param receipt The receipt event, exactly as it arrived.
@@ -85,6 +85,12 @@ export function receiptLines(receipt: Receipt): readonly Line[] {
     // still says so.
     { label: "cost", reading: `$${asMeasurement(receipt.dollars, 2, 4)}`, field: "dollars" },
     { label: "took", reading: `${asMeasurement(receipt.seconds, 1, 1)}s`, field: "seconds" },
+    // How hard the model was asked to try, in the word the service takes.
+    // **Two maps of the same sentence can differ because of this and for no
+    // other reason**, so it is a reading rather than a footnote: a recording is
+    // made rich and a live run is made fast, and a reader comparing one with
+    // the other has to be able to see which they are looking at.
+    { label: "how hard the model tried", reading: receipt.effort, field: "effort" },
     { label: "mode", reading: modeLine(receipt), field: "mode" },
   ];
 }
@@ -97,7 +103,7 @@ export function receiptLines(receipt: Receipt): readonly Line[] {
  * `prompt 93f85980` — eight characters of hex on a strip whose whole promise is
  * that every reading is a field, with no label a reader could act on and, worse,
  * cut here from the whole the engine sent. A browser that trims an identifier
- * has derived something (INV-workbench.72: none of the nine readings is
+ * has derived something (INV-workbench.72: none of the ten readings is
  * derived), and eight characters of a hash are not a fingerprint — they are a
  * fingerprint somebody could not check. It is printed whole, with a sentence
  * saying what it is for, in the panel's view of the run.
@@ -120,7 +126,7 @@ export interface ReceiptStripProps {
   readonly onOpen?: () => void;
 }
 
-/** The nine labelled readings, and nothing else. */
+/** The ten labelled readings, and nothing else. */
 function ReceiptLines({ receipt }: { receipt: Receipt }) {
   return (
     <dl className="receipt-strip__lines">

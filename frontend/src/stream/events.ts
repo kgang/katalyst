@@ -160,6 +160,21 @@ export interface Receipt {
   readonly mode: "live" | "replay";
   /** The day the recording was made, as the map writes a day: `2026-09-18`. Null when live. */
   readonly recording_date: string | null;
+  /**
+   * How hard the model was asked to try, as a plain word.
+   *
+   * `default` when nothing was asked for and the service's own applied,
+   * otherwise `low`, `medium`, `high`, `xhigh` or `max`. One setting with two
+   * pinned defaults behind it: **a recording is made rich and a live run is
+   * made fast** (Kent, G13, 2026-09-21), so two maps of the same sentence can
+   * differ for a reason that has nothing to do with the sentence — and a reader
+   * of a map is entitled to know which this was.
+   *
+   * It is a plain word rather than a number because it is the word the service
+   * takes, and a number would be this browser translating one thing into
+   * another and printing the translation.
+   */
+  readonly effort: string;
   /** A fingerprint of the prompt this run was made against. Always known. */
   readonly prompt_hash: string;
 }

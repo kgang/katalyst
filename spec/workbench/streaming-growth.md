@@ -710,8 +710,19 @@ THIS GENERATION
   web searches     <Receipt.searches>
   cost             <Receipt.dollars>
   took             <Receipt.seconds>
+  how hard the
+    model tried    <Receipt.effort>
   mode             live
 ```
+
+**Amended 2026-09-21 — there are ten readings, and the tenth is how hard the model tried.** A plain
+word: `default` when nothing was asked for and the service's own applied, otherwise `low`, `medium`,
+`high`, `xhigh` or `max`. One setting with two pinned defaults behind it — **a recording is made rich
+and a live run is made fast** (Kent, G13) — so two maps of the same sentence at the same seed can
+differ for a reason that has nothing to do with the sentence, and a reader comparing one with the
+other is entitled to see which they are looking at. It is the word the service takes rather than a
+number, because a number would be this browser translating one thing into another and printing the
+translation.
 
 Four things about it.
 
@@ -740,7 +751,7 @@ sentence saying what it is for; the whole transcript, one line per proposal in o
 refused, each accepted one naming the claim it became and each refused one carrying every sentence
 the validator wrote; a line per event name this build did not know, with how many of each arrived;
 and one sentence pointing at the strip for what the run cost. **It carries no copy of the receipt's
-nine readings.** It is drawn from the moment there is a generation, with whatever has arrived in it
+ten readings.** It is drawn from the moment there is a generation, with whatever has arrived in it
 and an em dash in each slot that has not — a section that appeared only once everything had landed
 would be a panel that is empty exactly while a reader is most likely to open it. The transcript is
 read from `GET /api/generate/{generation_id}/transcript`, which the server holds
@@ -862,21 +873,42 @@ one of those is true.
 
 **Add a claim** — *"…but this also happens"* — is the one intervention that calls the model (PRD §10
 anti-pattern 2's single exception: re-prompt only for an insert, and only over the affected subtree).
-It posts to `POST /api/generate/insert` — `{base_id, branch, claim_in_words, position}` — and gets
-back **one** intervention: a claim and its arrows, already drafted and already validated by the same
-rules everything else passes. **The field is `position`, not `at`:** `at` already means a transcript
-position on a stream event and a date on an edit, and a word that means three things is a word that
-means none. The browser appends the intervention to the branch like any other edit, and the branch
-panel shows it immediately ([`diff-view.md`](diff-view.md) B7). **The branch is one of the four
-fields and it is sent** *(2026-09-21)*: the claim is drafted and checked against the map the reader
-is actually looking at, which is the base map with the branch folded onto it. Leaving it out asks the
-rules about a map nobody has in front of them, and a claim that contradicts an edit made two minutes
-ago comes back accepted and then breaks the branch it is added to.
+It posts to `POST /api/generate/insert` — `{base_id, branch, claim_in_words}` — and gets back **one**
+intervention: a claim and its arrows, already drafted and already validated by the same rules
+everything else passes. The browser appends the intervention to the branch like any other edit, and
+the branch panel shows it immediately ([`diff-view.md`](diff-view.md) B7).
+
+**The branch is one of the three fields and it is sent** *(2026-09-21)*: the claim is drafted and
+checked against the map the reader is actually looking at, which is the base map with the branch
+folded onto it. Leaving it out asks the rules about a map nobody has in front of them, and a claim
+that contradicts an edit made two minutes ago comes back accepted and then breaks the branch it is
+added to.
+
+**And there is no `position`** *(Kent, 2026-09-21; this paragraph used to argue for the name)*. **A
+drafted edit goes at the end of the branch**, which is the only place this product ever puts one — a
+branch is append-only everywhere else in it. The field was read by nothing, and while it was there a
+reader who sent something other than the end got a 200 for an edit the world route then refused: a
+field that changes the answer's shape and not its content is worse than no field, because it makes a
+promise the next route breaks.
 
 It is not a generation — no stream and no reserved rectangle — but **it is several model calls, so it
 carries a receipt of its own**: the route answers a `DraftedInsert`, the edit and its `Receipt`
 together, and the cost is drawn by the same strip a generation's receipt is drawn by, with the same
-nine readings. **That closes Open question 3** (settled 2026-09-20 in
+ten readings.
+
+**It carries its working too, and the working is in the answer because there is nowhere else it
+could be** *(2026-09-21)*. An insert is one request and one answer: nothing about it is remembered on
+the server, so there is no identifier to ask by and no route to ask at — and filing it in the
+generation store instead made every insert unfindable, because nobody was ever told the identifier,
+while eight of them evicted the map they were being added to. So `DraftedInsert` carries
+`working`: one line per call, in the same shape a generation's transcript lines take, drawn by the
+**same component** the generation's working is drawn by. A reader who has learned to read one has
+learned to read the other, and the two cannot come to disagree about what a refusal looks like. Two
+things a line says that a generation's rarely does are drawn when they are there: an address the
+model cited that the search never returned, named rather than silently dropped — otherwise an arrow
+that says it *argued* looks like one that says it *documented* — and a reference class offered with
+nothing behind it, said as a class **with no number beside it**, because a figure with no page behind
+it reads as measured however it is marked. **That closes Open question 3** (settled 2026-09-20 in
 [`spec/generation/streaming.md`](../generation/streaming.md), drawn 2026-09-21 here). What made it
 answerable was learning that an insert is *several* calls rather than one — the starting-claim shape
 drafts the reader's sentence, then the ordinary walk proposes its arrows, one call each. A single
@@ -908,6 +940,17 @@ recording, or it reads *not yet live*. That third one now means one thing only �
 recording**, an example nobody has recorded yet — which is an honest state rather than the
 catch-all it was.
 
+**A recording that would not play is named, quietly, under the cards** *(2026-09-21)*. The readiness
+answer lists only the recordings that would actually play, and carries beside them one plain sentence
+per file in the folder this engine could not read. Both halves matter. **A bad file never hides the
+good ones** — the cards with recordings still run, because a recording is a committed file that
+outlives the code that wrote it and meeting an old one is ordinary rather than exceptional. And **it
+never hides itself either**: a reviewer who put a file in the recordings folder and then counts three
+cards where they expected four is owed the reason rather than left to wonder whether they put it in
+the wrong place. The sentence is the server's own, printed word for word, in the quiet type the
+*not yet live* explanation uses — it is a fact about this copy rather than about any map, so it sits
+under the cards and touches none of them.
+
 **Where the date comes from.** Not from the stream: S3 put the recording's date on `Receipt`, and the
 receipt arrives at the *end* of a run, long after the launchpad needs to print this sentence. So the
 readiness answer carries it. `GET /api/readyz` says `status` and `model_key_present` today, and gains
@@ -925,8 +968,10 @@ interface RecordingSummary {
 interface Readiness {
   readonly status: "ready" | "not_ready";
   readonly model_key_present: boolean;
-  /** Empty when nothing has been recorded. */
+  /** Only the ones that would actually play. Empty when nothing has been recorded. */
   readonly replayable: readonly RecordingSummary[];
+  /** One plain sentence per file in the folder this engine could not read. */
+  readonly unreadable: readonly string[];
 }
 ```
 
@@ -1091,14 +1136,16 @@ receipt's mode and the badge's source disagree, the receipt wins and the disagre
 
 **INV-workbench.72 — the receipt is the engine's, whole, and drawn once (NFR-6).** For every
 `receipt` event, the strip renders `model`, `calls`, `input_tokens`, `output_tokens`,
-`cache_read_tokens`, `searches`, `dollars`, `seconds` and `mode` — nine fields, each labelled, none
-omitted and **none derived, which includes none shortened** — and before the event arrives no cost,
-token count, search count or elapsed time is rendered anywhere. **The nine are rendered in exactly
-one place on any screen** *(amended 2026-09-21)*: the Inspector's view of the generation holds the
+`cache_read_tokens`, `searches`, `dollars`, `seconds`, `effort` and `mode` — **ten** fields *(amended
+2026-09-21: `effort` is the tenth)*, each labelled, none omitted and **none derived, which includes
+none shortened** — and before the event arrives no cost, token count, search count or elapsed time is
+rendered anywhere. The same ten are drawn for an insert's own receipt, by the same strip. **The ten
+are rendered in exactly one place on any screen** *(amended 2026-09-21)*: the Inspector's view of the generation holds the
 working and points at the strip, and renders no copy of them. *Tests:* strip ›
 `test_the_receipt_strip_prints_every_field_and_adds_nothing_up`,
 `test_the_cost_is_drawn_in_one_place_and_the_panel_points_at_it`,
 `test_the_mode_row_says_the_mode_and_the_day_and_nothing_else`,
+`test_the_strip_says_how_hard_the_model_tried`,
 `test_the_panel_prints_the_prompt_fingerprint_whole`; canvas ›
 `test_canvas_never_combines_two_model_numbers`, which walks every module under
 `frontend/src/stream/` for arithmetic on any of the receipt's own field names.
@@ -1262,7 +1309,7 @@ happened last, after a minute of things they already knew. *Tests:*
 3. **What does an `insert` cost, and where does that show?** **Answered 2026-09-20 by
    [`spec/generation/streaming.md`](../generation/streaming.md), drawn 2026-09-21, and nothing is
    open.** The route answers a `DraftedInsert` — the edit and its own `Receipt` — and the cost is
-   drawn beside the drafted claim by the same strip, with the same nine readings, that a generation's
+   drawn beside the drafted claim by the same strip, with the same ten readings, that a generation's
    receipt is drawn by. What made it answerable was learning that an insert is **several** calls
    rather than one: the starting-claim shape drafts the reader's sentence, and then the ordinary walk
    proposes its arrows, one call each. A running total in the browser lost on two counts — it is a

@@ -32,8 +32,26 @@ export interface RecordingSummary {
 
 /** The readiness answer as this build reads it. */
 export interface Readiness extends Described {
-  /** Empty when nothing has been recorded. */
+  /**
+   * The examples this copy can play. Empty when nothing has been recorded.
+   *
+   * **Only the ones that would actually play.** A file the engine could not
+   * read is not on this list, so a card that offers a run is a card that has
+   * one — the list and the offer cannot come apart.
+   */
   readonly replayable: readonly RecordingSummary[];
+  /**
+   * One plain sentence per file in the recordings folder this engine could not
+   * read.
+   *
+   * **A bad file never hides the good ones**, and it never hides itself either.
+   * A recording is a committed file that outlives the code that wrote it, so
+   * meeting an old one is ordinary rather than exceptional — and a reviewer who
+   * put a recording in the folder and sees three cards instead of four is owed
+   * the reason, in the server's own words, rather than left to guess whether
+   * they put it in the wrong place.
+   */
+  readonly unreadable: readonly string[];
 }
 
 /**
@@ -47,6 +65,13 @@ export interface Readiness extends Described {
  * @param answer The readiness answer, exactly as it arrived.
  */
 export function withRecordings(answer: Described): Readiness {
-  const listed = (answer as Partial<Readiness>).replayable;
-  return { ...answer, replayable: Array.isArray(listed) ? listed : [] };
+  const said = answer as Partial<Readiness>;
+  return {
+    ...answer,
+    replayable: Array.isArray(said.replayable) ? said.replayable : [],
+    // A server that does not send this is a server with nothing it could not
+    // read, which is what an empty list says. Nothing here guesses at a third
+    // state and nothing here writes a sentence of its own.
+    unreadable: Array.isArray(said.unreadable) ? said.unreadable : [],
+  };
 }

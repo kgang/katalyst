@@ -16,7 +16,17 @@ import type { ProposalAccepted, StreamEvent } from "../events";
 import type { Growth } from "../growth";
 import { fold, foldAll, waitingFor } from "../growth";
 import { A_REAL_RUN } from "./aRealRun";
-import { B, BELIEFS, EVERY_ARROW, H, STARTED, THE_GROWTH, THE_SENTENCE, theWorld } from "./aStream";
+import {
+  B,
+  BELIEFS,
+  EVERY_ARROW,
+  EVERY_CLAIM,
+  H,
+  STARTED,
+  THE_GROWTH,
+  THE_SENTENCE,
+  theWorld,
+} from "./aStream";
 
 /** Where a generation starts: a request has gone and nothing has come back. */
 function fresh(): Growth {
@@ -280,5 +290,36 @@ describe("an event this build does not know", () => {
     expect(after.unknown.get("a_call_went_out")).toBe(2);
     // Everything else is exactly as it was.
     expect({ ...after, unknown: grown.unknown }).toEqual(grown);
+  });
+});
+
+describe("the reader's own number", () => {
+  it("test_a_number_the_reader_gave_reaches_the_first_tile_on_a_replay", () => {
+    // The input bar sends `user_belief` and the engine stamps it on the
+    // hypothesis — **on a replay as well as on a live run** (server, 2026-09-21).
+    // So the number a reader typed into the bar is on the first tile either way,
+    // and the map does not quietly lose it the moment there is no key.
+    //
+    // It is checked against the number handed in, never against one written
+    // here: what is being asked is whether the screen carries the reader's own
+    // figure through, not what that figure is.
+    const mine = { p: 0.72, lo: 0.6, hi: 0.85, owner: "user" as const };
+    const withMine = EVERY_CLAIM.map((one) =>
+      one.id === "H" ? { ...one, beliefs: { ...one.beliefs, user: mine } } : one,
+    );
+    const finished = foldAll(fresh(), [
+      ...THE_GROWTH,
+      { event: "beliefs_propagated", world: theWorld(withMine) },
+    ]);
+
+    const hypothesis = finished.world.claims.find((claim) => claim.id === "H");
+    expect(hypothesis?.beliefs.user.reading).toEqual({ p: mine.p, lo: mine.lo, hi: mine.hi });
+    // And nobody else's slot was filled in from it: two slots that are never
+    // merged stay two slots.
+    for (const claim of finished.world.claims) {
+      if (claim.id !== "H") {
+        expect(claim.beliefs.user.reading).toBeUndefined();
+      }
+    }
   });
 });

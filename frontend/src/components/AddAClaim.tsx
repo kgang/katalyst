@@ -25,6 +25,7 @@ import type { Drafted, DraftedClaim } from "../stream/insert";
 import { draftAClaim } from "../stream/insert";
 import { asOneSentence } from "../world/failures";
 import { ReceiptStrip } from "./ReceiptStrip";
+import { TheWorking } from "./TheWorking";
 import "./addAClaim.css";
 
 /** What the control needs to draw itself. */
@@ -37,8 +38,6 @@ export interface AddAClaimProps {
    * branch is open.
    */
   readonly branch?: components["schemas"]["Branch"];
-  /** Where in the branch the new edit goes: the number of edits already in it. */
-  readonly position?: number;
   /** What to do with a claim that was drafted and passed the rules. */
   readonly onDrafted?: (drafted: DraftedClaim) => void;
   /**
@@ -55,7 +54,6 @@ export interface AddAClaimProps {
 export function AddAClaim({
   baseId,
   branch,
-  position = 0,
   onDrafted,
   andThen,
   draft = draftAClaim,
@@ -81,7 +79,6 @@ export function AddAClaim({
             base_id: baseId,
             ...(branch === undefined ? {} : { branch }),
             claim_in_words: words.trim(),
-            position,
           }).then(
             (drafted) => {
               setAsking(false);
@@ -150,14 +147,26 @@ export function AddAClaim({
           <p className="add-a-claim__drafted">
             {`Drafted and checked: "${answer.insert.proposition.claim}" ${andThen}`}
           </p>
-          {/* What drafting it cost, in the same nine readings and the same strip
-              a generation's receipt is printed in. An insert is several model
+          {/* What drafting it cost, in the same readings and the same strip a
+              generation's receipt is printed in. An insert is several model
               calls — one to draft the claim, then one per arrow — so it spends
               real money, and the person who pressed the button is the person who
               should see the bill. Absent only on a copy of the route older than
               the receipt, and then nothing is invented in its place. */}
           {answer.receipt === null ? null : (
             <ReceiptStrip receipt={answer.receipt} heading="What drafting it cost" />
+          )}
+          {/* And every call it took, in the same list a generation's working is
+              drawn in. **It is here because there is nowhere else it could be**:
+              an insert is one request and one answer, nothing about it is
+              remembered on the server, so there is no identifier to ask by and
+              no route to ask at. A reader who wants to know why an arrow says
+              what it says has one place to look, and it is this. */}
+          {answer.working.length === 0 ? null : (
+            <div className="add-a-claim__working">
+              <h4 className="add-a-claim__working-heading">Every call it took</h4>
+              <TheWorking lines={answer.working} />
+            </div>
           )}
         </div>
       )}

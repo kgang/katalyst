@@ -37,11 +37,49 @@ export interface TranscriptLine {
   readonly in_words: string;
   /** Every reason the map's own rules gave, in their words. Empty unless refused. */
   readonly violations: readonly Violation[];
+  /**
+   * Every address this call's answer cited that the search never returned.
+   *
+   * The reader is told which one rather than left to notice that an arrow says
+   * it argued where it might have said it documented.
+   */
+  readonly dropped?: readonly string[];
+  /**
+   * The reference class of a count that was offered with nothing behind it.
+   *
+   * The count itself is not carried, and this screen invents none: a figure
+   * with no page behind it reads as measured however it is marked, so the
+   * working says a class was offered and that nothing backed it, and shows no
+   * number at all.
+   */
+  readonly no_reference_class?: string | null;
+  /** How many round trips this one question took. */
+  readonly calls?: number;
+  /** How many web searches it ran. */
+  readonly searches?: number;
+  /** Tokens of question read fresh. */
+  readonly input_tokens?: number;
+  /** Tokens of answer written. */
+  readonly output_tokens?: number;
+  /** Tokens the service recognised from an earlier call. */
+  readonly cache_read_tokens?: number;
+  /** How many of the written tokens were thinking rather than answering. */
+  readonly thinking_tokens?: number;
+  /** How long this question took, wall clock. */
+  readonly seconds?: number;
 }
 
 /** The whole working of one generation, in the order it happened. */
 export interface Transcript {
   readonly generation_id: string;
+  /**
+   * The name the recording this was played from carries, on a replay.
+   *
+   * Not the name of this viewing, which is minted per viewing: a recording's
+   * own is a constant in a committed file, so two readers opening one card
+   * would otherwise share a single entry and overwrite each other's working.
+   */
+  readonly played_from?: string | null;
   readonly hypothesis: string;
   readonly target: string | null;
   readonly seed: number;

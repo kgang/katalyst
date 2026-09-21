@@ -7,9 +7,11 @@
  * **is** several model calls, so it carries a receipt of its own, drawn by the
  * same strip a generation's receipt is drawn by.
  *
- * **The field is `position`, not `at`.** `at` already means a place in a
- * transcript on a stream event and a date on an edit, and a word that means three
- * things is a word that means none.
+ * **A drafted edit goes at the end of the branch, and nothing says where.** A
+ * branch is append-only everywhere else in this product, so the end is the only
+ * place the browser ever puts one — and the field that let it say otherwise was
+ * read by nothing, while a reader who sent one got a 200 for an edit the world
+ * route then refused (Kent, 2026-09-21).
  *
  * **With no key, one sentence works and every other is declined in plain words.**
  * Each recording carries the one scripted intervention its card offers, matched
@@ -28,6 +30,7 @@
 import type { components } from "../api/schema";
 import type { Receipt } from "./events";
 import { INSERT_ADDRESS } from "./generate";
+import type { TranscriptLine } from "./transcript";
 
 /** One claim and its arrows, arriving as a single edit. */
 export type DraftedClaim = components["schemas"]["Insert"];
@@ -67,8 +70,6 @@ export interface DraftRequest {
   readonly branch?: components["schemas"]["Branch"];
   /** What the reader typed. */
   readonly claim_in_words: string;
-  /** Where in the branch the new edit goes. */
-  readonly position?: number;
 }
 
 /** How the ask turned out. Three answers, and a refusal is one of them. */
@@ -78,6 +79,17 @@ export type Drafted =
       readonly insert: DraftedClaim;
       /** What drafting it cost, in the shape the stream's receipt event carries. */
       readonly receipt: InsertReceipt | null;
+      /**
+       * Every call it took, in order — the insert's own working.
+       *
+       * **It arrives in the answer because there is nowhere else it could be.**
+       * An insert is one request and one answer, not a generation: nothing is
+       * remembered on the server, so there is no identifier to ask about it by
+       * and no route to ask at. Filing it in the generation store instead made
+       * every insert unfindable and evicted the map it was being added to
+       * (Kent, 2026-09-21).
+       */
+      readonly working: readonly TranscriptLine[];
     }
   /** The rules would not have it, with every reason at once, in their own words. */
   | { readonly state: "refused"; readonly reasons: readonly string[] }
@@ -99,11 +111,18 @@ export async function draftAClaim(
     answer = await ask(INSERT_ADDRESS, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      // `{base_id, branch, claim_in_words, position}` — the route's four fields,
-      // and the branch is one of them. A claim drafted against the stored map
-      // when the reader is looking at the map plus two edits is a claim checked
-      // against a map nobody has in front of them.
-      body: JSON.stringify({ position: 0, ...request }),
+      // `{base_id, branch, claim_in_words}` — the route's three fields, and the
+      // branch is one of them. A claim drafted against the stored map when the
+      // reader is looking at the map plus two edits is a claim checked against a
+      // map nobody has in front of them.
+      //
+      // **There is no `position`, and the browser never sent a meaningful one.**
+      // A drafted edit goes at the end of the branch, which is the only place
+      // this product ever puts one — a branch is append-only everywhere else in
+      // it. The field is gone from the route (Kent, 2026-09-21), and while it
+      // was there a reader who sent something other than the end got a 200 for
+      // an edit the world route then refused.
+      body: JSON.stringify(request),
     });
   } catch {
     return {
@@ -117,9 +136,18 @@ export async function draftAClaim(
     // **The route answers a `DraftedInsert`: the edit, and its own receipt.**
     // An insert is several model calls, so it spends real money, and a cost
     // nobody is shown is a cost nobody can check.
-    const both = body as { insert?: DraftedClaim; receipt?: InsertReceipt } | null;
+    const both = body as {
+      insert?: DraftedClaim;
+      receipt?: InsertReceipt;
+      working?: readonly TranscriptLine[];
+    } | null;
     if (both?.insert !== undefined) {
-      return { state: "drafted", insert: both.insert, receipt: both.receipt ?? null };
+      return {
+        state: "drafted",
+        insert: both.insert,
+        receipt: both.receipt ?? null,
+        working: both.working ?? [],
+      };
     }
     // A 200 that is not that shape is not a drafted claim, whatever else it is.
     // It used to be read as one — the body handed straight through as the edit —

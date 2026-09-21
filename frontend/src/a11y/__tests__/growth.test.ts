@@ -115,6 +115,7 @@ describe("the live region says what changed", () => {
       seconds: 1,
       mode: "replay",
       recording_date: "2026-09-17",
+      effort: "default",
       prompt_hash: "0".repeat(32),
     });
     expect(whatChanged(growth, withReceipt)).toBe("");

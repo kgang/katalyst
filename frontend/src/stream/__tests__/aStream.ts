@@ -279,6 +279,9 @@ export const RECEIPT: Receipt = {
   seconds: 512.4,
   mode: "live",
   recording_date: null,
+  // A live run asks for `medium`, which is the pinned default behind the one
+  // setting (Kent, G13). A recording is made at the service's own.
+  effort: "medium",
   prompt_hash: "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
 };
 
@@ -293,6 +296,7 @@ export const REPLAY_RECEIPT: Receipt = {
   dollars: 0,
   mode: "replay",
   recording_date: "2026-09-18",
+  effort: "default",
 };
 
 /** Why the run stopped, and how big the map ended up. */

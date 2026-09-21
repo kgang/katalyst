@@ -781,6 +781,9 @@ export const A_REAL_RUN = [
     seconds: 654.8896765419922,
     mode: "live",
     recording_date: null,
+    // The run was made before the receipt carried this, so the word is the one
+    // the field defaults to for a run that asked for nothing: the service's own.
+    effort: "default",
     prompt_hash: "93f859807d34b009f86c96f5ab59376ae122a665cf231a20de02a6560f68b087",
   },
   {

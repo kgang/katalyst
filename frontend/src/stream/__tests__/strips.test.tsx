@@ -84,7 +84,7 @@ describe("every refusal is on screen, in the validator's words", () => {
 });
 
 describe("the receipt", () => {
-  /** The nine labels, in the order the chapter prints them. */
+  /** The ten labels, in the order the chapter prints them. */
   const LABELS = [
     "model",
     "calls",
@@ -94,6 +94,7 @@ describe("the receipt", () => {
     "web searches",
     "cost",
     "took",
+    "how hard the model tried",
     "mode",
   ];
 
@@ -103,7 +104,7 @@ describe("the receipt", () => {
     const labels = [...container.querySelectorAll(".receipt-strip__label")].map(
       (one) => one.textContent,
     );
-    // Nine fields, each labelled, none omitted and none derived.
+    // Ten fields, each labelled, none omitted and none derived.
     expect(labels).toEqual(LABELS);
 
     const figures = [...container.querySelectorAll(".receipt-strip__reading")]
@@ -127,7 +128,7 @@ describe("the receipt", () => {
   });
 
   it("test_the_cost_is_drawn_in_one_place_and_the_panel_points_at_it", () => {
-    // The nine readings used to be drawn twice, one above the other in a
+    // The ten readings used to be drawn twice, one above the other in a
     // 320-pixel column: on the strip, and again in the panel's section for the
     // run. Two copies of one cost read as two costs, and the second was the one
     // no number on screen could be traced to.
@@ -214,6 +215,29 @@ describe("the receipt", () => {
     // A computed zero — the recording was played, nothing was called, nothing was
     // spent — printed rather than hidden.
     expect(cost?.textContent).toMatch(/^\$0\.0+$/);
+  });
+
+  it("test_the_strip_says_how_hard_the_model_tried", () => {
+    // **Two maps of the same sentence can differ because of this and for no
+    // other reason** — a recording is made at the service's own effort and a
+    // live run asks for `medium` (Kent, G13) — so a reader comparing one with
+    // the other has to be able to see which they are looking at. It is a plain
+    // word, the one the service takes, rather than a number this browser would
+    // have had to translate it into.
+    const live = render(<ReceiptStrip receipt={RECEIPT} />);
+    expect(
+      live.container.querySelector('[data-field="effort"] .receipt-strip__reading')?.textContent,
+    ).toBe(RECEIPT.effort);
+    expect(
+      live.container.querySelector('[data-field="effort"] .receipt-strip__label')?.textContent,
+    ).toBe("how hard the model tried");
+
+    const played = render(<ReceiptStrip receipt={REPLAY_RECEIPT} />);
+    expect(
+      played.container.querySelector('[data-field="effort"] .receipt-strip__reading')?.textContent,
+    ).toBe(REPLAY_RECEIPT.effort);
+    // And the two really do differ, or this test compares a word with itself.
+    expect(REPLAY_RECEIPT.effort).not.toBe(RECEIPT.effort);
   });
 
   it("test_the_mode_row_says_the_mode_and_the_day_and_nothing_else", () => {

@@ -294,6 +294,20 @@ export function Launchpad({ examples, failure, readiness, onOpen, onBuild }: Lau
             that example, so there is nothing it could honestly show you.
           </p>
         )}
+        {/* **A recording that would not play is named, in the server's own
+            sentence.** A reviewer who put a file in the recordings folder and
+            then counts three cards where they expected four is owed the reason
+            rather than left to wonder whether they put it in the wrong place —
+            and a recording is a committed file that outlives the code that
+            wrote it, so meeting one this engine cannot read is ordinary. It is
+            quiet, under the cards, because it is about the copy rather than
+            about the maps: the cards that do play are unaffected, which is the
+            other half of the same rule. */}
+        {(readiness?.unreadable ?? []).map((sentence) => (
+          <p className="launchpad__keyless launchpad__keyless--quiet" key={sentence}>
+            {sentence}
+          </p>
+        ))}
       </section>
 
       {/* A sentence of the reader's own. It is a section of its own rather than

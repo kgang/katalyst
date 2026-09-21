@@ -55,6 +55,7 @@ import { inFewWords, NOT_ON_THIS_MAP } from "../world/naming";
 import { toMovement, toReading, toShare, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
+import { TheWorking } from "./TheWorking";
 import "./inspector.css";
 
 /**
@@ -735,7 +736,7 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
  * also opens on the run behind them, which is neither, and so gets a section of
  * its own rather than being squeezed into one.
  *
- * **What it cost is not here.** The nine readings are drawn once, on the strip
+ * **What it cost is not here.** The ten readings are drawn once, on the strip
  * beside the map, and this section points at it. They used to be drawn in both
  * places, one above the other in a 320-pixel column, which reads to somebody
  * scrolling past as two costs — and the second copy was the one no number on
@@ -789,9 +790,9 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
           compared with anything.
         </p>
         <p className="inspector__reason">
-          {/* One cost, in one place. A panel that repeated the nine readings
+          {/* One cost, in one place. A panel that repeated the ten readings
               would be a second copy of a number nobody could point at. */}
-          What this run cost is on the strip beside the map, in nine readings, every one of them a
+          What this run cost is on the strip beside the map, in ten readings, every one of them a
           field the engine sent.
         </p>
       </Section>
@@ -811,31 +812,10 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
             <p className="inspector__reason">{working.reason}</p>
           </>
         ) : (
-          <ol className="inspector__transcript">
-            {working.transcript.lines.map((line, place) => (
-              <li
-                className="inspector__line"
-                // Two lines can genuinely carry the same words on different
-                // claims, and a stopped line has no place of its own, so its
-                // position in the list is the only stable name it has.
-                // biome-ignore lint/suspicious/noArrayIndexKey: the working arrives as one list from one answer and is never reordered, added to or removed.
-                key={`${place}-${line.at ?? "stopped"}`}
-                data-what={line.what}
-                data-open={line.at !== null && line.at === openAt ? "yes" : "no"}
-              >
-                <span className="inspector__line-at">{line.at === null ? "—" : line.at}</span>
-                <span className="inspector__line-what">{line.what}</span>
-                <span className="inspector__line-words">
-                  {line.in_words}
-                  {line.violations.map((violation) => (
-                    <span className="inspector__line-reason" key={violation.message}>
-                      {violation.message}
-                    </span>
-                  ))}
-                </span>
-              </li>
-            ))}
-          </ol>
+          // The same list an insert's working is drawn in, and the same
+          // component: a reader who has learned to read one has learned to
+          // read the other.
+          <TheWorking lines={working.transcript.lines} openAt={openAt} />
         )}
       </Section>
 

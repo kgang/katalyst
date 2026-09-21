@@ -28,6 +28,7 @@ const NO_KEY_ALL_FOUR: Readiness = {
     example: one.example,
     recording_date: "2026-09-18",
   })),
+  unreadable: [],
 };
 
 /** What the server says about itself when it has no key and one recording. */
@@ -38,10 +39,31 @@ const NO_KEY_ONE_RECORDING: Readiness = {
   status: "not_ready",
   model_key_present: false,
   replayable: [{ example: "hormuz", recording_date: "2026-09-18" }],
+  unreadable: [],
 };
 
 /** What it says when it has nothing at all. */
-const NOTHING: Readiness = { status: "not_ready", model_key_present: false, replayable: [] };
+const NOTHING: Readiness = {
+  status: "not_ready",
+  model_key_present: false,
+  replayable: [],
+  unreadable: [],
+};
+
+/**
+ * What it says when a file in the recordings folder could not be read.
+ *
+ * The one that could is still on the list and still plays: a bad file never
+ * hides the good ones, and it never hides itself either.
+ */
+const ONE_BAD_FILE: Readiness = {
+  status: "not_ready",
+  model_key_present: false,
+  replayable: [{ example: "hormuz", recording_date: "2026-09-18" }],
+  unreadable: [
+    "gulf-2026-08-02.jsonl could not be read: its header names no example, so there is nothing to offer it against.",
+  ],
+};
 
 /** Draw the first screen. */
 function draw(readiness: Readiness) {
@@ -145,6 +167,24 @@ describe("with no model key", () => {
     expect(screen.getByRole("button", { name: "Build the map" })).toBeDisabled();
   });
 
+  it("test_a_recording_that_would_not_play_is_named_and_hides_nothing", () => {
+    // A reviewer who put a file in the recordings folder and then counts three
+    // cards where they expected four is owed the reason, in the server's own
+    // sentence, rather than left to wonder whether they put it in the wrong
+    // place. It is quiet and under the cards, because it is about this copy
+    // rather than about any map.
+    const { container } = draw(ONE_BAD_FILE);
+    const said = ONE_BAD_FILE.unreadable[0] as string;
+    expect(screen.getByText(said)).toBeInTheDocument();
+    // The browser writes none of it: the whole sentence came from the server.
+    expect(container.textContent).toContain(said);
+
+    // **And the good file still plays.** A bad one never hides the others, so
+    // the card with a recording still offers its run.
+    const playing = container.querySelectorAll('[data-state="replay"]');
+    expect(playing).toHaveLength(1);
+  });
+
   it("test_the_map_that_is_already_drawn_still_opens", () => {
     draw(NOTHING);
     // The stored example needs no key and never did: it is a file on disk, and a
@@ -155,7 +195,12 @@ describe("with no model key", () => {
 
 describe("with a model key", () => {
   it("test_with_a_key_every_card_runs_live_and_nothing_says_replay", () => {
-    const { container } = draw({ status: "ready", model_key_present: true, replayable: [] });
+    const { container } = draw({
+      status: "ready",
+      model_key_present: true,
+      replayable: [],
+      unreadable: [],
+    });
 
     expect(container.querySelectorAll('[data-state="not-yet"]')).toHaveLength(0);
     expect(container.textContent).not.toContain("No model key configured");
