@@ -18,6 +18,18 @@ looking at — so a caller holding only a branch world cannot produce an edge at
 all. Where an edge cannot be built, it hands back a named refusal carrying the
 sentence the card prints and a break-even wherever one is defined.
 
+`draws.py` holds the one thing this layer asks of the engine: a sample of worlds
+carrying, per claim, the day it came on and the day it went off, with a weight per
+world. Everything else here is pure arithmetic over that shape. `paths.py` walks a
+daily price path through each drawn world, applying only a claim's **surprise** —
+what the market has not already priced — so the path invents no advantage of its
+own. `position.py` holds what the reader typed and answers how often their stop
+and their target are each reached first, with the correction a daily check needs
+and the refusal a contract gets. `lift.py` ranks the claims over-represented in
+the worlds where the stop went first. `ceiling.py` works out the greyed
+quartered-Kelly ceiling that sits beside the reader's own arithmetic under the
+words *never size to this*.
+
 What this layer must never do
 -----------------------------
 - Never compare a number from a world where an edit fixed something against a
@@ -29,8 +41,19 @@ What this layer must never do
   *difference*, computed out here and labelled as one — which is exactly why it is
   not in `katalyst.domain`.
 - Never change a map. It reads worlds and quotes, and builds an answer beside them.
+- Never derive the reader's stop, and never recommend a size.
+- Never report a number read off a sample of worlds without naming the sample.
 """
 
+from katalyst.thesis.ceiling import NEVER_SIZE_TO_THIS, Ceiling, ceiling_of
+from katalyst.thesis.draws import (
+    NEVER,
+    STILL_HOLDING,
+    Draws,
+    SampleFrom,
+    effective_draws,
+    weighted_share,
+)
 from katalyst.thesis.edge import (
     BreakEven,
     Edge,
@@ -40,13 +63,171 @@ from katalyst.thesis.edge import (
     priced,
     what_this_side_pays_on,
 )
+from katalyst.thesis.lift import (
+    Dropped,
+    DroppedBecause,
+    LiftRow,
+    WhatTakesYouOut,
+    what_takes_you_out,
+    wilson,
+)
+from katalyst.thesis.paths import ClaimMove, DecayShape, MarketChanceFrom, Paths, walk
+from katalyst.thesis.position import (
+    FirstTouch,
+    Position,
+    Refusal,
+    RefusalCode,
+    first_touch,
+    position_on,
+    what_the_form_refuses,
+    what_your_risk_budget_implies,
+)
 
 __all__ = [
+    "NEVER",
+    "NEVER_SIZE_TO_THIS",
+    "STILL_HOLDING",
     "BreakEven",
+    "Ceiling",
+    "ClaimMove",
+    "DecayShape",
+    "Draws",
+    "Dropped",
+    "DroppedBecause",
     "Edge",
+    "FirstTouch",
+    "LiftRow",
+    "MarketChanceFrom",
     "Mixture",
     "NotComparable",
     "NotComparableReason",
+    "Paths",
+    "Position",
+    "Refusal",
+    "RefusalCode",
+    "SampleFrom",
+    "WhatTakesYouOut",
+    "ceiling_of",
+    "effective_draws",
+    "first_touch",
+    "position_on",
     "priced",
+    "walk",
+    "weighted_share",
+    "what_takes_you_out",
+    "what_the_form_refuses",
     "what_this_side_pays_on",
+    "what_your_risk_budget_implies",
+    "wilson",
+]
+
+# --- The card and the export -------------------------------------------------
+# Added as one block at the end of this file rather than folded into the imports
+# above, so that two people building in this package at the same time never edit
+# the same line. `card.py` builds what the panel draws; `export.py` writes the
+# document a program reads, the page a person reads, and owns the committed
+# description of the document beside it. The imports sit below a statement, which
+# is why each one says the layout rule does not apply to it.
+from katalyst.thesis.card import (
+    Card,
+    Carried,
+    CeilingShown,
+    Figure,
+    Kind,
+    MixtureShown,
+    NotPriced,
+    NotRanked,
+    Owner,
+    PricedIn,
+    QuotedPrices,
+    RankedEnding,
+    Shift,
+    Shocked,
+    ShockRow,
+    Tail,
+    TailRow,
+    TakesYouOutRow,
+    TheTrade,
+    Unhedgeable,
+    UnhedgeableShown,
+    Watched,
+    WhatCarriesIt,
+    WhatElseCanITrade,
+    WhatIsPricedIn,
+    WhatTakesYouOutShown,
+    WhatThisDoesNotKnow,
+    WhatToWatch,
+    YourExit,
+    card_of,
+    what_else_can_i_trade,
+    where_the_numbers_came_from,
+)
+from katalyst.thesis.export import (
+    EXPORT_SCHEMA_FILE,
+    SCHEMA_NAME,
+    Conditions,
+    Export,
+    Hypothesis,
+    Leg,
+    RiskExit,
+    ShockExported,
+    Stamp,
+    as_it_is,
+    as_json,
+    as_markdown,
+    export_of,
+    say,
+    schema_json,
+    two_significant,
+)
+
+__all__ += [
+    "EXPORT_SCHEMA_FILE",
+    "SCHEMA_NAME",
+    "Card",
+    "Carried",
+    "CeilingShown",
+    "Conditions",
+    "Export",
+    "Figure",
+    "Hypothesis",
+    "Kind",
+    "Leg",
+    "MixtureShown",
+    "NotPriced",
+    "NotRanked",
+    "Owner",
+    "PricedIn",
+    "QuotedPrices",
+    "RankedEnding",
+    "RiskExit",
+    "Shift",
+    "ShockExported",
+    "ShockRow",
+    "Shocked",
+    "Stamp",
+    "Tail",
+    "TailRow",
+    "TakesYouOutRow",
+    "TheTrade",
+    "Unhedgeable",
+    "UnhedgeableShown",
+    "Watched",
+    "WhatCarriesIt",
+    "WhatElseCanITrade",
+    "WhatIsPricedIn",
+    "WhatTakesYouOutShown",
+    "WhatThisDoesNotKnow",
+    "WhatToWatch",
+    "YourExit",
+    "as_it_is",
+    "as_json",
+    "as_markdown",
+    "card_of",
+    "export_of",
+    "say",
+    "schema_json",
+    "two_significant",
+    "what_else_can_i_trade",
+    "where_the_numbers_came_from",
 ]

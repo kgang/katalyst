@@ -176,3 +176,24 @@ So **`Draws.weight` is real, not all ones**, and **the 200-draw floor counts *ef
 * `plans/analysis/2026-09-21-digest-finance.md` §2.2 (lift, the draw floor) and §2.3 (the ceiling as first proposed) · `plans/analysis/2026-09-21-red-team.md` S2 and S6 · `plans/analysis/2026-09-21-review-adr-06.md` (the reflection measurement, the lift correction, and must-fix 8, which named the double count) · `plans/analysis/2026-09-21-priced-in.md` (the simulation behind R28).
 * Related: **0013** (a payoff names the trade), **0018** (the edge, why a supposed world prices nothing, and the model-range threshold the ceiling reuses), **0020** (where a quote comes from, and the rule that a contract must ask the claim's own question), **0016** (the engine, whose weighted forward sample supplies the arrival days the giveback's schedule reads) and **0017** (a claim is an event or a state). Nothing else here depends on a number either of the last two states.
 * Measurement scripts: `plans/analysis/scripts/finance/check_stop_claims.py`, the review's `first_touch_reflection.py` beside it, and `plans/analysis/scripts/finance/priced-in/priced_in.py` with its saved output.
+
+---
+
+## Dated amendment — 2026-09-22: which number *the model's own chance* is
+
+**A coordinator's call under Kent's delegation, recorded as row R41 of `plans/notes/2026-09-21-decisions-after-review.md`. Not put to Kent, and not attributed to him.** Nothing above is rewritten; this is what changed and why.
+
+**What this record said.** Under *Where `q` comes from, in order*, where no venue quotes the claim: **the model's own number from the world with no fixed value in force** — the claim's printed likelihood, which this record elsewhere reads *on its own resolve-by day*.
+
+**Why it changed.** The same paragraph promises something that number does not deliver: *"With `q` from the model the base world's path carries no drift at all, so every point of advantage on a supposed screen came from what the reader supposed or observed."* A claim's resolve-by day and a trade's window are two different questions, so the printed likelihood leaves drift behind. The reviewer of the position's branch measured **+0.16 points** over a window on six hand-built worlds where the honest answer is nothing (`plans/analysis/2026-09-22-review-T2a.md`, item 5). The record stated a source and a guarantee that do not fit together, and the guarantee is the one the whole supposed-screen demonstration rests on.
+
+**What it is now.** Where no venue quotes the claim, the market's chance is **the weighted share of the drawn worlds in which the claim comes true inside the trade's window**, among the worlds where it was not already true when the window opened — a claim already true is in today's price, so the question does not arise for it. Under that number the weighted mean price is the entry price on **every** day, **exactly** rather than within a sampling error, which the branch now asserts as an identity rather than measuring.
+
+**What it costs.** One argument. The number is worked out from the sample the layer already reads (`the_sample_s_own_chance` in `backend/src/katalyst/thesis/paths.py`) rather than taken on trust, so no caller can hand in a different one by accident. Two consequences ride with it:
+
+* **The source list gains an entry.** *Where the chance came from* was `venue_quote | model | reader`; `model` splits into **`sample_share`** — this number — and **`base_world`** — the printed likelihood, still the right fallback where the sample carries no arrivals inside the window. A card that could not tell them apart could not say whether the number it is showing carries drift, and this record already requires the source in the same sentence as the number.
+* **A chance of one is now a chance.** The new definition legitimately comes out at exactly one — a claim that comes true in every drawn world the question arises for — and the layer refused that value. A certainty is already in today's price: there is no surprise to apply and nothing left to give back, so the claim moves the price by nothing, which the schedule names out loud.
+
+**What is unchanged.** A venue quote on the claim's own resolution test still comes first; the reader may still override and never must; and the three conditions of R28 — a level gap, additive moves in price units, and a chance of *this* claim's own test — all stand.
+
+**To overturn:** say so; it is one argument in `thesis/paths.py`.

@@ -1,0 +1,1404 @@
+{
+  "$defs": {
+    "CeilingShown": {
+      "description": "The greyed quartered-Kelly ceiling, and the words it is always shown under.\n\nA ceiling, never a size. The only number that sets a size is the reader's own\nrisk budget. **Zero and absent are different answers** and this shape says\nwhich: a fraction of zero means the arithmetic ran and came out at nothing to\nput on; nothing at all means there was no edge to run it on.",
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The likelihood it was worked out at: the unfavourable end of the model's range."
+        },
+        "fraction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The share of capital, quartered, at the unfavourable end of the model's range."
+        },
+        "sentence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why the answer is zero, or why it is absent. Nothing where a fraction came out.",
+          "title": "Sentence"
+        },
+        "taken_by": {
+          "anyOf": [
+            {
+              "enum": [
+                "buying",
+                "selling"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which side of the venue's book it was worked out for.",
+          "title": "Taken By"
+        },
+        "warning": {
+          "description": "The words the number is always shown under.",
+          "title": "Warning",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fraction",
+        "taken_by",
+        "at",
+        "warning",
+        "sentence"
+      ],
+      "title": "CeilingShown",
+      "type": "object"
+    },
+    "Conditions": {
+      "description": "The computed lists, each row carrying what it rests on.\n\nThese are the conditions the legs above hold under: what carries them, what\ntakes the reader out, what to watch and by when, what cannot be watched for,\nthe tails, and any shock the reader placed.",
+      "properties": {
+        "carried_by": {
+          "description": "The claims whose arrows carry most of the hypothesis's effect on the ending.",
+          "items": {
+            "$ref": "#/$defs/WhatCarriesIt"
+          },
+          "title": "Carried By",
+          "type": "array"
+        },
+        "shocks": {
+          "description": "Suppositions the reader placed, each with no probability.",
+          "items": {
+            "$ref": "#/$defs/ShockExported"
+          },
+          "title": "Shocks",
+          "type": "array"
+        },
+        "tails": {
+          "description": "Claims that are unlikely and would hurt, ranked by harm and never averaged.",
+          "items": {
+            "$ref": "#/$defs/TailRow"
+          },
+          "title": "Tails",
+          "type": "array"
+        },
+        "takes_you_out": {
+          "$ref": "#/$defs/WhatTakesYouOutShown",
+          "description": "The claims over-represented in the worlds where the stop went first."
+        },
+        "unhedgeable": {
+          "description": "What is adverse and cannot be watched for, each with its reason.",
+          "items": {
+            "$ref": "#/$defs/UnhedgeableShown"
+          },
+          "title": "Unhedgeable",
+          "type": "array"
+        },
+        "watch": {
+          "description": "What is adverse, resolves before the ending, and can be seen by anybody.",
+          "items": {
+            "$ref": "#/$defs/WhatToWatch"
+          },
+          "title": "Watch",
+          "type": "array"
+        }
+      },
+      "required": [
+        "carried_by",
+        "takes_you_out",
+        "watch",
+        "unhedgeable",
+        "tails",
+        "shocks"
+      ],
+      "title": "Conditions",
+      "type": "object"
+    },
+    "Figure": {
+      "description": "One number on the card, with who it belongs to and where it came from.\n\nThe card holds no bare numbers. A figure cannot be built without an owner, so\nno screen and no document can print one without being handed the owner in the\nsame breath \u2014 which is the shape this repository prefers to a rule a renderer\nhas to remember.\n\n`lo` and `hi` are the range around the number where one exists: the model's\nown stated range on a likelihood, or the interval on a measured share. They\nare absent where no range was stated, which is different from a range of zero\nwidth.",
+      "properties": {
+        "about": {
+          "description": "What the number is, in plain words a reader needs no other page to follow.",
+          "title": "About",
+          "type": "string"
+        },
+        "hi": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The top of that range. Absent together with `lo`.",
+          "title": "Hi"
+        },
+        "kind": {
+          "description": "What the number is, which decides how it is written: a likelihood and a share carry a guard word at each end, a move keeps its two figures however small, and a price, a count and a day are written as they are.",
+          "enum": [
+            "likelihood",
+            "share",
+            "move",
+            "size",
+            "ratio",
+            "price",
+            "count",
+            "days"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "lo": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The bottom of the range around this number, where one was stated.",
+          "title": "Lo"
+        },
+        "owner": {
+          "description": "Whose number this is: the reader's, the model's, a venue's, or a computation over the drawn worlds. Exactly one of the four, and never a merge.",
+          "enum": [
+            "reader",
+            "model",
+            "venue",
+            "computed"
+          ],
+          "title": "Owner",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Where it came from, where that is not obvious from the owner: the venue and the day a price was read, the sample a share was taken over, the rule a ranking used. Nothing at all for a number the reader typed.",
+          "title": "Source"
+        },
+        "value": {
+          "description": "The number itself, at full precision. A rendering rounds.",
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "kind",
+        "owner",
+        "about"
+      ],
+      "title": "Figure",
+      "type": "object"
+    },
+    "Hypothesis": {
+      "description": "The claim the map starts from.",
+      "properties": {
+        "claim": {
+          "description": "The claim, in one sentence.",
+          "title": "Claim",
+          "type": "string"
+        },
+        "id": {
+          "description": "Its identifier on the map.",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "claim"
+      ],
+      "title": "Hypothesis",
+      "type": "object"
+    },
+    "Leg": {
+      "description": "One position, with everything a reader of this document needs about it.\n\nA leg is complete on its own: what is traded, which way, what the model says,\nwhat a venue charges, the two edges or the named refusal, the break-even, the\nsize the reader's own risk budget implies, and the greyed ceiling with its\nlabel attached. A program that reads a leg should not have to look anywhere\nelse to know what it may and may not do with the numbers in it.\n\nOne leg is what this version builds, because one position is what the reader\nholds. The field is a list so that two positions are two legs rather than a\ndifferent document.",
+      "properties": {
+        "ceiling": {
+          "$ref": "#/$defs/CeilingShown",
+          "description": "The greyed quartered-Kelly ceiling, carried as a value with its label attached, so a program that reads the number reads *never size to this* with it."
+        },
+        "claim": {
+          "description": "That ending's claim, in one sentence.",
+          "title": "Claim",
+          "type": "string"
+        },
+        "contract_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The venue's own identifier for that contract.",
+          "title": "Contract Id"
+        },
+        "contract_side": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which outcome of the contract the ending takes.",
+          "title": "Contract Side"
+        },
+        "ending": {
+          "description": "The ending this leg is on.",
+          "title": "Ending",
+          "type": "string"
+        },
+        "instrument": {
+          "description": "What is bought or sold, named the way its venue names it.",
+          "title": "Instrument",
+          "type": "string"
+        },
+        "priced_in": {
+          "description": "The model's number, a venue's two prices and the two edges \u2014 or the named refusal and the break-even that stands where no edge could be built.",
+          "discriminator": {
+            "mapping": {
+              "not_priced": "#/$defs/NotPriced",
+              "priced": "#/$defs/PricedIn"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PricedIn"
+            },
+            {
+              "$ref": "#/$defs/NotPriced"
+            }
+          ],
+          "title": "Priced In"
+        },
+        "resolution_test": {
+          "description": "The test that settles it, word for word.",
+          "title": "Resolution Test",
+          "type": "string"
+        },
+        "resolved_by": {
+          "description": "Who applies that test.",
+          "title": "Resolved By",
+          "type": "string"
+        },
+        "resolves": {
+          "description": "The day the ending's own claim is judged.",
+          "format": "date",
+          "title": "Resolves",
+          "type": "string"
+        },
+        "side": {
+          "description": "Which way the trade is pointed.",
+          "enum": [
+            "long",
+            "short"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "size": {
+          "$ref": "#/$defs/Figure",
+          "description": "The share of capital the reader's own risk budget implies. Their rule's arithmetic, and never a recommendation."
+        },
+        "trades": {
+          "description": "Whether it names something traded whose price moves, or a contract.",
+          "enum": [
+            "instrument",
+            "contract"
+          ],
+          "title": "Trades",
+          "type": "string"
+        },
+        "venue": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The venue, where the ending names a contract.",
+          "title": "Venue"
+        }
+      },
+      "required": [
+        "ending",
+        "claim",
+        "trades",
+        "instrument",
+        "side",
+        "venue",
+        "contract_id",
+        "contract_side",
+        "resolves",
+        "resolution_test",
+        "resolved_by",
+        "priced_in",
+        "size",
+        "ceiling"
+      ],
+      "title": "Leg",
+      "type": "object"
+    },
+    "MixtureShown": {
+      "description": "How a supposed reading relates to the unsupposed one \u2014 an explanation, never a sum.\n\nAfter *Suppose this is true* the reader sees the ending's number re-worked in a\nworld where the supposition holds, beside an edge computed from the world where\nnothing was supposed. These are the terms relating the two: the map's own\nchance of the supposition times the reading where it holds, plus one minus that\nchance times the reading where it does not.\n\n**The two terms do not add up to the unsupposed number and nothing here claims\nthey do.** A cause of the supposed claim may reach the ending another way, and\nsupposing something pins a **date** as well as a truth while the unsupposed\nworld averages over the days it might have happened. So these are four numbers\nshown term by term, and nothing computes an edge from them.",
+      "properties": {
+        "reading_otherwise": {
+          "$ref": "#/$defs/Figure",
+          "description": "The ending's likelihood where that same claim goes the other way."
+        },
+        "reading_supposed": {
+          "$ref": "#/$defs/Figure",
+          "description": "The ending's likelihood in the world the reader is looking at."
+        },
+        "says": {
+          "description": "What these terms are, and what they are not.",
+          "title": "Says",
+          "type": "string"
+        },
+        "supposed": {
+          "description": "The claim the reader supposed.",
+          "title": "Supposed",
+          "type": "string"
+        },
+        "weight_otherwise": {
+          "$ref": "#/$defs/Figure",
+          "description": "One minus it. The two always sum to one."
+        },
+        "weight_supposed": {
+          "$ref": "#/$defs/Figure",
+          "description": "The map's own chance of that claim coming out the way they supposed it."
+        }
+      },
+      "required": [
+        "supposed",
+        "weight_supposed",
+        "weight_otherwise",
+        "reading_supposed",
+        "reading_otherwise",
+        "says"
+      ],
+      "title": "MixtureShown",
+      "type": "object"
+    },
+    "NotPriced": {
+      "description": "What is priced in, where an edge could not be built \u2014 a named refusal and a break-even.\n\nA refusal is a value and never a blank. Where the ending names a contract, the\nbreak-even comes with it, because it needs no quote and is the honest answer\nwhen there is none. Where the ending names an instrument, the break-even is a\n**price** rather than a likelihood, and the reader's own entry price is what\nmakes it computable.",
+      "properties": {
+        "because": {
+          "description": "Which of the four refusals this is.",
+          "enum": [
+            "conditional_world",
+            "no_contract",
+            "no_quote",
+            "settled_market"
+          ],
+          "title": "Because",
+          "type": "string"
+        },
+        "buy_below": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Worth buying below this, where the ending names a contract."
+        },
+        "costs_are_unknown": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Said out loud where nobody has stated what it costs to get in and out of the instrument, so the price above is the entry price itself.",
+          "title": "Costs Are Unknown"
+        },
+        "fee": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The venue's fee, where anybody has read it. Nothing at all where nobody has."
+        },
+        "fee_is_unknown": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Said out loud where nobody has read the fee schedule; nothing otherwise.",
+          "title": "Fee Is Unknown"
+        },
+        "kind": {
+          "const": "not_priced",
+          "default": "not_priced",
+          "title": "Kind",
+          "type": "string"
+        },
+        "price_break_even": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The price at which a position in an instrument is worth nothing: the reader's own entry price moved by what it costs to get in and out. Nothing at all where the ending names a contract, which has a break-even in likelihoods instead."
+        },
+        "sell_above": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Worth selling above this, where the ending names a contract."
+        },
+        "sentence": {
+          "description": "What the card prints, in plain words a reader can act on.",
+          "title": "Sentence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "because",
+        "sentence",
+        "fee",
+        "fee_is_unknown",
+        "buy_below",
+        "sell_above",
+        "price_break_even",
+        "costs_are_unknown"
+      ],
+      "title": "NotPriced",
+      "type": "object"
+    },
+    "NotRanked": {
+      "description": "One tradeable ending the ranking leaves out, and why.\n\nSaid out loud rather than quietly missing, because *this ending is not ranked*\nand *this ending was never considered* are different facts and a reader can act\non only one of them.",
+      "properties": {
+        "because": {
+          "description": "Which of the three reasons it was.",
+          "enum": [
+            "inside_the_model_range",
+            "no_edge",
+            "no_shift"
+          ],
+          "title": "Because",
+          "type": "string"
+        },
+        "ending": {
+          "description": "The ending left out.",
+          "title": "Ending",
+          "type": "string"
+        },
+        "says": {
+          "description": "Its claim, in one sentence.",
+          "title": "Says",
+          "type": "string"
+        },
+        "sentence": {
+          "description": "What the card prints beside it.",
+          "title": "Sentence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ending",
+        "says",
+        "because",
+        "sentence"
+      ],
+      "title": "NotRanked",
+      "type": "object"
+    },
+    "PricedIn": {
+      "description": "What is priced in, where a venue quotes this claim and an edge could be built.\n\nThe card shows whichever side is worth taking. When neither is, that is a\ncomplete answer rather than a gap: the number this side pays on sits inside the\nvenue's own bid and offer with fees paid.",
+      "properties": {
+        "buy_below": {
+          "$ref": "#/$defs/Figure",
+          "description": "Worth buying at any offer below this."
+        },
+        "buying": {
+          "$ref": "#/$defs/Figure",
+          "description": "What buying is worth, at the offer, after the fee."
+        },
+        "fee": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the venue charges on one filled trade, in the same units as a price. Nothing at all means nobody has read the venue's schedule, which is not the same as a fee of nothing."
+        },
+        "fee_is_unknown": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Said out loud where nobody has read the fee schedule; nothing otherwise.",
+          "title": "Fee Is Unknown"
+        },
+        "headline": {
+          "description": "Which side the card leads with, or that neither is worth taking.",
+          "enum": [
+            "buying",
+            "selling",
+            "no_edge_at_this_price"
+          ],
+          "title": "Headline",
+          "type": "string"
+        },
+        "kind": {
+          "const": "priced",
+          "default": "priced",
+          "title": "Kind",
+          "type": "string"
+        },
+        "mixture": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MixtureShown"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The terms relating a supposed reading to this one, where the reader supposed something and the other world was worked out. An explanation that never computes the edge. Nothing at all otherwise."
+        },
+        "model": {
+          "$ref": "#/$defs/Figure",
+          "description": "The claim's own likelihood \u2014 the chance it comes true \u2014 read from the map with nothing fixed by an edit."
+        },
+        "not_headlined_because": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why a positive edge is not led with: the gap is narrower than the venue's smallest price step, or it is inside the model's own stated range.",
+          "title": "Not Headlined Because"
+        },
+        "pays_on": {
+          "$ref": "#/$defs/Figure",
+          "description": "The likelihood this side of the contract actually pays on. The same number on a yes side; one minus it, range turned over, on a no side."
+        },
+        "quote": {
+          "$ref": "#/$defs/QuotedPrices",
+          "description": "The venue's two prices and the day they were read."
+        },
+        "sell_above": {
+          "$ref": "#/$defs/Figure",
+          "description": "Worth selling at any bid above this."
+        },
+        "selling": {
+          "$ref": "#/$defs/Figure",
+          "description": "What selling is worth, at the bid, after the fee."
+        }
+      },
+      "required": [
+        "model",
+        "pays_on",
+        "quote",
+        "fee",
+        "fee_is_unknown",
+        "buying",
+        "selling",
+        "headline",
+        "not_headlined_because",
+        "buy_below",
+        "sell_above",
+        "mixture"
+      ],
+      "title": "PricedIn",
+      "type": "object"
+    },
+    "QuotedPrices": {
+      "description": "What a venue is showing, and when it was read.\n\nA price the reader typed is **theirs**, not a venue's: it is their report of a\nprice they believe they could deal at, and it never fills the market's slot. So\nthe three figures below are owned by a venue on a quote a venue gave and by the\nreader on one they typed, and the card says which on the same line as the\nnumber.",
+      "properties": {
+        "bid": {
+          "$ref": "#/$defs/Figure",
+          "description": "The best bid: the price you would sell at."
+        },
+        "how": {
+          "description": "How it reached us: read now, read from a committed file, or typed.",
+          "title": "How",
+          "type": "string"
+        },
+        "midpoint": {
+          "$ref": "#/$defs/Figure",
+          "description": "Halfway between the two, shown because a reader recognises it and never traded at."
+        },
+        "offer": {
+          "$ref": "#/$defs/Figure",
+          "description": "The best offer: the price you would buy at."
+        },
+        "read_on": {
+          "description": "The day it was read.",
+          "format": "date",
+          "title": "Read On",
+          "type": "string"
+        },
+        "venue": {
+          "description": "Which venue published it, or that the reader entered it.",
+          "title": "Venue",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bid",
+        "offer",
+        "midpoint",
+        "venue",
+        "read_on",
+        "how"
+      ],
+      "title": "QuotedPrices",
+      "type": "object"
+    },
+    "RankedEnding": {
+      "description": "One tradeable ending in the ranking, and which rule put it there.",
+      "properties": {
+        "ending": {
+          "description": "The ending.",
+          "title": "Ending",
+          "type": "string"
+        },
+        "headline": {
+          "description": "Whether this row may be led with, or only listed.",
+          "title": "Headline",
+          "type": "boolean"
+        },
+        "instrument": {
+          "description": "What would be bought or sold, or the contract's identifier.",
+          "title": "Instrument",
+          "type": "string"
+        },
+        "key": {
+          "$ref": "#/$defs/Figure",
+          "description": "The number that rule ranked it on."
+        },
+        "made_of": {
+          "description": "The numbers the key is made of, so it can say why it is what it is.",
+          "items": {
+            "$ref": "#/$defs/Figure"
+          },
+          "title": "Made Of",
+          "type": "array"
+        },
+        "not_headlined_because": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why it may not be led with. Nothing where it may.",
+          "title": "Not Headlined Because"
+        },
+        "ranked_by": {
+          "description": "Which of the two rules ranked this row. Never a blend of the two.",
+          "enum": [
+            "the_size_of_its_edge",
+            "the_shift_times_the_move"
+          ],
+          "title": "Ranked By",
+          "type": "string"
+        },
+        "says": {
+          "description": "Its claim, in one sentence.",
+          "title": "Says",
+          "type": "string"
+        },
+        "trades": {
+          "description": "Whether it names something traded or a contract.",
+          "enum": [
+            "instrument",
+            "contract"
+          ],
+          "title": "Trades",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ending",
+        "says",
+        "trades",
+        "instrument",
+        "ranked_by",
+        "key",
+        "made_of",
+        "headline",
+        "not_headlined_because"
+      ],
+      "title": "RankedEnding",
+      "type": "object"
+    },
+    "RiskExit": {
+      "description": "What the reader typed about getting out, and how often each end is reached first.\n\nThe size their risk budget implies and the greyed ceiling are **not** here:\nthey are on the leg, because a leg has to be complete on its own.",
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/Figure",
+          "description": "The price they entered at."
+        },
+        "first_touch_refused": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why there is no first touch here. Nothing where the shares were worked out.",
+          "title": "First Touch Refused"
+        },
+        "horizon": {
+          "description": "The day by which they expect to be out.",
+          "format": "date",
+          "title": "Horizon",
+          "type": "string"
+        },
+        "method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the shares were arrived at.",
+          "title": "Method"
+        },
+        "neither": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How often the window closes with neither touched. The three sum to one."
+        },
+        "risk_budget": {
+          "$ref": "#/$defs/Figure",
+          "description": "The share of capital they are prepared to lose here."
+        },
+        "stop": {
+          "$ref": "#/$defs/Figure",
+          "description": "The price at which they get out for a loss. Never derived."
+        },
+        "stop_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The level actually checked for the stop, after the barrier shift."
+        },
+        "stop_first": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How often the stop is touched before the target, over the drawn worlds."
+        },
+        "target": {
+          "$ref": "#/$defs/Figure",
+          "description": "The price at which they get out for a gain. Never derived."
+        },
+        "target_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The same, for the target."
+        },
+        "target_first": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How often the target is touched first."
+        },
+        "through": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many days of the window the shares were read to: the reader's own horizon, counted from the day the window opened. Shares over a window nobody named are numbers nobody can check."
+        }
+      },
+      "required": [
+        "entry",
+        "stop",
+        "target",
+        "horizon",
+        "risk_budget",
+        "stop_first",
+        "target_first",
+        "neither",
+        "stop_at",
+        "target_at",
+        "through",
+        "first_touch_refused",
+        "method"
+      ],
+      "title": "RiskExit",
+      "type": "object"
+    },
+    "ShockExported": {
+      "description": "A shock the reader placed, with its probability written down as nothing at all.\n\nThe field exists and is fixed at nothing. An absent field reads as an\noversight; a field that says *null* says that nobody claims to know, which is\nthe truth: the reader supposed this, and supposing something is not a statement\nabout how likely it is.",
+      "properties": {
+        "change_to_the_position": {
+          "$ref": "#/$defs/Figure",
+          "description": "What the position is worth on that branch less what it is worth without it."
+        },
+        "name": {
+          "description": "What they supposed, in their own words.",
+          "title": "Name",
+          "type": "string"
+        },
+        "placed_by": {
+          "const": "reader",
+          "description": "Who placed it. Always the reader.",
+          "title": "Placed By",
+          "type": "string"
+        },
+        "probability": {
+          "description": "Always nothing at all. A shock is supposed, not forecast, and this document will not carry a number here.",
+          "title": "Probability",
+          "type": "null"
+        },
+        "says": {
+          "description": "Why there is no probability here.",
+          "title": "Says",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "placed_by",
+        "probability",
+        "change_to_the_position",
+        "says"
+      ],
+      "title": "ShockExported",
+      "type": "object"
+    },
+    "Stamp": {
+      "description": "The three things a card can be rebuilt from, plus the day it was worked out for.\n\nA world is a computed result and never a source of truth: it can always be\nthrown away and rebuilt from the base map, the branch and the seed. Stamping\nthem here is what makes the document replayable rather than merely readable.",
+      "properties": {
+        "as_of": {
+          "description": "The first day of the window the numbers were worked out over.",
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "base_id": {
+          "description": "The map this was built from.",
+          "title": "Base Id",
+          "type": "string"
+        },
+        "branch_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The branch folded on, or nothing at all for the untouched map.",
+          "title": "Branch Id"
+        },
+        "seed": {
+          "description": "The one number every random draw behind this came from.",
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "base_id",
+        "branch_id",
+        "seed",
+        "as_of"
+      ],
+      "title": "Stamp",
+      "type": "object"
+    },
+    "TailRow": {
+      "description": "One tail: unlikely, and enough to hurt. Never averaged into anything.",
+      "properties": {
+        "claim": {
+          "description": "The unlikely claim.",
+          "title": "Claim",
+          "type": "string"
+        },
+        "harm": {
+          "$ref": "#/$defs/Figure",
+          "description": "What it would do to the position, as a loss."
+        },
+        "likelihood": {
+          "$ref": "#/$defs/Figure",
+          "description": "The model's own chance of it, range and all."
+        },
+        "says": {
+          "description": "Its claim, in one sentence.",
+          "title": "Says",
+          "type": "string"
+        },
+        "what_could_be_done": {
+          "description": "What a reader could do about it, or why nothing can.",
+          "title": "What Could Be Done",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim",
+        "says",
+        "likelihood",
+        "harm",
+        "what_could_be_done"
+      ],
+      "title": "TailRow",
+      "type": "object"
+    },
+    "TakesYouOutRow": {
+      "description": "One claim over-represented in the worlds where the stop went first.\n\n**Company, not cause.** A claim can be over-represented in the worlds that\nstopped the reader out because it shares a cause with whatever did. The map\nbeside the card is where the mechanism lives.",
+      "properties": {
+        "came_on": {
+          "$ref": "#/$defs/Figure",
+          "description": "The share of all the drawn worlds where it came on at all."
+        },
+        "came_on_first": {
+          "$ref": "#/$defs/Figure",
+          "description": "The share of the stop-first worlds where this claim had already come on before the stop was touched, with the interval on that share."
+        },
+        "claim": {
+          "description": "The claim.",
+          "title": "Claim",
+          "type": "string"
+        },
+        "coverage": {
+          "$ref": "#/$defs/Figure",
+          "description": "How often the interval on the share above is meant to cover its true share. A figure rather than words inside a sentence, so that it cannot be printed without saying whose number it is."
+        },
+        "days_before_the_stop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Figure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The typical days between this claim coming on and the stop being touched. **Nothing at all** where no drawn world had it come on before the stop, which is an absence and never a day count of nothing."
+        },
+        "draws": {
+          "$ref": "#/$defs/Figure",
+          "description": "How many equally-weighted worlds the share above is worth."
+        },
+        "lift": {
+          "$ref": "#/$defs/Figure",
+          "description": "How much more often this claim had already come on where the stop went first than it came on across all the drawn worlds. Three means three times as often; one means it tells you nothing. No interval, because no coverage is claimed for a ratio of two shares over overlapping sets."
+        },
+        "no_days_because": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why there is no day count, in plain words. Nothing where there is one.",
+          "title": "No Days Because"
+        },
+        "says": {
+          "description": "Its claim, in one sentence.",
+          "title": "Says",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim",
+        "says",
+        "lift",
+        "came_on_first",
+        "came_on",
+        "draws",
+        "days_before_the_stop",
+        "no_days_because",
+        "coverage"
+      ],
+      "title": "TakesYouOutRow",
+      "type": "object"
+    },
+    "UnhedgeableShown": {
+      "description": "One adverse turn nothing can warn the reader about, with the reason.",
+      "properties": {
+        "can_be_seen": {
+          "description": "Whether anybody publishes the answer at all.",
+          "title": "Can Be Seen",
+          "type": "boolean"
+        },
+        "claim": {
+          "description": "The claim.",
+          "title": "Claim",
+          "type": "string"
+        },
+        "resolves": {
+          "description": "The day it is judged.",
+          "format": "date",
+          "title": "Resolves",
+          "type": "string"
+        },
+        "says": {
+          "description": "Its claim, in one sentence.",
+          "title": "Says",
+          "type": "string"
+        },
+        "why": {
+          "description": "Why it cannot be watched for.",
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim",
+        "says",
+        "why",
+        "resolves",
+        "can_be_seen"
+      ],
+      "title": "UnhedgeableShown",
+      "type": "object"
+    },
+    "WhatCarriesIt": {
+      "description": "One row of *what carries it*: a claim, and how much of the effect its arrows carry.",
+      "properties": {
+        "claim": {
+          "description": "The claim.",
+          "title": "Claim",
+          "type": "string"
+        },
+        "points": {
+          "$ref": "#/$defs/Figure",
+          "description": "How much of the shift this claim accounts for."
+        },
+        "says": {
+          "description": "Its claim, in one sentence.",
+          "title": "Says",
+          "type": "string"
+        },
+        "share": {
+          "$ref": "#/$defs/Figure",
+          "description": "What part of the whole shift that is."
+        }
+      },
+      "required": [
+        "claim",
+        "says",
+        "points",
+        "share"
+      ],
+      "title": "WhatCarriesIt",
+      "type": "object"
+    },
+    "WhatElseCanITrade": {
+      "description": "Every tradeable ending on the map, ranked \u2014 by two rules, kept apart.\n\nTwo lists rather than one because an edge in cents and a move in per cent are\nnot the same quantity and there is no honest exchange rate between them. Each\nlist is ordered within itself; no row is ever ordered against a row in the\nother.",
+      "properties": {
+        "by_the_shift_times_the_move": {
+          "description": "Endings naming an instrument, largest shift times move first.",
+          "items": {
+            "$ref": "#/$defs/RankedEnding"
+          },
+          "title": "By The Shift Times The Move",
+          "type": "array"
+        },
+        "by_the_size_of_its_edge": {
+          "description": "Endings a venue quotes, best edge first, whichever side it favours.",
+          "items": {
+            "$ref": "#/$defs/RankedEnding"
+          },
+          "title": "By The Size Of Its Edge",
+          "type": "array"
+        },
+        "not_ranked": {
+          "description": "Tradeable endings neither rule could rank, each with its reason.",
+          "items": {
+            "$ref": "#/$defs/NotRanked"
+          },
+          "title": "Not Ranked",
+          "type": "array"
+        },
+        "two_rules": {
+          "description": "Why there are two lists, said on the card itself.",
+          "title": "Two Rules",
+          "type": "string"
+        }
+      },
+      "required": [
+        "by_the_size_of_its_edge",
+        "by_the_shift_times_the_move",
+        "not_ranked",
+        "two_rules"
+      ],
+      "title": "WhatElseCanITrade",
+      "type": "object"
+    },
+    "WhatTakesYouOutShown": {
+      "description": "The rail: the rows, what was left off it, and what the numbers rest on.",
+      "properties": {
+        "draws": {
+          "$ref": "#/$defs/Figure",
+          "description": "How many equally-weighted worlds the whole rail rests on."
+        },
+        "floor": {
+          "$ref": "#/$defs/Figure",
+          "description": "The fewest equally-weighted worlds a row may rest on."
+        },
+        "left_off": {
+          "description": "Every claim the rail leaves off, with its reason, in full sentences.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Left Off",
+          "type": "array"
+        },
+        "rows": {
+          "description": "The claims, ranked by lift, highest first. Empty where the draws are too few.",
+          "items": {
+            "$ref": "#/$defs/TakesYouOutRow"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "sample_says": {
+          "description": "Which sample these worlds came from and where the market's chance of each claim came from, in one sentence, said once for the whole section rather than on every line of it.",
+          "title": "Sample Says",
+          "type": "string"
+        },
+        "stop_first_worlds": {
+          "$ref": "#/$defs/Figure",
+          "description": "How many drawn worlds ended with the stop touched first, before weighting."
+        },
+        "too_few_draws": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why the rail is empty, where it is empty because the draws behind it are too few. An empty rail without this reads as *nothing takes you out*.",
+          "title": "Too Few Draws"
+        }
+      },
+      "required": [
+        "rows",
+        "left_off",
+        "too_few_draws",
+        "draws",
+        "stop_first_worlds",
+        "floor",
+        "sample_says"
+      ],
+      "title": "WhatTakesYouOutShown",
+      "type": "object"
+    },
+    "WhatToWatch": {
+      "description": "One adverse turn to keep an eye on \u2014 and never a stop.",
+      "properties": {
+        "claim": {
+          "description": "The claim to watch.",
+          "title": "Claim",
+          "type": "string"
+        },
+        "hurts_by": {
+          "$ref": "#/$defs/Figure",
+          "description": "How far it moves the ending against the reader's side."
+        },
+        "observed_by": {
+          "description": "Who publishes the answer.",
+          "title": "Observed By",
+          "type": "string"
+        },
+        "resolves": {
+          "description": "The day it is judged, which is before the ending's own.",
+          "format": "date",
+          "title": "Resolves",
+          "type": "string"
+        },
+        "says": {
+          "description": "Its claim, in one sentence.",
+          "title": "Says",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim",
+        "says",
+        "resolves",
+        "observed_by",
+        "hurts_by"
+      ],
+      "title": "WhatToWatch",
+      "type": "object"
+    }
+  },
+  "description": "The whole document: legs, conditions, the exit, and the limits carried as data.",
+  "properties": {
+    "conditions": {
+      "$ref": "#/$defs/Conditions",
+      "description": "The computed lists the legs hold under."
+    },
+    "execution": {
+      "description": "The one thing this product says about getting out, and nothing else.",
+      "title": "Execution",
+      "type": "string"
+    },
+    "hypothesis": {
+      "$ref": "#/$defs/Hypothesis"
+    },
+    "legs": {
+      "description": "One position, complete on its own.",
+      "items": {
+        "$ref": "#/$defs/Leg"
+      },
+      "title": "Legs",
+      "type": "array"
+    },
+    "map": {
+      "$ref": "#/$defs/Stamp",
+      "description": "The map, the branch, the seed and the day, so it replays."
+    },
+    "not_advice": {
+      "description": "What this document is not, in one line.",
+      "title": "Not Advice",
+      "type": "string"
+    },
+    "refuses": {
+      "description": "What this document does not know, in full sentences, carried as data. Never empty: a document with no limits is a claim nobody on this map may make.",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Refuses",
+      "type": "array"
+    },
+    "risk_exit": {
+      "$ref": "#/$defs/RiskExit",
+      "description": "What the reader typed about getting out."
+    },
+    "schema": {
+      "const": "katalyst.thesis/1",
+      "description": "What this document calls itself, so a program knows what it has.",
+      "title": "Schema",
+      "type": "string"
+    },
+    "what_else": {
+      "$ref": "#/$defs/WhatElseCanITrade",
+      "description": "Every tradeable ending on the map, ranked by two rules kept apart."
+    }
+  },
+  "required": [
+    "schema",
+    "map",
+    "hypothesis",
+    "legs",
+    "conditions",
+    "risk_exit",
+    "what_else",
+    "refuses",
+    "not_advice",
+    "execution"
+  ],
+  "title": "Export",
+  "type": "object"
+}
