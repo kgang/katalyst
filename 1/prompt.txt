@@ -688,3 +688,34 @@ Drafts written: `plans/notes/msgs/pr-06-position-body.md`, `merge-06-position.tx
 Chapter marks the tails rule **proposed, for Kent**. ruff, format, mypy strict clean; 116 tests; `card.py` and `export.py` 100% statements and branches.</result>
 <usage><subagent_tokens>484932</subagent_tokens><tool_uses>67</tool_uses><duration_ms>1130744</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ace5bdcb8b3b8f796</task-id>
+<tool-use-id>toolu_01XbX1DMxRT26RtSXU1J3eWe</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ace5bdcb8b3b8f796.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer D: states" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Applied, plus one design change the new field forces.
+
+**Fixed.** `some_shapes` now passes `edges=window.edges, middle_day=window.middle_day`.
+
+**Changed in `states.py`:** `on_and_off` and `_ending_pushes` **lost the `window` argument**. The state's off-rate accrues from the middle of its *own* slice, which is now `ClaimShapes.middle_day`. A's two call sites passed *different* windows — `window=window` (`forward.py:405`, the map's) and `window=mine` (`:516`) — so one was reading another claim's grid.
+
+**Owed in `forward.py` (not mine):** delete `window=window,` at `:405` and `window=mine,` at `:516`.
+
+**Tails:** `All checks passed!` · `2 files already formatted` · `Success: no issues found` · `states.py 137 stmts 0 miss 24 branch 0 partial 100%` · `11 passed`. Evidence re-run: worst gap `3.386e-15`, seam `2.220e-16`.
+
+**Commit:** `fix(engine): a state's off-rate starts at the middle of its own slice, not the map's`</result>
+<usage><subagent_tokens>247336</subagent_tokens><tool_uses>7</tool_uses><duration_ms>74144</duration_ms></usage>
+</task-notification>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
+UX-round coordinator: I have taken decision record number 0027 (0025 stays reserved for the word help, 0026 stays yours) — and the generate stream is gaining a ninth event. No reply needed.
+Kent decided today (R44–R47 in plans/notes/2026-09-21-decisions-after-review.md): (R44) a ninth stream event, `activity`, EPHEMERAL by rule — the model's own web searches and what they found, sent on a live run only, never written to a recording, a transcript or a kept run, never replayed, never billed, no `at` counter; shape {"about": "<proposition id>"|null, "kind": "searching"|"found"|"thinking", "text": "..."}; record 0027 (accepted) amends 0023's "no ninth event" and generate.py's "never send anything that is not one of the eight events". (R47) summarised thinking rides the same channel. (R45) engine/grow.py hands each answer of a round over as its own call returns instead of holding all three for the slowest; each call is billed the moment it returns, before it is folded. None of it touches the prompt, the fingerprint, a cassette or a recording: the recorder's request stays byte-identical, only the LIVE request streams (R34 is the precedent) — so your one shape freeze is untouched.
+Files now open in my lanes that your engine work may want: backend/src/katalyst/engine/grow.py, engine/client.py, engine/events.py, engine/replay.py, api/generate.py, and in the browser stream/events.ts, stream/growth.ts, components/RunStrip.tsx. If your exact-core or card work needs any of them, tell me and we order it; otherwise whoever lands second rebases and keeps both sides. Stack 07's "a finished generation served back by its id" should treat `activity` like a replay does: there is none.
+</cross-session-message>
