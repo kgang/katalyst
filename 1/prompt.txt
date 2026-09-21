@@ -7,3 +7,14 @@ For clicking the pre-built "The strait of Hormuz is going to open next week card
 ---
 
 Is the work underway to unify the experience for when the api key is set vs when it's not? Also could we make a slight UI improvement to make the different card types (hypothesis vs tradeable outcomes) have a better use of color?
+
+---
+
+In the replay flow, could you have it so that clicking on a card will expand its details on the right hand side panel? In general, it's a little hard to find/navigate to/know what right hand side panels exist and how to navigate to them. Could you introduce some design elements as buttons or icons for users to be able to switch between the different side panels based on context?
+
+---
+
+Another bug, the market and model probability are overlapping each other on the UI
+[Image #4]
+
+Once you are done addressing all these changes, please put together another branch that I can test those out on.
