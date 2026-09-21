@@ -8,8 +8,9 @@ reading, which is the thing a source's own description already refuses.
 from katalyst.domain import BaseRate, Link, Source, validate
 from katalyst.engine.client import what_it_said
 from katalyst.engine.expand import expand
-from katalyst.engine.grounding import found_in, keep_cited, keep_returned, provenance_of
+from katalyst.engine.grounding import found_in, keep_cited, provenance_of
 from katalyst.engine.outcome import Accepted, Refused
+from katalyst.engine.transcript import line_for
 from katalyst.fixtures import HORMUZ
 from tests.unit.engine.answers import (
     THE_DAY_THE_RUN_HAPPENED,
@@ -56,7 +57,7 @@ def test_a_search_that_failed_reads_as_nothing_found_and_never_as_a_crash() -> N
 def test_an_address_is_the_same_address_after_whitespace_and_one_trailing_slash() -> None:
     """Matching is exact, and deliberately not clever."""
     found = (Source(url=A_PAGE, title="What is there", retrieved=THE_DAY_THE_RUN_HAPPENED),)
-    cited = an_arrow(cites=(f"  {A_PAGE}/  ",))
+    cited = (f"  {A_PAGE}/  ",)
 
     kept, dropped = keep_cited(cited, found)
 
@@ -67,7 +68,7 @@ def test_an_address_is_the_same_address_after_whitespace_and_one_trailing_slash(
 def test_a_cited_address_the_search_never_returned_is_dropped_and_named() -> None:
     """It is not fetched to see whether it was real, and not kept with a caveat."""
     found = (Source(url=A_PAGE, title="What is there", retrieved=THE_DAY_THE_RUN_HAPPENED),)
-    cited = an_arrow(cites=(A_PAGE, NEVER_RETURNED))
+    cited = (A_PAGE, NEVER_RETURNED)
 
     kept, dropped = keep_cited(cited, found)
 
@@ -196,7 +197,7 @@ def test_a_refusal_keeps_the_arrow_off_the_map_sources_and_all() -> None:
     assert all(A_PAGE not in [s.url for s in one.sources] for one in HORMUZ.links)
 
 
-def test_a_count_whose_pages_the_search_never_returned_is_thrown_away() -> None:
+def test_a_base_rate_nobody_sourced_is_dropped_and_noted() -> None:
     """Measured, 2026-09-17: eight claims in ten carried a count behind no page.
 
     One of them was "37 of 41 cases since 1980" — which is the schema's own
@@ -219,6 +220,12 @@ def test_a_count_whose_pages_the_search_never_returned_is_thrown_away() -> None:
     assert accepted.proposition is not None
     assert accepted.proposition.base_rate is None
     assert accepted.base_rate_dropped == "Closures of a major strait since 1980"
+    # And the transcript says a class was offered and nothing backed it, showing
+    # no number: a figure with no page behind it reads as measured however it is
+    # marked (`grounding.md` INV-generation.14).
+    line = line_for(outcome, 0)  # type: ignore[arg-type]
+    assert line.no_reference_class == "Closures of a major strait since 1980"
+    assert "37" not in line.in_words
 
 
 def test_a_count_the_search_did_return_is_kept_with_only_those_pages() -> None:
@@ -245,7 +252,7 @@ def test_one_rule_splits_the_addresses_for_arrows_and_for_counts_alike() -> None
     """The reason there is one function: two failures, one law, one place to change it."""
     found = (Source(url=A_PAGE, title="A page", retrieved_at=THE_DAY_THE_RUN_HAPPENED),)
 
-    kept, dropped = keep_returned((A_PAGE, NEVER_RETURNED), found)
+    kept, dropped = keep_cited((A_PAGE, NEVER_RETURNED), found)
 
-    assert kept == (A_PAGE,)
+    assert [one.url for one in kept] == [A_PAGE]
     assert dropped == (NEVER_RETURNED,)

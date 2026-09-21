@@ -79,7 +79,7 @@ def test_replay_is_labelled_in_receipt(recorded: replay.Recording) -> None:
     assert receipt.model
 
 
-def test_every_refusal_a_recording_shows_names_what_it_broke(
+def test_a_recording_holds_every_refusal_that_happened(
     recorded: replay.Recording,
 ) -> None:
     """Kent, 2026-09-20: a recording shows the refusals that happened, and no others.

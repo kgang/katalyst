@@ -419,10 +419,32 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
 
     if finished is None or finished.graph is None:
         working = working.model_copy(
-            update={"receipt": None if finished is None else finished.receipt}
+            update={
+                "receipt": None if finished is None else finished.receipt,
+                "reason": None if finished is None else finished.reason,
+                "why": None if finished is None else finished.why,
+            }
         )
         held.remember(working, None)
         yield _receipt_for(finished, "live", time.monotonic() - started)
+        if broke is None and finished is not None and finished.reason == "spend_cap":
+            # **Stopping because the money ran out is a decision, not a fault**,
+            # whether it runs out on call forty or call one — `events.py` says so
+            # in as many words, and `proposals.md` INV-generation.6 promises the
+            # stream ends in `done` for it. A run that emptied the purse before it
+            # had a map used to end in `failed`, which reads as "something broke"
+            # for the one ending nobody should read that way (2026-09-20).
+            #
+            # Everything else that leaves no map still ends in `failed`: a run the
+            # model would not answer, or would not start, is not a decision
+            # anybody took and should not read like one.
+            yield Done(
+                reason=finished.reason,
+                claims=finished.claims,
+                links=finished.links,
+                rejected=finished.refused,
+            )
+            return
         # The walk's own sentence, because it knows what happened and this does
         # not: a run the model never answered must not tell a person to go and
         # rewrite a sentence that was never the problem (Kent, 2026-09-20).

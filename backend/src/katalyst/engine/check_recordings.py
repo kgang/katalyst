@@ -19,7 +19,7 @@ struck, taken knowingly.
 import sys
 
 from katalyst.engine.prompt import prompt_hash
-from katalyst.engine.replay import RECORDINGS, every_recording, faults_in
+from katalyst.engine.replay import every_recording, faults_in, where_they_live
 
 
 def main() -> int:
@@ -30,7 +30,9 @@ def main() -> int:
     """
     recordings = every_recording()
     if not recordings:
-        print(f"No recordings in {RECORDINGS}. Nothing to check, and nothing wrong with that.")
+        print(
+            f"No recordings in {where_they_live()}. Nothing to check, and nothing wrong with that."
+        )
         return 0
 
     shipping = prompt_hash()

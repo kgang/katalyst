@@ -252,9 +252,11 @@ With no key, this route declines in plain words rather than failing: *"drafting 
 
 ### Upper bounds on `versions` and `worlds`
 
-`versions` — how many versions of the map to try — and `worlds` — how many worlds to run under each — are today bounded **below** only: `versions > 0` and `worlds > 1` on the three world routes. That is one guard short. A request for a hundred million versions is not refused; it is accepted and the server works on it until something else gives out.
+`versions` — how many versions of the map to try — and `worlds` — how many worlds to run under each — were bounded **below** only: `versions > 0` and `worlds > 1` on the three world routes. That was one guard short. A request for a hundred million versions was not refused; it was accepted and the server worked on it until something else gave out.
 
-**Both get an upper bound, on this route and on the three world routes** (Kent, S2). Two named constants live in `backend/src/katalyst/engine/worlds.py` beside `VERSIONS` and `WORLDS`, the defaults they already sit next to.
+**Both now carry an upper bound, on this route and on the three world routes** (Kent, S2). Two named constants live in `backend/src/katalyst/engine/worlds.py` beside `VERSIONS` and `WORLDS`, the defaults they already sit next to. A request above the ceiling is **refused, never quietly made smaller**: a caller who asks for one run and gets another is reading numbers that answer a question nobody asked.
+
+**`seed` is bounded the same way**, at the largest whole number a browser holds exactly (2⁵³ − 1), on every route that takes one and on the minting. Measured 2026-09-17: a run minted `4803646386380448080`, JavaScript read it back as `4803646386380448300`, and nothing errored — the browser then asked for a world under a seed the server never used, got different numbers, and every explanation of why was wrong.
 
 **The budget they are measured against is the server's own, not the browser's.** NFR-7's hundred milliseconds is a *rendering* budget — sixty tiles drawn and laid out again — and it has nothing to say about how long `propagate` may run. The quantity that matters here is the one [`../multiverse/propagation.md`](../multiverse/propagation.md) already times: how long one world takes to work through, at the shipped loop sizes, on the machine those timings were taken on. The ceiling is **the largest pair of loop sizes that keeps one request inside the time a person will wait for a world before assuming the app has stopped**, measured the same way and written down with the measurement and the date beside it, in that chapter's units.
 

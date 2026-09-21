@@ -63,7 +63,8 @@ from katalyst.engine.outcome import Caps, Outcome
 from katalyst.engine.prompt import prompt_hash
 from katalyst.engine.receipt import Receipt as RunningTotal
 from katalyst.engine.receipt import fold, nothing_spent_yet
-from katalyst.engine.replay import where_they_live
+from katalyst.engine.replay import faults_in, where_they_live
+from katalyst.engine.replay import read as read_recording
 from katalyst.engine.transcript import Transcript, line_for, makes_an_event
 from katalyst.engine.verify import verdict
 from katalyst.settings import get_settings
@@ -808,8 +809,36 @@ def main(argv: list[str] | None = None) -> int:
                 wrote_everything = False
             continue
         written = write_recording(run)
+        left_out = _why_it_is_not_a_recording(written)
+        if left_out:
+            # Promoted only if it passes the very checks the build runs, read back
+            # off the file rather than off the run in memory. A recording that
+            # would fail in continuous integration should never have been copied
+            # across in the first place (`replay.md` B6, B9).
+            written.unlink()
+            print("the recording was written and taken away again:", file=sys.stderr)
+            for fault in left_out:
+                print(f"  {fault}", file=sys.stderr)
+            wrote_everything = False
+            continue
         print(f"wrote the recording at {written}", file=sys.stderr)
     return 0 if wrote_everything else 1
+
+
+def _why_it_is_not_a_recording(written: Path) -> tuple[str, ...]:
+    """Read a just-written recording back and run the build's own checks over it.
+
+    Read off the file rather than off the run that made it, because the file is
+    what a keyless reviewer plays and what continuous integration reads. A
+    recording that would fail there should never be copied across.
+
+    Args:
+        written: The file that was just written.
+
+    Returns:
+        One sentence per fault, or nothing at all when it is sound.
+    """
+    return tuple(faults_in(read_recording(written), current_prompt_hash=prompt_hash()))
 
 
 def _with_the_insert(spent: RunningTotal, its_calls: tuple[Outcome, ...]) -> RunningTotal:

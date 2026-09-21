@@ -22,6 +22,7 @@ import pytest
 from katalyst.engine.client import (
     MAY_NOT_SEARCH,
     MAY_SEARCH,
+    ROUNDS_OF_RESEARCH,
     SEARCH_TOOL,
     AnswerWeCouldNotRead,
     Model,
@@ -297,3 +298,24 @@ def test_the_live_answerer_pins_how_long_it_waits_and_how_often_it_tries_again(
     assert asking.tries_again == HOW_OFTEN_TO_TRY_AGAIN
     # A whole question, retries and all, is bounded by something a person would sit through.
     assert HOW_LONG_TO_WAIT * (HOW_OFTEN_TO_TRY_AGAIN + 1) <= 15 * 60
+
+
+def test_research_stops_at_five_rounds() -> None:
+    """A round is one pass, and a question makes at most five of them.
+
+    `grounding.md` counts a round as one pass in which the model searches, reads
+    what came back, and decides whether to search again — so the first request is
+    the first round. This was written as five *hand-backs* once, which is six
+    rounds of a chapter that says five (2026-09-20).
+
+    At the fifth, the answer is taken as it stands: nothing is retried and
+    nothing is asked a second time, because both are paying twice for one
+    question.
+    """
+    paused = an_answer(a_claim("Half.", cause="C"), stopped="pause_turn")
+    wire = Wire([paused] * 20)
+
+    said = Model(wire).proposal("q", may_search=True)  # type: ignore[arg-type]
+
+    assert said.calls == ROUNDS_OF_RESEARCH == 5
+    assert len(wire.sent) == ROUNDS_OF_RESEARCH

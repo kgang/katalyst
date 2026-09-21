@@ -124,7 +124,13 @@ so the whole remembered prefix would be thrown away mid-run.
 """
 
 ROUNDS_OF_RESEARCH = 5
-"""How many times a part-finished answer is handed back to be continued.
+"""How many passes one question may make — **passes, not continuations**.
+
+A *round* is one pass in which the model searches, reads what came back, and
+decides whether to search again, which is what `grounding.md` counts. The first
+request is the first round, so five rounds is five requests and four hand-backs.
+It was written as five hand-backs once, which made six rounds of a chapter that
+says five (2026-09-20).
 
 The service runs the search tool in a loop of its own and stops after a while,
 handing back a part-finished answer. Sending it straight back — the same
@@ -480,7 +486,7 @@ class Model:
         conversation: list[MessageParam] = [{"role": "user", "content": question}]
         rounds: list[ParsedMessage[Any]] = []
         started = time.monotonic()
-        for _ in range(ROUNDS_OF_RESEARCH + 1):
+        for _ in range(ROUNDS_OF_RESEARCH):
             try:
                 answer = self._client.messages.parse(
                     model=self._model,

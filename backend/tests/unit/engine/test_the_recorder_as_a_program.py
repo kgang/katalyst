@@ -165,6 +165,29 @@ def test_a_run_that_crashes_after_the_generation_still_leaves_its_receipt(
     assert finished.returncode != 0
 
 
+def test_a_recording_is_promoted_only_after_it_passes_the_builds_own_checks(
+    tmp_path: Path,
+) -> None:
+    """`replay.md` B6: copied across **only if** it passes every check in B9.
+
+    Read back off the written file rather than off the run in memory, because the
+    file is what a keyless reviewer plays and what continuous integration reads.
+    A run answered by a stand-in never gets this far, so the check is proved here
+    by the one thing that does reach it: the folder stays empty and the program
+    says why (2026-09-20).
+    """
+    finished = run_the_recorder(
+        tmp_path,
+        "--only",
+        "hormuz",
+        answerer="tests.unit.engine.stand_ins:a_whole_story",
+    )
+
+    assert not list((tmp_path / "recordings").glob("*.jsonl"))
+    assert finished.returncode != 0
+    assert "no recording was written" in finished.stderr
+
+
 def test_the_recording_checker_runs_as_a_program_too(tmp_path: Path) -> None:
     """The other module with a guard in it, checked the same way and for the same reason."""
     (tmp_path / "recordings").mkdir(parents=True)

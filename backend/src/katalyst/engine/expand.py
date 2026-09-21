@@ -53,7 +53,7 @@ from katalyst.domain import (
     validate,
 )
 from katalyst.engine.client import Answerer, AnswerWeCouldNotRead, TheModelDidNotAnswer
-from katalyst.engine.grounding import found_in, keep_cited, keep_returned, provenance_of
+from katalyst.engine.grounding import found_in, keep_cited, provenance_of
 from katalyst.engine.ids import mint_id
 from katalyst.engine.outcome import Accepted, Caps, Outcome, Refused, Stopped, costing
 from katalyst.engine.prompt import (
@@ -309,9 +309,11 @@ def _claim(proposal: ClaimProposal, found: tuple[Source, ...]) -> tuple[Proposit
     base_rate = proposal.base_rate
     thrown_away: str | None = None
     if base_rate is not None:
-        kept_addresses, _ = keep_returned(base_rate.sources, found)
-        if kept_addresses:
-            base_rate = base_rate.model_copy(update={"sources": kept_addresses})
+        survived, _ = keep_cited(base_rate.sources, found)
+        if survived:
+            # A base rate keeps the addresses of what survived; an arrow keeps
+            # the `Source` records. One rule, two shapes of answer.
+            base_rate = base_rate.model_copy(update={"sources": tuple(one.url for one in survived)})
         else:
             thrown_away = base_rate.reference_class
             base_rate = None
@@ -351,7 +353,7 @@ def _arrow(
     Returns:
         The arrow, and the addresses it cited that the search never returned.
     """
-    kept, dropped = keep_cited(draft, found)
+    kept, dropped = keep_cited(tuple(one.url for one in draft.sources), found)
     arrow = Link(
         id=mint_id(),
         source=source,
@@ -496,6 +498,7 @@ def add_a_claim(
     added = written.proposition
     joined: list[Link] = []
     so_far = graph.model_copy(update={"propositions": (*graph.propositions, added)})
+    refused_in_a_row = 0
     for _ in range(width):
         if over_the_cap(running, cap):
             break
@@ -507,7 +510,14 @@ def add_a_claim(
         if isinstance(result, Stopped):
             break
         if not isinstance(result, Accepted):
+            refused_in_a_row += 1
+            if refused_in_a_row >= Caps().refusals_in_a_row:
+                # It stops the way everything else stops. Three proposals in a
+                # row refused for one claim is our willingness to keep paying for
+                # that claim running out, and an edit is no different.
+                break
             continue
+        refused_in_a_row = 0
         joined.extend(result.links)
         so_far = so_far.model_copy(update={"links": (*so_far.links, *result.links)})
 

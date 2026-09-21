@@ -98,6 +98,24 @@ class TranscriptLine(BaseModel):
         default=(),
         description="Every reason the map's own rules gave, in their words. Empty unless refused.",
     )
+    dropped: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Every address this call's answer cited that the search never "
+            "returned. The reader is told which one rather than left to notice "
+            "that an arrow says it argued where it might have said it documented."
+        ),
+    )
+    no_reference_class: str | None = Field(
+        default=None,
+        description=(
+            "The reference class of a count that was offered with nothing behind "
+            "it, when one was. The count itself is not kept: a figure with no page "
+            "behind it reads as measured however it is marked, so the transcript "
+            "says a class was offered and that nothing backed it, and shows no "
+            "number (Kent, 2026-09-20)."
+        ),
+    )
     calls: int = Field(default=0, description="How many round trips this question took.")
     searches: int = Field(default=0, description="How many web searches it ran.")
     input_tokens: int = Field(default=0, description="Tokens of question read fresh.")
@@ -159,16 +177,21 @@ def line_for(outcome: Outcome, at: int | None) -> TranscriptLine:
         if not in_words and result.links:
             in_words = result.links[0].rationale
         violations: tuple[Violation, ...] = ()
+        dropped, no_reference_class = result.sources_dropped, result.base_rate_dropped
     elif isinstance(result, Refused):
         what, in_words, violations = "refused", result.claim_in_words, result.violations
+        dropped, no_reference_class = (), None
     else:
         what, in_words, violations = "stopped", result.why, ()
+        dropped, no_reference_class = (), None
     return TranscriptLine(
         at=at,
         what=what,
         about=outcome.about,
         in_words=in_words,
         violations=violations,
+        dropped=dropped,
+        no_reference_class=no_reference_class,
         calls=outcome.calls,
         searches=outcome.searches,
         input_tokens=outcome.input_tokens,

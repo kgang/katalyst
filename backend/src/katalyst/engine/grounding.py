@@ -56,12 +56,19 @@ def found_in(said: Said, *, on: date) -> tuple[Source, ...]:
 
 
 def keep_cited(
-    draft: LinkDraft, found: tuple[Source, ...]
+    cited: Sequence[str], found: tuple[Source, ...]
 ) -> tuple[tuple[Source, ...], tuple[str, ...]]:
-    """Split what an arrow cites into what we can stand behind, and what we drop.
+    """Split what was cited into what we can stand behind, and what we drop.
+
+    **It takes bare addresses rather than a draft, because one rule serves both
+    places a citation can appear**: an arrow's sources and a base rate's. An
+    arrow keeps the `Source` records; a base rate keeps the addresses of what
+    survived. A count nobody can open a page for and a mechanism nobody can open
+    a page for are the same failure wearing two hats — and the first measured
+    run produced eight of the first kind in ten claims.
 
     Matching is an exact comparison of the address, after trimming surrounding
-    whitespace and any trailing slashes. Nothing cleverer: deciding that two
+    whitespace and one trailing slash. Nothing cleverer: deciding that two
     slightly different addresses are "the same page" is a judgement, and a
     judgement is how a dropped citation quietly comes back.
 
@@ -69,47 +76,22 @@ def keep_cited(
     was real. It is dropped, and a reader is told which one.
 
     Args:
-        draft: The arrow as the model wrote it, with the addresses it cited.
+        cited: The addresses as they were written, in the order they were cited.
         found: What the search tool returned in that same call.
 
     Returns:
-        The sources the search actually returned, in the order the model cited
-        them, and the addresses it cited that the search never returned.
+        The sources the search actually returned, in the order they were cited,
+        and the addresses cited that the search never returned.
     """
     by_address = {same_address(source.url): source for source in found}
     kept: list[Source] = []
     dropped: list[str] = []
-    for cited in draft.sources:
-        match = by_address.get(same_address(cited.url))
+    for one in cited:
+        match = by_address.get(same_address(one))
         if match is None:
-            dropped.append(cited.url)
+            dropped.append(one)
         elif match not in kept:
             kept.append(match)
-    return tuple(kept), tuple(dropped)
-
-
-def keep_returned(
-    cited: Sequence[str], found: tuple[Source, ...]
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """Split plain addresses into the ones the search returned and the ones it did not.
-
-    The same rule `keep_cited` applies to an arrow's citations, over the bare
-    strings a base rate's sources are. **One rule, used for both**, because a
-    count somebody cannot open a page for and a mechanism somebody cannot open a
-    page for are the same failure wearing two hats — and the first measured run
-    produced eight of the second kind in ten claims.
-
-    Args:
-        cited: The addresses as they were written.
-        found: What the search tool returned in that same call.
-
-    Returns:
-        The addresses the search returned, in the order they were cited, and the
-        ones it did not.
-    """
-    returned = {same_address(source.url) for source in found}
-    kept = [one for one in cited if same_address(one) in returned]
-    dropped = [one for one in cited if same_address(one) not in returned]
     return tuple(kept), tuple(dropped)
 
 
@@ -145,13 +127,13 @@ def provenance_of(draft: LinkDraft, kept: tuple[Source, ...]) -> Provenance:
 def same_address(url: str) -> str:
     """Put one address into the form two addresses are compared in.
 
-    Surrounding whitespace and **every** trailing slash come off, and nothing
-    else. Every rather than one, because `…/reports/` and `…/reports//` are the
-    same page and nobody would say otherwise; the docstring used to say one, and
-    a rule described wrongly is a rule nobody can rely on (2026-09-20). A page
-    written with something extra on the end — a tracking parameter, say — loses
-    its citation and the arrow falls back to saying it argued rather than
-    documented. That is the safe direction to be wrong in.
+    Surrounding whitespace and one trailing slash come off, and nothing else.
+    One rather than every, because anything cleverer is a judgement about which
+    two addresses are "the same page", and a judgement is how a dropped citation
+    quietly comes back. A page written with something extra on the end — a
+    tracking parameter, a doubled slash — loses its citation and the arrow falls
+    back to saying it argued rather than documented. That is the safe direction
+    to be wrong in.
 
     Args:
         url: The address as it was written.
@@ -159,4 +141,4 @@ def same_address(url: str) -> str:
     Returns:
         The form used for comparison. Never shown to anybody.
     """
-    return url.strip().rstrip("/")
+    return url.strip().removesuffix("/")

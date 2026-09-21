@@ -29,6 +29,7 @@ from tests.unit.engine.answers import (
     Scripted,
     Storyteller,
     a_claim,
+    a_declined_answer,
     a_starting_claim,
     a_stop,
     an_answer,
@@ -552,3 +553,27 @@ def test_a_live_run_that_breaks_some_other_way_still_ends_the_stream(
     said = read[-1][1]["message"]
     assert "a bug nobody wrote a sentence for" not in said
     assert "RuntimeError" not in said
+
+
+def test_a_run_that_empties_the_purse_before_it_has_a_map_still_says_done(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """INV-generation.6, for the case it was written for and did not hold in.
+
+    Stopping because the money ran out is a decision, not a fault, whether it
+    runs out on call forty or call one — `events.py` says so in as many words.
+    A run that emptied the purse on its first question used to end in `failed`,
+    which reads as "something broke" for the one ending nobody should read that
+    way (2026-09-20).
+    """
+    expensive = a_declined_answer("Not this one.", written=400_000)
+    monkeypatch.setattr(generate, "live_answerer", lambda: Scripted(starting=[expensive]))
+    monkeypatch.setattr(generate, "Caps", lambda: Caps(dollars=1.0))
+
+    read = stream(hypothesis="A sentence with no recording behind it.")
+
+    names = [name for name, _ in read]
+    assert names[-1] == "done"
+    assert "failed" not in names
+    assert read[-1][1]["reason"] == "spend_cap"
+    assert read[-1][1]["claims"] == 0

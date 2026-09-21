@@ -40,7 +40,7 @@ from katalyst.engine.expand import expand
 from katalyst.engine.grounding import found_in, keep_cited, provenance_of, same_address
 from katalyst.engine.outcome import Accepted, Refused, Said
 from katalyst.engine.prompt import expanding_question
-from katalyst.engine.proposal import ClaimProposal, LinkProposal
+from katalyst.engine.proposal import ClaimProposal, LinkDraft, LinkProposal
 from katalyst.fixtures import HORMUZ
 
 CASSETTES = Path(__file__).resolve().parents[1] / "cassettes"
@@ -140,6 +140,11 @@ def asking(answerer: Model, frontier: str = "C") -> Said:
     )
 
 
+def cited_by(draft: LinkDraft) -> tuple[str, ...]:
+    """The addresses an arrow cites, as the one grounding rule wants them."""
+    return tuple(one.url for one in draft.sources)
+
+
 def what_it_proposed(said: Said) -> ClaimProposal | LinkProposal:
     """Take the proposal out of an answer, or say loudly that there is not one."""
     proposed = said.answered
@@ -175,7 +180,7 @@ def test_provenance_is_written_from_what_was_found(answerer: Model) -> None:
     draft = what_it_proposed(said).link
     found = found_in(said, on=THE_DAY_THE_RUN_HAPPENED)
 
-    kept, _ = keep_cited(draft, found)
+    kept, _ = keep_cited(cited_by(draft), found)
     word = provenance_of(draft, kept)
 
     assert word == ("documented" if kept else "argued" if draft.rationale.strip() else "asserted")
@@ -208,7 +213,7 @@ def test_a_source_is_only_ever_one_the_search_tool_returned(answerer: Model) -> 
     found = found_in(said, on=THE_DAY_THE_RUN_HAPPENED)
     returned = {same_address(one.url) for one in found}
 
-    kept, dropped = keep_cited(draft, found)
+    kept, dropped = keep_cited(cited_by(draft), found)
 
     assert all(same_address(one.url) in returned for one in kept)
     assert all(same_address(one) not in returned for one in dropped)
