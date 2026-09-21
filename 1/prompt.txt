@@ -1,0 +1,7 @@
+Could you please read 
+
+<pasted_content id="a56a">
+/Users/kentgang/git3/katalyst/plans/HANDOFF-stacks-05-06.md
+</pasted_content id="a56a">
+
+ and orchestrate the completion of it using opus sub-agents? Try to resolve as much as you can using your best judgement. Cut scope if there's significant complexity and you can justify that the payoff isn't impactful relative to its effort. One of the goals now is to get towards completion.
