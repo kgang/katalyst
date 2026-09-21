@@ -43,17 +43,18 @@ export interface paths {
          * Readyz
          * @description Report whether the program can generate a map yet.
          *
-         *     Today that comes down to one thing: whether a key for the language model is
-         *     configured. Without it the program still runs, still serves the stored
-         *     example map, and still says so honestly here rather than failing later with
-         *     an error the user cannot interpret.
+         *     Two ways it can: with a key, by calling a model, or with none, by playing a
+         *     committed recording back through the same stream and the same canvas. It is
+         *     `not_ready` only when it can do neither, because a copy that can replay four
+         *     examples can do almost everything this product is judged on.
          *
          *     Args:
          *         settings: The program's settings. Supplied by the web framework, which
          *             lets a test replace them without touching the real environment.
          *
          *     Returns:
-         *         Whether the program is ready, and whether a model key is configured.
+         *         Whether the program is ready, whether a model key is configured, and what
+         *         it can play back.
          */
         get: operations["readyz_api_readyz_get"];
         put?: never;
@@ -253,6 +254,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate
+         * @description Build a map from one sentence, and write it out as it is built.
+         *
+         *     With a key this calls a model; with none it plays a committed recording back
+         *     through the same events. Either way the answer is one long response the
+         *     browser reads as it arrives.
+         *
+         *     Args:
+         *         request: The request itself, so the run can stop when the client goes.
+         *         asked: The sentence, and everything optional beside it.
+         *         settings: The program's settings, which say whether a key is configured.
+         *
+         *     Returns:
+         *         The stream.
+         */
+        post: operations["generate_api_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/generate/insert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draft A Claim
+         * @description Draft one claim a person asked for, and check it like any other proposal.
+         *
+         *     The one edit that needs a model. The other five — *Suppose this is true*,
+         *     *This happened*, *Change this push*, *Split this claim* and *My own number* —
+         *     are pure arithmetic in the rules layer, which is why a reviewer with no key
+         *     still gets the whole multiverse at full fidelity.
+         *
+         *     With no key this answers the one scripted intervention each recording carries,
+         *     and declines anything else in plain words.
+         *
+         *     Args:
+         *         asked: The map, the branch, the sentence and where it goes.
+         *
+         *     Returns:
+         *         The claim and its arrows, already checked.
+         *
+         *     Raises:
+         *         HTTPException: 404 when no map answers to that name; 422 with every reason
+         *             at once when the draft does not fit the map; 501 with one plain
+         *             sentence when there is no key and no recording holds that sentence.
+         */
+        post: operations["draft_a_claim_api_generate_insert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/generate/{generation_id}/transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Transcript Of
+         * @description Hand back the working of a generation this process is still holding.
+         *
+         *     Args:
+         *         generation_id: The identifier the stream's first event carried.
+         *
+         *     Returns:
+         *         Every proposal, in order, with what each one cost.
+         *
+         *     Raises:
+         *         HTTPException: 404 with one plain sentence when the generation is no
+         *             longer held — which a restart is enough to cause.
+         */
+        get: operations["transcript_of_api_generate__generation_id__transcript_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -326,7 +428,7 @@ export interface components {
         BaseRate: {
             /**
              * Reference Class
-             * @description The set of past cases being counted, stated precisely enough that someone else could recount them: 'Hormuz closure or disruption episodes since 1980 that ended within 90 days'.
+             * @description The set of past cases being counted, stated precisely enough that someone else could count them again: what kind of case, over what period, and what made a case count.
              */
             reference_class: string;
             /**
@@ -737,7 +839,7 @@ export interface components {
             branch_b: components["schemas"]["Branch"];
             /**
              * Seed
-             * @description The one seed both worlds are built from.
+             * @description The one seed both worlds are built from, inside what a browser holds.
              */
             seed: number;
             /**
@@ -788,6 +890,31 @@ export interface components {
              * @description The day the supposition takes effect. Links out of the target measure their delay from this day. None means the map's own start date.
              */
             at?: string | null;
+        };
+        /**
+         * DraftedInsert
+         * @description What the insert route answers with: the edit, and what drafting it cost.
+         *
+         *     An insert is not one call — a drafting call, then one call per arrow — so it
+         *     spends real money, and NFR-6 (every generation records model, tokens, cache
+         *     reads, searches and dollars) has no exception for money spent outside a
+         *     stream. The route used to answer a bare `Insert` and drop what it cost on the
+         *     floor (`streaming.md`, settled 2026-09-20).
+         *
+         *     **Nothing here is remembered between requests.** An insert is one request and
+         *     one answer, so there is nothing to evict and nothing to go looking for.
+         */
+        DraftedInsert: {
+            /** @description The claim and its arrows, already validated. */
+            insert: components["schemas"]["Insert"];
+            /** @description What drafting it cost, in the shape the stream's receipt event carries. */
+            receipt: components["schemas"]["katalyst__engine__events__Receipt"];
+            /**
+             * Working
+             * @description Every call it took, in order, with what each one cost and how long it took. **In the answer because there is nowhere else it could be**: an insert is one request and one answer, and it is not a generation. Filing it in the store instead made every insert unfindable — nobody was told the identifier — and eight of them evicted the map they were being added to (Kent, 2026-09-21).
+             * @default []
+             */
+            working: components["schemas"]["TranscriptLine"][];
         };
         /**
          * Evidence
@@ -875,6 +1002,41 @@ export interface components {
             one_line: string;
         };
         /**
+         * GenerateRequest
+         * @description What it takes to build a map: a sentence, and a few things that are optional.
+         */
+        GenerateRequest: {
+            /**
+             * Hypothesis
+             * @description The sentence the person typed. The map starts here.
+             */
+            hypothesis: string;
+            /**
+             * Target
+             * @description The place they want to know whether the story reaches, in their own words. Leave it out on the Explore door; supply it and the run is graded against it and says plainly when there is no route.
+             */
+            target?: string | null;
+            /** @description How likely the person thinks their own sentence is. Kept as theirs, never overwritten and never merged with the model's. */
+            user_belief?: components["schemas"]["Belief"] | null;
+            /**
+             * Seed
+             * @description The one number every likelihood is worked out from. **Leave it out and the server mints one**, and the first event says which, so the run is reproducible from the moment it starts. Send one only to reproduce a run you were handed: a number invented by whoever is asking is a number nobody computed sitting inside the reproducibility of the answer. It is bounded by the largest whole number a browser holds exactly, because a seed that comes back rounded is a seed nobody ran.
+             */
+            seed?: number | null;
+            /**
+             * Versions
+             * @description How many versions of the map to try. Bounded at both ends.
+             * @default 2000
+             */
+            versions: number;
+            /**
+             * Worlds
+             * @description How many worlds to run under each version. Bounded at both ends.
+             * @default 8
+             */
+            worlds: number;
+        };
+        /**
          * Graph
          * @description A whole cause-and-effect map: claims, the arrows between them, and which claim started it.
          *
@@ -943,6 +1105,24 @@ export interface components {
              * @description The arrows that attach the new claim to the map. Each one has the new claim at one end and an existing claim at the other.
              */
             links: components["schemas"]["Link"][];
+        };
+        /**
+         * InsertRequest
+         * @description What it takes to draft one claim a person asked for.
+         */
+        InsertRequest: {
+            /**
+             * Base Id
+             * @description The map the new claim is going onto, by **the map's own identifier** — the one a world carries as its `base_id`, and the one the stored examples answer to. Not the generation's identifier: a generation is a run and a map is a thing it built, and one run can hand its map to any number of later questions.
+             */
+            base_id: string;
+            /** @description The branch built so far, sent whole. **A drafted edit goes at the end of it**, and is drafted and judged against the map with it folded on — which is the map the reader is looking at. There is no field for where in the branch it goes: a branch is append-only everywhere else in this product, and the field that said otherwise was read by nothing while a reader who sent it got a 200 for an edit the world route then refused (Kent, 2026-09-21). */
+            branch?: components["schemas"]["Branch"] | null;
+            /**
+             * Claim In Words
+             * @description What the person typed: "…but Iran is struck the next day".
+             */
+            claim_in_words: string;
         };
         /**
          * Link
@@ -1146,7 +1326,7 @@ export interface components {
         Readiness: {
             /**
              * Status
-             * @description Reads "ready" when everything needed to generate a map is configured, and "not_ready" when something is missing.
+             * @description Reads "ready" when this program can build a map — with a key, or from a recording — and "not_ready" only when it can do neither. A copy with no key and four recordings draws four maps, refuses proposals in public and takes every intervention at full fidelity; calling that not ready would be the screen lying about itself in the one place it exists to be honest.
              * @enum {string}
              */
             status: "ready" | "not_ready";
@@ -1155,6 +1335,35 @@ export interface components {
              * @description Whether a key for the language model is configured. The key itself is never included in this answer.
              */
             model_key_present: boolean;
+            /**
+             * Replayable
+             * @description The examples this copy can play back from a committed recording, and the day each one was made. The first screen reads it before anything runs, which is the only way it can name a date at all: the day a recording was made travels on the receipt, and the receipt arrives last.
+             * @default []
+             */
+            replayable: components["schemas"]["RecordingSummary"][];
+            /**
+             * Unreadable
+             * @description One plain sentence per file in the recordings folder that this engine could not read. **A bad file never hides the good ones**: it is named here and the others still play, because a recording is a committed file that outlives the code that wrote it and meeting an old one is ordinary rather than exceptional (Kent, 2026-09-20).
+             * @default []
+             */
+            unreadable: string[];
+        };
+        /**
+         * RecordingSummary
+         * @description One recording the first screen can offer, and when it was made.
+         */
+        RecordingSummary: {
+            /**
+             * Example
+             * @description The short name of the example, matching its file name.
+             */
+            example: string;
+            /**
+             * Recording Date
+             * Format: date
+             * @description The day `make record-demo` wrote it.
+             */
+            recording_date: string;
         };
         /**
          * Refine
@@ -1217,12 +1426,12 @@ export interface components {
         Resolution: {
             /**
              * Criteria
-             * @description The test, written so that two people reading it would agree on the answer. 'At least 14 consecutive days of unrestricted commercial transit', not 'shipping returns to normal'.
+             * @description The test, written so that two people reading it would agree on the answer. A counted threshold over a named window, not a mood: 'at least 14 consecutive days of X', not 'things return to normal'.
              */
             criteria: string;
             /**
              * Source
-             * @description Who or what applies the test: a named publication, exchange, agency or venue. 'Lloyd's List transit counts', not 'the news'.
+             * @description Who or what applies the test: a named publication, exchange, agency or venue — the one that actually publishes this number, not 'the news'.
              */
             source: string;
             /**
@@ -1324,6 +1533,159 @@ export interface components {
              */
             retrieved?: string | null;
         };
+        /**
+         * Transcript
+         * @description The whole working of one generation, in the order it happened.
+         */
+        Transcript: {
+            /**
+             * Generation Id
+             * @description The identifier this generation answers to.
+             */
+            generation_id: string;
+            /**
+             * Played From
+             * @description The identifier the recording this was played from carries, when this is a replay. **Not the identifier of this viewing**: that is minted per viewing, because a recording's own is a constant in a committed file and two people opening one card would otherwise share a single entry and overwrite each other's working (2026-09-20).
+             */
+            played_from?: string | null;
+            /**
+             * Hypothesis
+             * @description The sentence the person typed, unaltered.
+             */
+            hypothesis: string;
+            /**
+             * Target
+             * @description The place they asked whether the story gets to.
+             */
+            target?: string | null;
+            /**
+             * Seed
+             * @description The one number every likelihood on this map was worked out from.
+             */
+            seed: number;
+            /**
+             * On
+             * Format: date
+             * @description The day this generation ran, which is its map's day zero.
+             */
+            on: string;
+            /**
+             * Mode
+             * @description Whether this run called a model or played a recording back.
+             * @enum {string}
+             */
+            mode: "live" | "replay";
+            /**
+             * Lines
+             * @description Every proposal, in the order it was folded in.
+             * @default []
+             */
+            lines: components["schemas"]["TranscriptLine"][];
+            /** @description What the run spent. Absent until the run has finished. */
+            receipt?: components["schemas"]["katalyst__engine__receipt__Receipt"] | null;
+            /**
+             * Reason
+             * @description Why the run stopped. Absent until it has.
+             */
+            reason?: string | null;
+            /**
+             * Why
+             * @description That reason in one plain sentence.
+             */
+            why?: string | null;
+        };
+        /**
+         * TranscriptLine
+         * @description One thing that was proposed, what happened to it, and what it cost.
+         *
+         *     Three kinds of line and no others: a proposal was accepted, a proposal was
+         *     refused, or the model said this part of the story was finished. The third
+         *     makes no event on the wire — nothing changed on the map — but it belongs here,
+         *     because "we asked and it said there was nothing more" is exactly the kind of
+         *     thing a reader goes to the working for.
+         */
+        TranscriptLine: {
+            /**
+             * At
+             * @description Where this sits on the stream, counting from 0 across accepted and refused proposals together. Nothing at all on a line that made no event, which is how the gaps in the stream's numbering are explained.
+             */
+            at?: number | null;
+            /**
+             * What
+             * @description What happened to this proposal.
+             * @enum {string}
+             */
+            what: "accepted" | "refused" | "stopped";
+            /**
+             * About
+             * @description The claim the call was asking about, so a refusal can be followed back to the question that produced it. Nothing at all on the two calls that turn a person's own sentences into claims.
+             */
+            about?: string | null;
+            /**
+             * In Words
+             * @description What the model wrote: the claim, the arrow's reason, or the sentence saying this line is finished. Never an identifier.
+             */
+            in_words: string;
+            /**
+             * Violations
+             * @description Every reason the map's own rules gave, in their words. Empty unless refused.
+             * @default []
+             */
+            violations: components["schemas"]["Violation"][];
+            /**
+             * Dropped
+             * @description Every address this call's answer cited that the search never returned. The reader is told which one rather than left to notice that an arrow says it argued where it might have said it documented.
+             * @default []
+             */
+            dropped: string[];
+            /**
+             * No Reference Class
+             * @description The reference class of a count that was offered with nothing behind it, when one was. The count itself is not kept: a figure with no page behind it reads as measured however it is marked, so the transcript says a class was offered and that nothing backed it, and shows no number (Kent, 2026-09-20).
+             */
+            no_reference_class?: string | null;
+            /**
+             * Calls
+             * @description How many round trips this question took.
+             * @default 0
+             */
+            calls: number;
+            /**
+             * Searches
+             * @description How many web searches it ran.
+             * @default 0
+             */
+            searches: number;
+            /**
+             * Input Tokens
+             * @description Tokens of question read fresh.
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @description Tokens of answer written.
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @description Tokens recognised from an earlier call.
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Thinking Tokens
+             * @description How many written tokens were thinking rather than answering.
+             * @default 0
+             */
+            thinking_tokens: number;
+            /**
+             * Seconds
+             * @description How long this question took, wall clock.
+             * @default 0
+             */
+            seconds: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1350,10 +1712,10 @@ export interface components {
         Violation: {
             /**
              * Code
-             * @description Which rule was broken. One of nineteen stable strings.
+             * @description Which rule was broken. One of twenty stable strings.
              * @enum {string}
              */
-            code: "missing_resolution" | "missing_rationale" | "documented_without_source" | "cycle" | "reflexive_without_lag" | "half_life_without_impulse" | "impulse_without_half_life" | "belief_out_of_range" | "no_terminal" | "no_hypothesis" | "multiple_hypotheses" | "dangling_link" | "market_without_payoff" | "not_tradeable_without_reason" | "unknown_target" | "unknown_link" | "duplicate_id" | "edit_not_applicable" | "worlds_not_comparable";
+            code: "missing_resolution" | "missing_rationale" | "documented_without_source" | "cycle" | "reflexive_without_lag" | "half_life_without_impulse" | "impulse_without_half_life" | "belief_out_of_range" | "no_terminal" | "no_hypothesis" | "multiple_hypotheses" | "dangling_link" | "duplicate_link" | "market_without_payoff" | "not_tradeable_without_reason" | "unknown_target" | "unknown_link" | "duplicate_id" | "edit_not_applicable" | "worlds_not_comparable";
             /**
              * Subject
              * @description The identifier of the thing at fault: a proposition id, a link id, the graph's own id for faults about the map as a whole — including two worlds that cannot be compared, which names the map they should both have come from — or a branch id when a chain of branches cannot be put in order. Never shown to the user.
@@ -1504,21 +1866,159 @@ export interface components {
             branch?: components["schemas"]["Branch"] | null;
             /**
              * Seed
-             * @description The one number every random draw in the answer comes from. The same seed always gives the same world.
+             * @description The one number every random draw in the answer comes from. The same seed always gives the same world. Bounded by what a browser can hold exactly: above it a browser rounds silently, asks for a world under a seed the server never used, and every explanation of the numbers is then wrong.
              */
             seed: number;
             /**
              * Versions
-             * @description How many versions of the map to try: how sure we are of the numbers put in. Each version is one coherent set of numbers this model would have stood behind, and the range on every answer is the spread across them.
+             * @description How many versions of the map to try: how sure we are of the numbers put in. Each version is one coherent set of numbers this model would have stood behind, and the range on every answer is the spread across them. Bounded at both ends: a request above the ceiling is refused, never quietly made smaller, because a caller who asks for one run and gets another is reading numbers that answer a question nobody asked.
              * @default 2000
              */
             versions: number;
             /**
              * Worlds
-             * @description How many worlds to run under each version: how the dice fall. At least two, or there is no spread inside a version to subtract from the range.
+             * @description How many worlds to run under each version: how the dice fall. At least two, or there is no spread inside a version to subtract from the range; and no more than the ceiling, which is measured rather than chosen.
              * @default 8
              */
             worlds: number;
+        };
+        /**
+         * Receipt
+         * @description What this run cost. The second-to-last event of every stream.
+         *
+         *     Second-to-last in both endings — before the run finished and before it broke.
+         *     A run that broke after ten calls still cost ten calls, and a run that broke
+         *     before its first emits a receipt of zeroes, which is also true.
+         *
+         *     It is not the same shape as the running total `engine/receipt.py` keeps. That
+         *     one counts what the bill is made of, cache writes included; this one is what a
+         *     person is shown, and it carries the three facts about the run that live here
+         *     and nowhere else: whether it was live or played back, the day the recording
+         *     was made, and the fingerprint of the prompt behind it.
+         */
+        katalyst__engine__events__Receipt: {
+            /**
+             * Model
+             * @description Which model wrote this map.
+             */
+            model: string;
+            /**
+             * Calls
+             * @description How many round trips the run made.
+             */
+            calls: number;
+            /**
+             * Input Tokens
+             * @description Tokens of question read fresh.
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @description Tokens of answer written, thinking included.
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @description Tokens the service recognised from an earlier call. A run where this stays at nothing is a bug in how the request is put together.
+             */
+            cache_read_tokens: number;
+            /**
+             * Searches
+             * @description Web searches this run made. Billed apart from tokens, so the dollars below cannot be worked out again without it.
+             */
+            searches: number;
+            /**
+             * Dollars
+             * @description What all of that came to, at the shipped price table.
+             */
+            dollars: number;
+            /**
+             * Seconds
+             * @description How long the run took, wall clock.
+             */
+            seconds: number;
+            /**
+             * Mode
+             * @description Whether this run called a model or played a recording back.
+             * @enum {string}
+             */
+            mode: "live" | "replay";
+            /**
+             * Recording Date
+             * @description The day the recording was made. Nothing at all when live.
+             */
+            recording_date?: string | null;
+            /**
+             * Effort
+             * @description How hard the model was asked to try, as a plain word — `default` when nothing was sent and the service's own applied, otherwise `low`, `medium`, `high`, `xhigh` or `max`. One setting with two pinned defaults behind it: a recording is made rich and a live run is made fast, and a reader of a map is entitled to know which this was (Kent, G13, 2026-09-21).
+             * @default default
+             */
+            effort: string;
+            /**
+             * Prompt Hash
+             * @description The fingerprint of the prompt this run was made against.
+             */
+            prompt_hash: string;
+        };
+        /**
+         * Receipt
+         * @description What one run has spent so far, and on what.
+         *
+         *     Frozen, like everything else on this map: folding a call in returns a new
+         *     receipt rather than changing this one, so a receipt handed to somebody cannot
+         *     quietly grow behind their back.
+         *
+         *     `dollars` is worked out from the counters and the price table every time the
+         *     receipt changes, so it can never drift away from the numbers beside it.
+         */
+        katalyst__engine__receipt__Receipt: {
+            /**
+             * Model
+             * @description Which model the run asked. Priced by `pricing.py`.
+             */
+            model: string;
+            /**
+             * Calls
+             * @description How many round trips this run has made. A question whose answer came back part finished and was sent back to be continued counts each trip, because each trip is on the bill.
+             * @default 0
+             */
+            calls: number;
+            /**
+             * Searches
+             * @description How many web searches the model ran across the whole run.
+             * @default 0
+             */
+            searches: number;
+            /**
+             * Input Tokens
+             * @description Tokens of question read fresh. It is the remainder only: the ones read back out of the cache are counted separately below.
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @description Tokens of answer written, the model's thinking included.
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @description Tokens the service recognised from an earlier call and charged a tenth of the usual price for. A run where this stays at nothing is a bug in how the request is put together, not a slow day.
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @description Tokens written into the cache as they were read, charged at more than a fresh one. A run pays these on its first call and rarely again.
+             * @default 0
+             */
+            cache_write_tokens: number;
+            /**
+             * Dollars
+             * @description What all of the above comes to, at the prices in `pricing.py`.
+             * @default 0
+             */
+            dollars: number;
         };
     };
     responses: never;
@@ -1735,6 +2235,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefusedEdit"];
+                };
+            };
+        };
+    };
+    generate_api_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description The eight events, in the order the grammar allows, one `event:` line and one `data:` line each. A refusal is one of them, never an error. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_a_claim_api_generate_insert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InsertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftedInsert"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcript_of_api_generate__generation_id__transcript_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                generation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transcript"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

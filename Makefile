@@ -11,7 +11,7 @@
 
 # These are names of tasks, not names of files to build. Saying so means `make
 # test` still works if a file called `test` ever appears.
-.PHONY: help dev up down prod test lint types eval record-cassettes
+.PHONY: help dev up down prod test lint types eval record-cassettes record-demo run-demo
 
 help: ## Show this list
 	@echo "Katalyst — make <task>"
@@ -49,9 +49,47 @@ types: frontend/node_modules ## Rewrite the browser app's types from the server'
 	./scripts/gen-types.sh
 
 eval: ## Score what the language model proposes against saved examples
-	@echo "make eval arrives in stack 04, the stack that first asks a language model for anything."
+	@echo "make eval arrives in the next pull request of this stack: the four saved"
+	@echo "examples, scored on structure and never on wording."
 
-# --- the one task that spends money -----------------------------------------
+# --- the two tasks that spend money -----------------------------------------
+#
+# `record-demo` writes the files a keyless clone plays back: one whole generation
+# per example, one JSON object per line. It is the only thing that ever writes
+# one — a hand-edited recording is a piece of state that traces to nobody.
+#
+#   make record-demo                  every example, at the ceiling written in code
+#   make record-demo ONLY=hormuz      one of them
+#   make record-demo CAP=5            the same, with a lower ceiling
+#   make run-demo EFFORT=medium       the same run, thinking less hard
+#   make run-demo MODEL=claude-opus-5 the same run, on the other model
+#
+# All four are flags on the one program, rather than two flags and an
+# environment variable: one way to say a thing is one place to look for it.
+#
+# EFFORT and MODEL are pinned for the whole of one run and never varied between
+# its calls: both are read once when the run starts, and changing either mid-run
+# would throw away the remembered prefix the run is reading back at a tenth of
+# the price. Left unset, EFFORT sends no such field at all and the service's own
+# default stands, so the request is byte for byte what it was before anybody had
+# an opinion (Kent, 2026-09-20).
+#
+# CAP can only lower the $15 hard stop that is written in code, never lift it: a
+# cap a caller can raise is not a cap. A run that reaches it stops and says what
+# it spent and what it got.
+#
+# `run-demo` is the same run meant as a measurement: it keeps everything and
+# writes no recording. One code path, one flag.
+#
+# **Either way the run is kept.** Whatever becomes of it, both print the whole
+# receipt and the reason it stopped, and write everything the run produced —
+# every proposal with the seconds and thinking tokens it took, the receipt, the
+# map — into `backend/.runs/`, which is not committed. A run that cost money and
+# left nothing behind is an afternoon nobody can account for.
+#
+# Re-run `record-demo` whenever a prompt changes. A recording made against
+# different words shows wording this program no longer uses, and the build says
+# so.
 #
 # Everything else in this file runs with no key. This one calls the model for
 # real and writes what it says into backend/tests/cassettes, so that every later
@@ -67,6 +105,16 @@ eval: ## Score what the language model proposes against saved examples
 #
 # Re-run this whenever a prompt changes. A recording made against different
 # words is a recording of a question we no longer ask.
+
+record-demo: ## Record an example running for real, so a keyless clone can watch it. Spends money; needs a key
+	cd backend && uv run python -m katalyst.engine.record \
+		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),) \
+		$(if $(EFFORT),--effort $(EFFORT),) $(if $(MODEL),--model $(MODEL),)
+
+run-demo: ## Run an example for real as a measurement, and write no recording. Spends money; needs a key
+	cd backend && uv run python -m katalyst.engine.record --measure-only \
+		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),) \
+		$(if $(EFFORT),--effort $(EFFORT),) $(if $(MODEL),--model $(MODEL),)
 
 record-cassettes: ## Record the model's real answers for the tests to replay. Spends money; needs a key
 	cd backend && uv run pytest tests/boundary -m "not handmade" --record-mode=rewrite

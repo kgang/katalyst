@@ -53,6 +53,7 @@ ViolationCode = Literal[
     "no_hypothesis",
     "multiple_hypotheses",
     "dangling_link",
+    "duplicate_link",
     "market_without_payoff",
     "not_tradeable_without_reason",
     "unknown_target",
@@ -61,9 +62,9 @@ ViolationCode = Literal[
     "edit_not_applicable",
     "worlds_not_comparable",
 ]
-"""The nineteen things that can be wrong: fourteen faults in a map, five refusals.
+"""The twenty things that can be wrong: fifteen faults in a map, five refusals.
 
-The first fourteen are what `validate` finds in a map. The last five are what our
+The first fifteen are what `validate` finds in a map. The last five are what our
 own code refuses to do, and no map can carry any of them. Four are about an
 *edit*, found when a branch is folded onto a map:
 
@@ -116,9 +117,7 @@ class Violation(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    code: ViolationCode = Field(
-        description="Which rule was broken. One of nineteen stable strings."
-    )
+    code: ViolationCode = Field(description="Which rule was broken. One of twenty stable strings.")
     subject: str = Field(
         description=(
             "The identifier of the thing at fault: a proposition id, a link id, the graph's own "
@@ -168,6 +167,7 @@ def validate(graph: Graph) -> list[Violation]:
         _arrows_say_why(graph, claims),
         _arrows_claiming_evidence_cite_it(graph, claims),
         _arrows_join_claims_on_this_map(graph, claims),
+        _one_arrow_between_any_two_claims(graph, claims),
         _no_loops_once_feedback_is_set_aside(graph, claims),
         _feedback_arrows_take_time(graph, claims),
         _half_lives_belong_to_pushes_that_fade(graph, claims),
@@ -484,7 +484,61 @@ def _arrows_join_claims_on_this_map(
     return found
 
 
-# --- Rule 9 — no loops, once the feedback arrows are set aside -------------
+# --- Rule 9 — one arrow between any two claims -----------------------------
+
+
+def _one_arrow_between_any_two_claims(
+    graph: Graph, claims: dict[PropositionId, Proposition]
+) -> list[Violation]:
+    """Find a second arrow drawn between a pair of claims one arrow already joins.
+
+    Propagation adds every arrow coming into a claim, so two arrows from the same
+    cause to the same effect push it twice as hard as either of them says — and
+    the canvas draws two wires where a reader sees one relationship. There is no
+    way in these shapes to say *two separate channels*: strength, lag and shape
+    are per arrow and they simply add up. Two genuinely different mechanisms want
+    the claim that sits between them, which is a third claim rather than a second
+    arrow.
+
+    **The two directions of a pair are a different thing and stay legal.** A to B
+    alongside B to A is the feedback loop a reflexive arrow exists for, which is
+    why the pair is read in order rather than as a set.
+
+    The **first** arrow between a pair is never the fault. The ones after it are,
+    which is what lets a map be built one arrow at a time: the arrow that arrives
+    and finds the pair already joined is the one the interface highlights, and the
+    one the map's own rules refuse.
+
+    Args:
+        graph: The map to read.
+        claims: Every claim on the map, by identifier.
+
+    Returns:
+        One violation per arrow after the first between the same ordered pair.
+    """
+    found: list[Violation] = []
+    joined: set[tuple[PropositionId, PropositionId]] = set()
+    for link in graph.links:
+        pair = (link.source, link.target)
+        if pair in joined:
+            found.append(
+                Violation(
+                    code="duplicate_link",
+                    subject=link.id,
+                    message=(
+                        f"{_name_of(claims, link.source)} and "
+                        f"{_name_of(claims, link.target)} are already joined by an "
+                        "arrow in that direction. Two arrows the same way round add "
+                        "their pushes together, so a second one says the cause is "
+                        "stronger than either arrow claims."
+                    ),
+                )
+            )
+        joined.add(pair)
+    return found
+
+
+# --- Rule 10 — no loops, once the feedback arrows are set aside ------------
 
 
 def _walkable_map(

@@ -10,6 +10,7 @@ from katalyst.engine.client import what_it_said
 from katalyst.engine.expand import expand
 from katalyst.engine.grounding import found_in, keep_cited, provenance_of
 from katalyst.engine.outcome import Accepted, Refused
+from katalyst.engine.transcript import line_for
 from katalyst.fixtures import HORMUZ
 from tests.unit.engine.answers import (
     THE_DAY_THE_RUN_HAPPENED,
@@ -56,7 +57,7 @@ def test_a_search_that_failed_reads_as_nothing_found_and_never_as_a_crash() -> N
 def test_an_address_is_the_same_address_after_whitespace_and_one_trailing_slash() -> None:
     """Matching is exact, and deliberately not clever."""
     found = (Source(url=A_PAGE, title="What is there", retrieved=THE_DAY_THE_RUN_HAPPENED),)
-    cited = an_arrow(cites=(f"  {A_PAGE}/  ",))
+    cited = (f"  {A_PAGE}/  ",)
 
     kept, dropped = keep_cited(cited, found)
 
@@ -67,7 +68,7 @@ def test_an_address_is_the_same_address_after_whitespace_and_one_trailing_slash(
 def test_a_cited_address_the_search_never_returned_is_dropped_and_named() -> None:
     """It is not fetched to see whether it was real, and not kept with a caveat."""
     found = (Source(url=A_PAGE, title="What is there", retrieved=THE_DAY_THE_RUN_HAPPENED),)
-    cited = an_arrow(cites=(A_PAGE, NEVER_RETURNED))
+    cited = (A_PAGE, NEVER_RETURNED)
 
     kept, dropped = keep_cited(cited, found)
 
@@ -131,8 +132,11 @@ def test_a_documented_arrow_that_cites_nothing_is_refused_whoever_wrote_it() -> 
     """The pipeline cannot produce one, and the map's own rules refuse one anyway."""
     unbacked = Link(
         id="an-arrow",
-        source="H",
-        target="C",
+        # A pair the stored map does not already join: since 2026-09-20 a second
+        # arrow the same way round is a fault of its own, and this test is about
+        # a different one.
+        source="C",
+        target="M1",
         mode="sustain",
         strength=0.5,
         lag=1.0,
@@ -191,3 +195,64 @@ def test_a_refusal_keeps_the_arrow_off_the_map_sources_and_all() -> None:
 
     assert isinstance(outcome.result, Refused)  # type: ignore[union-attr]
     assert all(A_PAGE not in [s.url for s in one.sources] for one in HORMUZ.links)
+
+
+def test_a_base_rate_nobody_sourced_is_dropped_and_noted() -> None:
+    """Measured, 2026-09-17: eight claims in ten carried a count behind no page.
+
+    One of them was "37 of 41 cases since 1980" — which is the schema's own
+    example wearing a number. A count nobody can open a page for is the same
+    failure as a mechanism nobody can open a page for, so it goes through the
+    same rule and the claim arrives without it.
+    """
+    counted = BaseRate(
+        reference_class="Closures of a major strait since 1980",
+        k=37,
+        n=41,
+        sources=(NEVER_RETURNED,),
+    )
+    answered = a_claim("A claim with a remembered count.", cause="C", counted=counted)
+
+    outcome = ask(Scripted([an_answer(answered, found=(A_PAGE,), searches=1)]))
+
+    accepted = outcome.result  # type: ignore[attr-defined]
+    assert isinstance(accepted, Accepted)
+    assert accepted.proposition is not None
+    assert accepted.proposition.base_rate is None
+    assert accepted.base_rate_dropped == "Closures of a major strait since 1980"
+    # And the transcript says a class was offered and nothing backed it, showing
+    # no number: a figure with no page behind it reads as measured however it is
+    # marked (`grounding.md` INV-generation.14).
+    line = line_for(outcome, 0)  # type: ignore[arg-type]
+    assert line.no_reference_class == "Closures of a major strait since 1980"
+    assert "37" not in line.in_words
+
+
+def test_a_count_the_search_did_return_is_kept_with_only_those_pages() -> None:
+    """The other side of the same rule: a sourced count survives, minus what was not found."""
+    counted = BaseRate(
+        reference_class="Something somebody counted and published",
+        k=3,
+        n=10,
+        sources=(A_PAGE, NEVER_RETURNED),
+    )
+    answered = a_claim("A claim with a checkable count.", cause="C", counted=counted)
+
+    outcome = ask(Scripted([an_answer(answered, found=(A_PAGE,), searches=1)]))
+
+    accepted = outcome.result  # type: ignore[attr-defined]
+    assert isinstance(accepted, Accepted)
+    assert accepted.proposition is not None
+    assert accepted.proposition.base_rate is not None
+    assert accepted.proposition.base_rate.sources == (A_PAGE,)
+    assert accepted.base_rate_dropped is None
+
+
+def test_one_rule_splits_the_addresses_for_arrows_and_for_counts_alike() -> None:
+    """The reason there is one function: two failures, one law, one place to change it."""
+    found = (Source(url=A_PAGE, title="A page", retrieved_at=THE_DAY_THE_RUN_HAPPENED),)
+
+    kept, dropped = keep_cited((A_PAGE, NEVER_RETURNED), found)
+
+    assert [one.url for one in kept] == [A_PAGE]
+    assert dropped == (NEVER_RETURNED,)

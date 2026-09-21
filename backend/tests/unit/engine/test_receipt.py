@@ -8,9 +8,8 @@ each other.
 from katalyst.engine.pricing import (
     CACHE_READ_SHARE_OF_INPUT,
     CACHE_WRITE_SHARE_OF_INPUT,
-    DOLLARS_PER_MILLION_INPUT_TOKENS,
-    DOLLARS_PER_MILLION_OUTPUT_TOKENS,
-    MODEL,
+    PER_MODEL,
+    prices_for,
 )
 from katalyst.engine.receipt import (
     dollars_for,
@@ -19,6 +18,7 @@ from katalyst.engine.receipt import (
     over_the_cap,
     what_it_spent_and_got,
 )
+from katalyst.settings import get_settings
 from tests.unit.engine.answers import Scripted, a_claim, an_answer
 from tests.unit.engine.test_expand import ask
 
@@ -34,7 +34,7 @@ def test_a_run_that_has_asked_nothing_has_spent_nothing() -> None:
     """Every counter starts at zero, and so does the bill."""
     nothing = nothing_spent_yet()
 
-    assert nothing.model == MODEL
+    assert nothing.model == get_settings().KATALYST_MODEL
     assert nothing.calls == 0
     assert nothing.dollars == 0.0
 
@@ -93,7 +93,38 @@ def test_a_token_written_into_the_cache_costs_more_than_a_fresh_one() -> None:
 
 def test_an_answer_costs_more_than_a_question_of_the_same_length() -> None:
     """A direction, not a number: the price table says which way round it goes."""
-    assert DOLLARS_PER_MILLION_OUTPUT_TOKENS > DOLLARS_PER_MILLION_INPUT_TOKENS
+    assert all(one.output_tokens > one.input_tokens for one in PER_MODEL.values())
+
+
+def test_every_model_this_program_may_be_pointed_at_is_priced() -> None:
+    """A bill worked out at a guess is worse than no bill, so it refuses instead."""
+    for named in PER_MODEL:
+        assert prices_for(named).input_tokens > 0
+
+    import pytest
+
+    with pytest.raises(KeyError, match="Nobody has read the prices"):
+        prices_for("a-model-nobody-priced")
+
+
+def test_every_model_says_how_long_a_prefix_it_will_remember() -> None:
+    """The one number that changes a bill without changing a line of code.
+
+    It is not the same for every model — the cheaper one needs twice the prefix
+    the dearer one does — and below it nothing caches, nothing errors, and the
+    bill simply goes up.
+    """
+    from katalyst.engine.prompt import STANDING_TEXT
+
+    # A pessimistic count: English runs about four characters to a token, so
+    # five is a floor nothing realistic falls below.
+    at_least = len(STANDING_TEXT) // 5
+    for named, prices in PER_MODEL.items():
+        assert prices.cacheable_from > 0
+        assert at_least >= prices.cacheable_from, (
+            f"the standing prompt is too short for {named} to remember: it needs "
+            f"{prices.cacheable_from:,} tokens and this is at most {at_least:,}"
+        )
 
 
 def test_a_search_is_on_the_bill_as_well_as_the_tokens_it_brought_back() -> None:

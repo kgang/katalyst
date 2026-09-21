@@ -20,7 +20,23 @@ and it is what lets the stored Hormuz example use identifiers a person can read 
 a test fails.
 """
 
+import secrets
+
 from ulid import ULID
+
+BIGGEST_SEED = 2**53 - 1
+"""The largest whole number that survives the trip to a browser and back.
+
+**This is not a style choice.** A browser holds every number as a double, and
+above this it starts rounding silently: the first measured run minted
+`4803646386380448080`, and JavaScript reads that back as `4803646386380448300`.
+Nothing errors. The browser then asks for a world under a seed the server never
+used, gets different numbers, and every explanation of why is wrong.
+
+So a seed is minted inside the range a browser can hold exactly, and every route
+that takes one refuses anything above it rather than accepting a number it knows
+will not come back the same.
+"""
 
 
 def mint_id() -> str:
@@ -35,3 +51,23 @@ def mint_id() -> str:
         The identifier as a plain string, ready to pass into a domain model.
     """
     return str(ULID())
+
+
+def mint_seed() -> int:
+    """Make one new seed: the number every likelihood on a map is worked out from.
+
+    Minted here, at the edge, for the same reason an identifier is: it needs a
+    source of randomness, and the rules layer reads none. A request that leaves
+    the seed out gets one from here, and the generation's first event says which —
+    so a run is reproducible from the moment it starts.
+
+    **The browser never invents one.** It sends a seed only to reproduce a run it
+    was handed, which is the one case where a seed means something to whoever is
+    sending it; a number made up at the other end would be a number nobody
+    computed sitting inside the reproducibility of the answer.
+
+    Returns:
+        A whole number, positive, and small enough that a browser reads it back
+        unchanged.
+    """
+    return secrets.randbelow(BIGGEST_SEED) + 1

@@ -5,6 +5,8 @@ asked about it — and the test checks the map that came out and the one reason 
 run gives for stopping.
 """
 
+from katalyst.domain import validate
+from katalyst.engine.client import SEARCHES_INSIDE_ONE_CALL, TheModelDidNotAnswer
 from katalyst.engine.grow import Finished, grow
 from katalyst.engine.outcome import Accepted, Caps, Outcome, Refused
 from katalyst.engine.receipt import dollars_for
@@ -224,7 +226,12 @@ def test_a_run_makes_no_further_call_once_it_has_spent_its_ceiling() -> None:
 
 
 def test_a_run_stops_searching_at_its_search_cap() -> None:
-    """The map keeps building; the arrows added afterwards say they argued."""
+    """The map keeps building; the arrows added afterwards say they argued.
+
+    The cap is a whole call's worth, because a call is told once whether it may
+    search and can then spend up to its own ceiling: a budget smaller than that
+    ceiling can never be handed to anybody (2026-09-20).
+    """
     searching = an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION), searches=1)
     told = Storyteller(
         {
@@ -232,9 +239,9 @@ def test_a_run_stops_searching_at_its_search_cap() -> None:
             A_STEP: [an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market"))],
         }
     )
-    finished = ending(walk(told, at_once=1, searches=1))
+    finished = ending(walk(told, at_once=1, searches=SEARCHES_INSIDE_ONE_CALL))
 
-    assert finished.receipt.searches <= 1
+    assert finished.receipt.searches <= SEARCHES_INSIDE_ONE_CALL
     assert told.searched[0] is True
     assert told.searched[-1] is False
     assert finished.reason != "no_terminal"
@@ -455,14 +462,22 @@ def test_an_arrow_between_two_claims_counts_toward_the_room_beside_its_cause() -
         {
             STARTED_AT: [
                 an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
-                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_claim(ANOTHER_STEP, cause=FROM_THE_QUESTION)),
                 an_answer(a_link(FROM_THE_QUESTION, AN_ENDING)),
                 an_answer(a_stop()),
             ],
-            A_STEP: [an_answer(a_stop())],
+            # The ending is reached from the step, so the arrow the starting claim
+            # draws to it is the first between that pair — a second arrow the same
+            # way round is a fault of its own since 2026-09-20, and this test is
+            # about the width cap rather than that rule.
+            A_STEP: [
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_stop()),
+            ],
+            ANOTHER_STEP: [an_answer(a_stop())],
         }
     )
-    steps = walk(told, at_once=1, width=3)
+    steps = walk(told, at_once=2, width=3)
     finished = ending(steps)
 
     assert finished.graph is not None
@@ -480,3 +495,380 @@ def test_an_arrow_between_two_claims_counts_toward_the_room_beside_its_cause() -
     assert len(arrow_only) == 1
     assert started not in arrow_only[0].frontier
     assert told.asked_about.count(STARTED_AT) == 3
+
+
+# --- A round of answers is judged where the map actually changes -----------
+#
+# Found by a read-only review of the pipeline, 2026-09-20, and confirmed by
+# running it. A round hands one snapshot of the map to all three calls and each
+# answer is judged against that snapshot, then all three are appended with no
+# further check. Two answers, each perfectly legal on its own, could between them
+# leave a map the rules refuse — and nothing was shown, counted or refused.
+
+
+def refusals_in(steps: list[object]) -> list[Outcome]:
+    """Every refused outcome a walk handed back, in order."""
+    return [one for one in steps if isinstance(one, Outcome) and isinstance(one.result, Refused)]
+
+
+def a_round_that_closes_a_loop() -> Storyteller:
+    """Two answers in one round which are legal apart and a loop together."""
+    return Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(ANOTHER_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_link(A_STEP, ANOTHER_STEP)),
+                an_answer(a_stop()),
+            ],
+            ANOTHER_STEP: [
+                an_answer(a_link(ANOTHER_STEP, A_STEP)),
+                an_answer(a_stop()),
+            ],
+        }
+    )
+
+
+def test_a_round_never_leaves_behind_a_map_the_rules_refuse() -> None:
+    """The map that comes out of a concurrent walk is a map `validate` accepts.
+
+    The two answers in the last round draw an arrow each way round between the
+    same two claims. Each is legal against the map as it stood when the round
+    started; together they are a loop. The one folded second is the one that
+    breaks it, and it is refused there — where the map actually changes.
+    """
+    steps = walk(a_round_that_closes_a_loop(), at_once=3, width=3)
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    assert validate(finished.graph) == []
+
+
+def test_an_answer_that_stops_being_legal_before_it_lands_is_refused_like_any_other() -> None:
+    """Shown, counted, never quietly dropped and never repaired."""
+    steps = walk(a_round_that_closes_a_loop(), at_once=3, width=3)
+    finished = ending(steps)
+
+    refused = refusals_in(steps[:-1])
+    assert len(refused) == 1
+    assert [one.code for one in refused[0].result.violations] == ["cycle"]  # type: ignore[union-attr]
+    assert finished.refused == 1
+    # The money it cost is still on the bill: it was a real call.
+    assert refused[0].calls == 1
+
+
+def test_two_answers_in_one_round_cannot_draw_the_same_arrow_twice() -> None:
+    """The other half of the same hole, and the reason `duplicate_link` exists."""
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(ANOTHER_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_link(A_STEP, ANOTHER_STEP)),
+                an_answer(a_stop()),
+            ],
+            ANOTHER_STEP: [
+                an_answer(a_link(A_STEP, ANOTHER_STEP)),
+                an_answer(a_stop()),
+            ],
+        }
+    )
+
+    steps = walk(told, at_once=3, width=3)
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    assert validate(finished.graph) == []
+    refused = refusals_in(steps[:-1])
+    assert [one.code for one in refused[0].result.violations] == ["duplicate_link"]  # type: ignore[union-attr]
+
+
+def test_the_width_cap_counts_the_room_beside_the_arrows_own_cause() -> None:
+    """An arrow naming somebody else's claim as its cause spends that claim's width.
+
+    Before this, the cap was checked only against the claim the call was about, so
+    an arrow proposed while expanding one claim could add a fourth, fifth and
+    sixth arrow to another (2026-09-20).
+    """
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(ANOTHER_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                # Its own width is spent; this arrow spends the starting claim's.
+                an_answer(a_link(STARTED_AT, AN_ENDING)),
+                an_answer(a_stop()),
+            ],
+            ANOTHER_STEP: [an_answer(a_stop())],
+        }
+    )
+
+    steps = walk(told, at_once=1, width=2)
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    started = finished.graph.hypothesis_id
+    assert sum(1 for one in finished.graph.links if one.source == started) == 2
+    refused = refusals_in(steps[:-1])
+    assert len(refused) == 1
+    said = refused[0].result.claim_in_words  # type: ignore[union-attr]
+    assert "room beside" in said
+    # A reader sees this sentence drawn as a tile, so it names the claim by its
+    # own words and never by a minted identifier (2026-09-20).
+    assert STARTED_AT in said
+    assert finished.graph.hypothesis_id not in said
+
+
+# --- Caps that were checked in the wrong place -----------------------------
+
+
+def an_expensive_round() -> Storyteller:
+    """A story whose second round costs more than the run is allowed to spend."""
+    return Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(ANOTHER_STEP, cause=FROM_THE_QUESTION), written=200_000),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [
+                an_answer(
+                    a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market"), written=200_000
+                ),
+                an_answer(a_stop()),
+            ],
+            ANOTHER_STEP: [an_answer(a_stop())],
+        }
+    )
+
+
+def test_every_question_a_run_pays_for_is_handed_back_and_counted() -> None:
+    """Nothing already paid for is thrown away because the money ran out (2026-09-20).
+
+    A round's calls are all in flight before the first of them is folded. The
+    walk used to stop folding the moment the ceiling was passed, so the answers
+    behind it were never yielded, never put on the map and never put on the bill —
+    a call that cost money and is not counted is money the receipt cannot account
+    for, which `outcome.py` forbids in as many words.
+    """
+    told = an_expensive_round()
+
+    steps = walk(told, at_once=3, dollars=1.0)
+    finished = ending(steps)
+
+    outcomes = [one for one in steps[:-1] if isinstance(one, Outcome)]
+    assert finished.reason == "spend_cap"
+    assert len(outcomes) == len(told.asked)
+    assert finished.receipt.calls == len(told.asked)
+
+
+def test_a_round_never_carries_the_map_past_the_claim_cap() -> None:
+    """The cap used to be read once a round, so a round could step over it.
+
+    Three questions in flight can bring three claims back, and the map was only
+    measured between rounds: a run allowed three claims could finish with five.
+    The round is sized to the room that is left instead (2026-09-20).
+    """
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_stop()),
+            ],
+            # Asked in the same round as the starting claim before the fix, which
+            # is how a run allowed three claims came back with four.
+            A_STEP: [
+                an_answer(a_claim(ANOTHER_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_stop()),
+            ],
+            ANOTHER_STEP: [an_answer(a_stop())],
+        }
+    )
+
+    finished = ending(walk(told, at_once=3, claims=3))
+
+    assert finished.graph is not None
+    assert len(finished.graph.propositions) == 3
+    assert finished.reason == "claim_cap"
+
+
+def test_a_round_never_carries_the_run_past_the_searches_cap() -> None:
+    """The same shape of mistake, and the same fix, on the other cap.
+
+    One call may now run twenty-five searches, so a round of three could carry a
+    run seventy-five past its ceiling. Each call in a round is allowed or refused
+    the tool in turn, and a call is allowed only while the whole of what it could
+    still spend fits — so the ceiling is never passed (2026-09-20).
+    """
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION), searches=8),
+                an_answer(a_claim(ANOTHER_STEP, cause=FROM_THE_QUESTION), searches=8),
+                an_answer(a_stop(), searches=8),
+            ],
+            A_STEP: [
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market"), searches=8),
+                an_answer(a_stop(), searches=8),
+            ],
+            ANOTHER_STEP: [an_answer(a_stop(), searches=8)],
+        }
+    )
+
+    finished = ending(walk(told, at_once=3, searches=30))
+
+    assert finished.receipt.searches <= 30
+    # And the run carried on to a proper ending: a spent budget stops searching,
+    # never the generation.
+    assert finished.reason != "spend_cap"
+
+
+def test_a_run_that_runs_out_of_money_on_the_first_question_says_so() -> None:
+    """`spend_cap` is an override, and it overrides this too (2026-09-20).
+
+    A run whose very first question emptied the purse used to report `refusal_cap`
+    and "the sentence could not be written as a claim anybody could settle" —
+    which blames the person's sentence for the ceiling being low.
+    """
+    told = Scripted(
+        starting=[a_declined_answer("Not this one.", written=200_000)],
+    )
+
+    finished = ending(walk(told, dollars=1.0))
+
+    assert finished.reason == "spend_cap"
+    assert finished.graph is None
+    assert "spending limit" in finished.why
+
+
+def test_a_service_that_would_not_answer_one_call_never_takes_the_round_with_it() -> None:
+    """The other two answers of that round were paid for and are still folded.
+
+    Before this, a 429 escaped `expand`, escaped `grow`, and left no partial map,
+    no receipt and no `Finished` at all (2026-09-20).
+    """
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [
+                # Asked in the same round as the starting claim's second answer.
+                TheModelDidNotAnswer("The model is busy and turned this question away."),
+                an_answer(a_stop()),
+            ],
+        }
+    )
+
+    steps = walk(told, at_once=3)
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    assert len(finished.graph.propositions) == 3
+    refused = refusals_in(steps[:-1])
+    assert [one.result.claim_in_words for one in refused] == [  # type: ignore[union-attr]
+        "The model is busy and turned this question away."
+    ]
+    assert finished.refused == 1
+    assert finished.reason == "reached_terminal"
+
+
+def test_a_service_that_never_answers_ends_the_run_saying_which_it_was() -> None:
+    """Three failures in a row on the first question is a run that cannot start.
+
+    It must not say "the sentence could not be written as a claim anybody could
+    settle" — the sentence was never the problem, and a person reading that would
+    go and rewrite a perfectly good one (2026-09-20).
+    """
+    told = Scripted(raises=TheModelDidNotAnswer("The model could not be reached."))
+
+    finished = ending(walk(told))
+
+    assert finished.reason == "refusal_cap"
+    assert finished.graph is None
+    assert "could not be reached" in finished.why
+
+
+def test_a_claims_run_of_refusals_starts_again_the_moment_it_is_answered() -> None:
+    """Three **in a row**, not three in all — and nothing pinned that until now.
+
+    A line that is refused twice, answered, and then refused twice more has had
+    four refusals and is still open, because none of its runs reached three. The
+    counter is reset where the acceptance is folded; a counter that only ever
+    went up would close a productive line on its fourth mistake of the afternoon
+    (2026-09-20).
+    """
+    refused = an_answer(a_link(STARTED_AT, STARTED_AT))
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                refused,
+                refused,
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                refused,
+                refused,
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [an_answer(a_stop())],
+        }
+    )
+
+    steps = walk(told, at_once=1, width=3)
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    assert finished.refused == 4
+    assert len(finished.graph.propositions) == 3
+    # Four refusals and the line was never closed for refusing.
+    assert finished.reason != "refusal_cap"
+
+
+def test_one_question_that_fails_never_discards_its_rounds_other_answers() -> None:
+    """The calls of a round go out together and are all billed together.
+
+    Reading them back with a comprehension meant the first exception the seam
+    had not converted threw away every other answer of that round — asked,
+    answered and paid for, and then on no receipt and in no transcript. Only a
+    bug of ours can reach this, since the seam converts everything the service
+    can do; a bug is not a reason to lose an afternoon's money (2026-09-20).
+    """
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_stop()),
+            ],
+            # Asked in the same round as the starting claim's second answer, and
+            # it fails in a way nothing downstream has a sentence for.
+            A_STEP: [RuntimeError("a bug nobody wrote a sentence for"), an_answer(a_stop())],
+        }
+    )
+
+    steps = walk(told, at_once=3)
+    finished = ending(steps)
+
+    outcomes = [one for one in steps[:-1] if isinstance(one, Outcome)]
+    # Every question asked is an outcome handed back and a call on the receipt,
+    # the one that failed included.
+    assert len(outcomes) == len(told.asked)
+    assert finished.receipt.calls == len(told.asked)
+    broke = [one for one in outcomes if "nobody chose" in getattr(one.result, "claim_in_words", "")]
+    assert len(broke) == 1
+    assert "a bug nobody wrote a sentence for" not in broke[0].result.claim_in_words  # type: ignore[union-attr]

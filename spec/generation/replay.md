@@ -81,6 +81,7 @@ Every event is re-emitted unchanged **except two** (Kent, decision S4, 2026-09-1
 | `mode` | `"replay"` |
 | `recording_date` | the header's date |
 | `prompt_hash` | the header's hash |
+| `effort` | the header's effort: how hard the model was asked to try when the map was **recorded**, not how hard this replay tried — a replay asks nobody anything, and what a reader wants to know is how the map they are watching was made (Kent, G13, 2026-09-21) |
 | `dollars` | `0.0` |
 | `calls`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `searches` | all zero — this run made no calls, used no tokens and searched for nothing |
 | `model` | copied from the recorded receipt: the model that actually wrote this map, which the reader is entitled to know |
@@ -186,12 +187,15 @@ The first live runs taught this the expensive way: a run costs real money and ta
 ```
 make run-demo    ONLY=hormuz CAP=…   # spends money, measures, keeps everything. Writes NO recording
 make record-demo ONLY=hormuz CAP=…   # runs the above, then promotes the result if it passes the checks
+make run-demo    EFFORT=medium       # the same run, thinking less hard
+make run-demo    MODEL=claude-opus-5 # the same run, on the other model
 ```
 
-* **`make run-demo` always keeps the whole run**, whatever becomes of it, under **`backend/.runs/<example>-<when>.jsonl`** — the same file format as a recording, git-ignored, never shipped. Every paid call is on disk before anything decides whether it was any good. This is where the first measured run lives, and it is where the next one's receipt is read from for `STATUS.md`.
+* **`make run-demo` always keeps the whole run**, whatever becomes of it, under **`backend/.runs/<example>-<when>-<generation>.json`**, git-ignored and never shipped. Every paid call is on disk before anything decides whether it was any good. This is where the first measured run lives, and it is where the next one's receipt is read from for [`../../docs/measurements.md`](../../docs/measurements.md).
+* **A kept run carries more than a recording does, and it is written twice** (*decided here*, 2026-09-20; the chapter first said the two were the same file format). It holds the seconds and the thinking tokens behind every call, which are on no event and in no recording, and it holds the reason a run stopped when nobody chose one. It is written the moment the generation ends and **before** the scripted intervention is drafted, then written again to the same file with the intervention on it — so an exception anywhere after the first paid call still leaves the money on disk. A 26-minute run was lost to a crash between those two points before this existed. The name carries the generation's own identifier as well as the second it started in, so two runs inside one second are still two files.
 * **`make record-demo` is still the only way a file lands in `backend/recordings/`.** It runs `make run-demo` and then promotes the result — copying it across **only if it passes every check in B9**. A run that fails a check stays in `.runs/`, legible and re-readable, and the person decides what to do next.
-* `CAP` is the run's spending ceiling in dollars (Kent, G5). The default is the **$15 hard stop written in code**, checked against the running receipt after every call; a run that reaches it stops with `done.reason = "spend_cap"` and a plain sentence naming what was spent and what was got. **The argument can only lower the ceiling, never raise it above the figure in code** — a cap a caller can raise is not a cap. The cross-run total for the stack, about $500, is a working agreement kept in `STATUS.md`; nothing is stored between runs until stack 05.
-* `ONLY` names one example, because G6 records Hormuz well before the other three.
+* `CAP` is the run's spending ceiling in dollars (Kent, G5). The default is the **$15 hard stop written in code**, checked against the running receipt after every call and between the rounds of research inside one; a run that reaches it stops with `done.reason = "spend_cap"` and a plain sentence naming what was spent and what was got. **The argument can only lower the ceiling, never raise it above the figure in code** — a cap a caller can raise is not a cap. The cross-run total for the stack, about $500, is a working agreement kept in [`../../docs/measurements.md`](../../docs/measurements.md); nothing is stored between runs until stack 05.
+* `ONLY` names one example, because G6 records Hormuz well before the other three. `EFFORT` and `MODEL` are pinned for the whole of one run and read once when it starts (Kent, G8/G10, 2026-09-20). **`EFFORT` unset sends no such field at all** and the run takes the service's own default — *record rich* (Kent, G13, 2026-09-21): a recording is made once and played back by everybody, so it is worth the model's best, and the request stays byte for byte what it was before anybody had an opinion. A live run through the stream route asks for `medium` instead, because a reader is waiting. The header says which, and so does the receipt. `MODEL` unset is the one the settings name, `claude-sonnet-5`. Neither is ever varied between the calls of one run: both sit in the part of a request the service remembers, and changing either mid-run would throw that prefix away at full price.
 * With no key both refuse to start and say so. **Only the coordinator runs either**; no sub-agent holds a key.
 * **A recording is re-made whenever a prompt changes.** This is the rule the cassettes already carry (decision record 0008), on the same pull-request checklist line: *"prompt changed? cassettes re-recorded, demo recordings re-recorded"*.
 * **Nothing else ever writes a recording** — not a test, not a fixture script, not a person with an editor.
@@ -235,9 +239,11 @@ A sixth job beside `backend`, `frontend`, `types-fresh`, `docker` and `e2e`. **I
 
 **It passes on an empty folder**, so it is green from the commit that adds it and stays green until the first recording lands. `gitleaks`, the secret scanner that already runs before every commit, scans this folder too (NFR-8: no key in a committed file).
 
-### B10 — The recordings folder is one setting
+### B10 — The folders are settings
 
-Which folder is read is **`RECORDINGS_DIR`**, a setting like everything else the environment says, read once by `katalyst.settings`. The default is `backend/recordings/`.
+Which folder is read is **`KATALYST_RECORDINGS`**, a setting like everything else the environment says, read once by `katalyst.settings`. The default is `backend/recordings/`. *(The chapter first called it `RECORDINGS_DIR`. Renamed on 2026-09-20 for one reason: every other setting this program added is `KATALYST_`-prefixed, and an unprefixed `RECORDINGS_DIR` in a shared environment is a collision waiting to happen.)* **The writer obeys it as well as the reader** — a writer that ignored a setting the reader obeys wrote into the shipped folder from a test once, which is how that was found.
+
+Two more of the same kind, and both exist so that a paid path can be exercised without paying. **`KATALYST_RUNS`** says where kept runs go; the default is `backend/.runs/`, and a test that starts the recorder points it somewhere throwaway, because that folder holds what real money bought. **`KATALYST_ANSWERER`** names an import path of a factory that builds the answerer, so the recorder can be started **as a program**, end to end, with no key and no network: two paid runs have been lost to bugs that exist only when a module is started rather than imported. A run answered that way is named as a fault and can never be promoted to a recording, so it cannot be mistaken for one.
 
 It is a setting for one reason that is not configurability: **the tests and the browser's end-to-end run need to point at a small recording of their own.** The end-to-end test drives the real launchpad through the real stream with no key, and it should not depend on whichever of the four real recordings happens to be committed today, nor take a real recording's minute of paced playback. One setting gives it a fixture-sized file of its own, through exactly the same code path. Without it the choice is a test that is slow and coupled to real recordings, or a second loading path built only for tests — and a second path is the one that rots.
 
@@ -262,7 +268,7 @@ Kent settled this on 2026-09-17 (G6), and it is an order chosen to spend the lea
 2. **Hormuz is recorded as soon as the pipeline runs.** It is the map every chapter in this book works its examples on, so a bad prompt shows up against a map the reader already knows by heart — and it unblocks the browser test and the growing canvas.
 3. **All four are recorded once the prompt is frozen**, at the end of the stream pull request.
 
-Every re-record is money, and the first Hormuz generation is also a measurement: its true cost, thinking tokens and web searches included, goes into `STATUS.md` before anything larger is run.
+Every re-record is money, and the first Hormuz generation is also a measurement: its true cost, thinking tokens and web searches included, goes into [`../../docs/measurements.md`](../../docs/measurements.md) before anything larger is run.
 
 ---
 
@@ -312,7 +318,7 @@ The generator here is **a finite corpus, not a Hypothesis strategy**, and it has
 
 Raised 2026-09-17.
 
-1. **Nobody has measured a recording yet.** Record 0012 budgets a few hundred kilobytes for four runs and says that past a megabyte we drop the stored reasoning and keep the proposals. Measure the first Hormuz file the day it is written, put the figure in `STATUS.md`, and decide then — not from an estimate.
+1. **Nobody has measured a recording yet.** Record 0012 budgets a few hundred kilobytes for four runs and says that past a megabyte we drop the stored reasoning and keep the proposals. Measure the first Hormuz file the day it is written, put the figure in [`../../docs/measurements.md`](../../docs/measurements.md), and decide then — not from an estimate.
 2. **Where the identifier of a replayed map is resolved.** A finished replay hands the browser a map with an identifier, and every edit afterwards goes through the world routes, which look up stored examples. Today the answer is "the generations this process is holding, looked up after the stored examples" ([`streaming.md`](streaming.md)). Stack 05's SQLite store (FR-31) may want that lookup instead; revisit there.
 3. **One recorded intervention per example, or two?** One is enough to prove the mechanism and it is what record 0012 settled. A second — an insert that the validator *refuses* — would show the reviewer the rejection path on an intervention as well as on a proposal, for the price of one more drafted claim per recording. Worth asking once the cost of a recording is measured.
 4. **Whether a recording should carry the wall-clock gaps of the run that made it**, so pacing could follow the real rhythm — a fast proposal, then a slow one that searched — instead of a fixed delay. It would read more like the live product and cost four numbers per file. It would also make "pacing is cosmetic and changes nothing" a longer sentence than it is now, so it needs a reason better than *nicer*. Ask after somebody has watched a live run and a replay back to back.

@@ -996,92 +996,170 @@ def best_backed_routes(
         For each claim a route reaches, that route. A claim nothing reaches is
         absent.
     """
-    onward: dict[PropositionId, list[tuple[PropositionId, float, int]]] = {}
-    backward: dict[PropositionId, list[tuple[PropositionId, float, int]]] = {}
+    arrows = tuple(_ordinary_arrows(graph))
+    # Where each arrow sits in the map's own list, which is what separates two
+    # routes that are equally well-backed and equally short.
+    position_of = {arrow.id: position for position, arrow in enumerate(graph.links)}
+
+    widest = _widths(graph, arrows, subjects, observed)
+    by_floor: dict[float, list[PropositionId]] = {}
+    for claim_id, width in widest.items():
+        by_floor.setdefault(width, []).append(claim_id)
+
+    found: dict[PropositionId, Route] = {}
+    for floor, wanted in by_floor.items():
+        over = _shortest_over(graph, arrows, position_of, subjects, observed, floor)
+        for claim_id in wanted:
+            if claim_id in subjects:
+                # A subject is reached by no arrow at all, so its route is itself.
+                found[claim_id] = Route(width=widest[claim_id], path=(claim_id,))
+                continue
+            walked = over.get(claim_id)
+            if walked is None:  # pragma: no cover - the width says it is reachable
+                continue
+            found[claim_id] = Route(width=widest[claim_id], path=walked)
+    return found
+
+
+def _widths(
+    graph: Graph,
+    arrows: tuple[Link, ...],
+    subjects: frozenset[PropositionId],
+    observed: frozenset[PropositionId],
+) -> dict[PropositionId, float]:
+    """The widest bottleneck any route reaches each claim by.
+
+    The max-min walk, which is the right way to find a widest bottleneck and
+    always was. Two states per claim, because a route out of an observed claim
+    has two halves: climbing against the arrows, then running with them. Dropping
+    from the first to the second is free and can happen anywhere, and there is no
+    way back, which is what stops a route zigzagging.
+
+    Args:
+        graph: The map the routes run over.
+        arrows: Its ordinary arrows.
+        subjects: The claims the routes work from.
+        observed: Which of those an observation named.
+
+    Returns:
+        For each claim a route reaches, how wide the widest route to it is.
+    """
+    onward: dict[PropositionId, list[tuple[PropositionId, float]]] = {}
+    backward: dict[PropositionId, list[tuple[PropositionId, float]]] = {}
     for claim in graph.propositions:
         onward[claim.id], backward[claim.id] = [], []
-    # Where each arrow sits in the map's own list, which is what separates two
-    # routes that are equally well-backed.
-    position_of = {arrow.id: position for position, arrow in enumerate(graph.links)}
-    for arrow in _ordinary_arrows(graph):
+    for arrow in arrows:
         worth = PROVENANCE_WEIGHT[arrow.provenance]
-        onward[arrow.source].append((arrow.target, worth, position_of[arrow.id]))
-        backward[arrow.target].append((arrow.source, worth, position_of[arrow.id]))
+        onward[arrow.source].append((arrow.target, worth))
+        backward[arrow.target].append((arrow.source, worth))
 
-    # Two states per claim, because a route out of an observed claim has two
-    # halves: climbing against the arrows, and then running with them. Dropping
-    # from the first half to the second is free and can happen anywhere, and there
-    # is no way back, which is what stops a route from zigzagging.
-    #
-    # Each state remembers how wide its route is, which claims it runs through,
-    # and where each of its arrows sits in the map's own list. The last of those
-    # is only ever read to separate two equally wide routes.
-    best: dict[tuple[PropositionId, bool], tuple[float, tuple[PropositionId, ...], tuple[int, ...]]]
-    best = {}
-    waiting: list[tuple[float, int, tuple[int, ...], PropositionId, bool]] = []
+    best: dict[tuple[PropositionId, bool], float] = {}
+    waiting: list[tuple[float, PropositionId, bool]] = []
     for subject in sorted(subjects):
         if subject not in onward:
             continue
         climbing = subject in observed
-        best[(subject, climbing)] = (math.inf, (subject,), ())
-        heappush(waiting, (-math.inf, 1, (), subject, climbing))
+        best[(subject, climbing)] = math.inf
+        heappush(waiting, (-math.inf, subject, climbing))
 
     while waiting:
-        reached, _, taken, here, climbing = heappop(waiting)
+        reached, here, climbing = heappop(waiting)
         width = -reached
-        walked = best[(here, climbing)][1]
-        onwards: list[
-            tuple[tuple[PropositionId, bool], float, tuple[PropositionId, ...], tuple[int, ...]]
-        ]
-        onwards = [
-            ((there, climbing), min(width, worth), (*walked, there), (*taken, position))
-            for there, worth, position in (backward if climbing else onward)[here]
+        if width < best.get((here, climbing), -1.0):
+            continue
+        onwards: list[tuple[tuple[PropositionId, bool], float]] = [
+            ((there, climbing), min(width, worth))
+            for there, worth in (backward if climbing else onward)[here]
         ]
         if climbing:
-            onwards.append(((here, False), width, walked, taken))
-        for state, along, path, steps in onwards:
-            if _is_wider(along, path, steps, best.get(state)):
-                best[state] = (along, path, steps)
-                heappush(waiting, (-along, len(path), steps, state[0], state[1]))
+            onwards.append(((here, False), width))
+        for state, along in onwards:
+            if along > best.get(state, -1.0):
+                best[state] = along
+                heappush(waiting, (-along, state[0], state[1]))
 
-    widest: dict[PropositionId, tuple[float, tuple[PropositionId, ...], tuple[int, ...]]] = {}
-    for (claim_id, _), (width, path, steps) in best.items():
-        capped = min(NO_ARROW_TO_WEAKEN, width)
-        if _is_wider(capped, path, steps, widest.get(claim_id)):
-            widest[claim_id] = (capped, path, steps)
-    return {
-        claim_id: Route(width=width, path=path) for claim_id, (width, path, _) in widest.items()
-    }
+    widest: dict[PropositionId, float] = {}
+    for (claim_id, _), width in best.items():
+        widest[claim_id] = max(widest.get(claim_id, 0.0), min(NO_ARROW_TO_WEAKEN, width))
+    return widest
 
 
-def _is_wider(
-    width: float,
-    path: tuple[PropositionId, ...],
-    steps: tuple[int, ...],
-    against: tuple[float, tuple[PropositionId, ...], tuple[int, ...]] | None,
-) -> bool:
-    """Say whether one route beats another under the rule above.
+def _shortest_over(
+    graph: Graph,
+    arrows: tuple[Link, ...],
+    position_of: dict[str, int],
+    subjects: frozenset[PropositionId],
+    observed: frozenset[PropositionId],
+    floor: float,
+) -> dict[PropositionId, tuple[PropositionId, ...]]:
+    """The shortest route to each claim over the arrows worth at least `floor`.
 
-    Wider first; then shorter; then the one whose first differing arrow comes
-    earlier in the map's own list. Nothing beats a route that is not there.
+    **Why this is the whole of the second half of the rule.** A route reaches a
+    claim with bottleneck `W` if and only if every arrow on it is worth at least
+    `W`: a route whose bottleneck is `W` cannot hold an arrow worth less, and a
+    route made only of arrows worth at least `W` has a bottleneck of at least
+    `W`, which cannot exceed the widest there is. So the best routes to a claim
+    are exactly the routes of the map with every thinner arrow set aside, and the
+    shortest of those — ties by the arrows' own order — is what the rule names.
+
+    Ties are broken by comparing `(how many arrows, their positions)` left to
+    right, which is "the first differing arrow comes earlier" written out.
 
     Args:
-        width: What the weakest arrow on the route being offered is worth.
-        path: The claims it runs through.
-        steps: Where each of its arrows sits in the map's own list.
-        against: The best route found so far, or nothing at all.
+        graph: The map the routes run over.
+        arrows: Its ordinary arrows.
+        position_of: Where each arrow sits in the map's own list.
+        subjects: The claims the routes work from.
+        observed: Which of those an observation named.
+        floor: The width every arrow on a route must be worth at least.
 
     Returns:
-        True when the route being offered should replace the one found so far.
+        For each claim reached, the claims its best route runs through.
     """
-    if against is None:
-        return True
-    so_far, walked, taken = against
-    if width != so_far:
-        return width > so_far
-    if len(path) != len(walked):
-        return len(path) < len(walked)
-    return steps < taken
+    onward: dict[PropositionId, list[tuple[PropositionId, int]]] = {}
+    backward: dict[PropositionId, list[tuple[PropositionId, int]]] = {}
+    for claim in graph.propositions:
+        onward[claim.id], backward[claim.id] = [], []
+    for arrow in arrows:
+        if PROVENANCE_WEIGHT[arrow.provenance] < floor:
+            continue
+        onward[arrow.source].append((arrow.target, position_of[arrow.id]))
+        backward[arrow.target].append((arrow.source, position_of[arrow.id]))
+
+    waiting: list[tuple[int, tuple[int, ...], PropositionId, bool, tuple[PropositionId, ...]]] = []
+    seen: dict[tuple[PropositionId, bool], tuple[int, tuple[int, ...]]] = {}
+    for subject in sorted(subjects):
+        if subject not in onward:
+            continue
+        climbing = subject in observed
+        seen[(subject, climbing)] = (0, ())
+        heappush(waiting, (0, (), subject, climbing, (subject,)))
+
+    reached: dict[PropositionId, tuple[int, tuple[int, ...], tuple[PropositionId, ...]]] = {}
+    while waiting:
+        steps, order, here, climbing, walked = heappop(waiting)
+        if (steps, order) > seen.get((here, climbing), (steps, order)):
+            continue
+        best = reached.get(here)
+        if best is None or (steps, order) < (best[0], best[1]):
+            reached[here] = (steps, order, walked)
+
+        moves: list[tuple[PropositionId, bool, int, tuple[PropositionId, ...], int]] = [
+            (there, climbing, steps + 1, (*walked, there), at)
+            for there, at in (backward if climbing else onward)[here]
+        ]
+        if climbing:
+            # The drop from climbing to descending is free and is not an arrow,
+            # so it adds neither a step nor a position.
+            moves.append((here, False, steps, walked, -1))
+
+        for there, still_climbing, cost, path, at in moves:
+            key = (cost, order if at < 0 else (*order, at))
+            state = (there, still_climbing)
+            if state not in seen or key < seen[state]:
+                seen[state] = key
+                heappush(waiting, (key[0], key[1], there, still_climbing, path))
+    return {claim_id: one[2] for claim_id, one in reached.items()}
 
 
 def _best_backed_routes(

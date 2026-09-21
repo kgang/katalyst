@@ -168,3 +168,102 @@ def test_one_rule_chooses_every_route_and_it_is_the_maps_own() -> None:
         if isinstance(holder, ast.FunctionDef) and "route" in holder.name
     ]
     assert chose_a_route == [], chose_a_route
+
+
+# --- The guard that runs a module as a program is the last thing in it -----
+
+
+def every_module_of_ours() -> list[Path]:
+    """Every Python file this package ships, so nothing can be added and missed."""
+    root = Path(the_pipeline.__file__).parent.parent
+    return sorted(one for one in root.rglob("*.py") if "__pycache__" not in one.parts)
+
+
+def test_nothing_follows_the_guard_that_runs_a_module_as_a_program() -> None:
+    """A 26-minute paid run was lost to this, on 2026-09-20.
+
+    `record.py` had `if __name__ == "__main__": raise SystemExit(main())` at line
+    617 and defined a function `main` calls at line 621 — below the guard. Run as
+    a program, `main()` executes before the rest of the module exists, and the run
+    died with a `NameError` after the money was spent. Imported by a test, every
+    name is defined first, so every test passed and no linter saw it.
+
+    Nothing catches this by running the code: the only reliable check is that the
+    guard is the last thing in the file. Blank lines and comments after it are
+    fine; a definition, an assignment or a statement is not.
+    """
+    offenders: list[str] = []
+    for module in every_module_of_ours():
+        written = ast.parse(module.read_text(encoding="utf-8"))
+        guards = [
+            one
+            for one in written.body
+            if isinstance(one, ast.If)
+            and ast.unparse(one.test) in ('__name__ == "__main__"', "__name__ == '__main__'")
+        ]
+        if not guards:
+            continue
+        after = [one for one in written.body if one.lineno > guards[-1].lineno]
+        if after:
+            offenders.append(f"{module.name}: {', '.join(ast.unparse(one)[:40] for one in after)}")
+
+    assert offenders == []
+
+
+# --- The word *agreement* stays free ---------------------------------------
+
+
+AGREEMENT_LIVES_HERE = "katalyst/domain/diff.py"
+"""The one file allowed a field called `agreement`: the diff's same-direction share.
+
+`ClaimDiff.agreement` and `Ranked.agreement` answer one question — of the worlds
+that were run, what share moved the same way as the headline. It is a column,
+never a factor, and it is about worlds inside one run.
+"""
+
+
+def every_field_called_agreement() -> list[str]:
+    """Find every field named `agreement` in our own source, with the file it is in."""
+    found: list[str] = []
+    for module in every_module_of_ours():
+        written = ast.parse(module.read_text(encoding="utf-8"))
+        for node in ast.walk(written):
+            named = (
+                node.target.id
+                if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+                else None
+            )
+            if named == "agreement":
+                found.append(f"{module}:{node.lineno}")
+    return found
+
+
+def test_the_word_agreement_means_same_direction_and_nothing_else() -> None:
+    """Decision record 0015 said *not yet* to an ensemble, and this keeps that door shut.
+
+    There is no `engine/ensemble.py`, no run-to-run number anywhere in the code
+    and no screen that says *runs agree* — so a field called `agreement` may
+    exist in exactly one place, where it means the share of worlds that moved the
+    same way as the headline **inside one run**. Anywhere else the same word
+    would quietly come to mean two models agreeing, which is a claim this product
+    has not earned and a reader would believe.
+
+    Read over our own source rather than trusted to memory, for the same reason
+    `test_beliefs_never_merged` is: an invariant that depends on good intentions
+    is a wish (`evaluation.md`, INV-generation.31).
+    """
+    elsewhere = [one for one in every_field_called_agreement() if AGREEMENT_LIVES_HERE not in one]
+
+    assert elsewhere == []
+
+
+def test_nothing_in_the_engine_runs_the_model_twice_to_compare_answers() -> None:
+    """The other half of the same door: record 0015 said *not yet* to an ensemble.
+
+    No module anywhere in this package is one, by name — and a module is where
+    one would have to live, because running the model twice and comparing needs
+    somewhere to hold both answers.
+    """
+    named = sorted(one.name for one in every_module_of_ours() if "ensemble" in one.name)
+
+    assert named == []

@@ -53,14 +53,14 @@ class Resolution(BaseModel):
     criteria: str = Field(
         description=(
             "The test, written so that two people reading it would agree on the "
-            "answer. 'At least 14 consecutive days of unrestricted commercial "
-            "transit', not 'shipping returns to normal'."
+            "answer. A counted threshold over a named window, not a mood: "
+            "'at least 14 consecutive days of X', not 'things return to normal'."
         )
     )
     source: str = Field(
         description=(
             "Who or what applies the test: a named publication, exchange, agency "
-            "or venue. 'Lloyd's List transit counts', not 'the news'."
+            "or venue — the one that actually publishes this number, not 'the news'."
         )
     )
     by: date = Field(
@@ -84,8 +84,8 @@ class BaseRate(BaseModel):
     reference_class: str = Field(
         description=(
             "The set of past cases being counted, stated precisely enough that "
-            "someone else could recount them: 'Hormuz closure or disruption "
-            "episodes since 1980 that ended within 90 days'."
+            "someone else could count them again: what kind of case, over what "
+            "period, and what made a case count."
         )
     )
     k: int = Field(ge=0, description="How many cases in that set came out true.")

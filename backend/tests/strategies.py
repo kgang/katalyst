@@ -139,6 +139,7 @@ BREAKABLE_RULES: tuple[str, ...] = (
     "cycle",
     "reflexive_without_lag",
     "dangling_link",
+    "duplicate_link",
     "multiple_hypotheses",
     "market_without_payoff",
     "not_tradeable_without_reason",
@@ -160,6 +161,7 @@ INDEPENDENTLY_BREAKABLE: tuple[str, ...] = (
     "cycle",
     "reflexive_without_lag",
     "dangling_link",
+    "duplicate_link",
     "multiple_hypotheses",
     "market_without_payoff",
     "not_tradeable_without_reason",
@@ -840,15 +842,16 @@ def _break_impulse_without_half_life(draw: Any, graph: Graph) -> Graph:
 
     Added rather than changed, so this damage and the one above it — a half-life
     on a push that holds — can be done to the same map at once without landing on
-    the same arrow and cancelling out. It runs alongside an ordinary arrow that is
-    already there, so it closes no loop and dangles from nothing.
+    the same arrow and cancelling out. The added arrow runs **forwards between two
+    claims nothing joins yet**, so it closes no loop, dangles from nothing, and is
+    not a second arrow between a pair that already has one (2026-09-20).
     """
-    joined = draw(st.sampled_from([one for one in graph.links if not one.reflexive]))
+    source, target = _a_pair_nothing_joins_yet(draw, graph)
     fading = draw(
         links(
             identifier=_added_arrow_id(graph),
-            source=joined.source,
-            target=joined.target,
+            source=source,
+            target=target,
             reflexive=False,
         )
     )
@@ -869,7 +872,12 @@ def _break_cycle(draw: Any, graph: Graph) -> Graph:
     it would close nothing. One added arrow makes exactly one tangle of claims, and
     so exactly one complaint.
     """
-    turned = draw(st.sampled_from([one for one in graph.links if not one.reflexive]))
+    joined = {(one.source, one.target) for one in graph.links}
+    turnable = [
+        one for one in graph.links if not one.reflexive and (one.target, one.source) not in joined
+    ]
+    assume(turnable)
+    turned = draw(st.sampled_from(turnable))
     closing = draw(
         links(
             identifier=_added_arrow_id(graph),
@@ -887,7 +895,10 @@ def _break_reflexive_without_lag(draw: Any, graph: Graph) -> Graph:
     Added rather than changed, so that this damage never interferes with the loop
     check: a feedback arrow is set aside there whatever its delay.
     """
-    turned = draw(st.sampled_from(graph.links))
+    joined = {(one.source, one.target) for one in graph.links}
+    turnable = [one for one in graph.links if (one.target, one.source) not in joined]
+    assume(turnable)
+    turned = draw(st.sampled_from(turnable))
     instant = draw(
         links(
             identifier=_added_arrow_id(graph),
@@ -914,6 +925,50 @@ def _break_dangling_link(draw: Any, graph: Graph) -> Graph:
         )
     )
     return graph.model_copy(update={"links": (*graph.links, dangling)})
+
+
+def _a_pair_nothing_joins_yet(draw: Any, graph: Graph) -> tuple[str, str]:
+    """Pick two claims, in order, that no arrow joins that way round yet.
+
+    Numbered order is kept — a lower-numbered claim causes a higher-numbered one —
+    so an arrow drawn between them closes no loop. Added on 2026-09-20 with the
+    rule that one ordered pair of claims takes one arrow: before it, a breaker
+    could quietly draw a second arrow between a pair and produce a fault it was
+    not asking for.
+    """
+    joined = {(one.source, one.target) for one in graph.links}
+    names = [one.id for one in graph.propositions]
+    free = [
+        (earlier, later)
+        for index, earlier in enumerate(names)
+        for later in names[index + 1 :]
+        if (earlier, later) not in joined
+    ]
+    assume(free)
+    pair: tuple[str, str] = draw(st.sampled_from(free))
+    return pair
+
+
+def _break_duplicate_link(draw: Any, graph: Graph) -> Graph:
+    """Draw a second arrow between a pair of claims one arrow already joins.
+
+    Only over an arrow whose two ends are both on the map: doubling a dangling
+    one would double its own complaint as well, and each breaker here damages a
+    map in exactly one way.
+    """
+    on_the_map = {one.id for one in graph.propositions}
+    joining = [one for one in graph.links if one.source in on_the_map and one.target in on_the_map]
+    assume(joining)
+    already = draw(st.sampled_from(joining))
+    again = draw(
+        links(
+            identifier=_added_arrow_id(graph),
+            source=already.source,
+            target=already.target,
+            reflexive=already.reflexive,
+        )
+    )
+    return graph.model_copy(update={"links": (*graph.links, again)})
 
 
 def _break_multiple_hypotheses(draw: Any, graph: Graph) -> Graph:
@@ -957,6 +1012,7 @@ BREAKERS = {
     "cycle": _break_cycle,
     "reflexive_without_lag": _break_reflexive_without_lag,
     "dangling_link": _break_dangling_link,
+    "duplicate_link": _break_duplicate_link,
     "multiple_hypotheses": _break_multiple_hypotheses,
     "market_without_payoff": _break_market_without_payoff,
     "not_tradeable_without_reason": _break_not_tradeable_without_reason,
@@ -981,7 +1037,7 @@ def broken_graphs(draw: Any, *rules: str) -> Graph:
         *rules: The codes of the rules to break. Naming none gives an undamaged map.
 
     Raises:
-        KeyError: If a name is not one of the fourteen.
+        KeyError: If a name is not one of the fifteen.
     """
     graph = draw(graphs())
     for rule in BREAKABLE_RULES:

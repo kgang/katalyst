@@ -1,54 +1,55 @@
 """The walk: which claim is asked about next, and what makes a run stop.
 
-`expand.py` answers one question. This walks the whole map: it turns the person's
-sentence into the claim the map starts from, keeps asking about whichever lines
-are still open, folds every answer in, and stops with **one** reason a person can
-read.
+`expand.py` answers one question. This walks the whole map — it turns the
+person's sentence into the claim the map starts from, keeps asking about
+whichever lines are still open, folds every answer in, and stops with **one**
+reason a person can read.
 
-Reading order
--------------
-`grow` first, because it is the story. `_Walk` under it, because it is the
-bookkeeping that story leans on: which claims are still open, how far each sits
-from the start, how many proposals in a row have failed for each, what closed the
-last one to close, and what the run has spent. Then the one rule that picks the
-reason.
-
-Three things worth knowing before reading it
----------------------------------------------
+Four things worth knowing before reading it
+-------------------------------------------
 **The order is fixed even though three lines are asked about at once.** A round
-takes the first few open claims in frontier order and asks about them at the same
-time; their answers are folded **in that same frontier order**, whichever came
-back first. The map depends on the answers and never on the weather.
+takes the first few open claims in frontier order and asks about them at the
+same time; their answers are folded in that same order, whichever came back
+first. The map depends on the answers and never on the weather.
+
+**An answer is judged twice: when it comes back, and where the map changes.** A
+round hands one snapshot of the map to all its calls, so two answers can each be
+legal against that snapshot and illegal together — a loop, or the same arrow
+twice. Every accepted answer is checked again at the fold, and one that has
+stopped being legal is refused there like any other: shown, counted, never
+repaired.
 
 **No answer ever says "this claim is closed".** Every outcome carries the
-frontier as it stands once it was folded in, and a claim leaving that list is how
-a reader learns it has closed.
+frontier as it stands once it was folded in, and a claim leaving that list is
+how a reader learns it has closed.
 
-**The spending cap is checked after every call.** A round's calls are already in
-flight when the first of them is folded, so a run can pass its ceiling by at most
-the calls that were in the air with it.
+**Nothing a run paid for is ever lost.** A round's calls are all made and billed
+before the first of them is folded, so a reader who goes away, a cap that trips
+mid-round and a question that fails all leave every answer folded — into the map
+where it belongs, and onto the bill always.
 
 What this file must never do
 ----------------------------
 - Never write a claim or an arrow the model did not propose — not to make a map
   end somewhere, and not to make a Verify run reach its destination.
-- Never talk over the network, and never name a type from the library we call the
-  model with.
+- Never talk over the network, and never name a type from the library we call
+  the model with.
 - Never read a clock. The day a run happened is passed in.
 - Never give two reasons for stopping, or a reason nothing can produce.
 """
 
-from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+import logging
+from collections.abc import Callable, Generator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from katalyst.domain import Graph, Proposition, PropositionId
+from katalyst.domain import Belief, Graph, Link, Proposition, PropositionId
 from katalyst.domain.validity import TERMINAL_KINDS
-from katalyst.engine.client import Answerer
-from katalyst.engine.expand import expand, start_the_map
+from katalyst.engine.client import SEARCHES_INSIDE_ONE_CALL, Answerer
+from katalyst.engine.expand import expand, map_with, start_the_map, still_legal_on
 from katalyst.engine.ids import mint_id
 from katalyst.engine.outcome import Accepted, Caps, Outcome, Refused, Stopped
 from katalyst.engine.receipt import (
@@ -127,7 +128,9 @@ def grow(
     answerer: Answerer,
     on: date,
     caps: Caps | None = None,
-) -> Iterator[Outcome | Finished]:
+    user_belief: Belief | None = None,
+    never_seen: Callable[[Outcome], None] | None = None,
+) -> Generator[Outcome | Finished, None, None]:
     """Walk the frontier, one round at a time, until every line has closed.
 
     Hands back every outcome as it is folded in, oldest first, and then exactly
@@ -147,29 +150,60 @@ def grow(
         on: The day this run is happening. Passed in rather than read, which is
             what lets a recorded run and a live one be compared.
         caps: Every limit this run has. The defaults are in `Caps`.
+        user_belief: How likely the person said their own sentence is, when they
+            said. Stamped on the claim the map starts from as **theirs**, beside
+            the model's and never merged with it (FR-2). Saying nothing stamps
+            nothing: "I don't know" is an answer, and it is not a likelihood of
+            one half.
+        never_seen: Told about an answer that was paid for and that nobody will
+            ever be handed, because the reader went away while its round was in
+            flight. The money was spent and the working is still owed
+            (2026-09-20).
 
     Yields:
         Each call's outcome in the order it was folded, then one `Finished`.
+
+    It is a generator rather than a list on purpose, and the caller may stop
+    reading it at any point: abandoning it is what makes "the run stops calling
+    the model when the client goes away" true without a flag to check. Close it
+    when you stop, so the round of calls in flight is let go of at once.
     """
     caps = caps or Caps()
     walk = _Walk(caps)
 
     # The claim the map starts from, and the destination when there is one.
     started = yield from _keep_asking(
-        lambda: start_the_map(hypothesis, is_the_hypothesis=True, answerer=answerer, on=on), walk
+        lambda: start_the_map(
+            hypothesis,
+            is_the_hypothesis=True,
+            answerer=answerer,
+            on=on,
+            may_search=_still_room_to_search(caps.searches - walk.receipt.searches),
+        ),
+        walk,
+        answerer,
     )
     if started is None:
+        # The money is an override wherever it runs out, this question included:
+        # blaming the person's sentence for a ceiling being low is a lie a reader
+        # would act on (2026-09-20).
+        why_it_ended: StoppingReason = "spend_cap" if walk.spent else "refusal_cap"
         yield Finished(
-            reason="refusal_cap",
+            reason=why_it_ended,
             why=(
-                "This run never got started: the sentence could not be written as "
-                "a claim anybody could settle."
+                _in_one_sentence(why_it_ended, walk.receipt, caps, None)
+                if walk.spent
+                else _never_got_started(walk.last_refusal)
             ),
             receipt=walk.receipt,
             refused=walk.refused,
         )
         return
     first, opening = started
+    if user_belief is not None:
+        first = first.model_copy(
+            update={"beliefs": first.beliefs.model_copy(update={"user": user_belief})}
+        )
     graph = Graph(id=mint_id(), propositions=(first,), links=(), hypothesis_id=first.id)
     walk.open_a_line(first.id, layer=0)
     yield opening.model_copy(update={"frontier": tuple(walk.frontier)})
@@ -177,7 +211,15 @@ def grow(
     destination: PropositionId | None = None
     if target is not None and not walk.spent:
         asked_for = yield from _keep_asking(
-            lambda: start_the_map(target, is_the_hypothesis=False, answerer=answerer, on=on), walk
+            lambda: start_the_map(
+                target,
+                is_the_hypothesis=False,
+                answerer=answerer,
+                on=on,
+                may_search=_still_room_to_search(caps.searches - walk.receipt.searches),
+            ),
+            walk,
+            answerer,
         )
         if asked_for is not None:
             wanted, its_outcome = asked_for
@@ -193,7 +235,13 @@ def grow(
                 walk.the_map_is_full()
                 break
 
-            asking = list(walk.frontier[: caps.at_once])
+            # A round is sized to the room the map has left, not only to how many
+            # lines may be asked about at once: three questions in flight bring
+            # three claims back, and a cap read once a round is a cap a round
+            # steps over (2026-09-20).
+            room = caps.claims - len(graph.propositions)
+            asking = list(walk.frontier[: min(caps.at_once, room)])
+            walk.watch(answerer)
             answers = _ask_about_each(
                 pool,
                 graph,
@@ -201,13 +249,29 @@ def grow(
                 target=target,
                 answerer=answerer,
                 on=on,
-                may_search=walk.receipt.searches < caps.searches,
+                searches_left=caps.searches - walk.receipt.searches,
             )
-            for claim_id, outcome in zip(asking, answers, strict=True):
-                graph = walk.fold(graph, claim_id, outcome)
-                yield outcome.model_copy(update={"frontier": tuple(walk.frontier)})
-                if walk.spent:
-                    break
+            # **Every answer of the round is on the bill before any of them is
+            # folded.** They were all asked and all billed together, so an
+            # exception inside one fold used to take the rest off the receipt
+            # (Kent, 2026-09-21).
+            walk.bill(answers)
+            waiting = list(zip(asking, answers, strict=True))
+            while waiting:
+                claim_id, answer = waiting.pop(0)
+                graph, outcome = walk.fold(graph, claim_id, answer)
+                try:
+                    yield outcome.model_copy(update={"frontier": tuple(walk.frontier)})
+                except GeneratorExit:
+                    # The reader went away mid-round. Every call of this round was
+                    # made and billed before the first of them was folded, so the
+                    # rest are folded here — nobody will see them, and they are
+                    # still owed to the working and to the bill (2026-09-20).
+                    for left_over, its_answer in waiting:
+                        graph, its_outcome = walk.fold(graph, left_over, its_answer)
+                        if never_seen is not None:
+                            never_seen(its_outcome)
+                    raise
 
         # One last call per open line, asking only for an ending. A cap that
         # stopped the walk is exactly when this is wanted; only the money running
@@ -216,16 +280,17 @@ def grow(
             for claim_id in _lines_with_no_ending(graph):
                 if walk.spent:
                     break
+                walk.watch(answerer)
                 outcome = expand(
                     graph,
                     claim_id,
                     target=target,
                     answerer=answerer,
                     on=on,
-                    may_search=walk.receipt.searches < caps.searches,
+                    may_search=_still_room_to_search(caps.searches - walk.receipt.searches),
                     ending_only=True,
                 )
-                graph = walk.fold(graph, claim_id, outcome, growing=False)
+                graph, outcome = walk.fold(graph, claim_id, outcome, growing=False)
                 yield outcome.model_copy(update={"frontier": ()})
 
     reason = _why_it_stopped(walk, graph)
@@ -259,6 +324,36 @@ class _Walk:
         self.closed_last: str | None = None
         self.spent = False
         self.filled_up = False
+        self.last_refusal: str | None = None
+        self._billed: list[Outcome] = []
+
+    def bill(self, answers: Sequence[Outcome]) -> None:
+        """Put a whole round on the bill before any of it is folded.
+
+        A round's calls are all made and billed together, so the money is a fact
+        about the round and not about whether each answer folds cleanly. An
+        exception part way through the folding used to take the rest of the
+        round off the receipt (Kent, 2026-09-21).
+
+        Args:
+            answers: Every answer of the round, in the order it will be folded.
+        """
+        for one in answers:
+            self.receipt = fold(self.receipt, one)
+            self._billed.append(one)
+
+    def watch(self, answerer: Answerer) -> None:
+        """Say what has been spent and what may be, before a question is put.
+
+        A question can now run twenty-five searches over five rounds, so one call
+        can cost a dollar by itself and a ceiling checked only between calls is a
+        ceiling the dearest thing in the program steps over. Saying it here means
+        the answerer can stop between rounds of its own (Kent, 2026-09-20).
+
+        Args:
+            answerer: Whatever this run asks its questions of.
+        """
+        answerer.watching(self.receipt, self.caps.dollars)
 
     @property
     def stopped(self) -> bool:
@@ -293,8 +388,15 @@ class _Walk:
 
     def fold(
         self, graph: Graph, claim_id: PropositionId, outcome: Outcome, *, growing: bool = True
-    ) -> Graph:
+    ) -> tuple[Graph, Outcome]:
         """Put one answer onto the map, and decide whether its claim stays open.
+
+        **This is where an accepted answer is judged for the second time.** It was
+        judged when it came back, against the map as it stood at the start of its
+        round; here it is judged against the map as it stands now, with whatever
+        the answers folded before it added. An answer that has stopped being legal
+        in between becomes a refusal — carrying its own counters, because the call
+        was made and the money was spent.
 
         Args:
             graph: The map as it stands.
@@ -305,15 +407,21 @@ class _Walk:
                 changes what closed the last one — only the map and the bill grow.
 
         Returns:
-            The map, with whatever the answer added.
+            The map with whatever the answer added, and the answer as it now
+            stands — the one that came in, or a refusal in its place.
         """
-        self.receipt = fold(self.receipt, outcome)
+        if outcome not in self._billed:
+            self.receipt = fold(self.receipt, outcome)
+        else:
+            self._billed.remove(outcome)
+        outcome = self._judged_again(graph, outcome)
         result = outcome.result
 
         if isinstance(result, Stopped):
             if growing:
                 self.close_a_line(claim_id, CLOSED_BY_HAVING_NOTHING_MORE_TO_SAY)
         elif isinstance(result, Refused):
+            self.last_refusal = result.claim_in_words
             # Anything that is not an accepted proposal counts toward the three:
             # a rejection by the map's rules, a refusal by the vendor, an answer
             # that did not fit the shape. One rule, not three — what has run out
@@ -327,7 +435,7 @@ class _Walk:
         else:
             if growing:
                 self.failures_here[claim_id] = 0
-            graph = _with(graph, result)
+            graph = map_with(graph, result)
             # An ending never joins the frontier: there is nothing downstream of
             # a trade.
             arrived = result.proposition
@@ -342,7 +450,53 @@ class _Walk:
                     self._close_if_out_of_room(graph, arrived.id)
 
         self.spent = self.spent or over_the_cap(self.receipt, self.caps.dollars)
-        return graph
+        return graph, outcome
+
+    def _judged_again(self, graph: Graph, outcome: Outcome) -> Outcome:
+        """Check an accepted answer against the map as it now stands, and refuse it if need be.
+
+        Two questions, in this order. First the map's own rules, through the very
+        same function that judged it the first time — so a loop or a second arrow
+        between one pair is refused with the rules' own code and sentence. Then
+        this run's own width cap, counted against **each arrow's own cause**
+        rather than only against the claim the call was about: an arrow may name
+        any claim on the map as its source, and a cap checked only on the claim
+        being expanded is a cap that arrow walks straight past.
+
+        Args:
+            graph: The map as it stands, before this answer lands.
+            outcome: What came back.
+
+        Returns:
+            The same outcome, or a refusal carrying its counters.
+        """
+        accepted = outcome.result
+        if not isinstance(accepted, Accepted):
+            return outcome
+        introduced = still_legal_on(graph, accepted)
+        if introduced:
+            return outcome.model_copy(
+                update={
+                    "result": Refused(
+                        claim_in_words=_what_arrived(accepted),
+                        violations=introduced,
+                    )
+                }
+            )
+        crowded = out_of_room_beside(graph, accepted.links, self.caps.width)
+        if crowded is not None:
+            return outcome.model_copy(
+                update={
+                    "result": Refused(
+                        claim_in_words=(
+                            f"There is no room beside {named_on(graph, crowded)} for "
+                            f"another arrow: it already has the {self.caps.width} "
+                            "this run allows it."
+                        )
+                    )
+                }
+            )
+        return outcome
 
     def _close_if_out_of_room(self, graph: Graph, claim_id: PropositionId) -> None:
         """Close a claim that has run out of layers below it, or of room beside it.
@@ -363,7 +517,7 @@ class _Walk:
 
 
 def _keep_asking(
-    ask: Callable[[], Outcome], walk: _Walk
+    ask: Callable[[], Outcome], walk: _Walk, answerer: Answerer
 ) -> Generator[Outcome, None, tuple[Proposition, Outcome] | None]:
     """Ask for a starting claim until one comes back, or until the tries run out.
 
@@ -377,6 +531,8 @@ def _keep_asking(
     Args:
         ask: The question to put, as something that can be called again.
         walk: What this walk has spent and refused so far. Changed as it goes.
+        answerer: Whatever this run asks its questions of. Told what is left in
+            the purse before each attempt.
 
     Yields:
         Each refused attempt's outcome.
@@ -386,12 +542,15 @@ def _keep_asking(
         came back with none.
     """
     for _ in range(walk.caps.refusals_in_a_row):
+        walk.watch(answerer)
         outcome = ask()
         walk.receipt = fold(walk.receipt, outcome)
         walk.spent = walk.spent or over_the_cap(walk.receipt, walk.caps.dollars)
         result = outcome.result
         if isinstance(result, Accepted) and result.proposition is not None:
             return result.proposition, outcome
+        if isinstance(result, Refused):
+            walk.last_refusal = result.claim_in_words
         yield outcome
         walk.refused += 1
         if walk.spent:
@@ -399,14 +558,86 @@ def _keep_asking(
     return None
 
 
-def _with(graph: Graph, accepted: Accepted) -> Graph:
-    """Add what one accepted answer brought to the map."""
-    claims = graph.propositions
-    if accepted.proposition is not None:
-        claims = (*claims, accepted.proposition)
-    return graph.model_copy(
-        update={"propositions": claims, "links": (*graph.links, *accepted.links)}
+def _never_got_started(last_refusal: str | None) -> str:
+    """Say why the very first question never came back with a claim.
+
+    It used to say the sentence could not be written as a claim anybody could
+    settle, whatever had actually happened — so a run the model never answered at
+    all told the person to go and rewrite a perfectly good sentence. The last
+    refusal's own words are carried instead (Kent, 2026-09-20).
+
+    Args:
+        last_refusal: What the last attempt said, if anything did.
+
+    Returns:
+        One plain sentence.
+    """
+    if last_refusal:
+        return f"This run never got started. {last_refusal}"
+    return (
+        "This run never got started: the sentence could not be written as a claim "
+        "anybody could settle."
     )
+
+
+def out_of_room_beside(graph: Graph, arrows: Sequence[Link], width: int) -> PropositionId | None:
+    """Name the first claim these arrows would give more children than a run allows.
+
+    **The width cap counts the arrows leaving a claim, whatever put them there.**
+    An arrow may name any claim on the map as its source, so a cap checked only
+    on the claim being expanded is a cap that arrow walks straight past — and a
+    cap that counted only an edit's *own* new arrows is one three edits walk past
+    together, one each (Kent, 2026-09-21).
+
+    Here rather than on the walk because both callers need the same answer: the
+    walk, when an answer lands, and the insert route, against the map the reader
+    is looking at. One function, used twice.
+
+    Args:
+        graph: The map as it stands, with everything already on it.
+        arrows: The arrows that would be added.
+        width: How many arrows one claim may have leaving it.
+
+    Returns:
+        The crowded claim, or nothing at all when every arrow has room.
+    """
+    leaving: dict[PropositionId, int] = {}
+    for arrow in graph.links:
+        leaving[arrow.source] = leaving.get(arrow.source, 0) + 1
+    for arrow in arrows:
+        if leaving.get(arrow.source, 0) >= width:
+            return arrow.source
+        leaving[arrow.source] = leaving.get(arrow.source, 0) + 1
+    return None
+
+
+def named_on(graph: Graph, claim_id: PropositionId) -> str:
+    """Quote a claim by its own words, because a reader reads this on the screen.
+
+    A refusal's sentence is drawn as a tile. It carried a twenty-six-character
+    minted identifier, which means nothing to anybody outside this process
+    (2026-09-20).
+
+    Args:
+        graph: The map the claim is on.
+        claim_id: The claim to name.
+
+    Returns:
+        Its words, trimmed if they run long, or its identifier when it is not on
+        the map after all.
+    """
+    for one in graph.propositions:
+        if one.id == claim_id:
+            words = " ".join(one.claim.split())
+            return f'"{words}"' if len(words) <= 80 else f'"{words[:79].rstrip()}…"'
+    return claim_id
+
+
+def _what_arrived(accepted: Accepted) -> str:
+    """Quote what an answer brought, so a late refusal names a claim rather than a code."""
+    if accepted.proposition is not None:
+        return accepted.proposition.claim
+    return "This arrow, on the map as it stood once the rest of its round had landed."
 
 
 def _ask_about_each(
@@ -417,13 +648,20 @@ def _ask_about_each(
     target: str | None,
     answerer: Answerer,
     on: date,
-    may_search: bool,
+    searches_left: int,
 ) -> list[Outcome]:
     """Ask about several claims at the same time, and hand the answers back in order.
 
     The answers are read out in the order the questions were asked, not in the
     order they came back, which is what makes a run's shape depend on its answers
     rather than on how fast each one arrived.
+
+    **The searches are handed out one call at a time, in that same order.** Every
+    call in a round goes out before any of them comes back, so a round that read
+    the budget once could carry a run a whole round's worth past it — twenty-five
+    searches a call, three calls. Each call is allowed the tool only while the
+    whole of what it could still spend fits in what is left, and what it is
+    allowed is set aside for it, so the ceiling is never passed (2026-09-20).
 
     Args:
         pool: Where the questions are run.
@@ -432,11 +670,18 @@ def _ask_about_each(
         target: The destination in the person's own words, or nothing at all.
         answerer: Whatever this run asks its questions of.
         on: The day this run is happening.
-        may_search: Whether this run still has searches left to spend.
+        searches_left: How much of the run's budget of searches is unspent.
 
     Returns:
         One outcome per claim, in the same order.
     """
+    allowed: list[bool] = []
+    left = searches_left
+    for _ in asking:
+        may = _still_room_to_search(left)
+        allowed.append(may)
+        if may:
+            left -= SEARCHES_INSIDE_ONE_CALL
     in_flight = [
         pool.submit(
             expand,
@@ -447,9 +692,67 @@ def _ask_about_each(
             on=on,
             may_search=may_search,
         )
-        for claim_id in asking
+        for claim_id, may_search in zip(asking, allowed, strict=True)
     ]
-    return [one.result() for one in in_flight]
+    # **Every result is collected before any failure is dealt with.** Reading
+    # them with a comprehension meant one exception the seam had not converted
+    # threw away the round's other answers, which were asked, answered and
+    # billed — the money spent on them would have been on no receipt and in no
+    # transcript (2026-09-20).
+    answers: list[Outcome] = []
+    went_wrong: BaseException | None = None
+    for one in in_flight:
+        try:
+            answers.append(one.result())
+        except BaseException as failed:
+            went_wrong = went_wrong or failed
+            answers.append(_never_answered(failed))
+    if went_wrong is not None:
+        logging.getLogger(__name__).exception(
+            "a question failed in a way the seam did not convert", exc_info=went_wrong
+        )
+    return answers
+
+
+def _never_answered(failed: BaseException) -> Outcome:
+    """Turn a question that failed in a way nobody wrote a sentence for into an outcome.
+
+    The seam converts everything the service can do, so reaching here is a bug of
+    ours. It is still one call of the round, and the other calls of that round
+    are still owed their fold — so it becomes a refusal like any other and the
+    exception goes to the log.
+
+    Args:
+        failed: Whatever was raised.
+
+    Returns:
+        A refusal carrying one plain sentence and the one call it cost.
+    """
+    return Outcome(
+        result=Refused(
+            claim_in_words=(
+                "This question stopped for a reason nobody chose. The run carried "
+                "on with what its other questions came back with."
+            )
+        ),
+        calls=1,
+    )
+
+
+def _still_room_to_search(left: int) -> bool:
+    """Say whether a call may use the search tool with this much budget unspent.
+
+    The whole of what one call could spend has to fit, because a call is told
+    once before it goes out and nothing can stop it at search twelve. So the last
+    call's worth goes unspent: the price of never passing the ceiling.
+
+    Args:
+        left: How many searches of the run's budget are unspent and unreserved.
+
+    Returns:
+        True when a whole call's worth still fits.
+    """
+    return left >= SEARCHES_INSIDE_ONE_CALL
 
 
 def _ends_somewhere(graph: Graph) -> bool:
@@ -506,23 +809,11 @@ def _walk_onward(
 def _why_it_stopped(walk: _Walk, graph: Graph) -> StoppingReason:
     """Pick the one reason a run gives for stopping.
 
-    **The rule: the reason names what closed the last claim that was still open**,
-    with two overrides above it. One rule, so two readers cannot get two answers.
-
-    1. **The money ran out.** An override, because it stops the run wherever it
-       happens to be and nothing further is asked.
-    2. **The map ends nowhere you can act on**, even after the last ending-seeking
-       call. An override, because it is the most important thing a reader can be
-       told about a finished map.
-    3. **A cap closed the last open claim** — the map was full, it sat at the
-       depth cap, it already had its full width of arrows, or three proposals in a
-       row for it failed. Our limit, under its own name.
-    4. **The last open claim had nothing more to say.** The model answered that
-       this part of the story was finished, which is the ordinary, good ending,
-       and it is the fall-through.
-
-    Reaching the cap on searches can never appear: it stops searching rather than
-    closing a claim.
+    **The rule: the reason names what closed the last claim that was still
+    open** — with the money and the map ending nowhere overriding it, in that
+    order, because each stops the run wherever it happens to be. One rule, so two
+    readers cannot get two answers. Reaching the cap on searches can never
+    appear: it stops the searching and not the run.
 
     Args:
         walk: What this walk remembers, including what closed the last claim.

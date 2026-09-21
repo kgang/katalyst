@@ -50,6 +50,7 @@ RULE_ORDER: tuple[tuple[str, ...], ...] = (
     ("missing_rationale",),
     ("documented_without_source",),
     ("dangling_link",),
+    ("duplicate_link",),
     ("cycle",),
     ("reflexive_without_lag",),
     ("half_life_without_impulse",),
@@ -181,6 +182,27 @@ def test_validate_rejects_dangling_link(graph: Graph) -> None:
 
     assert [fault.code for fault in faults] == ["dangling_link"]
     assert "not on this map" in faults[0].message
+
+
+@given(broken_graphs("duplicate_link"))
+@many
+def test_validate_rejects_a_second_arrow_between_the_same_two_claims(graph: Graph) -> None:
+    """One ordered pair of claims, one arrow (2026-09-20).
+
+    Propagation sums every incoming arrow, so two arrows from A to B push B twice
+    as hard as either of them says — and the canvas draws two wires where a reader
+    sees one relationship. There is no way in these shapes to say "two separate
+    channels": strength, lag and shape are per arrow and they simply add. Two
+    genuinely different mechanisms want the claim in between them, which is a
+    third claim, not a second arrow.
+
+    The two *directions* of a pair are a different thing and stay legal: A -> B
+    with B -> A is the feedback loop a reflexive arrow is for.
+    """
+    faults = validate(graph)
+
+    assert [fault.code for fault in faults] == ["duplicate_link"]
+    assert "already joined" in faults[0].message
 
 
 @given(broken_graphs("cycle"))

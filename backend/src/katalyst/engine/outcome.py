@@ -97,6 +97,23 @@ class Said(BaseModel):
     output_tokens: int = Field(default=0, description="Tokens of answer written.")
     cache_read_tokens: int = Field(default=0, description="Tokens recognised from an earlier call.")
     cache_write_tokens: int = Field(default=0, description="Tokens written into the cache.")
+    thinking_tokens: int = Field(
+        default=0,
+        description=(
+            "How many of those written tokens were the model thinking rather than "
+            "answering. Half to two-thirds of a call, measured on the first recorded "
+            "five, and never shown — so this is the only way to find out where a "
+            "minute went without running the whole thing again."
+        ),
+    )
+    seconds: float = Field(
+        default=0.0,
+        description=(
+            "How long this question took, wall clock, measured at the seam. The other "
+            "half of the same measurement: tokens say what was written, this says how "
+            "long the writing took."
+        ),
+    )
 
 
 # --- What our own code decided ----------------------------------------------
@@ -128,6 +145,15 @@ class Accepted(BaseModel):
             "Addresses the answer cited that the search tool never returned in "
             "that call. They are not behind anything, and this is where a reader "
             "is told so."
+        ),
+    )
+    base_rate_dropped: str | None = Field(
+        default=None,
+        description=(
+            "The reference class of a count that was thrown away because nothing "
+            "the search returned backs it. The claim is accepted without it and "
+            "the screen says honestly that there is no reference class, rather "
+            "than showing a number that looks measured and was remembered."
         ),
     )
 
@@ -215,6 +241,10 @@ class Outcome(BaseModel):
     output_tokens: int = Field(default=0, description="Tokens of answer written.")
     cache_read_tokens: int = Field(default=0, description="Tokens recognised from an earlier call.")
     cache_write_tokens: int = Field(default=0, description="Tokens written into the cache.")
+    thinking_tokens: int = Field(
+        default=0, description="How many written tokens were thinking rather than answering."
+    )
+    seconds: float = Field(default=0.0, description="How long this question took, wall clock.")
 
 
 def costing(
@@ -239,10 +269,21 @@ def costing(
         output_tokens=said.output_tokens,
         cache_read_tokens=said.cache_read_tokens,
         cache_write_tokens=said.cache_write_tokens,
+        thinking_tokens=said.thinking_tokens,
+        seconds=said.seconds,
     )
 
 
 # --- Every limit a run has --------------------------------------------------
+
+
+WHAT_THE_SERVICE_DEFAULTS_TO = "default"
+"""The plain word for "no effort was sent, so the service's own default applied".
+
+A receipt and a recording header say which effort made a map, and the word has to
+mean something to somebody reading it months later — an empty string reads as a
+field nobody filled in.
+"""
 
 
 class Caps(BaseModel):
@@ -269,12 +310,17 @@ class Caps(BaseModel):
     )
     at_once: int = Field(default=3, description="How many lines are expanded at the same time.")
     searches: int = Field(
-        default=30,
+        default=750,
         description=(
-            "How many web searches the whole run may make. It is the claims cap: "
-            "one search's worth of budget for each claim the map is allowed to "
-            "hold, so it adds no new number to the product. Reaching it turns "
-            "searching off; it never ends the run."
+            "How many web searches the whole run may make: the claims cap times "
+            "one call's research budget, which is the floor `proposals.md` sets "
+            "and the number this picks. It is deliberately loose. Set lower it "
+            "would bind before the research caps do and starve the base rates it "
+            "exists to pay for — which is what 150 did, turning searching off at "
+            "125 of them for a reason nobody chose. **The spending cap is what "
+            "protects the bill**, and it is checked between the rounds inside a "
+            "call as well as between calls. Reaching this one turns searching "
+            "off; it never ends the run."
         ),
     )
     dollars: float = Field(

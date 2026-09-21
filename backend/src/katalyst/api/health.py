@@ -14,6 +14,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from katalyst.engine.replay import RecordingSummary, readable
 from katalyst.settings import Settings, get_settings
 
 router = APIRouter(tags=["health"])
@@ -32,14 +33,37 @@ class Readiness(BaseModel):
 
     status: Literal["ready", "not_ready"] = Field(
         description=(
-            'Reads "ready" when everything needed to generate a map is configured, '
-            'and "not_ready" when something is missing.'
+            'Reads "ready" when this program can build a map — with a key, or from '
+            'a recording — and "not_ready" only when it can do neither. A copy with '
+            "no key and four recordings draws four maps, refuses proposals in public "
+            "and takes every intervention at full fidelity; calling that not ready "
+            "would be the screen lying about itself in the one place it exists to be "
+            "honest."
         ),
     )
     model_key_present: bool = Field(
         description=(
             "Whether a key for the language model is configured. The key itself is "
             "never included in this answer."
+        ),
+    )
+    replayable: tuple[RecordingSummary, ...] = Field(
+        default=(),
+        description=(
+            "The examples this copy can play back from a committed recording, and "
+            "the day each one was made. The first screen reads it before anything "
+            "runs, which is the only way it can name a date at all: the day a "
+            "recording was made travels on the receipt, and the receipt arrives last."
+        ),
+    )
+    unreadable: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "One plain sentence per file in the recordings folder that this "
+            "engine could not read. **A bad file never hides the good ones**: it "
+            "is named here and the others still play, because a recording is a "
+            "committed file that outlives the code that wrote it and meeting an "
+            "old one is ordinary rather than exceptional (Kent, 2026-09-20)."
         ),
     )
 
@@ -63,21 +87,29 @@ def healthz() -> Health:
 def readyz(settings: Annotated[Settings, Depends(get_settings)]) -> Readiness:
     """Report whether the program can generate a map yet.
 
-    Today that comes down to one thing: whether a key for the language model is
-    configured. Without it the program still runs, still serves the stored
-    example map, and still says so honestly here rather than failing later with
-    an error the user cannot interpret.
+    Two ways it can: with a key, by calling a model, or with none, by playing a
+    committed recording back through the same stream and the same canvas. It is
+    `not_ready` only when it can do neither, because a copy that can replay four
+    examples can do almost everything this product is judged on.
 
     Args:
         settings: The program's settings. Supplied by the web framework, which
             lets a test replace them without touching the real environment.
 
     Returns:
-        Whether the program is ready, and whether a model key is configured.
+        Whether the program is ready, whether a model key is configured, and what
+        it can play back.
     """
     # An empty string counts as no key: copying .env.example unfilled must not read as ready.
     model_key_present = bool(settings.ANTHROPIC_API_KEY)
+    good, unreadable = readable()
+    replayable = tuple(
+        RecordingSummary(example=one.example, recording_date=one.header.recording_date)
+        for one in good
+    )
     return Readiness(
-        status="ready" if model_key_present else "not_ready",
+        status="ready" if model_key_present or replayable else "not_ready",
         model_key_present=model_key_present,
+        replayable=replayable,
+        unreadable=unreadable,
     )

@@ -167,7 +167,7 @@ class StartingClaim(BaseModel):
 def expand(graph: Graph, frontier: PropositionId, *, target: str | None) -> Outcome
 ```
 
-One call, one proposal, then `domain.validate` on the map that proposal would leave behind. The caps below are further arguments on the same function, with the defaults in the table; the signature above is the shape of the question — one map, one claim to expand, one destination or none.
+One call, one proposal, then `domain.validate` on the map that proposal would leave behind. The signature above is the whole shape of the question — one map, one claim to expand, one destination or none. **The caps are not arguments to it**: they belong to the walk, which is the only thing that can count claims, layers, arrows or money across calls, and `grow` reads them from one `Caps` and enforces them where an answer lands.
 
 ```python
 class Accepted(BaseModel):
@@ -177,6 +177,7 @@ class Accepted(BaseModel):
     proposition: Proposition | None   # the new claim; None when an arrow alone was proposed
     links: tuple[Link, ...]           # its incoming arrows, provenance written by us
     sources_dropped: tuple[str, ...]  # addresses the model cited that the search never returned
+    base_rate_dropped: str | None     # the reference class of a count nothing the search returned backed
 
 
 class Refused(BaseModel):
@@ -230,18 +231,20 @@ Every cap is an argument with a default. Nothing here is a constant buried in a 
 | Cap | Default | What it limits |
 |---|---|---|
 | depth | 5 layers | How far a line may run from the hypothesis |
-| width | 3 children | How many claims one claim may cause |
+| width | 3 arrows | How many arrows may leave one claim — arrows, not claims, since an arrow proposed on its own spends the width of the claim it leaves (2026-09-20) |
 | claims | 30 | How large the map may get |
 | refusals in a row | 3 | How many proposals for **one** frontier claim may be refused before that claim is closed |
 | frontier claims at once | 3 | How many lines are expanded concurrently |
 | searches per call | 25 | How much research one claim may do — the reference class first, then the mechanism (Kent, 2026-09-20) |
 | research rounds per call | 5 | How many times the model may search, read and decide to search again |
-| searches per generation | at least 30 × 25 | The floor, not a guess: the two above over a full map. The pipeline agent picks the default at or above it ([`grounding.md`](grounding.md) B6) |
+| searches per generation | 750 | The floor, not a guess: the two above over a full map, 30 × 25. Picked at the floor ([`grounding.md`](grounding.md) B6) |
 | spending per run | $15 | What one generation may cost before it stops (Kent, 2026-09-17) |
 
 The searches cap adds no new number to the product: its floor is the claims cap times one call's research budget, and set any lower it would bind before the research caps do and starve the base rates it exists to pay for. It is deliberately loose, because **the spending cap is what protects the bill** — and with research inside a call, that cap is checked between rounds as well as between calls. The two research caps and what happens when they bind are [`grounding.md`](grounding.md)'s.
 
-Decision record 0006 *estimates* a 30-claim map at about 40 calls. The first real measurement, quoted in B5, is smaller and slower than the estimate; the rest go in the pull request and `STATUS.md`, never guessed here.
+**A round holds back one call's worth of searches so the generation cap is never passed** (*decided here*, 2026-09-20). A call is told once whether it may search and can then spend up to its own budget; nothing can stop it at search twelve. So the calls of a round are allowed the tool one at a time, in frontier order, and a call is allowed only while a whole call's budget still fits in what is left. The last call's worth therefore goes unspent — the price of never passing a ceiling, and a cheap one against a number that is a floor rather than a target. The same shape of reservation is why the claims cap sizes a round to the room the map has left, rather than being read once a round and stepped over by the three answers already in flight.
+
+Decision record 0006 *estimates* a 30-claim map at about 40 calls. The first real measurement, quoted in B5, is smaller and slower than the estimate; the rest go in the pull request and [`../../docs/measurements.md`](../../docs/measurements.md), never guessed here.
 
 ### What a prompt may and may not contain
 
@@ -311,6 +314,12 @@ Then `domain.validate` runs on the map the proposal would leave behind — not o
 
 **One proposal is one thing.** A claim arrives with the arrow that put it there, because a claim with nothing causing it is not a step in a story. That is still one thing: one question, one answer (`test_expand_returns_one_proposal_per_call`).
 
+**And then it is judged a second time, where the map actually changes** (*decided here*, 2026-09-20). Three lines are expanded at once, and all three calls are handed the map as it stood when the round started — they cannot see each other's answers, because none of them has come back yet. So two answers can each be legal against that map and illegal together: an arrow each way round between the same two claims is a loop; the same arrow from both is a second arrow between one pair. Validating once, when an answer arrives, and then appending all three, let both onto the map with nothing shown, nothing counted and nothing refused.
+
+So every accepted answer is put through the same judging again at the moment it is folded, against the map as it then stands, and **an answer that has stopped being legal in between is a refusal like any other**: shown, counted toward the three in a row, carrying its own counters because the call was made and the money was spent, and never repaired. The width cap is checked there too, counted against **each arrow's own cause** rather than against the claim the call was about — an arrow may name any claim on the map as its source, and a cap checked only on the claim being expanded is a cap that arrow walks straight past.
+
+The order answers are folded in is the frontier's, whichever came back first, so which of two answers is the one refused depends on the map and the answers and never on the weather.
+
 ### B2 — a refusal is an event, and every reason comes back at once
 
 Expanding `B`, the model proposes an arrow instead of a claim: `B → H`, *"cheaper crude reduces the incentive to close the strait."* Read on its own it is a reasonable sentence. Added to the map it closes `H → B → H`, because `H → B` is already drawn.
@@ -330,7 +339,7 @@ The arrow is **not** added. The map the person is looking at is untouched, becau
 
 **Every reason, never the first.** A proposal with three faults comes back with three violations, in the rule table's order, because a model told one fault at a time needs one call per fault and a person told one fault at a time learns only that the tool is hostile. **And never a repair.** No dropping the arrow that closes the loop, no inventing a resolve-by date, no downgrading an arrow to make it fit ([`../graph/validity.md`](../graph/validity.md), *Reject; never repair*).
 
-Two kinds of failure are not the validator's and arrive the same way. **A model refusal** — the vendor's safety check declines the call, and the answer comes back with a refusal stop reason and its own explanation (decision record 0006) — and **an answer that does not fit the shape**. Both become a `Refused` whose `claim_in_words` holds the plain sentence of what happened and whose `violations` is **empty**: there is no fault in a map to name, because no map was proposed. Nothing crashes and no stack trace reaches a screen (`test_expand_reports_a_malformed_answer_and_does_not_crash`). Whether those two deserve codes of their own is Open questions 3.
+Three kinds of failure are not the validator's and arrive the same way. **A model refusal** — the vendor's safety check declines the call, and the answer comes back with a refusal stop reason and its own explanation (decision record 0006) — and **an answer that does not fit the shape**. Both become a `Refused` whose `claim_in_words` holds the plain sentence of what happened and whose `violations` is **empty**: there is no fault in a map to name, because no map was proposed. Nothing crashes and no stack trace reaches a screen (`test_expand_reports_a_malformed_answer_and_does_not_crash`). Whether those two deserve codes of their own is Open questions 3.
 
 ### B3 — after a refusal, ask again and say nothing (Kent, 2026-09-17)
 
@@ -338,7 +347,7 @@ Decision record 0003 originally allowed *one targeted re-prompt naming those vio
 
 **The rule: up to three fresh proposals in a row for one frontier claim, and the next call is never told what was wrong.** Three in a row closes that frontier claim; the line simply stops growing there. Each attempt is its own event, and all three are shown.
 
-**Anything that is not an accepted proposal counts toward the three** — a rejection by the validator, a refusal by the vendor, an answer that did not fit the shape. **One rule, not three.** The cap is on attempts, because what has run out is our willingness to keep paying for this line, and that is the same whichever way the attempt failed. *Settled by the coordinator on 2026-09-17, as the one-rule reading of Kent's G4:* record 0003's amendment speaks only of proposals the validator turned down, and three separate counters would mean a line could be asked nine times while every count stayed under three.
+**Anything that is not an accepted proposal counts toward the three** — a rejection by the validator, a refusal by the vendor, an answer that did not fit the shape, a call the service never answered. **One rule, not three.** The cap is on attempts, because what has run out is our willingness to keep paying for this line, and that is the same whichever way the attempt failed. *Settled by the coordinator on 2026-09-17, as the one-rule reading of Kent's G4:* record 0003's amendment speaks only of proposals the validator turned down, and three separate counters would mean a line could be asked nine times while every count stayed under three.
 
 Worked: expanding `B`, the model proposes `B → H` and is refused for the loop. The next call is the *same* call — the same map, the same frontier claim, the same prompt — with no mention of the loop, no mention of the refusal, and nothing new to read. It proposes `M2`, the pair trade, and that is accepted, which puts `B`'s count back to zero.
 
@@ -354,7 +363,7 @@ The stream ends with one `done` event carrying **one** of seven reasons. **The r
 
 | # | `done.reason` | Chosen when |
 |---|---|---|
-| 1 | `spend_cap` | **Override.** The running receipt reached the run's spending cap. Checked after every call, so nothing further is asked |
+| 1 | `spend_cap` | **Override.** The running receipt reached the run's spending cap. A run that ended this way drafts no scripted intervention. Checked after every call, so nothing further is asked |
 | 2 | `no_terminal` | **Override.** The map ends nowhere you can act on, even after the last ending-seeking call (B6) |
 | 3 | `depth_cap` · `width_cap` · `claim_cap` | The last open claim was closed by that cap: it sat at the depth cap, it already had its full width of children, or the map was full |
 | 4 | `refusal_cap` | The last open claim was closed by the refusals cap — three proposals in a row for it were refused. The map is finished, and one line was abandoned rather than ended. *(Named `model_stopped` until 2026-09-17; renamed because the model did not stop — our rules refused it — and a value must mean what it says. A model that answers `Stop` is the row below.)* |
@@ -393,13 +402,37 @@ The generated map is not the shipped fixture and does not pretend to be: it has 
 
 `engine/receipt.py` folds every `Outcome`'s counters into the run's one receipt, and **the running receipt is checked against the spending cap after every call — and, once a call can research, between the rounds inside a call too** ([`grounding.md`](grounding.md)). Over the cap, the generation stops where it is: `done.reason = "spend_cap"`, and one plain sentence naming what was spent and what was got — *"This run reached its spending limit of <cap>. It spent <spent> and built <n> claims and <n> arrows."* No figure is written into that sentence, because every one of its slots is filled from the receipt at run time.
 
+**What a ceiling really promises.** A round of up to three questions goes out together and is all billed before the first of them is folded, so "checked after every call" overstates it. The honest bound: **a run can pass its ceiling by at most the calls that were in flight when it was reached, plus the rounds of research one of those calls may still run.** Nothing further is *asked* once it is reached, which is the part that matters — including the scripted intervention, which a run that ended for money does not draft at all (Kent, 2026-09-21).
+
 What was built is kept, not thrown away: a partial map with a visible reason beats a blank screen with a silent one. The price table lives in `engine/pricing.py` and nothing else, per model, with the day it was read beside it and the `claude-api` skill named — prices change, and memory is unreliable (`test_a_run_stops_at_its_spending_cap_and_says_so`).
 
 **The model is one setting** (Kent, 2026-09-20). The prototype runs on `claude-sonnet-5`; `claude-opus-5` is one setting away for a final recording if quality asks for it. **Nothing else in the pipeline knows which model it is** — not `expand`, not the caps, not the provenance rule — and **`Receipt.model` names the one that actually ran**, so no reader has to guess what a map came from.
 
+**Record rich, run live fast** (Kent, G13, 2026-09-21). How hard the model is
+asked to try is one setting, `KATALYST_EFFORT`, with **two pinned defaults**
+behind it. The recorder sends nothing and takes the service's own: a recording is
+made once and played back by everybody, so it is worth the model's best, and the
+request stays byte for byte what it was before anybody had an opinion. A live run
+through the stream route asks for **`medium`**: somebody watching a map arrive is
+waiting, and the measurement is 27 seconds a call against 79. The setting
+overrides either. It is pinned for a whole run and never varied between its
+calls, because it sits in the part of a request the service remembers.
+
+**The receipt says which effort made the map**, as a plain word — `default` when
+nothing was sent — and so does a recording's header, so a reader of a replay
+knows which of the two they are looking at.
+
+**Record rich, run live fast** (Kent, G13, 2026-09-21). How hard the model is asked to try is one setting, `KATALYST_EFFORT`, with **two pinned defaults** behind it. The recorder sends nothing and takes the service's own: a recording is made once and played back by everybody, so it is worth the model's best, and the request stays byte for byte what it was before anybody had an opinion. A live run through the stream route asks for **`medium`**: somebody watching a map arrive is waiting, and the measurement is 27 seconds a call against 79. The setting overrides either. It is pinned for a whole run and never varied between its calls, because it sits in the part of a request the service remembers.
+
+**The receipt says which effort made the map**, as a plain word — `default` when nothing was sent — and so does a recording's header, so a reader of a replay knows which of the two they are looking at.
+
+**How long a call waits, and how often it tries again, are decisions** (*decided here*, 2026-09-20; both read from the `claude-api` reference bundle that day). The library's own defaults are ten minutes and two retries, over 408, 409, 429, every 5xx and every connection failure. Two retries is kept and written down — a failed request is not billed, so trying again is free, and what it costs is time. Ten minutes is not: a whole question measures about two hundred seconds and one round of it far less, so ten minutes is a hang rather than a timeout, and three attempts of it is half an hour of somebody watching a stream that will never move. **Five minutes**, which is comfortably above anything measured and bounds a whole question, retries and all, at fifteen.
+
+**Every failure of the service is a sentence, not a crash.** A 429 or a 529 on call twenty of forty is ordinary; it used to take the whole run with it, leaving no partial map, no receipt and no `Finished` — and dropping the round's other two paid answers unread. Every error the library raises now stops at the seam and crosses it as one of ours, carrying one plain sentence a person could act on: the model is busy, the model did not answer in time, this run asked too much too quickly, this key is not allowed to ask this model. Never a class name, never a status code, never a stack trace. `expand` folds it exactly as it folds an answer it could not read — a refusal, counted toward the three in a row, shown, never repaired.
+
 **One measurement, and it is a fact rather than an estimate.** The first live Hormuz run, 2026-09-17, on `claude-opus-5` at the default effort: **10 calls, 9 searches, $1.32, 10 minutes 54 seconds, 61% of the written tokens spent on thinking, 10 claims, 0 refused.** About one tile a minute, and sequential by nature — every call has to see the map as it stands. No figure is quoted here for `claude-sonnet-5`, on cost or on time, because none has been measured yet; both go in the pull request when they are.
 
-The ceiling *across* runs is a working agreement kept in `STATUS.md`; nothing is stored between requests until stack 05. **Only the coordinator runs a command that spends money.**
+The ceiling *across* runs is a working agreement kept in [`../../docs/measurements.md`](../../docs/measurements.md); nothing is stored between requests until stack 05. **Only the coordinator runs a command that spends money.**
 
 ### B6 — no ending reached: one last call, then an honest card
 
@@ -413,7 +446,7 @@ If that still fails, the stream ends `done.reason = "no_terminal"` and the brows
 
 A Verify run carries a destination in the person's own words. It is turned into a claim by one `StartingClaim` call and added to the map **up front**, as an ordinary `event`. Every expansion call is told what it is, and expansion is steered toward it.
 
-**Reached.** The person asks: *does the strait opening reach a Polymarket contract on Brent below $70?* The map runs `H` → `C` → `B` → `M1`. The `verdict` event carries `kind="reached"`, the path `(H, C, B, M1)`, and `product` — the multiplied-out likelihood of that path, read off the world, never multiplied here. The path shown is the **best-backed path**: over every path from the hypothesis to the destination, the one whose weakest arrow is strongest. That is the same rule the delta rail's ranking and the Inspector's path bar already use (Kent, 2026-09-17) — one path-choosing rule, used three times. Record 0014 states the honest caveat beside it: a path's multiplied-out likelihood multiplies numbers each read on a different day, and it is not a joint probability. Say so next to it.
+**Reached.** The person asks: *does the strait opening reach a Polymarket contract on Brent below $70?* The map runs `H` → `C` → `B` → `M1`. The `verdict` event carries `kind="reached"`, the path `(H, C, B, M1)`, and `product` — the multiplied-out likelihood of that path. **It is multiplied out in `engine/verify.py` today, over the likelihoods the world carries**, which is not where it belongs: reading numbers off a world is the rules layer's work, and this one sits in the pipeline only because the engine is the first thing that needed it. It moves to `domain/` in the last pull request of this stack, where the engine is gaining the path product anyway; until then the honest sentence is that the engine multiplies the world's own numbers rather than that the world hands the product over (2026-09-20). The path shown is the **best-backed path**: over every path from the hypothesis to the destination, the one whose weakest arrow is strongest. That is the same rule the delta rail's ranking and the Inspector's path bar already use (Kent, 2026-09-17) — one path-choosing rule, used three times. Record 0014 states the honest caveat beside it: a path's multiplied-out likelihood multiplies numbers each read on a different day, and it is not a joint probability. Say so next to it.
 
 **Not reached.** The person asks instead: *does the strait opening reach Iranian crude exports returning to pre-sanction levels?* Nothing the model proposed gets there. The `verdict` event carries `kind="no_path"`, an empty path, `nearest="B"` — the claim the map did reach that sits closest to the destination — and one plain sentence saying so.
 
@@ -427,7 +460,7 @@ The answer is not a fourth proposal shape. It is the two shapes we have, used in
 
 1. **One call drafts the sentence into a claim**, with the existing `StartingClaim` shape. The person's words in, a claim with a test, a judge, a date and a likelihood out. Nothing about arrows is asked, because nothing about arrows is known yet. It is stamped `kind="event"` and its identifier is minted here.
 2. **Then the ordinary machinery proposes its arrows, one per call**, as `LinkProposal`s with the new claim as one end — both ends already on the map, which is exactly what a `LinkProposal` is for. Each is validated like any other proposal: a loop is refused, a `documented` arrow with nothing kept is impossible, every arrow needs a rationale.
-3. **It stops the way everything stops**: on `Stop`, on the width cap, or on three refusals in a row. No new stop rule, no new cap.
+3. **It stops the way everything stops**: on `Stop`, on the width cap, or on three refusals in a row. No new stop rule. The one cap it carries of its own is the run's own spending ceiling, applied to the edit rather than to a run — an edit is asked for by hand, one at a time, and there is no walk above it counting the money (2026-09-20).
 4. **The answer is one `Insert` intervention** — the claim and its arrows together — for the browser to append to its branch. A map is never left holding a claim that causes nothing.
 
 **One proposal per call still holds.** Nothing here asks for a list; a person's one sentence simply takes one drafting call plus one call per arrow.
@@ -456,15 +489,15 @@ Nothing new appears on screen. The chip keeps record 0014's label — *model int
 
 Each is written *for all inputs drawn from generator S, statement P holds*, and names the test that checks it. The boundary tests live in `backend/tests/boundary/test_expand_cassettes.py` and run against **cassettes** — real exchanges with the vendor recorded to disk and replayed, so the suite needs no key (INV-13). The suite already runs with recording off, so an unrecorded call fails rather than dialling out.
 
-Local numbers come from one pool shared by the five chapters of this part. **This chapter holds `INV-generation.1` through `INV-generation.8`**; [`grounding.md`](grounding.md) holds `.9` through `.13`.
+Local numbers come from one pool shared by the five chapters of this part. **This chapter holds `INV-generation.1` through `INV-generation.8`**; [`grounding.md`](grounding.md) holds `.9` through `.15`.
 
 | ID | Statement | Test |
 |---|---|---|
 | **INV-generation.1** | For every recorded answer in `backend/tests/cassettes/`, `expand` returns exactly one `Outcome`, and that outcome names at most one new claim. No call returns a list | `test_expand_returns_one_proposal_per_call` |
-| **INV-generation.2** | For every recorded proposal that would close a loop, `expand` returns a `Refused` whose violations contain exactly one `cycle`, and the map is unchanged. Likewise for a claim with no resolution criteria: exactly one `missing_resolution` | `test_expand_rejects_cycle`, `test_expand_rejects_a_claim_with_no_resolution_criteria` |
-| **INV-generation.3** | For every recorded answer that is a vendor refusal, and for every recorded answer that does not fit the proposal shape, `expand` returns a `Refused` with a plain sentence and raises nothing | `test_expand_surfaces_a_refusal_as_a_rejected_proposal`, `test_expand_reports_a_malformed_answer_and_does_not_crash` |
+| **INV-generation.2** | For every recorded proposal that would close a loop, `expand` returns a `Refused` whose violations contain exactly one `cycle`, and the map is unchanged. Likewise for a claim with no resolution criteria: exactly one `missing_resolution`. **And for every run, the map a walk hands back satisfies `validate`** — an accepted answer that stopped being legal between the moment it was judged and the moment it was folded is refused at the fold, with the rules' own code and sentence, and counted | `test_expand_rejects_cycle`, `test_expand_rejects_a_claim_with_no_resolution_criteria`, `test_a_round_never_leaves_behind_a_map_the_rules_refuse`, `test_an_answer_that_stops_being_legal_before_it_lands_is_refused_like_any_other`, `test_two_answers_in_one_round_cannot_draw_the_same_arrow_twice` |
+| **INV-generation.3** | For every recorded answer that is a vendor refusal, for every recorded answer that does not fit the proposal shape, and for **every failure of the service itself** — a rate limit, an overload, a timeout, a connection that dropped — `expand` returns a `Refused` with a plain sentence and raises nothing. Nothing the model or the network can do escapes `grow` | `test_expand_surfaces_a_refusal_as_a_rejected_proposal`, `test_expand_reports_a_malformed_answer_and_does_not_crash`, `test_a_service_that_would_not_answer_is_a_refusal_and_not_a_crash`, `test_a_service_that_would_not_answer_one_call_never_takes_the_round_with_it` |
 | **INV-generation.4** | Read over our own source: no model in `engine/proposal.py` has a field named `id`, `provenance` or `owner`, and no proposal type is or contains a list of proposals | `test_the_model_never_names_an_identifier` |
-| **INV-generation.5** | For every sequence of recorded refusals on one frontier claim, the prompt of call *n+1* is byte-identical to the prompt of call *n*, and no violation code or violation message appears anywhere in it. After the third, that claim is closed | `test_a_refused_claim_is_asked_again_without_being_told_why` |
+| **INV-generation.5** | For every sequence of recorded refusals on one frontier claim, **no violation code and no violation message appears anywhere in any of their prompts** — never, on any run. After the third refusal in a row for one claim, that claim is closed; an accepted answer for it starts the count again. The prompts of calls *n* and *n+1* are byte-identical when nothing else landed on the map in between, which is every run at `at_once = 1` and most re-asks above it; a round that accepts another claim while this one is being re-asked changes the map the next prompt shows, and that is the map arriving rather than a hint about the refusal | `test_a_refused_claim_is_asked_again_without_being_told_why`, `test_a_claims_run_of_refusals_starts_again_the_moment_it_is_answered` |
 | **INV-generation.6** | For every recorded run whose folded counters exceed the run's spending cap, the stream ends with `done.reason == "spend_cap"`, the sentence names what was spent, and no further call is made | `test_a_run_stops_at_its_spending_cap_and_says_so` |
 | **INV-generation.7** | For every recorded run in which no proposal ever names a `market` or `not_tradeable` claim, the stream ends with `done.reason == "no_terminal"`, and the map contains no claim that no proposal contained | `test_a_generation_that_reaches_no_ending_says_so` |
 | **INV-generation.8** | For every recorded Verify run whose destination is not reached, the `verdict` event has `kind == "no_path"`, names a nearest claim that is on the map, and the map holds no arrow that no proposal contained. Read over our own source: no code path in `engine/` builds a `Link` outside the accept step | `test_verify_returns_no_path_rather_than_a_bridge` |
@@ -498,6 +531,7 @@ Two more tests belong to this pull request and are stated where they are owned: 
    **Decided 2026-09-17, in the cross-chapter review: no. The value is gone**, and `Done.reason` has seven. A reason nobody can produce is a reason a reader will one day trust. [`streaming.md`](streaming.md) carries the seven.
 2. **Does the vendor's structured-output call take a discriminated union directly?**
    **Answered 2026-09-17, by the first live call: no.** The service refuses a union at the top of a schema — *"For 'anyOf', '$defs' is not supported"* — so the union travels inside a **one-field envelope, on the wire only**. The envelope is built and unwrapped in `engine/client.py`; **the pipeline still asks for and receives a plain `Proposal`**, and no shape in this chapter changed. A reader of `expand` never meets the envelope, which is the point of putting it at the boundary.
-3. **Should a vendor refusal and a malformed answer carry codes of their own?** Today both arrive as a `Refused` with an empty violation list and a plain sentence, so a reader cannot tell *the model declined* from *the answer did not parse* except by reading the sentence. Such a code would live in `engine/`, not in `domain/validity.py`, because neither is a fault in a map — the nineteen codes there stay nineteen.
+3. **Should a vendor refusal and a malformed answer carry codes of their own?** Today both arrive as a `Refused` with an empty violation list and a plain sentence, so a reader cannot tell *the model declined* from *the answer did not parse* except by reading the sentence. Such a code would live in `engine/`, not in `domain/validity.py`, because neither is a fault in a map — the twenty codes there stay twenty.
 4. **A generated map can hold no feedback arrow.** `LinkDraft` has no `reflexive` field, so the one kind of arrow allowed to close a loop cannot be proposed, and a proposal that closes a loop is always refused. The shipped example has one such arrow, hand-written. Add the field in stack 06, when unrolling a feedback arrow over time actually does something?
-5. **Which day a generated claim's resolve-by date is checked against.** `validate` reads no clock, so a model that writes a date already past is not caught by the map's rules. `engine/` can see today. Is a stale date a violation, a warning on the world, or nothing? This is [`../graph/proposition.md`](../graph/proposition.md) Open questions 4, still open, and generation is the first caller that could answer it.
+5. **Is the same claim, proposed twice, a fault?** *(Raised 2026-09-20.)* Two proposals can say the same thing in the same words and both be accepted: identifiers are minted by us, so the second is a different claim as far as every rule is concerned, and the map ends up carrying one sentence twice with two sets of arrows. A concurrent round makes it easy — the calls of a round cannot see each other's answers — and re-validating each answer at the fold, which now catches a duplicate *arrow*, does not catch this. **Not a violation for now, and deliberately not:** "the same claim" is a judgement about words, and the map's rules are mechanical by design. A rule anybody can re-run would have to be exact sentence equality, which is easy to slip past and would refuse two genuinely different claims that happen to be worded alike. It is written down here rather than guessed at.
+6. **Which day a generated claim's resolve-by date is checked against.** `validate` reads no clock, so a model that writes a date already past is not caught by the map's rules. `engine/` can see today. Is a stale date a violation, a warning on the world, or nothing? This is [`../graph/proposition.md`](../graph/proposition.md) Open questions 4, still open, and generation is the first caller that could answer it.

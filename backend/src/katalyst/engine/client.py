@@ -1,56 +1,46 @@
 """The one place this program talks to a model, and the one place its types appear.
 
 Everything else in the pipeline is arithmetic and rules over values already in
-hand. This file is the seam. On one side a question written as plain text; on the
-other a `Said` — our own small shape holding what was answered, what the search
+hand. This file is the seam: a question as plain text on one side, a `Said` on
+the other — our own small shape holding what was answered, what the search
 returned, whether the model declined, and what the call cost. **The library's own
-types are named here and nowhere else in this program**, and a test reads the
-layer's source to keep it so.
+types are named here and nowhere else**, and a test reads the layer's source to
+keep it so.
 
-Why a seam and not a function
------------------------------
-`expand.py` takes an *answerer* as an argument rather than reaching for a client
-itself. Three things follow, and each of them is the point:
-
-* The tests are fast and exact. A test that wants a refusal writes a refusal; it
-  does not hope one turns up in a recording.
-* Nothing below this line can start calling a model by accident.
-* Playing back a recorded run plugs in where the live answerer does, with no
-  second path through the pipeline.
-
-`what_it_said` is the translation, and it is a pure function of an answer. The
-tests build answers in the library's own types and put them through this same
-function, so what they exercise is what a real call exercises.
-
-The search tool, and the two states it has
--------------------------------------------
-The tool, its version and its per-call limit were re-read from the `claude-api`
-reference bundle on 2026-09-17. Three things about it are decisions rather than
-defaults: one search per call, nothing declared alongside it, and no fetching of
-a page of our own choosing.
-
-Once a run has spent its whole budget of searches, the tool stays declared and is
-**forbidden** for the rest of the run rather than removed from the list. The two
-look the same to the model and cost very differently: the tool list is written at
-the very front of a request, so removing it would stop the service recognising
-the prefix it has been reading back at a tenth of the price all run, while
-forbidding it leaves that prefix untouched.
+`expand.py` takes an *answerer* as an argument rather than reaching for a client,
+which is what lets a test write the refusal it wants instead of hoping one turns
+up, stops anything below this line calling a model by accident, and lets a
+recording plug in where the live answerer does. `what_it_said` is the
+translation and it is pure, so a test's hand-written answer goes through exactly
+what a real one does.
 
 What this file must never do
 ----------------------------
 - Never decide anything about a map. It asks, it translates, it hands back.
-- Never read an environment variable itself; `katalyst.settings` is the one place
-  that does.
-- Never hide a refusal or a part-finished answer. Both come back for the pipeline
-  to report.
+- Never read an environment variable itself; `katalyst.settings` does that.
+- Never hide a refusal or a part-finished answer. Both come back for the
+  pipeline to report.
 - Never declare a place to run code beside the search tool, and never declare a
-  tool that fetches a page of our choosing.
+  tool that fetches a page of our choosing. Both were decided in record 0006.
+- Never take the search tool **out** of the list to stop a run searching. The
+  tool list is the very front of a request, so removing it throws away the
+  prefix the service has been reading back at a tenth of the price; forbidding
+  it with `tool_choice` leaves that prefix untouched. The two look identical
+  from here and cost very differently.
+
+Everything the service can do to a call — declining, pausing part-finished,
+rate-limiting, falling over, not answering — comes back through here as one of
+our own shapes with a plain sentence on it. Nothing above this file should ever
+have to know whose exception it was.
 """
 
+import time
 from collections.abc import Sequence
+from importlib import import_module
 from typing import Any, Protocol
 
 import anthropic
+from anthropic import Omit, omit
 
 # A private path into the client library, used in exactly one place and never to
 # build a request: `wire_schema` below looks at what the library *would* send, so
@@ -59,6 +49,7 @@ import anthropic
 from anthropic.lib._parse._transform import transform_schema
 from anthropic.types import (
     MessageParam,
+    OutputConfigParam,
     ParsedMessage,
     TextBlockParam,
     ToolChoiceParam,
@@ -66,10 +57,10 @@ from anthropic.types import (
 )
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
-from katalyst.engine.outcome import FoundPage, Said
-from katalyst.engine.pricing import MODEL
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO, FoundPage, Said
 from katalyst.engine.prompt import STANDING_TEXT
 from katalyst.engine.proposal import Proposal, StartingClaim
+from katalyst.engine.receipt import Receipt, fold, nothing_spent_yet, over_the_cap
 from katalyst.settings import get_settings
 
 ROOM_FOR_AN_ANSWER = 16_000
@@ -82,26 +73,40 @@ never cut off in the middle, small enough that the request cannot sit past the
 client library's own patience.
 """
 
-SEARCHES_INSIDE_ONE_CALL = 1
+SEARCHES_INSIDE_ONE_CALL = 25
 """How many web searches the model may run while answering one question.
 
-One proposal per call, one search per proposal. One answer is one claim and the
-one arrow that reaches it, so it is checking one mechanism, and a budget of one
-look keeps the bill in step with the work. It is raised only when a measurement
-says it should be, never because a run felt thin.
+One search was enough to check an arrow's mechanism and nowhere near enough to
+**count a reference class**. The first measured run proved it: eight of ten
+claims came back with a count like "12 of 15" and not one source behind it,
+because the one search had gone to the arrow. Counting how often something has
+happened before means finding the cases, and finding cases takes looking.
 
 Fixed for the whole of a run, on purpose. A figure that counted down per call
-would change the tool list, and the tool list is the very front of the request.
+would change the tool list, and the tool list is the very front of the request —
+so the whole remembered prefix would be thrown away mid-run.
 """
 
-TIMES_A_PART_FINISHED_ANSWER_IS_SENT_BACK = 3
-"""How often a part-finished answer is handed straight back to be continued.
+ROUNDS_OF_RESEARCH = 5
+"""How many passes one question may make — **passes, not continuations**.
 
-A question that uses the search tool can come back with the search half done and
-no answer yet. The service expects exactly one thing in reply: the same
-conversation with its own part-finished turn on the end, and no new instruction —
-it picks up where it left off. This is how many times we will do that before
-treating the answer as one we never got.
+A *round* is one pass in which the model searches, reads what came back, and
+decides whether to search again, which is what `grounding.md` counts. The first
+request is the first round, so five rounds is five requests and four hand-backs.
+It was written as five hand-backs once, which made six rounds of a chapter that
+says five (2026-09-20).
+
+The service runs the search tool in a loop of its own and stops after a while,
+handing back a part-finished answer. Sending it straight back — the same
+conversation with its own turn on the end and no new instruction — lets it carry
+on where it left off. Each of those is a round: search, read, decide whether to
+look again.
+
+**At the cap the answer is taken as it stands.** Whatever the model has by then
+is what we read: if it found a countable class it says so, and if it did not, the
+claim arrives without a base rate and the transcript says why. Nothing is retried
+and nothing is asked a second time, because both would be paying twice for the
+same question.
 """
 
 SEARCH_TOOL: WebSearchTool20260209Param = {
@@ -172,6 +177,32 @@ class OneProposal(BaseModel):
     proposal: Proposal = Field(description="The one thing this answer is.")
 
 
+# NOTE: **this class's docstring goes over the wire.** A shape's docstring is its
+# description in the request body, so editing one changes the bytes the service
+# sees, invalidates every cassette and changes the prompt's fingerprint. Found on
+# 2026-09-20 by adding one paragraph to it and watching four recordings stop
+# matching. Say things about a shape in a comment like this one, not in its
+# docstring, unless the model is meant to read them.
+
+
+def what_goes_out() -> dict[str, dict[str, Any]]:
+    """Every description of an answer this program sends, as the library sends them.
+
+    Here rather than in `prompt.py`, which needs them for the prompt's
+    fingerprint: the envelope a proposal travels in is this file's business and
+    nothing outside it names one. A caller asks what goes out and is told. That
+    is what keeps `OneProposal`'s "nothing outside this file knows the envelope
+    exists" true — `prompt.py` used to import it by name (2026-09-20).
+
+    Returns:
+        One entry per question this program asks, keyed by what it asks for.
+    """
+    return {
+        "proposal": wire_schema(OneProposal),
+        "starting_claim": wire_schema(StartingClaim),
+    }
+
+
 def wire_schema(shape: Any) -> dict[str, Any]:
     """Return the exact description of an answer that the library will send.
 
@@ -205,6 +236,86 @@ class AnswerWeCouldNotRead(Exception):
         self.why = why
 
 
+EFFORT_WHEN_RECORDING = ""
+"""What the recorder sends when nothing says otherwise: nothing at all.
+
+**Record rich** (Kent, G13, 2026-09-21). A recording is made once and played back
+by everybody, so it is worth the service's own default — its best — and the
+request is byte for byte what it was before anybody had an opinion.
+"""
+
+EFFORT_WHEN_LIVE = "medium"
+"""What a live run through the stream route sends when nothing says otherwise.
+
+**Run live fast** (Kent, G13, 2026-09-21). Somebody watching a map arrive is
+waiting; the measured difference is 27 seconds a call against 79, for a map of
+nine claims against twenty. `KATALYST_EFFORT` overrides this and the line above.
+"""
+
+HOW_LONG_TO_WAIT = 300.0
+"""How long one request may take before it is given up on, in seconds.
+
+The library's own default is ten minutes. Measured on 2026-09-17 and again on
+2026-09-20, a whole question — every round of research it takes — runs about two
+hundred seconds, and one round of it is well inside that. Ten minutes is
+therefore not a timeout, it is a hang: three attempts of it is half an hour of
+somebody watching a stream that will never move. Five minutes is comfortably
+above anything measured and bounds a whole question, retries and all, at fifteen.
+"""
+
+HOW_OFTEN_TO_TRY_AGAIN = 2
+"""How many times the library tries a failed request again by itself.
+
+The library's own default, written down rather than inherited. It retries 408,
+409, 429, every 5xx and every connection failure, with a wait between — which is
+exactly the set of failures that go away on their own, and exactly the set this
+program has no better answer to. A failed request is not billed, so trying again
+is free; what it costs is time, which the figure above bounds.
+"""
+
+
+class TheModelDidNotAnswer(Exception):
+    """The service could not be reached, or would not answer, after the library gave up.
+
+    The vendor's own exception classes stop here, as `AnswerWeCouldNotRead` stops
+    the library's validation errors here: nothing past this file knows whose
+    complaint it was. Carries one plain sentence a person could read.
+    """
+
+    def __init__(self, why: str) -> None:
+        """Hold the plain sentence of what went wrong."""
+        super().__init__(why)
+        self.why = why
+
+
+def _in_plain_words(failure: anthropic.APIError) -> str:
+    """Say what went wrong with a call, in words a person reads.
+
+    Never the exception's class, never a status code, never a stack trace: those
+    belong in the server's own log. What a reader needs is whether to wait, to
+    try a smaller run, or to tell somebody.
+
+    Args:
+        failure: Whatever the library raised.
+
+    Returns:
+        One plain sentence.
+    """
+    if isinstance(failure, anthropic.APITimeoutError):
+        return "The model did not answer in time, twice over, so this question was given up on."
+    if isinstance(failure, anthropic.APIConnectionError):
+        return "The model could not be reached. The connection failed, twice over."
+    if isinstance(failure, anthropic.RateLimitError):
+        return "This run has asked too much of the model too quickly, and was turned away."
+    if isinstance(failure, anthropic.APIStatusError) and failure.status_code >= 500:
+        return "The model is busy and turned this question away, twice over."
+    if isinstance(failure, anthropic.APIStatusError) and failure.status_code in (401, 403):
+        return "The key this run was started with is not allowed to ask this model."
+    if isinstance(failure, anthropic.APIStatusError) and failure.status_code == 402:
+        return "This account cannot pay for another question."
+    return "The model would not answer this question, and did not say why in words we can pass on."
+
+
 class Answerer(Protocol):
     """Whatever the pipeline asks its questions of.
 
@@ -221,7 +332,18 @@ class Answerer(Protocol):
     fit the shape.
     """
 
-    def starting_claim(self, question: str) -> Said:
+    effort_used: str
+    """Which effort this answerer asks with, as the plain word a receipt shows."""
+
+    def watching(self, spent: Receipt, cap: float) -> None:
+        """Say what the run has spent and what it may spend, before the next question.
+
+        Called before every question. An answerer that cannot go over a budget —
+        every fake in the tests — may do nothing with it.
+        """
+        ...
+
+    def starting_claim(self, question: str, *, may_search: bool = True) -> Said:
         """Ask for one typed sentence, written as a claim anybody could settle."""
         ...
 
@@ -243,31 +365,63 @@ class Model:
     `expand.py`, which can be tested without spending a penny.
     """
 
-    def __init__(self, client: anthropic.Anthropic, *, model: str = MODEL) -> None:
+    def __init__(
+        self,
+        client: anthropic.Anthropic,
+        *,
+        model: str | None = None,
+        effort: str | None = None,
+    ) -> None:
         """Wrap a client.
 
         Args:
             client: The vendor's client, already built and already holding
                 whatever credentials it needs.
-            model: Which model to ask. The default is the one decision record
-                0006 chose and `pricing.py` prices.
+            model: Which model to ask. The one the settings name when not said.
+            effort: How hard it should try. The one the settings name when not
+                said, and nothing at all when neither says — which leaves the
+                service's own default and puts no field in the request.
         """
         self._client = client
-        self._model = model
+        settings = get_settings()
+        self._model = model or settings.KATALYST_MODEL
+        chosen: Any = effort if effort is not None else settings.KATALYST_EFFORT
+        # Pinned for the whole run and never varied between calls: changing it
+        # mid-run would throw away the remembered prefix the run is reading back
+        # at a tenth of the price. Left empty it is not sent at all, so the
+        # request is byte for byte what it was before anybody had an opinion.
+        self._trying: OutputConfigParam | Omit = (
+            OutputConfigParam(effort=chosen) if chosen else omit
+        )
+        self.effort_used = str(chosen) if chosen else WHAT_THE_SERVICE_DEFAULTS_TO
+        self._spent = nothing_spent_yet(self._model)
+        self._cap = float("inf")
 
-    def starting_claim(self, question: str) -> Said:
+    def watching(self, spent: Receipt, cap: float) -> None:
+        """Take note of what the run has spent and what it may spend.
+
+        Args:
+            spent: What the run had spent before this question was put.
+            cap: What the whole run may spend, in dollars.
+        """
+        self._spent = spent
+        self._cap = cap
+
+    def starting_claim(self, question: str, *, may_search: bool = True) -> Said:
         """Ask for one typed sentence, written as a claim anybody could settle.
 
-        Searching is forbidden on this call. The question is what the person
-        meant, and the web has nothing to say about that.
+        **Searching is allowed here**, which it was not at first: how often this
+        kind of thing has happened before is exactly what the web is for, and
+        this is the claim every number below it hangs off.
 
         Args:
             question: The varying half of the request, from `prompt.py`.
+            may_search: Whether this run still has searches left.
 
         Returns:
             The answer, in our own words.
         """
-        return self._ask(question, StartingClaim, may_search=False)
+        return self._ask(question, StartingClaim, may_search=may_search)
 
     def proposal(self, question: str, *, may_search: bool) -> Said:
         """Ask for the one next piece of the map.
@@ -285,15 +439,11 @@ class Model:
     def _ask(self, question: str, shape: Any, *, may_search: bool) -> Said:
         """Put one question, sending a part-finished answer back until it finishes.
 
-        The shape is handed to the client library, which turns it into the
-        description of what an answer must look like, sends it with the request,
-        and checks what comes back against it before returning.
-
-        The shape goes on `output_format`, which is what `messages.parse` takes;
-        the reference bundle's note that `output_format` is deprecated is about
-        `messages.create`, where the same thing is spelled `output_config.format`.
-        `messages.parse` merges the two itself. Do not "fix" this to the other
-        spelling — decision record 0006 names this call.
+        The shape goes on `output_format`, which is what `messages.parse` takes.
+        The reference bundle's note that `output_format` is deprecated is about
+        `messages.create`, where the same thing is spelled `output_config.format`;
+        `messages.parse` merges the two itself. **Do not "fix" this to the other
+        spelling** — record 0006 names this call.
 
         Args:
             question: The varying half of the request.
@@ -305,10 +455,13 @@ class Model:
 
         Raises:
             AnswerWeCouldNotRead: If what came back did not fit the shape.
+            TheModelDidNotAnswer: If the service could not be reached, or would
+                not answer, after the library had tried again as often as it may.
         """
         conversation: list[MessageParam] = [{"role": "user", "content": question}]
         rounds: list[ParsedMessage[Any]] = []
-        for _ in range(TIMES_A_PART_FINISHED_ANSWER_IS_SENT_BACK + 1):
+        started = time.monotonic()
+        for _ in range(ROUNDS_OF_RESEARCH):
             try:
                 answer = self._client.messages.parse(
                     model=self._model,
@@ -323,19 +476,42 @@ class Model:
                     tool_choice=MAY_SEARCH if may_search else MAY_NOT_SEARCH,
                     messages=conversation,
                     output_format=shape,
+                    output_config=self._trying,
                 )
             except ValidationError as did_not_fit:
                 raise AnswerWeCouldNotRead(_did_not_fit_the_shape(did_not_fit)) from did_not_fit
+            except anthropic.APIError as did_not_answer:
+                # Everything the library raises stops here. The pipeline folds a
+                # sentence, never an exception class (Kent, 2026-09-20).
+                raise TheModelDidNotAnswer(_in_plain_words(did_not_answer)) from did_not_answer
             rounds.append(answer)
             if answer.stop_reason != "pause_turn":
-                return what_it_said(rounds)
+                return what_it_said(rounds, seconds=time.monotonic() - started)
+            if self._out_of_money(rounds):
+                # The rounds already paid for are kept and read as they stand.
+                return what_it_said(rounds, seconds=time.monotonic() - started)
             # Part finished. The service picks up from its own turn, and adding a
             # "carry on" of our own would only confuse it.
             conversation = [*conversation, {"role": "assistant", "content": answer.content}]
-        return what_it_said(rounds)
+        return what_it_said(rounds, seconds=time.monotonic() - started)
+
+    def _out_of_money(self, rounds: Sequence[ParsedMessage[Any]]) -> bool:
+        """Say whether the rounds so far have taken the run past what it may spend.
+
+        Priced through the same receipt the run itself is priced through, so the
+        figure that stops a question mid-flight and the figure on the bill are
+        worked out by one piece of code.
+
+        Args:
+            rounds: Every round trip this question has made so far.
+
+        Returns:
+            True once this question's rounds have carried the run over its cap.
+        """
+        return over_the_cap(fold(self._spent, what_it_said(rounds)), self._cap)
 
 
-def what_it_said(rounds: Sequence[ParsedMessage[Any]]) -> Said:
+def what_it_said(rounds: Sequence[ParsedMessage[Any]], *, seconds: float = 0.0) -> Said:
     """Turn every round trip of one question into one answer in our own words.
 
     The only place a reply of the library's becomes a shape of ours. Pure: it
@@ -352,6 +528,9 @@ def what_it_said(rounds: Sequence[ParsedMessage[Any]]) -> Said:
     Args:
         rounds: Every round trip the question took, oldest first. The last one
             holds the answer.
+        seconds: How long the whole question took, measured by the caller that
+            made it. Passed in rather than read here, so this stays a pure
+            function of an answer and a test can hand it a fixed number.
 
     Returns:
         The answer, its search results, whether the model declined, and the sum of
@@ -375,6 +554,13 @@ def what_it_said(rounds: Sequence[ParsedMessage[Any]]) -> Said:
         output_tokens=sum(one.usage.output_tokens for one in rounds),
         cache_read_tokens=sum(one.usage.cache_read_input_tokens or 0 for one in rounds),
         cache_write_tokens=sum(one.usage.cache_creation_input_tokens or 0 for one in rounds),
+        thinking_tokens=sum(
+            one.usage.output_tokens_details.thinking_tokens
+            if one.usage.output_tokens_details
+            else 0
+            for one in rounds
+        ),
+        seconds=seconds,
     )
 
 
@@ -458,12 +644,67 @@ def _did_not_fit_the_shape(problem: ValidationError) -> str:
     return f"The model's answer did not fit the shape this call asked for, at: {named}."
 
 
-def live_answerer() -> Model | None:
+def a_stand_in_answerer() -> Any | None:
+    """Build the stand-in `KATALYST_ANSWERER` names, when it names one.
+
+    **Only the recorder ever asks for this**, and it asks by name. It used to sit
+    inside `live_answerer`, which the stream route calls — so a deployed server
+    with the setting on would have answered every reader from a list in a test
+    file, unlabelled, and the map would have looked generated. That was a veto
+    (Kent, 2026-09-20), and this is how it is not one: the seam is reachable from
+    one program, which refuses to call a run answered this way a recording.
+
+    Returns:
+        The stand-in, or nothing at all when the setting is empty — which it is
+        everywhere but a test that starts the recorder as a program.
+    """
+    named = get_settings().KATALYST_ANSWERER
+    return _named(named) if named else None
+
+
+def _named(path: str) -> Any:
+    """Build whatever `module:name` names, by calling it.
+
+    Args:
+        path: An import path of the form `module:name`, naming something that
+            can be called with no arguments and hands back an answerer.
+
+    Returns:
+        Whatever that factory built.
+
+    Raises:
+        ValueError: If the path does not name a module and something in it.
+    """
+    module, _, name = path.partition(":")
+    if not module or not name:
+        raise ValueError(
+            f"KATALYST_ANSWERER is {path!r}, which does not name anything. It wants "
+            "'module:name', where the name can be called with no arguments."
+        )
+    return getattr(import_module(module), name)()
+
+
+def live_answerer(
+    *,
+    effort: str | None = None,
+    model: str | None = None,
+    when_nothing_is_said: str = EFFORT_WHEN_RECORDING,
+) -> Model | None:
     """Build the live answerer, or say plainly that there is no key for one.
 
     The one function that knows whether this program can call a model at all.
     Nothing here raises and nothing here prints: a missing key is an ordinary fact
     about how the program was started, and the screen says so rather than failing.
+
+    Args:
+        effort: How hard the model should try on this run, when a measurement run
+            has said. The settings decide when it has not.
+        model: Which model to ask, when a measurement run has said. The settings
+            decide when it has not.
+        when_nothing_is_said: The effort to use when neither the caller nor the
+            settings name one. One setting, two pinned defaults: the recorder
+            sends nothing and takes the service's own, a live run asks for
+            `medium` (Kent, G13, 2026-09-21).
 
     Returns:
         A live answerer, or nothing at all when no key is configured.
@@ -471,4 +712,12 @@ def live_answerer() -> Model | None:
     key = get_settings().ANTHROPIC_API_KEY
     if not key:
         return None
-    return Model(anthropic.Anthropic(api_key=key))
+    return Model(
+        anthropic.Anthropic(
+            api_key=key,
+            timeout=HOW_LONG_TO_WAIT,
+            max_retries=HOW_OFTEN_TO_TRY_AGAIN,
+        ),
+        effort=effort or get_settings().KATALYST_EFFORT or when_nothing_is_said,
+        model=model,
+    )

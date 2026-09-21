@@ -69,7 +69,15 @@ import { readAbout, readHealth, readReadiness } from "./api/client";
 /** Set the three stand-ins to answer the way a healthy server with no key would. */
 function serverAnswersNormally() {
   vi.mocked(readHealth).mockResolvedValue({ status: "ok" });
-  vi.mocked(readReadiness).mockResolvedValue({ status: "not_ready", model_key_present: false });
+  vi.mocked(readReadiness).mockResolvedValue({
+    status: "not_ready",
+    model_key_present: false,
+    // What a keyless server can replay. Empty here: this stand-in is a server
+    // with nothing recorded, which is what "not ready" means on this screen.
+    replayable: [],
+    // And nothing in its recordings folder that it could not read.
+    unreadable: [],
+  });
   vi.mocked(readAbout).mockResolvedValue({ name: "Katalyst", version: "0.1.0" });
 }
 

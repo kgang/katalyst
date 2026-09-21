@@ -221,8 +221,8 @@ All under `/api/`, like everything else, in `backend/src/katalyst/api/generate.p
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed` |
-| `POST /api/generate/insert` | `{base_id, branch, claim_in_words, position}` | A `DraftedInsert`: one `Insert` intervention — a claim and its arrows, drafted and already validated — **and its own small receipt** |
+| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed`. **A live run here asks the model for `medium` effort** unless `KATALYST_EFFORT` says otherwise (Kent, G13): a reader is waiting, and the `receipt` event says which effort made the map |
+| `POST /api/generate/insert` | `{base_id, branch?, claim_in_words}` | A `DraftedInsert`: one `Insert` intervention — a claim and its arrows, drafted and already validated — **its own small receipt, and its own working** |
 | `GET /api/generate/{generation_id}/transcript` | — | The transcript of a generation this process still holds; `404` with a plain sentence when it does not |
 
 **`seed` is the one optional field with a rule behind it.** Left out, `engine/ids.py` mints one and `generation_started` says which; sent, it reproduces a run the browser was handed. **The browser never invents a seed** — the three world routes still *require* one, because by then the run has a seed and asking for a world under a different one is asking a different question. On replay the recording's header seed wins over anything in the request.
@@ -241,10 +241,36 @@ The drafted claim is validated exactly like any other proposal, by the same `dom
 
 ```python
 class DraftedInsert(BaseModel):
-    """What the insert route answers with: the edit, and what drafting it cost."""
-    insert: Insert       # the claim and its arrows, already validated
-    receipt: Receipt     # the same shape the stream's receipt event carries
+    """What the insert route answers with: the edit, what it cost, and its working."""
+    insert: Insert                       # the claim and its arrows, already validated
+    receipt: Receipt                     # the same shape the stream's receipt event carries
+    working: tuple[TranscriptLine, ...]  # every call it took, in order
 ```
+
+**An insert is one request and one answer, and it is not a generation** (*decided
+here*, 2026-09-21). Its working comes back **in the answer**, because there is
+nowhere else it could be: filing it in the store of generations instead made
+every insert unfindable — nobody was ever told the identifier it was filed
+under — and, since that store is bounded, eight inserts evicted the map they
+were being added to and the ninth answered `404`. Nothing is remembered between
+requests, so there is nothing to evict and nothing to go looking for.
+
+**A drafted edit goes at the end of the branch it was drafted against**, and is
+drafted and judged against the map with that branch folded on — the map the
+reader is actually looking at. There is no field for where in the branch it
+goes. `position` used to be one: declared, documented, and read by nothing,
+while a reader who sent `position: 0` got a `200` for an edit that `POST
+/api/worlds` then refused with `unknown_target`, because the second edit hangs
+off the first. A branch is append-only everywhere else in this product — the
+browser only ever appends, and no route edits one in the middle — so it is
+append-only here too. A request that still carries `position` is **ignored**
+rather than refused, which is what every other route here does with a field it
+does not know.
+
+**The width cap is counted on that same folded map.** Three separate edits could
+each hang one more claim off the same one, because the drafting cap counts only
+the arrows of the new claim and says nothing about the out-degree of the claim
+they leave. It is the walk's own check, used twice.
 
 One shape for a cost, used twice — a second, smaller "insert cost" shape would be the same fact with a second set of field names. On replay the receipt is rebuilt exactly as a replayed stream's is: `mode: "replay"`, zeros, and the recording's date and hash ([`replay.md`](replay.md)).
 
@@ -252,13 +278,19 @@ With no key, this route declines in plain words rather than failing: *"drafting 
 
 ### Upper bounds on `versions` and `worlds`
 
-`versions` — how many versions of the map to try — and `worlds` — how many worlds to run under each — are today bounded **below** only: `versions > 0` and `worlds > 1` on the three world routes. That is one guard short. A request for a hundred million versions is not refused; it is accepted and the server works on it until something else gives out.
+`versions` — how many versions of the map to try — and `worlds` — how many worlds to run under each — were bounded **below** only: `versions > 0` and `worlds > 1` on the three world routes. That was one guard short. A request for a hundred million versions was not refused; it was accepted and the server worked on it until something else gave out.
 
-**Both get an upper bound, on this route and on the three world routes** (Kent, S2). Two named constants live in `backend/src/katalyst/engine/worlds.py` beside `VERSIONS` and `WORLDS`, the defaults they already sit next to.
+**Both now carry an upper bound, on this route and on the three world routes** (Kent, S2). Two named constants live in `backend/src/katalyst/engine/worlds.py` beside `VERSIONS` and `WORLDS`, the defaults they already sit next to. A request above the ceiling is **refused, never quietly made smaller**: a caller who asks for one run and gets another is reading numbers that answer a question nobody asked.
+
+**`seed` is bounded the same way**, at the largest whole number a browser holds exactly (2⁵³ − 1), on every route that takes one and on the minting. Measured 2026-09-17: a run minted `4803646386380448080`, JavaScript read it back as `4803646386380448300`, and nothing errored — the browser then asked for a world under a seed the server never used, got different numbers, and every explanation of why was wrong.
 
 **The budget they are measured against is the server's own, not the browser's.** NFR-7's hundred milliseconds is a *rendering* budget — sixty tiles drawn and laid out again — and it has nothing to say about how long `propagate` may run. The quantity that matters here is the one [`../multiverse/propagation.md`](../multiverse/propagation.md) already times: how long one world takes to work through, at the shipped loop sizes, on the machine those timings were taken on. The ceiling is **the largest pair of loop sizes that keeps one request inside the time a person will wait for a world before assuming the app has stopped**, measured the same way and written down with the measurement and the date beside it, in that chapter's units.
 
-The values are **measured, not invented**, and the ceiling is never below the shipped default. Until they are measured, nothing may quote one.
+The values are **measured, not invented**, and the ceiling is never below the shipped default. The measurement is written beside them in `engine/worlds.py`, which is the only place either number appears.
+
+**The rule, said once.** One ceiling comes out of one sum: the cost of working every likelihood through a map is claims times days times worlds; the worst request is a *comparison*, which builds two worlds, on a build machine about two and a half times slower than the one the timings were taken on; and **ten seconds** is as long as somebody will wait before deciding the program has stopped. So the ceiling is the largest pair of loop sizes that keeps the **worst map this program will build** — thirty claims, its own cap, over a window a year long — inside two seconds a world.
+
+**Re-derived 2026-09-21**, because the engine changed underneath the first derivation: it now computes every day and thins only the wire, and at the shipped loop sizes sixty claims over a year cost 2.7 seconds where the old figure was taken from a seven-claim example over sixty-one days. The pair fell from 8 000 by 16 — eight times the shipped budget — to **2 400 by 8**. A measurement that moves moves the ceiling with it; that is what "measured, not invented" costs, and it is the point of writing the sum down rather than the number.
 
 **A request above the ceiling is refused, never clamped.** Clamping is a repair: the caller asks for one run and silently gets a different one, and every number that comes back is answering a question nobody asked. Refusal is a `422` naming the field and the ceiling, which pydantic's `le=` produces for free. Test: `test_a_run_above_the_loop_ceilings_is_refused_not_clamped`.
 
@@ -382,6 +414,6 @@ Raised 2026-09-17.
 
 1. **What an `insert` costs, and where that cost shows.** NFR-6 says every generation records model, tokens, cache reads, searches and dollars — and the insert route answers once, with no `receipt` event, because it is not a stream. So the money it spends had nowhere to be seen. Raised by the workbench chapter and assigned here.
    **Decided 2026-09-20: the route answers with a `DraftedInsert` — the edit and its own `Receipt`.** What made it answerable was learning that an insert is *several* calls, not one ([`proposals.md`](proposals.md): the starting-claim shape drafts the user's claim, then the ordinary walk proposes its arrows one per call). A single cheap call might have been fair to fold into the map's own transcript; several are not, and the person pressing the button is the person who should see the bill. The alternatives both lost on the same ground: folding it into the generation's transcript files this run's cost under a different run, and a running total in the browser is a number that vanishes on a page reload.
-2. **How many generations a process should hold before it drops the oldest.** It is an argument with a default, and the default wants one measurement: the size of a finished thirty-claim map and its transcript in memory. Measure it with the first Hormuz generation, alongside the cost measurement that is already going into `STATUS.md`.
+2. **How many generations a process should hold before it drops the oldest.** It is an argument with a default, and the default wants one measurement: the size of a finished thirty-claim map and its transcript in memory. Measure it with the first Hormuz generation, alongside the cost measurement that is already going into [`../../docs/measurements.md`](../../docs/measurements.md).
 3. **Should `Failed` carry a stable code beside its sentence?** Every other refusal in this codebase does — `Violation` has a code the browser switches on and a sentence the person reads. `Failed` has only the sentence today, which is enough for "say something honest" and not enough for "offer the right next step". Decide when there is a second thing the browser would do differently.
 4. **Whether a generation should be resumable once stack 05's store exists.** FR-31 puts transcripts in SQLite; at that point the events so far are on disk and resumption becomes cheap. It is still not obviously *wanted*: a reviewer whose connection dropped would rather start again than join a run half-finished. Ask on top of stack 05, not before.

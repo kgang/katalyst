@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field
 
 from katalyst.domain import Belief, Branch, Diff, LinkId, Violation, World
 from katalyst.engine import worlds as engine
+from katalyst.engine.ids import BIGGEST_SEED
 
 router = APIRouter(tags=["worlds"])
 
@@ -90,26 +91,36 @@ class WorldRequest(BaseModel):
         ),
     )
     seed: int = Field(
+        ge=0,
+        le=BIGGEST_SEED,
         description=(
             "The one number every random draw in the answer comes from. The same seed "
-            "always gives the same world."
-        )
+            "always gives the same world. Bounded by what a browser can hold exactly: "
+            "above it a browser rounds silently, asks for a world under a seed the "
+            "server never used, and every explanation of the numbers is then wrong."
+        ),
     )
     versions: int = Field(
         default=engine.VERSIONS,
         gt=0,
+        le=engine.MOST_VERSIONS,
         description=(
             "How many versions of the map to try: how sure we are of the numbers put in. "
             "Each version is one coherent set of numbers this model would have stood "
-            "behind, and the range on every answer is the spread across them."
+            "behind, and the range on every answer is the spread across them. Bounded "
+            "at both ends: a request above the ceiling is refused, never quietly made "
+            "smaller, because a caller who asks for one run and gets another is reading "
+            "numbers that answer a question nobody asked."
         ),
     )
     worlds: int = Field(
         default=engine.WORLDS,
         gt=1,
+        le=engine.MOST_WORLDS,
         description=(
             "How many worlds to run under each version: how the dice fall. At least two, "
-            "or there is no spread inside a version to subtract from the range."
+            "or there is no spread inside a version to subtract from the range; and no "
+            "more than the ceiling, which is measured rather than chosen."
         ),
     )
 
@@ -135,11 +146,23 @@ class DiffRequest(BaseModel):
             "what the summary sentence calls the change."
         )
     )
-    seed: int = Field(description="The one seed both worlds are built from.")
-    versions: int = Field(
-        default=engine.VERSIONS, gt=0, description="The outer loop both worlds run."
+    seed: int = Field(
+        ge=0,
+        le=BIGGEST_SEED,
+        description="The one seed both worlds are built from, inside what a browser holds.",
     )
-    worlds: int = Field(default=engine.WORLDS, gt=1, description="The inner loop both worlds run.")
+    versions: int = Field(
+        default=engine.VERSIONS,
+        gt=0,
+        le=engine.MOST_VERSIONS,
+        description="The outer loop both worlds run.",
+    )
+    worlds: int = Field(
+        default=engine.WORLDS,
+        gt=1,
+        le=engine.MOST_WORLDS,
+        description="The inner loop both worlds run.",
+    )
 
 
 class ConditionalRequest(BaseModel):
@@ -161,10 +184,14 @@ class ConditionalRequest(BaseModel):
     versions: int = Field(
         default=engine.VERSIONS,
         gt=0,
+        le=engine.MOST_VERSIONS,
         description="The outer loop. Match the world this number is shown beside.",
     )
     worlds: int = Field(
-        default=engine.WORLDS, gt=1, description="The inner loop, for the same reason."
+        default=engine.WORLDS,
+        gt=1,
+        le=engine.MOST_WORLDS,
+        description="The inner loop, for the same reason.",
     )
 
 

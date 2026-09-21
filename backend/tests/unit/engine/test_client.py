@@ -15,17 +15,27 @@ is ours, and this is the only way to look at it without spending money.
 
 from typing import Any
 
+import anthropic
+import httpx
 import pytest
+from anthropic import omit
 
 from katalyst.engine.client import (
+    EFFORT_WHEN_LIVE,
+    EFFORT_WHEN_RECORDING,
     MAY_NOT_SEARCH,
     MAY_SEARCH,
+    ROUNDS_OF_RESEARCH,
     SEARCH_TOOL,
     AnswerWeCouldNotRead,
     Model,
+    TheModelDidNotAnswer,
+    live_answerer,
 )
-from katalyst.engine.pricing import MODEL
+from katalyst.engine.outcome import WHAT_THE_SERVICE_DEFAULTS_TO
 from katalyst.engine.prompt import STANDING_TEXT
+from katalyst.engine.receipt import nothing_spent_yet
+from katalyst.settings import get_settings
 from tests.unit.engine.answers import a_claim, a_starting_claim, an_answer
 
 
@@ -59,7 +69,7 @@ def test_the_part_the_service_remembers_is_the_same_bytes_on_every_call() -> Non
     assert first["system"][0]["text"] == STANDING_TEXT
     assert first["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert first["tools"] == second["tools"] == [SEARCH_TOOL]
-    assert first["model"] == second["model"] == MODEL
+    assert first["model"] == second["model"] == get_settings().KATALYST_MODEL
 
 
 def test_a_run_that_has_spent_its_searches_forbids_the_tool_rather_than_removing_it() -> None:
@@ -76,10 +86,25 @@ def test_a_run_that_has_spent_its_searches_forbids_the_tool_rather_than_removing
     assert with_none["tools"] == [SEARCH_TOOL]
 
 
-def test_the_question_about_what_somebody_meant_never_searches() -> None:
-    """The web has nothing to say about what a person meant by their own sentence."""
+def test_the_first_claim_of_a_map_may_research_like_any_other() -> None:
+    """It was the one claim nobody could look anything up for, and it showed.
+
+    The question is partly what the person meant, which the web cannot answer,
+    and partly how often this kind of thing has happened before, which is exactly
+    what the web is for. A run that could not search here produced a first claim
+    with a two-character test and no reference class (2026-09-17).
+    """
     wire = Wire([an_answer(a_starting_claim())])
     Model(wire).starting_claim("what did they mean")  # type: ignore[arg-type]
+
+    assert wire.sent[0]["tool_choice"] == MAY_SEARCH
+    assert wire.sent[0]["tools"] == [SEARCH_TOOL]
+
+
+def test_a_run_with_no_searches_left_forbids_them_on_the_first_claim_too() -> None:
+    """One budget, and the first claim spends from it like any other."""
+    wire = Wire([an_answer(a_starting_claim())])
+    Model(wire).starting_claim("what did they mean", may_search=False)  # type: ignore[arg-type]
 
     assert wire.sent[0]["tool_choice"] == MAY_NOT_SEARCH
 
@@ -121,6 +146,42 @@ def test_every_round_trip_is_on_the_bill() -> None:
     assert said.output_tokens == 7 + 5
 
 
+def test_a_question_stops_between_its_own_rounds_when_the_money_runs_out() -> None:
+    """Kent, 2026-09-20: twenty-five searches over five rounds can cost a dollar.
+
+    A ceiling checked only between calls is a ceiling the dearest thing in the
+    program steps over. The walk says what is left in the purse; this stops.
+    """
+    paused = an_answer(a_claim("Half.", cause="C"), stopped="pause_turn", written=1_000_000)
+    asking = Model(Wire([paused, paused, paused]))  # type: ignore[arg-type]
+    asking.watching(nothing_spent_yet("claude-sonnet-5"), 5.0)
+
+    said = asking.proposal("q", may_search=True)
+
+    # One round of a million written tokens is $10 on Sonnet 5, so the second
+    # never goes out, and what the first one cost is still on the bill.
+    assert said.calls == 1
+    assert said.output_tokens == 1_000_000
+
+
+def test_a_question_with_money_left_runs_its_rounds_out() -> None:
+    """The same check, from the other side: a cheap round is not interrupted."""
+    paused = an_answer(a_claim("Half.", cause="C"), stopped="pause_turn", written=100)
+    finished = an_answer(a_claim("Whole.", cause="C"), written=100)
+    asking = Model(Wire([paused, finished]))  # type: ignore[arg-type]
+    asking.watching(nothing_spent_yet("claude-sonnet-5"), 15.0)
+
+    assert asking.proposal("q", may_search=True).calls == 2
+
+
+def test_a_question_nobody_told_about_a_purse_is_not_stopped() -> None:
+    """A seam built and asked directly — every request test above — spends freely."""
+    paused = an_answer(a_claim("Half.", cause="C"), stopped="pause_turn", written=1_000_000)
+    finished = an_answer(a_claim("Whole.", cause="C"))
+
+    assert Model(Wire([paused, finished])).proposal("q", may_search=True).calls == 2  # type: ignore[arg-type]
+
+
 def test_what_the_model_wrote_and_what_the_search_returned_arrive_apart() -> None:
     """Two fields, so no code downstream could mistake one for the other."""
     found = "https://example.test/returned"
@@ -150,3 +211,192 @@ def test_an_answer_that_did_not_fit_the_shape_crosses_the_seam_as_one_of_ours() 
 
     assert "did not fit the shape" in caught.value.why
     assert not isinstance(caught.value, ValidationError)
+
+
+# --- When the vendor does not answer at all --------------------------------
+#
+# Found by the read-only review, 2026-09-20. A 429 or a 529 on call twenty of
+# forty is ordinary, and it used to take the whole run with it: no partial map,
+# no receipt, no `Finished`, and the round's other two paid answers dropped
+# unread. The seam turns it into a plain sentence of ours, like everything else
+# that crosses this boundary.
+
+
+def a_request() -> httpx.Request:
+    """One request object, for building the library's own errors in a test."""
+    return httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+
+
+class Broken(Wire):
+    """A stand-in that fails the way the service fails."""
+
+    def __init__(self, raising: Exception) -> None:
+        """Set out which failure to raise."""
+        super().__init__()
+        self._raising = raising
+
+    def parse(self, **request: Any) -> Any:
+        """Fail instead of answering."""
+        self.sent.append(request)
+        raise self._raising
+
+
+OVERLOADED = anthropic.InternalServerError(
+    "Overloaded",
+    response=httpx.Response(
+        529,
+        request=a_request(),
+        json={"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}},
+    ),
+    body=None,
+)
+RATE_LIMITED = anthropic.RateLimitError(
+    "Too many requests",
+    response=httpx.Response(429, request=a_request(), json={"type": "error", "error": {}}),
+    body=None,
+)
+TIMED_OUT = anthropic.APITimeoutError(request=a_request())
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [(OVERLOADED, "busy"), (RATE_LIMITED, "asked too much"), (TIMED_OUT, "did not answer in time")],
+    ids=["529", "429", "timeout"],
+)
+def test_a_failure_of_the_service_crosses_the_seam_as_one_of_ours(
+    failure: Exception, expected: str
+) -> None:
+    """Nothing past this file knows the vendor's exception classes, and nothing should."""
+    with pytest.raises(TheModelDidNotAnswer) as caught:
+        Model(Broken(failure)).proposal("q", may_search=True)  # type: ignore[arg-type]
+
+    assert expected in caught.value.why
+    assert not isinstance(caught.value, anthropic.APIError)
+    # A plain sentence a person could read, never a class name or a stack trace.
+    assert "Error" not in caught.value.why
+    assert "anthropic" not in caught.value.why
+
+
+def test_the_live_answerer_pins_how_long_it_waits_and_how_often_it_tries_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both were the library's defaults, which is a decision nobody had written down.
+
+    Read from the `claude-api` reference bundle on 2026-09-20: the default wait is
+    ten minutes and the default number of retries is two, covering 408, 409, 429,
+    every 5xx and connection failures. Ten minutes is far longer than anything
+    this program has measured, and a request that hangs that long three times
+    over is half an hour of a person watching a stream that will never move.
+    """
+    from katalyst.engine.client import HOW_LONG_TO_WAIT, HOW_OFTEN_TO_TRY_AGAIN
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    get_settings.cache_clear()
+    try:
+        asking = live_answerer()
+    finally:
+        get_settings.cache_clear()
+
+    assert asking is not None
+    # Read off the library's own client, not off a field this program keeps so
+    # that a test has something to read (2026-09-20).
+    assert asking._client.timeout == HOW_LONG_TO_WAIT
+    assert asking._client.max_retries == HOW_OFTEN_TO_TRY_AGAIN
+    # A whole question, retries and all, is bounded by something a person would sit through.
+    assert HOW_LONG_TO_WAIT * (HOW_OFTEN_TO_TRY_AGAIN + 1) <= 15 * 60
+
+
+def test_research_stops_at_five_rounds() -> None:
+    """A round is one pass, and a question makes at most five of them.
+
+    `grounding.md` counts a round as one pass in which the model searches, reads
+    what came back, and decides whether to search again — so the first request is
+    the first round. This was written as five *hand-backs* once, which is six
+    rounds of a chapter that says five (2026-09-20).
+
+    At the fifth, the answer is taken as it stands: nothing is retried and
+    nothing is asked a second time, because both are paying twice for one
+    question.
+    """
+    paused = an_answer(a_claim("Half.", cause="C"), stopped="pause_turn")
+    wire = Wire([paused] * 20)
+
+    said = Model(wire).proposal("q", may_search=True)  # type: ignore[arg-type]
+
+    assert said.calls == ROUNDS_OF_RESEARCH == 5
+    assert len(wire.sent) == ROUNDS_OF_RESEARCH
+
+
+# --- Record rich, run live fast --------------------------------------------
+
+
+def a_key(monkeypatch: pytest.MonkeyPatch, **rest: str) -> None:
+    """A copy of the program with a key and whatever settings a test names."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    monkeypatch.delenv("KATALYST_EFFORT", raising=False)
+    for name, said in rest.items():
+        monkeypatch.setenv(name, said)
+    get_settings.cache_clear()
+
+
+def test_the_recorder_sends_no_effort_and_takes_the_services_own(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Record rich (Kent, G13, 2026-09-21).
+
+    A recording is made once and played back by everybody, so it is worth the
+    service's best — and the request stays byte for byte what it was before
+    anybody had an opinion.
+    """
+    a_key(monkeypatch)
+    try:
+        asking = live_answerer(when_nothing_is_said=EFFORT_WHEN_RECORDING)
+    finally:
+        get_settings.cache_clear()
+
+    assert asking is not None
+    assert asking.effort_used == WHAT_THE_SERVICE_DEFAULTS_TO
+    assert asking._trying is omit
+
+
+def test_a_live_run_asks_for_medium(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run live fast (Kent, G13, 2026-09-21).
+
+    Somebody watching a map arrive is waiting. Measured 2026-09-21 on one Hormuz
+    map each: 27 seconds a call at medium against 79 at the service's default.
+    """
+    a_key(monkeypatch)
+    try:
+        asking = live_answerer(when_nothing_is_said=EFFORT_WHEN_LIVE)
+    finally:
+        get_settings.cache_clear()
+
+    assert asking is not None
+    assert asking.effort_used == "medium"
+
+
+@pytest.mark.parametrize("default", [EFFORT_WHEN_RECORDING, EFFORT_WHEN_LIVE])
+def test_the_one_setting_overrides_both_defaults(
+    monkeypatch: pytest.MonkeyPatch, default: str
+) -> None:
+    """One setting, two pinned defaults, and the setting wins over either."""
+    a_key(monkeypatch, KATALYST_EFFORT="xhigh")
+    try:
+        asking = live_answerer(when_nothing_is_said=default)
+    finally:
+        get_settings.cache_clear()
+
+    assert asking is not None
+    assert asking.effort_used == "xhigh"
+
+
+def test_the_effort_is_pinned_for_a_whole_run_and_never_varies_between_calls() -> None:
+    """Changing it mid-run would throw away the prefix the run reads back cheaply."""
+    wire = Wire([an_answer(a_claim("One.", cause="C")), an_answer(a_claim("Two.", cause="C"))])
+    asking = Model(wire, effort="medium")  # type: ignore[arg-type]
+
+    asking.proposal("q", may_search=True)
+    asking.proposal("q again", may_search=True)
+
+    assert [one["output_config"] for one in wire.sent] == [{"effort": "medium"}] * 2
+    assert asking.effort_used == "medium"

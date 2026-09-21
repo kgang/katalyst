@@ -1,15 +1,18 @@
 # The checks that run on every pull request and on every push to `main`.
 #
-# Five jobs, named exactly `backend`, `frontend`, `types-fresh`, `docker` and
-# `e2e`. The names are not decoration: decision record 0009 makes them the checks
-# that must pass before anything reaches `main`, so renaming one here would
-# quietly stop it being required.
+# Six jobs, named exactly `backend`, `frontend`, `types-fresh`, `docker`, `e2e`
+# and `recordings`. The names are not decoration: decision record 0009 makes them
+# the checks that must pass before anything reaches `main`, so renaming one here
+# would quietly stop it being required — and adding one here does not make it
+# required until somebody adds its name there.
 #
 #   backend      the Python half: style, types, tests
 #   frontend     the browser half: style, types, tests
 #   types-fresh  the browser's types still match the server's data shapes
 #   docker       both packaged images still build
 #   e2e          the one test that drives both halves in a real browser
+#   recordings   the committed recordings still read, still obey the stream's
+#                grammar, and were made against the prompt that is shipping
 #
 # No job below is given an API key or any other secret, and no job needs one.
 # That is the rule INV-13 in `PRODUCT_REQUIREMENTS.md`: the whole suite passes
@@ -216,3 +219,40 @@ jobs:
       - name: Open the stored map, branch it, and read it with the keyboard
         run: npx playwright test
         working-directory: frontend
+
+  # The committed recordings a keyless clone plays back. It needs no key and has
+  # none, and it passes on an empty folder, so it is green from the commit that
+  # adds it and bites the moment the first recording lands.
+  #
+  # What it reads, for every file in the recordings folder: it reads at all, as a
+  # header and its events; line one is a header and every line after it is one of
+  # the eight events with a payload that fits; the sequence obeys the stream's
+  # grammar — it starts where a generation starts, ends where one ends, puts its
+  # receipt second to last, stops growing at its verdict and numbers its proposals
+  # in a rising line; no file stores likelihoods, which are recomputed from the
+  # seed; every refusal it holds names the rules it broke, however many there are
+  # and **none is a legal count** (Kent, G9, 2026-09-20 — requiring one made
+  # re-running until the model erred the only way to satisfy it); the file is
+  # named after one of the four cards; no two files were made from the same
+  # sentence; and every header names the prompt that is shipping today.
+  recordings:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv, the tool that installs Python packages
+        uses: astral-sh/setup-uv@v6
+        with:
+          # The same version the other five jobs pin. A job that floats is a job
+          # that can go red for a reason nobody changed (2026-09-20).
+          version: "0.12.15"
+          enable-cache: true
+
+      - name: Install exactly the packages the lock file names
+        run: uv sync --frozen
+
+      - name: Read every committed recording
+        run: uv run python -m katalyst.engine.check_recordings
