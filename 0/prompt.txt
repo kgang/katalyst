@@ -743,3 +743,28 @@ All four are option (C) of the old *Open for Kent* item 1, which R24 removes; `6
 **0016's kill-criterion section: the history is now three sentences of dated fact** — the two misses with their conditions (10× at 200 versions and 12 slices; 1.2× at 2 000 and 24 slices; 29 527 ms like for like), R19's fixed 600 ms, then R24's proportional target with Kent's quoted words. The standalone *misses* paragraph is gone, folded into that. The section is 868 words: a 250-word evidence table and a 150-word speed-up table, with about 250 of prose around them — structural rather than fat, so I stopped there as instructed.</result>
 <usage><subagent_tokens>317038</subagent_tokens><tool_uses>73</tool_uses><duration_ms>2144801</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a68fdcfa6d5cf7270</task-id>
+<tool-use-id>toolu_01A9abWw8mNtr1PuDg8WbBkL</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a68fdcfa6d5cf7270.output</output-file>
+<status>completed</status>
+<summary>Agent "Fold Kent's trade decisions into 0019, 0020" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me:** `cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync python ../plans/analysis/scripts/finance/priced-in/priced_in.py` (~40 s, log saved beside it) · then `plans/analysis/2026-09-21-priced-in.md` · then `git -C /Users/kentgang/git3/katalyst-wt/adr-06-the-trade diff`.
+
+**The priced-in rule, in five lines.** (1) The defect is real: with model and market agreeing, today's path drifts `+2.789` points and reads *target first* `.3794` where the honest answer is `.2594` — twelve points, 46% relative. (2) The surprise rule's window move matches `m·(p−q)` within 1.8 standard errors at five `(p,q)` pairs, zero when they agree. (3) The giveback must be paid **gradually**; one step at the deadline is `.0818` off on *stop first* and leaves a `−2.66`-point cliff. (4) **I changed the proposal once:** the decay follows **the model's own arrival days** (already in `Draws`), not a straight line or a uniform guess — the shape is worth `.0456` of *stop first*, and only the matched schedule is fair day by day. (5) Three conditions or it is worse than nothing: the stated `move` must be a **level gap, not an announcement reaction** (else it discounts twice, `2.80` points); moves **additive in price units** (a percentage puts back `+1.9%` at 40%); `q` must price **this claim's own test**.
+
+**Decisions written in.** R28 → `0019` §*What the path applies…* (was *Open for Kent* 1), mirrored in `position.md` (data model, anti-pattern 5, INV-thesis.16) and `card-and-export.md`. R29 → `0019` §*The size ceiling the card greys out* + two Confirmation tests + removed from the cut list; mirrored in `card-and-export.md` (table row, sentence, export leg, `refuses`) and `position.md` B5. R23 → `0020` §*The committed quote file…*, quoting Kent verbatim; `quotes.md` B1. R30 → `0020` §*The curated map takes the venue's own question*; `quotes.md` B3, `edge.md` B1/B3, `README.md`.
+
+**Open for Kent, final line:** all three read **“Nothing open.”** 0019 adds that R28's mechanism is the coordinator's and awaits his acceptance on reading.
+
+**Words:** 0018 2604 · 0019 **3982** · 0020 3071 · position 1965 · card 1808 · quotes 1738 · edge 1657 · README 751. **0019 and position are over target** — two decisions plus a measured check; I cut the declined options to one line and compressed the spike-evidence block, but did not gut load-bearing numbers.
+
+**Owed additions** (§1.7a, §1.7b, §1.12 of the owed note): the exact fixture edit with the venue's test, ids, tokens, resolve-by, all sourced from `event-hormuz-oct31.json`; **the knock-on that `H`'s prior, base rate and evidence were written for the harder test and must be re-examined**; one freeze prompt sentence defining `move`; vocabulary *surprise* and *ceiling*; FR-24/FR-25 wording; terms-of-use precondition struck.
+
+**Not checked:** the engine's own arrival days (synthetic here), moving volatility, multi-day moves, the barrier shift, Kelly's arithmetic itself, any test suite.</result>
+<usage><subagent_tokens>244270</subagent_tokens><tool_uses>129</tool_uses><duration_ms>1381592</duration_ms></usage>
+</task-notification>
