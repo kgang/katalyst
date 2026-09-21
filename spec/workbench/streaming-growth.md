@@ -48,9 +48,11 @@ this stack's server half; this chapter says what the browser does with them.
 // Written by hand, exactly as `WorldView` was, because the server's description of
 // itself and this canvas are built at the same time. The server's own copy is
 // `backend/src/katalyst/engine/events.py`. A type-level test,
-// `frontend/src/stream/__tests__/eventsMatchSchema.test-d.ts`, fails the build if the
-// two ever drift — it needs the eight in the generated `frontend/src/api/schema.ts`,
-// so it lands in the LAST server pull request, with that regenerated schema.
+// `frontend/src/stream/__tests__/eventsMatchSchema.test-d.ts`, fails the build when
+// the two drift. It cannot pin the eight envelopes — server-sent events have no body
+// OpenAPI can describe — so it pins every piece they are built from, which are
+// aliased to the generated types below rather than retyped, and the four shapes that
+// do travel as JSON: the receipt, the request, the drafted insert and the working.
 
 import type { components } from "../api/schema";
 

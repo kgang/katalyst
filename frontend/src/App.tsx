@@ -15,14 +15,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { About, FixtureSummary, Health } from "./api/client";
+import type { About, FixtureSummary, Health, Readiness } from "./api/client";
 import { readAbout, readExampleList, readHealth, readReadiness } from "./api/client";
 import type { Asked } from "./components/InputBar";
 import { Launchpad } from "./components/Launchpad";
 import { MapScreen } from "./components/MapScreen";
 import { GenerationScreen } from "./stream/GenerationScreen";
-import type { Readiness } from "./stream/readiness";
-import { withRecordings } from "./stream/readiness";
 import type { TheRun } from "./stream/theRun";
 import { askForAMap } from "./stream/theRun";
 import {
@@ -62,13 +60,21 @@ interface Reading {
 }
 
 /**
- * Ask what this copy can do, and read the list of recordings off the answer.
+ * Ask what this copy can do.
  *
- * Defined at module level because the hook below runs it once and needs the same
- * function on every render.
+ * Defined at module level because the hook below runs it once and needs the
+ * same function on every render.
+ *
+ * **It reads the generated description of the server and nothing else.** The
+ * two fields the first screen lives on — which examples can be played, and one
+ * sentence per recording this engine could not read — were written out by hand
+ * here for as long as the route that owns them was being built beside this
+ * half. They are in `schema.ts` now, so the hand-written copy is gone: two
+ * descriptions of one answer eventually disagree, and the generated one is the
+ * server's own.
  */
 function askReadiness(): Promise<Readiness> {
-  return readReadiness().then(withRecordings);
+  return readReadiness();
 }
 
 /**

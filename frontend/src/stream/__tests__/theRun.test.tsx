@@ -42,7 +42,14 @@ import { readAbout, readExampleList, readHealth, readReadiness } from "../../api
 
 beforeEach(() => {
   vi.mocked(readHealth).mockResolvedValue({ status: "ok" });
-  vi.mocked(readReadiness).mockResolvedValue({ status: "ready", model_key_present: true });
+  vi.mocked(readReadiness).mockResolvedValue({
+    status: "ready",
+    model_key_present: true,
+    // A copy with a key plays nothing back and has no recordings folder to
+    // have failed to read: the whole answer, as the server describes it.
+    replayable: [],
+    unreadable: [],
+  });
   vi.mocked(readAbout).mockResolvedValue({ name: "Katalyst", version: "0.1.0" });
   vi.mocked(readExampleList).mockResolvedValue([]);
 });

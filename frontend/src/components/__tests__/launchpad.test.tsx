@@ -8,7 +8,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Readiness } from "../../stream/readiness";
+import type { Readiness } from "../../api/client";
 import { keylessSentence, Launchpad, STARTING_SENTENCES } from "../Launchpad";
 
 /** The one stored example the server ships with. */

@@ -18,6 +18,7 @@
  * nothing.
  */
 
+import type { components } from "../api/schema";
 import type { Violation } from "./events";
 import { transcriptAddress } from "./generate";
 
@@ -87,6 +88,21 @@ export interface Transcript {
   readonly on: string;
   readonly mode: "live" | "replay";
   readonly lines: readonly TranscriptLine[];
+  /**
+   * What the run spent. Absent until the run has finished.
+   *
+   * **The screen does not draw this one.** What a run cost is drawn from the
+   * `receipt` event, on the strip beside the map, and a second copy read back
+   * from a different route would be a second cost a reader could find
+   * disagreeing with the first. It is typed because the route sends it and a
+   * shape this half describes must be the shape that arrives — and because a
+   * person reading the working straight from the route is entitled to it.
+   */
+  readonly receipt?: components["schemas"]["katalyst__engine__events__Receipt"] | null;
+  /** Why the run stopped, as the `done` event's own word. Absent until it has. */
+  readonly reason?: string | null;
+  /** That reason in one plain sentence, in the engine's words. */
+  readonly why?: string | null;
 }
 
 /** How the working turned out to be readable, or the plain reason it was not. */

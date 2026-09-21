@@ -25,8 +25,7 @@
  * screen in the product.
  */
 
-import type { FixtureSummary } from "../api/client";
-import type { Readiness } from "../stream/readiness";
+import type { FixtureSummary, Readiness } from "../api/client";
 import { countInWords } from "../world/naming";
 import type { Asked } from "./InputBar";
 import { InputBar } from "./InputBar";

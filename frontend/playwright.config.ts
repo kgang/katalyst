@@ -74,11 +74,6 @@ export default defineConfig({
         // is not a client: it sets the setting, in the environment, where the
         // person running the suite can see it.
         //
-        // Both spellings are set because the server is being renamed under this
-        // one: it reads `REPLAY_INSTANT` today and is moving to the
-        // `KATALYST_` prefix every other setting carries. Setting both costs
-        // nothing and means this file needs no change on the day it lands.
-        REPLAY_INSTANT: "true",
         KATALYST_REPLAY_INSTANT: "true",
       },
     },
