@@ -1,0 +1,30 @@
+Could you please read these docs and other files in this repo to hydrate your context?
+
+
+
+<pasted_content id="a2a1">
+/Users/kentgang/git3/katalyst/plans/STATUS.md
+/Users/kentgang/git3/katalyst/plans/PLAN.md
+/Users/kentgang/git3/katalyst/plans/README.md
+/Users/kentgang/git3/katalyst/plans/HANDOFF.md
+/Users/kentgang/git3/katalyst/plans/design-after-midpoint-review.md
+</pasted_content id="a2a1">
+
+
+Your job this session is to do some of the work in stacks 5 and 6 for the purpose of making progress faster and completing this project. Here is a description of some work that'd make sense
+
+
+
+<pasted_content id="a2a1">
+ Start now: a session for stack 05's opening spike (05-0). It needs no file in the repo, no pull request, no money and nothing from the stack-04 tail, so it cannot collide with this session. It is also the gate on almost everything after it: it settles how This happened is computed and sets the tolerance that goes into record 0016. That session can also draft record 0016 and record 0017 (events and states) as proposed, for you to read while the tail lands.
+
+      One thing must wait. Those records rewrite propagation.md and diff.md, and the unlanded evals branch has just rewritten both. The stack-05 docs pull request therefore waits until the evals branch is on main.
+
+      Soon, and lower priority: a session for the front of stack 06.
+      - It would draft records 0018–0020 and the short thesis chapters, and do the half-hour Polymarket look (R11).
+      - Once you accept those records, it can build 06-1, the quote and the edge. That lives in new packages (thesis/, grounding/) that nothing else touches, and it needs only Suppose, which the red team measured as exact to four decimal places in the prototypes.
+      - It must stop there. 06-2 onward depends on the spike's answer and on the engine flip. 06-4 edits the Inspector, panel and tile, which the growth branch and the polish pull request are about to change.
+</pasted_content id="a2a1">
+
+
+Please do a principled analysis on what work can be done right now on stack 5 and 6. Another agent right now is working on the completion of stack 4. Use opus 5 sub-agents to execute your work.
