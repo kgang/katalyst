@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from katalyst.engine.replay import RecordingSummary, summaries
+from katalyst.engine.replay import RecordingSummary, readable
 from katalyst.settings import Settings, get_settings
 
 router = APIRouter(tags=["health"])
@@ -56,6 +56,16 @@ class Readiness(BaseModel):
             "recording was made travels on the receipt, and the receipt arrives last."
         ),
     )
+    unreadable: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "One plain sentence per file in the recordings folder that this "
+            "engine could not read. **A bad file never hides the good ones**: it "
+            "is named here and the others still play, because a recording is a "
+            "committed file that outlives the code that wrote it and meeting an "
+            "old one is ordinary rather than exceptional (Kent, 2026-09-20)."
+        ),
+    )
 
 
 @router.get("/healthz")
@@ -92,9 +102,14 @@ def readyz(settings: Annotated[Settings, Depends(get_settings)]) -> Readiness:
     """
     # An empty string counts as no key: copying .env.example unfilled must not read as ready.
     model_key_present = bool(settings.ANTHROPIC_API_KEY)
-    replayable = summaries()
+    good, unreadable = readable()
+    replayable = tuple(
+        RecordingSummary(example=one.example, recording_date=one.header.recording_date)
+        for one in good
+    )
     return Readiness(
         status="ready" if model_key_present or replayable else "not_ready",
         model_key_present=model_key_present,
         replayable=replayable,
+        unreadable=unreadable,
     )

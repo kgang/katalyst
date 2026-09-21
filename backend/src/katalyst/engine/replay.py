@@ -173,6 +173,24 @@ class Recording(BaseModel):
         return ""
 
 
+class CannotBeRead(Exception):
+    """This file is not a recording this engine can read, and says so in one sentence.
+
+    A recording is a committed file that outlives the code that wrote it — that
+    is the whole point of having them — so a file from an older engine, or from a
+    newer one, or one somebody truncated, is an ordinary thing to meet and not an
+    exceptional one. Every way of failing to read one stops here and crosses as
+    this, with a sentence a person could act on: nothing above this file should
+    have to know about JSON, about pydantic, or about which of them complained
+    (Kent, 2026-09-20).
+    """
+
+    def __init__(self, why: str) -> None:
+        """Hold the plain sentence of what could not be read."""
+        super().__init__(why)
+        self.why = why
+
+
 def read(path: Path) -> Recording:
     """Read one recording off disk.
 
@@ -183,17 +201,54 @@ def read(path: Path) -> Recording:
         Its header and its events, in the order they were written.
 
     Raises:
-        ValueError: If the file is empty, or its first line is not a header.
+        CannotBeRead: If it is not a recording this engine can read, whatever the
+            reason. The sentence names the file.
     """
-    written = [one for one in path.read_text(encoding="utf-8").splitlines() if one.strip()]
-    if not written:
-        raise ValueError(f"{path.name} is empty; a recording is a header and its events")
-    header = RecordingHeader.model_validate_json(written[0])
-    lines: list[tuple[str, dict[str, Any]]] = []
-    for line in written[1:]:
-        said = json.loads(line)
-        lines.append((str(said["event"]), dict(said["data"])))
+    try:
+        written = [one for one in path.read_text(encoding="utf-8").splitlines() if one.strip()]
+        if not written:
+            raise CannotBeRead(f"{path.name} is empty; a recording is a header and its events.")
+        header = RecordingHeader.model_validate_json(written[0])
+        lines: list[tuple[str, dict[str, Any]]] = []
+        for line in written[1:]:
+            said = json.loads(line)
+            lines.append((str(said["event"]), dict(said["data"])))
+    except CannotBeRead:
+        raise
+    except Exception as unreadable:
+        raise CannotBeRead(
+            f"{path.name} could not be read as a recording this engine understands. "
+            "It was probably made by an older or a newer one; record it again."
+        ) from unreadable
     return Recording(example=path.stem, header=header, lines=tuple(lines))
+
+
+def readable(folder: Path | None = None) -> tuple[tuple[Recording, ...], tuple[str, ...]]:
+    """Read every recording in a folder, and say which ones could not be read.
+
+    **One bad file never takes the others with it.** Before this, a single
+    recording from an older engine made the readiness route answer 500 and the
+    first screen show nothing at all, though good recordings sat beside it — the
+    keyless product blanked by a file it did not need (Kent, 2026-09-20).
+
+    Args:
+        folder: Where the recordings live. The committed folder when not said.
+
+    Returns:
+        Every recording that read, by file name, and one plain sentence per file
+        that did not.
+    """
+    looking_in = where_they_live() if folder is None else folder
+    if not looking_in.is_dir():
+        return (), ()
+    good: list[Recording] = []
+    bad: list[str] = []
+    for one in sorted(looking_in.glob("*.jsonl")):
+        try:
+            good.append(read(one))
+        except CannotBeRead as unreadable:
+            bad.append(unreadable.why)
+    return tuple(good), tuple(bad)
 
 
 def every_recording(folder: Path | None = None) -> tuple[Recording, ...]:
@@ -210,10 +265,7 @@ def every_recording(folder: Path | None = None) -> tuple[Recording, ...]:
     """
     # Resolved when asked rather than when this function was written, so that
     # where the recordings live is a fact about the running program.
-    looking_in = where_they_live() if folder is None else folder
-    if not looking_in.is_dir():
-        return ()
-    return tuple(read(one) for one in sorted(looking_in.glob("*.jsonl")))
+    return readable(folder)[0]
 
 
 def summaries(folder: Path | None = None) -> tuple[RecordingSummary, ...]:
@@ -230,9 +282,10 @@ def summaries(folder: Path | None = None) -> tuple[RecordingSummary, ...]:
     Returns:
         One summary per recording, by file name.
     """
+    good, _ = readable(folder)
     return tuple(
         RecordingSummary(example=one.example, recording_date=one.header.recording_date)
-        for one in every_recording(folder)
+        for one in good
     )
 
 
@@ -277,7 +330,19 @@ def play(recording: Recording) -> Iterator[Event]:
         if name == events.NAMES[Receipt]:
             yield _rebuilt(payload, recording)
             continue
-        yield events.BY_NAME[name].model_validate(payload)
+        shape = events.BY_NAME.get(name)
+        if shape is None:
+            raise CannotBeRead(
+                f"{recording.example} holds an event this engine does not know "
+                f"({name}). It was probably made by a newer one; record it again."
+            )
+        try:
+            yield shape.model_validate(payload)
+        except ValidationError as did_not_fit:
+            raise CannotBeRead(
+                f"{recording.example} holds a {name} this engine could not read. "
+                "It was probably made by an older or a newer one; record it again."
+            ) from did_not_fit
 
 
 def seconds_between(instant: bool | None = None) -> float:

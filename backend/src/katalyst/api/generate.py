@@ -476,29 +476,43 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
         on=recording.header.recording_date,
         mode="replay",
     )
-    graph = replay.map_of(recording)
-    held.remember(working, graph)
-
     at = 0
     worked_through = False
-    for event in replay.play(recording):
-        if isinstance(event, ProposalAccepted | ProposalRejected):
-            working = working.plus(_line_from(event, at))
-            held.remember(working, graph)
-            at += 1
+    try:
+        # Building the map from the file is as much "reading the recording" as
+        # playing it is, so it sits inside the same guard.
+        graph = replay.map_of(recording)
+        held.remember(working, graph)
+        for event in replay.play(recording):
+            if isinstance(event, ProposalAccepted | ProposalRejected):
+                working = working.plus(_line_from(event, at))
+                held.remember(working, graph)
+                at += 1
+                yield event
+                continue
+            # The likelihoods are the one event a recording never holds: they are
+            # recomputed here, and the grammar puts them straight after the growing
+            # and before the two events that read them — the verdict, whose
+            # multiplied-out number comes off the world, and the receipt.
+            if not worked_through and isinstance(event, Verdict | Receipt):
+                worked_through = True
+                yield replay.beliefs_of(recording, (asked.versions, asked.worlds))
+            if isinstance(event, Receipt):
+                yield event.model_copy(update={"seconds": time.monotonic() - started})
+                continue
             yield event
-            continue
-        # The likelihoods are the one event a recording never holds: they are
-        # recomputed here, and the grammar puts them straight after the growing
-        # and before the two events that read them — the verdict, whose
-        # multiplied-out number comes off the world, and the receipt.
-        if not worked_through and isinstance(event, Verdict | Receipt):
-            worked_through = True
-            yield replay.beliefs_of(recording, (asked.versions, asked.worlds))
-        if isinstance(event, Receipt):
-            yield event.model_copy(update={"seconds": time.monotonic() - started})
-            continue
-        yield event
+    except replay.CannotBeRead as unreadable:
+        # Half a map and an open connection is the worst of both worlds. This
+        # ends where it is, with what it spent — nothing — and one plain sentence
+        # naming the file (Kent, 2026-09-20).
+        yield _nothing_spent(time.monotonic() - started)
+        yield Failed(message=unreadable.why)
+    except Exception:
+        # The same treatment for a bug of our own, because the one thing that
+        # must never reach the wire is a stack trace.
+        logging.getLogger(__name__).exception("a replay stopped where it should not have")
+        yield _nothing_spent(time.monotonic() - started)
+        yield Failed(message=WENT_WRONG)
 
 
 def _line_from(event: ProposalAccepted | ProposalRejected, at: int) -> TranscriptLine:

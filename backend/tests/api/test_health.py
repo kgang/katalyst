@@ -67,6 +67,7 @@ def test_readyz_reports_not_ready_when_no_model_key_is_configured(
         "status": "not_ready",
         "model_key_present": False,
         "replayable": [],
+        "unreadable": [],
     }
 
 
@@ -85,6 +86,7 @@ def test_readyz_treats_an_empty_key_as_no_key(
         "status": "not_ready",
         "model_key_present": False,
         "replayable": [],
+        "unreadable": [],
     }
     get_settings.cache_clear()
 
@@ -103,5 +105,6 @@ def test_readyz_reports_ready_when_a_model_key_is_configured(
         "status": "ready",
         "model_key_present": True,
         "replayable": [],
+        "unreadable": [],
     }
     assert FAKE_KEY not in response.text

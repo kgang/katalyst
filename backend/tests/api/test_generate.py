@@ -705,3 +705,93 @@ def test_a_reader_who_goes_away_mid_round_still_leaves_the_bill_behind(
     assert working["receipt"] is not None
     assert working["receipt"]["calls"] == len(told.asked)
     assert len(working["lines"]) == len(told.asked)
+
+
+# --- One unreadable file never takes the keyless product with it ----------
+
+
+def a_file_nobody_can_read(tmp_path: Path, written: str) -> None:
+    """Put a recording that cannot be read beside the good one."""
+    (tmp_path / "recordings" / "broken.jsonl").write_text(written, encoding="utf-8")
+
+
+BROKEN_RECORDINGS = {
+    "a header from an older engine": '{"base_id": "x"}\n',
+    "an event nobody knows": (
+        '{"base_id":"x","seed":1,"recording_date":"2026-09-17","prompt_hash":"h",'
+        '"hypothesis":"Something.","insert":null}\n{"event":"weather_changed","data":{}}\n'
+    ),
+    "a payload that does not fit its event": (
+        '{"base_id":"x","seed":1,"recording_date":"2026-09-17","prompt_hash":"h",'
+        '"hypothesis":"Something.","insert":null}\n{"event":"done","data":{"reason":"nonsense"}}\n'
+    ),
+    "nothing at all": "\n",
+}
+"""Four ways a recording can be unreadable, and every one of them has happened.
+
+A file from an older engine, a file from a newer one, a file somebody truncated.
+None of them is exotic: a recording is a committed file that outlives the code
+that wrote it, which is the whole point of having them.
+"""
+
+
+@pytest.mark.parametrize("broken", list(BROKEN_RECORDINGS), ids=list(BROKEN_RECORDINGS))
+def test_one_unreadable_recording_never_blanks_the_launchpad(tmp_path: Path, broken: str) -> None:
+    """Readiness lists what READS, and says in one sentence per file what did not.
+
+    One malformed file made `GET /api/readyz` answer 500 and the first screen
+    show nothing at all, though a perfectly good recording sat beside it — the
+    keyless product, blanked by a file it did not need (2026-09-20).
+    """
+    a_file_nobody_can_read(tmp_path, BROKEN_RECORDINGS[broken])
+
+    ready = client().get("/api/readyz")
+
+    assert ready.status_code == 200
+    said = ready.json()
+    assert [one["example"] for one in said["replayable"]] == ["hormuz"]
+    assert any("broken" in one for one in said["unreadable"])
+
+
+@pytest.mark.parametrize("broken", list(BROKEN_RECORDINGS), ids=list(BROKEN_RECORDINGS))
+def test_an_unreadable_recording_is_never_played_at_somebody(tmp_path: Path, broken: str) -> None:
+    """The good one still plays, and the bad one is not reached by matching on a sentence."""
+    a_file_nobody_can_read(tmp_path, BROKEN_RECORDINGS[broken])
+
+    names = [name for name, _ in stream()]
+
+    assert names[-1] == "done"
+    assert names[0] == "generation_started"
+
+
+ANOTHER_SENTENCE = "A sentence whose recording goes wrong part way through."
+"""A second card's sentence, so this file is the one that matches and plays."""
+
+
+def test_a_recording_that_stops_being_readable_ends_the_stream_honestly(
+    tmp_path: Path,
+) -> None:
+    """The header reads, the events play, and then the file turns out to be old.
+
+    Built from the good recording so that everything up to the break is real:
+    only the sentence and one appended event differ. It used to raise out of the
+    route with the response half written — no `failed`, no `receipt`, and a
+    browser left holding half a map and an open connection. Now the stream ends
+    where it is, with what it spent, and one plain sentence naming the file
+    (2026-09-20).
+    """
+    good = (tmp_path / "recordings" / "hormuz.jsonl").read_text(encoding="utf-8")
+    (tmp_path / "recordings" / "half-old.jsonl").write_text(
+        good.replace(THE_SENTENCE, ANOTHER_SENTENCE) + '{"event":"weather_changed","data":{}}\n',
+        encoding="utf-8",
+    )
+
+    read = stream(hypothesis=ANOTHER_SENTENCE)
+
+    names = [name for name, _ in read]
+    assert names[0] == "generation_started"
+    assert names[-1] == "failed"
+    assert names[-2] == "receipt"
+    assert "does not know" in read[-1][1]["message"]
+    assert "weather_changed" in read[-1][1]["message"]
+    assert "Error" not in read[-1][1]["message"]
