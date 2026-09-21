@@ -903,28 +903,48 @@ def test_diff_states_respect_locality(data: st.DataObject) -> None:
 # --- How a likelihood is written ------------------------------------------
 
 
-WRITTEN_BY_THE_BROWSER: tuple[tuple[float, str], ...] = (
+WRITTEN_BY_THE_RULE: tuple[tuple[float, str], ...] = (
     (0.0, "<.01"),
-    (1.0, ">.99"),
-    (0.995, ">.99"),
-    (0.0999, ".10"),
-    (1e-09, ".0000000010"),
-    (0.35, ".35"),
-    (0.06, ".060"),
+    (1e-09, "<.01"),
+    (0.00012, "<.01"),
+    (0.0035, "<.01"),
+    (0.0099, "<.01"),
+    (0.00995, ".010"),
     (0.01, ".010"),
-    (0.00012, ".00012"),
-    (0.0035, ".0035"),
+    (0.0105, ".011"),
+    (0.0999, ".10"),
+    (0.06, ".060"),
+    (0.35, ".35"),
+    (0.99, ".99"),
+    (0.994, ".99"),
+    (0.995, ">.99"),
+    (1.0, ">.99"),
 )
-"""What the browser writes for each of these, and therefore what the engine must write.
+"""The rule, written out on the cases that decide it.
 
-The right-hand column is not a number anybody decided here: it is the output of
-`toTwoFigures` in `frontend/src/components/BeliefChip.tsx`, run over each input on
-the left. One rule, written twice, and this table is where the two are held
-against each other. The awkward ones are all here on purpose — `.995`, which
-rounds up into the guard; `.0999`, whose rounding carries into the next place; a
-billionth, which is where asking Python for two significant figures used to give
-`1.0e-09` and put an exponent in a sentence; and nothing at all and one, the two
-values the guards exist for.
+The right-hand column is not a measurement and nothing computed it: it is the
+rule's own definition — *round to two significant figures, then use a guard word
+exactly when it is true of the rounded number* (Kent, 2026-09-20) — worked out by
+hand for each input on the left. Every awkward case is here on purpose:
+
+* **both guards' own numbers print**, because neither `.010` nor `.99` is below or
+  above its own guard, which is the whole of where the boundary sits;
+* **both guards catch a rounding that carries across them** — `.00995` rounds up
+  to `.010` and prints, `.0099` does not and is guarded; `.994` rounds to `.99`
+  and prints, `.995` rounds to one and is guarded;
+* `.0999`, whose rounding carries into the next place and gives `.10`, not `.100`;
+* `.060`, which keeps the trailing nought it earned;
+* a billionth and a ten-thousandth, which are now guarded and which used to print
+  `1.0e-09` and `.00012` — the first put an exponent in a sentence, and the second
+  stated a likelihood more precisely than this product is willing to;
+* nothing at all and one, the two values the guards exist for.
+
+**The browser writes this same rule as `toTwoFigures` in
+`frontend/src/components/BeliefChip.tsx`**, and the two are one rule written
+twice. When the two stacks meet, run this table through both and require the same
+answer for every row — that cross-check is the thing that keeps one number from
+reading two ways on one screen, and a table stated from the rule cannot do it
+alone.
 """
 
 
@@ -933,19 +953,21 @@ values the guards exist for.
 def test_a_likelihood_is_written_as_a_plain_decimal(likelihood: float) -> None:
     """However small it is, a likelihood is written as a decimal a person can read aloud.
 
-    Three things at once, for every likelihood there is. It never carries an
+    Four things at once, for every likelihood there is. It never carries an
     exponent — *"moves this claim from `>.99` to `1.0e-09`"* is not a sentence
     anybody can read aloud, and it is what this function used to produce below a
     ten thousandth. It always matches the shape the summary sentence's own pattern
     expects, which is the same pattern this checks against, so the two cannot
-    drift. And, where it is not one of the two guards, it reads back within half a
-    unit of its second figure — which is what *two significant figures* means, and
-    is worked out from the answer rather than typed in.
+    drift. Where it is not one of the two guards it reads back within half a unit
+    of its second figure — which is what *two significant figures* means, and is
+    worked out from the answer rather than typed in — and it lands between the two
+    guards' own numbers, which is where the rule says the figures live.
 
-    The two guards are checked by what they claim. `<.01` is written for nothing at
-    all and for nothing else, because two figures keep two digits however small the
-    number gets. `>.99` is written only for a number past the very figure it
-    prints.
+    **The two guards are checked by what their words claim**, which is the whole
+    reason the boundary sits where it does (Kent, 2026-09-20): `<.01` is written
+    only for a likelihood that really is below a hundredth, and `>.99` only for one
+    that really is above ninety-nine hundredths. A guard beside a number those
+    words are false of would be the product lying in two characters.
     """
     written = _two_figures(likelihood)
 
@@ -953,32 +975,39 @@ def test_a_likelihood_is_written_as_a_plain_decimal(likelihood: float) -> None:
     assert WRITTEN_LIKELIHOOD.match(written), written
 
     if written == "<.01":
-        assert likelihood <= 0.0, "nothing at all is the only likelihood written as less than one"
+        assert likelihood < 0.01, "the words say it is below a hundredth, so it has to be"
     elif written == ">.99":
-        assert likelihood > 0.99, "only a number past the figure the guard prints is written as it"
+        assert likelihood > 0.99, (
+            "the words say it is above ninety-nine hundredths, so it has to be"
+        )
     else:
         # Half a unit of the second figure: the most that rounding to two of them
         # can move a number. Both sides are read as exact decimals so that the
         # comparison needs no slack of its own.
         half_the_second_figure = Decimal(1).scaleb(Decimal(written).adjusted() - 1) / 2
         assert abs(Decimal(repr(likelihood)) - Decimal(written)) <= half_the_second_figure, written
+        # And the printed figures always land between the two guards' own numbers,
+        # because anything below rounds under `<.01` and anything above rounds to
+        # one. Read off the guard words themselves so the bounds cannot drift.
+        assert Decimal("0.01") <= Decimal(written) <= Decimal("0.99"), written
 
 
-def test_the_engine_writes_a_likelihood_exactly_as_the_browser_does() -> None:
-    """One rule written twice, held against itself on the cases that break it.
+def test_a_likelihood_is_written_by_the_rule_on_the_cases_that_decide_it() -> None:
+    """The boundary, pinned on every case that decides where it sits.
 
-    The engine writes the summary sentence and the browser writes the chip, and a
-    reader looking at one screen must never see the same number written two ways.
-    So this pins the engine's answer to the browser's on every case where a
-    careless implementation of *two significant figures* parts company from a
-    careful one: rounding that carries into the guard, rounding that carries into
-    the next place, a number small enough to tempt a language into scientific
-    notation, and the two ends of the scale.
+    *Round to two significant figures, then use a guard word exactly when it is
+    true of the rounded number.* Everything a careless reading of that sentence
+    gets wrong is in the table: whether the guards' own numbers print, what happens
+    when rounding carries across a guard, what happens when it carries into the
+    next place, and the two ends of the scale.
 
-    If this fails, one of the two was changed alone. Both move together or neither
-    does — `_two_figures` says which browser function is its twin.
+    The browser writes the same rule as `toTwoFigures` in
+    `frontend/src/components/BeliefChip.tsx`. This table states the rule, so it
+    catches the engine drifting from it — it cannot catch the two implementations
+    drifting from each other, and running the same rows through both is still owed
+    where the two stacks meet.
     """
-    for likelihood, expected in WRITTEN_BY_THE_BROWSER:
+    for likelihood, expected in WRITTEN_BY_THE_RULE:
         assert _two_figures(likelihood) == expected, likelihood
 
 

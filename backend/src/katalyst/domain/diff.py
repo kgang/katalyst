@@ -1085,34 +1085,49 @@ def _two_figures(likelihood: float) -> str:
     and `.42` and `.060` — both figures always printed, because dropping a
     trailing nought would claim less precision than we have.
 
-    **Never a certainty.** Rounding to two figures turns `.995` into `1.0` and
-    nothing at all into `.0`, and both are claims nobody on this map is entitled
-    to make: one says the thing cannot fail, the other that it cannot happen. So
-    those print as `>.99` and `<.01`. The upper guard catches everything from
-    `.995` up, including 1 itself. The lower one is rarer than it looks: two
-    figures keeps two digits however small the number gets, so `.0035` prints
-    `.0035` and a billionth prints `.0000000010`, and the only value that prints
-    as `<.01` is nothing at all.
+    **The whole rule, in one sentence: round to two significant figures, then use
+    a guard word exactly when it is true of the rounded number.** `<.01` when the
+    rounded number is less than a hundredth, `>.99` when it is more than
+    ninety-nine hundredths, and the figures themselves otherwise. That is all of
+    it, and it is stated this way because *the guard's words have to mean what
+    they say*: a chip reading `<.01` beside a number that was `.0035` is telling
+    the reader something true, and one reading `<.01` beside `.010` would not be
+    (Kent, 2026-09-20).
+
+    Two things fall out of that sentence rather than being decided beside it.
+    `.010` and `.99` print, because neither is below or above its own guard.
+    And the two figures always land in the first two places after the point —
+    `.99` down to `.010` — because anything further down rounds to less than a
+    hundredth and anything further up rounds to one.
+
+    **Never a certainty, and never a nothing.** Rounding to two figures turns
+    `.995` into `1.0` and `.0004` into `.0`, and both are claims nobody on this
+    map is entitled to make: one says the thing cannot fail, the other that it
+    cannot happen. The guards are what stand in their place.
+
+    **A move is not a likelihood**, and must never come through here. `.36 · up
+    by .0090` is the honest way to write a small move, because a move of `.0090`
+    is a real quantity a reader acts on, while a likelihood of `.0090` is one the
+    product declines to state that precisely. Nothing in this file writes a move
+    as text today; the day something does, it gets its own function, not a flag on
+    this one.
 
     **Never scientific notation.** A sentence that reads *"moves this claim from
     `>.99` to `1.0e-09`"* is not a sentence anybody can read aloud, and asking
     Python for two significant figures directly produces exactly that below a ten
     thousandth. So the rounding is done on the number's own decimal digits: the
     shortest decimal that reads back as this exact number, its point shifted by
-    counting rather than by multiplying, rounded half-up, and written out with as
-    many noughts after the point as it takes. That is also what stops `.995`
-    printing `.99` — a computer stores it as `0.99499999999999999556`, so asking
-    for two figures directly gives a number under the guard, and the sentence
-    would print the one thing this rule forbids.
+    counting rather than by multiplying, and rounded half-up. That is also what
+    stops `.995` printing `.99` — a computer stores it as `0.99499999999999999556`,
+    so asking for two figures directly gives a number under the guard, and the
+    sentence would print the one thing this rule forbids.
 
     **This rule is written twice and the two must move together.** The browser
     writes it as `toTwoFigures` in `frontend/src/components/BeliefChip.tsx`, and
-    this function says the same thing for every input it can be given, carry
-    cases included. Change one and change the other in the same pull request, or
-    the same number reads two ways on one screen. Where the lower guard should
-    *begin* — whether a likelihood under `.01` ought to print `<.01` rather than
-    its own two figures — is a question for Kent and is deliberately not settled
-    here; whatever he says lands in both places at once.
+    this function says the same thing for every input it can be given, carry cases
+    included. Change one and change the other in the same pull request, or the
+    same number reads two ways on one screen, and cross-check the two against each
+    other wherever the two stacks meet.
 
     Args:
         likelihood: The number, between 0 and 1.
@@ -1136,8 +1151,15 @@ def _two_figures(likelihood: float) -> str:
     if figures >= 100:
         # Rounding up carried into the next place: `.0999` is `.10`, not `.100`.
         figures, place = 10, place + 1
+    # Where the rounded number's first figure landed is the whole guard. The
+    # first place after the point holds `.10` to `.99`, and the second holds
+    # `.010` to `.099`; one place further up is a rounded number of 1 or more,
+    # which is past `>.99`, and one further down is `.0099` or less, which is
+    # under `<.01`.
     if place >= 0:
         return ">.99"
+    if place <= -3:
+        return "<.01"
     return f".{'0' * (-place - 1)}{figures}"
 
 
