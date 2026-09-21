@@ -380,6 +380,62 @@ function MapSurface({
   }, []);
 
   /**
+   * Find a tile or a wire on the glass by the identifier it carries.
+   *
+   * By reading each element's own identifier rather than by asking the page for
+   * a match: a wire is named after its two ends — `H->B` — and the arrow in the
+   * middle of that is not a character an address for an element may contain.
+   */
+  const onTheGlass = useCallback((kind: "node" | "edge", id: string): HTMLElement | undefined => {
+    const all = surface.current?.querySelectorAll<HTMLElement>(`.react-flow__${kind}`) ?? [];
+    return [...all].find((one) => one.dataset.id === id);
+  }, []);
+
+  /** Which claim the keyboard is standing on right now, read off the glass. */
+  const standingOn = useCallback(
+    (): string | undefined =>
+      document.activeElement?.closest<HTMLElement>(".react-flow__node")?.dataset.id,
+    [],
+  );
+
+  /** The tile the keyboard was last asked to stand on, so a late move can be dropped. */
+  const wantedTile = useRef<string | null>(null);
+
+  /**
+   * Put the keyboard on a tile, and make it stick.
+   *
+   * **A tile that is being rebuilt cannot be focused.** The drawing library
+   * rebuilds a tile's element when what it knows about it changes — which
+   * selecting one does — so the element found on the glass this instant is
+   * sometimes the one about to be thrown away, and focusing it does nothing at
+   * all. The keyboard then stays on the tile it was on while the ring, the
+   * panel and the line under the map all move to the new one: the page says the
+   * reader is on the hypothesis and the next keystroke walks from Brent.
+   *
+   * The same hazard is already handled for wires below, in the same way. Here
+   * the move is made at once, and made again after the rebuild has been and
+   * gone if it did not take — and only if it is still the move the reader last
+   * asked for, so that two quick steps do not drag the keyboard back to the
+   * first one.
+   */
+  const putTheKeyboardOn = useCallback(
+    (id: string): void => {
+      wantedTile.current = id;
+      const land = (): void => onTheGlass("node", id)?.focus({ preventScroll: true });
+      land();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (wantedTile.current !== id || standingOn() === id) {
+            return;
+          }
+          land();
+        });
+      });
+    },
+    [onTheGlass, standingOn],
+  );
+
+  /**
    * Fill the panel with whatever was pressed, or empty it on a press on the map.
    *
    * It listens for the press rather than the click, and that is not a detail:
@@ -404,13 +460,13 @@ function MapSurface({
       if (under?.kind === "claim") {
         onFocused(under.id);
         // Pointing at a tile and reaching it with the keyboard land in the same
-        // place, so the ring says where you are whichever way you got there.
-        (event.target as HTMLElement)
-          .closest<HTMLElement>(".react-flow__node")
-          ?.focus({ preventScroll: true });
+        // place, so the ring says where you are whichever way you got there —
+        // and the pointer's landing is made to stick for the same reason the
+        // keyboard's is.
+        putTheKeyboardOn(under.id);
       }
     },
-    [onSelect, whatIsUnder, onFocused, openColumn],
+    [onSelect, whatIsUnder, onFocused, openColumn, putTheKeyboardOn],
   );
 
   /**
@@ -457,18 +513,6 @@ function MapSurface({
     return map;
   }, [layout, heightOf]);
 
-  /**
-   * Find a tile or a wire on the glass by the identifier it carries.
-   *
-   * By reading each element's own identifier rather than by asking the page for
-   * a match: a wire is named after its two ends — `H->B` — and the arrow in the
-   * middle of that is not a character an address for an element may contain.
-   */
-  const onTheGlass = useCallback((kind: "node" | "edge", id: string): HTMLElement | undefined => {
-    const all = surface.current?.querySelectorAll<HTMLElement>(`.react-flow__${kind}`) ?? [];
-    return [...all].find((one) => one.dataset.id === id);
-  }, []);
-
   const claimWords = useCallback(
     (id: string) => world.claims.find((claim) => claim.id === id)?.claim ?? id,
     [world],
@@ -484,7 +528,7 @@ function MapSurface({
       // the same thing: the panel beside the map reads it out. Nothing opens
       // over the map.
       onSelect({ kind: "claim", id });
-      onTheGlass("node", id)?.focus();
+      putTheKeyboardOn(id);
     },
     onStatus,
     keys,

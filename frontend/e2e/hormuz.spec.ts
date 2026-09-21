@@ -365,6 +365,23 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(page.locator(".map-status")).toContainText("along an arrow");
   await landedOn(page, ["H", "C", "R"]);
 
+  await test.step("test_two_keys_in_one_frame_both_count", async () => {
+    // The two steps again, pressed one after the other with nothing waited for
+    // in between — which is what a reader typing quickly does, and what a
+    // machine slow enough to deliver two keydowns in one task does to any
+    // reader at all. **The second key has to start from where the first one
+    // left the keyboard**, not from where it was before that: the page moves
+    // the keyboard inside the keystroke, and a handler that believed the value
+    // it was rendered with worked both keys out from the claim before the
+    // first. Whichever of the three this walk is standing on, forward and then
+    // back lands on a claim that causes something.
+    await page.keyboard.press("l");
+    await page.keyboard.press("h");
+    await landedOn(page, ["H", "C", "R"]);
+    // And the map never said this about a claim that has causes.
+    await expect(page.locator(".map-status")).not.toContainText("nothing causes this claim");
+  });
+
   // Down the column, which is about the picture rather than about the wires.
   await page.keyboard.press("j");
   await expect(page.locator(".map-status")).toContainText("column");
