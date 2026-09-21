@@ -2,32 +2,44 @@
 
 ## The idea
 
-A map of causes is not a trade. This part turns it into one, and does so by *derivation* rather than by asking the user to type numbers.
+A map of causes is not a trade. This part turns it into one, and is careful about which numbers are ours and which are the reader's.
 
-**Sensitivity.** Flip each proposition one at a time and record how much each tradeable terminal moves. The proposition whose flip hurts most — *and* resolves before the terminal *and* can be observed publicly — is the **invalidation**: the event that proves the idea wrong. That is the stop-loss, and it is derived, not guessed. The mirror case is the take-profit. Propositions that matter but cannot be observed in time are listed as *unhedgeable*, never used as a stop.
+**We compute** what the hypothesis carries through to each ending; the **edge** — the model's number against the price a venue would actually deal at — when the two answer the same question; which claims are over-represented in the worlds where the reader's stop was touched first; and which single adverse turn would hurt most *and* resolves in time *and* can be seen by anybody.
 
-**Tails.** Rare, large outcomes get their own rows with a suggested hedge. They are never folded into an average, because an average hides the case where you are wiped out.
+**The reader types** the stop, the target, the horizon and how much they are prepared to lose. None of those is derivable from a map of claims.
 
-**The card.** Everything above compiles into a thesis card — legs, entry, invalidation, take-profit, the distribution of outcomes, tails, caveats — and exports as a plain declarative document a downstream trading system could read.
+> **Changed 2026-09-21 (decision record 0019).** This page used to say the flip which damages an ending most *"is the stop-loss, and it is derived, not guessed."* Withdrawn. On this product's own worked example the derivation leaves one claim — the step the thesis rests on — so the derived "stop" reads *get out if the thing you are betting on stops being true*; and the sweep behind it computed one direction per claim, never consulting the reader's side. **A stop is a price the reader owns. What we derive is a watchlist, and a list of what takes you out.**
+
+**The honest refusals are load-bearing.** A read of the venue on 2026-09-21 found nothing quoting Brent crude, and that the one Hormuz contract it does quote resolves on a different test from the claim on the map. Kent's decision R30 takes the venue's test as the curated map's own and adds an ending naming that contract, so the **curated** example carries one real venue price and refuses everywhere else; the **recorded** map the walk opens has eleven endings naming instruments and no contract, so it prints *no contract quotes this claim — edge not calculable* eleven times, honestly, until the one paid re-recording after the freeze.
+
+**A path invents nothing.** The simulated price path applies only what the market has not already priced — a claim's **surprise**, not its whole stated move — so it manufactures no advantage of its own (Kent's decision R28, record 0019).
+
+---
 
 ## Terms this part owns
 
-Sensitivity sweep · Invalidation · Take-profit · Unhedgeable · Tail · Thesis · Strategy export.
+**Edge · break-even · no-trade band · not comparable** (`edge.md`) · **quote · spot anchor** (`quotes.md`) · **position · your exit · first touch · draws · surprise · ceiling** (`position.md`) · **lift · what takes you out · what to watch · unhedgeable** (`what-takes-you-out.md`) · **tail · shock · thesis · strategy export** (`card-and-export.md`). Each is defined where it is used, and `spec/vocabulary.md` holds the one-line form.
+
+---
 
 ## Invariants this part owns
 
 | ID | Statement |
 |----|-----------|
-| INV-14 | The invalidation proposition resolves before its terminal and is publicly observable; otherwise it is listed as unhedgeable, never as a stop |
+| INV-14 | **A watchlist you can see.** A claim shown under *what to watch* resolves before the ending it is watched for and is publicly observable; a claim that is adverse but resolves too late, or cannot be observed, is listed as *unhedgeable*. No claim is ever presented as a stop |
+
+*(INV-14 as amended by decision record 0019; the wording in `PRODUCT_REQUIREMENTS.md` §9 follows in the pull request that lands the amendment.)* Local invariants `INV-thesis.1`–`INV-thesis.16` are stated in the chapters, each naming the test that checks it.
+
+---
 
 ## Chapters
 
 | Chapter | Covers | Written in |
 |---------|--------|-----------|
-| `sensitivity.md` | One-at-a-time flips, ranking, the observability and timing filters | stack 05 |
-| `tails.md` | What counts as a tail, hedging suggestions, the "wiped out" row | stack 05 |
-| `thesis-card.md` | Fields, how each is derived from the graph, what the user may edit | stack 05 |
-| `strategy-export.md` | The export schema and how each leg cites the propositions that justify it | stack 05 |
-| `market-beliefs.md` | Live prices as the `market` belief: sources, caching, attribution, cross-venue disagreement | stack 05 |
+| [`edge.md`](edge.md) | The two edges and the break-even; what `priced` returns in every case; the mixture after a *Suppose* | stack 06 |
+| [`quotes.md`](quotes.md) | Recorded first, fetched second, reader-entered always; what a quote carries; a market belief is a point; an economic level is an observation | stack 06 |
+| [`position.md`](position.md) | The reader's position and exit; the one contract with the engine; daily paths that apply only the surprise; first touch; the greyed ceiling; what is refused | stack 06 |
+| [`what-takes-you-out.md`](what-takes-you-out.md) | Lift over the worlds where the stop went first; the two-way sweep and the watchlist | stack 06 |
+| [`card-and-export.md`](card-and-export.md) | The card's sections and who owns each number; **tails and reader-placed shocks**; ranked endings; the export that carries its own refusals | stack 06 |
 
-Decision records behind this part: ADR-0010 (grounding sources).
+Decision records behind this part: **0010** (grounding sources), **0013** (a payoff names the trade, a quote names the price), **0018** (an edge comes from the world with no supposition in force), **0019** (a stop is a price the reader owns), **0020** (a quote is recorded first; an economic figure is an observation).
