@@ -8,9 +8,38 @@
 
 **Engine timings are not restated here.** How long it takes to work the likelihoods through a map — a world, a sixty-claim map, a year-long window — is measured in `spec/multiverse/propagation.md`, which owns those numbers. Go there rather than copying them.
 
+**Nor are the evaluation scorecards.** `make eval` writes its own rows into `evals/runs/<date>.tsv`, committed, one file per day it is run. Those say how well the prompt did; this file says what a run cost. Nothing here restates a scorecard, and no scorecard restates a receipt.
+
 ---
 
 <!-- NEXT ENTRY GOES HERE — newest first. Add above the rule below; change nothing beneath it. -->
+
+## `<<HORMUZ RECORDING: the day it was made>>` — the committed Strait of Hormuz recording
+
+The generation a keyless clone plays back, made by `make record-demo ONLY=hormuz`. It is the only
+committed recording; the other three example sentences have none, and each would cost about the same
+again.
+
+| | |
+|---|---|
+| Model and effort | `<<HORMUZ RECORDING: model and effort>>` |
+| Calls | `<<HORMUZ RECORDING: calls>>` |
+| Searches | `<<HORMUZ RECORDING: searches>>` |
+| Dollars | `<<HORMUZ RECORDING: dollars>>` |
+| Wall clock | `<<HORMUZ RECORDING: minutes>>` |
+| Map reached | `<<HORMUZ RECORDING: claims and arrows>>` |
+| Refusals | `<<HORMUZ RECORDING: refusals>>` |
+| Claims with a sourced base rate | `<<HORMUZ RECORDING: sourced base rates>>` |
+| Stopped because | `<<HORMUZ RECORDING: stop reason>>` |
+| Committed as | `backend/recordings/hormuz.jsonl` |
+| Raw record | `<<HORMUZ RECORDING: the kept run under backend/.runs/>>` |
+
+**Why this entry carries no figure from an earlier attempt.** A recording is re-made whenever the
+words this program sends the model change, and the shapes it asks the model to fill changed after the
+first Hormuz recording was made. The run above is the one that is committed; the one before it cost
+real money and is a different measurement, not a correction of this one.
+
+---
 
 ## 2026-09-21 — two whole-map runs on `claude-sonnet-5`, one per effort
 
