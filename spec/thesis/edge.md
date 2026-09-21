@@ -12,9 +12,11 @@ The reader's first finance question is *what is already priced in?* This chapter
 
 `backend/src/katalyst/thesis/edge.py`, outside `domain/`: it touches a live price, and an edge is a difference between two owners' numbers, which no function in `domain/` may return (INV-11).
 
-One function builds an edge and nothing else does: `priced(base, shown, claim, quote)`. Both worlds are required — `base` is the world with nothing fixed by an edit, `shown` is what the reader is looking at — so a caller holding only a branch world must go and work out the base world first. Decision record 0018 carries the signature and the reasoning.
+One function builds an edge and nothing else does: `priced(base, shown, claim, quote)`. Both worlds are required — `base` is the world with nothing fixed by an edit, `shown` is what the reader is looking at — so a caller holding only a branch world must go and work out the base world first. Decision record 0018 carries the signature and the reasoning. Two further things may be named, and neither can be handed in instead of a world: the **fee**, which a caller passes because nobody has read the venue's schedule and the answer is nothing until somebody does; and the **other world**, for the mixture below.
 
-**`Edge`** holds the model's belief read from `base`; the quote; the **fee**, anything the venue charges on a filled trade; the two edges below; the no-trade band; the venue's minimum price increment; and the mixture terms when a supposition is in force. **`NotComparable`** holds a reason from a closed list, the sentence the card prints, and a break-even where one exists.
+**`Edge`** holds the model's belief read from `base`; the quote; the **fee**, anything the venue charges on a filled trade; the two edges below; the no-trade band; the venue's minimum price increment; whether the edge changes sign across the model's own range; and the mixture terms when a supposition is in force. **`NotComparable`** holds a reason from a closed list, the sentence the card prints, and a break-even where one exists.
+
+*Built 2026-09-21 (06-1). Two details the chapter did not settle, decided at the keyboard and written back here. **A break-even goes with a contract, and with nothing else**: `no_quote` and `settled_market` always carry one, `no_contract` never does — one rule rather than a row-by-row answer, and it agrees with every row of the table below. And **the mixture needs a third world**, so it appears only when the caller hands in the world where the supposition goes the other way; there is no honest way to read that reading off `base` and `shown`, because working it back out of the unsupposed number would assume the very equality the mixture does not claim.*
 
 ### The arithmetic
 
@@ -53,6 +55,8 @@ The reader selects an ending a venue quotes on the curated Hormuz map — the on
 The reader supposes the strait opens; every number on the map re-works, and the ending's tile now reads *the chance of this ending in a world where the strait has been made to open*. **The edge does not move**, because it is still the base world's number against the venue's prices. Beside it the card shows the **mixture**: the map's own chance of the supposition times the supposed reading, plus one minus that chance times the reading with the supposition made false.
 
 The two terms are an **explanation**, not an identity, and the card never claims they add up to the base number. They do not, for two reasons a reader needs: a cause of the supposed claim may reach the ending by another route, and *Suppose this is true* pins a **date** as well as a truth while the base world averages over the days the claim might have happened. Record 0018 quotes the measured residual and names the script.
+
+Reading the second term costs a third world — the same map with the same claim supposed the other way — so the card works that world out and hands it in. Without it the card shows the supposed reading and the edge, and no mixture at all. That is deliberate: the alternative is to recover the second reading from the base number by arithmetic, and the arithmetic that does it is exactly the equality this passage says does not hold.
 
 ### B3 — No contract quotes this claim
 
