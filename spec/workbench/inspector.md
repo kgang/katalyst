@@ -34,8 +34,14 @@ nothing of its own:
 
 ```ts
 interface InspectorProps {
-  /** What is selected. Nothing selected is a real state with its own copy, not a blank panel. */
-  subject: { kind: "claim"; id: string } | { kind: "link"; id: string } | null;
+  /** What is selected. Nothing selected is a real state with its own copy, not a blank panel.
+      The third kind is the generation itself — not a claim and not an arrow, but the run that
+      produced them; see B7. */
+  subject:
+    | { kind: "claim"; id: string }
+    | { kind: "link"; id: string }
+    | { kind: "generation"; id: string }
+    | null;
   world: WorldView;          // frontend/src/world/types.ts
   onSelect: (subject: InspectorProps["subject"]) => void;
 }
@@ -165,6 +171,39 @@ Three rules about it:
 3. **This panel never computes the block.** A canvas that added up its own pushes would be a second
    engine, and two engines disagree.
 
+**The whole block, or none of it** *(decided 2026-09-17, stack 04a; this closes open question 3
+below)*. The question was whether the panel might draw an arrow's pushes before the engine existed,
+leaving out the prior-plus-pushes-equals-result line it could not compute. It is closed by the engine
+arriving rather than by an argument: the world now carries the decomposition whole, so there is
+nothing a half block would be for, and it is not built. The rule that survives is the one already
+here — the panel renders the block the world carries, and renders *"no engine yet"* when there is
+none. A block missing its last line reads as a sum somebody forgot to finish, and the reader cannot
+tell that from a sum that went wrong.
+
+**A claim that moved only because some versions started counting more says so, here.** Observing one
+claim reweights the versions of the map — a version under which the observation was likely counts
+for more than one under which it was a fluke (record 0014 §F) — and a claim with **no causes** can
+move by that reweighting alone, because inside every single version its answer is its own prior in
+both worlds and the paired difference is exactly zero. On Hormuz, observing **C** moves **H**, which
+nothing on the map causes. Without a word about it the reader opens H and finds a number that moved,
+a prior, and nothing in between to explain it.
+
+So the panel prints one sentence, word for word:
+
+> this claim moved only because the observation made some versions count more.
+
+**Where it sits:** under **WHY THIS NUMBER**, as the first line of that section, above the
+decomposition — because it is a fact about the reading of the number, and the decomposition is the
+reading (the same shape as which sentence sits under the model row, Kent's K4).
+
+**When it shows:** only when the panel is open on a claim in a world being compared against another,
+and the engine's own diff row for that claim carries the field saying so — a field the engine writes
+in `domain/diff.py` and 04a's bottom pull request generates into `frontend/src/api/schema.ts`
+([`../multiverse/diff.md`](../multiverse/diff.md) names it). Never otherwise, and **never worked out
+here**: the browser does not compare a same-direction share against zero, does not check whether a
+claim has incoming arrows, and does not infer this from a decomposition with no lines in it. It reads
+the field or it says nothing.
+
 ### B3 — The reserved slot: "why is this band wide?"
 
 Where the model row carries a *computed* band — that is, where `WorldView.versions` is present —
@@ -285,6 +324,92 @@ reader can act on. *"no engine yet"* means the engine has not run. *"no market"*
 quotes this, which is a finding about the world. A dash in the user's slot is an invitation, not an
 error. None of these opens a window: the panel is always there, and selecting changes what is in it.
 
+### B7 — This generation: the receipt and the transcript
+
+*(Decided 2026-09-17, stack 04a; this closes open question 2 below.)*
+
+NFR-6 says every generation records the model, the tokens, the cache reads, the searches and the
+dollars, and shows them in the Inspector's transcript view. Nothing generated in the stack that wrote
+this chapter, so nothing was specified and nothing was drawn. A generation now exists, and this is
+where it is read.
+
+**The generation is the panel's third subject.** Until now the panel opened on a claim or an arrow.
+It also opens on the run that produced them — `{ kind: "generation", id }`, where `id` is the
+identifier the engine minted and sent on `generation_started`. It is not a claim and not an arrow, so
+it gets its own section rather than being squeezed into one:
+
+```
+THIS GENERATION
+  model            <Receipt.model>
+  calls            <Receipt.calls>
+  tokens in        <Receipt.input_tokens>
+  tokens out       <Receipt.output_tokens>
+  read from cache  <Receipt.cache_read_tokens>
+  web searches     <Receipt.searches>
+  cost             <Receipt.dollars>
+  took             <Receipt.seconds>
+  mode             replay · recorded <Receipt.recording_date> · prompt <Receipt.prompt_hash>
+
+TRANSCRIPT
+  0   accepted   The Strait of Hormuz is open to unrestricted commercial transit for
+                 14 consecutive days                                                  → H
+  …
+  6   refused    "cheaper crude reduces the incentive to close the strait"
+                 These claims form a loop with no delay in it: … Mark the arrow where a
+                 market feeds back on the world as reflexive and give it a delay, or
+                 remove one arrow.
+  7   accepted   The energy fund XLE underperforms the S&P 500 fund SPY by more than
+                 3% over 20 trading days                                             → M2
+  —   stopped    Nothing further to add on "Lloyd's war-risk insurance premium for Gulf
+                 transits falls below 0.4%"
+  —   stopped    Nothing further to add on "Brent crude settles below $68 for five
+                 sessions"
+```
+
+**Three kinds of line, not two.** A proposal was accepted, a proposal was refused, or the model
+answered *Stop* on a line and it closed with nothing added. The third is the one a reader would
+otherwise never see: it makes no event on the stream, because nothing about the map changed, and the
+transcript is the only place it is recorded. **A stopped line carries no `at`** — `at` counts what was
+proposed, and a stop proposed nothing — so the positions in this list have gaps in them, and the gaps
+are the stops. Printing them as a dash rather than renumbering is what keeps `at` meaning the same
+thing here as it does on the stream and in the refusal strip.
+
+Five rules, and four of them are rules this panel already obeys.
+
+* **Every number is a field, and the panel adds nothing up.** It does not total the two token counts,
+  does not work a cost out of a token count and a price, and does not time anything. Searches have
+  their own row because they are billed apart from tokens, so a reader checking `cost` against the
+  token counts alone would find it wrong. INV-workbench.54 already forbids the arithmetic for
+  likelihoods; the same rule covers a cost.
+* **Every line of the transcript is in the engine's own words.** An accepted line names the claim it
+  became; a refused line quotes what the model wrote and then carries the validator's own sentence,
+  one per rule broken, with nothing added; a stopped line carries the model's own one-sentence reason.
+  The panel composes no sentence about any of the three, and a refused claim is quoted rather than
+  given an identifier or a tile.
+* **The mode is read first.** In a replay the row says `replay`, names the day the recording was made
+  and the prompt it was made against, and the cost reads what the rebuilt receipt carries — zero,
+  because the recording was played and nothing was called. That zero is a computed zero, printed
+  rather than hidden (record 0012).
+* **Before the receipt arrives, the section is not drawn.** No running estimate, no partial total, no
+  ticking cost. A cost nobody has totalled is a number nobody computed, which is the same rule as the
+  reserved band slot's in B3.
+* **The two-significant-figures rule is about likelihoods.** A token count, a call count, a duration
+  and a dollar figure are counts and measurements: they are printed whole, in `--font-mono` with
+  fixed-width digits, and they carry no range because nothing sampled them. INV-workbench.36 is
+  phrased over beliefs for exactly this reason.
+
+**Where it is read from, and how long it lasts.** `GET /api/generate/{generation_id}/transcript`, and
+the server holds it in memory for the life of the process. There is no storage in this stack, so a
+transcript does not outlive the server — FR-13's *"transcripts are stored with the graph"* arrives
+with the SQLite file in stack 05 (FR-31). Until then, a transcript the process no longer has renders
+as an absence with that reason, in the words of the route's own answer, rather than as an empty
+section a reader would read as a transcript with nothing in it.
+
+**How you get here.** Selecting a row on the refusal strip opens the panel at that transcript line.
+Selecting the receipt strip opens it at the top. Both strips, and the shape of the stream behind
+them, are [`streaming-growth.md`](streaming-growth.md)'s; this chapter owns only what the panel does
+with them, and INV-workbench.72 there pins the receipt's own fields.
+
 ---
 
 ## INVARIANTS
@@ -296,8 +421,8 @@ are `test_snake_case`. Unless another file is named, the test lives in **inspect
 `.59`.
 
 **INV-workbench.50 — one panel, no pop-ups.** For every subject the Inspector can be opened on —
-every claim and every arrow on the Hormuz map, and the empty selection — it renders no modal,
-dialog, alert or pop-over, and is a persistent region of the page. That the *whole product* has none
+every claim and every arrow on the Hormuz map, a generation, and the empty selection — it renders no
+modal, dialog, alert or pop-over, and is a persistent region of the page. That the *whole product* has none
 is checked by eye: **visual review checklist line 2**. *Test:* inspector ›
 `test_renders_no_dialog_for_any_subject`.
 
@@ -318,10 +443,20 @@ The single exception is the **user** belief slot, absence kind `not_said`, which
 inviting a number — the one absence that is an offer rather than a finding. *Test:* inspector ›
 `test_renders_a_reason_for_every_absent_value`; **visual review checklist line 5**.
 
-**INV-workbench.54 — the panel never computes a likelihood.** For every claim and every arrow, no
-number displayed is derived by arithmetic in the browser; each is a field on the world or on the
-map. In particular the decomposition renders only when `decomposition` is present, and no line of it
-is computed here. *Test:* inspector › `test_never_derives_a_displayed_number`.
+**INV-workbench.54 — the panel never computes a number, and never infers a reading.** For every
+claim, every arrow and every generation, no number displayed is derived by arithmetic in the browser;
+each is a field on the world, on the map or on the `receipt` event. In particular the decomposition
+renders only when `decomposition` is present and no line of it is computed here — whole block or
+none — and the receipt's counts are printed one by one and never added together. And for every claim
+in a world being compared, the sentence *"this claim moved only because the observation made some
+versions count more."* is rendered exactly when the engine's diff row for that claim carries the
+field saying so, and by no other route: no comparison of a same-direction share against zero, no
+check for whether a claim has incoming arrows, no inference from an empty decomposition. *Tests:*
+inspector › `test_never_derives_a_displayed_number`,
+`test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector`;
+`frontend/src/stream/__tests__/strips.test.tsx` ›
+`test_the_receipt_strip_prints_every_field_and_adds_nothing_up`, which covers this rendering and the
+strip's, because there is one rule and it should not be checked twice under two names.
 
 **INV-workbench.55 — which sentence, and the band slot.** For every claim, the sentence under the
 model row is the stated one when `WorldView.versions` is absent and record 0014's when it is
@@ -402,14 +537,19 @@ comes from (B1).*
    a claim carries it: the resolution criteria read backwards, or a genuinely missing field on
    `Proposition`. **Owner:** `spec/graph/proposition.md`.
 
-2. **Where do generation cost and the transcript live?** NFR-6 says the Inspector shows model,
-   tokens, cache hits and dollars per generation. Nothing generates in this stack, so no section is
-   specified and none is drawn. **Owner:** stack 04, with streaming.
+2. **Where do generation cost and the transcript live?**
+   **Decided 2026-09-17 (stack 04a): in the panel's own section, on a third subject.** The panel
+   opens on a generation as well as on a claim and an arrow; the section prints the `receipt`
+   event's fields one by one and the transcript beneath them, and is read from
+   `GET /api/generate/{generation_id}/transcript`, which lives in memory for the life of the process
+   until stack 05's file. In B7, and pinned by INV-workbench.54 here and INV-workbench.72 in
+   [`streaming-growth.md`](streaming-growth.md).
 
-3. **May the panel show an arrow's pushes before the engine, without the result line?** The
-   per-arrow lines are data on the links; only prior-plus-pushes-equals-result needs the engine. A
-   half block might be useful, or might read as a sum somebody forgot to finish. Left as an absence
-   with a reason for now. **Owner:** this chapter, once there are screenshots to look at.
+3. **May the panel show an arrow's pushes before the engine, without the result line?**
+   **Decided 2026-09-17 (stack 04a): no, and the question closes rather than being answered.** The
+   world now carries the whole decomposition, so a half block would be for nothing; the rule already
+   in B2 — render the block the world carries, render *"no engine yet"* when there is none — is the
+   whole of it, and no half block is built. In B2.
 
 4. **"no reference class recorded for this claim"** *(proposed here)* is wording the interface wrote
    rather than a field it read, exactly as the "no market" sentences were before Kent settled them.

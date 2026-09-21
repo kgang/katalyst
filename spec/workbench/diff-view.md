@@ -116,9 +116,28 @@ export interface LinkView {
   conditional: Known<BeliefView>;        // the midpoint chip; fetched one arrow at a time
 }
 
+/** One claim's row in a difference, as the browser reads the engine's `ClaimDiff`. */
+export interface ClaimDiffView {
+  claimId: string;
+  state: "unchanged" | "shifted" | "added" | "killed";
+  before: Known<number>;
+  after: Known<number>;
+  /** "Same direction": the share of versions that moved the same way. */
+  agreement: Known<number>;
+  /** True when the whole of the move is the observation changing how much each version
+      counts — the claim's own arithmetic did not move it at all. Written by the engine
+      (`spec/multiverse/diff.md`); the Inspector turns it into one sentence and nothing
+      in the browser ever works it out. */
+  movedOnlyByReweighting: boolean;
+}
+
 export interface DeltaRow {
   claimId: string;
   label: string;                                     // the terminal's own words
+  /** The engine's own verdict on this ending, from its `ClaimDiff`. False draws a greyed
+      row reading "no change" (B5) — never a row left out. The browser never works it
+      out by comparing two numbers. */
+  shifted: boolean;
   move: Known<{ from: number; to: number; largestOn: string }>;
   rangeWidth: Known<number>;   // "how firm": the width of the new world's own range on this claim
   agreement: Known<number>;    // "same direction": the share of versions that moved the same way
@@ -136,7 +155,14 @@ takes one. `TileProps` and `WireProps` there, and `ClaimDetail` and `LinkDetail`
 **One field, two spellings, said once here.** The server's wire name is `range_width`; the view
 model's is `rangeWidth`. Same number, and neither is ever shown — the rail's column is headed **how
 firm**. Likewise the field `agreement`, whose column reads **same direction**: the bare word
-*agreement* is left free on screen for stack 04's run-to-run number.
+*agreement* is left free on screen for a run-to-run number, if one is ever earned. Decision record
+0015 says not in stack 04 — the range a claim ships with is the one the model stated, labelled as
+stated, and no number anywhere says how far two generations agreed.
+
+**And one field with one spelling in all three places.** The engine's `ClaimDiff` carries
+`moved_only_by_reweighting`; the view model spells it `movedOnlyByReweighting`; the Inspector turns it
+into one fixed sentence. Nothing shortens it, nothing abbreviates it, and nothing in the browser
+decides it — [`inspector.md`](inspector.md) B2 has the sentence and the rule.
 
 ### Component props
 
@@ -257,10 +283,27 @@ columns that are never folded into the rank**:
 | Column on screen | The question it answers | Field |
 |---|---|---|
 | **how firm** | *How firm is this number?* The width of the new world's own range on that claim — the same quantity the tile shows, so the rail and the tile cannot disagree | `rangeWidth` |
-| **same direction** | *Did it point the same way whatever numbers we started from?* The share of the 2 000 versions of the map that moved in the same direction | `agreement` |
+| **same direction** | *Did it point the same way whatever numbers we started from?* The share of the 2 000 versions of the map that moved in the same direction — **each version counted by as much as it counted for the two numbers**, so a version that contributed nothing to either number votes on neither | `agreement` |
 
 Different questions, weighed separately by a trader, which is why they are columns and not one
 score. Folding width into the rank would sink exactly the claims that most deserve attention.
+
+**An ending that did not move is a greyed row reading *no change*, never a missing one** *(decided
+2026-09-17, stack 04a; this closes [`../multiverse/diff.md`](../multiverse/diff.md) open question
+5)*. The engine's `rows` hold only the endings that came out `shifted`, so a reader looking at that
+list alone cannot tell *"it did not move"* from *"it is not on this map"* — and silence that could
+mean either is the state the traceability rule exists to forbid. So the rail draws **every ending the
+edit can reach**: the engine's rows first, in the engine's order, and beneath them, greyed and
+unranked, in map order, every other reachable ending, each reading **no change** where the move would
+be.
+
+Where that verdict comes from matters as much as the row. The engine's `Diff` carries a `claims` map
+with **every** claim in either world exactly once and its state, so *did not move* is a fact the
+engine already states, read off `ClaimDiff.state`. The browser never decides it by comparing two
+numbers — that would be the browser re-running the shifted test, with its own .005 floor and its own
+90% bar, and two answers to that question is one too many. The two numbers behind a greyed row are
+still one click away in the Inspector; the row itself says the thing that is true, which is that
+nothing here moved.
 
 **Before the engine — this stack — the rail does not rank and does not compute.** It lists the
 terminals the edit can reach, in **map order**, each with an absence and a reason where the number
@@ -300,14 +343,13 @@ series is data, never inference** — and this stack has some of it and not the 
 | Part | On Hormuz | Comes from | Needs the world? |
 |---|---|---|---|
 | **Supposed · Oct 1** | Oct 1; H shows the word, not a number | The assignment itself: an earlier supposition on H, with its date | **No** — the branch carries it |
-| **Retracted · Oct 2 · by "…"** | Oct 2 | A `sustain` arrow into H inserted afterwards, and the later edit that makes its source true; the quoted words are S's own `claim` field | **No** — structure and dates, the same reachability the four states use |
+| **Retracted · Oct 2 · by "…"** | Oct 2 | **The world's own `retractions`**, once there is a world; derived from the branch until then | **Yes, once there is one** — see below |
 | **withdrawn** | Oct 2 – Oct 4, `.36`, labelled *"withdrawn — no live push yet"* | The `states` series: the cause of the opposing arrow became true on the 2nd, so we stop taking the user's word; S → H's three-day delay has not run, so H reads its own prior again | **Yes** |
 | **pushed** | Oct 5 onward, about `.080` | The `states` series: the delay has run and S → H's −1.9 push lands on that prior | **Yes** |
 
 So in this stack H's tile carries the badge pair and its order, its number slot reads *"no engine
-yet"*, and the series is absent with its reason. As with the affected set, the browser's derived
-badge becomes a hint the world must agree with once the engine lands. (`.080`, not `.08`: two
-significant figures on every number, the rule [`keyboard-and-access.md`](keyboard-and-access.md)
+yet"*, and the series is absent with its reason. (`.080`, not `.08`: two significant figures on
+every number, the rule [`keyboard-and-access.md`](keyboard-and-access.md)
 owns. And `.36` rather than H's stated prior of `.35` — reading a prior back through the engine
 lands a hair above the middle for a likelihood under a half, which decision record 0014 predicts and
 the golden series confirms.)
@@ -317,6 +359,25 @@ to smooth away.** A supposition ends the day its undermining *cause* becomes tru
 arrow's push arrives — otherwise "do I still take your word for this" would hang on a delay
 parameter, and changing a lag from three days to thirty would let the supposition outlive the news
 (decision record 0014).
+
+**The badge comes from the world** *(decided 2026-09-17, stack 04a; this closes open question 1
+below)*. A world carries `retractions`, one `Retraction` per supposition that actually ended, and
+each one names the claim, **the day the cause became true** (never that day plus the arrow's delay),
+the arrow that undermined it, that arrow's source — which is the claim the badge quotes — and which
+edit introduced the arrow ([`../multiverse/propagation.md`](../multiverse/propagation.md)). The
+moment `ApiWorldSource` is switched on, the tile reads that record and **the derivation from the
+branch stops, rather than staying on as a fallback.** Two derivations of one line eventually
+disagree, and a badge that says two different things on two screens is the traceability veto wearing
+a badge; one of them had to become the only one, and the world's is the one with the day the engine
+actually used.
+
+Three consequences worth stating. The branch derivation is **deleted, not kept behind a condition**
+— a fallback nobody exercises is a second answer waiting to be wrong, and a world that failed to
+arrive already falls back to the fixture and says so. When the world carries no retraction for a
+claim, **the tile carries no badge**: silence from the engine is an answer, not a gap to fill in.
+And the engine can name the edit responsible for every retraction as a matter of theorem rather than
+of convention — supposing a claim cuts every arrow pointing at it at that moment, so any arrow that
+later pushes against it was added afterwards, by an edit — so the badge's *by "…"* is never empty.
 
 ### B7 — The branch panel: a sequence, not a surprise
 
@@ -388,7 +449,7 @@ the browser computed equals the state derived from the server's `affected_set`. 
 with feedback arrows set aside, which is why they can agree at all; the day stack 06 unrolls them,
 `test_a_feedback_arrow_never_carries_a_change` in the domain fails loudly and points at the one
 sentence to change. Until stack 03a lands this test is skipped with its reason written in it, never
-deleted. *Test:* diffState › `test_agrees_with_the_servers_affected_set`.
+deleted. *Test:* diffState › `test_the_browser_states_agree_with_the_engine`.
 
 **INV-workbench.44 — `shifted` is never produced without two numbers.** For every pair of worlds in
 which either side's likelihood is absent, no claim is `shifted`. *Test:* diffState ›
@@ -400,19 +461,31 @@ dash-without-meaning (the one dash with a meaning is the empty user belief, abse
 `not_said`). *Test:* deltaRail › `test_renders_a_reason_for_every_absent_number`; **visual review
 checklist line 5**.
 
-**INV-workbench.46 — the rail invents no order.** For every branch, while `ranked` is false the rail
-renders the reachable terminals in the order the base map stores them, independent of every number
-on the world. *Test:* deltaRail › `test_lists_reachable_terminals_in_map_order`.
+**INV-workbench.46 — the rail invents no order, and silence is never absence.** Two statements, one
+subject: the rail neither ranks what nothing has ranked nor leaves out what nothing said was
+missing. While `ranked` is false the rail renders the reachable terminals in the order the base map
+stores them, independent of every number on the world. Once the engine ranks them, every reachable
+terminal is still on the rail — one the engine reported as `shifted` in the order the engine gave,
+and one it did not as a greyed row reading *no change*, in map order beneath them — and the
+`shifted` flag on every row is read off the engine's `ClaimDiff`, never derived by comparing two
+numbers in the browser. *Tests:* deltaRail › `test_lists_reachable_terminals_in_map_order`,
+`test_the_rail_keeps_the_engines_order`, `test_an_unmoved_terminal_is_a_greyed_row_not_a_missing_one`.
 
 **INV-workbench.47 — how firm and same direction are never folded into the rank.** For every rail
 row the two are rendered as their own columns, and no ordering function reads either. *Test:*
-deltaRail › `test_never_sorts_by_width_or_agreement`.
+deltaRail › `test_how_firm_and_same_direction_are_columns_not_factors`.
 
-**INV-workbench.48 — a supposed claim shows the word.** For every claim under a live supposition,
-the tile renders **Supposed · date** where a likelihood would go and renders no likelihood for it at
-all; where a later edit undermined the supposition, both states render in order with the arrow
-between them. *Test:* `frontend/src/components/__tests__/beliefChip.test.tsx` ›
-`test_a_supposed_claim_renders_the_word_not_a_number`; **visual review checklist line 12**.
+**INV-workbench.48 — a supposed claim shows the word, and the retraction comes from the world.** For
+every claim under a live supposition, the tile renders **Supposed · date** where a likelihood would
+go and renders no likelihood for it at all; where a later edit undermined the supposition, both
+states render in order with the arrow between them. And for every world that carries `retractions`,
+every **Retracted · date · by "…"** badge on screen is read from that record — its day, its arrow and
+its quoted claim — with no code path deriving one from the branch; a claim the world reports no
+retraction for carries no such badge. *Tests:*
+`frontend/src/components/__tests__/beliefChip.test.tsx` ›
+`test_a_supposed_claim_renders_the_word_not_a_number`;
+`frontend/src/components/__tests__/tile.test.tsx` › `test_the_retraction_badge_comes_from_the_world`;
+**visual review checklist line 12**.
 
 **INV-workbench.49 — the branch is append-only and reads in vocabulary words.** For every sequence
 of button presses, the branch is the edits in the order they were made with no earlier edit altered,
@@ -460,7 +533,17 @@ review checklist line 11**.
 read as statements in the body: which arrows carry a change (B2), what `killed` means (B2), which
 columns the rail shows (B5), and what the one-line summary says when nothing moved (B5).*
 
-1. **Does the retraction badge need the world, or is the branch enough for good?** This stack derives
-   it from the branch. Once the world carries the retraction, two derivations of one line exist, and
-   one should become the only one — probably the world's. **Owner:** stack 04, when
-   `ApiWorldSource` is switched on.
+**Nothing is open in this chapter.** Two more were settled in stack 04a and now read as statements
+in the body:
+
+1. **Does the retraction badge need the world, or is the branch enough for good?**
+   **Decided 2026-09-17 (stack 04a): it comes from the world.** `World.retractions` carries the day,
+   the arrow, the claim to quote and the edit responsible, and the branch derivation is deleted
+   rather than kept as a fallback — two derivations of one line eventually disagree. In B6, and
+   pinned by INV-workbench.48.
+2. **Should the rail ever show an ending that did not move?** Raised on the engine's side, as
+   [`../multiverse/diff.md`](../multiverse/diff.md) open question 5, and left there for this part to
+   answer. **Decided 2026-09-17 (stack 04a): yes — a greyed row reading *no change*,** because a
+   reader cannot tell "it did not move" from "it is not on this map" by looking at a list something
+   was left out of. In B5, and pinned by INV-workbench.46. Nothing changes on the engine's side: the
+   verdict is already on `ClaimDiff.state`.

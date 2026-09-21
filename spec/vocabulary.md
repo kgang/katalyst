@@ -84,8 +84,23 @@ The six operations keep their code names in code, in the wire format and in this
 | `retune` | **Change this push** | **Retuned** | "You moved this arrow from +0.7 to +0.3" |
 | `refine` | **Split this claim** | **Split** | The finer claims add back up to the one they replace |
 | `believe` | **My own number** | none — the three-up belief chip is the badge | Your number sits beside the model's and the market's |
+| none | **Build the map** | none — the map is the answer | "Turn what I typed into a map of what it would cause" |
 
 One more badge is **derived**: no button produces it. **Retracted · date · by "…"** appears on a claim that was supposed true and has since been pushed back down by a later edit — what was holding this up was removed. It names the edit responsible and the day it landed (UX-14; the mechanism is in `multiverse/interventions.md`).
+
+**Build the map** is the one button in that table with no code name behind it, because it starts a generation rather than editing a map: there is no intervention called *build*. It is the only button on the input bar, and it is the same button on both doors — Explore and Verify differ by whether the destination field has anything in it, and a button whose label changed as you typed would be a control moving under you. Not *Generate*, which is the pipeline's word rather than the reader's.
+
+### Words the growing map uses
+
+Four things a reader sees only while a map is being generated. What each is, and what it is never allowed to become, is in `workbench/streaming-growth.md`.
+
+**Skeleton tile.** A reserved rectangle standing where a claim is about to arrive: the tile's own box, one line of words, and nothing else. Never a number, never an identifier on the map, and never a shimmer — it is a space held open, not a thing pretending to load.
+
+**Refusal strip.** The list beside a growing map of every proposal the map's own rules turned down: one row each, carrying what the model wrote and the validator's own sentence for each rule it broke. Nothing is trimmed, merged or summarised away.
+
+**Receipt strip.** The lines beneath it saying what the run cost — the model, the calls, the tokens in and out, the tokens read from cache, the web searches, the dollars, how long it took, and whether it ran live or from a recording. Every one of them is a number the engine sent; the screen adds nothing up.
+
+**Replay badge.** The mark on the canvas saying this session is playing a recording rather than calling a model, with the day the recording was made. It is a fact about the session, not a badge on a claim, and no button produces it.
 
 ## Words for a number that is not there
 

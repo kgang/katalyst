@@ -208,7 +208,7 @@ NFR-7 (performance: sixty tiles render and re-layout in under 100 milliseconds o
 
 ## INVARIANTS
 
-Each is *for all X, statement P holds*, and each names what checks it. "Visual review checklist line *n*" is line *n* of the twelve-line checklist in [`README.md`](README.md) — a checklist line is a checkable thing; it is checked by a person.
+Each is *for all X, statement P holds*, and each names what checks it. "Visual review checklist line *n*" is line *n* of the visual review checklist in [`README.md`](README.md) — a checklist line is a checkable thing; it is checked by a person.
 
 | ID | Statement | Checked by |
 |---|---|---|

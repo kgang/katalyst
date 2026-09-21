@@ -8,7 +8,9 @@ It borrows three things from simulation games: a visible world state, discrete t
 
 ## Terms this part owns
 
-Workbench · Tile · Port · Wire · Inspector · Delta rail · World-state strip · Launchpad · Level of detail.
+Workbench · Tile · Port · Wire · Inspector · Delta rail · World-state strip · Launchpad · Level of detail · Skeleton tile · Refusal strip · Receipt strip · Replay badge.
+
+The last four belong to a map that is being generated and are defined, with the button that starts one, in [`../vocabulary.md`](../vocabulary.md).
 
 ## Invariants this part owns
 
@@ -27,7 +29,7 @@ Workbench · Tile · Port · Wire · Inspector · Delta rail · World-state stri
 | [`inspector.md`](inspector.md) | The persistent side panel: rationale, sources, base rate, three beliefs, "falsified if" | stack 03b — written, canvas built |
 | [`color-motion-type.md`](color-motion-type.md) | The color law, the three budgeted animations, typography | stack 03b — written, built bar the number-roll, which has nothing to roll until a number changes |
 | [`keyboard-and-access.md`](keyboard-and-access.md) | Keyboard map, outline view for screen readers, reduced motion, contrast | stack 03b — written, canvas built |
-| `streaming-growth.md` | How the map draws itself during generation | stack 04 — not written |
+| [`streaming-growth.md`](streaming-growth.md) | How the map draws itself during generation: the eight stream events, skeleton tiles, growth in causal order, the refusal strip, the receipt strip, the Verify door's two cards, the input bar, the replay badge | stack 04a — written; the growing canvas is 04a's last pull request |
 
 **"Built" here means drawn, not fed.** The canvas reads the stored example from `GET /api/fixtures/hormuz`; it does not yet ask the engine's world routes. So every chapter's *drawing* rules are built and tested, and every number a chapter says the engine would compute is on screen as an absence with its reason — "no engine yet". Joining the two is the first job of stack 04, and no component changes when it happens.
 
@@ -66,5 +68,6 @@ Kent vetoes a template-looking interface on sight, so every screenshot is checke
 10. With reduced motion on, the ordering is still there and the tweening is gone.
 11. The six buttons and their badges are word for word the Interface words table in [`../vocabulary.md`](../vocabulary.md).
 12. A claim that was supposed and then overridden says so on its tile (UX-14).
+13. The map grew rather than appeared: a reserved rectangle stood where the next claim would go, no tile that was already placed moved when a later one arrived, every proposal the rules refused is on screen in the validator's own words, and the receipt says what the run cost.
 
-Decision records behind this part: ADR-0007 (canvas technology), ADR-0014 (what the range under a number means, and how a supposition ends — the words the chips and badges use).
+Decision records behind this part: ADR-0007 (canvas technology), ADR-0012 (replay mode — with no model key the four examples run from recordings, through the same stream and the same canvas), ADR-0014 (what the range under a number means, and how a supposition ends — the words the chips and badges use).
