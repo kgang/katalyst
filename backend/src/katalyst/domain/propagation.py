@@ -1136,8 +1136,8 @@ def _warnings_about(
     if days + 1 > SERIES_CAP:
         said.append(
             f"This map runs for {days} days, so each claim's series is drawn at {SERIES_CAP} "
-            "evenly spaced points rather than one for every day. Every day is still worked "
-            "out; it is the drawing that is thinned."
+            "evenly spaced points rather than one for every day. Every day a push fires or "
+            "a claim is judged is worked out exactly; the days between are not needed."
         )
     return tuple(said)
 

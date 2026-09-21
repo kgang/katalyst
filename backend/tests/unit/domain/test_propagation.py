@@ -1317,6 +1317,41 @@ def test_a_long_window_is_drawn_at_a_manageable_number_of_points() -> None:
     assert any("180" in one for one in world.warnings), world.warnings
 
 
+def test_the_long_window_warning_says_what_the_engine_actually_does() -> None:
+    """The sentence a reader is shown about a long window has to be true of the engine.
+
+    This one is drawn verbatim in the browser, so it is the whole of what a reader
+    is ever told about the thinning, and it has already been wrong once: it used to
+    say *every day is still worked out*, which stopped being true the moment the
+    engine started working out only the days it sends plus the days the arithmetic
+    must land on exactly. A number the reader can see is a promise, and so is a
+    sentence.
+
+    The engine's own answer for how many days it works out is compared against the
+    promise rather than typed in: if the two ever part company again, this fails.
+    """
+    graph = _map(
+        (
+            _claim("top", kind="hypothesis", days=5),
+            _claim("ending", kind="market", days=900),
+        ),
+        (_arrow("top", "ending"),),
+    )
+
+    world = _folded(graph)
+    about_the_window = [one for one in world.warnings if str(SERIES_CAP) in one]
+
+    assert about_the_window == [
+        f"This map runs for {world.days} days, so each claim's series is drawn at "
+        f"{SERIES_CAP} evenly spaced points rather than one for every day. Every day a "
+        "push fires or a claim is judged is worked out exactly; the days between are "
+        "not needed."
+    ], world.warnings
+    # And the sentence is not merely well written: the engine really does work out
+    # fewer days than the window has, so "the days between" is the truth about it.
+    assert len(versions_of(world).days) < world.days + 1
+
+
 @given(st.data())
 @a_few
 def test_a_long_window_still_keeps_every_resolve_by_day(data: st.DataObject) -> None:
