@@ -9,7 +9,8 @@
  * never sees the tile.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
@@ -41,6 +42,28 @@ function columnsOf(container: HTMLElement): (string | null)[] {
 
 /** The two columns that are drawn only when they hold a number. */
 const ON_REQUEST: readonly BeliefOwner[] = ["user", "market"];
+
+/**
+ * Every source file in the tree, by the path the rules below name it by.
+ *
+ * Read as text, so that a rule added in a stylesheet nobody thought about is
+ * still found. It is the same technique the colour law and the no-spinner check
+ * already use.
+ */
+function everySourceFile(from: string): Record<string, string> {
+  const found: Record<string, string> = {};
+  for (const name of readdirSync(from)) {
+    const path = join(from, name);
+    if (statSync(path).isDirectory()) {
+      Object.assign(found, everySourceFile(path));
+    } else if (/\.(ts|tsx|css)$/.test(name)) {
+      found[`/${path.replaceAll("\\", "/")}`] = readFileSync(path, "utf8");
+    }
+  }
+  return found;
+}
+
+const EVERY_SOURCE_FILE = everySourceFile("src");
 
 /**
  * The map a reviewer with no key actually watches build, folded by the app's
@@ -289,24 +312,61 @@ describe("what a tile draws, and what it never draws", () => {
     }
   });
 
-  it("test_four_kinds_four_silhouettes_one_palette", () => {
+  it("test_a_tile_says_its_kind_with_no_hue_at_all", () => {
+    // Two of the four kinds now take a hue as well — the hypothesis the teal
+    // accent it already borrowed, a tradeable outcome the one new hue — because
+    // those two are the ends of the map and a reader is hunting for them. Hue is
+    // the third saying of the kind and never the only one, so this reads the
+    // tile with every colour taken away and asks the same question: can you
+    // still tell the four apart? Nothing below looks at a colour value, so no
+    // version of this test can ever pass on one.
     const drawn = OF_EVERY_KIND.map((claim) => {
       const { container } = draw(claim);
-      const outline = container.querySelector(".tile__outline path");
       return {
         kind: claim.kind,
-        shape: outline?.getAttribute("d") ?? "",
-        // Everything the markup says about colour. Kind rides shape; a colour
-        // written onto one of the four would be a second channel saying the same
-        // thing, and the greyscale check on line 3 would stop working.
-        colour: (container.innerHTML.match(/(fill|stroke|color)="[^"]*"/g) ?? []).join(" "),
+        shape: container.querySelector(".tile__outline path")?.getAttribute("d") ?? "",
+        word: container.querySelector(".tile__kind")?.textContent ?? "",
       };
     });
 
-    // Four kinds, four different silhouettes.
+    // Four kinds, four different silhouettes, and four different words.
     expect(new Set(drawn.map((one) => one.shape)).size).toBe(4);
-    // And one palette: nothing about the four differs in a colour value.
-    expect(new Set(drawn.map((one) => one.colour)).size).toBe(1);
+    expect(new Set(drawn.map((one) => one.word)).size).toBe(4);
+    for (const one of drawn) {
+      expect(one.shape).not.toBe("");
+      expect(one.word).not.toBe("");
+    }
+
+    // And the one kind whose outline is drawn a second time — the cut corner of
+    // a tradeable outcome — draws a line, not a colour: the same diagonal its
+    // own silhouette already has, so a grey print keeps it too.
+    const stub = draw(OF_EVERY_KIND.find((one) => one.kind === "market") as ClaimView);
+    expect(stub.container.querySelector(".tile__outline .tile__cut")).not.toBeNull();
+    for (const claim of OF_EVERY_KIND.filter((one) => one.kind !== "market")) {
+      expect(draw(claim).container.querySelector(".tile__cut")).toBeNull();
+    }
+  });
+
+  it("test_the_kind_hue_is_named_only_by_the_tiles_own_stylesheet", () => {
+    // The tile's stylesheet is the one place allowed to say `--kind-market`.
+    // Everywhere else naming it would be a second place a kind could be
+    // coloured — and the place it must never reach is a number: a hue on a
+    // number means which way the money moves, which is a different thing
+    // entirely. This is the same walk that keeps the two direction colours
+    // inside `DirectionReadout`.
+    const allowed = new Set([
+      "/src/styles/tokens.css",
+      "/src/components/tile.css",
+      "/src/components/__tests__/tile.test.tsx",
+      "/src/styles/__tests__/colourLaw.test.ts",
+    ]);
+    // A check that silently walks nothing is a check that always passes.
+    expect(Object.keys(EVERY_SOURCE_FILE).length).toBeGreaterThan(20);
+    expect(EVERY_SOURCE_FILE["/src/components/tile.css"] ?? "").toContain("--kind-market");
+    const offenders = Object.entries(EVERY_SOURCE_FILE)
+      .filter(([path, text]) => !allowed.has(path) && text.includes("--kind-market"))
+      .map(([path]) => path);
+    expect(offenders).toEqual([]);
   });
 
   it("test_clipping_draws_a_monogram_and_requests_nothing_outside", () => {

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-A map with seven claims and eight arrows carries six kinds of information at once, and before this chapter a reader had to click something to learn any of them. After it the picture itself is readable: brightness says how likely a claim is, hue with a glyph and a sign says which way the money moves, a hatch says a tail is involved, the stroke says what kind of push an arrow is, a mark at the arrow's tail says how much is behind it, and a lane colour with a name chip says which branch you are in.
+A map with seven claims and eight arrows carries seven kinds of information at once, and before this chapter a reader had to click something to learn any of them. After it the picture itself is readable: brightness says how likely a claim is, hue with a glyph and a sign says which way the money moves, a hatch says a tail is involved, the stroke says what kind of push an arrow is, a mark at the arrow's tail says how much is behind it, a lane colour with a name chip says which branch you are in, and — at the two ends of the map only — a hue on a tile's outline says what kind of claim it is.
 
-**The organising rule is one channel per meaning.** A *channel* is one thing the eye can vary on its own — brightness, hue, texture, stroke pattern, stroke width, shape, position. Six meanings, six channels, and no channel doing two jobs. Every failure in this area is two meanings fighting over one channel: a wire that is dot-dash for one reason and dashed for another says neither; a tile dimmed because it is unlikely cannot also be dimmed because it belongs to the old world. The test before adding anything: *if I change this meaning, what on screen changes?* If the answer names a channel something else already uses, stop and find another channel — or decide which of the two meanings loses.
+**The organising rule is one channel per meaning.** A *channel* is one thing the eye can vary on its own — brightness, hue, texture, stroke pattern, stroke width, shape, position. Seven meanings, six channels, and **one channel — hue — doing two jobs, under the three fences written below**; every other channel does one. Every failure in this area is two meanings fighting over one channel: a wire that is dot-dash for one reason and dashed for another says neither; a tile dimmed because it is unlikely cannot also be dimmed because it belongs to the old world. The test before adding anything: *if I change this meaning, what on screen changes?* If the answer names a channel something else already uses, stop and find another channel — or fence the two apart so completely that they can never appear on the same element, which is what *Hue says what kind of tile this is* below had to do to earn its exception.
 
 This chapter states the law. [`tiles-ports-wires.md`](tiles-ports-wires.md) draws it on a tile and a wire, [`diff-view.md`](diff-view.md) draws it across two worlds, [`layout-and-zoom.md`](layout-and-zoom.md) says what survives when you zoom out, and [`keyboard-and-access.md`](keyboard-and-access.md) says what a reader who is not looking at any of it hears instead.
 
@@ -24,11 +24,28 @@ For an interface chapter the data model is the tokens. A **token** is one of the
 | **What kind of push an arrow is** | Stroke: pattern, width, doubling | none; the stroke takes `--text-muted` | The Inspector's words, and the midpoint chip's | Pattern, width and doubling |
 | **Where an arrow came from** | **A mark at the wire's tail**, not a stroke | none | One, two or three dots, with the exact word in the Inspector | The count of dots |
 | **Which branch you are in** | Its own small palette, on lanes and chips only | `--branch-violet`, `--branch-teal`, `--branch-rose`, `--branch-slate` *(new)* | A name chip carrying the branch's label | The name chip |
+| **What kind of tile this is** — the two ends of a map only *(added 2026-09-22)* | Hue, on a tile's outline and on the kind printed in its heading, and nowhere else | `--accent` on the hypothesis, `--kind-market` on a tradeable outcome *(new)* | The outline's own silhouette **and** the kind spelled out in words | The silhouette and the word |
 
 Two rules hold the table together, and both are absolute.
 
 - **Never red and green.** Blue and amber instead. Red-green fails the most common form of colour blindness, and red and green carry loss-and-gain baggage that is wrong half the time — a falling oil price is good news for an airline.
 - **Never hue alone.** This is INV-12, the product-level rule that no information is carried by colour by itself: every direction has a glyph, every tail a texture, every provenance a mark.
+
+### Hue says what kind of tile this is, as well as which way money moves *(amended 2026-09-22 — Kent, R42)*
+
+**His words:** *"could we make a slight UI improvement to make the different card types (hypothesis vs tradeable outcomes) have a better use of color?"* Shown three options, he chose **the accent plus one new hue**: the hypothesis keeps the teal accent it already borrowed, made stronger — the outline, the word in its heading, and a faint wash behind the tile; a tradeable outcome takes **one** new hue, on its outline, on the corner that outline cuts away, and on its word. Ordinary steps stay neutral, and so does a dead end, because if every kind were coloured none of them would stand out. *Slight* is his word.
+
+**This is the second meaning on the hue channel, and the law survives it because the two are fenced apart in three ways at once.**
+
+1. **Different tokens, each named by one file.** `--dir-up` and `--dir-down` are named only by `DirectionReadout.tsx` and its stylesheet; `--kind-market` is named only by `tile.css`. Both fences are a walk over every file in the tree, so a component that only wanted the colour cannot reach it.
+2. **Different places on the screen, and they never meet.** A direction hue is only ever on a readout of a number. A kind hue is only ever on a tile's outline and on the word in its heading. **No number, belief chip, badge, wire or port ever takes a kind hue** — a hue on a number means which way the money moves, and what kind of claim this is is a different thing entirely.
+3. **Both are still redundant.** A direction still carries its glyph, its sign and its word. A kind still carries its silhouette and its printed word, both of which survive a grey print. So INV-workbench.14, the greyscale test, is untouched: take every colour away and the picture says exactly what it said before.
+
+**The hypothesis's wash is derived, not new.** It is `--accent` mixed into the tile's own surface at eight parts in a hundred — 1.1 to 1 against a plain tile, a tint you notice only beside one — so there is no fourth teal and nothing extra to keep in step between the themes. Every word drawn on a washed tile still clears 4.5 to 1 in both: the claim at 13.1 dark and 16.6 light, the accent itself at 8.6 and 4.9.
+
+**How the new hue was chosen, since a hue picked on the spot is how a palette dies.** Eight hues are already spoken for — the two directions, the four branches, and the accent and focus teals. Measured in OKLCH, they leave exactly three stretches of the wheel free: a yellow-green near 127°, a red-orange near 33°, and an orchid near 330°. **The first two are ruled out by this chapter's own third anti-pattern, which forbids red and green for anything at all**; on a finance screen a green outline would also read as *profit* on a tile that has no direction in it. That leaves the orchid, and it is the better fence besides: its two nearest neighbours are the violet and rose branch hues, which are drawn only on a branch's lane and its name chip, where a tradeable outcome's outline never is — while the red-orange's nearest neighbour after rose is the amber that means *the money moves down*, which is drawn on numbers.
+
+`--kind-market` is `#ed9ee5` dark and `#8a3785` light: 32.9° and 36.7° from the nearest hue in use, 14.0 and 15.0 apart from it by CIEDE2000 — about six times the smallest difference an eye can see — and 9.6 / 8.8 and 6.7 / 7.1 to 1 against `--surface` and `--surface-raised`, which clears what a word needs and far clears what a one-pixel outline needs. The measurements and the script that made them are in `plans/logs/04c/colour/`.
 
 ### Why provenance left the stroke
 
@@ -130,11 +147,12 @@ The map draws. With no clicks at all a reader can tell four things:
 - **H is less likely than M1.** H's chip bar is `--p-1` (`.35`), M1's is `--p-3` (`.61`), and each chip prints its owner, its number and its range on three stacked lines over that bar.
 - **H → B is a strong one-time shove; C → B is a gentler standing one.** H → B is dot-dash (an `impulse`: a spike that fades) and three steps wide. C → B is solid (a `step`: switched on and held), doubled because it is a `sustain` arrow, and two steps wide.
 - **Nothing on this map has a document behind it.** Every arrow's tail mark shows two dots (`argued` — a mechanism was stated, nothing was fetched), except H → N1, which shows one (`asserted` — a story rather than a mechanism).
-- **No hue appears anywhere.** There is no financial direction to show yet, no tail is marked, and there is one branch. The base map is deliberately a monochrome picture.
+- **Where the map starts and where it could be traded.** H's outline and the word *hypothesis* in its heading are in `--accent`, and H alone carries a wash of that same accent. M1's and M2's outlines, their cut corners and the word *market* are in `--kind-market`. C, B, R and N1 keep the hairline. *(amended 2026-09-22 — R42.)*
+- **No other hue appears anywhere.** There is no financial direction to show yet, no tail is marked, and there is one branch. Apart from the two ends, the base map is deliberately a monochrome picture.
 
 ### B2 — the greyscale test
 
-Screenshot the canvas, convert it to greyscale, read it again. Everything in B1 still reads: brightness is brightness, a dot-dash is a dot-dash, three dots are three dots, a doubled stroke is doubled. This is line 3 of the visual review checklist and it runs on **every** screenshot, not once at the end. If anything is lost, the law has been broken somewhere, and the fix is a channel, never a darker colour.
+Screenshot the canvas, convert it to greyscale, read it again. Everything in B1 still reads: brightness is brightness, a dot-dash is a dot-dash, three dots are three dots, a doubled stroke is doubled — and the two ends of the map are still the two ends, because H still comes to a point on its left and still says *hypothesis*, and M1 and M2 still have a corner cut away and still say *market*. This is `VR3` of the visual review checklist and it runs on **every** screenshot, not once at the end. If anything is lost, the law has been broken somewhere, and the fix is a channel, never a darker colour.
 
 ### B3 — the strike branch gets a lane, and it is violet
 
@@ -158,21 +176,25 @@ Each is *for all inputs of this kind, this statement holds*, and each names what
 
 Local numbers in this part are `INV-workbench.<n>`. This chapter holds **13 – 19**; [`tiles-ports-wires.md`](tiles-ports-wires.md) holds 1 – 12.
 
-### INV-workbench.13 — One channel per meaning
+### INV-workbench.13 — One channel per meaning, and where hue carries two, each is fenced *(amended 2026-09-22)*
 
-For every channel in the colour law table, exactly one meaning is drawn with it. Four of the six are checked automatically, and the other two by eye:
+For every channel in the colour law table, exactly one meaning is drawn with it — **except hue, which carries two: which way money moves, and what kind of tile this is.** For those two: no file names a token of one meaning and a token of the other; no element drawn with a direction token is a tile's outline or heading; and no element drawn with a kind token is a number, a belief chip, a badge, a wire or a port.
+
+Five of the seven meanings are checked automatically, and the other two by eye:
 
 - **Test, the brightness channel:** `frontend/src/styles/__tests__/colourLaw.test.ts` › `test_likelihood_ramp_is_read_only_by_the_two_chips` and `test_no_rule_sets_a_text_colour_to_the_ramp` — a walk over every stylesheet under `frontend/src/`.
-- **Test, the hue channel:** `frontend/src/components/__tests__/directionReadout.test.tsx` › `test_no_file_outside_direction_readout_names_a_direction_token` (stated again as INV-workbench.15).
+- **Test, the hue channel, the direction half:** `frontend/src/components/__tests__/directionReadout.test.tsx` › `test_no_file_outside_direction_readout_names_a_direction_token` (stated again as INV-workbench.15).
+- **Test, the hue channel, the kind half:** `frontend/src/components/__tests__/tile.test.tsx` › `test_the_kind_hue_is_named_only_by_the_tiles_own_stylesheet` — the same walk, over every file under `frontend/src/`. `tile.css` draws no number and no wire, so a kind hue provably cannot reach one.
 - **Test, the stroke and mark channels:** `frontend/src/graph/wires/__tests__/strokeIsShapeOnly.test.tsx` › `test_two_wires_differing_only_in_provenance_have_identical_strokes` (stated again as INV-workbench.17).
-- **By eye, the texture and lane channels:** visual review checklist line 3 — convert the screenshot to greyscale and everything still reads. No automated check covers those two; nothing draws a tail in this stack, and a lane's colour is only ever redundant with its name chip.
+- **By eye, the texture and lane channels:** visual review checklist `VR3` — convert the screenshot to greyscale and everything still reads. No automated check covers those two; nothing draws a tail in this stack, and a lane's colour is only ever redundant with its name chip.
 
 ### INV-workbench.14 — The greyscale test *(refines INV-12, nothing by hue alone)*
 
-For every screenshot of any screen in this app, in either theme, converted to greyscale: every direction still reads (glyph and sign), every tail still reads (hatch), every kind of push still reads (pattern, width, doubling), every provenance still reads (the count of dots), and every branch still reads (its name chip).
+For every screenshot of any screen in this app, in either theme, converted to greyscale: every direction still reads (glyph and sign), every tail still reads (hatch), every kind of push still reads (pattern, width, doubling), every provenance still reads (the count of dots), every branch still reads (its name chip), and every tile's kind still reads (its silhouette and the kind spelled out in its heading).
 
 - **Test:** `frontend/src/graph/wires/__tests__/notByColourAlone.test.tsx` › `test_nothing_is_carried_by_hue_alone` — for each of the three signal shapes the rendered stroke pattern differs; for each of the three origin steps the rendered dot count differs; for each direction the rendered glyph and sign differ. Colour values are excluded from every comparison, so a test can never pass on a hue.
-- **Also:** visual review checklist line 3, run on every screenshot.
+- **Test, the kind:** `frontend/src/components/__tests__/tile.test.tsx` › `test_a_tile_says_its_kind_with_no_hue_at_all` — for each of the four kinds the rendered outline's path differs and the printed word differs, and the comparison looks at no colour value at all.
+- **Also:** visual review checklist `VR3`, run on every screenshot.
 
 ### INV-workbench.15 — A direction is never a hue on its own
 
@@ -219,6 +241,8 @@ For every piece of text rendered: its size is one of `--text-sm`, `--text-md`, `
 7. **Do not crossfade a diff**, because the frames in between show numbers from a world that does not exist. **Instead:** a hard switch on `Space`, and a transition you can scrub.
 8. **Do not animate anything to make the tool feel alive** — no idle loop, no spring, no shimmer. **Instead:** spend the three budgeted moves on showing causality and give everything else 120 milliseconds of opacity.
 9. **Do not let a colour be the only difference between two states**, even a state this chapter has not named — a hover, a selection, a control that is not yet live. **Instead:** pair every colour change with a change of shape, weight, texture or position, and check it in greyscale.
+10. **Do not put the kind hue on a number** — not on a belief chip, not on a badge, not on a reading, not on a wire or a port. *(added 2026-09-22)* A hue on a number is the one thing hue already means: which way the money moves. A tradeable outcome's own likelihood drawn in that outcome's hue would read as a direction the claim does not have. **Instead:** the outline, its cut corner, and the word in the heading — the three places the tile says what kind it is anyway. The walk in `tile.test.tsx` is what keeps it there.
+11. **Do not colour a third kind, or a fourth**, because the two hues exist to make the two *ends* of a map findable, and a map where every tile is coloured has no ends. *(added 2026-09-22)* **Instead:** a step and a dead end keep the hairline; if a later kind really needs to be found at a glance, that is a question for Kent, not a fifth hue picked on the spot.
 
 ---
 
@@ -227,6 +251,7 @@ For every piece of text rendered: its size is one of `--text-sm`, `--text-md`, `
 *Raised 2026-09-17.*
 
 1. **Three teals on one screen.** `--accent` is a teal meaning "this is fine", `--focus` is a brighter teal meaning "the keyboard is here", and the branch palette adds a third. Either they are far enough apart to tell at a glance, or the branch teal is dropped for a fourth hue that is not amber. Needs settling when the branch tokens are written, in pull request 3.
+   **Still three, 2026-09-22.** The hypothesis's stronger treatment spends `--accent` again rather than adding a teal, and its wash is that same accent mixed into the tile's surface. `--kind-market` is 147° away from the accent in OKLCH, which is as far from a teal as the wheel allows. The question is unchanged and still open.
 2. **The five `--p-n` values, and the light theme.** Five brightness steps clearly distinguishable against near-black are easy; five against white are harder, because a light surface leaves less room beneath it before a bar reads as flat black. Whether the light ramp runs the same direction or inverts is not settled.
 3. **What branch creation actually animates.** The budget spends one of its three moves on it and nothing says which property moves. Proposed above: the lane colour and the name chip arriving over about 200 milliseconds, with no bounce.
 4. **Does the hatch survive being zoomed out?** `--tail` repeats every 4 pixels, so at the zoom floor of `11/22 = 0.5` it is a grey smear — a texture that has stopped being one. The thresholds are [`layout-and-zoom.md`](layout-and-zoom.md)'s and are derived rather than chosen: summary tiles below `11/13 ≈ 0.85`, floor at `0.5`, both consequences of "text never below 11 pixels". The hatch may need a coarser variant, or the tail marking may need to become a glyph when zoomed out. Nothing in this stack draws a tail, so it can wait — but not past the stack that does.

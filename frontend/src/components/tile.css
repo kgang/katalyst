@@ -74,14 +74,6 @@
   padding-right: var(--space-3);
 }
 
-/* The claim the reader started from is the one thing on the map that did not
- * come from the model, so its outline is drawn in the accent rather than in the
- * hairline. The shape already says it is the hypothesis; this only makes the
- * eye land there first. */
-.tile[data-hypothesis="yes"] .tile__outline path {
-  stroke: var(--accent);
-}
-
 /* ---- The header: what kind of claim, and when it settles ---------------- */
 
 .tile__header {
@@ -104,6 +96,66 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* ---- What kind of claim this is, said a third time, in colour ----------- *
+ * The two ends of a map are the two tiles a reader is hunting for: the
+ * hypothesis they started from, and a tradeable outcome they could act on.
+ * Both already say what they are twice — the outline's shape, and the word in
+ * the heading — so colour here is a third saying of the same thing and never
+ * the only one. Convert the screen to grey and nothing is lost, which is `VR3`
+ * of the visual review checklist.
+ *
+ * The steps in between keep the hairline, and so does a dead end: if every kind
+ * were coloured, none of them would stand out, which is the whole point.
+ *
+ * **Neither hue goes anywhere near a number.** Hue on a number means which way
+ * the money moves, and what kind of claim this is is a different thing
+ * entirely — so nothing below touches a belief chip, a badge, a wire or a port.
+ *
+ * What an edit did to a claim is drawn further down this file and wins over
+ * both, by coming after them: a claim your edit just added is drawn as added,
+ * whatever kind it is, because that is the more urgent thing to know. */
+
+/* The hypothesis: the teal accent it already borrowed, now said three times —
+ * the outline, the word in the heading, and a wash of the same accent behind
+ * the whole tile.
+ *
+ * The wash is the accent mixed into the tile's own surface rather than a colour
+ * of its own, so there is no fourth teal and nothing new to keep in step. Eight
+ * parts in a hundred: 1.1 to 1 against the plain surface — a tint you notice
+ * only beside an ordinary tile — and every word drawn on it still clears 4.5 to
+ * 1 in both themes (measured: the claim at 13.1 dark and 16.6 light, the accent
+ * itself at 8.6 and 4.9). */
+.tile[data-kind="hypothesis"] .tile__outline path {
+  stroke: var(--accent);
+  fill: color-mix(in oklab, var(--accent) 8%, var(--surface-raised));
+}
+
+.tile[data-kind="hypothesis"] .tile__kind {
+  color: var(--accent);
+}
+
+/* A tradeable outcome: the one new hue in the product, in exactly three places
+ * — the outline, the corner that outline cuts away, and the word *market*. No
+ * wash, on purpose: the two ends of the map are then told apart by more than a
+ * hue, so neither depends on a reader telling teal from orchid. */
+.tile[data-kind="market"] .tile__outline path {
+  stroke: var(--kind-market);
+}
+
+/* The cut corner, drawn a second time over the outline at twice the width. It
+ * is the outline's own diagonal and nothing else — no new mark, nothing a grey
+ * print would lose — and it is what makes the ticket-stub corner read from
+ * across the map instead of from a foot away. */
+.tile[data-kind="market"] .tile__outline .tile__cut {
+  fill: none;
+  stroke: var(--kind-market);
+  stroke-width: 2;
+}
+
+.tile[data-kind="market"] .tile__kind {
+  color: var(--kind-market);
 }
 
 /* ---- The claim ---------------------------------------------------------- *

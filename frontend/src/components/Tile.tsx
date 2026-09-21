@@ -14,8 +14,11 @@
  *   3. at most two evidence clippings, each a letter standing for a publication
  *      and one line of what it says;
  *   4. the day the claim is settled by;
- *   5. its outline, which says what kind of claim it is — shape carries that,
- *      never colour;
+ *   5. its outline, which says what kind of claim it is. Shape says it first
+ *      and always; at the two ends of a map — the hypothesis and a tradeable
+ *      outcome — a hue says it as well, so the eye lands on those two before
+ *      it reads anything. Never the hue on its own: the shape and the printed
+ *      word are both still there, so the kind survives a grey print;
  *   6. a place for its badges, which arrive with the buttons that earn them.
  *
  * The rest — the full claim, the resolution criteria, the sources, the
@@ -26,7 +29,9 @@
  * own; a line drawing sits behind it with a one-pixel stroke at a tenth of the
  * text colour, and its path is what makes a hypothesis look different from a
  * dead end. Four shapes, four kinds, and the shapes survive being printed in
- * grey — which a colour never does.
+ * grey — which a colour never does. Two of the four take a hue on that same
+ * stroke as well (`tile.css` says which and why); the shape underneath is what
+ * the grey print keeps.
  */
 
 import { Handle, useStore } from "@xyflow/react";
@@ -67,6 +72,22 @@ const OUTLINES: Record<ClaimKind, (height: number) => string> = {
   not_tradeable: (h) =>
     `M 0.5 0.5 H ${TILE_WIDTH - 0.5} V ${h / 2 - 14} L ${TILE_WIDTH - 14.5} ${h / 2} ` +
     `L ${TILE_WIDTH - 0.5} ${h / 2 + 14} V ${h - 0.5} H 0.5 Z`,
+};
+
+/**
+ * The one corner a kind draws twice.
+ *
+ * A tradeable outcome's outline has its top right corner cut away like a
+ * ticket. That diagonal is drawn a second time, over the outline, at twice the
+ * width, so the corner reads from across the map rather than from a foot away.
+ * It is the same line the outline already draws — no new mark, and nothing a
+ * grey print would lose — and `tile.css` is the only place that says what
+ * colour it takes.
+ *
+ * Only one kind has one. The other three draw their outline and nothing else.
+ */
+const CUT_CORNERS: Partial<Record<ClaimKind, string>> = {
+  market: `M ${TILE_WIDTH - 18.5} 0.5 L ${TILE_WIDTH - 0.5} 18.5`,
 };
 
 /** What each kind is called on screen. No underscores and no code names. */
@@ -259,6 +280,9 @@ export function Tile({ claim, isHypothesis, versions, height: reserved }: TilePr
         focusable="false"
       >
         <path d={OUTLINES[claim.kind](height)} />
+        {CUT_CORNERS[claim.kind] === undefined ? null : (
+          <path className="tile__cut" d={CUT_CORNERS[claim.kind]} />
+        )}
       </svg>
 
       {/* The ports. An arrow that fires once and an arrow that has to keep

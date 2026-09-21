@@ -218,6 +218,32 @@
   --branch-slate: #98a8c2;
   /* 7.8 to 1 on --surface, 7.3 to 1 on --surface-raised. */
 
+  /* ---- What kind of tile this is -------------------------------------- *
+   * One hue, for one kind: a tradeable outcome — the claim at the end of a
+   * chain that names something you could actually hold. It is drawn on that
+   * tile's outline, on the cut corner of that outline, and on the word
+   * *market* in its heading. **Never on a number, a belief chip, a wire or a
+   * port.** The hypothesis at the other end of the map keeps the teal accent
+   * it already borrows, made stronger; everything in between stays neutral,
+   * which is what makes the two ends stand out.
+   *
+   * **Shape still says it too**, so nothing here is carried by hue alone: a
+   * tradeable outcome's corner is cut whatever the colour, and its heading
+   * prints the word. Convert the screen to grey and the kind still reads.
+   *
+   * Why this hue and not another. The wheel has exactly three stretches left
+   * free by the eight hues already spoken for — a yellow-green near 127°, a
+   * red-orange near 33°, and this orchid near 330° — and the colour law's own
+   * third anti-pattern rules out red and green for anything at all. Measured
+   * in OKLCH, this one sits 32.9° from the nearest hue in use and 14.0 apart
+   * from it by CIEDE2000, which is about six times the smallest difference an
+   * eye can see; its two nearest neighbours are the violet and rose branch
+   * hues, which are drawn only on a branch's lane and its name chip and never
+   * on a tile. The measurements are in `plans/logs/04c/colour/`. */
+  --kind-market: #ed9ee5;
+  /* 9.6 to 1 on --surface, 8.8 to 1 on --surface-raised. Clears 4.5 to 1 as
+   * the heading's word and far past the 3 to 1 a one-pixel outline needs. */
+
   /* ---- Two more durations --------------------------------------------- *
    * The motion budget is three moves and no more: wires drawing in causal
    * order, a branch arriving, and a likelihood rolling from its old figure to
@@ -289,6 +315,12 @@
   /* 6.4 to 1 on --surface, 6.8 to 1 on --surface-raised. */
   --branch-slate: #44527a;
   /* 7.2 to 1 on --surface, 7.7 to 1 on --surface-raised. */
+
+  /* The same orchid hue on a white page, darkened until it clears the bar a
+   * word has to clear. Same hue angle to within a third of a degree, so the
+   * kind reads as the same colour in both themes. */
+  --kind-market: #8a3785;
+  /* 6.7 to 1 on --surface, 7.1 to 1 on --surface-raised. */
 }
 
 /* No data-theme attribute at all: follow the operating system. Dark stays the
@@ -327,6 +359,8 @@
     --branch-teal: #0a5a72;
     --branch-rose: #a32f52;
     --branch-slate: #44527a;
+
+    --kind-market: #8a3785;
   }
 }
 
