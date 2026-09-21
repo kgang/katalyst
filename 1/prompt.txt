@@ -423,3 +423,35 @@ What are the outstanding decisions that require my input or judgement?
 **The cost Kent must see:** two causes each taking a claim 10%→40% give **59%** together, not **91%**.</result>
 <usage><subagent_tokens>488950</subagent_tokens><tool_uses>49</tool_uses><duration_ms>2132251</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ae7ac9a335781e12f</task-id>
+<tool-use-id>toolu_014ukAzQrkkRRZW3vG6Kh7J6</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/ae7ac9a335781e12f.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0018-0020, thesis chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me:** 0018 §*The shape* point 3 (R20), 0019 §*Where the event days come from* and §*What this record still waits for*, `spec/thesis/position.md` §*Data model*, and §1.11 of the owed note.
+
+**Tokens — all five filled, none left.**
+
+| Was at | Filled with | Source |
+|---|---|---|
+| `0019:89` *(distribution)* | §*Where the event days come from* — the engine's weighted forward sample; `.0023` mean / `.0064` worst total variation against the exact answer; median day moves ≤1 slice (2.5 days) vs ten days for the alternative; caveats (four-claim maps, multiplicative rate, round two did not re-run the day table); `weight` real; effective draws 96.7% mean / 41.8% worst | `spike-05-observe.md` §7 (`when_table.py`), §(a) for the effective share; round two verdict 3 and §5 |
+| `0019:90` *(states)* | folded into the same section: `Draws` carries on and off days; the states sweep is being re-run under the additive rate and the shape does not depend on it | `spike-05-states.md` §1, §2.5 |
+| `position.md:21,22` | §*Data model* — two days per claim with the reasoning, plus a four-sentence *Where the days come from* pointing at 0019 | same |
+| `what-takes-you-out.md:30` | the weighted forward sample named inline, with `.0064` and the 2.5-day bound; effective-draw share attached to the 200 floor | same |
+
+**R20 in 0018.** Point 3 now states the decision: any fixed value in `base`, from either button, refuses the edge; the cost accepted (a reader who records a real public fact loses the edge on that map until they start from one without it, even though a later quote reflects it); the alternative declined (allow an observation when the quote is dated on or after it). *Open for Kent* now reads **nothing**, and says which question R20 closed.
+
+**Quotations corrected — four.** Three paraphrases were in quotation marks attributed to Kent (R10 twice in 0019, R11 in 0020); all three are now stated as his decision with the row cited, no quote marks. One misattribution: 0020 and my `belief.md` amendment put *"where the venue publishes a spread, that becomes `lo` and `hi`"* in record 0010's mouth — 0010 says *"an interval where the venue gives one"*; the spread reading is `spec/graph/belief.md`'s and the fixture's. Both now say so.
+
+**Word counts** — 0018 2,377 · 0019 2,703 · 0020 2,468 · edge 1,623 · quotes 1,667 · position 1,684 · what-takes-you-out 1,600 · card-and-export 1,568 · README 680. 0019 grew by the spike section (476 words of measured evidence the record exists to hold); chapters sit ~10% over 1,500 with the decision table, barrier correction and lift interval kept intact as instructed.
+
+**Open for Kent, final.** 0018: **none**. 0019: (1) the path double-counts what the spot already prices — recommended, the reader states how much is priced; (2) a greyed quarter-Kelly ceiling — recommended, leave out. 0020: (1) which map carries a venue price on the walk — recommended, honest with none and let the freeze try; (2) may a dated quote file be committed — recommended, a person reads the terms first.
+
+**Owed list** gained §1.11's second paragraph: `spec/graph/belief.md` is also on the evals lane's paused number sweep, my amendment is twelve lines in two adjacent passages with no numbers, and whoever lands second rebases that file by hand.</result>
+<usage><subagent_tokens>488065</subagent_tokens><tool_uses>32</tool_uses><duration_ms>307840</duration_ms></usage>
+</task-notification>
