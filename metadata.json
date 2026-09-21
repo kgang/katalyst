@@ -3,7 +3,7 @@
   "checkpoint_id": "01M32D2HPRENR4PW5MGKF4YWG7",
   "strategy": "manual-commit",
   "branch": "adr/06-the-trade",
-  "checkpoints_count": 5,
+  "checkpoints_count": 11,
   "files_touched": [
     "docs/adr/0018-an-edge-is-computed-from-the-unsupposed-world.md",
     "docs/adr/0019-a-stop-is-a-price-the-reader-owns.md",
@@ -23,13 +23,27 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 512,
-    "cache_creation_tokens": 833021,
-    "cache_read_tokens": 101047542,
-    "output_tokens": 302378,
-    "api_call_count": 222
+    "input_tokens": 582,
+    "cache_creation_tokens": 917994,
+    "cache_read_tokens": 109019440,
+    "output_tokens": 347312,
+    "api_call_count": 250,
+    "subagent_tokens": {
+      "input_tokens": 516,
+      "cache_creation_tokens": 4293071,
+      "cache_read_tokens": 90310246,
+      "output_tokens": 341414,
+      "api_call_count": 258
+    }
   }
 }
