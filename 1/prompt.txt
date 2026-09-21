@@ -936,3 +936,30 @@ Nothing changed since my report. Restating the essentials:
 <status>completed</status>
 <summary>Background command "Wait for checks and squash-merge PR #60" completed (exit code 0)</summary>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ac42d12ae8555d932</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ac42d12ae8555d932.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer E: assemble by-deadline core" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me,** from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core`: `make numbers-check`; then from `backend/`: `uv run ruff check . &amp;&amp; uv run ruff format --check .` · `uv run mypy --strict src/katalyst/domain src/katalyst/grounding` · `uv run mypy src` · `uv run pytest tests/unit/domain/test_by_deadline.py -q` · `uv run pytest tests/unit/domain tests/oracles -q --cov=src/katalyst/domain --cov-report=term-missing`. Long version: `plans/analysis/2026-09-22-E-assembly-report.md`. (`states.py` in my `git status` is the performance agent's, not mine.)
+
+**Built.** `_by_deadline` and eight helpers in `propagation.py` (today's path byte-identical); `ImpossibleObservation` exported; `tests/oracles_adapter.py` (the adapter E1 owed, both directions); twelve tests; the benchmark; a dated `docs/measurements.md` section. 100% statement and branch on all of `domain/`; whole suite **739 passed, 4 xfailed** (the oracle lane's four, untouched).
+
+**Oracle agreement, both conditions in one sentence:** sixteen seeded maps from `tests/oracles/maps.py` at 24 slices of each claim's own window, eight points inside each slice, an arrival at the middle of its slice, one version whose stated range is a point, *This happened* answered by a seeded sample of 50 000 worlds, judged by `by_integrating` on the same map through the adapter at that same grid and convention — **1 030 numbers, none over `.005`**: worst `.0015` (no edit, 62), `.0014` (*Suppose*, 484), `.0049` (*This happened*, 484). Elimination vs `by_summing` at `1e-9` over seventeen questions.
+
+**Your four.** (1) Locality: the map is solved again with the report set aside, and a correction added only where the two differ — exact, needs nothing of `solving.py`, costs one extra `all_marginals` (31.7–33.8 ms); tested byte-identical. (2) Impossible observation: nothing to change — the `1e-9` floor is `main`'s own documented `TINY`, shared by both engines; impossibility is reachable without it (a claim judged on day zero has no window), and today's engine reports `0.0` for every claim the news reaches where this one answers with the map plus a naming sentence. (3) The test was wrong, not `forward.py`/`states.py`: by hand, `leaves = .2715` on the event against `stops = .6763` on the state — the sign picks which rate it bends (0017), and `by_integrating.fit` agrees. Fixed. (4) The correction in every world is *worse* — same maps, seed, grid: `.0015/.0014` without against `.0018/.0031` with — so it stays where something is reported.
+
+**Benchmark** (M3 Max, `a5551f7`, forward/solve/sample timed separately, 20 claims, 2 000 versions, 24 slices, 2 repeats, one claim reported): all-event **483.7 ms**; three holding-back arrows **978.2 ms**; five states **7 490.8 ms**, 8.03 GB, against a 600 ms target. Hormuz base end to end **380.1 ms**. **Finding:** the strike branch puts two holding-back arrows on Brent — 625 combinations, **12.53 GB at 2 000 versions** — so it does not run at the shipped budget. Cause: `rates.added_up` allocates `(versions, combos, cause times, slices)`.
+
+**Owed, not edited:** `rates.py` `added_up` (keep terms factored, or block the versions); `solving.py` `_can_reach` → `can_reach`; `ARCHITECTURE.md:101` ("two nested loops" → two engines). Replacement words in §6.
+
+**C:** stub at my start; `sample_forward` grew keyword-only `window` mid-way, which I matched; committed `a5551f7` and everything works.
+
+**Commit:** `feat(engine): a claim's number becomes the chance it happens by its deadline — the new core, assembled behind its flag`</result>
+<usage><subagent_tokens>427600</subagent_tokens><tool_uses>141</tool_uses><duration_ms>2392877</duration_ms></usage>
+</task-notification>
