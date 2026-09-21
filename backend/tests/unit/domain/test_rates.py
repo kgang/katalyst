@@ -26,7 +26,9 @@ from katalyst.domain.graph import Graph
 from katalyst.domain.link import Link
 from katalyst.domain.proposition import Proposition, Resolution
 from katalyst.domain.rates import (
+    MOST_NUMBERS_AT_ONCE,
     POINTS_IN_A_SLICE,
+    SLICES,
     ClaimShapes,
     Window,
     _push_at,
@@ -504,10 +506,10 @@ def test_a_helping_causes_total_is_nothing_until_it_arrives_and_nothing_if_it_ne
     added = added_up(shapes, rates)
 
     assert added.helps[0].shape == (1, 1, window.slices + 1, window.slices)
-    never = added.helps[0][:, :, window.slices, :]
+    never = added.helps[0].whole()[:, :, window.slices, :]
     assert numpy.all(never == 0.0)
     for arrived in range(window.slices):
-        running = added.helps[0][0, 0, arrived]
+        running = added.helps[0].whole()[0, 0, arrived]
         # Nothing before the slice the cause arrived in, because the push had not
         # started; and never falling afterwards, because a rate is never negative.
         assert numpy.all(running[:arrived] == 0.0)
@@ -589,7 +591,7 @@ def test_an_arrow_whose_push_lands_after_the_deadline_is_a_fault_and_not_a_crash
     rates = rates_of(shapes, _one(0.3), {0: _one(0.6)}, persistence="event")
     assert numpy.all(numpy.isfinite(rates.helps[0]))
     added = added_up(shapes, rates)
-    assert numpy.all(added.helps[0] == 0.0)
+    assert numpy.all(added.helps[0].whole() == 0.0)
 
 
 def test_shapes_built_by_hand_are_refused_rather_than_quietly_worked_out() -> None:
@@ -614,3 +616,65 @@ def test_shapes_built_by_hand_are_refused_rather_than_quietly_worked_out() -> No
     )
     with pytest.raises(ValueError, match="the other kind"):
         rates_of(muddled, _one(0.3), {0: _one(0.1)}, persistence="state")
+
+
+def test_a_claim_two_arrows_hold_back_is_never_held_as_one_array() -> None:
+    """The memory wall, and where it was taken down.
+
+    Two arrows holding one claim back multiply out over every pair of slices they
+    might have arrived in — twenty-five each, six hundred and twenty-five pairs. A
+    helping arrow's running total across every version, every one of those pairs,
+    every time its own cause might have come and every slice is one array of
+    gigabytes, and the committed Hormuz strike branch needed 12.53 of them.
+
+    It is never built. What is stored is one version-free block per term of the
+    expansion plus one number per version, and the big array is built for as many
+    versions at a time as the ceiling allows. This asserts on shapes and on bytes,
+    and on nothing that has a clock in it.
+    """
+    window = window_of(_map(_claim("effect", days=60)), DAY_ZERO, slices=SLICES)
+    effect = _claim("effect", prior=0.3, days=60)
+    arrows = (
+        _arrow("helps", "effect", strength=1.4),
+        _arrow("first", "effect", strength=-1.1),
+        _arrow("second", "effect", strength=-0.8),
+    )
+    shapes = _shapes(effect, arrows, window)
+    versions = 200
+    hold = numpy.full(versions, 0.08)
+    rates = rates_of(
+        shapes,
+        numpy.full(versions, 0.3),
+        {0: numpy.full(versions, 0.6), 1: hold, 2: hold},
+        persistence="event",
+    )
+    added = added_up(shapes, rates)
+    spread = added.helps[0]
+
+    combos = (SLICES + 1) ** 2
+    assert spread.shape == (versions, combos, SLICES + 1, SLICES)
+
+    as_one_array = versions * combos * (SLICES + 1) * SLICES * 8
+    kept = (
+        spread.coefficients.nbytes
+        + sum(block.nbytes for block in spread.blocks)
+        + sum(row.nbytes for row in spread.rows)
+    )
+    assert kept * 100 < as_one_array
+
+    # Every version is read exactly once, in order, and no block asks for more
+    # numbers at a time than the ceiling allows.
+    blocks = spread.version_blocks()
+    assert len(blocks) > 1
+    assert blocks[0][0] == 0
+    assert blocks[-1][1] == versions
+    assert all(blocks[index][1] == blocks[index + 1][0] for index in range(len(blocks) - 1))
+    biggest = max(last - first for first, last in blocks) * combos * (SLICES + 1) * SLICES
+    assert biggest <= MOST_NUMBERS_AT_ONCE
+
+    # The total on the deadline is the last entry of the running total. It is read
+    # off the pieces rather than off the running total, so the two agree to the last
+    # place a double carries rather than bit for bit.
+    ends = spread.over_the_window()
+    assert ends.shape == (versions, combos, SLICES + 1)
+    numpy.testing.assert_allclose(ends[3], spread[3][:, :, -1], rtol=1e-12, atol=0.0)

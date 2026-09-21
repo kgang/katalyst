@@ -331,6 +331,139 @@ class Clamp:
     """What suppressing the claim's rate entirely while the cause is on actually gives."""
 
 
+MOST_NUMBERS_AT_ONCE: Final = 16_000_000
+"""How many numbers one working array may hold while a helping arrow's total is read.
+
+Sixteen million of them is a hundred and twenty-eight megabytes. The array being
+bounded is *versions by combinations by readings by slices*, and on a map with two
+arrows holding one claim back it would otherwise be gigabytes. Versions are read in
+blocks small enough to stay under this, which changes no number: every version is
+worked out from the same arrays, and a version enters only as a scalar multiplying
+them.
+"""
+
+
+@dataclass(frozen=True)
+class Spread:
+    """One helping arrow's rate added up across the window, kept as the pieces it is a sum of.
+
+    **Why this is not one array.** What a reader wants is *versions by combinations
+    by readings by slices*: for each version of the stated numbers, for each
+    combination of the arrival times of the arrows that hold the claim back, for each
+    time this arrow's own cause might have come, a running total to the end of each
+    slice. On a map where two arrows hold one claim back that array is six hundred
+    and twenty-five combinations wide and runs to gigabytes — the committed Hormuz
+    strike branch needed 12.53 gigabytes of them, and the product did not run.
+
+    **It does not have to be one array**, because a version enters only as a number
+    multiplying arrays nothing about a version changes. The claim's rate is expanded
+    into one term per *subset* of the arrows that hold it back; each term is a
+    version-free block, and each carries one number per version. So what is stored is
+    small, and the big array is built only for as many versions at a time as
+    `MOST_NUMBERS_AT_ONCE` allows.
+
+    A reader asks for what it needs: `over_the_window` for the total on the claim's
+    deadline, `between` for a block of versions, `whole` for all of them, and
+    indexing with a version number for one version.
+    """
+
+    rate: NDArray[numpy.float64]
+    """`(versions,)` how much this arrow adds to the claim's rate while it is pushing."""
+
+    coefficients: NDArray[numpy.float64]
+    """`(versions, terms)` what each term of the expansion is multiplied by, per version."""
+
+    blocks: tuple[NDArray[numpy.float64], ...]
+    """One per term: `(rows, readings, slices)` that term's push, which no version changes.
+
+    `rows` is however many combinations of arrival times the arrows in **that term**
+    have between them — one for the term that names no arrow at all.
+    """
+
+    rows: tuple[NDArray[numpy.int64], ...]
+    """One per term: `(combos,)` which row of that term's block each combination takes."""
+
+    versions: int
+    """How many versions were drawn."""
+
+    combos: int
+    """How many combinations of the holding-back arrows' arrival times there are."""
+
+    readings: int
+    """How many different *when its cause happened* this arrow's push is held for.
+
+    `slices + 1` for an arrow that reads only the day its cause came on, and
+    `(slices + 1) * (slices + 1)` for one that reads its cause's whole stretch, in the
+    flattened layout `ClaimShapes.carried` describes. The entries where the cause
+    never came hold nought, so the exponential of minus them is one and such a cause
+    pushes nothing.
+    """
+
+    slices: int
+    """How many slices the claim's window is cut into."""
+
+    @property
+    def shape(self) -> tuple[int, int, int, int]:
+        """The shape the whole thing would have, without building it."""
+        return (self.versions, self.combos, self.readings, self.slices)
+
+    def versions_at_once(self) -> int:
+        """How many versions can be built at a time under `MOST_NUMBERS_AT_ONCE`."""
+        per_version = max(self.combos * self.readings * self.slices, 1)
+        return max(1, MOST_NUMBERS_AT_ONCE // per_version)
+
+    def version_blocks(self) -> list[tuple[int, int]]:
+        """The version ranges to read this in, each small enough to build at once."""
+        step = self.versions_at_once()
+        return [
+            (first, min(first + step, self.versions)) for first in range(0, self.versions, step)
+        ]
+
+    def between(self, first: int, last: int) -> NDArray[numpy.float64]:
+        """Build the running totals for the versions from `first` up to but not including `last`.
+
+        Args:
+            first: The first version to build.
+            last: One past the last version to build.
+
+        Returns:
+            `(last - first, combos, readings, slices)` a running total from day zero
+            to the end of each slice, the rate already multiplied through.
+        """
+        total = numpy.zeros((last - first, self.combos, self.readings, self.slices))
+        for term, (block, row) in enumerate(zip(self.blocks, self.rows, strict=True)):
+            total += self.coefficients[first:last, term][:, None, None, None] * block[row][None]
+        built: NDArray[numpy.float64] = self.rate[first:last, None, None, None] * numpy.cumsum(
+            total, axis=-1
+        )
+        return built
+
+    def whole(self) -> NDArray[numpy.float64]:
+        """Build every version at once. Only for a claim small enough that it fits."""
+        return self.between(0, self.versions)
+
+    def over_the_window(self) -> NDArray[numpy.float64]:
+        """The running total on the claim's deadline, which is the end of its last slice.
+
+        Read straight off the pieces rather than off the running total: the total to
+        the end of the last slice is simply the whole of each block added up, so
+        nothing per slice is ever built and every version is done at once.
+
+        Returns:
+            `(versions, combos, readings)`.
+        """
+        ends = numpy.zeros((self.versions, self.combos, self.readings))
+        for term, (block, row) in enumerate(zip(self.blocks, self.rows, strict=True)):
+            ends += self.coefficients[:, term][:, None, None] * block.sum(axis=-1)[row][None]
+        whole: NDArray[numpy.float64] = self.rate[:, None, None] * ends
+        return whole
+
+    def __getitem__(self, version: int) -> NDArray[numpy.float64]:
+        """One version's running totals, `(combos, readings, slices)`."""
+        one: NDArray[numpy.float64] = self.between(version, version + 1)[0]
+        return one
+
+
 @dataclass(frozen=True)
 class AddedUp:
     """Each rate added up across the window, ready to be turned into survival by one exponential.
@@ -350,14 +483,11 @@ class AddedUp:
     leak: NDArray[numpy.float64]
     """`(versions, combos, slices)` the no-cause rate, added up to the end of each slice."""
 
-    helps: Mapping[int, NDArray[numpy.float64]]
-    """Arrow -> `(versions, combos, cause times, slices)` a helping cause's rate added up.
+    helps: Mapping[int, Spread]
+    """Arrow -> a helping cause's rate added up, held as the pieces it is a sum of.
 
-    The third axis is **when its cause happened**, in the flattened layout
-    `ClaimShapes.carried` describes: `slices + 1` entries for an arrow that reads
-    only the day its cause came on, and `(slices + 1) * (slices + 1)` for one that
-    reads its cause's whole stretch. The entries where the cause never came hold
-    nought, so the exponential of minus them is one and such a cause pushes nothing.
+    It is not one array, because on a map with two arrows holding one claim back one
+    array would run to gigabytes. `Spread` says how to read it.
     """
 
 
@@ -702,10 +832,11 @@ def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
     }
 
     leak_total = numpy.zeros((versions, combos, slices))
-    help_totals = {
-        position: numpy.zeros((versions, combos, _cause_times(shapes.carried[position]), slices))
-        for position in shapes.helps
+    coefficients: list[NDArray[numpy.float64]] = []
+    help_blocks: dict[int, list[NDArray[numpy.float64]]] = {
+        position: [] for position in shapes.helps
     }
+    help_rows: list[NDArray[numpy.int64]] = []
 
     for size in range(len(held) + 1):
         for term in itertools.combinations(range(len(held)), size):
@@ -726,18 +857,31 @@ def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
             )
             spread = shapes.width[None, :] * product.mean(axis=2)
             leak_total += coefficient[:, None, None] * spread[here][None, :, :]
+            # **The version axis stops here.** Each helping arrow's block is kept as
+            # it is — nothing about a version changes it — beside the one number per
+            # version it is multiplied by. Multiplying the two out now would be the
+            # array that does not fit.
+            coefficients.append(coefficient)
+            help_rows.append(here)
             for position in shapes.helps:
                 together = product[:, None, :, :] * flat[position][None, :, :, :]
-                both = shapes.width[None, None, :] * together.mean(axis=3)
-                help_totals[position] += (
-                    coefficient[:, None, None, None] * both[here][None, :, :, :]
-                )
+                help_blocks[position].append(shapes.width[None, None, :] * together.mean(axis=3))
 
+    stacked = numpy.stack(coefficients, axis=1) if coefficients else numpy.ones((versions, 0))
     return AddedUp(
         leak=rates.leak[:, None, None] * numpy.cumsum(leak_total, axis=-1),
         helps={
-            position: rates.helps[position][:, None, None, None] * numpy.cumsum(total, axis=-1)
-            for position, total in help_totals.items()
+            position: Spread(
+                rate=rates.helps[position],
+                coefficients=stacked,
+                blocks=tuple(blocks),
+                rows=tuple(help_rows),
+                versions=versions,
+                combos=combos,
+                readings=_cause_times(shapes.carried[position]),
+                slices=slices,
+            )
+            for position, blocks in help_blocks.items()
         },
     )
 

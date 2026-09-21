@@ -14,6 +14,7 @@ from datetime import date, timedelta
 import numpy
 import pytest
 
+from katalyst.domain import states
 from katalyst.domain.belief import Belief, Beliefs
 from katalyst.domain.forward import forward_pass
 from katalyst.domain.graph import Graph
@@ -195,8 +196,8 @@ def test_one_cause_at_a_time_equals_the_full_table() -> None:
     # answer is worked out the slow way instead: every combination of the two causes'
     # arrival slices, enumerated and weighed.
     leak = added.leak[:, 0, -1]
-    first = added.helps[0][:, 0, :, -1]
-    second = added.helps[1][:, 0, :, -1]
+    first = added.helps[0].over_the_window()[:, 0, :]
+    second = added.helps[1].over_the_window()[:, 0, :]
     when_first = _given_it_happened(forward.times["first"], slices)
     when_second = _given_it_happened(forward.times["second"], slices)
 
@@ -433,3 +434,45 @@ def test_supposing_a_state_holds_it_on_from_the_start_and_never_off() -> None:
     assert float(is_true_on_its_deadline(supposed.times["ending"])[0]) > float(
         is_true_on_its_deadline(plain.times["ending"])[0]
     )
+
+
+def test_the_square_of_still_holding_chances_is_built_once_a_state(monkeypatch) -> None:
+    """A state's yes/no table re-weighs the pass; it does not run the pass again.
+
+    The square of *came on in this slice, still holding at the end of that one* is
+    the costliest thing a state asks for. A state with two causes has four
+    combinations of their truths, and its table used to be filled by running the
+    whole state pass once for each of them. This counts what is built on a map with
+    one state and two causes: one square, for the state's own times, and no more.
+    """
+    graph = _map(
+        [
+            _claim("shock", prior=0.4),
+            _claim("strike", prior=0.35),
+            _claim("opens", prior=0.5),
+            _claim("ending", prior=0.3),
+        ],
+        [
+            _arrow("shock", "opens", strength=1.4),
+            _arrow("strike", "opens", strength=-2.0),
+            _arrow("opens", "ending", strength=1.2, mode="sustain"),
+        ],
+    )
+    window = window_of(graph, DAY_ZERO, slices=5)
+    drawn = _drawn(
+        graph,
+        with_cause={"shock->opens": [0.8], "strike->opens": [0.1], "opens->ending": [0.7]},
+    )
+
+    built: list[int] = []
+    real = states._still_on_at_each_slice
+
+    def watched(*arguments, **keywords):
+        built.append(1)
+        return real(*arguments, **keywords)
+
+    monkeypatch.setattr(states, "_still_on_at_each_slice", watched)
+    forward = forward_pass(graph, window, drawn, persistence={"opens": "state"})
+
+    assert forward.table["opens"].shape == (1, 2, 2, 2)
+    assert len(built) == 1

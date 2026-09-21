@@ -49,11 +49,11 @@ from katalyst.domain.rates import (
     added_up,
     rates_of,
     shapes_of,
-    window_cut_to,
 )
 from katalyst.domain.states import (
     Times,
     as_joint,
+    holding_under_each_truth,
     is_true_on_its_deadline,
     needs_the_joint,
     on_and_off,
@@ -341,7 +341,7 @@ def _an_events_table(
     how_many = len(shapes.arrows)
     survived_leak = numpy.exp(-added.leak[:, :, -1])
     survived_help = {
-        position: numpy.exp(-added.helps[position][:, :, :, -1]) for position in shapes.helps
+        position: numpy.exp(-added.helps[position].over_the_window()) for position in shapes.helps
     }
 
     table = numpy.zeros((versions,) + (2,) * how_many)
@@ -357,55 +357,6 @@ def _an_events_table(
             not_yet = not_yet * numpy.einsum("vd,vcd->vc", reading, survived_help[position])
         where: tuple[slice | int, ...] = (slice(None), *truths)
         table[where] = 1.0 - not_yet.sum(axis=1)
-    return table
-
-
-def _a_states_table(
-    shapes: ClaimShapes,
-    rates: Rates,
-    added: AddedUp,
-    window: Window,
-    cause_times: Sequence[Times],
-    under_each_truth: Sequence[tuple[Times, Times]],
-) -> NDArray[numpy.float64]:
-    """One state's chance of holding on its deadline, for every combination of its causes.
-
-    A state's truth is not *did it happen* but *is it still holding*, so its table
-    cannot be read off the on-process alone: the whole pass is redone with each cause
-    held at false and at true. That is at most eight passes on the maps this product
-    builds, and only on a claim that is a state; an event's table costs nothing
-    beyond its own times.
-
-    Args:
-        shapes: The claim's shapes.
-        rates: The claim's rates, one column per version.
-        added: Those rates added up across the window.
-        window: The map's window.
-        cause_times: The times of each cause, in the arrow order of `shapes`. Used
-            only for their shape, since every entry is replaced.
-        under_each_truth: For each arrow, its cause's times given the cause is false
-            and given it is true.
-
-    Returns:
-        `(versions,) + (2,) * how many arrows` the chance the state is holding on its
-        deadline under each combination of its causes' truths.
-    """
-    versions = int(rates.leak.shape[0])
-    how_many = len(shapes.arrows)
-    table = numpy.zeros((versions,) + (2,) * how_many)
-    for truths in itertools.product((0, 1), repeat=how_many):
-        held = [under_each_truth[position][truths[position]] for position in range(how_many)]
-        where: tuple[slice | int, ...] = (slice(None), *truths)
-        table[where] = is_true_on_its_deadline(
-            on_and_off(
-                shapes,
-                rates,
-                added,
-                held or cause_times,
-                persistence="state",
-                joint=False,
-            )
-        )
     return table
 
 
@@ -492,9 +443,6 @@ def forward_pass(
 
         cause_times = [times[arrow.source] for arrow in arrows]
         under_each_truth = [_told_twice(one) for one in cause_times]
-        # Every claim is worked out on its own window, cut from its own deadline, so
-        # that nothing an edit cannot reach can move it. This is that window.
-        mine = window_cut_to(window.day_zero, shapes.deadline, window.slices)
 
         if supposed is not None:
             settled = _pinned_times(name, supposed, kind, window.slices, drawn.versions)
@@ -516,9 +464,7 @@ def forward_pass(
                 joint=wants_pairs,
             )
             if kind == "state":
-                happened = _a_states_table(
-                    shapes, rates, added, mine, cause_times, under_each_truth
-                )
+                happened = holding_under_each_truth(shapes, rates, added, under_each_truth)
             else:
                 happened = _an_events_table(
                     shapes,

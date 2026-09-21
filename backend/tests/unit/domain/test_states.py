@@ -8,6 +8,7 @@ one number must move in, or an ordering two must keep.
 """
 
 import ast
+import itertools
 from datetime import date
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from katalyst.domain.belief import Belief, Beliefs
 from katalyst.domain.graph import Graph
 from katalyst.domain.link import Link
 from katalyst.domain.proposition import Proposition, Resolution
-from katalyst.domain.rates import AddedUp, ClaimShapes, Rates, Window
+from katalyst.domain.rates import AddedUp, ClaimShapes, Rates, Spread, Window
 from katalyst.domain.states import (
     Times,
     as_joint,
@@ -168,13 +169,30 @@ def added_up_by_hand(
     for index in shapes.helps:
         push = shapes.carried[index]
         per_slice = width * push.reshape(-1, push.shape[-2], push.shape[-1]).mean(axis=2)
-        block = (
-            rates.helps[index][:, None, None, None] * numpy.cumsum(per_slice, axis=1)[None, None]
-        )
-        helps[index] = numpy.broadcast_to(
-            block, (versions, combinations, per_slice.shape[0], slices)
-        ).reshape(versions, combinations, *push.shape[:-2], slices)
+        helps[index] = one_block(per_slice, rates.helps[index], combinations, slices)
     return AddedUp(leak=leak, helps=helps)
+
+
+def one_block(
+    per_slice: numpy.ndarray, rate: numpy.ndarray, combinations: int, slices: int = SLICES
+) -> Spread:
+    """One helping arrow's added-up push where no arrow holds the claim back at all.
+
+    Then the expansion has one term, whose number per version is one, and every
+    combination reads the same row of it. `Spread` does the running total and
+    multiplies the rate through, so what is handed over here is the push per slice
+    and nothing else.
+    """
+    return Spread(
+        rate=rate,
+        coefficients=numpy.ones((rate.shape[0], 1)),
+        blocks=(per_slice[None],),
+        rows=(numpy.zeros(combinations, dtype=numpy.int64),),
+        versions=int(rate.shape[0]),
+        combos=combinations,
+        readings=int(per_slice.shape[0]),
+        slices=slices,
+    )
 
 
 # --- times built by hand, for a claim's causes -----------------------------
@@ -602,14 +620,8 @@ def test_arrows_that_hold_a_claim_back_are_averaged_over_their_arrival_slices():
     on_amount = width * push.mean(axis=2)
     per_slice = width[None, :] - (1.0 - rates.leaves[1][:, None, None]) * on_amount[None, :, :]
     leak = rates.leak[:, None, None] * numpy.cumsum(per_slice, axis=2)
-    helps_push = numpy.cumsum(width * push.mean(axis=2), axis=1)
-    helps = {
-        0: numpy.broadcast_to(
-            rates.helps[0][:, None, None, None] * helps_push[None, None],
-            (VERSIONS, SLICES + 1, SLICES + 1, SLICES),
-        ).copy()
-    }
-    added = AddedUp(leak=leak, helps=helps)
+    per_slice = width * push.mean(axis=2)
+    added = AddedUp(leak=leak, helps={0: one_block(per_slice, rates.helps[0], SLICES + 1)})
 
     holding_back_arrived = numpy.full((VERSIONS, SLICES + 1), 1.0 / (SLICES + 1))
     causes = [
@@ -626,9 +638,11 @@ def test_arrows_that_hold_a_claim_back_are_averaged_over_their_arrival_slices():
 
     one_at_a_time = numpy.zeros((VERSIONS, SLICES + 1))
     for arrived in range(SLICES + 1):
+        # The same claim with the holding-back arrow's arrival fixed: one combination
+        # rather than every one of them.
         just_this_one = AddedUp(
             leak=leak[:, arrived : arrived + 1, :],
-            helps={0: helps[0][:, arrived : arrived + 1, :, :]},
+            helps={0: one_block(per_slice, rates.helps[0], 1)},
         )
         pinned = numpy.zeros((VERSIONS, SLICES + 1))
         pinned[:, arrived] = 1.0
@@ -671,3 +685,89 @@ def test_every_row_of_times_is_a_chance_and_adds_to_one():
         numpy.testing.assert_allclose(
             times.spread.sum(axis=1), numpy.ones(VERSIONS), rtol=0.0, atol=1e-12
         )
+
+
+# --- a state's yes/no table, and the work it must not redo -----------------
+
+
+def a_state_with_a_helper_and_an_ender(window: Window):
+    """One state with an arrow above its own chance and one below it."""
+    push = a_push_that_keeps_going(window, reading_days(window))
+    shapes = some_shapes(window, carried={0: push, 1: push}, helps=(0,), ends=(1,))
+    rates = some_rates(leak=0.08, helps={0: 0.5}, ends={1: 0.35})
+    return shapes, rates, added_up_by_hand(shapes, rates)
+
+
+def told_twice_by_hand(shapes: ClaimShapes):
+    """For each arrow, two different sets of times for its cause: one per truth.
+
+    A yes/no table asks what the claim's chance is with a cause false and with it
+    true, so each cause's timing is re-read under both. Which two sets they are does
+    not matter to the identity below — only that they differ.
+    """
+    return [
+        (
+            times_of_an_event(0, claim=f"cause-{index}"),
+            times_of_an_event(2, claim=f"cause-{index}"),
+        )
+        for index in range(len(shapes.arrows))
+    ]
+
+
+def test_a_states_table_agrees_with_redoing_the_whole_pass():
+    """The one-pass table and a pass per combination of truths give the same numbers.
+
+    Redoing the whole state pass once per combination is what this replaced. The two
+    must agree entry for entry, with an arrow that ends the state and without one.
+    """
+    window = a_window()
+    for shapes, rates, added in (
+        a_state_with_a_helper_and_an_ender(window),
+        a_claim_with_one_helper(window),
+    ):
+        how_many = len(shapes.arrows)
+        under = told_twice_by_hand(shapes)
+        together = states.holding_under_each_truth(shapes, rates, added, under)
+
+        one_at_a_time = numpy.zeros((VERSIONS,) + (2,) * how_many)
+        for truths in itertools.product((0, 1), repeat=how_many):
+            held = [under[index][truths[index]] for index in range(how_many)]
+            one_at_a_time[(slice(None), *truths)] = is_true_on_its_deadline(
+                on_and_off(shapes, rates, added, held, persistence="state", joint=False)
+            )
+
+        assert together.shape == (VERSIONS,) + (2,) * how_many
+        numpy.testing.assert_allclose(together, one_at_a_time, rtol=0.0, atol=1e-12)
+
+
+def test_a_combination_of_truths_reweighs_work_rather_than_redoing_it(monkeypatch):
+    """The costly pieces are worked out per arrow, never per combination of truths.
+
+    Two arrows make four combinations. An arrow's exponentials depend on the arrow
+    and on nothing else, so there must be one pass per helping arrow — which averages
+    both readings of its cause against the same exponential — and one per ending
+    arrow. Not four of each.
+    """
+    window = a_window()
+    shapes, rates, added = a_state_with_a_helper_and_an_ender(window)
+    under = told_twice_by_hand(shapes)
+    assert len(shapes.arrows) == 2
+
+    helpings: list[int] = []
+    endings: list[int] = []
+    for name, tally in (
+        ("_a_helping_arrows_factors", helpings),
+        ("_survival_on_the_deadline", endings),
+    ):
+        real = getattr(states, name)
+
+        def watched(*arguments, _real=real, _tally=tally):
+            _tally.append(1)
+            return _real(*arguments)
+
+        monkeypatch.setattr(states, name, watched)
+
+    states.holding_under_each_truth(shapes, rates, added, under)
+
+    assert len(helpings) == len(shapes.helps)
+    assert len(endings) == len(shapes.ends)
