@@ -429,6 +429,13 @@ body {
   margin: 0;
 }
 
+/* A generated map keeps nothing here until it has something to say — where it
+ * came from is read in the panel now. An empty strip with a hairline above it
+ * would be a band at the foot of the screen that means nothing. */
+.map-origin:empty {
+  display: none;
+}
+
 /* What the screen says while the map is on its way, or when it could not be
  * read. A sentence naming the address, never a spinner. */
 .map-waiting {

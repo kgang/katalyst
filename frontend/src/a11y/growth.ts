@@ -70,7 +70,7 @@ export function whatChanged(was: Growth, now: Growth): string {
     const last = now.refusals[now.refusals.length - 1];
     return last === undefined
       ? ""
-      : `A proposal was refused. ${last.reasons.join(" ")} ${whatIsOpen(now)}`.trim();
+      : `A proposal was refused. ${last.reasons.join(" ")} ${whatIsOpen(now, null)}`.trim();
   }
 
   // The likelihoods landing: one event, one world, every number. It is the
@@ -85,9 +85,11 @@ export function whatChanged(was: Growth, now: Growth): string {
 
   if (now.world.claims.length > was.world.claims.length) {
     const arrived = now.world.claims[now.world.claims.length - 1];
+    const many = now.world.claims.length;
     return (
       `A claim arrived: "${inFewWords(arrived?.claim ?? "")}". ` +
-      `${asClaims(now.world.claims.length)} so far. ${whatIsOpen(now)}`
+      `${asCount(many)} ${many === 1 ? "claim" : "claims"} so far. ` +
+      `${whatIsOpen(now, arrived?.id ?? null)}`
     ).trim();
   }
 
@@ -121,15 +123,26 @@ export function whatChanged(was: Growth, now: Growth): string {
  * server's business and is not on the wire; the browser can count what it was
  * sent and nothing else.
  *
+ * **And it says *it* rather than repeating a claim just quoted.** The claim that
+ * has this moment arrived is usually the first thing still open, and a sentence
+ * that names it twice in twelve words reads as a stutter.
+ *
  * @param now Everything known after the event.
- * @returns The sentence, or an empty one when nothing is open — which is what a
+ * @param justArrived The claim this event brought, when it brought one, so the
+ *   sentence can point back at it instead of quoting it again.
+ * @returns The sentence, or the one that says nothing is open — which is what a
  *   map has just before the likelihoods land.
  */
-function whatIsOpen(now: Growth): string {
+function whatIsOpen(now: Growth, justArrived: string | null): string {
   const open = now.skeletons;
   const first = open[0];
   if (first === undefined) {
     return "No place is left open.";
+  }
+  const others = open.length - 1;
+  const rest = others === 0 ? "" : ` and ${inWords(others)} ${others === 1 ? "other" : "others"}`;
+  if (first.after !== null && first.after === justArrived) {
+    return `Working on what follows from it${rest}.`;
   }
   // The rectangle carries the claim it hangs off; the claim's own words are on
   // the map. The first rectangle of all hangs off nothing and carries the
@@ -138,8 +151,6 @@ function whatIsOpen(now: Growth): string {
     first.after === null
       ? first.words
       : (now.world.claims.find((claim) => claim.id === first.after)?.claim ?? first.words);
-  const others = open.length - 1;
-  const rest = others === 0 ? "" : ` and ${inWords(others)} ${others === 1 ? "other" : "others"}`;
   return `Working on what follows from "${inFewWords(words)}"${rest}.`;
 }
 

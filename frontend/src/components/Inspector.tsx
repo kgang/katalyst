@@ -998,10 +998,10 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
  */
 function RunDetails({
   detail,
-  numbersLanded,
+  theMapsOwn,
 }: {
   detail: GenerationDetail;
-  numbersLanded: boolean;
+  theMapsOwn: string | null;
 }) {
   const { generationId, seed } = detail;
   return (
@@ -1017,10 +1017,20 @@ function RunDetails({
             to sixteen. */}
         <dd className="inspector__mono">{seed ?? NOT_YET}</dd>
       </dl>
-      <p className="inspector__reason">{NOTHING_HERE_WAS_TYPED_IN}</p>
-      {/* True while the map is being built and false the moment the numbers
-          land, so it is printed for exactly that long. */}
-      {numbersLanded ? null : <p className="inspector__reason">{NO_LIKELIHOOD_YET}</p>}
+      {/* While the map is being built these two are the whole of what is true
+          about where it came from. The moment the engine hands its own world
+          over it also hands over its own origin sentence — which says the same
+          thing and more, at the seed and over the versions it really used — so
+          that one is printed instead. It is never printed at the foot of the
+          screen as well: one account, in one place. */}
+      {theMapsOwn === null ? (
+        <>
+          <p className="inspector__reason">{NOTHING_HERE_WAS_TYPED_IN}</p>
+          <p className="inspector__reason">{NO_LIKELIHOOD_YET}</p>
+        </>
+      ) : (
+        <p className="inspector__reason">{theMapsOwn}</p>
+      )}
     </Section>
   );
 }
@@ -1045,7 +1055,10 @@ export function Inspector({
           run — except while the panel is already reading that run out, which
           says the same three things at more length. */}
       {generation === undefined || run !== undefined ? null : (
-        <RunDetails detail={generation} numbersLanded={world.versions !== undefined} />
+        <RunDetails
+          detail={generation}
+          theMapsOwn={world.versions === undefined ? null : world.origin}
+        />
       )}
       {run !== undefined ? (
         <GenerationDetailPanel detail={run} />

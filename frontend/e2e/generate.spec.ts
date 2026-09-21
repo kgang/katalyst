@@ -245,16 +245,18 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
 
   // **The run's own name is the exception, and it is deliberate.** Somebody has
   // to be able to ask for this answer again — the map, the seed and the working
-  // — and the working is asked for by the generation's name. It is printed once,
-  // in *Run details* in the panel, beside the route and the seed, and nowhere
-  // else. It moved there from the foot of the screen on 2026-09-21 (R16), where
-  // it stood in a strip of prose that also claimed, over an empty map, that
-  // every claim on it had already arrived.
+  // — and the working is asked for by the generation's name. So it is on the
+  // screen, in *Run details* in the panel beside the route and the seed, and it
+  // is **the only identifier anywhere on it**: every twenty-six-character name
+  // the page shows is that one name. It moved into the panel on 2026-09-21
+  // (R16), from a strip of prose at the foot that also claimed, over an empty
+  // map, that every claim on it had already arrived.
   const names =
     ((await page.locator(".map-body").textContent()) ?? "").match(
       /\b01[0-9A-HJKMNP-TV-Z]{24}\b/g,
     ) ?? [];
-  expect(names).toHaveLength(1);
+  expect(names.length).toBeGreaterThan(0);
+  expect(new Set(names).size).toBe(1);
   await expect(page.locator(".inspector")).toContainText("Run details");
   await expect(page.locator(".inspector")).toContainText("/api/generate");
 

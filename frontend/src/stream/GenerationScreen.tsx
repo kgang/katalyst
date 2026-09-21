@@ -493,15 +493,13 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
       origin={
         <>
           {/* **Where this map came from is not here any more.** The route, the
-              run's own name and the seed are read in *Run details*, in the
-              panel — R16, and the reason it came forward is that the line that
-              stood here said *"Every claim and arrow on this map arrived
-              from…"* from the run's first event, over a map with nothing on it
-              yet. Once the likelihoods land the engine hands over its own
-              origin sentence, and that one is true, so it is printed. */}
-          {growth.world.versions === undefined ? null : (
-            <p className="map-origin__line">{growth.world.origin}</p>
-          )}
+              run's own name, the seed and the map's own origin sentence are all
+              read in *Run details*, in the panel — R16, brought forward. The
+              line that stood here said *"Every claim and arrow on this map
+              arrived from…"* from the run's first event, which is to say over a
+              map with nothing on it yet, and it was the third of three stacked
+              strips of prose at the foot of a screen that could not say whether
+              anything was happening at all. */}
           {replaying ? (
             <p className="map-origin__line">
               {replaySentence({
