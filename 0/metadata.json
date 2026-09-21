@@ -1,0 +1,50 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M32GR4GSBZN3ZE3H3S6CS9E3",
+  "session_id": "b3719e32-fae2-4866-b0f9-fedf04e7fad7",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-21T17:38:18.771518Z",
+  "branch": "adr/05-sound-numbers",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-1",
+  "turn_id": "13b635cf7d1c",
+  "checkpoint_transcript_start": 759,
+  "transcript_lines_at_start": 759,
+  "compact_transcript_start": 135,
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 22984,
+    "cache_read_tokens": 3209145,
+    "output_tokens": 13208,
+    "api_call_count": 12,
+    "subagent_tokens": {
+      "input_tokens": 670,
+      "cache_creation_tokens": 1481773,
+      "cache_read_tokens": 57799216,
+      "output_tokens": 252609,
+      "api_call_count": 335
+    }
+  },
+  "session_metrics": {
+    "turn_count": 7
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
