@@ -15,13 +15,22 @@
  * reader who cannot see the screen has no other way to know that the
  * likelihoods are on their way rather than missing.
  *
- * On the stored example's strike branch the two lines are, word for word:
+ * On the stored example's strike branch the first line is, word for word:
  *
  * > Branch created. One claim added, six claims your edit can reach, one
  * > supposition retracted. The numbers are on their way from the engine.
  *
- * > Branch created. One claim added, six claims moved, one supposition
- * > retracted.
+ * Every count in it is a fact about the branch and about which arrows lead
+ * where, so it reads the same on every machine and on every day. The second
+ * line swaps the middle clause for the engine's own count of the claims it
+ * called shifted:
+ *
+ * > Branch created. One claim added, N claims moved, one supposition retracted.
+ *
+ * **N is not written down here, because nobody here worked it out.** It is how
+ * many of the `· strike · what happened` lines in `docs/worked-numbers.txt` read
+ * `shifted`, and it moves on the day the arithmetic does — as it did when every
+ * arrow's push was first drawn as wide as its backing says.
  */
 
 import type { DiffView, WorldView } from "../world";

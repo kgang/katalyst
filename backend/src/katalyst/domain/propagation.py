@@ -13,8 +13,9 @@ and a plain sentence for anything the reader should be told.
   inside the likelihood: it is the share of worlds in which the claim came out
   true.
 * *How sure we are of the numbers we put in.* Every prior on the map was
-  elicited, and a different but equally defensible set of priors would give a
-  different answer. **That** is the range.
+  elicited, and **every arrow's push was written down by somebody with more or
+  less to go on**. A different but equally defensible set of those numbers would
+  give a different answer. **That** is the range.
 
 So the outer loop draws 2 000 **versions of the map** — each one a coherent set
 of numbers this model would have stood behind — and the inner loop runs 8
@@ -31,7 +32,17 @@ volatile".
   and a test freezes every prior at a point and demands a band of no width.
 - Never let the stream that picks the versions depend on the branch. A base world
   and a branch world built from one seed must try the *same* 2 000 versions, or
-  every comparison between them is the user's edit plus a wash of noise.
+  every comparison between them is the user's edit plus a wash of noise. Each
+  claim's prior and each arrow's push get a stream of their own, keyed by the seed
+  and by that thing's own identifier, so adding a claim or an arrow cannot shift
+  what any other one drew.
+- Never let a drawn push change the *shape* of the map. Which arrows oppose a
+  supposition, and the day one of them undermines it, are read off the strength
+  the map states — the same answer in every version, because a retraction is one
+  record on one world and cannot be true in version 7 and false in version 8.
+  A drawn push decides only how hard that arrow shoves inside its own version.
+- Never store how wide an arrow's push is. It is derived from where the arrow came
+  from, every time, and there is no `strength_lo` and no `strength_hi`.
 - Never model a supposition as a large baseline the arrows argue with. While a
   supposition holds the claim is true in **every** draw, and the tile shows a word
   where a number would mislead.
@@ -62,7 +73,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from katalyst.domain.belief import Belief
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import BranchId, LinkId, PropositionId
-from katalyst.domain.link import Link
+from katalyst.domain.link import Link, Provenance
 from katalyst.domain.patch import Assignment
 from katalyst.domain.proposition import Proposition
 from katalyst.domain.validity import _name_of
@@ -99,10 +110,73 @@ arrived yet, so the claim reads its own prior again.
 """
 
 PARAMS_STREAM = 1
-"""Which stream of random numbers picks the versions of the map. Never sees the branch."""
+"""Which stream of random numbers picks each claim's prior. Never sees the branch."""
 
 WORLDS_STREAM = 2
 """Which stream of random numbers rolls the dice inside one version."""
+
+STRENGTHS_STREAM = 3
+"""Which stream of random numbers picks each arrow's push. Never sees the branch.
+
+A stream of its own, keyed by the arrow's own identifier, for the same reason the
+priors have one: adding an arrow must not shift what any other arrow drew, or two
+worlds of one map would stop agreeing about a claim neither of them touched.
+"""
+
+PROVENANCE_SPREAD: Mapping[Provenance, float] = MappingProxyType(
+    {
+        "documented": 0.15,
+        "historical": 0.15,
+        "market_implied": 0.15,
+        "argued": 0.40,
+        "user": 0.40,
+        "simulated": 0.50,
+        "asserted": 0.60,
+    }
+)
+"""How unsure we are of an arrow's push, read off where that arrow came from.
+
+**"How well-backed is this" becomes "how wide is this", with nobody asked a second
+question.** An arrow's `provenance` is a receipt our own pipeline writes, never
+something a model claims for itself, so it is the one thing on an arrow that
+already says how much there was to go on. Each of the versions of the map draws
+every arrow's push from a bell curve centred on the push the map states, this wide
+— measured in the same log-odds the push itself is written in, so a spread of
+`0.40` on a push of `1.6` is four tenths of a log-odds unit and not four tenths of
+the push.
+
+The three words that mean *somebody fetched something* are narrow and equal:
+`documented` (the search tool returned a page this arrow cites), `historical` (a
+study of past cases), `market_implied` (read off a live price). `argued` and
+`user` are a stated mechanism and a person's own judgement. `simulated` is a
+probe's output. `asserted` is a sentence with no mechanism in it, and it is the
+widest for exactly that reason.
+
+**A generated map's arrows are only ever `documented` or `argued`.** The accept
+step writes `documented` when the search returned an address the arrow cites and
+`argued` otherwise, and the map's own rules refuse an arrow with no mechanism at
+all — so no arrow a generation produces is ever `asserted`. The other four words
+are written by somebody else: a stored example, a person, a price adapter, a
+probe.
+
+**There is no `strength_lo` and no `strength_hi`, now or ever** (Kent, decision
+record 0014). The spread is derived from the receipt every time it is needed; a
+stored width would be a second number about one arrow, and the two would drift.
+
+Not to be confused with `PROVENANCE_WEIGHT` in `diff.py`, which turns the same
+receipt into *how well-backed a route is* for the change list's ranking. Two
+questions, two tables: one widens a band, the other ranks a row. Merging them
+would make a well-backed arrow's rank depend on how sure we are of its number.
+"""
+
+NO_SPREAD: Mapping[Provenance, float] = MappingProxyType(dict.fromkeys(PROVENANCE_SPREAD, 0.0))
+"""Every arrow's push held at exactly what the map states.
+
+Not how the engine runs, and not reachable through `propagate`. It exists so that
+"the band is not the coin flips" can be **checked** rather than asserted: freeze
+every prior at a point, hold every push at its stated value, and a band of any
+width at all is the machine talking about itself.
+"""
 
 NINETIETH_PERCENTILE = 1.2816
 """How many standard deviations out a bell curve's 10th and 90th percentiles sit."""
@@ -131,6 +205,32 @@ NOTHING_ADDED: Mapping[LinkId, int] = MappingProxyType({})
 
 LOUD_STRENGTH = 5.0
 """A push beyond this is roughly 1% to 99% on a coin flip, and is worth a second look."""
+
+
+def _push_as_written(strength: float) -> str:
+    """Write how hard an arrow pushes, the way this product writes every push.
+
+    One place after the point, and always with its sign, because a push's sign is
+    half of what it says: `+0.9` takes the claim at the arrow's head toward coming
+    true and `-2.4` takes it away. Both figures are printed even when the second is
+    a nought, so `+2.0` does not read as a number somebody measured more loosely
+    than its neighbours.
+
+    This is deliberately **not** the rule for a likelihood. A likelihood runs from
+    0 to 1 and is written `.40` or `<.01`; a push runs from minus infinity to plus
+    infinity on the log-odds scale and has no such bounds, so sending one through
+    the likelihood rule would print `>.99` for a push of 5.2 — a sentence that says
+    the opposite of the truth. Two quantities, two rules, and each says what it
+    means.
+
+    Args:
+        strength: How hard an arrow pushes, on the log-odds scale.
+
+    Returns:
+        The push as text: `+0.9`, `-2.4`, `+5.2`.
+    """
+    return f"{strength:+.1f}"
+
 
 RANGE_BINS = 20
 """How many groups the versions are sorted into when working out where a band's width comes from."""
@@ -273,7 +373,9 @@ class World(BaseModel):
         default_factory=dict,
         description=(
             "How much of each claim's band comes from not being sure of each claim's "
-            "prior: range_shares[target][source]. Nothing on screen reads it yet; it is "
+            "prior: range_shares[target][source]. These do not add up to the whole band, "
+            "and are not meant to: a version draws every arrow's push as well, and what "
+            "the pushes explain is in no entry here. Nothing on screen reads it yet; it is "
             "carried because the sample it comes from is thrown away otherwise."
         ),
     )
@@ -427,8 +529,50 @@ def propagate(
             does not account for. The one thing this file raises for, and why is in
             `_retractions`.
     """
+    return _propagated(
+        graph,
+        assignments,
+        as_of=as_of,
+        seed=seed,
+        versions=versions,
+        worlds=worlds,
+        introduced_by=introduced_by,
+        spreads=PROVENANCE_SPREAD,
+    )
+
+
+def _propagated(
+    graph: Graph,
+    assignments: tuple[Assignment, ...],
+    *,
+    as_of: date,
+    seed: int,
+    versions: int,
+    worlds: int,
+    introduced_by: Mapping[LinkId, int],
+    spreads: Mapping[Provenance, float],
+) -> World:
+    """Work a map through, with the spread on the arrows' pushes handed in.
+
+    The body of `propagate`, with the one thing `propagate` never lets a caller
+    choose. Nothing that ships calls this; `_propagate_with_no_spread` below does,
+    and says why.
+
+    Args:
+        graph: The map a fold left behind.
+        assignments: Every value that fold fixed, in order.
+        as_of: Day zero.
+        seed: The one number every draw comes from.
+        versions: The outer loop.
+        worlds: The inner loop.
+        introduced_by: Which edit added each arrow.
+        spreads: How wide each kind of arrow's push is drawn.
+
+    Returns:
+        One world.
+    """
     setup = _prepare(graph, assignments, as_of)
-    sample = _draw(setup, seed=seed, versions=versions, worlds=worlds)
+    sample = _draw(setup, seed=seed, versions=versions, worlds=worlds, spreads=spreads)
     return _world_from(
         graph,
         assignments,
@@ -438,6 +582,54 @@ def propagate(
         seed=seed,
         versions=versions,
         worlds=worlds,
+    )
+
+
+def _propagate_with_no_spread(
+    graph: Graph,
+    assignments: tuple[Assignment, ...],
+    *,
+    as_of: date,
+    seed: int,
+    versions: int,
+    worlds: int,
+) -> World:
+    """The same world with every arrow's push held at exactly what the map states.
+
+    Not how the engine runs and not reachable through `propagate`, for the same
+    reason `_versions_on_every_day` is not: it exists so that a promise can be
+    **checked** rather than asserted. Hold every push at its stated value, freeze
+    every prior at a point, and there is nothing uncertain anywhere on the map —
+    so any band left is the machine reporting its own wobble, which is the single
+    most likely way to get this engine wrong.
+
+    It is deliberately **not** an argument on `propagate`. A world carries only the
+    map, the branch and the seed, and `versions_of` rebuilds its version-by-version
+    numbers from those three — so a world built with a different spread table could
+    not be rebuilt, and every comparison against it would be quietly wrong.
+    `test_band_is_not_sampling_noise` and `test_range_matches_analytic_first_order_on_fixture`
+    are the only callers.
+
+    Args:
+        graph: The map to work through.
+        assignments: Every value the branch's edits fixed.
+        as_of: Day zero.
+        seed: The one number every draw comes from.
+        versions: The outer loop.
+        worlds: The inner loop.
+
+    Returns:
+        One world, in which no arrow's push varies between versions.
+    """
+    return _propagated(
+        graph,
+        assignments,
+        as_of=as_of,
+        seed=seed,
+        versions=versions,
+        worlds=worlds,
+        introduced_by=NOTHING_ADDED,
+        spreads=NO_SPREAD,
     )
 
 
@@ -458,7 +650,13 @@ def versions_of(world: World) -> Versions:
         on each day.
     """
     setup = _prepare(world.graph, world.assignments, world.day_zero)
-    sample = _draw(setup, seed=world.seed, versions=world.versions, worlds=world.worlds)
+    sample = _draw(
+        setup,
+        seed=world.seed,
+        versions=world.versions,
+        worlds=world.worlds,
+        spreads=PROVENANCE_SPREAD,
+    )
     return _versions_from(setup, sample)
 
 
@@ -480,7 +678,13 @@ def _versions_on_every_day(world: World) -> Versions:
         The version-by-version numbers, one column per day of the window.
     """
     setup = _prepare(world.graph, world.assignments, world.day_zero, every_day=True)
-    sample = _draw(setup, seed=world.seed, versions=world.versions, worlds=world.worlds)
+    sample = _draw(
+        setup,
+        seed=world.seed,
+        versions=world.versions,
+        worlds=world.worlds,
+        spreads=PROVENANCE_SPREAD,
+    )
     return _versions_from(setup, sample)
 
 
@@ -1146,9 +1350,9 @@ def _warnings_about(
         ends = f"from {_name_of(named, link.source)} to {_name_of(named, link.target)}"
         if abs(link.strength) > LOUD_STRENGTH:
             said.append(
-                f"The arrow {ends} pushes by {link.strength}, which is past the point where a "
-                "coin flip becomes a near certainty. The map is still legal; the number is "
-                "worth a second look."
+                f"The arrow {ends} pushes by {_push_as_written(link.strength)}, which is past "
+                "the point where a coin flip becomes a near certainty. The map is still "
+                "legal; the number is worth a second look."
             )
     if days + 1 > SERIES_CAP:
         said.append(
@@ -1167,21 +1371,25 @@ class _Sample:
     """What the two loops produced, before any of it is turned into a world."""
 
     priors: Mapping[PropositionId, Numbers]
+    strengths: Mapping[LinkId, Numbers]
     likelihood: Mapping[PropositionId, Numbers]
     inner_spread: Mapping[PropositionId, Numbers]
     weights: Mapping[PropositionId, Numbers]
     survival: float
 
 
-def _claim_key(identifier: PropositionId) -> int:
-    """Turn a claim's identifier into a number, the same one on every machine.
+def _stream_key(identifier: str) -> int:
+    """Turn one thing's identifier into a number, the same one on every machine.
+
+    Used for a claim and for an arrow alike: each gets a stream of random numbers
+    of its own, and this is what picks which stream.
 
     Python's own hashing is stirred differently in every process, which would make
     a world depend on when it was computed. This does not: the same identifier
     always gives the same number, today and next week, here and in a container.
 
     Args:
-        identifier: The claim's identifier.
+        identifier: The claim's or the arrow's identifier.
 
     Returns:
         A number standing for that identifier.
@@ -1316,7 +1524,7 @@ def _version_priors(claim: Proposition, seed: int, versions: int) -> Numbers:
     Returns:
         One likelihood per version.
     """
-    drawer = numpy.random.default_rng([seed, PARAMS_STREAM, _claim_key(claim.id)])
+    drawer = numpy.random.default_rng([seed, PARAMS_STREAM, _stream_key(claim.id)])
     strata = (drawer.permutation(versions) + drawer.random(versions)) / versions
     steps = _standard_normal_quantile(strata)
     below, above = _fitted_halves(claim.prior)
@@ -1324,7 +1532,48 @@ def _version_priors(claim: Proposition, seed: int, versions: int) -> Numbers:
     return _likelihood_of(middle + steps * numpy.where(steps < 0.0, below, above))
 
 
-def _draw(setup: _Setup, *, seed: int, versions: int, worlds: int) -> _Sample:
+def _version_strengths(
+    arrow: Link, seed: int, versions: int, spreads: Mapping[Provenance, float]
+) -> Numbers:
+    """Draw one push per version for one arrow, as wide as where it came from says.
+
+    The same stratified draw the priors get — spread evenly over the curve rather
+    than left to clump — and, like theirs, the numbers come from the seed and the
+    arrow's **own** identifier and from nothing else. So adding an arrow cannot
+    shift what another arrow drew, and version 7 of a base world and version 7 of
+    a branch world push exactly as hard as each other along every arrow the two
+    maps share.
+
+    The draw is on the log-odds scale, because that is the scale a push is already
+    written in: a spread of four tenths is four tenths of a log-odds unit, whatever
+    the push itself happens to be. A weakly-backed push can therefore come out the
+    other way round in some versions, and that is the honest reading — *we do not
+    know which way this one goes* is most of what `asserted` means.
+
+    Args:
+        arrow: The arrow whose push is being drawn.
+        seed: The one number every draw comes from.
+        versions: How many versions to draw.
+        spreads: How wide each kind of arrow's push is drawn.
+
+    Returns:
+        One push per version.
+    """
+    drawer = numpy.random.default_rng([seed, STRENGTHS_STREAM, _stream_key(arrow.id)])
+    strata = (drawer.permutation(versions) + drawer.random(versions)) / versions
+    steps = _standard_normal_quantile(strata)
+    drawn: Numbers = arrow.strength + steps * spreads[arrow.provenance]
+    return drawn
+
+
+def _draw(
+    setup: _Setup,
+    *,
+    seed: int,
+    versions: int,
+    worlds: int,
+    spreads: Mapping[Provenance, float],
+) -> _Sample:
     """Run the two loops: every version of the map, and every world under each.
 
     Each claim is worked out causes-first, for every draw and every day at once.
@@ -1344,18 +1593,25 @@ def _draw(setup: _Setup, *, seed: int, versions: int, worlds: int) -> _Sample:
         seed: The one number every draw comes from.
         versions: The outer loop.
         worlds: The inner loop.
+        spreads: How wide each kind of arrow's push is drawn.
 
     Returns:
-        What each version drew for each prior, what each version answered for each
-        claim on each day, how much the worlds inside a version disagreed, how much
-        each version counts, and what share of worlds survived.
+        What each version drew for each prior and for each arrow's push, what each
+        version answered for each claim on each day, how much the worlds inside a
+        version disagreed, how much each version counts, and what share of worlds
+        survived.
     """
     priors = {
         claim_id: _version_priors(setup.claims[claim_id], seed, versions)
         for claim_id in setup.order
     }
+    strengths = {
+        arrow.id: _version_strengths(arrow, seed, versions, spreads)
+        for arrows in setup.arrows_into.values()
+        for arrow in arrows
+    }
     coins = {
-        claim_id: numpy.random.default_rng([seed, WORLDS_STREAM, _claim_key(claim_id)])
+        claim_id: numpy.random.default_rng([seed, WORLDS_STREAM, _stream_key(claim_id)])
         .random((versions, worlds))
         .astype(DRAWING)
         for claim_id in setup.order
@@ -1363,8 +1619,12 @@ def _draw(setup: _Setup, *, seed: int, versions: int, worlds: int) -> _Sample:
 
     alive: Mapping[PropositionId, Flags] = {}
     if setup.observation_reach:
-        _, _, alive = _one_pass(setup, priors, coins, versions, worlds, alive, reduce=False)
-    likelihood, inner, _ = _one_pass(setup, priors, coins, versions, worlds, alive, reduce=True)
+        _, _, alive = _one_pass(
+            setup, priors, strengths, coins, versions, worlds, alive, reduce=False
+        )
+    likelihood, inner, _ = _one_pass(
+        setup, priors, strengths, coins, versions, worlds, alive, reduce=True
+    )
 
     # How much each version counts, **per claim**: the share of its worlds that
     # survived the observations that are evidence about that claim, and no others.
@@ -1379,6 +1639,7 @@ def _draw(setup: _Setup, *, seed: int, versions: int, worlds: int) -> _Sample:
         counting[claim_id] = kept.astype(numpy.float64) / worlds
     return _Sample(
         priors=priors,
+        strengths=MappingProxyType(strengths),
         likelihood=likelihood,
         inner_spread=inner,
         weights=MappingProxyType(counting),
@@ -1389,6 +1650,7 @@ def _draw(setup: _Setup, *, seed: int, versions: int, worlds: int) -> _Sample:
 def _one_pass(
     setup: _Setup,
     priors: Mapping[PropositionId, Numbers],
+    strengths: Mapping[LinkId, Numbers],
     coins: Mapping[PropositionId, Draws],
     versions: int,
     worlds: int,
@@ -1401,6 +1663,7 @@ def _one_pass(
     Args:
         setup: Everything chance has no say in.
         priors: What each version drew for each claim's prior.
+        strengths: What each version drew for each arrow's push.
         coins: One number per claim per world, held the same on every day. It is
             also the same in a base world and a branch world, so the two can be
             compared draw by draw and the dice cancel out of the comparison.
@@ -1427,11 +1690,16 @@ def _one_pass(
         baseline = _log_odds(priors[claim_id]).astype(DRAWING)
         total = numpy.broadcast_to(baseline[:, None, None], shape).astype(DRAWING)
         for arrow in setup.arrows_into[claim_id]:
-            push = (arrow.strength * setup.shape_rows[arrow.id]).astype(DRAWING)
+            # One push per version per day: each version drew its own strength for
+            # this arrow, as wide as where the arrow came from says, and the shape
+            # row says how much of that push has arrived on each day.
+            push = (strengths[arrow.id][:, None] * setup.shape_rows[arrow.id][None, :]).astype(
+                DRAWING
+            )
             if arrow.mode == "sustain":
-                total += push * truth[arrow.source]
+                total += push[:, None, :] * truth[arrow.source]
             else:
-                total += push * fired[arrow.source][:, :, None]
+                total += push[:, None, :] * fired[arrow.source][:, :, None]
         answer = _draw_likelihood_of(total)
         # One number per claim per world, held the same on every day of the
         # window. A world is one coherent draw, and a claim that flickered true,
@@ -1703,6 +1971,13 @@ def _range_shares(
     those group averages explain. That share is what a later stack turns into
     "where would more homework pay?" — it is worked out here because the sample it
     comes from is thrown away otherwise.
+
+    **The shares do not add up to the whole band, and must never be presented as
+    though they did.** A version draws every arrow's push as well as every prior,
+    so part of every band is the arrows, and this answers about the priors only.
+    On the shipped example B's seven shares total about seven tenths of its band;
+    the rest is the arrows. Asking the same question of the arrows would be the
+    same six lines over `sample.strengths`, and nothing needs the answer yet.
 
     Args:
         setup: Everything chance has no say in.

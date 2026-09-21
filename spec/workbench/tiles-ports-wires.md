@@ -116,14 +116,16 @@ All four differ in outline alone, so all four survive a greyscale screenshot and
 
 ### The belief chips
 
-The three voices are stored and drawn separately and **never averaged** — INV-11, the product rule that says no code path merges them. If the model says `.61` and the market says `.48`, the gap is the thing worth trading, and `.545` is a number nobody holds.
+The three voices are stored and drawn separately and **never averaged** — INV-11, the product rule that says no code path merges them. If the model says `.61` and the market says `.52`, the gap is the thing worth trading, and `.565` is a number nobody holds.
+
+**The chip drawn below belongs to no claim on this map.** `.61 (.45–.74)` is the rounding example the browser's own chip test is written against, and the market beside it is made up to go with it. M1, the Polymarket contract, is the real tradeable ending on this map and reads its own numbers at B2 below, where the gap between the model and the venue is a good deal narrower than this one. An illustration that borrowed M1's quote read as M1 and contradicted B2, which is how it was found.
 
 **A chip is three stacked lines**: the owner, then the number, then the range beneath it.
 
 ```
 model          user           market
-.61            —              .48
-.45–.74                       .45–.52
+.61            —              .52
+.45–.74                       .49–.55
 ```
 
 Stacked, because three numbers and three ranges strung along one line of a 280-pixel tile is a row of digits nobody parses. The one-line form `.61 (.45–.74)` is still the canonical spelling and is used everywhere the chip is not: in prose, in the outline view, and as the chip's own accessible name, so a screen reader hears one phrase rather than three fragments.
@@ -258,7 +260,7 @@ The chip at the middle of a wire shows the **conditional likelihood**: the targe
 
 That number is **not computed here and is not on the world.** It is computed lazily by the engine, one arrow at a time, because computing every one of them costs a whole extra propagation per arrow. The canvas asks for it when a wire is hovered or selected, and caches the answer.
 
-**Until it has one — and always, in this stack, because the route does not exist yet — the chip reads the arrow's push back in words**, from data already on the link:
+**Until the answer arrives — and wherever no engine can be reached — the chip reads the arrow's push back in words**, from data already on the link:
 
 ```
 +1.6 · a strong push toward
@@ -308,7 +310,11 @@ The chips are the whole argument in one row: the model says `.35`, the user said
 
 ### B2 — a tradeable ending, and the edge
 
-M1 draws with a ticket-stub bottom edge. Its model chip reads `.61` over `.45–.74` and its market chip `.48` over `.45–.52`; the user slot is an em dash inviting a number. The 13 points between the model and the market is the edge somebody would trade — shown as two chips side by side and never as one number, because the moment they are merged the reason for the screen is gone. The difference itself is named and computed on the thesis card, in a much later stack, and labelled a difference rather than a belief.
+M1 draws with a ticket-stub bottom edge. Read from the fixture, as this screenshot reads it, its model chip is the claim's stated prior — `.40` over `.28–.55` — and its market chip is the venue's quote, `.48` over `.45–.52`; the user slot is an em dash inviting a number. Eight points apart.
+
+**Say which source a number came from before calling the gap an edge.** The model's half is a number nothing has worked through the map yet, so the gap is not yet the edge somebody would trade. Run the engine over this map and the model chip becomes the reading on the line named `M1 · base · reading` in [`../../docs/worked-numbers.txt`](../../docs/worked-numbers.txt) — the one generated file that owns every computed number this example quotes — which sits closer to the market's quote than the prior does. [`inspector.md`](inspector.md) B1 says the same thing at more length; the two chapters are describing one tile and must agree.
+
+Either way it is two chips side by side and never one number, because the moment they are merged the reason for the screen is gone. The difference itself is named and computed on the thesis card, in a much later stack, and labelled a difference rather than a belief.
 
 ### B3 — three kinds of absence, in one screenshot
 
@@ -355,7 +361,7 @@ H has three arrows leaving it. Two of them — to B and to N1 — leave from `ou
 
 ## INVARIANTS
 
-Each is *for all inputs of this kind, this statement holds*, and each names what checks it: a **component test** under `frontend/src/**/__tests__/`, or a numbered line of the **visual review checklist** in [`README.md`](README.md) — the things the coordinator looks for on every screenshot. A checklist line is a checkable thing; it is checked by a person.
+Each is *for all inputs of this kind, this statement holds*, and each names what checks it: a **component test** under `frontend/src/**/__tests__/`, or a named line of the **visual review checklist** in [`README.md`](README.md) — `VR1` to `VR13`, the things the coordinator looks for on every screenshot. A checklist line is a checkable thing; it is checked by a person.
 
 Local numbers in this part are `INV-workbench.<n>`. This chapter holds **1 – 12**; [`color-motion-type.md`](color-motion-type.md) holds 13 – 19.
 
@@ -364,7 +370,7 @@ Local numbers in this part are `INV-workbench.<n>`. This chapter holds **1 – 1
 For every tile rendered from any map: its width is exactly 280 px; its height is computed from its content, lands between 152 and 320 px, and is a multiple of 8; every margin and gap is a value from the spacing scale; its border is one hairline at `--hairline`; and it casts no shadow. The height is never read back from the rendered element, so the same input always gives the same number.
 
 - **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_is_280_wide_and_on_the_eight_pixel_grid` and `frontend/src/graph/__tests__/layout.test.ts` › `test_tile_height_is_content_fit_within_152_and_320`.
-- **Also:** visual review checklist line 8 — measure the tile, do not eyeball it.
+- **Also:** visual review checklist `VR8` — measure the tile, do not eyeball it.
 
 ### INV-workbench.2 — The claim is never cut mid-word
 
@@ -383,7 +389,7 @@ For every tile: the rendered regions are exactly those in the six-things table, 
 For every belief rendered in a chip: the likelihood and both ends of its range show at most two significant figures; the range is present; and the chip never prints `1.0` or `.0` — those print as `>.99` and `<.01`.
 
 - **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range` and `test_chip_never_prints_a_certainty`. This is decision record 0005's promised frontend rendering test, and it is the one test that holds the honesty requirement up — NFR-1: *every belief renders at two significant figures with its interval, never `.347`.*
-- **Also:** visual review checklist line 4 — is any number on screen showing more than two significant figures, or missing its range?
+- **Also:** visual review checklist `VR4` — is any number on screen showing more than two significant figures, or missing its range?
 
 ### INV-workbench.5 — Every number says where it came from, and every absence says why
 
@@ -393,7 +399,7 @@ Two statements, one subject: a chip never leaves a reader guessing what it is lo
 - For every **model chip that has a number**: it renders the computed label and hover sentence exactly when the world carries `versions`, and the stated label and hover sentence exactly when it does not. There is no input for which it claims a computation over a number nothing computed.
 
 - **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_every_absence_renders_words_and_a_reason` and `test_a_computed_chip_says_it_is_uncalibrated`.
-- **Also:** visual review checklist line 5 — is there a number nobody computed, an empty slot filled in rather than left as an absence with a reason, or a number whose origin cannot be named in one click?
+- **Also:** visual review checklist `VR5` — is there a number nobody computed, an empty slot filled in rather than left as an absence with a reason, or a number whose origin cannot be named in one click?
 
 ### INV-workbench.6 — Three voices, never merged *(refines INV-11)*
 
@@ -406,14 +412,14 @@ For every tile: exactly three chips are rendered, labelled model, user and marke
 For every tile whose claim is supposed: the chip renders the word and the date, and renders no likelihood at all.
 
 - **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_a_supposed_claim_renders_the_word_not_a_number`.
-- **Also:** visual review checklist line 12 — does a claim that was supposed and then overridden say so on its tile?
+- **Also:** visual review checklist `VR12` — does a claim that was supposed and then overridden say so on its tile?
 
 ### INV-workbench.8 — Kind rides shape, never hue
 
 For all four kinds: the four rendered outlines differ from one another, and the four renderings are identical in every colour value.
 
 - **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_four_kinds_four_silhouettes_one_palette`.
-- **Also:** visual review checklist line 3 — the greyscale conversion.
+- **Also:** visual review checklist `VR3` — the greyscale conversion.
 
 ### INV-workbench.9 — A clipping never reaches the network
 

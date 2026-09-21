@@ -827,13 +827,19 @@ def _likelihoods_sit_inside_their_own_range(graph: Graph) -> list[Violation]:
         for belief in slots:
             if belief is None or not _out_of_range(belief):
                 continue
+            # This message goes back to the browser inside a refused request, so
+            # the three numbers are written the way the product writes a
+            # likelihood — never at the precision a computer happens to hold one
+            # at. A number that is not between 0 and 1 says so in words instead;
+            # `belief.py` owns both rules and explains why.
+            low, likelihood, high = belief.as_written()
             found.append(
                 Violation(
                     code="belief_out_of_range",
                     subject=proposition.id,
                     message=(
                         f"The {belief.owner} likelihood on {_quoted(proposition.claim)} is "
-                        f"{belief.p}, with a range of {belief.lo} to {belief.hi}, which is not "
+                        f"{likelihood}, with a range of {low} to {high}, which is not "
                         "a range around that number between 0 and 1."
                     ),
                 )

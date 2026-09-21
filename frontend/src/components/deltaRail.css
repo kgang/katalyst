@@ -125,22 +125,36 @@
   color: var(--text-muted);
 }
 
-/* Which way it went, in a word, and the day the two worlds were furthest apart.
- * The word is here because the chevron beside the number is a glyph and a glyph
- * on its own is not a reading; the day is here because a row is read on the day
- * of largest divergence rather than on the claim's own judging day, and a number
- * whose day is not said is a number nobody can check. */
-.delta-rail__day {
+/* The half-line under an ending's own words, and there is one rule for every
+ * row rather than one per kind of row.
+ *
+ * On a row that moved it is which way it went and the day the two worlds were
+ * furthest apart. The word is here because the chevron beside the number is a
+ * glyph and a glyph on its own is not a reading; the day is here because a row
+ * is read on the day of largest divergence rather than on the claim's own
+ * judging day, and a number whose day is not said is a number nobody can check.
+ *
+ * On a row the engine ranked no move on it is the engine's own word for why —
+ * *barely moved*, *the versions disagreed which way*, *it was supposed false*,
+ * *it arrived with the edit*. That is what makes such a row survive being read
+ * in grey and being read out loud: see `.delta-rail__row[data-ranked="no"]`
+ * below, whose brightness says the same thing a second time and never alone. */
+.delta-rail__note {
   display: block;
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
-/* An ending that held still. It is quieter than the ones that moved and it is
- * still fully readable — the whole reason it is on the rail at all is that
- * silence cannot be told from absence, so a row nobody can read would be no
- * better than no row. */
-.delta-rail__row[data-moved="no"] .delta-rail__label {
+/* An ending the engine gave no row of its own. It is quieter than the ones it
+ * ranked and it is still fully readable — the whole reason it is on the rail at
+ * all is that silence cannot be told from absence, so a row nobody can read
+ * would be no better than no row.
+ *
+ * **Nothing here is the only thing saying so.** The change cell reads the
+ * engine's own verdict in words and the half-line above says why it ranked no
+ * move, so a screen converted to grey loses none of it. This rule is the
+ * glance. */
+.delta-rail__row[data-ranked="no"] .delta-rail__label {
   color: var(--text-muted);
 }
 

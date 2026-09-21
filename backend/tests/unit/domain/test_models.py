@@ -150,6 +150,25 @@ def test_belief_bounds_at_construction() -> None:
         a_belief(p=-0.1, lo=-0.2, hi=0.5)
 
 
+def test_a_refused_belief_writes_its_numbers_the_way_the_product_does() -> None:
+    """The sentence a refused belief raises quotes two figures, not sixteen.
+
+    This sentence is read by a person: it comes back out of the server when a
+    request is refused. A computer holds a tenth plus two tenths as
+    0.30000000000000004, and a number nobody wrote and nobody could act on is
+    exactly the kind of state this product refuses to show.
+    """
+    awkward = 0.1 + 0.2
+    assert repr(awkward) == "0.30000000000000004"
+
+    with pytest.raises(ValidationError) as refused:
+        a_belief(p=0.1, lo=awkward, hi=0.9)
+
+    said = str(refused.value)
+    assert "0.30000000000000004" not in said, said
+    assert "low=.30, likelihood=.10, high=.90" in said, said
+
+
 def test_owner_matches_slot() -> None:
     """Each of the three slots holds a number owned by the voice it is named for.
 

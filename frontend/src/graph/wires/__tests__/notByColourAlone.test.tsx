@@ -8,8 +8,10 @@
  * effect the glyph and the sign differ.
  *
  * This is the automated half of the rule. The other half is a person converting
- * a screenshot to grey and reading it again, which is line 3 of the visual
- * review checklist and runs on every screenshot rather than once at the end.
+ * a screenshot to grey and reading it again, which is `VR3` of the visual review
+ * checklist in `spec/workbench/README.md` and runs on every screenshot rather
+ * than once at the end. The lines of that list carry names now, so a citation
+ * still points at the check it meant when a line is added above it.
  */
 
 import { render } from "@testing-library/react";

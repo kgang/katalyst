@@ -146,7 +146,7 @@ Two things fall out of that, and both are worth saying plainly.
 
 **How far a number moved, and how wide a band is, keep two significant figures however small they get** *(Kent, 2026-09-20, G10)*. They are measured on the likelihood scale and they are not likelihoods: a move of nine thousandths is a measurement rather than a claim about the world, and `<.01` would throw out the only thing the reader came for. So the delta rail's **how firm** column and every before-and-after reading print `.0090`, `.0035`, `.00012` — and a move of exactly one prints `1.0`, because a move of one is a real move.
 
-The two rules live in one file each and are checked against each other: `toTwoFigures` and `toSize` in `frontend/src/components/BeliefChip.tsx`, and the engine's `_two_figures` in `backend/src/katalyst/domain/diff.py`, which writes the same numbers into the one-line summary the world carries. **They are one rule written twice and must move together** — a screen and a sentence that round the same number differently are two answers to one question.
+The two rules live in one file each and are checked against each other: `toTwoFigures` and `toSize` in `frontend/src/components/BeliefChip.tsx`, and the engine's `two_figures` in `backend/src/katalyst/domain/belief.py`, which writes the same numbers into the one-line summary the world carries and into every sentence the server sends back about a likelihood. **They are one rule written twice and must move together** — a screen and a sentence that round the same number differently are two answers to one question.
 
 ### Worked examples
 
@@ -164,11 +164,11 @@ The two rules live in one file each and are checked against each other: `toTwoFi
 | `.9962` | `>.99` | Same |
 | `0` | `<.01` | The floor of the same rule |
 
-And the same values printed as a **size** — a move, or the width of a band — where no guard applies:
+And the same values printed as a **size** — a move, or the width of a band — where no guard applies. These three are chosen to exercise the rule and are nobody's reading of anything; the moves the engine actually works out on the stored example are in [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt), each on its own named line:
 
 | Value carried | Reads | Why |
 |---|---|---|
-| `.0089679…` | `.0090` | Two figures. This is the move observing the insurance premium makes to the strait |
+| `.0089679…` | `.0090` | Two figures, and rounding up carries into a trailing zero that is printed: `.009` would claim less precision than we have |
 | `.0035` | `.0035` | Two figures, however small: a measurement, not a claim about the world |
 | `1` | `1.0` | A move of one is a real move, and no guard stands in its way |
 
@@ -206,7 +206,7 @@ The Hormuz map, spoken:
 > - **B** — *"Brent crude settles below $68 for five sessions. Model .28, range .15 to .42. Caused by the strait reopening, two days later. Held up by the war-risk premium falling. Pushed the other way by OPEC+ restraint. Three claims follow."*
 >   - **M1** — *"A Polymarket contract, Brent below $70 on the 31st of October, resolves yes. Model .40, range .28 to .55. Market .48, range .45 to .52. A tradeable ending. Caused by Brent settling below $68, one day later."*
 >   - **M2** — *"The energy fund XLE underperforms the S&P 500 fund SPY by more than 3 per cent over 20 trading days. Model .35, range .22 to .50. No market — no venue quotes this claim; what you would trade is on the payoff. A tradeable ending. Caused by Brent settling below $68, three days later."*
->   - **R** — *"OPEC+ announces output restraint. Model .18, range .08 to .32. Fed back into by Brent settling below $68, fourteen days later. It pushes back on Brent, already listed above."*
+>   - **R** — *"OPEC+ announces output restraint. Model .18, range .080 to .32. Fed back into by Brent settling below $68, fourteen days later. It pushes back on Brent, already listed above."*
 > - **C** — *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4 per cent. Model .30, range .18 to .45. Held up by the strait reopening, the same day. It reaches Brent crude, already listed above."*
 > - **N1** — *"Omani-mediated United States–Iran talks resume publicly. Model .22, range .12 to .36. Not tradeable — no venue quotes a contract on a diplomatic round. Caused by the strait reopening, ten days later."*
 
@@ -216,17 +216,15 @@ A claim sitting behind a **"+n more"** tile (`layout-and-zoom.md`) still gets it
 
 When a branch re-propagates, an `aria-live="polite"` region speaks one line. Polite means it waits for a pause rather than cutting across what is being read.
 
-Once the engine is connected, that line is:
+**The line is said twice, because the two facts arrive at different moments.** What the edit did to the *shape* of the map is known the instant the branch opens; what it did to the *numbers* comes back from the engine seconds later. A reader who cannot see the screen needs both, and needs to be told that the second is coming rather than left wondering whether it is missing.
 
-> *"Branch created. Six claims changed, one retracted."*
+> *"Branch created. One claim added, <n> claims your edit can reach, one supposition retracted. The numbers are on their way from the engine."*
 
-**In this stack there is no engine, so no claim has changed, because nothing computed a change.** Saying "six claims changed" would be inventing exactly the state the second veto exists to stop. What *is* real is structure — which claims arrived, which your edit can reach, which it provably cannot — computed from the branch by the reducer in `diff-view.md` and needing no arithmetic at all. So today the line is:
+> *"Branch created. One claim added, <n> claims moved, one supposition retracted."*
 
-> *"Branch created. One claim added, six claims your edit can reach, one supposition retracted. No numbers yet."*
+**Every count comes from somewhere nameable.** The **added** count and the **your edit can reach** count are structure, computed from the branch by the reducer in `diff-view.md` with no arithmetic at all — on the strike branch that is S added, and R left out, because the only wire that could carry the edit to R is a feedback arrow and the diff sets those aside. The **moved** count is the engine's own word, one per claim, read off its difference. The **retracted** count is UX-14's, which `tiles-ports-wires.md` renders on H's tile.
 
-Every count comes from somewhere nameable: the **added** and **downstream** counts from `diff-view.md`'s reducer — on the strike branch that is S added, six claims downstream (H, C, B, N1, M1, M2), and R `untouched`, because the only wire that could carry the edit to R is reflexive and the diff sets those aside; the **retracted** count from UX-14, which `tiles-ports-wires.md` renders on H's tile; and **no numbers yet** said out loud rather than left as a silence.
-
-When `ApiWorldSource` lands, "your edit can reach" becomes "changed" and the count becomes a computed one. Nothing is deleted at that point, because nothing false was said.
+**The browser never counts moved claims by comparing two numbers.** It reads how many claims the engine called `shifted`. That is why the two lines can differ — a claim the edit can reach is a claim that *could* move, and the engine decides whether it did — and why a reader hearing a smaller second number is hearing a real finding rather than a bug.
 
 ### B9 — Focus, contrast, and nothing by hue alone
 
@@ -246,19 +244,19 @@ The build grows a fifth job, **`e2e`**, running the single Playwright test `fron
 
 ## INVARIANTS
 
-Each is *for all X, statement P holds*, and each names what checks it. "Visual review checklist line *n*" is line *n* of the visual review checklist in [`README.md`](README.md) — a checklist line is a checkable thing; it is checked by a person.
+Each is *for all X, statement P holds*, and each names what checks it. "Visual review checklist `VRn`" is the line named `VRn` in the visual review checklist in [`README.md`](README.md) — a checklist line is a checkable thing; it is checked by a person.
 
 | ID | Statement | Checked by |
 |---|---|---|
-| **INV-workbench.31** | For every interactive element in the app, it is reachable and operable with the keyboard alone | `frontend/e2e/hormuz.spec.ts`; visual review checklist line 9 (tab through the whole screen) |
-| **INV-workbench.32** | For every focused element, a focus ring drawn with `--focus` is visible against the surface behind it, in both themes | visual review checklist line 9; `frontend/e2e/hormuz.spec.ts` |
-| **INV-workbench.33** | For every focused claim and every press of `h` or `l`, the claim focus lands on is joined to it by a wire; focus never moves to a claim that is merely nearby on screen | `test_h_and_l_land_only_on_a_wired_neighbour` in `frontend/src/keyboard/__tests__/focusMap.test.ts`; visual review checklist line 9 (does arrow movement follow the wires?) |
-| **INV-workbench.34** | For every overlay in the app, `Escape` closes it, the canvas stays live behind it, and nothing is left pending by closing it — there is no dialog anywhere that must be dismissed | visual review checklist line 2 (is there a spinner, a pop-up, or a dialog you must dismiss?) |
-| **INV-workbench.35** | For every animation, under `prefers-reduced-motion: reduce` the ordering is preserved and the tweening is absent | visual review checklist line 10 |
-| **INV-workbench.36** | For every belief rendered anywhere in the app, the chip shows two significant figures on the number and on both ends of its range, always shows the range, and prints no likelihood that two figures would put at `1.0` or above or below `.010` — those print `>.99` and `<.01`. A **size** — how far a number moved, how wide a band is — takes two figures and no guard | `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range`, `test_chip_never_prints_a_certainty`, `test_the_lower_guard_begins_at_a_hundredth` and `test_a_size_is_not_a_likelihood_and_takes_no_guard`, all in `frontend/src/components/__tests__/beliefChip.test.tsx`; visual review checklist line 4 |
+| **INV-workbench.31** | For every interactive element in the app, it is reachable and operable with the keyboard alone | `frontend/e2e/hormuz.spec.ts`; visual review checklist `VR9` (tab through the whole screen) |
+| **INV-workbench.32** | For every focused element, a focus ring drawn with `--focus` is visible against the surface behind it, in both themes | visual review checklist `VR9`; `frontend/e2e/hormuz.spec.ts` |
+| **INV-workbench.33** | For every focused claim and every press of `h` or `l`, the claim focus lands on is joined to it by a wire; focus never moves to a claim that is merely nearby on screen | `test_h_and_l_land_only_on_a_wired_neighbour` in `frontend/src/keyboard/__tests__/focusMap.test.ts`; visual review checklist `VR9` (does arrow movement follow the wires?) |
+| **INV-workbench.34** | For every overlay in the app, `Escape` closes it, the canvas stays live behind it, and nothing is left pending by closing it — there is no dialog anywhere that must be dismissed | visual review checklist `VR2` (is there a spinner, a pop-up, or a dialog you must dismiss?) |
+| **INV-workbench.35** | For every animation, under `prefers-reduced-motion: reduce` the ordering is preserved and the tweening is absent | visual review checklist `VR10` |
+| **INV-workbench.36** | For every belief rendered anywhere in the app, the chip shows two significant figures on the number and on both ends of its range, always shows the range, and prints no likelihood that two figures would put at `1.0` or above or below `.010` — those print `>.99` and `<.01`. A **size** — how far a number moved, how wide a band is — takes two figures and no guard | `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range`, `test_chip_never_prints_a_certainty`, `test_the_lower_guard_begins_at_a_hundredth` and `test_a_size_is_not_a_likelihood_and_takes_no_guard`, all in `frontend/src/components/__tests__/beliefChip.test.tsx`; visual review checklist `VR4` |
 | **INV-workbench.37** | For every belief, the view model carries the full precision the world carried, and rounding happens exactly once, in the chip, at paint | `test_the_view_model_keeps_full_precision` in `beliefChip.test.tsx` |
-| **INV-workbench.38** | For every piece of text and every glyph, in both themes, the contrast ratio against the surface behind it is at least 4.5 to 1 | visual review checklist line 7 |
-| **INV-workbench.39** | For every claim in the world there is exactly one outline item, its sentence names every incoming wire, and the announcement names no number the world does not carry | `frontend/e2e/hormuz.spec.ts`; visual review checklist line 5 (is there a number nobody computed?) |
+| **INV-workbench.38** | For every piece of text and every glyph, in both themes, the contrast ratio against the surface behind it is at least 4.5 to 1 | visual review checklist `VR7` |
+| **INV-workbench.39** | For every claim in the world there is exactly one outline item, its sentence names every incoming wire, and the announcement names no number the world does not carry | `frontend/e2e/hormuz.spec.ts`; visual review checklist `VR5` (is there a number nobody computed?) |
 
 ## ANTI-PATTERNS
 
@@ -268,9 +266,9 @@ Each is *for all X, statement P holds*, and each names what checks it. "Visual r
 4. **Do not round in the view model**, because the Inspector needs the precision the chip threw away, and a number rounded twice drifts a whole step. Carry the full number; round once, in the chip, at paint.
 5. **Do not drop the range when the space is tight**, because a bare `.40` is the fake-precise number this product exists to argue against. Widen the space.
 6. **Do not print `1.0` or `.0` on a chip**, because a likelihood of one is a claim that something cannot fail and this product does not make that claim. Print `>.99` and `<.01`, on the range's ends as well as on the number.
-7. **Do not say "six claims changed" before anything computed a change**, because a count nobody computed is a state nobody can trace. Say what is true — added, reachable, retracted — and say "no numbers yet" out loud.
+7. **Do not say a claim changed before the engine has said it did, and do not count the ones that did by comparing two numbers**, because a count nobody computed is a state nobody can trace, and a second count is a second answer. While the engine is being asked, say what is true — added, reachable, retracted — and say out loud that the numbers are coming. Afterwards, count the claims the engine itself called moved.
 8. **Do not build the outline from the tiles on screen**, because a claim behind a "+n more" tile would silently vanish for the reader who needs the outline most. Build it from the world.
-9. **Do not lean on hue for anything**, because roughly one reader in twelve will not see the difference and a greyscale screenshot is line 3 of the visual review checklist. Every direction gets a glyph, every tail a texture, every provenance a mark.
+9. **Do not lean on hue for anything**, because roughly one reader in twelve will not see the difference and a greyscale screenshot is `VR3` of the visual review checklist. Every direction gets a glyph, every tail a texture, every provenance a mark.
 10. **Do not write `outline: none`**, anywhere, for any reason. A focus ring you cannot see is a keyboard interface you cannot use. Restyle the ring with `--focus`; never remove it.
 
 ## Open questions

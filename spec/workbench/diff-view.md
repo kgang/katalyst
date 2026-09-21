@@ -13,6 +13,8 @@ Before the engine exists that answer is **structural** — *here is what your ed
 is what it cannot* — and where a number will later sit, this stack draws **an absence with its
 reason**: never a blank, never a zero, never a stand-in.
 
+**Every engine-computed figure quoted below is read from one generated file.** [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) is written by `make numbers` from the shipped engine on the Strait of Hormuz map, at that example's own seed and the shipped loop sizes, and the build fails when it goes stale. Every line in it starts with a name a passage can cite — `B · base · reading` — and the numbers a person typed into the example are kept in a part of their own, apart from the numbers the engine worked out. A figure is quoted here only where it teaches something; the file is where it is kept true, so the day the arithmetic changes, the diff of that one file is the whole list of what moved.
+
 This chapter owns the ghost overlay, the delta rail, the A ⇄ A′ toggle and the branch panel — and,
 because every number slot on the world uses them, the `Known<T>` and `Absence` shapes the whole of
 `spec/workbench/` reads.
@@ -133,23 +135,67 @@ export interface ClaimDiffView {
       (`spec/multiverse/diff.md`); the Inspector turns it into one sentence and nothing
       in the browser ever works it out. */
   movedOnlyByReweighting: boolean;
-}
-
-export interface DeltaRow {
-  claimId: string;
-  label: string;                                     // the terminal's own words
-  /** The engine's own verdict on this ending, from its `ClaimDiff`. False draws a greyed
-      row reading "no change" (B5) — never a row left out. The browser never works it
-      out by comparing two numbers. */
-  shifted: boolean;
-  move: Known<{ from: number; to: number; largestOn: string }>;
-  rangeWidth: Known<number>;   // "how firm": the width of the new world's own range on this claim
-  agreement: Known<number>;    // "same direction": the share of versions that moved the same way
+  /** Which half of the `unchanged` test the claim failed, in the engine's own plain word:
+      `under_the_floor` (it barely moved) or `versions_disagree` (it moved, and the versions
+      of the map did not agree which way). The engine reads the floor first, so a claim that
+      failed both says `under_the_floor`. Null on any claim that is not `unchanged`, and on an
+      `unchanged` claim with no move to measure. The browser prints the sentence that goes with
+      the word and works nothing out: the floor and the bar are constants inside the engine and
+      are on no wire. The server's name is `unchanged_because`. */
+  unchangedBecause: "under_the_floor" | "versions_disagree" | null;
 }
 ```
 
 Every number slot is `Known<T>`, so an absent number **cannot** be rendered as anything but its
 reason — a type-level guarantee, not a convention.
+
+### The change list's row
+
+**`DeltaRow` in `frontend/src/world/types.ts` is the shape; this is what it holds and why.** The
+fields are not copied out here — a chapter that pastes an interface in goes stale the first time a
+field is renamed, and this one had: it described a `shifted` flag that the code has not carried for
+some time, and described it the wrong way round.
+
+A row names **one ending**: its identifier, its own words, and its **kind**, which is what says
+whether anything trades. Beside the name sit the three quantities the list is read across — **the
+move** (the two readings, which way it went, how far, and the day the two worlds are furthest apart),
+**how firm** (the width of this world's own range on that claim) and **same direction** (the share of
+versions of the map that moved the same way). All three are `Known<T>`, so a row with nothing to
+report says why rather than going blank. Two further fields carry the rule below: **whether the
+engine gave this ending a row of its own in its ranking**, and the half-line under the ending's own
+words that says what that ending did instead.
+
+**One rule, and the list obeys nothing else: every ending the edit can reach has a row, whatever the
+engine called it.** Ranked if the engine ranked it; otherwise quiet, saying in the engine's own word
+why. The engine ranks an ending only when it calls it `shifted`, so everything else falls to the
+change list — and the change list keeps it.
+
+| The engine's word | The row |
+|---|---|
+| **`shifted`** | Ranked: in the engine's order, above the rest, with its move, how firm and same direction |
+| **`unchanged`** | Quiet: *no change* where the move would be, **and which half of the engine's test it failed** — *barely moved* (`under_the_floor`) or *the versions disagreed which way* (`versions_disagree`) |
+| **`killed`** — an edit fixed its value to false | Quiet: **the word its tile shows**, never a likelihood. The engine stores a flat zero on such a claim, and a row reading `.46 ▼ <.01` would be that zero wearing the certainty guard's clothes |
+| **`added`** — it arrived with the edit | Quiet: *Added*. There is no earlier reading of it to put beside this world's, so there is no move to rank |
+
+**One builder, and one writer.** `railRows` in `frontend/src/graph/diff/branchWorld.ts` builds the
+whole list and is the only thing that does — the engine's `rows` are its ranking and nothing else,
+and the second builder that used to sit in `apiSource.ts` is gone, because two builders of one list
+eventually disagree about what is on it. What each quiet row *says* is one rule in one place,
+`quietRow` in `frontend/src/graph/diff/noChange.ts`, keyed on the engine's word and on no number, so
+that the tile's movement line, the change list's row and the panel's *what your edit did* cannot say
+three different things about one claim.
+
+**On screen the two kinds of row are told apart by `data-ranked`**, which the quieter styling keys
+on. It used to read `data-moved` — untrue of a forced-false row, which did not move and is the
+loudest thing on the list.
+
+**Why the rule is *every* ending and not *every ending that moved*.** A reader looking at the
+engine's ranking alone cannot tell *"it held still"* from *"you forced it false a moment ago"* from
+*"it is not on this map"* — and silence that could mean any of the three is the state the
+traceability rule exists to forbid. The verdict is never worked out here: the engine's `Diff` carries
+a `claims` map with every claim in either world exactly once and its state, and the row reads that.
+The browser re-deciding it by comparing two numbers would be the browser re-running the shifted test
+with its own floor and its own bar, and two answers to that question is one too many.
 
 **`BeliefView`** — one likelihood with its range and a name on it — is defined once in
 [`tiles-ports-wires.md`](tiles-ports-wires.md), because the belief chip is the only component that
@@ -274,7 +320,7 @@ line each, in the order the engine gave them:
 M1  A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.
     tradeable
     down · largest on 2026-10-04
-    .50 ▼ .42        .27        97%
+    .49 ▼ .42        .27        95%
 ```
 
 The ending's own words and what kind of ending it is; then which way it went and
@@ -284,12 +330,18 @@ rather than after them, so the row reads as one number becoming another, and the
 direction is a word as well as a glyph because a glyph read aloud is nothing at
 all.
 
-The engine writes every part of that row. On the Hormuz strike branch (seed 20261001) the three rows
-it gives are: the Polymarket Brent contract · `.50 → .42` ▼ · largest on Oct 4; the energy-shares
-claim · `.43 → .36` ▼ · largest on Oct 6; the talks that cannot be traded · `.28 → .37` ▲ · largest
-on Oct 11 — the biggest move on the map, and last, because the only arrow into it is a bare assertion
-([`../multiverse/diff.md`](../multiverse/diff.md) has the arithmetic). This stack draws none of those
-numbers; it asks for none.
+The engine writes every part of that row. On the Hormuz strike branch (seed 20261001) it gives
+**two** rows: the Polymarket Brent contract · `.49 → .42` ▼ · largest on Oct 4; and the energy-shares
+claim · `.43 → .36` ▼ · largest on Oct 6. This stack draws neither number; it asks for neither.
+
+**The third ending is the one worth reading.** N1, the talks that cannot be traded, makes the biggest
+move on the map — `.28 → .38` — and the engine still calls it `unchanged`, so it is **not** a ranked
+row. Its only incoming arrow is the map's one bare assertion, `H → N1`, and a bare assertion is drawn
+so wide that only 88 of every 100 versions of the map agree the talks go *up* at all — under the 90
+in 100 the engine needs before it will say a claim moved
+([`../multiverse/diff.md`](../multiverse/diff.md) owns that bar). A big move nobody can agree the
+direction of is exactly what the bar is for, and the rail still lists N1: greyed, beneath the two
+ranked rows, reading **no change**. That is the case B5's greyed row was written for, arriving.
 
 That order is the size of the move times the **weakest arrow on the best-backed route** from any of
 the branch's edits to that ending — the route whose weakest arrow is strongest. Two factors and no
@@ -304,22 +356,38 @@ columns that are never folded into the rank**:
 Different questions, weighed separately by a trader, which is why they are columns and not one
 score. Folding width into the rank would sink exactly the claims that most deserve attention.
 
-**An ending that did not move is a greyed row reading *no change*, never a missing one** *(decided
-2026-09-17, stack 04a; this closes [`../multiverse/diff.md`](../multiverse/diff.md) open question
-5)*. The engine's `rows` hold only the endings that came out `shifted`, so a reader looking at that
-list alone cannot tell *"it did not move"* from *"it is not on this map"* — and silence that could
-mean either is the state the traceability rule exists to forbid. So the rail draws **every ending the
-edit can reach**: the engine's rows first, in the engine's order, and beneath them, greyed and
-unranked, in map order, every other reachable ending, each reading **no change** where the move would
-be.
+**Every ending the edit can reach is on the rail, and never a missing one** *(decided 2026-09-17,
+stack 04a, and widened 2026-09-21; this closes [`../multiverse/diff.md`](../multiverse/diff.md) open
+question 5)*. The engine's `rows` hold only the endings it called `shifted`, so a reader looking at
+that list alone cannot tell *"it held still"* from *"you forced it false a moment ago"* from *"it is
+not on this map"* — and silence that could mean any of the three is the state the traceability rule
+exists to forbid. So the rail draws the engine's rows first, in the engine's order, and beneath them,
+greyed and unranked, in map order, **every other reachable ending**, each saying its own true thing
+where the move would be. The *change list's row* section above has the word-by-word table.
+
+**The widening, and why it was needed.** The rule began as *an ending that did not move is a greyed
+row reading no change* — and an ending an edit **forced false** answers to neither half of it: it did
+not move, and *no change* is the last thing that is true of it. It was therefore on no list at all:
+the loudest thing an edit can do to an ending was the quietest thing on this screen. The rule now
+asks only where the ending is, never what the engine called it.
 
 Where that verdict comes from matters as much as the row. The engine's `Diff` carries a `claims` map
-with **every** claim in either world exactly once and its state, so *did not move* is a fact the
+with **every** claim in either world exactly once and its state, so what happened is a fact the
 engine already states, read off `ClaimDiff.state`. The browser never decides it by comparing two
 numbers — that would be the browser re-running the shifted test, with its own .005 floor and its own
 90% bar, and two answers to that question is one too many. The two numbers behind a greyed row are
-still one click away in the Inspector; the row itself says the thing that is true, which is that
-nothing here moved.
+still one click away in the Inspector; the row itself says the thing that is true.
+
+**And a row that held still says which half of the test it failed.** *Barely moved* and *moved, but the
+versions disagreed which way* are two different findings, and a reader given only "no change" cannot
+tell them apart. The engine writes the word — `under_the_floor` or `versions_disagree` — on the
+claim's own row, and the browser picks the sentence that goes with it. It still works nothing out:
+the floor and the bar are constants inside the engine and are on no wire, so the browser could not
+re-run the test if it wanted to. On the Hormuz strike branch the two claims that moved and still came
+out `unchanged`, B and N1, read `versions_disagree`; R, which did not move at all, reads
+`under_the_floor`. Where a claim fails both halves the engine names the floor, because a move nobody
+would notice needs no second sentence about its direction —
+[`../multiverse/diff.md`](../multiverse/diff.md) owns that rule and the two constants.
 
 **Before the engine — this stack — the rail does not rank and does not compute.** It lists the
 terminals the edit can reach, in **map order**, each with an absence and a reason where the number
@@ -373,10 +441,10 @@ series is data, never inference** — and this stack has some of it and not the 
 | **Supposed · Oct 1** | Oct 1; H shows the word, not a number | The assignment itself: an earlier supposition on H, with its date | **No** — the branch carries it |
 | **Retracted · Oct 2 · by "…"** | Oct 2 | **The world's own `retractions`**, once there is a world; derived from the branch until then | **Yes, once there is one** — see below |
 | **withdrawn** | Oct 2 – Oct 4, `.36`, labelled *"withdrawn — no live push yet"* | The `states` series: the cause of the opposing arrow became true on the 2nd, so we stop taking the user's word; S → H's three-day delay has not run, so H reads its own prior again | **Yes** |
-| **pushed** | Oct 5 onward, about `.080` | The `states` series: the delay has run and S → H's −1.9 push lands on that prior | **Yes** |
+| **pushed** | Oct 5 onward, `.086` | The `states` series: the delay has run and S → H's −1.9 push lands on that prior | **Yes** |
 
 So in this stack H's tile carries the badge pair and its order, its number slot reads *"no engine
-yet"*, and the series is absent with its reason. (`.080`, not `.08`: two significant figures on
+yet"*, and the series is absent with its reason. (`.086` and not `.09`: two significant figures on
 every number, the rule [`keyboard-and-access.md`](keyboard-and-access.md)
 owns. And `.36` rather than H's stated prior of `.35` — reading a prior back through the engine
 lands a hair above the middle for a likelihood under a half, which decision record 0014 predicts and
@@ -449,8 +517,8 @@ Three rules in this stack:
 ## INVARIANTS
 
 Each is *for all X, statement P holds*, and each names what checks it: a component test, or a
-numbered line of the **visual review checklist** in [`README.md`](README.md). Frontend test names
-are `test_snake_case`. Short file names below: **diffState** is
+named line of the **visual review checklist** in [`README.md`](README.md), `VR1` to `VR13`.
+Frontend test names are `test_snake_case`. Short file names below: **diffState** is
 `frontend/src/graph/__tests__/diffState.test.ts`, **deltaRail**
 `frontend/src/components/__tests__/deltaRail.test.tsx`, **ghostOverlay**
 `frontend/src/components/__tests__/ghostOverlay.test.tsx`. This chapter uses `INV-workbench.40` …
@@ -486,18 +554,26 @@ which either side's likelihood is absent, no claim is `shifted`. *Test:* diffSta
 **INV-workbench.45 — no number slot is ever blank.** For every claim and every delta row in this
 view, a slot without a value renders its `Absence.reason` as words — no empty string, no zero, no
 dash-without-meaning (the one dash with a meaning is the empty user belief, absence kind
-`not_said`). *Test:* deltaRail › `test_renders_a_reason_for_every_absent_number`; **visual review
-checklist line 5**.
+`not_said`). *Test:* deltaRail › `test_renders_a_reason_for_every_absent_number`;
+**visual review checklist `VR5`**.
 
 **INV-workbench.46 — the rail invents no order, and silence is never absence.** Two statements, one
 subject: the rail neither ranks what nothing has ranked nor leaves out what nothing said was
 missing. While `ranked` is false the rail renders the reachable terminals in the order the base map
-stores them, independent of every number on the world. Once the engine ranks them, every reachable
-terminal is still on the rail — one the engine reported as `shifted` in the order the engine gave,
-and one it did not as a greyed row reading *no change*, in map order beneath them — and the
-`shifted` flag on every row is read off the engine's `ClaimDiff`, never derived by comparing two
-numbers in the browser. *Tests:* deltaRail › `test_lists_reachable_terminals_in_map_order`,
-`test_the_rail_keeps_the_engines_order`, `test_an_unmoved_terminal_is_a_greyed_row_not_a_missing_one`.
+stores them, independent of every number on the world. Once the engine ranks them, **every reachable
+terminal is still on the rail whatever the engine called it** — the ones it called `shifted`, in the
+order it gave; then, in map order beneath them and marked `data-ranked="no"`, every other one,
+whether it held still, was forced false by an edit or arrived with one. Which of the two a row is,
+and what a quiet one says, are both read off the engine's word on its `ClaimDiff` and never derived
+by comparing two numbers in the browser: no floor and no bar is written down here. One builder makes
+the whole list — `railRows` — and one rule writes what a quiet row says — `quietRow`.
+*Tests:* deltaRail ›
+`test_lists_reachable_terminals_in_map_order`, `test_the_rail_keeps_the_engines_order`,
+`test_an_unmoved_terminal_is_a_greyed_row_not_a_missing_one`,
+`test_the_no_change_sentence_comes_from_the_engines_own_word`; and, for the ending an edit forced
+false, `frontend/src/graph/__tests__/diffState.test.ts` ›
+`test_an_ending_you_forced_false_stays_on_the_list_and_is_not_no_change` and
+`test_a_forced_false_ending_is_on_the_list_even_with_no_word_to_show`.
 
 **INV-workbench.47 — how firm and same direction are never folded into the rank.** For every rail
 row the two are rendered as their own columns, and no ordering function reads either. *Test:*
@@ -515,15 +591,15 @@ retraction for carries no such badge. *Tests:*
 `frontend/src/components/__tests__/beliefChip.test.tsx` ›
 `test_a_supposed_claim_renders_the_word_not_a_number`;
 `frontend/src/components/__tests__/tile.test.tsx` › `test_the_retraction_badge_comes_from_the_world`;
-**visual review checklist line 12**.
+**visual review checklist `VR12`**.
 
 **INV-workbench.49 — the branch is append-only and reads in vocabulary words.** For every sequence
 of button presses, the branch is the edits in the order they were made with no earlier edit altered,
 and every badge on screen is one of the six — the five in the *Interface words* table plus the
 derived **Retracted · date · by "…"** — with no code name anywhere. *Tests:*
 `frontend/src/world/__tests__/branchReducer.test.ts` ›
-`test_appends_edits_in_order_and_never_rewrites_one`, `test_renders_only_interface_words`; **visual
-review checklist line 11**.
+`test_appends_edits_in_order_and_never_rewrites_one`, `test_renders_only_interface_words`;
+**visual review checklist `VR11`**.
 
 ---
 
@@ -575,5 +651,7 @@ in the body:
    [`../multiverse/diff.md`](../multiverse/diff.md) open question 5, and left there for this part to
    answer. **Decided 2026-09-17 (stack 04a): yes — a greyed row reading *no change*,** because a
    reader cannot tell "it did not move" from "it is not on this map" by looking at a list something
-   was left out of. In B5, and pinned by INV-workbench.46. Nothing changes on the engine's side: the
-   verdict is already on `ClaimDiff.state`.
+   was left out of. **Widened 2026-09-21 to every ending whatever its state**, because an ending an
+   edit forced false answered to neither *moved* nor *no change* and so appeared on no list. In B5,
+   and pinned by INV-workbench.46. Nothing changes on the engine's side: the verdict is already on
+   `ClaimDiff.state`.

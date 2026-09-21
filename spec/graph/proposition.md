@@ -153,7 +153,7 @@ class ContractPayoff(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    kind: Literal["contract"] = "contract"
+    kind: Literal["contract"]
     venue: str = Field(
         description=(
             "Where the contract trades, named as the venue names itself: "
@@ -195,7 +195,7 @@ class PricePayoff(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    kind: Literal["price"] = "price"
+    kind: Literal["price"]
     instrument: str = Field(
         description=(
             "What you would buy or sell, named the way its venue names it: a "
@@ -229,6 +229,14 @@ Read the `kind` field to know which of the two it is — `"contract"` or
 types generated for the browser, can tell the two shapes apart from one field
 without guessing from which others happen to be present. It is the same pattern
 the six interventions use (`../multiverse/interventions.md`).
+
+**Neither `kind` has a default, and that is the point.** A default would keep the
+field out of the schema's list of required fields, and that schema is what the
+model is asked to fill — so the one field that says which of the two shapes was
+meant would become the one field the model could leave out. Then a price payoff
+with no `kind` would read as a contract payoff missing its venue, and the refusal
+would name the wrong thing. Required in both shapes, the discriminator is always
+there to discriminate on.
 
 Neither shape carries a price. That is the rule stated in both docstrings above
 and settled in decision record 0013.

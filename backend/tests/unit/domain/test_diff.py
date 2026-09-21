@@ -68,6 +68,7 @@ from katalyst.domain import (
     sensitivity,
     versions_of,
 )
+from katalyst.domain.belief import two_figures
 from katalyst.domain.diff import (
     AGREEING_AT_LEAST,
     MOVED_AT_LEAST,
@@ -79,7 +80,6 @@ from katalyst.domain.diff import (
     _counting_for,
     _ordinary_arrows,
     _read_on,
-    _two_figures,
     best_backed_routes,
 )
 from katalyst.domain.propagation import Numbers, Versions
@@ -982,6 +982,114 @@ def test_no_direction_at_all_when_no_version_counted_in_both_numbers() -> None:
         assert not one.moved_only_by_reweighting, claim_id
     assert answer.rows == (), "no ending can be listed as moved when no direction can be read"
     assert SECOND_SENTENCE.match(answer.summary), answer.summary
+    for claim_id, one in answer.claims.items():
+        # No direction was readable, so the second half of the test never ran and
+        # there is no honest way to say it failed. Where the move is under the
+        # floor the first half did run, and that answer stands on its own.
+        assert one.unchanged_because in {None, "under_the_floor"}, claim_id
+        if one.unchanged_because is None:
+            assert one.delta is None or abs(one.delta) >= 0.005, claim_id
+
+
+# --- Which half of the test an unchanged claim failed ----------------------
+
+
+@given(st.data())
+@many
+def test_an_unchanged_claim_says_which_half_it_failed(data: st.DataObject) -> None:
+    """The word on the row is the rule applied to the two numbers beside it.
+
+    Both constants live in the engine and reach no reader, so *unchanged* on its
+    own cannot tell "it barely moved" from "nobody agrees which way it went".
+    The word says which. Nothing here is typed in: the expected answer is worked
+    out from the row's own `delta` and `agreement`, so the row has to be
+    self-consistent for every map a generator can produce.
+    """
+    graph = data.draw(graphs())
+    answer = _compared(graph, data.draw(branches(graph)), data.draw(branches(graph)))
+
+    for claim_id, one in answer.claims.items():
+        if one.state != "unchanged" or one.delta is None:
+            assert one.unchanged_because is None, claim_id
+            continue
+        if abs(one.delta) < 0.005:
+            assert one.unchanged_because == "under_the_floor", claim_id
+        elif one.agreement is not None and one.agreement < 0.90:
+            assert one.unchanged_because == "versions_disagree", claim_id
+        else:
+            assert one.unchanged_because is None, claim_id
+
+
+def test_only_an_unchanged_claim_says_which_half_it_failed() -> None:
+    """Every other word means the test did not fail, so there is no half to name.
+
+    On the worked example's strike branch: claims that moved, the claim the
+    branch added, and a claim forced false all carry nothing at all, and the
+    claims that held still all carry a word.
+    """
+    base = _hormuz_world(None)
+    strike = _hormuz_world(HORMUZ_THEN_STRIKE)
+    answer = diff(base, strike, edit_in_words=HORMUZ_THEN_STRIKE.label)
+    assert not isinstance(answer, list), answer
+
+    held_still = [one for one in answer.claims.values() if one.state == "unchanged"]
+    moved = [one for one in answer.claims.values() if one.state != "unchanged"]
+    assert held_still and moved, "the worked example was expected to show both"
+    assert all(one.unchanged_because is not None for one in held_still), held_still
+    assert all(one.unchanged_because is None for one in moved), moved
+
+    cut = _hormuz_world(_branch(Do(target="C", value=False, at=FIXTURE_DATE)), **SMALL)
+    forced = diff(_hormuz_world(None, **SMALL), cut, edit_in_words="The premium never falls")
+    assert not isinstance(forced, list), forced
+    assert forced.claims["C"].state == "killed"
+    assert forced.claims["C"].unchanged_because is None
+
+
+def test_the_floor_is_read_first_when_a_claim_fails_both_halves() -> None:
+    """A claim that barely moved and disagreed about it says it barely moved.
+
+    Two true answers, and something has to choose; the floor is the cheaper fact
+    to act on, because a move nobody would notice needs no second sentence about
+    its direction. The claim is the one an observation moves through the version
+    weights alone — its move is tiny and its same-direction share is zero — and
+    the test finds it by those two facts rather than by name.
+    """
+    base = _hormuz_world(None)
+    observed = _hormuz_world(_branch(Observe(target="B", value=True)))
+    answer = diff(base, observed, edit_in_words="Brent settled below $68")
+    assert not isinstance(answer, list), answer
+
+    failing_both = [
+        one
+        for one in answer.claims.values()
+        if one.state == "unchanged"
+        and one.delta is not None
+        and abs(one.delta) < 0.005
+        and one.agreement is not None
+        and one.agreement < 0.90
+    ]
+    assert failing_both, "the observation was expected to leave a claim failing both halves"
+    assert all(one.unchanged_because == "under_the_floor" for one in failing_both), failing_both
+
+
+def test_a_claim_moved_only_by_reweighting_keeps_both_fields() -> None:
+    """The reweighting field is the fuller answer, and neither field replaces the other.
+
+    Such a claim moved far enough and every version that counts moved by exactly
+    nothing, so the half it failed is the same-direction half — and the reason it
+    failed is the one `moved_only_by_reweighting` states. Both are true, both are
+    carried, and the Inspector shows the fuller one.
+    """
+    base = _hormuz_world(None)
+    observed = _hormuz_world(_branch(Observe(target="C", value=True)))
+    answer = diff(base, observed, edit_in_words="the premium printed below 0.4%")
+    assert not isinstance(answer, list), answer
+
+    reweighted = [one for one in answer.claims.values() if one.moved_only_by_reweighting]
+    assert reweighted, "the worked example was expected to show one"
+    for one in reweighted:
+        assert one.state == "unchanged"
+        assert one.unchanged_because == "versions_disagree"
 
 
 # --- Locality, seen from the difference ------------------------------------
@@ -1170,7 +1278,7 @@ def test_a_likelihood_is_written_as_a_plain_decimal(likelihood: float) -> None:
     that really is above ninety-nine hundredths. A guard beside a number those
     words are false of would be the product lying in two characters.
     """
-    written = _two_figures(likelihood)
+    written = two_figures(likelihood)
 
     assert "e" not in written.lower(), written
     assert WRITTEN_LIKELIHOOD.match(written), written
@@ -1209,7 +1317,7 @@ def test_a_likelihood_is_written_by_the_rule_on_the_cases_that_decide_it() -> No
     where the two stacks meet.
     """
     for likelihood, expected in WRITTEN_BY_THE_RULE:
-        assert _two_figures(likelihood) == expected, likelihood
+        assert two_figures(likelihood) == expected, likelihood
 
 
 def test_a_likelihood_that_is_not_a_number_is_refused_rather_than_written() -> None:
@@ -1224,7 +1332,7 @@ def test_a_likelihood_that_is_not_a_number_is_refused_rather_than_written() -> N
     """
     for not_a_number in (float("nan"), float("inf"), float("-inf")):
         with pytest.raises(ValueError, match="real number"):
-            _two_figures(not_a_number)
+            two_figures(not_a_number)
 
 
 # --- The one sentence beside the list --------------------------------------
@@ -1284,12 +1392,14 @@ def test_a_warning_either_world_carried_is_said_once() -> None:
 def test_the_hormuz_rail_reads_the_way_the_story_reads() -> None:
     """The shipped example's change list, pinned by its directions and its order.
 
-    Four sentences a person can check, and not one number among them. The two
-    tradeable endings fall and the one nobody quotes rises; the one that rises
-    moves furthest and still ranks last, because the only arrow into it is the
-    weakest on the map and the rank's second factor says so; the claim reached only
-    through a feedback arrow is identical to the byte; and the strike itself is a
-    claim the base map has never heard of.
+    Five sentences a person can check, and not one number among them. Both
+    tradeable endings fall. The claim nobody quotes moves further than either of
+    them and does **not** make the list at all, because the only arrow into it is
+    the one arrow on the map that nobody could back, so its push is drawn widest
+    and the versions do not agree which way it went — *we cannot vouch for this
+    one* is the honest reading, and the change list is for changes a reader can
+    act on. The claim reached only through a feedback arrow is identical to the
+    byte, and the strike itself is a claim the base map has never heard of.
 
     Values are deliberately absent. The example is a curated one whose illustrative
     inputs may be tuned, so a test that pinned numbers would break every time
@@ -1300,13 +1410,19 @@ def test_the_hormuz_rail_reads_the_way_the_story_reads() -> None:
     answer = diff(base, strike, edit_in_words=HORMUZ_THEN_STRIKE.label)
     assert not isinstance(answer, list), answer
 
-    assert [one.target for one in answer.rows] == ["M1", "M2", "N1"]
+    assert [one.target for one in answer.rows] == ["M1", "M2"]
     by_name = {one.target: one for one in answer.rows}
     assert by_name["M1"].peak_delta < 0.0
     assert by_name["M2"].peak_delta < 0.0
-    assert by_name["N1"].peak_delta > 0.0
-    assert abs(by_name["N1"].peak_delta) == max(abs(one.peak_delta) for one in answer.rows)
-    assert by_name["N1"].rank == min(one.rank for one in answer.rows)
+
+    talks = answer.claims["N1"]
+    assert talks.delta is not None and talks.agreement is not None
+    assert talks.delta > 0.0
+    assert abs(talks.delta) > max(abs(one.peak_delta) for one in answer.rows)
+    assert talks.state == "unchanged"
+    assert talks.agreement < AGREEING_AT_LEAST
+    only_arrow = next(one for one in HORMUZ.links if one.target == "N1")
+    assert only_arrow.provenance == "asserted"
 
     assert answer.claims["R"].state == "unchanged"
     assert base.series["R"] == strike.series["R"]
@@ -1316,7 +1432,7 @@ def test_the_hormuz_rail_reads_the_way_the_story_reads() -> None:
     contract = next(one for one in HORMUZ.propositions if one.id == "M1")
     assert contract.claim.rstrip(".") in answer.summary
     assert HORMUZ_THEN_STRIKE.label in answer.summary
-    assert "leaves 1 claim untouched" in answer.summary
+    assert "leaves 3 claims untouched" in answer.summary
 
 
 # --- One claim at a time ---------------------------------------------------

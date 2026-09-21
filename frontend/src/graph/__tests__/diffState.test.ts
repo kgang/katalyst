@@ -30,7 +30,7 @@ import { bothPaintings, branchWorld, railRows } from "../diff/branchWorld";
 import { toDay } from "../diff/days";
 import { readDiff } from "../diff/diffState";
 import { endings } from "../diff/endings";
-import { noChangeReason } from "../diff/noChange";
+import { noChangeInAWord, noChangeReason } from "../diff/noChange";
 import type { Arrow } from "../diff/reach";
 import { badgeLines } from "../geometry";
 
@@ -304,14 +304,18 @@ describe("the second world", () => {
    *
    * The engine calls a claim `shifted` only when **both** halves of its test
    * pass: the move clears its floor, and the versions of the map agree on which
-   * way it went. `unchanged` is the default, and it does not say which half
-   * failed. Neither does the wire: the floor and the bar are constants inside
-   * the engine and are nowhere in its answer.
+   * way it went. `unchanged` is what a claim gets when either half fails — **and
+   * the engine now says which half**, on the claim's own row, in one plain word:
+   * *under the floor* where the move is too small to report at all, *versions
+   * disagree* where the move was far enough and the versions did not agree which
+   * way. The floor is read first, so a claim failing both says the floor.
    *
-   * So the browser may report the verdict and the engine's own numbers, and it
-   * may not name a cause. Naming one means guessing, and guessing here means
-   * printing a sentence that is flatly false about half the claims it appears
-   * on — which is the traceability veto in plain sight.
+   * So the browser copies that word across and turns it into words. It still
+   * works nothing out: the floor and the bar are constants inside the engine and
+   * are nowhere in its answer, so re-running the test here is not possible even
+   * by accident. Where the engine gives no word, neither does the browser —
+   * guessing would mean printing a sentence that is flatly false about half the
+   * claims it appears on, which is the traceability veto in plain sight.
    */
   describe("why the engine reports no change", () => {
     /** The engine's answer: every claim untouched but one, which it calls unchanged. */
@@ -335,36 +339,59 @@ describe("the second world", () => {
       return (b?.badges ?? []).find((badge) => badge.movement === true);
     }
 
-    it("test_the_no_change_reason_names_no_cause_the_engine_did_not_give", () => {
-      // It moved .41 to .46 and only .62 of the versions went the same way. The
-      // half that failed is the agreement, so "it did not move by enough to
-      // report" is false of this claim.
+    it("test_the_no_change_reason_names_the_half_the_engine_named", () => {
+      // It moved .41 to .46 and only .62 of the versions went the same way, and
+      // the engine says which half of its test that failed. So the sentence may
+      // say the versions disagreed — and must not say it barely moved, which is
+      // flatly false of a claim five points apart.
       const disagreed = tileLine({
         from: 0.41,
         to: 0.46,
         way: "up",
         by: 0.05,
         sameDirection: { reading: 0.62 },
+        unchangedBecause: "versions_disagree",
       });
       expect(disagreed?.words).toBe("no change");
-      expect(disagreed?.reason).not.toMatch(/did not move by enough/i);
+      expect(disagreed?.reason).toMatch(/did not agree which way it went/);
+      expect(disagreed?.reason).not.toMatch(/smaller than the engine will report/);
 
-      // And this one moved a hair with the versions all but unanimous. The half
-      // that failed is the floor, so "the versions did not agree" is false of
-      // it — and the same sentence has to be true of both.
+      // And this one moved a hair with the versions all but unanimous, and the
+      // engine names the other half. The two say different, true things.
       const aHair = tileLine({
         from: 0.41,
         to: 0.412,
         way: "up",
         by: 0.002,
         sameDirection: { reading: 0.99 },
+        unchangedBecause: "under_the_floor",
       });
-      expect(aHair?.reason).not.toMatch(/did not agree|these did not/i);
+      expect(aHair?.reason).toMatch(/smaller than the engine will report/);
+      expect(aHair?.reason).not.toMatch(/did not agree which way it went/);
 
-      // What it may say is the verdict and the engine's own two numbers.
+      // Either way it says the verdict and the engine's own two numbers.
       expect(disagreed?.reason).toContain(".41");
       expect(disagreed?.reason).toContain(".46");
       expect(disagreed?.reason).toContain(toShare(0.62));
+    });
+
+    it("test_the_no_change_reason_invents_no_half_the_engine_left_out", () => {
+      // The engine leaves the word out where there was no test to fail — no
+      // version of the map counted in both numbers, so there was no direction
+      // for them to agree about. The browser cannot work the half out for
+      // itself, because neither the floor nor the bar is anywhere in the
+      // engine's answer, so where the word is missing neither half is named.
+      const silent = tileLine({
+        from: 0.41,
+        to: 0.46,
+        way: "up",
+        by: 0.05,
+        sameDirection: { reading: 0.62 },
+      });
+      expect(silent?.words).toBe("no change");
+      expect(silent?.reason).not.toMatch(/smaller than the engine will report/);
+      expect(silent?.reason).not.toMatch(/did not agree which way it went/);
+      expect(silent?.reason).toMatch(/gave no word for which half/);
     });
 
     it("test_the_tile_and_the_rail_give_one_reason_and_not_two", () => {
@@ -374,6 +401,7 @@ describe("the second world", () => {
         way: "up",
         by: 0.05,
         sameDirection: { reading: 0.62 },
+        unchangedBecause: "versions_disagree",
       };
       const line = tileLine(moved);
       // The rail lists endings, so this half of the test asks about one: M1, a
@@ -386,6 +414,118 @@ describe("the second world", () => {
       expect(held?.move.absence?.words).toBe("no change");
       expect(held?.move.absence?.reason).toContain(noChangeReason(moved));
       expect(line?.reason).toBe(noChangeReason(moved));
+
+      // And the row's own half-line — the words a reader gets without pressing
+      // anything — comes from the same module and the same engine word, so the
+      // glance and the sentence behind it cannot say two different things.
+      expect(held?.note).toBe(noChangeInAWord(moved));
+      expect(held?.note).toBe("the versions disagreed which way");
+    });
+
+    it("test_an_ending_the_versions_disagree_about_stays_on_the_list", () => {
+      // The rule this whole block exists for, stated as a rule about the list
+      // rather than about a sentence: an ending the engine will not call moved
+      // is **on the change list**, marked as one that held still, and saying
+      // why. On the stored example's strike branch that is the talks — the
+      // biggest move on the map, behind the map's one bare assertion — and a
+      // list that quietly dropped it would drop the most interesting thing on
+      // the map without saying so.
+      const moved: Movement = {
+        from: 0.28,
+        to: 0.38,
+        way: "up",
+        by: 0.1,
+        sameDirection: { reading: 0.88 },
+        unchangedBecause: "versions_disagree",
+      };
+      const change = saysUnchanged(moved, "N1");
+      const listed = railRows(
+        branchWorld(base(), branch(), { at: "answered", now: base(), change }),
+        change,
+      );
+      expect(listed.map((row) => row.claimId)).toContain("N1");
+      const talks = listed.find((row) => row.claimId === "N1");
+      expect(talks?.unranked).toBe(true);
+      expect(talks?.note).toBe("the versions disagreed which way");
+    });
+
+    it("test_an_ending_you_forced_false_stays_on_the_list_and_is_not_no_change", () => {
+      // **The loudest thing an edit can do to an ending used to be the quietest
+      // thing on this screen.** Suppose the Brent contract false and the engine
+      // calls it `killed`; it ranks only what it calls moved, so it gives that
+      // ending no row — and the change list used to add one only for an ending
+      // it called `unchanged`. The reader forced an ending false and the list
+      // said nothing at all.
+      const edits: Edit[] = [{ op: "do", target: "M1", value: false, at: "2026-10-01" }];
+      const forcedFalse: BranchView = {
+        id: "br_kill_the_contract",
+        label: "Suppose the Brent contract does not come true",
+        hue: "violet",
+        edits,
+        claims: [],
+        links: [],
+      };
+      const change: DiffView = {
+        claims: new Map([["M1", { state: "killed" as const }]]),
+        rows: [],
+        summary: { reading: "It moves no ending." },
+        warnings: [],
+      };
+      // The world the engine built, in which the contract carries the word its
+      // tile shows instead of a likelihood. The word is not written out here:
+      // it comes from the one function that makes one.
+      const said = standingByClaim(edits, new Map());
+      expect(said.get("M1")?.words).toMatch(/^Supposed · /);
+      const asTheEngineBuiltIt = {
+        ...base(),
+        claims: base().claims.map((claim) =>
+          claim.id === "M1" ? { ...claim, standing: said.get("M1") } : claim,
+        ),
+      };
+      const listed = railRows(
+        branchWorld(base(), forcedFalse, { at: "answered", now: asTheEngineBuiltIt, change }),
+        change,
+      );
+
+      const contract = listed.find((row) => row.claimId === "M1");
+      expect(contract).toBeDefined();
+      expect(contract?.unranked).toBe(true);
+      // And it says what is true rather than what is convenient. *No change* is
+      // flatly false of an ending the reader has just forced false, and a
+      // likelihood would be the flat zero the engine stores for it wearing the
+      // certainty guard's clothes. It reads the word its tile reads.
+      expect(contract?.move.absence?.words).toBe(said.get("M1")?.words);
+      expect(contract?.move.absence?.words).not.toBe("no change");
+      expect(contract?.note).toBe("it was supposed false");
+      expect(contract?.move.absence?.reason).toContain("supposed this is false");
+    });
+
+    it("test_a_forced_false_ending_is_on_the_list_even_with_no_word_to_show", () => {
+      // The same rule with the browser's own half missing: whatever else is or
+      // is not known, an ending the engine called `killed` is **on the list**.
+      // The row falls back to the engine's own word for what happened rather
+      // than to silence or to *no change*, either of which would be untrue.
+      const forcedFalse: BranchView = {
+        id: "br_kill_the_contract",
+        label: "Suppose the Brent contract does not come true",
+        hue: "violet",
+        edits: [{ op: "do", target: "M1", value: false, at: "2026-10-01" }],
+        claims: [],
+        links: [],
+      };
+      const change: DiffView = {
+        claims: new Map([["M1", { state: "killed" as const }]]),
+        rows: [],
+        summary: { reading: "It moves no ending." },
+        warnings: [],
+      };
+      const contract = railRows(
+        branchWorld(base(), forcedFalse, { at: "answered", now: base(), change }),
+        change,
+      ).find((row) => row.claimId === "M1");
+      expect(contract?.unranked).toBe(true);
+      expect(contract?.move.absence?.words).not.toBe("no change");
+      expect(contract?.note).toBe("it was supposed false");
     });
   });
 

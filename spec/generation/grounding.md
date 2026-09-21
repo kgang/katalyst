@@ -118,6 +118,8 @@ def provenance_of(draft: LinkDraft, kept: tuple[Source, ...]) -> Provenance:
 
 **Provenance is written before the map is validated**, because it is one of the four things we stamp on the way in, beside the two identifiers and the owner. That ordering has a visible consequence, and B4 below is it.
 
+**The word we stamp here is also how wide that arrow's push gets drawn.** When the engine works the map through, each of its two thousand versions draws every arrow's push from a bell curve centred on what the map states, and how wide that curve is is read off this one word — narrowest for the three that mean somebody fetched something, widest for a bare assertion ([`../multiverse/propagation.md`](../multiverse/propagation.md) owns the table and the arithmetic). Two consequences worth stating here, where the word is written. **Nobody is asked a second question**: *how well-backed is this* and *how sure are we of this number* are the same question, and asking twice would invite two answers that disagree. And **no arrow this pipeline produces is ever the widest kind**, because the map's rules refuse an arrow with no mechanism at all — the table above says a proposal can only come out `documented` or `argued`, so the extremes belong to arrows a person, a price adapter or a probe wrote.
+
 ### How a base rate is researched, and when it is shown
 
 `BaseRate` is a domain shape ([`../graph/proposition.md`](../graph/proposition.md)), and `ClaimProposal` carries it optionally:

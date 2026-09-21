@@ -1,0 +1,12 @@
+# Deliberately unreachable. Export controls on frontier models have no mechanism
+# that reaches Gulf shipping insurance, so the only honest answer is no route,
+# naming the nearest claim the story did reach. This case is how we know the
+# pipeline is not making the chain up: we ask it for a chain that cannot exist.
+id: export-controls
+hypothesis: Models more capable than Fable get export restricted by the United States.
+door: verify
+target: Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.
+unreachable: true
+# Reads as the day the example is set on: 15 January 2027, a quarter out, which
+# is about as long as a rule-making of this kind takes to bite.
+seed: 20270115

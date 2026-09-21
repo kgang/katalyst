@@ -17,8 +17,8 @@ watching: our own rules turning the model down.
 Three things a reader can do after this chapter that they could not before. **Type any sentence and
 watch what it would cause.** **Name a destination and get a graded path to it, or an honest "no path
 reaches this" naming the nearest claim that was reached** (FR-7, UX-13). And, **with no model key at
-all, watch the same four examples run from recordings** (record 0012) — the same stream, the same
-canvas, the same refusals, labelled as a replay everywhere a reader looks.
+all, watch a recorded example run** (record 0012) — the same stream, the same canvas, the same
+refusals, labelled as a replay everywhere a reader looks.
 
 This chapter owns the eight stream events as the browser types them, the `growth` reducer that folds
 them into a world, the skeleton tile, the refusal strip, the receipt strip, the Verify door's two
@@ -451,10 +451,12 @@ The map that grows is the one the rest of this part works on — the cast is in
 settles below $68, **R** OPEC+ announces restraint, **M1** a Polymarket contract, **M2** an
 energy-fund claim, **N1** talks resume. B7 uses the Verify door instead, with M1 as the destination.
 
-**No number in this chapter is a measurement of a generation, because no generation has been run
-yet.** The recordings are made in this stack's server half. Where a run's own number would go — a
-token count, a cost, how long it took, a likelihood — this chapter says which field it comes from
-and prints nothing.
+**No number in this chapter is a measurement of a generation, and that is on purpose.** Real runs
+have been made and what they cost is written down, dated, in
+[`../../docs/measurements.md`](../../docs/measurements.md), which owns those figures. Where a run's
+own number would go here — a token count, a cost, how long it took, a likelihood — this chapter says
+which field it comes from and prints nothing, so a chapter about a screen never goes stale because a
+model got cheaper.
 
 ### B1 — The first second: a rectangle, never a spinner
 
@@ -483,14 +485,13 @@ token"*, and this pipeline has no first token to be within a second of: the mode
 measured from the first token would be a budget nothing could ever miss, because the thing it starts
 timing from arrives at the same moment as the thing it times. So the budget is measured from the
 request being accepted, and what has to be on screen within the second is a skeleton at its column —
-which is the honest reading of what UX-8 promises anyway. The sentence `PRODUCT_REQUIREMENTS.md`
-should carry instead is in this pull request's report; the requirement itself is not this chapter's
-to edit.
+which is the honest reading of what UX-8 promises anyway. **NFR-7 now reads that way**, amended
+2026-09-20 in `PRODUCT_REQUIREMENTS.md` itself, so the two no longer disagree.
 
 **There is no spinner anywhere in this product** — not here, not on the launchpad, not on the
 `insert` route, not while a lazily fetched midpoint chip is in flight. Waiting is always shown as the
 shape of the thing being waited for: a reserved rectangle where a claim will go, an absence with its
-reason where a number will go. Checklist line 2 is the standing check and
+reason where a number will go. Checklist `VR2` is the standing check and
 `test_there_is_no_spinner_anywhere` is the automated one.
 
 ### B2 — What a skeleton is, and what it never becomes
@@ -784,7 +785,7 @@ THIS GENERATION
 ```
 
 **Money has two places** *(coordinator, 2026-09-21)*. It printed up to four — `$0.6132` — which is
-the same fake precision checklist line 4 exists to stop, in the place a reader is most likely to
+the same fake precision checklist `VR4` exists to stop, in the place a reader is most likely to
 compare two runs: the fourth place is a rounding of a price table, and four places read as a
 measurement. **And a guard word exactly when it is true** (K2): a run that spent nothing prints
 `$0.00`, which is a computed zero and reads as one, and a run that spent something and less than a
@@ -815,7 +816,7 @@ Four things about it.
   and the dollars on this strip came from there. **Searches are a row of their own** because they are
   billed apart from tokens: without that row, `dollars` is a number a reader could check against the
   token counts and find wrong.
-* **Checklist line 4 is about likelihoods.** *"No number shows more than two significant figures, and
+* **Checklist `VR4` is about likelihoods.** *"No number shows more than two significant figures, and
   none is missing its range"* is the rule that stops a fake-precise `.347` reaching the screen
   (NFR-1). A token count, a call count, a duration and a dollar figure are counts and measurements:
   they are printed whole, in `--font-mono` with fixed-width digits, and they have no range because
@@ -1006,19 +1007,29 @@ The other five operations — **Suppose this is true**, **This happened**, **Cha
 the engine's pure core, which is why a reader with no key still gets the whole multiverse at full
 fidelity.
 
-### B9 — With no key: the replay badge, and the four cards
+### B9 — With no key: the replay badge, and the cards
 
-**The launchpad's four cards all open a map**, and the three that today read *not yet live* stop
-doing so. With a key they run live. With no key they run from recordings, through the same route, the
-same eight events, the same canvas, at a fixed pacing that is cosmetic and never changes content or
-order (record 0012).
+**With a key, all four cards run live.** With no key, a card runs from a recording — through the same
+route, the same eight events, the same canvas, at a fixed pacing that is cosmetic and never changes
+content or order (record 0012) — or **it is not drawn at all**: no key and no recording means an
+example nobody has recorded yet, and a card a reader cannot take up is not a card. So an example is
+live, replayed or named in a sentence, and each of the three is a fact about this copy rather than a
+guess.
 
-**The launchpad says so, word for word:**
+**The launchpad says which, and it never says more than is true.** Record 0012's sentence —
 
 > No model key configured — these four run from recordings made on \<date\>.
 
-The sentence sits under the cards and again beneath the free-text field, which is visibly
-disabled with it.
+— is printed **only when all four can be played and all four were made on one day**. Fewer than four,
+and the screen says how many of the four run and that the rest have nothing recorded yet. More than
+one day, and it names the **oldest**, so the sentence is never more current than the oldest thing it
+describes. Whichever it is, the sentence sits under the cards and again beneath the free-text field,
+which is visibly disabled with it. **Today one example is recorded**, the Strait of Hormuz, so a
+keyless reviewer reads the *fewer than four* form: *No model key configured — one of these four
+runs from recordings, made on \<date\>; the midterms, export controls and photonic chips have
+nothing recorded yet.* A screen promising four replays above
+one card that plays is the most misleading thing this product could put on its first screen, which is
+why the wording is chosen from what the folder holds rather than from what the design hoped for.
 
 **A card is only ever something a reader can take up** *(2026-09-21)*. It runs live or it runs from
 a recording — and a sentence this copy can do neither with gets **no card at all**. With one
@@ -1078,13 +1089,13 @@ the same day the `receipt` event carries, so it keeps one name in all three plac
 word, nothing to translate between.
 
 The browser reads the day from that field and never from a file name, a build date or its own clock.
-When the four were not all recorded on one day — G6 records them together once the prompt is frozen,
-so they normally are — the shared sentence prints the **oldest** day in the set and each card carries
-its own beneath, so the sentence is never more current than the oldest thing it describes.
+When the recordings were not all made on one day, the shared sentence prints the **oldest** day in the
+set and each card carries its own beneath, so the sentence is never more current than the oldest
+thing it describes.
 
 **The launchpad reads `replayable` and `model_key_present`, and ignores `status`.** A program with no
-key but four recordings can do everything a reviewer came to see, and a card greyed out because the
-whole server called itself `not_ready` would be the most misleading screen in the product.
+key but a recording can do everything a reviewer came to see, and a card greyed out because the whole
+server called itself `not_ready` would be the most misleading screen in the product.
 
 **A replay says it is a replay, twice, from two sources.** The badge is in the bar for the whole
 session, from the moment the run starts, set from `model_key_present` — the browser knows before the
@@ -1103,8 +1114,9 @@ still true that the run reported itself live. Resolving it in favour of either w
 deciding which of two things it was told to believe, which is the one decision it must not make on a
 reader's behalf. The reasoning lives beside the code that does it, in `ReplayBadge.tsx`.
 
-**One recorded intervention per recording.** Each file carries the scripted *"…but Iran is struck
-the next day"* its card offers, so **Add a claim** works once on a replayed map — the route matches
+**One recorded intervention per recording.** Each file carries the scripted "…but this also happens"
+sentence its card offers — for the Strait of Hormuz, *"…but Iran is struck the next day"* — so **Add
+a claim** works once on a replayed map. The route matches
 the sentence against the recording's own, exactly after trimming surrounding spaces, the same rule
 that chose which recording to play. There is no fuzzy matching and there will not be: a similarity
 score doing the model's job badly is a piece of state nobody could trace to an input, a rule or a
@@ -1137,8 +1149,8 @@ followed by a finished list.
 
 Each is *for all X, statement P holds*, and each names what checks it: a **component test** under
 `frontend/src/**/__tests__/`, the end-to-end browser test `frontend/e2e/generate.spec.ts`, or a
-numbered line of the **visual review checklist** in [`README.md`](README.md) — a checklist line is a
-checkable thing; it is checked by a person. Frontend test names are `test_snake_case`. Short file
+named line of the **visual review checklist** in [`README.md`](README.md), `VR1` to `VR13` — a
+checklist line is a checkable thing; it is checked by a person. Frontend test names are `test_snake_case`. Short file
 names below: **growth** is `frontend/src/stream/__tests__/growth.test.ts`, **reader**
 `frontend/src/stream/__tests__/generate.test.ts`, **noSpinner**
 `frontend/src/stream/__tests__/noSpinner.test.ts`, **strip**
@@ -1155,19 +1167,19 @@ state of the app, no element is rendered whose only content is an indeterminate 
 no `role="progressbar"` without a value, no spinning or pulsing element, no stylesheet rule that
 rotates or sweeps anything. Waiting is rendered as the shape of the thing waited for. *Test:*
 noSpinner › `test_there_is_no_spinner_anywhere` — a walk over every component and every stylesheet,
-the same technique `colourLaw.test.ts` uses. **Also: visual review checklist line 2.**
+the same technique `colourLaw.test.ts` uses. **Also: visual review checklist `VR2`.**
 
 **INV-workbench.61 — something is on screen before the first proposal returns.** For every
 generation, a skeleton tile is rendered on the `generation_started` event, before any
 `proposal_accepted` has arrived, and it carries the hypothesis as the reader typed it. *Tests:*
 growth › `test_a_skeleton_tile_appears_before_the_first_claim`; `frontend/e2e/generate.spec.ts`.
-**Also: visual review checklist line 13.**
+**Also: visual review checklist `VR13`.**
 
 **INV-workbench.62 — a skeleton is a box, never a claim.** For every skeleton rendered: it carries no
 digit anywhere, has no belief chip, is absent from `WorldView.claims`, is absent from the outline
 view, cannot be selected, and its identifier appears in no request the browser makes. *Test:*
-growth › `test_a_skeleton_carries_no_number_and_no_identifier`. **Also: visual review checklist line
-5** (is there a number nobody computed?).
+growth › `test_a_skeleton_carries_no_number_and_no_identifier`. **Also: visual review checklist
+`VR5`** (is there a number nobody computed?).
 
 **INV-workbench.63 — the skeletons are the frontier, and nothing else.** For every stream and after
 every event in it, the set of skeletons on screen is exactly the set named by the most recent
@@ -1190,7 +1202,7 @@ changed drops its pin. It is the one event that could move a tile a reader is al
 it was the one event the walks stopped short of. *Tests:* growth ›
 `test_a_tile_keeps_its_place_when_a_later_tile_arrives`; layout ›
 `test_no_two_tiles_in_a_column_collide`; `frontend/e2e/generate.spec.ts`. **Also: visual review
-checklist line 13.**
+checklist `VR13`.**
 
 **INV-workbench.65 — a wire draws only after both ends exist.** For every stream, including one built
 so that an arrow arrives before one of its ends, no wire is rendered unless both of the claims it
@@ -1210,8 +1222,8 @@ one or rolled through a value in between. *Test:* growth › `test_chips_resolve
 per entry in `violations`, each line being that violation's own `message` with no text added, and no
 refusal is dropped, merged or summarised. No rendered element derives its text from a `Violation`'s
 `code`. *Tests:* strip › `test_a_rejected_proposal_is_shown_not_hidden`;
-`frontend/e2e/generate.spec.ts`, which requires at least one refusal on screen. **Also: visual review
-checklist line 13.**
+`frontend/e2e/generate.spec.ts`, which requires at least one refusal on screen. **Also: visual
+review checklist `VR13`.**
 
 **INV-workbench.68 — the reducer computes nothing.** For every module under `frontend/src/stream/`,
 no expression combines two values read from an event with `+`, `−`, `×` or `÷`, and every number
@@ -1219,8 +1231,8 @@ rendered from a generation is a field on an event. Counting the rows in a list t
 comparing a value with a fixed threshold, are excluded by name. *Tests:*
 `frontend/src/graph/__tests__/noArithmetic.test.ts` › `test_canvas_never_combines_two_model_numbers`,
 extended to `frontend/src/stream/`; strip ›
-`test_the_receipt_strip_prints_every_field_and_adds_nothing_up`. **Also: visual review checklist line
-5.**
+`test_the_receipt_strip_prints_every_field_and_adds_nothing_up`. **Also: visual review checklist
+`VR5`.**
 
 **INV-workbench.69 — an unknown event is ignored and reported.** For every event name the build does
 not know, the reducer leaves its state otherwise unchanged, counts the name, and the Inspector's
@@ -1268,8 +1280,8 @@ under `prefers-reduced-motion: reduce` every tween is `0ms` while the 60-millise
 columns remains. This is [`color-motion-type.md`](color-motion-type.md)'s INV-workbench.18 with
 nothing added to it. *Test:* `frontend/src/styles/__tests__/motionBudget.test.ts` ›
 `test_no_duration_above_120ms_outside_the_three_budgeted_moves`,
-`test_reduced_motion_zeroes_every_tween_and_keeps_the_stagger`. **Also: visual review checklist line
-10.**
+`test_reduced_motion_zeroes_every_tween_and_keeps_the_stagger`. **Also: visual review checklist
+`VR10`.**
 
 **INV-workbench.74 — nothing is silently inert without a key.** For every control a generation needs
 — the hypothesis field, the destination field, the likelihood slider, **Add a claim** — whenever the

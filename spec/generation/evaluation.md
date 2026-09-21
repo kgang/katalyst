@@ -55,6 +55,13 @@ evals/
   runs/           <date>.tsv, one row per case, committed
 ```
 
+It sits **outside `backend/`** on purpose. It is not in the build, it calls a
+model and it costs money, so putting it inside the package that ships would put a
+thing that spends money one import away from the thing that serves requests. Its
+own tests live in the suite all the same, under `backend/tests/unit/evals/`,
+because they are the only thing that says the eight checks do what this chapter
+says they do.
+
 A case is small, because everything interesting about it is what the *model* does with it:
 
 ```yaml
@@ -77,7 +84,7 @@ The case identifiers are the four example names — the same strings the launchp
 | # | Case | Hypothesis | Door | Destination | What it is for |
 |---|---|---|---|---|---|
 | 1 | `hormuz` | *The Strait of Hormuz is going to open next week.* | **Verify** | *Brent crude settles below $68 for five sessions.* | The assignment's own first use case, word for word: does the opening logically lead to oil prices falling? A path should exist, and the eval asserts only that a graded path or an honest refusal comes back — never which path |
-| 2 | `midterms` | *Republicans win the House but Democrats take the Senate during the Midterm.* | **Explore** | — | A hypothesis in a different domain entirely, with no oil in it. It is here to catch a prompt that has quietly learned one subject |
+| 2 | `midterms` | *Republicans win the House but Democrats take the senate during the Midterm.* | **Explore** | — | A hypothesis in a different domain entirely, with no oil in it. It is here to catch a prompt that has quietly learned one subject |
 | 3 | `export-controls` | *Models more capable than Fable get export restricted by the United States.* | **Verify** | *Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.* | **Deliberately unreachable.** Export controls on frontier models have no mechanism that reaches Gulf shipping insurance. This case exists to prove that no code path invents a bridge (FR-7) |
 | 4 | `photonics` | *Photonic chips get adopted faster than expected.* | **Explore** | — | A slow, diffuse, long-horizon hypothesis — the kind that tempts a model into vague claims. Every claim it produces still has to be checkable (INV-1) |
 
@@ -99,6 +106,10 @@ Eight checks. Every one is a count or a shape; not one is a judgement about a se
 | 8 | Every base rate on the finished map cites a page the research actually returned; `base_rates_dropped` counts the ones that did not, and each carries its note in the transcript | Kent's G7, 2026-09-20 — 8 of 10 claims in the first live run came with a recalled count like "12 of 15" and no source at all. A count with no page behind it is a number nobody computed |
 
 Checks 1 to 4 are `domain.validate` run on the finished map, which is the same rules layer the pipeline already refuses proposals with. The harness adds nothing new to the rules; what it adds is the question *does the model's own output satisfy them, on a map nobody hand-wrote?*
+
+**Five of the eight are about the map and three are about the run**, and the line matters when a run built no map at all: the five say plainly that there is nothing to read, and checks 5, 6 and 7 are still read — because "it could not say why it stopped" is worth knowing about a run that produced nothing.
+
+**Four of the eight can only fail if our own accept step let something past.** A loop, an arrow with no mechanism, a claim with no test and a count of past cases with no page behind it are all refused at the moment the proposal lands, so none of them can reach a finished map through `expand` at all. Checks 1, 3, 4 and 8 are therefore not questions about the model; they are the same question `violations` and `asserted_links` ask — *and if one ever did?* Their tests feed the harness maps damaged on purpose, the same damaged maps the rules layer's own property tests use. The other four can fail on a real run, and are shown failing on one.
 
 ### The scorecard, named now
 
@@ -155,15 +166,17 @@ class Scorecard(BaseModel):
     model: str
     prompt_hash: str                # which prompt produced these numbers
     cases: tuple[CaseScore, ...]
-    passed: int                     # cases where all seven checks held
+    passed: int                     # cases where all eight checks held
     failed: int
 ```
+
+**Which check did not hold is said on the terminal, not in the file.** The row carries the counts each check was read from, and a column saying "three of eight" would be a ninth number derived from the other twenty-five. So `run.py` prints the failed checks by number, by name and with the rules' own sentence, beneath the table, and exits non-zero. A reader comparing two committed scorecards is comparing counts; a person watching a run is told what went wrong.
 
 **Why these columns and no others.** Each is either a count of something on the finished map or a number the receipt already holds. There is no column that requires an opinion, because a column that requires an opinion moves with whoever is holding it.
 
 **Two columns are derived, and say so:** `searches_per_claim` and `seconds_per_call` are the two columns above them divided. They earn their place because they are what a person actually compares between two runs, and putting the division in one place stops two readers doing it two ways. They are never a *source*: if either disagrees with the columns it came from, it is the derived one that is wrong.
 
-**One column has no home yet.** `thinking_tokens` is on `Outcome` and on the transcript's lines, and deliberately **not** on `Receipt`: the receipt's shape is settled and a number shown in two places is two numbers that eventually disagree. So it is read per call, from the working, and never summed onto the bill. It matters now because the first measured run spent **61% of its written tokens thinking**, so a prompt change that halves the thinking halves most of the bill and no existing column would show it. Adding it is one counter on `Outcome` and one field on `Receipt`; flagged to whoever writes `engine/receipt.py`, and until it lands this column reads whatever the harness can see.
+**One column is read from somewhere else, on purpose.** `thinking_tokens` is on `Outcome` and on the transcript's lines, and deliberately **not** on `Receipt`: the receipt's shape is settled and a number shown in two places is two numbers that eventually disagree. So the harness sums it off the transcript's own lines rather than off the bill. It matters because the first measured run spent **61% of its written tokens thinking**, so a prompt change that halves the thinking halves most of the bill and no other column would show it. It is the one column whose source is the working rather than the receipt, and that is written down here so nobody later "fixes" it by adding a field to `Receipt`.
 
 **A scorecard compares runs of the same model** (Kent, G8, 2026-09-20). The model is one named setting, `KATALYST_MODEL`, defaulting to `claude-sonnet-5` for the prototype; nothing else in the pipeline knows which model it is, and the price table is per model. `Scorecard.model` is on every run for exactly this reason: **two rows from two models are not a comparison**, they are two measurements, and reading them as a before-and-after would credit a prompt change with a model change or the reverse. When a run deliberately crosses models — a final recording on a larger model, say — the comparison says so in words beside it.
 
@@ -185,17 +198,27 @@ That second row is worth reading twice. An ensemble cannot be justified against 
 ### `make eval`
 
 ```
-make eval               # all four cases, at the cap written in code
-make eval CAP=…         # the same, with a lower ceiling
+make eval ONLY=hormuz     # the one to run today — see the bullet on the freeze below
+make eval ONLY=hormuz CAP=5         # the same, with a lower ceiling over the whole round
+make eval ONLY=hormuz EFFORT=high   # the same, thinking harder than the default
+make eval ONLY=hormuz EFFORT=as-recorded  # the same, at the effort the recordings are made at
+make eval                 # all four cases, for the cap written in code between them
 ```
 
-* Runs **live**, against a real key. `CAP` is the run's spending ceiling in dollars; the default is the **$15 hard stop written in code** (Kent, G5), and the argument can only lower it. The running receipt is checked after every call, and between the rounds of research inside one.
-* Prints the scorecard to the terminal, as a table a person reads.
-* Writes `evals/runs/<date>.tsv` — tab-separated, one header row, one row per case, `run_at` first. A second run on the same day **appends**; the rows are told apart by `run_at` and by `prompt_hash`. Tab-separated because it opens in a spreadsheet and still diffs as text in git.
-* Exits non-zero if any case failed a check, so it is usable from a script even though nothing schedules it.
+The same three flags as `make record-demo`, meaning the same three things: one name, one ceiling, one effort. There is deliberately **no flag naming a model** — `KATALYST_MODEL` is what the bill is priced against and what the scorecard's own column reports, so a flag could name a third model and nobody would know which one the dollars belonged to.
+
+* **A round asks for `medium` effort on `claude-sonnet-5` unless told otherwise** *(Kent, 2026-09-21)*. This is the development default, and it extends the rule the stream route already follows — *record rich, run live fast* — to the scorecard: **only the recorder sends nothing.** The reason is patience, measured: at the service's own default one Hormuz case ran for the best part of an hour, and a scorecard that slow is not run while a prompt is being worked on, which is the only time it is useful. `medium` is also what a person typing a sentence in the browser gets, so the round scores the maps a live reader actually sees. **What it gives up, said plainly:** the committed recordings are made at the service's default, so a default round no longer scores the maps a reviewer with no key is shown. `EFFORT=as-recorded` sends no effort at all and scores exactly those; run it when the recordings are made, at the freeze. `KATALYST_EFFORT` in the settings outranks both, as it outranks every pinned default. Every row of the scorecard carries an `effort` column beside `model`, for the same reason `model` is there — a round at `medium` and a round at the recorder's effort are two measurements, not a before-and-after — and the kept run's receipt says it too. **The first pair, 2026-09-21:** the recorder's effort held all eight checks in 27 minutes; `medium` held seven in 11, its one tradeable ending refused for naming no payoff. Kent kept the decision with those numbers in front of him; what each round cost is in [`docs/measurements.md`](../../docs/measurements.md), and what each scored is in `evals/runs/2026-09-21.tsv`.
+* Runs **live**, against a real key. **A `CAP` that is not money is refused before anything runs** *(2026-09-21)*: at or below zero asks for a round that may never start a case, and anything under half a penny prints `$0.00`, so the round would have reported spending a penny out of a ceiling of nothing — which it did. The minimum is one penny, the refusal is one sentence, and nothing is written. **`CAP` is otherwise the ceiling on the whole round, across every case it runs — not on each case** *(stated plainly here 2026-09-21; the harness gave every case the whole figure, so a default four-case round could spend four times it)*. The default is the **$15 hard stop written in code** (Kent, G5), and the argument can only lower it. One running total is carried from case to case: each is handed what is left of the ceiling, the running receipt is checked after every call and between the rounds of research inside one, and **a case there is nothing left for is never started**. The scorecard then says in one plain sentence what the round spent, which cases ran and which were left out — four silent columns would otherwise read as four cases with nothing to report — and the program exits non-zero, because a round that stopped short has scored nothing about what it never ran. `test_the_cap_bounds_the_round_and_not_each_case` starts the program with a stand-in whose every answer is dear and holds all of that.
+* **Drives the one walk that already exists** — `engine/grow.py` followed by `engine/following.py`, the same loop the stream route and the recorder use. A harness with a walk of its own would eventually score a pipeline nobody ships.
+* **Keeps every run under `backend/.runs/`, whatever it scores**, through the recorder's own keeper: every proposal with the seconds and the thinking tokens it took, the receipt, the reason it stopped and the map it built. A run that cost money and left nothing behind is an afternoon nobody can account for. Those files are not committed; the scorecard is.
+* Prints the scorecard to the terminal, **turned on its side** — one line per field, one column per case — because a row per case is twenty-five columns wide and nobody reads that. A person comparing two runs reads down a column.
+* Writes `evals/runs/<date>.tsv` — tab-separated, one header row, one row per case, `run_at` first, then `model`, `effort` and `prompt_hash`, then the row. Those four read the same on every row rather than sitting once at the top, because a second run on the same day **appends** to that same file and a heading would then be a heading over somebody else's rows. Tab-separated because it opens in a spreadsheet and still diffs as text in git.
+* Exits non-zero if any case failed a check, or if the round ran out of money before it reached every case, so it is usable from a script even though nothing schedules it.
+* **Writes no row for a run it did not pay for.** A run answered by the stand-in named in `KATALYST_ANSWERER` prints its table, says in one line that it measured nothing, and writes no file — the same rule the recorder keeps for recordings, for the same reason: a file the repository commits as evidence has to be evidence.
 * Is **committed**, results and all. It holds counts and dollars, no prompt text and no model output, so it can neither leak a key nor embarrass anybody. `gitleaks` scans it like everything else.
 * **Only the coordinator runs it.** No sub-agent holds a key.
 * **All four cases run once through it as soon as the pipeline is green** (Kent, G6) — structure only, no recording written — so a prompt that fails on the midterm or the photonics example is found while it is still cheap to fix. See [`replay.md`](replay.md).
+* **Until the prompt is frozen, the command to run is `make eval ONLY=hormuz`** *(Kent, 2026-09-21)*. The Strait of Hormuz is the only example with a committed recording. Each of the other three means about forty minutes of live model time against words that are about to change: every change to what the model is asked is being batched into **one freeze at the end of the engine work**, and scoring the other three before it buys a measurement of a prompt nobody will ship. When the freeze lands, all four are recorded together and scored together, and `make eval` with nothing else on the line is the ordinary use again. **The program's own default is still all four cases**, and is not changed by this — a command that quietly scored one case while saying it scored four would be exactly the kind of silence the scorecard exists to stop.
 
 ### Evals are not in the build, on purpose
 
@@ -246,9 +269,11 @@ If this case ever comes back `reached`, one of two things is true: a mechanism g
 
 ### B3 — A run that reaches its cap
 
-Case 4 is a diffuse hypothesis and the map keeps growing. The running receipt reaches the ceiling. The generation stops, the stream's `done` carries `reason: "spend_cap"`, and the `Failed` event is **not** used — stopping on budget is a decision, not a fault.
+Case 4 is a diffuse hypothesis and the map keeps growing. The running receipt reaches what is left of the round's ceiling. The generation stops, the stream's `done` carries `reason: "spend_cap"`, and the `Failed` event is **not** used — stopping on budget is a decision, not a fault.
 
-The scorecard row is still written. `stopped_for` reads `spend_cap`, `dollars` reads the cap, and the structural checks still run against the partial map — a map that stopped early can still be free of loops, still carry resolution criteria on every claim, and still fail check 2 by having no ending yet. That failure is informative, and losing it by refusing to score the row would be the wrong trade.
+The scorecard row is still written. `stopped_for` reads `spend_cap`, `dollars` reads what that case was allowed, and the structural checks still run against the partial map — a map that stopped early can still be free of loops, still carry resolution criteria on every claim, and still fail check 2 by having no ending yet. That failure is informative, and losing it by refusing to score the row would be the wrong trade.
+
+**A case with nothing left to spend is a different thing and reads differently.** It is never started, so it has no row, no kept run and no checks — there is nothing to score. The sentence beneath the table names it, and that is the only place it appears. Writing an empty row for it would put a case on the scorecard that no model ever answered, which is the same mistake as writing a row for a run a stand-in answered.
 
 ---
 
@@ -297,4 +322,5 @@ Raised 2026-09-17.
 1. **The pastcast is stack 07, and it is the missing half of this chapter.** FR-30 wants a chain run on a resolved 2024–25 event against a date-frozen corpus, scored with a Brier score — the standard accuracy score for probability forecasts, where lower is better — and shown *including when it is bad*. It needs three things this stack does not have: resolved events with dates, a way to keep the search tool from seeing anything after the freeze date, and a calibration column on the scorecard above. Decision record 0015 names it as the measurement that would reopen the ensemble question, and S8 names it as the measurement that would justify a critique pass. **Both reopenings depend on it, so it is the first thing stack 07 should cost.**
 2. **How many eval rounds the stack's budget actually buys.** Kent's G5 sizes the stack at about $500 and a run at no more than $15, and estimates cassettes, four recordings, two or three re-record rounds and about five eval rounds. Nothing has been measured. The first Hormuz generation's true cost — thinking tokens and web searches included — goes into [`../../docs/measurements.md`](../../docs/measurements.md), and this estimate should be redone against it before a second full round is run.
 3. **Should a case carry an expected claim count, as a loose band?** It would catch a prompt that has quietly started producing three-claim maps. It would also be the first number in this harness that somebody typed rather than measured, so it can only come *after* several runs have been scored — a band read off the baseline, dated, and re-read when the prompt changes. Not before.
-4. **Four cases is the assignment's four, and the assignment's four are all the coverage there is.** They share a shape: a single near-term event with financial consequences. A hypothesis with no plausible market at the end of it — one that *should* produce a `not_tradeable` ending — is not among them, and check 2 would pass either way. Worth one more case when there is budget for a fifth.
+4. **`evals/` is outside what the build lints and type-checks.** The `backend` job runs `ruff` and `mypy` from `backend/`, so it covers the harness's *tests* and not the harness. They are kept clean by hand today, which is a promise rather than a check. The cheapest fix is one more path on those two commands; it was left out of the pull request that built the harness because the commands belong to the build's own files rather than to this chapter's.
+5. **Four cases is the assignment's four, and the assignment's four are all the coverage there is.** They share a shape: a single near-term event with financial consequences. A hypothesis with no plausible market at the end of it — one that *should* produce a `not_tradeable` ending — is not among them, and check 2 would pass either way. Worth one more case when there is budget for a fifth.

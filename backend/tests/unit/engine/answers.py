@@ -475,29 +475,35 @@ def _pointing_at(
     said = answer.parsed_output
     if isinstance(said, ClaimProposal) and said.cause == FROM_THE_QUESTION:
         named = _name_for(question, about)
-        return answer.model_copy(
-            update={"content": [_a_block(said.model_copy(update={"cause": named}))]}
-        )
+        return _answering_with(answer, said.model_copy(update={"cause": named}))
     if isinstance(said, LinkProposal):
         # A story writes an arrow by naming the two claims' own words; the short
         # names are minted while the run is happening, so they are put in here.
-        return answer.model_copy(
-            update={
-                "content": [
-                    _a_block(
-                        said.model_copy(
-                            update={
-                                "source": _name_for(question, about)
-                                if said.source == FROM_THE_QUESTION
-                                else _name_for(question, said.source),
-                                "target": _name_for(question, said.target),
-                            }
-                        )
-                    )
-                ]
-            }
+        return _answering_with(
+            answer,
+            said.model_copy(
+                update={
+                    "source": _name_for(question, about)
+                    if said.source == FROM_THE_QUESTION
+                    else _name_for(question, said.source),
+                    "target": _name_for(question, said.target),
+                }
+            ),
         )
     return answer
+
+
+def _answering_with(answer: ParsedMessage[Proposal], said: object) -> ParsedMessage[Proposal]:
+    """Put a rewritten answer back where the old one was, keeping the rest of the reply.
+
+    **What the search tool returned is kept.** Replacing the whole of a reply's
+    content with the answer block threw the search results away, so no run driven
+    by a story could ever produce an arrow that said it documented anything, or a
+    count of past cases with a page behind it — the two things the grounding rule
+    exists to produce. The answer is the last block a reply carries, so everything
+    before it is whatever the tools returned (2026-09-21).
+    """
+    return answer.model_copy(update={"content": [*answer.content[:-1], _a_block(said)]})
 
 
 def _name_for(question: str, about: str) -> str:

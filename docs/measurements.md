@@ -8,9 +8,65 @@
 
 **Engine timings are not restated here.** How long it takes to work the likelihoods through a map — a world, a sixty-claim map, a year-long window — is measured in `spec/multiverse/propagation.md`, which owns those numbers. Go there rather than copying them.
 
+**Nor are the evaluation scorecards.** `make eval` writes its own rows into `evals/runs/<date>.tsv`, committed, one file per day it is run. Those say how well the prompt did; this file says what a run cost. Nothing here restates a scorecard, and no scorecard restates a receipt.
+
 ---
 
 <!-- NEXT ENTRY GOES HERE — newest first. Add above the rule below; change nothing beneath it. -->
+
+## 2026-09-21 — `make eval ONLY=hormuz`, twice: once at each effort
+
+The first two rounds the scorecard ever ran against a real key, side by side on one sentence, one model, one prompt and one evening. **They are the measurement behind Kent's decision that development runs at `medium`** (2026-09-21): only the recorder sends no effort; a live run and `make eval` ask for `medium`. What each scored is in [`evals/runs/2026-09-21.tsv`](../evals/runs/2026-09-21.tsv), which owns those figures; this entry is what each cost.
+
+| | Effort left to the service (`EFFORT=as-recorded` today) | `medium` (the default today) |
+|---|---|---|
+| Model | `claude-sonnet-5` | `claude-sonnet-5` |
+| Code | `dacd6da` | `dacd6da` plus the uncommitted change of default |
+| Started (UTC) | 17:57:30 | 18:19:46 |
+| Calls | 15 | 13 |
+| Searches | 55 | 24 |
+| Dollars | $2.17 | $0.94 |
+| Wall clock | 27 m 25 s | 11 m 16 s |
+| Seconds a call | 110 | 52 |
+| Written tokens, of which thinking | 92 949, 74 421 | 32 823, 22 385 |
+| Map reached | 6 claims, 9 arrows, 1 ending | 4 claims, 5 arrows, no ending |
+| Refused by the rules | 1 | 3 — two `duplicate_link`, one `market_without_payoff` |
+| Stopped because | `reached_terminal` | `no_terminal` |
+| The eight checks | all eight held | seven held; *an ending that names a trade, or says why there is none* did not |
+| Raw record | `backend/.runs/hormuz-2026-09-21T18-24-54Z-01M32HVA1F3SX18H513M6GTNPT.json` | `backend/.runs/hormuz-2026-09-21T18-31-02Z-01M32K42Z4036436TG96Q46RN0.json` |
+
+**What the pair buys, and what it gives up.** `medium` was 2.4 times faster and 2.3 times cheaper, which is the whole reason for it: a scorecard that takes the best part of an hour is not run while a prompt is being worked on. It also drew the smaller map, and **its one tradeable ending was refused by our own rules** — the model proposed a market claim and named no payoff — so the map ended nowhere a reader can act. Kent saw these numbers and kept the decision. **One round each proves a direction, not a rate**: the evaluation chapter says plainly that one prompt scores slightly differently twice. The refusal itself is a known gap, not a new one — requiring a payoff in the shape the model fills is already written and is held for the one change of shape at the end of the engine work, because it moves the prompt's fingerprint and every recording would have to be paid for again.
+
+**The two rounds ran at once**, the second starting 22 minutes into the first, so neither wall clock is a clean solo timing; the first had the key to itself for most of its length.
+
+---
+
+## 2026-09-21 — the committed Strait of Hormuz recording
+
+The generation a keyless clone plays back, made by `make record-demo ONLY=hormuz`. It is the only
+committed recording; the other three example sentences have none, and each would cost about the same
+again.
+
+| | |
+|---|---|
+| Model and effort | claude-sonnet-5, effort left at the service's default |
+| Calls | 29 |
+| Searches | 93 |
+| Dollars | $4.04 |
+| Wall clock | 36 m 19 s |
+| Map reached | 18 claims, 19 arrows |
+| Refusals | 3 proposals refused by the rules, each kept in the recording in the validator's own words |
+| Claims with a sourced base rate | 5 of 18 |
+| Stopped because | `width_cap` — the last open claim already had as many children as the run allowed |
+| Committed as | `backend/recordings/hormuz.jsonl` |
+| Raw record | not on disk. The run was kept under `backend/.runs/` in the working copy that made it, and that copy has since been removed; the two Hormuz runs kept in the main copy carry other identifiers. The committed recording is complete — every event, and the receipt these figures were read from — so nothing on this table rests on the missing file |
+
+**Why this entry carries no figure from an earlier attempt.** A recording is re-made whenever the
+words this program sends the model change, and the shapes it asks the model to fill changed after the
+first Hormuz recording was made. The run above is the one that is committed; the one before it cost
+real money and is a different measurement, not a correction of this one.
+
+---
 
 ## 2026-09-21 — two whole-map runs on `claude-sonnet-5`, one per effort
 

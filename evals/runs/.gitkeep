@@ -1,0 +1,8 @@
+The scorecards `make eval` writes land here, one file per day it was run:
+`<date>.tsv`, one header row and one row per case. A second run on the same day
+appends to that day's file rather than replacing it, and its rows are told apart
+by when the run started and by the prompt's fingerprint.
+
+They are committed, results and all. They hold counts and dollars — no prompt
+text and no model output — so a scorecard can neither leak a key nor embarrass
+anybody, and two of them side by side are how a prompt change is judged.

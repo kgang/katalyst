@@ -66,9 +66,61 @@ numbers-check: ## Check that file still says what the engine says. Changes no fi
 	cd backend && env -u ANTHROPIC_API_KEY -u FRED_API_KEY \
 		uv run python -m katalyst.engine.worked_numbers --check
 
-eval: ## Score what the language model proposes against saved examples
-	@echo "make eval arrives in the next pull request of this stack: the four saved"
-	@echo "examples, scored on structure and never on wording."
+# `eval` runs the saved examples live and scores what comes back on **structure,
+# never on wording**: no loops, an ending that names a trade, a reason on every
+# arrow, a test on every claim, a graded route or an honest refusal, the cache
+# actually being read back, a named reason for stopping inside the ceiling, and a
+# page behind every count of past cases. Not one check is a judgement about a
+# sentence, because a test that judges a sentence fails when somebody improves
+# the prompt.
+#
+#   make eval ONLY=hormuz         THE ONE TO RUN TODAY - see the paragraph below
+#   make eval ONLY=hormuz CAP=5   the same, with a lower ceiling over the round
+#   make eval ONLY=hormuz EFFORT=high     the same, thinking harder than the default
+#   make eval ONLY=hormuz EFFORT=as-recorded   the same, at the effort the recordings are made at
+#   make eval                     all four cases, for the ceiling written in code
+#
+# **Run it as `ONLY=hormuz` until the prompt is frozen** (Kent, 2026-09-21). Only
+# the Strait of Hormuz has a committed recording; the other three cases each mean
+# a live run of about forty minutes against words that are about to change, and
+# every such change is being batched into one freeze at the end of the engine
+# work. When that freeze lands, all four are recorded together and `make eval`
+# with nothing else on the line is the ordinary use again. **The program's own
+# default is still all four** - this is a standing instruction about what to run
+# now, not a change to what the command means, so nothing here silently scores
+# less than it says it did.
+#
+# **A round asks the model for `medium` effort unless told otherwise** (Kent,
+# 2026-09-21). At the service's own default one case took the best part of an
+# hour, and a scorecard nobody has the patience to run measures nothing. `medium`
+# is what a live run in the browser already asks for, so the round also scores the
+# maps a person typing a sentence actually gets. The rule is one rule: ONLY THE
+# RECORDER SENDS NOTHING. `EFFORT=as-recorded` sends nothing too, for the day you
+# want the scorecard of the maps a reviewer with no key is shown. Which model
+# answers is unchanged: KATALYST_MODEL, `claude-sonnet-5` unless you say otherwise.
+#
+# The same three flags as `record-demo`, meaning the same three things. CAP can
+# only lower the $15 hard stop written in code, never lift it — and it bounds the
+# WHOLE ROUND, not each case: one running total is carried from case to case, each
+# is handed what is left, and a case there is nothing left for is not started. The
+# scorecard says which ones those were. Which model answers is the KATALYST_MODEL
+# setting and nothing else, so the bill and the scorecard's own column can never
+# name two different models.
+#
+# It prints a scorecard, writes one row per case into `evals/runs/<date>.tsv`, and
+# exits non-zero if any check did not hold or if the round ran out of money before
+# it reached every case. **Every run is kept under `backend/.runs/` whatever it
+# scores**, exactly as a recorded run is.
+#
+# It is deliberately **not** in the build: it costs money, it needs a key, and
+# the same prompt scores slightly differently twice — so a merge would be blocked
+# by a model's mood. The build's check on the model boundary is the recorded
+# exchanges under `backend/tests/cassettes/`, and nothing else.
+
+eval: ## Score what the language model proposes against saved examples. Spends money; needs a key
+	cd backend && PYTHONPATH=.. uv run python -m evals.run \
+		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),) \
+		$(if $(EFFORT),--effort $(EFFORT),)
 
 # --- the two tasks that spend money -----------------------------------------
 #

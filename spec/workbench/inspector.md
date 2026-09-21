@@ -18,6 +18,8 @@ click (NFR-1). Where a value does not exist the panel says so **in words, with a
 blank, never a zero, never a stand-in. In this stack that reason is usually *"no engine yet"*, which
 is an honest sentence rather than a hole.
 
+**Every engine-computed figure quoted below is read from one generated file.** [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) is written by `make numbers` from the shipped engine on the Strait of Hormuz map, at that example's own seed and the shipped loop sizes, and the build fails when it goes stale. Every line in it starts with a name a passage can cite — `B · base · reading` — and the numbers a person typed into the example are kept in a part of their own, apart from the numbers the engine worked out. A figure is quoted here only where it teaches something; the file is where it is kept true, so the day the arithmetic changes, the diff of that one file is the whole list of what moved.
+
 [`keyboard-and-access.md`](keyboard-and-access.md) covers reaching and reading the panel without a
 mouse, and owns the rendering rule behind INV-7 — two significant figures, and the range never
 omitted.
@@ -140,7 +142,7 @@ Five things to read off that:
 * **The model row here is the prior's own numbers, and that is not a coincidence.** Every
   `beliefs.model` in the fixture equals its `prior`, because nothing has been computed into it — so
   the stated sentence describes exactly what the row holds. Run the engine over this map and B comes
-  out `.40 (.25–.55)`, which is the number the computed sentence above would be about.
+  out `.40 (.24–.56)`, which is the number the computed sentence above would be about.
 * **Four things are genuinely absent on B, and each absence says which kind it is.** The **tile**
   shows `no market` and nothing else; **this panel is where the reason is read** — chosen by the
   claim's `kind` and written once in [`../vocabulary.md`](../vocabulary.md). B is an `event`, so it
@@ -228,7 +230,13 @@ there is a slot directly under it, and **in this stack nothing ever draws it**, 
 computed yet. What it will hold, in stack 06, is one sentence naming the claim whose own prior
 explains most of the band:
 
-> **65% of this band is B's own prior; pin that down and the band goes from 30 points to 12.**
+> **`<share>` of this band is `<claim>`'s own prior; pin that down and the band goes from `<this
+> wide>` to `<that wide>`.**
+
+Every slot in it is the engine's. Today the share is the line named `B · base · band from B` in the
+generated numbers file and the band it is a share of is `B · base · reading`; **what the band
+narrows to is computed nowhere yet**, which is the one thing still owed before this sentence can be
+written, and it is why the example above is a shape rather than a sentence with figures in it.
 
 That sentence is computed from `World.range_shares` — each stated range's share of this claim's
 band, which the engine gets out of the same two thousand versions of the map it already runs, at no
@@ -294,6 +302,13 @@ WHERE IT CAME FROM
 The weakest arrow on the map is H → N1, and it says so: **●** `asserted`, with a rationale admitting
 it cannot tell which way the causality runs. It is kept rather than deleted, because the ending it
 reaches — a real outcome nobody can trade — is worth saying out loud.
+
+**One mark, two things, and the second is new.** The mark says how well-backed the arrow is, and the
+engine now reads the same word as *how unsure we are of its push*: each version of the map draws a
+`documented` arrow's push close to what the map states and an `asserted` one's far from it
+([`../multiverse/propagation.md`](../multiverse/propagation.md) owns the table). N1's only incoming
+arrow is this one, and on the strike branch N1 has the widest band of the eight claims because of it:
+`.38 (.17–.61)`. A reader who sees one dot is being told both things at once.
 
 ### B5 — The path-product bar (INV-8)
 
@@ -459,21 +474,21 @@ with them, and INV-workbench.72 there pins the receipt's own fields.
 ## INVARIANTS
 
 Each is *for all X, statement P holds*, and each names what checks it: a component test, or a
-numbered line of the **visual review checklist** in [`README.md`](README.md). Frontend test names
-are `test_snake_case`. Unless another file is named, the test lives in **inspector** —
+named line of the **visual review checklist** in [`README.md`](README.md), `VR1` to `VR13`.
+Frontend test names are `test_snake_case`. Unless another file is named, the test lives in **inspector** —
 `frontend/src/components/__tests__/inspector.test.tsx`. This chapter uses `INV-workbench.50` …
 `.59`.
 
 **INV-workbench.50 — one panel, no pop-ups.** For every subject the Inspector can be opened on —
 every claim and every arrow on the Hormuz map, a generation, and the empty selection — it renders no
 modal, dialog, alert or pop-over, and is a persistent region of the page. That the *whole product* has none
-is checked by eye: **visual review checklist line 2**. *Test:* inspector ›
+is checked by eye: **visual review checklist `VR2`**. *Test:* inspector ›
 `test_renders_no_dialog_for_any_subject`.
 
 **INV-workbench.51 — every number in the panel is one click from its why.** For every number the
 panel renders, there is a subject it belongs to and one interaction that opens the panel there. That
-the same holds for every number on the *canvas and the delta rail* is **visual review checklist line
-5**, checked by eye, plus the tile's and rail's own tests. *Test:* inspector ›
+the same holds for every number on the *canvas and the delta rail* is **visual review checklist
+`VR5`**, checked by eye, plus the tile's and rail's own tests. *Test:* inspector ›
 `test_every_rendered_number_resolves_to_a_subject`.
 
 **INV-workbench.52 — three voices, never merged.** For every claim, the panel renders model, user
@@ -485,7 +500,7 @@ panel takes two beliefs of different owners and returns one number (INV-11). *Te
 absent value renders its `Absence.reason` as words: no empty string, no zero, no stand-in number.
 The single exception is the **user** belief slot, absence kind `not_said`, which renders a dash
 inviting a number — the one absence that is an offer rather than a finding. *Test:* inspector ›
-`test_renders_a_reason_for_every_absent_value`; **visual review checklist line 5**.
+`test_renders_a_reason_for_every_absent_value`; **visual review checklist `VR5`**.
 
 **INV-workbench.54 — the panel never computes a number, and never infers a reading.** For every
 claim, every arrow and every generation, no number displayed is derived by arithmetic in the browser;
@@ -512,7 +527,7 @@ component reads `range_shares` and the slot never renders. *Tests:* inspector �
 **INV-workbench.56 — the mark and the word come from one component.** For every one of the seven
 provenance values, the mark beside the word in this panel is produced by the same `OriginMark`
 component the wire renders, from the same input. *Test:* inspector ›
-`test_the_panels_mark_matches_the_wires_mark`; **visual review checklist line 3**.
+`test_the_panels_mark_matches_the_wires_mark`; **visual review checklist `VR3`**.
 
 **INV-workbench.57 — the path bar renders, never multiplies.** For every selected claim the bar
 shows the product the world supplied, or `no path shown`, or *no path from the hypothesis reaches

@@ -6,7 +6,7 @@ Each step is a claim that can be checked by a date, judged by a named source. Ea
 
 This is a take-home prototype for [Catalyst](https://catalyst.app). The brief is in `ASSIGNMENT.md`.
 
-That is the whole product. It is being built in numbered stacks, and `ARCHITECTURE.md` says section by section what exists and what is still a plan. As of 2026-09-21: the rules of the map, a stored worked example, the engine that works a change through it, the canvas that draws it, and **the pipeline that writes a map from a sentence** are built, and the canvas now reads its numbers from the engine. A hypothesis goes to a language model one claim at a time; every proposal is checked against the rules of the map before it is allowed on, and what the checker refuses is shown rather than hidden. **Two things are deliberately not here yet:** the map drawing itself claim by claim in the browser — the server streams a generation today, and the browser still asks for a finished map — and the thesis.
+That is the whole product. It is being built in numbered stacks, and `ARCHITECTURE.md` says section by section what exists and what is still a plan. As of 2026-09-21: the rules of the map, a stored worked example, the engine that works a change through it, the canvas that draws it, and **the pipeline that writes a map from a sentence** are built. A hypothesis goes to a language model one claim at a time; every proposal is checked against the rules of the map before it is allowed on, what the checker refuses is shown rather than hidden, and **the map draws itself on screen as the answers arrive** — a reserved rectangle where the next claim will go, never a spinner. **The thesis is the one part deliberately not here yet.**
 
 ## Run it
 
@@ -20,11 +20,15 @@ Then open <http://localhost:5173>. That is the browser app. The Python server is
 
 ## What you see
 
-**The launchpad.** Two ways in — *Explore* ("what happens next?") and *Verify* ("does A really lead to B?") — and the four example hypotheses from the brief. One of them is live; the other three say so rather than failing when you press them. At the foot, a strip reporting what the server said about itself.
+**The launchpad.** Two ways in — *Explore* ("what happens next?") and *Verify* ("does A really lead to B?") — and the four example hypotheses from the brief. With a model key all four run live. With none, the Strait of Hormuz card plays a recorded generation back through the same route and the same canvas, and the other three say plainly that nothing has been recorded for them yet rather than failing when you press them. At the foot, a strip reporting what the server said about itself.
+
+**Start here.** With no key, press the Strait of Hormuz card. That one press is the whole product: a sentence becomes a map claim by claim, the rules refuse some of what the model proposes and the refusals stay on screen, the likelihoods arrive once at the end, and then every button works — suppose a claim, report one as news, change a push, add your own number — with no key and no network.
 
 **The map.** Open the Strait of Hormuz and the page swaps for it: seven tiles with typed sockets, each with the claim, three belief chips side by side (what the model thinks, what you think, what the market prices), and its resolve-by date. Wires between them carry five things at once, and not one of them in colour: what kind of push it is and how hard it pushes (the stroke's pattern and its width), whether it has to keep holding to keep working (one stroke or two), whether it loops back on the world it is measuring, and where it came from — one, two or three dots at the wire's tail, never the line. A plate at each wire's midpoint reads the push back in words, with the delay in days. The layout is worked out left to right on a background thread, so a cause is always left of what it causes. Point at a claim and a lens dims everything that neither causes it nor is caused by it. A panel on the right answers "why is this number what it is" and never opens over the map. The line under the map says which address the numbers came from.
 
 **The branch.** Press `⌘K` (or `Ctrl+K`), type "Hormuz opens", and the branch in which Iran is struck the next day opens over the base map: one layout, two worlds painted in the same coordinates, the claim the branch added drawn where it belongs, and one word per claim saying what the edit did to it. Beside it, a rail listing the endings the edit can reach and a panel listing the branch's edits in the order they were made. The hypothesis's own tile reads *Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"*, because the strike's arrow into it arrived after the supposition.
+
+**The growing map.** Type a sentence of your own, or press a card, and the map builds itself: a rectangle held open where the first claim will land, then claims as the model proposes them and our rules accept them, wires in the order cause runs, and the likelihood chips filling in once at the end — never four times as the causes arrive, because a number that changes four times is four numbers nobody computed. Beside the map, one row per proposal the rules refused, in the validator's own words, and a strip saying what the run cost. There is no spinner anywhere in this product and a test walks every component and every stylesheet to prove it.
 
 **Every number on those screens came from the server.** The canvas asks the three world routes below for a world, a difference and the number on one arrow, and draws what comes back — it works nothing out for itself, and a test reads its own source to keep it that way. If the server cannot answer, the page falls back to the stored example and says on screen that it has done so, because a map you can still read beats a blank screen. The whole map also works from the keyboard (`?` lists every key) and exists as a nested list for a reader who never sees the picture.
 
@@ -59,11 +63,12 @@ curl -s localhost:8000/api/fixtures/hormuz \
 ```
 
 ```text
-"Hormuz opens, then Iran is struck" moves A Polymarket contract "Brent below $70 on
-2026-10-31" resolves YES from .50 to .42 by 2026-10-04 and leaves 1 claim untouched.
+the shape of the answer:  "<the branch>" moves <the ending, in its own words> from
+                          <what it read> to <what it reads now> by <the day it
+                          moved> and leaves <how many> claims untouched.
 ```
 
-That sentence is quoted here word for word from [`docs/worked-numbers.txt`](docs/worked-numbers.txt), where it is the line named `strike · the sentence beside the list`. Its two numbers are written the way every likelihood in this product is written — two significant figures, with `<.01` and `>.99` standing in for the two claims nobody here is entitled to make.
+**The sentence with its numbers in it is not printed here**, for the same reason the four figures above are not: it is worked out, so it moves the day the arithmetic does, and a copy in a second place is a copy that goes stale. It is in [`docs/worked-numbers.txt`](docs/worked-numbers.txt) on the line named `strike · the sentence beside the list`, word for word. Its two likelihoods are written the way every likelihood in this product is written — two significant figures, with `<.01` and `>.99` standing in for the two claims nobody here is entitled to make.
 
 The whole answer also carries a word per claim (`unchanged`, `shifted`, `added`, `killed`) and the endings that moved in ranked order. A third route, `POST /api/worlds/conditional`, gives the number on one arrow: its target, with its source **supposed** true — never how often the two happen to show up together.
 
@@ -81,7 +86,7 @@ Leave the seed out and the server mints one, and says in the first event which i
 
 Two more routes go with it: `POST /api/generate/insert` drafts one new claim and its arrows for a map that already exists, and `GET /api/generate/{id}/transcript` hands back what a generation proposed, accepted and refused, in order, for as long as the process that ran it is alive. Nothing is kept on disk between requests.
 
-**With no key**, the same route plays a *recording* back through the same stream, at the same pace, and the receipt says it was a replay and cost nothing. A recording is one whole generation, written only by `make record-demo` into `backend/recordings/`, and `/api/readyz` lists which are present — so the screen can say what a keyless clone can and cannot do, rather than guessing.
+**With no key**, the same route plays a *recording* back through the same stream, at the same pace, and the receipt says it was a replay and cost nothing. It is chosen by the sentence in the request and nothing else, so the keyless path and the live path send byte-identical requests. A recording is one whole generation, written only by `make record-demo` into `backend/recordings/`, and `/api/readyz` lists which are present — so the screen can say what a keyless clone can and cannot do, rather than guessing. **One is committed today**, the Strait of Hormuz.
 
 ## While you work
 
@@ -110,13 +115,12 @@ make lint     # style, formatting, types. Changes no file
 make types    # rewrite the browser app's types from the server's description of itself
 make numbers  # rewrite the one file that owns every number the worked example quotes
 make numbers-check  # check that file still says what the engine says. Changes no file
-make eval     # says out loud that it is not written yet, rather than pretending
 make          # the whole list of tasks
 ```
 
 **Two of these tasks rewrite a committed file from the code itself, and the build fails when either output goes stale.** `make types` rewrites `frontend/src/api/schema.ts` from the server's own description of itself, which is what stops the two halves drifting apart. `make numbers` rewrites [`docs/worked-numbers.txt`](docs/worked-numbers.txt), which holds every number the Strait of Hormuz example quotes — each claim's reading, what the strike branch did to it, the number on every arrow — with the numbers a person typed into the example kept separately from the numbers the engine worked out. Prose quotes a computed number only where that file is one link away, so that the day the arithmetic changes, the diff of one file is the whole list of what moved. `make numbers-check` is what the build runs: it works every number out again and compares numbers *as numbers*, so "stale" means a number moved rather than that one machine's last bit differed from another's. None of the three needs a key or the network.
 
-**Three tasks call a model and spend real money**, and none of them runs unless you ask for it. Everything else in this repository runs with no key at all.
+**Four tasks call a model and spend real money**, and none of them runs unless you ask for it. Everything else in this repository runs with no key at all.
 
 ```sh
 make record-cassettes            # the real exchanges the tests replay
@@ -126,11 +130,17 @@ make record-demo CAP=5           # the same, with a lower spending ceiling
 make run-demo                    # the same run as a measurement: keeps everything, writes no recording
 make run-demo EFFORT=medium      # the same run, thinking less hard
 make run-demo MODEL=claude-opus-5  # the same run, on the other model
+make eval ONLY=hormuz            # the one to run today: score the recorded example on structure
+make eval ONLY=hormuz CAP=5      # the same, with a lower spending ceiling
+make eval ONLY=hormuz EFFORT=as-recorded  # the same, at the effort the recordings are made at
+make eval                        # all four examples — once the prompt is frozen
 ```
 
-**`make record-demo` writes the recordings a keyless clone plays back** — one whole generation per example, into `backend/recordings/` — and it is the only thing that ever writes one, because a recording edited by hand is a piece of state that traces to nobody. **`make run-demo` is the same run meant as a measurement**: it keeps everything and writes no recording. Either way the run is kept: both print the whole receipt and the reason the run stopped, and write every proposal — with the seconds and the thinking tokens it took — into `backend/.runs/`, which is not committed, because it is the record of one afternoon's spending rather than something the product plays back. What those runs have cost so far is written down, dated, in [`docs/measurements.md`](docs/measurements.md).
+**`make eval` is the one that says whether the prompt is any good**, and it is deliberately not in `make test`: it needs a key, it costs money, and one prompt scores slightly differently twice, so a merge would be blocked by a model's mood. It runs each example live through the same walk the stream route uses, and scores only **structure, never wording** — no loops; an ending that names something to trade or says why there is none; a reason on every arrow and a page behind every arrow claiming one; criteria, a judge and a date on every claim; a graded route or an honest refusal from the Verify door, including one case whose destination is deliberately out of reach; the remembered prefix actually read back on the second call; a named reason for stopping, inside the ceiling; and a page behind every count of past cases. It prints the scorecard, writes one row per case into `evals/runs/<date>.tsv` — committed, so two of them side by side are how a prompt change is judged — and exits non-zero if a check did not hold. A check on a model's *sentences* would fail when somebody improved the prompt, so there is none. **Run it as `make eval ONLY=hormuz` for now.** The Strait of Hormuz is the only example with a committed recording; each of the other three means about forty minutes of live model time against words that are about to change, and every such change is being batched into one freeze at the end of the engine work. All four are scored together when that lands, and `make eval` with nothing else on the line is the ordinary use again — the command's own default has never been anything but all four.
 
-`CAP` can only lower the spending ceiling written in code, never lift it: a cap a caller can raise is not a cap. A run that reaches it stops and says what it spent and what it got. `EFFORT` and `MODEL` are pinned for a whole run and never varied between its calls — changing either mid-run would throw away the remembered prefix the run is reading back at a tenth of the price. All three refuse to start with no key and say so.
+**`make record-demo` writes the recordings a keyless clone plays back** — one whole generation per example, into `backend/recordings/` — and it is the only thing that ever writes one, because a recording edited by hand is a piece of state that traces to nobody. **`make run-demo` is the same run meant as a measurement**: it keeps everything and writes no recording. **No paid run is ever thrown away.** All three of the whole-map tasks — `record-demo`, `run-demo` and `eval` — print the whole receipt and the reason the run stopped, and write every proposal — with the seconds and the thinking tokens it took — into `backend/.runs/`, which is not committed, because it is the record of one afternoon's spending rather than something the product plays back. What those runs have cost so far is written down, dated, in [`docs/measurements.md`](docs/measurements.md).
+
+`CAP` can only lower the spending ceiling written in code, never lift it: a cap a caller can raise is not a cap. A run that reaches it stops and says what it spent and what it got. `EFFORT` and `MODEL` are pinned for a whole run and never varied between its calls — changing either mid-run would throw away the remembered prefix the run is reading back at a tenth of the price. All four refuse to start with no key and say so.
 
 Re-run `make record-demo` whenever a prompt changes: a recording made against different words shows wording this program no longer uses, and the build says so rather than letting it pass unnoticed.
 
@@ -139,12 +149,12 @@ Re-run `make record-demo` whenever a prompt changes: a recording made against di
 | Setting | What it does |
 |---|---|
 | `KATALYST_MODEL` | Which model proposes the claims and the arrows. `claude-sonnet-5` unless you say otherwise, which is what the measured runs and the recorded answers were made on; `claude-opus-5` is the only other name a price has been read for, and asking for anything else stops the run rather than billing against a guess |
-| `KATALYST_EFFORT` | How hard the model tries — `low`, `medium`, `high`, `xhigh` or `max`. Empty by default, and then each path takes its own: **the recorder sends nothing**, so the service's own default stands and a recording is the richest map; **a live run asks for `medium`**, so a map arrives in minutes rather than the best part of an hour (Kent, 2026-09-21; the measured runs are in `docs/measurements.md`). Set it to override both. The receipt and a recording's first line say which effort made the map |
+| `KATALYST_EFFORT` | How hard the model tries — `low`, `medium`, `high`, `xhigh` or `max`. Empty by default, and then each path takes its own: **the recorder sends nothing**, so the service's own default stands and a recording is the richest map; **everything else asks for `medium`** — a live run in the browser, and `make eval`, the scorecard you run while working on a prompt — so a map arrives in minutes rather than the best part of an hour (Kent, 2026-09-21; the measured runs are in `docs/measurements.md`). `make eval EFFORT=as-recorded` scores the recorder's effort by name. Set it to override both. The receipt and a recording's first line say which effort made the map |
 | `KATALYST_RECORDINGS` | Where recorded generations are read from. Empty means the folder that ships here. Point it elsewhere to play a recording back through the real route before committing it |
 | `KATALYST_RUNS` | Where a paid run is written. Empty means `backend/.runs/` |
 | `KATALYST_REPLAY_PACE` | How long a replay waits between two of its events, in seconds. `0.6` unless you say otherwise, which is the speed a person watches a map arrive at; `0` means no pause at all. One number rather than a length and a switch beside it, and never something a request can ask for — a client that could skip the pacing could skip the thing a recording exists to show |
 
-The end-to-end tests are not in `make test`, because they want a browser downloaded first. They start both halves themselves, so there is nothing to have running:
+The end-to-end tests are not in `make test`, because they want a browser downloaded first. They start both halves themselves, on ports of their own, so there is nothing to have running:
 
 ```sh
 cd frontend
@@ -162,13 +172,13 @@ They run side by side, five browsers at a time here and two on the build machine
 make test
 ```
 
-No network, no key, and the same checks a pull request runs. On 2026-09-21 that was **558 tests on the server and 240 in the browser app**, plus the three end-to-end tests above. The figures are dated because they move with every round; what does not move is that all of them run with no key and no network:
+No network, no key, and the same checks a pull request runs. On 2026-09-21 that was **642 tests on the server and 358 in the browser app**, plus 14 end-to-end tests. The figures are dated because they move with every round; what does not move is that all of them run with no key and no network:
 
 - **The rules, checked against maps nobody wrote by hand.** Hundreds of random maps per test, built by the generators in `backend/tests/strategies.py` — some correct by construction, some damaged on exactly one rule — and when one fails, the `hypothesis` library shrinks it to the smallest map that still breaks. Every line and every branch of `backend/src/katalyst/domain/` is run.
 - **The engine.** Folding a branch onto a map, working every likelihood through time, and saying what moved — including a state machine that re-checks *only what is still connected to the edit may move* after every step of a generated sequence of edits.
 - **The stored example.** The Strait of Hormuz map and its "Iran is struck the next day" branch, held to every rule they claim to obey, and refusing to load at all if they break one.
 - **The routes**, including the `422` that carries every reason a branch was refused.
-- **The browser app**, from what it draws — tiles, belief chips, wires, layout, the diff overlay, the rail, the branch panel, the Inspector, the path bar, the keyboard, the outline — and from reading its own source: one test walks every file that draws one of the map's numbers and fails on any multiplication of one, because the moment this half works out a number of its own there are two engines on the map.
+- **The browser app**, from what it draws — the launchpad, tiles, belief chips, wires, layout, the diff overlay, the rail, the branch panel, the Inspector, the path bar, the keyboard, the outline, and the map growing from a stream — and from reading its own source: one test walks every file that draws one of the map's numbers and fails on any multiplication of one, because the moment this half works out a number of its own there are two engines on the map; another walks every component and every stylesheet and fails on anything that spins, pulses or sweeps.
 - **The one that matters most**: it reads every file under `backend/src/katalyst/domain/` — the layer that holds the rules — and fails if any of them imports the routes, the engine, the outside-data layer, or a language-model client. That layer must stay decidable by our own code alone.
 
 **Nothing in either suite is skipped.** The one test that used to be — the canvas's own answer to "what can this edit reach", compared against the server's — had nothing to compare against until the two were joined. They are joined, so it runs, and the day those two disagree is the day this stops being traceable.
@@ -181,8 +191,8 @@ Continuous integration runs six jobs on every pull request — `backend`, `front
 
 So that nothing here reads as more finished than it is:
 
-- **The map does not draw itself yet.** The server streams a generation claim by claim; the browser still asks for a finished map and lays it out once. Watching it grow on screen is the next pull request.
-- **No scored runs.** `evals/` does not exist, so nothing yet scores what the model proposes across the four examples. `make eval` says so rather than pretending.
+- **Only one example is recorded.** The Strait of Hormuz plays back with no key; the other three cards say so rather than pretending. Each of the three is about forty minutes of live model time and a few dollars, written by `make record-demo ONLY=<example>` whenever somebody chooses to pay for it.
+- **No path product on a stored map.** A chain of four plausible steps is not a plausible chain, and the number that says so is only worked out for the *Verify* door, where you name a destination. Everywhere else the bar names the route's steps and says honestly that there is no product to show, rather than the browser multiplying and inventing a second engine.
 - **No outside data.** There is no Polymarket adapter and no FRED adapter, so a market price on the map is a number a person wrote down with its source beside it.
 - **No thesis.** What to trade, when to enter, the one event that would prove you wrong: designed, not written. The sweep it reads — flip each claim in turn and see what it does to every ending — is built, and nothing on screen reads it.
 - **Nothing is stored.** No database, no accounts, no session. Close the tab and the branch you made is gone.
@@ -199,7 +209,8 @@ So that nothing here reads as more finished than it is:
 | `docs/measurements.md` | What the paid runs actually cost and took, dated. Added to, never rewritten |
 | `docs/research/` | Research reports that fed the requirements. Inputs, not decisions |
 | `backend/` | Python server: `domain/` (the rules and the arithmetic, pure), `fixtures/` (the stored worked example), `engine/` (asks the model for one proposal at a time, decides where each number came from, prices the run, records it and plays it back), `grounding/` (will fetch outside data), `api/` (routes, including the generation stream) |
-| `frontend/` | React browser app: the canvas, the Inspector, the diff overlay, the keyboard. `src/api/schema.ts` is generated from the server, never hand-written; `e2e/` holds the end-to-end tests |
+| `frontend/` | React browser app: the canvas, the Inspector, the diff overlay, the keyboard, and the map growing from a stream. `src/api/schema.ts` is generated from the server, never hand-written; `e2e/` holds the end-to-end tests |
+| `evals/` | The four example hypotheses as cases, the eight structural checks, and the scorecards each run writes. Run by hand with `make eval`; never in the build |
 | `docker/`, `compose.yaml` | Container images and how they run together |
 
 Start with `PRODUCT_REQUIREMENTS.md` §1 (the product in one screen), then `ARCHITECTURE.md`.

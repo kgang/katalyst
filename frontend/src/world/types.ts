@@ -344,6 +344,25 @@ export interface Movement {
    * knows it. The panel prints one sentence when it is set.
    */
   readonly onlyReweighted?: boolean;
+  /**
+   * Which half of its test a claim the engine called **unchanged** failed, in
+   * the engine's own word.
+   *
+   * The engine reports a move only when both halves pass: the move clears a
+   * floor, and the versions of the map agree on which way it went.
+   * `under_the_floor` means the move is smaller than the engine will report at
+   * all; `versions_disagree` means the move was far enough and the versions did
+   * not agree on its direction. The floor is read first, so a claim failing both
+   * says `under_the_floor`.
+   *
+   * **Nothing in the browser decides this.** The floor and the bar are constants
+   * inside the engine and are on no wire, so the browser can copy the word and
+   * cannot re-run the test. Absent on every claim the engine did not call
+   * `unchanged`, and on an `unchanged` claim with no test to fail — one only one
+   * world holds, and one no version of the map counted in both numbers.
+   * `graph/diff/noChange.ts` turns it into the words on screen.
+   */
+  readonly unchangedBecause?: "under_the_floor" | "versions_disagree";
 }
 
 /**
@@ -811,15 +830,33 @@ export interface DeltaRow {
   /** Same direction: the share of versions of the map that moved the same way. */
   readonly agreement: Known<number>;
   /**
-   * True when this row is here only to say the ending did **not** move.
+   * True when the engine gave this ending no row of its own.
    *
-   * The engine lists the endings that moved; an ending missing from that list
-   * could mean either "it did not move" or "it is not on this map", and silence
-   * cannot be told from absence. So the rail adds a quiet row reading *no
-   * change* for every ending the edit can reach that the engine left out, after
-   * the ones it ranked and never mixed in among them.
+   * The engine ranks an ending only when it calls it **shifted**. An ending
+   * missing from that ranking could mean it held still, or that it is not on
+   * this map, or that you forced it false a moment ago — and a reader cannot
+   * tell those apart by looking at a list something was left out of. So the
+   * change list keeps a quieter row for **every** ending the edit can reach
+   * that the engine left out, after the ones it ranked and never mixed in among
+   * them. What each such row says is `graph/diff/noChange.ts`'s one rule.
    */
-  readonly noChange?: boolean;
+  readonly unranked?: boolean;
+  /**
+   * The half-line under the ending's own words: why the engine ranked no move
+   * on it, in a handful of words.
+   *
+   * It stands in the same slot a row that moved uses for *down · largest on Oct
+   * 4*, so a quieter row carries its reason **in words** rather than only in
+   * being paler than its neighbours — which says nothing in grey and nothing at
+   * all read aloud. A claim that barely moved, a claim whose versions of the map
+   * disagreed which way, and a claim you supposed false say different, true
+   * things.
+   *
+   * **`graph/diff/noChange.ts` writes it and nothing else does**, from the
+   * engine's own word for what happened to the claim. Absent where there is
+   * nothing true to put in it, and on every row that moved.
+   */
+  readonly note?: string;
 }
 
 /**

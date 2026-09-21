@@ -4,6 +4,8 @@
 
 A branch is a list of edits; a world is what those edits do to the numbers. This chapter is the arithmetic in between. After it, the user can suppose the strait opens, insert a strike the next day, and watch one claim after another move on the days they actually move — and click any number to see the prior it started from and the pushes that were added to it. It settles four things the rest of the product has been deferring: **when** each claim's clock starts, **how** a likelihood is computed on a given day, **how a supposition ends** when a later edit undermines it, and **what the range under a computed number means**. The last one is the reason the range stopped being decoration: it says *how sure we are of the number*, not how much the world can move, and it no longer shrinks when the machine is given more computer time.
 
+**Every engine-computed figure quoted below is read from one generated file.** [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) is written by `make numbers` from the shipped engine on the Strait of Hormuz map, at that example's own seed and the shipped loop sizes, and the build fails when it goes stale. Every line in it starts with a name a passage can cite — `B · base · reading` — and the numbers a person typed into the example are kept in a part of their own, apart from the numbers the engine worked out. A figure is quoted here only where it teaches something; the file is where it is kept true, so the day the arithmetic changes, the diff of that one file is the whole list of what moved.
+
 Everything here rests on decision record **0014** (accepted 2026-09-17) — *a supposition ends when something pushes back; a range says how sure we are of the number, not how the dice fall* — and on record 0005 (log-odds pushes, trigger and sustain, seeded simulation), which 0014 amends in three places without superseding.
 
 ---
@@ -123,7 +125,11 @@ Sixteen thousand worlds in total, and the two numbers are not interchangeable: t
 
 What replaced it costs neither. The days worked out are the days **sent** plus the handful the arithmetic must land on **exactly**, so a five-year map works out about 180 points rather than 1 826, and the numbers are the same ones — see the invariant below. The backend test suite, without coverage and warm, went from **42.5 s to 48.7 s** — medians of four runs each, 270 tests to 289. The **six** seconds are the nineteen new tests, most of them the ones that work a map out twice to check the invariant below, and a state machine turned up from fifteen runs of four steps to **two hundred of eight**. That state machine is exploration and not a guard, and the chapter should not pretend otherwise: at two hundred runs of eight steps the code it was written against passes it eight times out of eight, because the sequences that break need two observations in a row and are too rare to reach at that size. What guards those shapes is the named tests that build them. (The plan's "about ten milliseconds at sixty claims" measured one day in a prototype and is not what the shipped engine does over a window.)
 
-**Three things that are deliberately absent.** There is no `strength_lo` and no `strength_hi`, now or ever: link strengths are **fixed numbers in stack 03a** and only priors vary between versions. Widening an arrow is derived from its `provenance` — "how well-backed" becomes "how wide" — and that ships in stack 04, where arrows finally differ from one another; every arrow in today's fixture is hand-written `argued` or `asserted`, so doing it now would widen everything by the same amount and teach nobody anything. There is no `scipy`: the Latin hypercube — a way of spreading draws evenly instead of letting them clump — is three lines of `numpy`, and the percentiles are one. And there is no module-level random generator — see B7.
+**Three things that are deliberately absent.** There is no `strength_lo` and no `strength_hi`, now or ever *(and that is still true now that arrows vary — see B5's rule, which derives how wide a push is drawn from where the arrow came from, every time it is needed)*. There is no `scipy`: the Latin hypercube — a way of spreading draws evenly instead of letting them clump — is three lines of `numpy`, and the percentiles are one. And there is no module-level random generator — see B7.
+
+*(Amended 2026-09-21. This paragraph said link strengths were fixed numbers and that widening an arrow would ship in stack 04. It shipped: every version now draws every arrow's push as well as every claim's prior. The rule is in B5 and the three streams are in B7. Nothing was added to store it — the first half of the sentence, no `strength_lo` and no `strength_hi`, is exactly what "derived, never stored" means.)*
+
+**What the spread costs.** Nothing the table above could show. A version drawing a push per arrow is one number per arrow per version — on this map seven arrows × 2 000 versions, about a tenth of a megabyte — against the claims × days × 16 000 worlds those rows are made of. They were measured before arrows varied and are not re-measured for it.
 
 ---
 
@@ -136,11 +142,11 @@ Worked on the Strait of Hormuz map. Its claims, quoted from the fixture word for
 | **H** | *The Strait of Hormuz reopens to unrestricted commercial transit.* — the hypothesis | `.35 (.22–.50)` | day 31 |
 | **C** | *Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.* | `.30 (.18–.45)` | day 30 |
 | **B** | *Brent crude settles below $68 for five sessions.* | `.28 (.15–.42)` | day 14 |
-| **R** | *OPEC+ announces output restraint.* — the tail | `.18 (.08–.32)` | day 60 |
+| **R** | *OPEC+ announces output restraint.* — the tail | `.18 (.080–.32)` | day 60 |
 | **M1** | *A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.* — tradeable | `.40 (.28–.55)` | day 30 |
 | **M2** | *The energy fund XLE underperforms the S&P 500 fund SPY by more than 3% over 20 trading days.* — tradeable | `.35 (.22–.50)` | day 45 |
 | **N1** | *Omani-mediated United States-Iran talks resume publicly.* — real, and no venue prices it | `.22 (.12–.36)` | day 60 |
-| **S** | *A confirmed military strike on Iranian territory.* — on the branch only | `.06 (.02–.14)` | day 1 |
+| **S** | *A confirmed military strike on Iranian territory.* — on the branch only | `.060 (.020–.14)` | day 1 |
 
 "Judged on" is the claim's own `resolution.by`, counted from day zero — the day the claim is settled by, and therefore the day its tile's headline is read on. B's is a **fortnight**: five settlements below $68 is about a fortnight of sessions, and the fixture was tuned to say so (it used to read day 45, by which time both pushes on B had faded to nothing much and the tile read almost exactly B's own prior).
 
@@ -211,7 +217,9 @@ ramp(u)    = 1                          for u ≥ L        full size, held — t
 
 **A warning above ±5.** `validate` is untouched and puts no ceiling on `strength`; an unbounded number is the honest type. But ±5 is roughly 1% to 99% on a coin flip, so `propagate` adds a plain sentence to `warnings` naming any arrow beyond it. A warning, not a rejection: the map is still legal, and the user should be told.
 
-> **On the Hormuz map.** B's prior is `.28`, whose log-odds is `−0.94`. On the strike branch, day 1: `S → B` is an impulse with `lag=0.0`, so it is already at full size — `−2.4`. `H → B` has not arrived (two-day lag); `C → B` has not arrived (seven-day lag); `R → B` has not arrived (five days from R's day zero). Total `−0.94 − 2.4 = −3.34`, about **`.03`**. Day 2: `H → B` arrives at full size, `+1.6`, and `S → B` has faded by one day of its ten-day half-life to `−2.24`. Total `−1.58`, about **`.17`**. B *rises* between day 1 and day 2, and that rise is golden assertion 4.
+**The push in that sentence is written to one place after the point, always with its sign** *(2026-09-21)* — `+5.2` for a push toward the claim at the arrow's head, `-6.1` for one against it, written with the ordinary hyphen the sentence itself uses. It used to be written at whatever precision the computer happened to hold it at, so a push arithmetic worked out rather than a person typed reached a reader as `5.199999999999999`. **This is a second rule, not the likelihood rule**, and the difference is the point: a likelihood runs from 0 to 1 and is written `.40` or `>.99`, while a push runs from minus infinity to plus infinity on the log-odds scale. Sending a push through the likelihood rule would print `>.99` for a push of `5.2` — the opposite of what the sentence means. The two rules are `_push_as_written` in `domain/propagation.py` and `two_figures` in `domain/belief.py`, each living beside the thing it writes, each named once, and each shared by everything that writes that kind of number.
+
+> **On the Hormuz map.** B's prior is `.28`, whose log-odds is `−0.94`. On the strike branch, day 1: `S → B` is an impulse with `lag=0.0`, so it is already at full size — `−2.4`. `H → B` has not arrived (two-day lag); `C → B` has not arrived (seven-day lag); `R → B` has not arrived (five days from R's day zero). Total `−0.94 − 2.4 = −3.34`, about **`.03`** by hand. Day 2: `H → B` arrives at full size, `+1.6`, and `S → B` has faded by one day of its ten-day half-life to `−2.24`. Total `−1.58`, about **`.17`** by hand. **The engine reports `.039` and `.19`**, seed `20261001` — a hair above the hand sums, for the same reason as in B4: each is an average across two thousand versions, and that average sits above the middle whenever the likelihood is below `.5`. B *rises* between day 1 and day 2 either way, and that rise is golden assertion 4.
 
 ### B3 — Trigger and sustain, as arithmetic
 
@@ -250,9 +258,11 @@ step     push  ────┴────────────────�
 ramp     push  ────┴▁▁▁▂▂▂▃▃▃▄▄▄▅▅▅▆▆▆▇▇▇▇██████████████   climbs across the lag, then holds
 ```
 
-> **On the Hormuz map.** `H → B` is a trigger that fired on day 0, so on day 2 it delivers `+1.6` to B even though H's supposition was withdrawn on day 1 — that domino is down. `H → C` is a sustain, so from day 1 its `+1.1` is present only in the draws where H still came out true, which after day 4 is about eight in a hundred. Same cause, two honest behaviours, one branch.
+> **On the Hormuz map.** `H → B` is a trigger that fired on day 0, so on day 2 it delivers `+1.6` to B even though H's supposition was withdrawn on day 1 — that domino is down. `H → C` is a sustain, so from day 1 its `+1.1` is present only in the draws where H still came out true, which after day 4 is about nine in a hundred. Same cause, two honest behaviours, one branch.
 >
-> The clearest reading of the difference is **N1**, *Omani-mediated talks resume publicly*. `H → N1` is a trigger, and H was supposed true on day 0, so it fired in **every** world. The strike then withdraws H — and N1 still comes out **higher** on the strike branch than in the base world, `.37` against `.28`, because that domino cannot be stood back up. Meanwhile C, held by a sustain arrow from the same claim, collapses from `.40` to `.07`. One cause, one branch, two claims moving in opposite directions, and the only difference between them is a single field on the arrow.
+> The clearest reading of the difference is **N1**, *Omani-mediated talks resume publicly*. `H → N1` is a trigger, and H was supposed true on day 0, so it fired in **every** world. The strike then withdraws H — and N1 still comes out **higher** on the strike branch than in the base world, `.38` against `.28`, because that domino cannot be stood back up. Meanwhile C, held by a sustain arrow from the same claim, collapses from `.40` to `.074`. One cause, one branch, two claims moving in opposite directions, and the only difference between them is a single field on the arrow.
+>
+> N1's move is the largest of any ending on the map and the change list still leaves it off, because the only arrow into it is the map's one `asserted` arrow and a push nobody could back is drawn so wide that the versions do not agree which way it went. [`diff.md`](diff.md) B4 works that through; it is the clearest thing the spread does on this fixture.
 
 ### B4 — How a supposition ends
 
@@ -280,11 +290,11 @@ Two tests hold the pair up: `test_a_claim_can_be_supposed_again_after_it_was_und
 > |---|---|---|
 > | Oct 1 | **Supposed · Oct 1** — a word, not a number | The `do` holds; `H` is true in every draw |
 > | Oct 2 – Oct 4 | **`.36`**, the series marked *withdrawn — no live push yet* | `S` became true on Oct 2, so the supposition is withdrawn that day. `S → H` carries `lag=3`, so nothing is pushing yet and `H` falls back to its own prior, `.35` |
-> | Oct 5 onward | **about `.08`**, the series marked *pushed* | `S → H`'s step reaches full size — `−1.9` on a log-odds baseline of `−0.62` — and pushes `H` down |
+> | Oct 5 onward | **about `.086`**, the series marked *pushed* | `S → H`'s step reaches full size — `−1.9` on a log-odds baseline of `−0.62` — and pushes `H` down |
 >
 > The tile reads *Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"* — UX-14's badge, with the claim named in the fixture's own words — and the world carries one `Retraction` with `at=2026-10-02`, `by_link="S->H"`, `by_claim="S"`. The three-day gap between the date on the badge and the day the number moves is **not a bug to hide**. It is the honest shape of the answer, and the series has to be able to say so — which is exactly why every day carries a named state.
 >
-> The engine's own figures, seed `20261001`: `.356` on the withdrawn days and `.081` from Oct 5. Do the two sums by hand and you get `.35` and `sigmoid(−2.52) = .074` — both right as hand arithmetic. The reported numbers sit a hair above because each is a mean across two thousand versions, and that mean sits above the middle whenever the likelihood is below `.5`; B5 explains it. Where this chapter quotes a number the engine reported, it is the engine's.
+> The engine's own figures, seed `20261001`: `.356` on the withdrawn days and `.086` from Oct 5. Do the two sums by hand and you get `.35` and `sigmoid(−2.52) = .074` — both right as hand arithmetic. The reported numbers sit a hair above because each is a mean across two thousand versions, and that mean sits above the middle whenever the likelihood is below `.5`; B5 explains it. The gap is wider now that the versions draw the pushes as well as the priors, for the same reason and no other. Where this chapter quotes a number the engine reported, it is the engine's.
 
 **The rejected alternatives**, one line each, kept for the record. *A permanent seal* — the user's first edit would silently veto their third; [`interventions.md`](interventions.md) rejected it on 2026-09-17, and it deletes the showcase. *A large finite baseline the arrows argue with* — at ±4.0 an arrow of `−1.9` moves the claim from `.98` to `.89`, which is not a retraction, and it makes "suppose" mean "assume ninety-eight per cent", which is not what the button says. *Hold until the push lands* — that is the delay-parameter trap above, and it is a cliff with no state in between.
 
@@ -293,7 +303,7 @@ Two tests hold the pair up: `test_a_claim_can_be_supposed_again_after_it_was_und
 Read this before any formula, because it is the idea the whole design rests on.
 
 * **How the dice fall.** The strait either opens or it does not. That is already inside `p`: `p` is the share of worlds in which the claim came out true.
-* **How sure we are of the numbers we put in.** Every prior on the map was elicited, and a different but equally defensible set of priors would give a different `p`. **That** is the range.
+* **How sure we are of the numbers we put in.** Every prior on the map was elicited, and **every arrow's push was written down by somebody with more or less to go on**. A different but equally defensible set of those numbers would give a different `p`. **That** is the range.
 
 So a wide band means *"we are not sure what number to give you; more homework would move it"* — never *"the event is more volatile"*. That is the one sentence a trader has to be able to repeat, and the chip says it: **model interval, uncalibrated · how sure we are of `.35` — not how much the world can move.** The formal name for two loops of this shape — one for how sure we are of the inputs, one for how the dice fall — is a second-order, or two-dimensional, Monte Carlo.
 
@@ -310,9 +320,33 @@ Version *k* draws one standard-normal number `z` per stated range and reads the 
 
 **One consequence, written here rather than left for a reader to trip over.** The mean of a split logit-normal sits slightly above its median when `p < .5`. So a claim's `prior.p` and its computed `beliefs.model.p` differ by a hair *even for the hypothesis, which has no causes*: H is `.35` as a prior and `.36` as a computed belief. Both are right. [`../graph/belief.md`](../graph/belief.md)'s `prior` versus `beliefs.model` table says so too.
 
+#### How wide an arrow's push is drawn — the rule, stated once
+
+*(Added 2026-09-21. Kent settled it in decision record 0014 and deferred it to stack 04, because every arrow on this fixture is hand-written and generation is what finally makes arrows differ. Every other chapter cites this paragraph rather than re-deciding it.)*
+
+**How well-backed an arrow is becomes how wide it is, and nobody is asked a second question.** An arrow carries a `provenance` — a receipt our own pipeline writes from what actually happened, never something a model claims for itself — and that receipt is the one thing on an arrow that already says how much there was to go on. So each version of the map draws every arrow's push from a bell curve centred on the push the map states, this wide:
+
+| Where the arrow came from | How wide the push is drawn |
+|---|---|
+| `documented` · `historical` · `market_implied` — somebody fetched something | `0.15` |
+| `argued` · `user` — a stated mechanism, or a person's own judgement | `0.40` |
+| `simulated` — a probe's output | `0.50` |
+| `asserted` — a sentence with no mechanism in it | `0.60` |
+
+Four things the rule means, each of which somebody will otherwise get wrong:
+
+* **It is measured in log-odds**, the scale a push is already written in. A width of `0.40` is four tenths of a log-odds unit, not four tenths of the push, so a weak arrow and a strong one with the same receipt are drawn equally wide.
+* **A weakly-backed push can come out the other way round in some versions**, and that is the honest reading: *we cannot vouch for which way this one goes* is most of what `asserted` means. [`diff.md`](diff.md) B4 shows the consequence on this very fixture.
+* **There is no `strength_lo` and no `strength_hi`, now or ever** (Kent, record 0014). The width is derived from the receipt every time it is needed. A stored width would be a second number about one arrow, and the two would drift.
+* **A drawn push never changes the *shape* of the map.** Which arrows oppose a supposition, and the day one of them undermines it, are read off the strength the map *states* — the same answer in every version, because a retraction is one record on one world and cannot be true in version 7 and false in version 8. A drawn push decides only how hard that arrow shoves inside its own version.
+
+Not to be confused with the *other* table that reads the same receipt: [`diff.md`](diff.md)'s provenance **weight**, which turns it into how well-backed a *route* is for the change list's ranking. Two questions, two tables. Merging them would make a well-backed arrow's rank depend on how sure we are of its number.
+
+**A generated map's arrows are only ever `documented` or `argued`** — the accept step writes `documented` when the search returned an address the arrow cites and `argued` otherwise, and the map's own rules refuse an arrow with no mechanism at all. The other four words are written by somebody else: a stored example, a person, a price adapter, a probe.
+
 **The loop.**
 
-1. Draw **2 000 versions** of the map with a Latin hypercube over every prior's fitted shape. `numpy` only, three lines. A version is **one coherent set of numbers this model would have stood behind**, never "every low end at once".
+1. Draw **2 000 versions** of the map: a likelihood for every claim's prior, from the fitted shape above, **and a push for every arrow**, from the rule above. A Latin hypercube either way — a way of spreading draws evenly instead of letting them clump. `numpy` only, three lines. A version is **one coherent set of numbers this model would have stood behind**, never "every low end at once".
 2. Inside each version, run **8 worlds**.
 3. **Keep the likelihood, not the coin flip**: for each claim keep the likelihood it came out true in that world. Free variance reduction — the number is already computed. (The textbook name for this is Rao-Blackwellisation.)
 4. **Correct for inner noise** with the law of total variance (the rule that a total spread is the spread of the averages plus the average of the spreads — so subtract the second), so that what is left is the spread across versions and not the spread across eight coin flips. Writing `q` for the 2 000 version-level answers and `inner_var` for the spread of the eight likelihoods inside a version — measured the unbiased way, dividing by one fewer than the number of worlds, because eight numbers give only seven independent comparisons and dividing by eight would understate the noise and leave the band a shade too wide:
@@ -324,7 +358,7 @@ q_corrected = mean(q) + (q − mean(q)) · f
 
 5. `p` is the mean over both loops. With no `observe` on the branch that is the same number as `mean(q)`, because every version runs the same number of worlds; with an `observe` it is the survival-weighted mean of B6, and the recentring above uses that same weighted mean. `lo` and `hi` are the 10th and 90th percentiles of the corrected version-level values. `f` is clamped at 0, so a claim whose apparent spread was all noise reports a zero-width band rather than an imaginary number.
 
-**Four designs, measured on 2026-09-17** — on Hormuz claim B read at **day 45**, against the exact answer by enumeration, `.35 (.20–.49)`. This is a dated comparison of four *designs*, so it is kept as it was measured; B's resolve-by day has since moved to day 14, and the shipped engine still reports `.35 (.20–.49)` for B at day 45.
+**Four designs, measured on 2026-09-17** — on Hormuz claim B read at **day 45**, against the exact answer by enumeration, `.35 (.20–.49)`. This is a dated comparison of four *designs*, so it is kept as it was measured; B's resolve-by day has since moved to day 14, and the shipped engine reports `.35 (.20–.50)` for B at day 45 *(re-measured 2026-09-21, now that the versions draw the pushes too; it read `.35 (.20–.49)` before)*.
 
 | Design | Reports | Wobble of the band edges across seeds |
 |---|---|---|
@@ -333,22 +367,24 @@ q_corrected = mean(q) + (q − mean(q)) · f
 | The analytic delta method — calculus instead of sampling: work out how much each stated range moves the answer, and add those up | `.22–.52`, accurate to .004, but fifty times slower and first-order only | none |
 | **2 000 × 8, likelihoods kept, noise-corrected** | **`.20–.50`** | **±.002 to ±.003** |
 
-The delta method is kept — not as the engine, but as a **cross-check in a test**. On the shipped engine, B in the base world on its own resolve-by day: the sampler reports `.2495–.5451` and the analytic answer is `.2459–.5455`. Two independent methods, agreeing to two significant figures.
+The delta method is kept — not as the engine, but as a **cross-check in a test**, and it now carries a term per arrow as well as a term per prior. On the shipped engine, B in the base world on its own resolve-by day: the sampler reports `.2424–.5564` and the analytic answer is `.2394–.5562`. Two independent methods, agreeing to two significant figures.
 
 **Where the width comes from, free.** From the same outer sample, sorting the versions into bins by the value each prior drew, and comparing the bins' averages, gives each claim's **share of another claim's band** — how much of the width comes from not being sure of *this* claim. Six lines of `numpy`, nothing run twice. It is carried as `range_shares[target][source]` — the share of `target`'s band explained by `source`'s prior — and **no route reads it until stack 06**, where it becomes FR-21's "where to spend modeling budget" ranking. It is computed and carried now because the sample it comes from is thrown away otherwise.
 
-On the shipped fixture, B in the base world read on its own resolve-by day: **65% of B's band is B's own prior**, then H at 6.1% and C at 4.2%. Pin B's prior down — freeze it at a point — and the band goes from `.25–.55` to `.34–.46`: **from 30 points wide to 12**. That is the ranking FR-21 asks for, in one number per claim. (FR-21 and record 0014 say "its own base rate"; the thing that varies between versions is the claim's `prior`, which is the word used here.)
+**The shares do not add up to the whole band, and should not be read as though they did** *(added 2026-09-21)*. They answer *whose **prior*** explains this width, and a version now draws the arrows' pushes as well; what the pushes explain is in no entry here. On B in the base world the seven shares total **72%**, and the missing 28% is the arrows. Asking the same question of the arrows would be the same six lines over the drawn pushes, and nothing needs the answer yet.
+
+On the shipped fixture, B in the base world read on its own resolve-by day: **most of B's band is B's own prior**, and H and C, the next two, are an order of magnitude behind it. The three shares are the lines named `B · base · band from B`, `B · base · band from H` and `B · base · band from C` in the generated numbers file; the band they are shares of is `B · base · reading`. Pin B's prior down — freeze it at a point — and most of that width goes with it. That is the ranking FR-21 asks for, in one number per claim. (FR-21 and record 0014 say "its own base rate"; the thing that varies between versions is the claim's `prior`, which is the word used here.)
 
 **Two counter-intuitive warnings, both measured.**
 
-* **A `do` does not reliably narrow what is downstream.** It collapses the target's own band, but B's width goes *up* under `do(H)` — `.296` to `.318`, measured — because the logistic curve is steeper where the answer lands. The honest thing to show is the **share**, not the width: H's contribution to B's band falls from **6.1% to 0.4%**, which is the sentence a reader can act on.
-* **A terminal's band is dominated by its own prior.** An upstream range reaches it multiplied by `p(1−p)`, which is at most a quarter. Do not build the demo around "widen H and watch B widen"; it moves about 4%.
+* **A `do` does not reliably narrow what is downstream.** It collapses the target's own band, but B's width goes *up* under `do(H)` — `.314` to `.380`, measured — because the logistic curve is steeper where the answer lands. The honest thing to show is the **share**, not the width: H's contribution to B's band falls from **5.0% to 0.6%**, which is the sentence a reader can act on.
+* **A terminal's band is dominated by its own prior.** An upstream range reaches it multiplied by `p(1−p)`, which is at most a quarter. Do not build the demo around "widen H and watch B widen": double H's stated range on the log-odds scale — both halves — and B's band widens by **8%**, from `.314` to `.340`.
 
 ### B6 — `observe`: keep only the consistent draws
 
 `observe` records that a claim actually came true or false. Unlike `do` it cuts nothing, and it is handled in the **inner** loop: inside each version, keep only the worlds in which the claim came out as observed, then **weight that version by its survival share** when the two loops are pooled. Five lines of importance weighting — a version under which the observation was likely counts for more than one under which it was a fluke.
 
-**How far upstream, honestly.** A claim with causes of its own is revised world by world. A claim with **no** causes — the hypothesis, usually — is its own prior in every world of a version, so an observation moves it only by changing how much each *version* counts: on Hormuz, learning that B happened moves H by `−0.0002`. The direction is right and the size is small, because at eight worlds per version the survival shares are coarse; [`diff.md`](diff.md) has the consequence for the change list: the direction of a move is read with these same version weights, and a claim moved by them alone says so (its open question 7, closed 2026-09-17).
+**How far upstream, honestly.** A claim with causes of its own is revised world by world. A claim with **no** causes — the hypothesis, usually — is its own prior in every world of a version, so an observation moves it only by changing how much each *version* counts: on Hormuz, learning that B happened moves H by `−.00019`. The direction is right and the size is small, because at eight worlds per version the survival shares are coarse; [`diff.md`](diff.md) has the consequence for the change list: the direction of a move is read with these same version weights, and a claim moved by them alone says so (its open question 7, closed 2026-09-17).
 
 **This is why observing reaches upstream and supposing does not.** Throwing worlds away changes what the survivors say about the claim's *causes* just as much as what it *causes* — which is exactly why `observe`'s affected set under INV-4 (locality: an edit changes only what is still connected to its subject in the map the edit leaves behind) includes its ancestors and their descendants, while `do`'s does not. INV-3 (assert is not observe) is the product-level statement of the same thing, and the two operations are never merged into one "set this value" control.
 
@@ -364,22 +400,23 @@ It used to be one pooled set of survivors for the whole branch, and that was the
 
 > **On the Hormuz map.** `Observe(target="C", value=True)` — the premium printed below 0.4% this morning — keeps only the worlds in which C came out true. C's own cause is H, and the surviving worlds are the ones where H more often came out true, so H rises: cheap insurance is evidence the lane really is open. `Do(target="C", value=True)` on the same claim leaves H exactly where it was. That difference is the product.
 
-### B7 — Two seed streams, and replay
+### B7 — Three seed streams, and replay
 
 Everything comes from the one `seed` argument, through `numpy.random.Generator` objects built from it and nothing else. **No module-level generator, no clock, no global state, ever.** The same `(map, branch, seed)` gives byte-identical worlds on any machine — NFR-2, the determinism requirement — which is what makes a three-day-old screenshot reproducible from three values.
 
-There are **two streams**, and keeping them apart is load-bearing:
+There are **three streams** *(the third added 2026-09-21, with the spread on the arrows)*, and keeping them apart is load-bearing:
 
 | Stream | Drives | Rule |
 |---|---|---|
-| `params` | The outer loop — which 2 000 versions of the map we try | **Must not depend on the branch.** A base world and a branch world built from the same seed use the *same* 2 000 versions |
+| `params` | The outer loop — which likelihood each of the 2 000 versions gives each claim's prior | **Must not depend on the branch.** A base world and a branch world built from the same seed use the *same* 2 000 versions |
+| `strengths` | The outer loop — which push each of those versions gives each arrow | The same rule, for the same reason |
 | `worlds` | The inner loop — how the dice fall inside one version | Ordinary; may depend on anything |
 
-**Both streams are derived per claim**, from the seed and a hash of the claim's own identifier. So adding a claim to the map cannot shift any other claim's draws — a claim's numbers depend on its own name and the seed, and on nothing about how many neighbours it has or what order they were written in. That is what makes `test_versions_do_not_depend_on_the_branch` hold *exactly* rather than approximately, and it is also what makes the dice cancel out of a paired comparison: version *k* of the base world and version *k* of the branch world drew the same numbers for every claim they share.
+**Every stream is derived per thing**, from the seed and a hash of that claim's or that arrow's **own** identifier. So adding a claim cannot shift any other claim's draws and **adding an arrow cannot shift any other arrow's** — a thing's numbers depend on its own name and the seed, and on nothing about how many neighbours it has or what order they were written in. That is what makes `test_versions_do_not_depend_on_the_branch` and `test_adding_an_arrow_does_not_move_another_arrows_draws` hold *exactly* rather than approximately, and it is also what makes the dice cancel out of a paired comparison: version *k* of the base world and version *k* of the branch world drew the same numbers for every claim and every arrow they share.
 
 The `params` rule is what makes a difference between two worlds readable. Compare a base world and a branch world version by version and the only thing that changed is the edit — the numbers underneath were held fixed. That is *common random numbers*, and without it every comparison is the user's change plus a wash of sampling noise, which is exactly the failure [`branches-and-worlds.md`](branches-and-worlds.md)'s anti-pattern 4 describes. [`diff.md`](diff.md) spends the whole of it: a change is read off the paired difference, never off whether two bands overlap.
 
-> **On the Hormuz map.** Supposing the strait opens moves B, on its own resolve-by day, from `.40 (.25–.55)` to `.58 (.42–.73)`. The two bands **overlap from `.42` to `.55`** — about two fifths of each — and a reader comparing bands would call that inconclusive. Compare the same versions against each other instead and **99.9% of them move the same way**, by `+.19` (`+.10` to `+.27` eight times in ten); [`diff.md`](diff.md) owns that number and the rule that reads it. Band overlap would report "no change" about the single clearest change on the map.
+> **On the Hormuz map.** Supposing the strait opens moves B, on its own resolve-by day, from `.40 (.24–.56)` to `.58 (.38–.76)`. The two bands **overlap from `.38` to `.56`** — more than half the narrower of the two — and a reader comparing bands would call that inconclusive. Compare the same versions against each other instead and **99.9% of them move the same way**, by `+.19` (`+.084` to `+.29` eight times in ten); [`diff.md`](diff.md) owns that number and the rule that reads it. Band overlap would report "no change" about the single clearest change on the map.
 
 ### B8 — What the user ends up looking at
 
@@ -398,15 +435,17 @@ One `propagate` call fills every field of `World`. On the Hormuz strike branch, 
 
 | | Base world | Strike branch | |
 |---|---|---|---|
-| **H** the strait reopens | `.36 (.22–.50)` | `.08 (.04–.13)` | the supposition is withdrawn and then pushed down |
-| **C** the premium falls below 0.4% | `.40 (.25–.55)` | `.07 (.03–.11)` | `S → C` holds the premium up |
-| **B** Brent below $68 | `.40 (.25–.55)` | `.30 (.17–.44)` | the strike puts the risk premium back in the price |
-| **R** OPEC+ restraint | `.19 (.08–.32)` | `.19 (.08–.32)` | **byte-identical** — reached only by a feedback arrow |
+| **H** the strait reopens | `.36 (.22–.50)` | `.086 (.034–.15)` | the supposition is withdrawn and then pushed down |
+| **C** the premium falls below 0.4% | `.40 (.25–.56)` | `.074 (.029–.13)` | `S → C` holds the premium up |
+| **B** Brent below $68 | `.40 (.24–.56)` | `.31 (.16–.48)` | the strike puts the risk premium back in the price |
+| **R** OPEC+ restraint | `.19 (.080–.32)` | `.19 (.080–.32)` | **byte-identical** — reached only by a feedback arrow |
 | **M1** the Polymarket contract | `.46 (.32–.60)` | `.41 (.28–.55)` | tradeable |
-| **M2** XLE against SPY | `.43 (.28–.58)` | `.36 (.23–.51)` | tradeable |
-| **N1** talks resume | `.28 (.15–.42)` | `.37 (.22–.53)` | **up** — see B3 |
+| **M2** XLE against SPY | `.43 (.28–.59)` | `.36 (.23–.51)` | tradeable |
+| **N1** talks resume | `.28 (.15–.44)` | `.38 (.17–.61)` | **up**, and the widest band on the map — see B3 |
 
-Two rows repay a second look. **R is identical to the byte**, which is the feedback rule doing its work rather than a coincidence. And **N1 goes up** on the branch that makes everything else worse: `H → N1` is a trigger, H was true in every world on day 0, so that push fired everywhere and stays fired after the strike withdraws H. What already fell stays fallen, and here what already rose stays risen.
+*(Re-measured 2026-09-21, after the versions began drawing the arrows' pushes as well as the priors. Every likelihood on this table is within a hundredth of what it was; every band is wider, N1's most of all, because the only arrow into it is the map's one `asserted` arrow.)*
+
+Three rows repay a second look. **R is identical to the byte**, which is the feedback rule doing its work rather than a coincidence. **N1 goes up** on the branch that makes everything else worse: `H → N1` is a trigger, H was true in every world on day 0, so that push fired everywhere and stays fired after the strike withdraws H. What already fell stays fallen, and here what already rose stays risen. And **N1's band runs from `.17` to `.61`** — nearly half the scale — which is the spread saying, in the one place on this map where it is entitled to, *we cannot vouch for this arrow*.
 
 Four things are what the golden test checks, and each is a sentence a person can read back: the strike lowers B; the strike makes **C less likely** (`C` is the claim *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%"* and `S → C` is `−2.0`, so the shorthand "the premium stays high" means C goes **down** — getting this backwards silently inverts the test); H is *supposed*, then *withdrawn*, then *pushed*; and B **rises** between day 1 and day 2, because what already fell stays fallen.
 
@@ -418,7 +457,7 @@ Each statement is true for every input a named generator can produce, and each n
 
 This chapter uses the local numbers `INV-multiverse.9` through `.17`. `.1`–`.5` belong to [`interventions.md`](interventions.md) and `.6`–`.8` to [`branches-and-worlds.md`](branches-and-worlds.md); `.18` onward belongs to [`diff.md`](diff.md).
 
-Two of them, `.13` and `.17`, are pinned to the shipped Hormuz fixture at the fixed seed rather than to a generator, and say so. The rest quantify over generated maps.
+Two of them, `.13` and `.17`, are pinned to the shipped Hormuz fixture at the fixed seed rather than to a generator, and say so; `.13b` is pinned to maps written for it. The rest quantify over generated maps.
 
 **INV-7 — honest numbers (product invariant: `0 ≤ lo ≤ p ≤ hi ≤ 1` on every belief, always).** For all maps `g` from `graphs()`, all branches `b` from `branches(g)` and all seeds `s` from `seeds()`: every belief and every series point in the world built from `(g, b, s)` lies between 0 and 1 and satisfies that chain. Tests: `test_probability_bounds`, and `test_belief_bounds_after_any_sequence` driven by `GraphEditMachine`.
 
@@ -434,9 +473,11 @@ Two of them, `.13` and `.17`, are pinned to the shipped Hormuz fixture at the fi
 
 **INV-multiverse.11 — a retraction dates from the cause, not from the push.** For all maps `g` from `graphs()` and all branches from `branches(g)` that undermine a supposition: each `Retraction.at` equals the day the opposing arrow's **source** was settled, and never that day plus the arrow's `lag`. Test: `test_retraction_dates_from_the_cause_not_the_push`. *Catches:* tying "do I still take your word for this" to a delay parameter.
 
-**INV-multiverse.12 — the band is not sampling noise.** For all maps `g` from `graphs()` rewritten so that every prior is a point — `lo = p = hi` — and all seeds `s`: every computed band comes out **essentially zero width**, within tolerance. Test: `test_band_is_not_sampling_noise`. *Catches:* reporting coin-flip spread as uncertainty, which is the single most likely way to get this chapter wrong.
+**INV-multiverse.12 — the band is not sampling noise.** For all maps `g` from `graphs()` rewritten so that every prior is a point — `lo = p = hi` — **and worked through with every arrow's push held at exactly what the map states**, and all seeds `s`: every computed band comes out **essentially zero width**, within tolerance. Test: `test_band_is_not_sampling_noise`. **Both freezes are needed, and 2026-09-21 is when the second one became so**: a version draws a push per arrow as well as a likelihood per prior, so freezing the priors alone leaves a band that is perfectly real. `test_freezing_the_priors_alone_leaves_the_arrows_talking` is the other half, and it fails the day the spread stops doing anything. The push freeze is reached through `_propagate_with_no_spread`, a private seam, and deliberately not through an argument on `propagate`: a world carries only the map, the branch and the seed, so a world built with a different spread table could not be rebuilt by `versions_of` and every comparison against it would be quietly wrong. *Catches:* reporting coin-flip spread as uncertainty, which is the single most likely way to get this chapter wrong.
 
-**INV-multiverse.13 — the band agrees with an independent method.** Not a generated statement: it is pinned to the shipped Hormuz fixture at the fixed seed. The sampled band agrees with the analytic first-order (delta-method) band to two significant figures — measured, on B in the base world on its own resolve-by day: `.2495–.5451` sampled against `.2459–.5455` analytic. Two independent methods, one answer; it is what keeps the delta method useful after it was rejected as the engine. Test: `test_range_matches_analytic_first_order_on_fixture`. *Catches:* a band that is the right shape and the wrong size.
+**INV-multiverse.13 — the band agrees with an independent method.** Not a generated statement: it is pinned to the shipped Hormuz fixture at the fixed seed. The sampled band agrees with the analytic first-order (delta-method) band to two significant figures — measured, on B in the base world on its own resolve-by day: `.2424–.5564` sampled against `.2394–.5562` analytic. The calculus carries **two** kinds of term now, a half-width per prior and a width per arrow, and the tolerance tightened from `.02` to `.01` when the second kind was added; the two methods agree to `.005` or better on every claim of the fixture. Two independent methods, one answer; it is what keeps the delta method useful after it was rejected as the engine. Test: `test_range_matches_analytic_first_order_on_fixture`. *Catches:* a band that is the right shape and the wrong size.
+
+**INV-multiverse.13b — how wide an arrow's push is drawn comes from where it came from, and from nothing else** *(added 2026-09-21)*. Two arrows that share a `provenance` and differ in every other field an arrow carries draw pushes that agree **to the bit**; each word's draws are centred on the push the map states and spread by the width B5's table gives it; and on a map whose every prior is a point, the claim an arrow points at has a wider band where that arrow is `asserted` than where it is `argued`, and wider there than where it is `documented`. Adding an arrow leaves every other arrow's draws untouched. Tests: `test_link_spread_comes_only_from_provenance`, `test_a_documented_arrow_gives_a_narrower_band_than_an_asserted_one`, `test_adding_an_arrow_does_not_move_another_arrows_draws`. *Catches:* a spread keyed to the strength, to the arrow's place on the map, or to one stream shared between the arrows — any of which would make adding an arrow re-draw its neighbours, and locality would fail through the sampling rather than along the arrows.
 
 **INV-multiverse.14 — the domino stays fallen and the apple falls.** For all maps `g` from `graphs()` containing a `trigger` arrow whose source is later reset: the target's series after the reset is byte-identical to the series in which the source was never reset. For all maps containing a `sustain` arrow: on every day its source is not true, its term is exactly zero. Tests: `test_trigger_persists_after_parent_reset`, `test_sustain_retracts_when_parent_removed`.
 
@@ -459,15 +500,15 @@ Directions and orderings, never values: research report 02 §3 reports `P(M1)` g
 
 ## ANTI-PATTERNS
 
-**1. Do not report the spread of the coin flips as the band.** *Because* it measures the machine rather than the map: run more worlds and the "uncertainty" shrinks, which means a number that moves when you buy computer time is being passed off as a statement about the world. **Do** run two loops, subtract the inner noise with the law of total variance, and take the percentiles across versions — and keep `test_band_is_not_sampling_noise`, which freezes every prior at a point and demands a zero-width band.
+**1. Do not report the spread of the coin flips as the band.** *Because* it measures the machine rather than the map: run more worlds and the "uncertainty" shrinks, which means a number that moves when you buy computer time is being passed off as a statement about the world. **Do** run two loops, subtract the inner noise with the law of total variance, and take the percentiles across versions — and keep `test_band_is_not_sampling_noise`, which freezes every prior at a point **and holds every arrow's push at what the map states** and demands a zero-width band. Freezing only one of the two would let the test pass on an engine that reports its own wobble.
 
-**2. Do not let the `params` stream see the branch.** *Because* the base world and the branch world then run on different underlying numbers, and every comparison becomes the user's edit plus a wash of elicitation noise, with no way to separate them. **Do** derive `params` from the seed alone, so version *k* of both worlds was built from the same numbers and the difference is the edit.
+**2. Do not let the `params` or the `strengths` stream see the branch.** *Because* the base world and the branch world then run on different underlying numbers, and every comparison becomes the user's edit plus a wash of elicitation noise, with no way to separate them. **Do** derive both from the seed alone — and each thing's own stream from its own identifier — so version *k* of both worlds was built from the same numbers and the difference is the edit.
 
 **3. Do not model a supposition as a big finite baseline.** *Because* ±4.0 is an arbitrary constant with no source; it contradicts the user in about two per cent of worlds; an opposing arrow of `−1.9` moves the claim from `.98` to `.89`, which is not a retraction; and it makes "suppose this is true" mean "assume ninety-eight per cent", which is not what the button says. **Do** make the claim true in every draw while the supposition holds, show a word where a number would go, and end it on the day the opposing cause becomes true.
 
 **4. Do not fit `{p, lo, hi}` on the probability scale.** *Because* elicited ranges are lopsided there — over the seven base-map claims the fixture's are skewed 1.24 on probability and near-symmetric 0.94 on log-odds — so a symmetric fit has to clamp at 0 and 1 and silently stops honouring the three numbers the model actually stated. **Do** fit the two halves separately on the log-odds scale, which honours all three exactly and can never leave 0–1.
 
-**5. Do not decide that something moved by comparing two bands.** *Because* the bands answer a different question. Under `do(H)` on the fixture, B's two bands overlap across about two fifths of their width — `.25–.55` against `.42–.73` — while 99.9% of versions agree on the direction; band overlap would report "no change" about the clearest change on the map. **Do** subtract version by version and read the paired difference; [`diff.md`](diff.md) states the rule and `test_shifted_needs_agreement` pins it.
+**5. Do not decide that something moved by comparing two bands.** *Because* the bands answer a different question. Under `do(H)` on the fixture, B's two bands overlap across more than half the narrower of them — `.24–.56` against `.38–.76` — while 99.9% of versions agree on the direction; band overlap would report "no change" about the clearest change on the map. **Do** subtract version by version and read the paired difference; [`diff.md`](diff.md) states the rule and `test_shifted_needs_agreement` pins it.
 
 **6. Do not reach for a module-level random generator, a global seed, or the clock.** *Because* a world would then depend on how many other worlds had been computed before it, which quietly destroys replay (NFR-2: the same map, branch and seed give byte-identical worlds) and with it every reproducible screenshot. **Do** pass the seed as an argument, build every `numpy.random.Generator` from it, and let `test_world_replays_from_base_branch_seed` fail loudly if anyone slips.
 
@@ -475,7 +516,7 @@ Directions and orderings, never values: research report 02 §3 reports `P(M1)` g
 
 **8. Do not put "how often these two show up together" on a wire.** *Because* that is a correlation, and a wire claims a mechanism; the two disagree whenever a third thing caused both, and the reader has no way to tell. **Do** compute `conditionals` with the arrow's source **supposed** true — a `do` — exactly as [`../graph/link.md`](../graph/link.md)'s anti-pattern 3 requires.
 
-**9. Do not add `strength_lo` and `strength_hi` to make arrows uncertain.** *Because* every arrow in today's fixture is hand-written `argued` or `asserted`, so spreading them now would widen everything by the same amount and teach nobody anything — and a second elicited pair per arrow is exactly the budget record 0005 refused. **Do** keep strengths fixed in 03a and derive the spread from `provenance` in stack 04, where "how well-backed" becomes "how wide" at no extra elicitation cost.
+**9. Do not add `strength_lo` and `strength_hi` to make arrows uncertain.** *Because* a second elicited pair per arrow is exactly the budget record 0005 refused, and two numbers about one arrow's width would eventually drift apart. **Do** derive the width from the arrow's `provenance` every time it is needed, by B5's rule — "how well-backed" becomes "how wide" at no extra elicitation cost, and there is one number about an arrow's push, the one the map states. *(Amended 2026-09-21: this used to say the spread ships in stack 04. It has. The reason it waited was that every arrow on this fixture is hand-written, so spreading them earlier would have widened everything by the same amount and taught nobody anything; generation is what finally makes arrows differ, and the fixture's one `asserted` arrow is now visibly wider than its six `argued` ones.)*
 
 ---
 

@@ -579,6 +579,16 @@ export interface components {
          *     where it was supposed false) so that the arithmetic stays ordinary. **No
          *     surface prints that number**: every reader looks at the world's `states`
          *     first and writes the word *Supposed* where the number would go.
+         *
+         *     `unchanged_because` says which half of the moved-at-all test an `unchanged`
+         *     claim failed. It is here because the floor and the bar are constants inside
+         *     this file and appear on no wire, so a reader who is only told *unchanged*
+         *     cannot tell "it barely moved" from "nobody agrees which way it went" — and
+         *     working it out at the other end would mean a second copy of both constants,
+         *     disagreeing with these ones. Where `moved_only_by_reweighting` is also true
+         *     it is the fuller answer and is the one to show: such a claim always says
+         *     `versions_disagree`, because every version that counts moved by exactly
+         *     nothing, and *nothing agreed with the direction* is a thin way to put that.
          */
         ClaimDiff: {
             /**
@@ -617,6 +627,11 @@ export interface components {
              * @description True when the move above came from nothing but the observation changing how much each version counts: the claim is in both worlds, it moved by at least 0.005, and not one version that counts moved at all. Only an observation can produce it, and the Inspector says so in one sentence.
              */
             moved_only_by_reweighting: boolean;
+            /**
+             * Unchanged Because
+             * @description Which half of the moved-at-all test this claim failed, in one word: 'under_the_floor' when the move is smaller than the floor, 'versions_disagree' when it cleared the floor and too few versions of the map moved that way. The floor is read first, so a claim that fails both says 'under_the_floor'. Nothing at all unless the claim is 'unchanged', and nothing when there is no test to fail: a claim only one world holds, and a claim no version counted in both numbers, whose absent 'agreement' already says there was no direction to read.
+             */
+            unchanged_because: ("under_the_floor" | "versions_disagree") | null;
         };
         /**
          * ConditionalRequest
@@ -1834,7 +1849,7 @@ export interface components {
             };
             /**
              * Range Shares
-             * @description How much of each claim's band comes from not being sure of each claim's prior: range_shares[target][source]. Nothing on screen reads it yet; it is carried because the sample it comes from is thrown away otherwise.
+             * @description How much of each claim's band comes from not being sure of each claim's prior: range_shares[target][source]. These do not add up to the whole band, and are not meant to: a version draws every arrow's push as well, and what the pushes explain is in no entry here. Nothing on screen reads it yet; it is carried because the sample it comes from is thrown away otherwise.
              */
             range_shares?: {
                 [key: string]: {
