@@ -84,8 +84,9 @@ export interface Port {
  * The four ports every tile has, in the order they are drawn.
  *
  * Arriving before leaving, and within each pair the one that fires once before
- * the one that holds — the same top-to-bottom order the sockets are drawn in,
- * so the list reads the way the tile looks.
+ * the one that holds — on each edge, the same top-to-bottom order its two
+ * sockets are drawn in, so each side of the list reads the way that side of the
+ * tile looks.
  */
 export const PORTS: readonly Port[] = [
   { id: "in-trigger", kind: "target", edge: Position.Left, mode: "trigger" },
