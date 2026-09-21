@@ -1,0 +1,283 @@
+In general how long does the bar take?
+
+---
+
+Where is this standard of doing 20 times recorded or enshrined? Will this bar continue through to stacks 5,6,7 or will it be less necessary once stack 4 is finalized. In any case, I'd like some way of reducing the amount of time this bar takes
+
+---
+
+<task-notification>
+<task-id>b77lgj3pe</task-id>
+<tool-use-id>toolu_01Rou3Y1deRyZYTGvc9FPa4E</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/86beda38-90c4-4207-9a6f-61a8688db3b5/tasks/b77lgj3pe.output</output-file>
+<status>completed</status>
+<summary>Background command "Run growth's suite and 20 cold runs on the tree with the layout-race fix" completed (exit code -1)</summary>
+</task-notification>
+
+---
+
+Could you please update the relevant docs and put them in a place for an agent with a fresh context to continue through with working towards the completion of stack 4?
+
+---
+
+<task-notification>
+<task-id>bnd3ok4eu</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/86beda38-90c4-4207-9a6f-61a8688db3b5/tasks/bnd3ok4eu.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for PR 43's checks on the fixed tree and land it" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+Can you go ahead with the full completion of the remaining two proposals, the dated amendment to record 0008 and the small PR to make the single browser run faster? Use opus 5 sub-agents for the actual execution
+
+---
+
+I will kick off another agent now to handle the completion of stack 4 based on the resume doc
+
+---
+
+<task-notification>
+<task-id>af4e5e0965268a5a0</task-id>
+<tool-use-id>toolu_01DivFw7hEPEWo9jtoNRu4pn</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/86beda38-90c4-4207-9a6f-61a8688db3b5/tasks/af4e5e0965268a5a0.output</output-file>
+<status>completed</status>
+<summary>Agent "Build: ADR 0008 amendment + faster browser run" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**What the coordinator must run to check me** (worktree `/Users/kentgang/git3/katalyst-wt/test-04-faster-browser-run`, branch `test/04-faster-browser-run`, two commits on `90001b1`, not pushed):
+
+```sh
+# 1. one cold end-to-end run — tier 1, which is what this branch is for
+plans/scripts/heavy.sh "check FB: cold run" -- bash -c 'cd /Users/kentgang/git3/katalyst-wt/test-04-faster-browser-run/frontend &amp;&amp; KATALYST_E2E_BACKEND_PORT=8087 KATALYST_E2E_FRONTEND_PORT=5187 env -u ANTHROPIC_API_KEY -u FRED_API_KEY npx playwright test'
+# 2. the teeth, if you want to see them yourself: break graph/onTheGlass.ts, then
+npx playwright test e2e/lateLayout.spec.ts     # expect: "no rectangle stood when arrival 1 was drawn", received 0
+# 3. from backend/: uv run pytest -q &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy --strict src/katalyst/domain
+# 4. from frontend/: npm run check
+# 5. read docs/adr/0008-...md from "## Amendment (2026-09-21)" and git diff 90001b1 --stat
+```
+
+## What I built
+
+**Part 1 — the amendment** (`eeff64c`, on its own). Record 0008 gains `## Amendment (2026-09-21)`, written in the manner of its own 2026-09-17 amendment: dated, in place, decision untouched. It records that the twenty-cold-runs bar was in **no** committed file, quotes the day's measurements as measurements of that day (17 of 17; 20 of 20 then red on the build's first run; the byte-identical numbers file that still failed its margin test), and sets the three tiers. Tier 3's sizing says where it comes from — `(1 − 1/1000)ⁿ` passes 5% at about 3000 runs, so about three runs per unit of rate. Tier 2 names the two real no-browser tests (`graph/__tests__/onTheGlass.test.ts`, `graph/__tests__/ports.test.tsx`, plus its end-to-end twin `test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification` in `hormuz.spec.ts` — names checked in the tree). Layer 4's "One end-to-end browser test" and the skipped-list's "more than one end-to-end test" are corrected **without a count**. `docs/adr/README.md`'s 0008 line gets an "amended again 2026-09-21" clause, which is how 0003/0006/0009/0012/0014 already read. `ARCHITECTURE.md` §7 gains one paragraph pointing at the tiers, marked `[built]`.
+
+**Part 2 — the run** (`5487e85`).
+
+| | Change | Cold run, wall-clock |
+|---|---|---|
+| (a) before | — | **75 s** · 9 tests (queue `took=`; includes a one-off ~5 s `uv sync` building the venv) |
+| (b) after 2a | `fullyParallel`, honest worker count | **23 s** · 9 tests (queue `took=`) |
+| (c) after 2b | pace 0.6 → 0.4 | **15 s** · the same 9 tests |
+| (d) after 2c | the late-layout check added | **24 s** · 10 tests |
+
+(c) and (d) ran inside combined queue turns (`took=43s` and `took=149s`, the latter also covering `npm run check` and the server suite), so their numbers are `date`-stamped around each invocation inside the turn; Playwright's own totals corroborate at 13.8 s and 23.7 s.
+
+**The pace I chose: `0.4` s, and the measurement is next to it in `playwright.config.ts`.** `generate.spec.ts`, four browsers at a time, twice at each pace: **0.40 green 8/8 · 0.25 green 8/8 · 0.15 RED · 0.08 RED · 0.04 RED · 0.02 RED**. The 0.15 failure is *not* the one the old comment predicted — the record held **17 arrivals for 18 claims**, i.e. two events landed inside one render. 0.4 rather than 0.25 because the build machine is ~2.5× slower and 2.5 × 0.15 (the fastest pace that has actually gone red here) = 0.375; the margin is the build's own measured handicap.
+
+**Worker counts: 5 locally, 2 in CI.** Five tests watch a whole recording (four in `generate.spec.ts`, one in `lateLayout.spec.ts`) and they are the long pole; a sixth browser has nothing to overlap. CI gets 2 because the runner has 4 cores to this machine's 14 and the layout runs on a background thread that must answer between two events — overcommitting it is exactly what produced the 2026-09-21 race. **Server side checked first:** each viewing mints its own id (`api/generate.py` `announced = mint_id()`), `HOW_MANY_GENERATIONS_A_PROCESS_KEEPS = 8` and an in-flight run is never evicted, so 5 concurrent replays sit inside the bound; `/api/fixtures/*` and the three `/api/worlds*` routes are pure functions of the request body. `hormuz.spec.ts` was parallelised **through the config only** — not one line of that file, or of `.github/workflows/ci.yml`, is touched.
+
+**2c has teeth, shown.** Route interception works: `page.route(/elk-worker[\w.-]*\.js/)` holds the worker script 900 ms (longer than the event gap, shorter than `layoutRunner.ts`'s 2000 ms patience), and the test asserts first that it actually fired. With the old rule restored in `graph/onTheGlass.ts` in a throwaway edit (`git status` clean afterwards; the backup is in `plans/logs/fb/`), the no-browser twin went **red on 3 of its 6 statements**, and the browser test went red with the build's own words: `no rectangle stood when claim 1 arrived`, **Received: 0**. Restored → both green.
+
+## Where I deviated, and why
+
+- **The pace sweep went the wrong way.** The brief said start at 0.15 and go lower; 0.15 was already red, so I swept **upward**. The failure mode at 0.15–0.04 is partial folding (17 arrivals for 18 claims), not the total fold the old comment predicted — that only appears at 0.02.
+- **One assertion is deliberately not made in the late-layout test.** `heldWhenEachClaimArrived.length === claims` fails *correctly* under the injected fault: stalling the thread is precisely what makes two claims land together when it catches up (measured: 18 claims, 17 arrivals). I replaced it with "the map still arrived in steps" (`&gt; 1`, `&lt;= claims`). The teeth live in the per-arrival loop, which is where the red proof fired, so nothing was weakened.
+- **`docs/adr/0012` line 50 still says "an `instant` flag drops it for tests".** I left it: it is a dated record of a 2026-09-17 decision, and the journal rule is amend, never rewrite. If it should carry its own dated amendment, that is a one-line follow-up.
+- **Twelve Playwright invocations, not ten** (6 queue turns): 1 baseline, 1 after-2a, 4 sweep-down, 2 sweep-up (`--repeat-each=2`), 1 teeth-red, 1 (c), 2 for (d) — the first (d) found the over-strict assertion above. Never above `--repeat-each=2`; no source file edited while a run was in flight; ports 8087/5187 throughout.
+- **One free diagnostic instead of a browser run:** a throwaway vitest probe (deleted) walked the real run with the layout always behind and showed the drawn-claim count is strictly monotone — which ruled out `onTheGlass.ts` and pointed at event folding. It never reached a commit.
+- **(d) is 24 s, not ~15 s, and I know why.** Playwright takes files in order, so with 5 workers the first round is `generate`'s four plus one `hormuz` test, and `lateLayout` (12 s) lands in the second round behind four one-second tests. A file name away from ~15 s; left alone rather than gamed. Your call.
+
+## Every reader of the old setting, moved
+
+`backend/src/katalyst/settings.py` (field + docs; `A_COMFORTABLE_PACE` and the new `THE_SLOWEST_PACE` now live here, with a `field_validator` that refuses a negative pause or one over 10 s in one plain sentence) · `backend/src/katalyst/engine/replay.py` (constant deleted; `seconds_between(instant=None)` → `seconds_between()`) · `backend/tests/api/test_generate.py` · `backend/tests/api/test_the_stream_is_not_buffered.py` (no longer reaches into the module; sets the setting) · `backend/tests/unit/test_replay.py` (rewritten, plus a new parametrised refusal test) · `frontend/playwright.config.ts` · `.env.example` · `spec/generation/replay.md` (Pacing + anti-pattern 7; also drops a stale claim that the `recordings` build job sets it — it never did) · `spec/workbench/streaming-growth.md` (open question 4) · `README.md` (four → **five** settings, plus the e2e paragraph) · `ARCHITECTURE.md` §6. `Makefile` and `ci.yml`: no references, checked. `KATALYST_REPLAY_INSTANT` now appears nowhere in the repo.
+
+## Chapter numbers made stale
+
+None. No engine number moved; `docs/worked-numbers.txt` is untouched.
+
+## Open questions
+
+1. Rename `lateLayout.spec.ts` so the five long tests share one round (~24 s → ~15 s)?
+2. Should record 0012 get its own dated amendment for the setting's rename?
+3. `ARCHITECTURE.md` §7 still says "three end-to-end tests" and "240 browser tests" — stale before my branch (it is ten and 337). I left the counting sentence to the `fix/04-polish` session, which owns that paragraph and is adding four tests.
+
+## Files touched
+
+16 files, +693 −336 (`git diff --stat 90001b1`, listed in the commit above). **Scratch:** `plans/logs/fb/` (all run logs, the `onTheGlass.ts` backup). **Written for you:** `plans/notes/msgs/pr-faster-run-body.md` (exactly three `##` headings, ends with the Claude Code line) and `plans/notes/msgs/merge-faster-run.txt` (prose, ends `Co-Authored-By: Claude Fable 5.1`).
+
+## Verification tails
+
+```
+$ npx playwright test                 10 passed (23.7s)
+$ npm run check  (lint &amp;&amp; typecheck)  Test Files 41 passed (41) · Tests 337 passed (337)
+$ uv run pytest -q                    569 passed, 1 warning in 118.49s   (domain TOTAL 1304 0 348 0 100%)
+$ uv run ruff check .                 All checks passed!
+$ uv run ruff format --check .        93 files already formatted
+$ uv run mypy --strict src/katalyst/domain    Success: no issues found in 12 source files
+```
+
+No push, no pull request, no other worktree touched, no model call, nothing spent.</result>
+<usage><subagent_tokens>286401</subagent_tokens><tool_uses>148</tool_uses><duration_ms>1534520</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a29289d91666271b1</task-id>
+<tool-use-id>toolu_015Z3DnzGCu9Moqjr6YG4npt</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/86beda38-90c4-4207-9a6f-61a8688db3b5/tasks/a29289d91666271b1.output</output-file>
+<status>completed</status>
+<summary>Agent "Review the faster-run branch" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Verdict: **READY AFTER MUST-FIX**
+
+Three must-fixes. The branch's engineering is good and its evidence is real; the problem is one assertion that asserts more than the product promises, one number that the evidence does not support, and a base that `main` has already moved past.
+
+---
+
+## MUST FIX BEFORE MERGE
+
+**1. `frontend/e2e/generate.spec.ts:276` and `:292–294` — a test that reads a moment, tuned green rather than made honest.**
+
+```ts
+expect(saw.heldWhenEachClaimArrived.length).toBe(claims);          // :276
+expect(saw.claimsWentOn).toEqual(saw.claimsWentOn.map((_, s) =&gt; s)); // :294
+```
+
+*What the product actually promises* — `spec/workbench/streaming-growth.md:1310`, INV-workbench.79, which names `heldWhenEachClaimArrived` by name:
+
+&gt; "while any box on the map is still waiting for a place, every reserved rectangle that was standing goes on standing where it stood; and once no box is waiting, the rectangles are exactly the ones the frontier asks for — so a map that is still growing always has one"
+
+That is a promise about *rectangles at each arrival*. Nowhere — not INV-60 to 79, not `frontend/src/graph/onTheGlass.ts`, not `spec/generation/replay.md` — does the product promise **one render per event**. The nearest thing is PRD FR-5 ("arrive one at a time over server-sent events and render as they arrive"), which is a promise about the *stream*, and it is already tested at the right layer by `backend/tests/api/test_the_stream_is_not_buffered.py::test_the_events_of_a_replay_are_let_go_of_one_at_a_time`. React batches; the browser cannot promise otherwise.
+
+**How I know it is an artefact of pacing, not a promise — from the builder's own evidence:**
+- `plans/logs/fb/pace-sweep.log`: at 0.15/0.08/0.04 the *only* failure at every pace is line 507 (`heldWhenEachClaimArrived.length`), received 17, 14, 17. Every other assertion in the file stayed green.
+- `plans/logs/fb/cd-runs.log`: at pace **0.4** — the chosen pace — with a 900 ms stall injected, the page's own record held **17 arrivals for 18 claims**. A 900 ms stall at 0.4 s folds a pair. The builder then relaxed the assertion in `lateLayout.spec.ts:139–140` and left the identical one standing in `generate.spec.ts`.
+
+**Why the margin argument does not hold.** `playwright.config.ts:145–149` reasons "2.5 × 0.15 = 0.375, so 0.4". That treats the folding threshold as a mean that scales with machine speed. It is a **tail**: two events fold when the main thread is busy longer than the gap, once. A 2.5× slower mean does not bound the maximum stall, and `fullyParallel` makes stalls *more* likely, not less — on CI two workers now each drive a replay page plus an ELK background thread on four cores, against one vite dev server (`playwright.config.ts:164`), where before `fullyParallel: false` meant at most one replay at a time. This is the exact shape of the failure the repo already paid for (20/20 local, red on CI's first run).
+
+**Smallest fix** — adopt the relaxation the builder already wrote next door, and assert what is promised:
+
+```ts
+// grew in steps, not in one lump — and never went backwards
+expect(saw.heldWhenEachClaimArrived.length).toBeGreaterThan(1);
+expect(saw.heldWhenEachClaimArrived.length).toBeLessThanOrEqual(claims);
+expect(saw.claimsWentOn[0]).toBe(0);
+expect(saw.claimsWentOn[saw.claimsWentOn.length - 1]).toBe(claims);
+// strictly rising: never down, never repeating
+saw.claimsWentOn.forEach((n, i) =&gt; { if (i &gt; 0) expect(n).toBeGreaterThan(saw.claimsWentOn[i - 1]!); });
+```
+Keep `:277–279` (a rectangle stood at every arrival but the last) — that *is* INV-79. Keep `:301–302` (`whenTheNumbersCame`) — that is INV-66 and is fold-safe.
+
+Put those five lines in `e2e/watching.ts` as one exported helper and call it from both specs, so there is one statement of "the map arrived in steps" rather than two.
+
+**Is the pace then free to be lower?** In principle yes — with the weakened statement, the builder's own sweep shows green down to 0.04 (14 and 17 arrivals, both &gt; 1); only 0.02 collapses to one. **But do not lower it.** After the fix the pace has exactly one job left: keep *one* gap — `generation_started` → first `proposal_accepted` — from folding, so `rectangleBeforeAnyClaim` is true. 0.4 is then a generous margin for a weak requirement rather than a tuned number propping up a wrong assertion, and 0.4 → 0.25 saves ~4 s of a ~24 s run. **The comment at `playwright.config.ts:129–157` must be rewritten with the fix**, because its table documents reds that will no longer be reds — left as-is it is a measurement justifying an assertion that no longer exists, and the next reader will either lower the pace or keep it for a dead reason.
+
+---
+
+**2. The branch is based on a superseded `main`, and one of its two central numbers is stale.**
+
+`fix/04-polish` has **already landed** — `ad8fbc4` (#45), the direct child of this branch's base `90001b1`. It added `frontend/e2e/hormuz.spec.ts` +350 (four tests: three `test_nothing_in_the_panel_is_cut_off_at_*` at 120 s budgets, plus `test_the_mouse_alone_reaches_the_six_things_you_can_do`), `trace: "retain-on-failure"`, and the artifact-upload step.
+
+- **One conflict, mechanical.** Both branches rewrite `frontend/playwright.config.ts` lines 1–12 (`@@ -1,12 +1,14 @@` vs `@@ -1,12 +1,12 @@`). Nothing else overlaps: this branch's other hunks are at old lines 44–52 and 82–101, polish's at 57–63; `spec/workbench/streaming-growth.md` hunks are at 1017/1030/1257 (polish) vs 1442 (here). Merge the docstring by hand so it says both things.
+- **`playwright.config.ts:70–73` is now false.** "Five is the long pole… Five tests watch a whole recording play… A sixth browser would have nothing left to overlap and would only contend." Against `main` the suite is **13 tests**, not 9, and three of them are 120-second-budget window tests. `workers: 5` may still be right, but the stated reason is not. Rebase, re-word, and take the tier-1 cold run on the rebased tree — the "75 s → 24 s" figure was measured on a suite that no longer exists (`plans/.heavy.log:74–77`, `plans/logs/fb/final-checks.log`).
+
+On `workers: 2` for CI: defensible, not a guess in the harmful sense — it is the number CI already used (2 spec files × `fullyParallel: false` capped Playwright at 2 jobs). But say plainly in the comment that nothing has been measured on four cores, and that what changed is not the worker count but the **replay concurrency**, 1 → 2.
+
+---
+
+**3. `docs/adr/0008-testing-layers-and-cassettes.md:110` — "about seventy minutes" is not what was measured.**
+
+`plans/.heavy.log` holds all three bars of 2026-09-21: `took=1372s`, `took=1373s`, `took=367s` (lines 25–26, 37–38, 61–62), the third stopped at 5 runs of 20 (line 63). That is **3112 s = 51.9 minutes**, not ~70. Seventy is 3 × 23 — the nominal cost of three full bars, one of which was cut short. In a journal whose whole point is "what was measured that day", and in the very sentence that argues the bar was waste, the typed number must be the measured one.
+
+Smallest fix: *"was run twice in full and a third time to five runs of twenty — about fifty-two minutes"*. (`plans/PLAN.md:110` and `plans/STATUS.md:131` carry the same ~70; they are git-ignored notes, not the record.)
+
+---
+
+## SHOULD FIX
+
+- **`docs/adr/0012-replay-mode-from-recorded-transcripts.md:50`** still reads *"an `instant` flag drops it for tests"*. **Yes, carry a one-line dated amendment on this branch.** Not because a measurement changed — none did — but because that line describes a *mechanism* a reader will go looking for and will not find, and record 0008 on this same branch sets the exact precedent (amend at the foot, keep the old words, add a clause to the `docs/adr/README.md` row). Rewriting line 50 in place would be the wrong move.
+- **`.github/workflows/ci.yml:187–199`** (on `main`) still says "The one end-to-end test", "It is deliberately one test", and the step is named "Open the stored map, branch it, and read it with the keyboard". This branch's first commit exists to correct exactly that claim in record 0008 ("Both were out of date: there is a small suite now"). Leaving the build's own file contradicting it is HANDOFF lesson 4. Comment-only, in the job polish already touched.
+- **`docs/adr/0008:127`** — `(1 − 1/1000)ⁿ` is the one formula in the record and AGENTS.md:40 forbids unexplained symbols. The arithmetic is **correct** (ln 0.05 / ln 0.999 = 2994 ≈ 3000; 0.9²⁰ = 0.12, so "twenty runs say almost nothing about anything rarer than one in ten" is true). But "costs about three runs for every one of its rate" does not parse. Suggest: *"a fault that shows once in every thousand runs survives n clean runs with a chance of 0.999 multiplied by itself n times — under five per cent at about three thousand runs. A fault that shows once in every k runs costs about three times k."*
+- **`frontend/playwright.config.ts:58–64`** overstates the statelessness. Per-viewing identifiers are real (`backend/src/katalyst/api/generate.py:555–558`), and `/api/worlds*` is a pure function for `base_id="hormuz"` (`engine/worlds.py:148`, `find()` first) — both PROVED. But `held.remember` also writes `_which_generation[graph.id]`, and every replay of one recording carries the **same** `graph.id`, so five concurrent replays are last-writer-wins on that index (`engine/transcript.py:261–262`). Benign today — all five build the identical map, and no e2e test asks `/api/worlds` for a generated map — and `_drop_the_oldest` already guards the eviction case. But the docstring should say "each viewing's *transcript* is its own" rather than implying nothing is shared.
+- **`frontend/e2e/lateLayout.spec.ts:62`** — `HOW_LATE = 900` is a fixed wall-clock delay in the test process; `THREAD_PATIENCE = 2000` (`src/graph/layoutRunner.ts:89`) is a budget the CI machine spends 2.5× slower. Locally ≈ 900 + boot + layout ≈ 1.05 s; on CI plausibly 1.3–1.6 s under two-worker contention. If it ever crosses 2000 the page silently falls back to `elk.bundled.js` on the main thread — the assertions still pass, and the test quietly stops testing the background-thread path its docstring is about. Add a read-back that the worker path was the one taken (or lower `HOW_LATE` toward 700, still comfortably above the 0.4 s event gap).
+
+## NITS
+
+- `backend/src/katalyst/settings.py:119` — `given &lt; 0 or given &gt; THE_SLOWEST_PACE` lets `nan` through (both comparisons are false), and `asyncio.sleep(nan)` is not a length of time somebody could watch. One `!=` self-comparison, or `math.isfinite`.
+- `backend/src/katalyst/settings.py:122` — dead `f` prefix on a fragment with no placeholder (ruff does not catch it because the concatenated group has one).
+- `lateLayout.spec.ts:111` asserts `heldBack &gt; 0` but not that it was **once**. If a bundler change made ELK fetch the script per layout, the test would become 18 × 900 ms and time out rather than say why.
+- `docs/adr/0008` front-matter `spec-impact:` was not extended to mention the browser tiers or `ARCHITECTURE.md §7`. The 2026-09-17 amendment did not either, so this is consistent, not wrong.
+- `lateLayout` is now the joint-longest test (11.9 s). With 5 local workers it costs ~0 wall clock; on CI with 2 workers it adds roughly what the pace change saved. Worth one line beside the pace measurement.
+
+## Checked and found sound
+
+- **`KATALYST_REPLAY_INSTANT` is gone** from every tracked file — `git grep` over the whole worktree returns only ordinary English uses of "instant" plus the record-0012 line above. `.env.example`, `README.md` (five settings, all five present in `.env.example`), `ARCHITECTURE.md`, `spec/generation/replay.md`, `spec/workbench/streaming-growth.md`, both backend test files and `engine/replay.py` all moved together. No CI job ever set the old flag, so the removed sentence "the build's own check turns it on" was stale and the replacement is accurate.
+- **One rule over two, and the validator's sentence.** `seconds_between()` takes no argument; `KATALYST_REPLAY_PACE` is the only dial; the default is still the comfortable 0.6, and `A_COMFORTABLE_PACE` moved to `settings.py` where a setting's default belongs. The refusal sentence names the setting, its range and what it was given — plain, and aimed at somebody looking at their own shell.
+- **NFR-2 holds.** `_pause` (`api/generate.py:436–448`) runs strictly between `yield events.framed(event)` calls, outside `_replayed`; the pace is invisible to event generation, so it cannot change what is emitted, only when. `if waiting &gt; 0` guards the zero case.
+- **Server tests green.** `uv run pytest tests/unit/test_replay.py tests/api/test_the_stream_is_not_buffered.py -q --no-cov` → 27 passed. `ruff check` clean, `ruff format --check` clean, `mypy --strict` clean on both changed modules. Frontend `npm run lint` and `npm run typecheck` clean.
+- **The helper is shared, not copied.** `generate.spec.ts` −263 / `e2e/watching.ts` +263; `lateLayout.spec.ts` imports `whatItSaw`, `startWatching`, `boxesRunningIntoEachOther`, `A_WHOLE_RUN`, `THE_SENTENCE` from it and `whereTheTileSits` from `waiting.ts`. `watching.ts` does not match Playwright's `testMatch`, so it is not run as a spec.
+- **The late-layout test has teeth.** `plans/logs/fb/teeth-red.log`: with `onTheGlass.ts` reverted it fails with *"no rectangle stood when claim 1 arrived"* — the exact CI failure of 2026-09-21. `heldBack &gt; 0` also proves the route pattern `/elk-worker[\w.-]*\.js/` matches what vite dev actually serves, and both local and CI use `npm run dev`, so dev is the only mode that matters; a renamed URL would make it fail loudly, not skip.
+- **The generation store's bound is not a new hazard.** Five `/api/generate` calls per suite run (four in `generate.spec.ts`, one in `lateLayout.spec.ts`; polish's hormuz tests use the stored example), against `HOW_MANY_GENERATIONS_A_PROCESS_KEEPS = 8`. Parallelism changes the interleaving, not the count — eviction is by total held over the process's life. "A run that was cut still offers its working" reads its transcript by id with at most four other generations created in between. Three spare.
+- **Every other measurement in the 0008 amendment checks out.** "Nowhere in the committed repository" — verified by `git grep` at `ad8fbc4` for *twenty*, *20 cold*, *20 runs*, *repeat-each*, *cold run*: nothing. "Seventeen cold runs of seventeen" — `STATUS.md:168`. "Twenty of twenty, red on the build's first run" — `STATUS.md:150`. "About two hundred and eighty numbers" — `engine/worked_numbers.py:842`. The two tier-2 tests exist by their real names and their one-line descriptions match their docstrings; `test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification` is at `hormuz.spec.ts:1162`. No count of end-to-end tests is typed anywhere, and the record says why. The decision itself is untouched — the two body edits keep the old words verbatim in a dated parenthetical, which is the manner the 2026-09-17 amendment set.</result>
+<usage><subagent_tokens>188951</subagent_tokens><tool_uses>63</tool_uses><duration_ms>678356</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>af4e5e0965268a5a0</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/86beda38-90c4-4207-9a6f-61a8688db3b5/tasks/af4e5e0965268a5a0.output</output-file>
+<status>completed</status>
+<summary>Agent "Build: ADR 0008 amendment + faster browser run" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>Fix round complete. Rebased onto `ad8fbc4`, two commits, tree clean.
+
+## What the coordinator must run to check me
+
+```sh
+cd /Users/kentgang/git3/katalyst-wt/test-04-faster-browser-run
+plans/scripts/heavy.sh "check FB" -- bash -c 'cd .../frontend &amp;&amp; KATALYST_E2E_BACKEND_PORT=8087 KATALYST_E2E_FRONTEND_PORT=5187 env -u ANTHROPIC_API_KEY -u FRED_API_KEY npx playwright test'   # 14 passed, ~28 s
+cd frontend &amp;&amp; npm run check        # 350
+cd backend &amp;&amp; uv run pytest -q &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy --strict src/katalyst/domain   # 572, clean
+```
+
+**Rebase.** One conflict, as predicted: `playwright.config.ts` lines 1–12. Merged by hand to say both things (stored example *and* recorded one; mouse-alone; panel whole at every window). Polish's `trace: "retain-on-failure"` and its comment kept untouched. `spec/workbench/streaming-growth.md` and `ARCHITECTURE.md` §7 applied cleanly.
+
+## Each item
+
+**1 — done.** One exported helper, **`theMapArrivedInSteps(saw, claims)`** in `e2e/watching.ts`, called by both specs. It asserts: more than one arrival and at most `claims`; `claimsWentOn` starts at 0, ends at `claims`, **strictly rising**; `mostRectangles &gt; 0`; and the per-arrival loop that a rectangle stood at every arrival but the last. `whenTheNumbersCame` (INV-66) stays where it was in `generate.spec.ts`. The docstring says in plain words why it does not assert a render per claim and names `test_the_events_of_a_replay_are_let_go_of_one_at_a_time` as where FR-5 is tested. INV-workbench.79 in the chapter gains the same paragraph and lists the new test. Pace kept at **0.4**; the comment block is rewritten — what the pace is for now (one gap: `generation_started` → first `proposal_accepted`), the sweep quoted and dated as what it showed about the *old* assertion, the 2.5× margin claim **gone**, and a note that 0.25 would save ~4 s and buy back a tail.
+
+**2 — done, measured.** **69 s (13 tests) → 28 s (14 tests)** on the rebased tree, both from a fresh start inside one queue turn; Playwright's own totals 1.1 m and 27.3 s. Reasoning rewritten in terms of what is true now: 14 tests, five watching a recording at ~12 s, the other nine short (four ask for two-minute budgets — three panel-at-a-window, one retune-under-a-report). For CI: says plainly that nothing has been measured on four cores, that it is reasoning not a reading, and that **what changed there is replay concurrency, one → two**, not the worker count.
+
+**3 — done.** "twice in full and a third time to five runs of twenty — **about fifty-two minutes**, read off the queue's own log rather than multiplied out". (1372 + 1373 + 367 = 3112 s.)
+
+**4 — done.** One-line dated amendment at the foot of 0012; line 50 untouched; only 0012's and 0008's index rows changed.
+
+**5 — done.** `e2e` job header, the jobs list line, and the step name. Comments and names only; no count typed; `run:` unchanged. YAML parses.
+
+**6 — done.** In words: *"survives one clean run with a chance of 0.999, and survives n clean runs with 0.999 multiplied by itself n times… a fault that shows once in every k runs costs about three times k."*
+
+**7 — done.** "each viewing's **transcript** is its own", then a clause naming `engine/transcript.py`'s map-id → generation index as last-writer-wins across concurrent replays, why it is harmless today, and that this is the line to return to.
+
+**8 — done, and it found a real defect in my own test.** Asserting *exactly once* failed at **two**: Vite serves the address as its own module (`…elk-worker.min.js?url`) which the page loads in its import graph, so the unanchored pattern was **also delaying the app's startup** — a different fault from the one the test is named for. Pattern anchored (`…\.js$`); now exactly one request, and it is the thread's. Read-backs: held-back URLs `toHaveLength(1)` with the URLs in the message, the response arrived, and **no request for `elk.bundled`** (the main-thread fallback) — which is the guard against the delay crossing `THREAD_PATIENCE` on a slower machine and silently swapping paths.
+
+**9 — done.** `math.isfinite` plus `not 0 &lt;= given &lt;= THE_SLOWEST_PACE`; dead `f` removed; refusal test parametrised over `-0.1`, `11.0`, `nan`, `inf`, `-inf` (84 → 87 in those files).
+
+**10 — done.** One line: the late-layout test is joint-longest at ~12 s, so at two workers on the build it costs about what the shortened pace saves — and why that is worth it.
+
+## Teeth, re-proved under the anchored interception
+
+Old rule back in `onTheGlass.ts` (throwaway, restored, `git status` empty): no-browser twin **3 of 6 red**; browser test **red** with `no rectangle stood when arrival 1 was drawn`, **Received: 0**. Restored → 14 of 14 green.
+
+## Two things you should know
+
+- **I broke my own worktree once and recovered.** My first before/after script did `git checkout &lt;rev&gt; -- &lt;dir&gt;` over uncommitted work. I killed it, but `pkill` orphaned the inner shell, which later ran its restore and silently reverted `watching.ts` and `generate.spec.ts` *after* my lint/typecheck passed — so a broken pair got committed (the AFTER run died in 2 s on a missing export). Recovered from HEAD, redone, and verified by reading the content back out of the commit. Everything measured since was measured on a committed, clean tree.
+- **`plans/.heavy.log` has an unmatched `START FB:` at 20:16:57** from that killed turn. The lock was released; it is not an open bar.
+
+Verification tails: `14 passed (27.3s)` · `Test Files 41 passed · Tests 350 passed` · `572 passed in 115.82s` (domain 100%) · `All checks passed!` · `93 files already formatted` · `Success: no issues found in 12 source files`.
+
+`pr-faster-run-body.md` and `merge-faster-run.txt` updated (new before/after, the assertion change and why, fifty-two minutes, the interception finding). Not pushed, no PR.</result>
+<usage><subagent_tokens>433324</subagent_tokens><tool_uses>168</tool_uses><duration_ms>1226250</duration_ms></usage>
+</task-notification>
