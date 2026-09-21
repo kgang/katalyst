@@ -1001,7 +1001,7 @@ def best_backed_routes(
     # routes that are equally well-backed and equally short.
     position_of = {arrow.id: position for position, arrow in enumerate(graph.links)}
 
-    widest = _widths(graph, arrows, position_of, subjects, observed)
+    widest = _widths(graph, arrows, subjects, observed)
     by_floor: dict[float, list[PropositionId]] = {}
     for claim_id, width in widest.items():
         by_floor.setdefault(width, []).append(claim_id)
@@ -1024,7 +1024,6 @@ def best_backed_routes(
 def _widths(
     graph: Graph,
     arrows: tuple[Link, ...],
-    position_of: dict[str, int],
     subjects: frozenset[PropositionId],
     observed: frozenset[PropositionId],
 ) -> dict[PropositionId, float]:
@@ -1039,14 +1038,12 @@ def _widths(
     Args:
         graph: The map the routes run over.
         arrows: Its ordinary arrows.
-        position_of: Where each arrow sits in the map's own list.
         subjects: The claims the routes work from.
         observed: Which of those an observation named.
 
     Returns:
         For each claim a route reaches, how wide the widest route to it is.
     """
-    del position_of
     onward: dict[PropositionId, list[tuple[PropositionId, float]]] = {}
     backward: dict[PropositionId, list[tuple[PropositionId, float]]] = {}
     for claim in graph.propositions:

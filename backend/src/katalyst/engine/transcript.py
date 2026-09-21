@@ -292,19 +292,31 @@ class Generations:
         found = self._held.get(generation_id)
         return None if found is None else found[0]
 
-    def map_of(self, base_id: str) -> Graph | None:
-        """A map this process generated, by its identifier, or nothing at all."""
+    def _its_generation(self, base_id: str) -> tuple[Transcript, Graph | None] | None:
+        """Find the generation a map belongs to, or nothing at all.
+
+        **The one place the two names are read together**, so they cannot get out
+        of step: a name left behind by an eviction used to raise a `KeyError` out
+        of the routes rather than answering "no" (Kent, 2026-09-21).
+        """
         generation_id = self._which_generation.get(base_id)
         if generation_id is None:
             return None
-        return self._held[generation_id][1]
+        found = self._held.get(generation_id)
+        if found is None:  # pragma: no cover - the eviction pops both together
+            self._which_generation.pop(base_id, None)
+            return None
+        return found
+
+    def map_of(self, base_id: str) -> Graph | None:
+        """A map this process generated, by its identifier, or nothing at all."""
+        found = self._its_generation(base_id)
+        return None if found is None else found[1]
 
     def day_zero_of(self, base_id: str) -> date | None:
         """The day a generated map's window starts on: the day its run happened."""
-        generation_id = self._which_generation.get(base_id)
-        if generation_id is None:
-            return None
-        return self._held[generation_id][0].on
+        found = self._its_generation(base_id)
+        return None if found is None else found[0].on
 
     def forget_everything(self) -> None:
         """Drop everything. For a test that wants a process which has just started."""

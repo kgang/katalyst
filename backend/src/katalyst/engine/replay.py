@@ -238,6 +238,40 @@ def read(path: Path) -> Recording:
     return Recording(example=path.stem, header=header, lines=tuple(lines))
 
 
+def why_it_cannot_be_played(recording: Recording) -> str | None:
+    """Say, in one sentence, why this recording would not play through. Or nothing.
+
+    **Reading a file and playing it are two different questions**, and readiness
+    asks the second. A file whose header parses can still hold an event this
+    engine does not know or a payload that does not fit one: it reads perfectly
+    well and stops half way through playing. Offering a card for it promises
+    something that will not happen (Kent, 2026-09-21).
+
+    Args:
+        recording: A recording that read.
+
+    Returns:
+        One plain sentence, or nothing at all when every event in it would play.
+    """
+    for name, payload in recording.lines:
+        if name == events.NAMES[Receipt]:
+            continue
+        shape = events.BY_NAME.get(name)
+        if shape is None:
+            return (
+                f"{recording.example} holds an event this engine does not know "
+                f"({name}). It was probably made by a newer one; record it again."
+            )
+        try:
+            shape.model_validate(payload)
+        except ValidationError:
+            return (
+                f"{recording.example} holds a {name} this engine could not read. "
+                "It was probably made by an older or a newer one; record it again."
+            )
+    return None
+
+
 def readable(folder: Path | None = None) -> tuple[tuple[Recording, ...], tuple[str, ...]]:
     """Read every recording in a folder, and say which ones could not be read.
 
@@ -249,9 +283,17 @@ def readable(folder: Path | None = None) -> tuple[tuple[Recording, ...], tuple[s
     Args:
         folder: Where the recordings live. The committed folder when not said.
 
+    **A file that reads but would not play through is not one of the good
+    ones.** Readiness offers a card for each of these, and a card that fails half
+    way through is worse than one that is not there (Kent, 2026-09-21).
+    `find` is deliberately more forgiving: asked for a sentence it will hand back
+    anything that reads, so the stream fails with that file's own precise
+    sentence rather than with "no recording of that sentence", which would be a
+    lie. Two questions, two answers.
+
     Returns:
-        Every recording that read, by file name, and one plain sentence per file
-        that did not.
+        Every recording that read **and** would play, by file name, and one plain
+        sentence per file that would not.
     """
     looking_in = where_they_live() if folder is None else folder
     if not looking_in.is_dir():
@@ -260,9 +302,15 @@ def readable(folder: Path | None = None) -> tuple[tuple[Recording, ...], tuple[s
     bad: list[str] = []
     for one in sorted(looking_in.glob("*.jsonl")):
         try:
-            good.append(read(one))
+            found = read(one)
         except CannotBeRead as unreadable:
             bad.append(unreadable.why)
+            continue
+        unplayable = why_it_cannot_be_played(found)
+        if unplayable is None:
+            good.append(found)
+        else:
+            bad.append(unplayable)
     return tuple(good), tuple(bad)
 
 
@@ -280,7 +328,22 @@ def every_recording(folder: Path | None = None) -> tuple[Recording, ...]:
     """
     # Resolved when asked rather than when this function was written, so that
     # where the recordings live is a fact about the running program.
-    return readable(folder)[0]
+    #
+    # **Everything that reads**, including a file that would stop part way
+    # through playing: asked for a sentence, this hands back what it has so the
+    # stream can fail with that file's own precise words rather than with "no
+    # recording of that sentence", which would be a lie. `readable` answers the
+    # other question — what a card may be offered for (Kent, 2026-09-21).
+    looking_in = where_they_live() if folder is None else folder
+    if not looking_in.is_dir():
+        return ()
+    found: list[Recording] = []
+    for one in sorted(looking_in.glob("*.jsonl")):
+        try:
+            found.append(read(one))
+        except CannotBeRead:
+            continue
+    return tuple(found)
 
 
 def summaries(folder: Path | None = None) -> tuple[RecordingSummary, ...]:
@@ -380,7 +443,9 @@ def seconds_between(instant: bool | None = None) -> float:
     return 0.0 if instant else A_COMFORTABLE_PACE
 
 
-def beliefs_of(recording: Recording, world_sizes: tuple[int, int]) -> BeliefsPropagated:
+def beliefs_of(
+    recording: Recording, world_sizes: tuple[int, int], onto: Graph | None = None
+) -> BeliefsPropagated:
     """Work every likelihood through the map this recording built.
 
     The one event a recording never stores. The header carries the seed, the
@@ -393,12 +458,17 @@ def beliefs_of(recording: Recording, world_sizes: tuple[int, int]) -> BeliefsPro
         world_sizes: How many versions of the map to try, and how many worlds
             under each.
 
+        onto: The map to work the numbers through, when the caller has one of
+            its own — the recording's map with the reader's own likelihood
+            stamped on it, which is an input rather than part of the file. The
+            recording's own map when not said.
+
     Returns:
         The event, ready to be written out where the grammar puts it.
     """
     versions, worlds = world_sizes
     world = propagate(
-        map_of(recording),
+        onto if onto is not None else map_of(recording),
         (),
         as_of=recording.header.recording_date,
         seed=recording.header.seed,
@@ -510,11 +580,22 @@ def _grammar_faults(recording: Recording, names: list[str]) -> list[str]:
                 f"{recording.example} goes on growing after its verdict, which "
                 "grades a map that has stopped changing."
             )
-    numbered = [
-        int(payload["at"])
-        for name, payload in recording.lines
-        if name in growth and "at" in payload
-    ]
+    numbered: list[int] = []
+    for name, payload in recording.lines:
+        if name not in growth or "at" not in payload:
+            continue
+        try:
+            numbered.append(int(payload["at"]))
+        except (TypeError, ValueError):
+            # A bad value is a fault to name. Reading it as a number one line
+            # after the check above appended the right sentence turned this
+            # whole report — every other file's included — into a traceback
+            # (Kent, 2026-09-21).
+            found.append(
+                f"{recording.example} numbers a proposal {payload['at']!r}, which "
+                "is not a number, so a reader cannot tell what order they arrived in."
+            )
+            return found
     if numbered != sorted(numbered) or len(set(numbered)) != len(numbered):
         found.append(
             f"{recording.example} numbers its proposals {numbered}, which is not a "
@@ -570,6 +651,16 @@ def faults_in(recording: Recording, *, current_prompt_hash: str) -> list[str]:
             f"{recording.example} is not one of the four examples this program "
             f"ships with ({', '.join(THE_FOUR_EXAMPLES)}), so no card would ever play it."
         )
+    for name, payload in recording.lines:
+        if name != events.NAMES[ProposalRejected]:
+            continue
+        if not payload.get("violations") and not str(payload.get("claim_in_words", "")).strip():
+            found.append(
+                f"{recording.example} holds a refusal that says nothing at all: no "
+                "rule it broke and no words of the model's. A refusal by the vendor "
+                "carries no violation and that is legitimate, but it always carries "
+                "the sentence the service gave."
+            )
     if recording.header.prompt_hash != current_prompt_hash:
         found.append(
             f"{recording.example} was made against a different prompt from the one shipping "

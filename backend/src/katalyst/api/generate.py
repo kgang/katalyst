@@ -584,7 +584,11 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
     try:
         # Building the map from the file is as much "reading the recording" as
         # playing it is, so it sits inside the same guard.
-        graph = replay.map_of(recording)
+        # The reader's own likelihood is an **input**, not part of the
+        # recording, so it is stamped here exactly as the live path stamps it.
+        # It was accepted by the route and then dropped in silence on this path
+        # (Kent, 2026-09-21).
+        graph = _with_the_readers_own(replay.map_of(recording), asked.user_belief)
         held.remember(working, graph, in_flight=True)
         for event in replay.play(recording):
             if isinstance(event, GenerationStarted):
@@ -604,7 +608,7 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
             # multiplied-out number comes off the world, and the receipt.
             if not worked_through and isinstance(event, Verdict | Receipt):
                 worked_through = True
-                yield replay.beliefs_of(recording, (asked.versions, asked.worlds))
+                yield replay.beliefs_of(recording, (asked.versions, asked.worlds), graph)
             if isinstance(event, Receipt):
                 yield event.model_copy(update={"seconds": time.monotonic() - started})
                 continue
@@ -628,6 +632,35 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
         # every abandoned replay un-evictable for ever: forty of them against a
         # bound of eight (Kent, 2026-09-21).
         held.remember(working, graph, in_flight=False)
+
+
+def _with_the_readers_own(graph: Graph, user_belief: Belief | None) -> Graph:
+    """Stamp the reader's own likelihood on the map's starting claim, if they gave one.
+
+    Theirs, beside the model's and never merged with it (FR-2). Saying nothing
+    stamps nothing.
+
+    Args:
+        graph: The map as it was built or recorded.
+        user_belief: What the reader said, or nothing at all.
+
+    Returns:
+        The map, with their number on its starting claim when there is one.
+    """
+    if user_belief is None:
+        return graph
+    return graph.model_copy(
+        update={
+            "propositions": tuple(
+                one.model_copy(
+                    update={"beliefs": one.beliefs.model_copy(update={"user": user_belief})}
+                )
+                if one.id == graph.hypothesis_id
+                else one
+                for one in graph.propositions
+            )
+        }
+    )
 
 
 def _line_from(event: ProposalAccepted | ProposalRejected, at: int) -> TranscriptLine:

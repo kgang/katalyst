@@ -251,6 +251,11 @@ def grow(
                 on=on,
                 searches_left=caps.searches - walk.receipt.searches,
             )
+            # **Every answer of the round is on the bill before any of them is
+            # folded.** They were all asked and all billed together, so an
+            # exception inside one fold used to take the rest off the receipt
+            # (Kent, 2026-09-21).
+            walk.bill(answers)
             waiting = list(zip(asking, answers, strict=True))
             while waiting:
                 claim_id, answer = waiting.pop(0)
@@ -320,6 +325,22 @@ class _Walk:
         self.spent = False
         self.filled_up = False
         self.last_refusal: str | None = None
+        self._billed: list[Outcome] = []
+
+    def bill(self, answers: Sequence[Outcome]) -> None:
+        """Put a whole round on the bill before any of it is folded.
+
+        A round's calls are all made and billed together, so the money is a fact
+        about the round and not about whether each answer folds cleanly. An
+        exception part way through the folding used to take the rest of the
+        round off the receipt (Kent, 2026-09-21).
+
+        Args:
+            answers: Every answer of the round, in the order it will be folded.
+        """
+        for one in answers:
+            self.receipt = fold(self.receipt, one)
+            self._billed.append(one)
 
     def watch(self, answerer: Answerer) -> None:
         """Say what has been spent and what may be, before a question is put.
@@ -389,7 +410,10 @@ class _Walk:
             The map with whatever the answer added, and the answer as it now
             stands — the one that came in, or a refusal in its place.
         """
-        self.receipt = fold(self.receipt, outcome)
+        if outcome not in self._billed:
+            self.receipt = fold(self.receipt, outcome)
+        else:
+            self._billed.remove(outcome)
         outcome = self._judged_again(graph, outcome)
         result = outcome.result
 

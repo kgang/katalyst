@@ -8,7 +8,7 @@ without a model, a network or a penny.
 """
 
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -721,17 +721,26 @@ def a_file_nobody_can_read(tmp_path: Path, written: str) -> None:
     (tmp_path / "recordings" / "broken.jsonl").write_text(written, encoding="utf-8")
 
 
-BROKEN_RECORDINGS = {
-    "a header from an older engine": '{"base_id": "x"}\n',
-    "an event nobody knows": (
-        '{"base_id":"x","seed":1,"recording_date":"2026-09-17","prompt_hash":"h",'
-        '"hypothesis":"Something.","insert":null}\n{"event":"weather_changed","data":{}}\n'
+def a_good_header(tmp_path: Path) -> str:
+    """The real recording's own header line, which this engine reads perfectly well.
+
+    Built from the shipped fixture rather than typed out, because a header typed
+    by hand is a header that fails for its own reasons — which is what made two
+    of these cases exercise the header path instead of the paths they are named
+    for (2026-09-21).
+    """
+    return (tmp_path / "recordings" / "hormuz.jsonl").read_text(encoding="utf-8").splitlines()[0]
+
+
+BROKEN_RECORDINGS: dict[str, Callable[[str], str]] = {
+    "a header from an older engine": lambda header: '{"base_id": "x"}\n',
+    "an event nobody knows": lambda header: (
+        f'{header}\n{{"event":"weather_changed","data":{{}}}}\n'
     ),
     "a payload that does not fit its event": (
-        '{"base_id":"x","seed":1,"recording_date":"2026-09-17","prompt_hash":"h",'
-        '"hypothesis":"Something.","insert":null}\n{"event":"done","data":{"reason":"nonsense"}}\n'
+        lambda header: f'{header}\n{{"event":"done","data":{{"reason":"nonsense"}}}}\n'
     ),
-    "nothing at all": "\n",
+    "nothing at all": lambda header: "\n",
 }
 """Four ways a recording can be unreadable, and every one of them has happened.
 
@@ -749,7 +758,7 @@ def test_one_unreadable_recording_never_blanks_the_launchpad(tmp_path: Path, bro
     show nothing at all, though a perfectly good recording sat beside it — the
     keyless product, blanked by a file it did not need (2026-09-20).
     """
-    a_file_nobody_can_read(tmp_path, BROKEN_RECORDINGS[broken])
+    a_file_nobody_can_read(tmp_path, BROKEN_RECORDINGS[broken](a_good_header(tmp_path)))
 
     ready = client().get("/api/readyz")
 
@@ -762,7 +771,7 @@ def test_one_unreadable_recording_never_blanks_the_launchpad(tmp_path: Path, bro
 @pytest.mark.parametrize("broken", list(BROKEN_RECORDINGS), ids=list(BROKEN_RECORDINGS))
 def test_an_unreadable_recording_is_never_played_at_somebody(tmp_path: Path, broken: str) -> None:
     """The good one still plays, and the bad one is not reached by matching on a sentence."""
-    a_file_nobody_can_read(tmp_path, BROKEN_RECORDINGS[broken])
+    a_file_nobody_can_read(tmp_path, BROKEN_RECORDINGS[broken](a_good_header(tmp_path)))
 
     names = [name for name, _ in stream()]
 
@@ -1145,3 +1154,31 @@ def test_a_live_run_is_always_let_go_of_too(monkeypatch: pytest.MonkeyPatch) -> 
             next(iter(answer.iter_lines()))
 
     assert held.how_many() <= HOW_MANY_GENERATIONS_A_PROCESS_KEEPS
+
+
+def test_the_readers_own_likelihood_reaches_a_replayed_map_too() -> None:
+    """It is an **input**, not part of the recording (2026-09-21).
+
+    The route accepted it on this path and dropped it in silence: a reader who
+    typed their own number watched a replay that did not carry it, with nothing
+    saying so.
+    """
+    read = stream(user_belief={"p": 0.7, "lo": 0.5, "hi": 0.9, "owner": "user"})
+
+    world = next(payload for name, payload in read if name == "beliefs_propagated")
+    started = world["world"]["graph"]["hypothesis_id"]
+    its = next(one for one in world["world"]["graph"]["propositions"] if one["id"] == started)
+
+    assert its["beliefs"]["user"] == {"p": 0.7, "lo": 0.5, "hi": 0.9, "owner": "user"}
+    assert its["beliefs"]["model"]["owner"] == "model"
+
+
+def test_saying_nothing_stamps_nothing_on_a_replay_either() -> None:
+    """ "I don't know" is an answer on both paths."""
+    read = stream()
+
+    world = next(payload for name, payload in read if name == "beliefs_propagated")
+    started = world["world"]["graph"]["hypothesis_id"]
+    its = next(one for one in world["world"]["graph"]["propositions"] if one["id"] == started)
+
+    assert its["beliefs"]["user"] is None

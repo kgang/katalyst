@@ -264,3 +264,46 @@ def test_every_reason_at_once_and_never_the_first(tmp_path: Path) -> None:
 
     assert len(faults) > 1
     assert any("Record it again" in one for one in faults)
+
+
+def test_a_proposal_numbered_with_something_that_is_not_a_number_is_named(
+    tmp_path: Path,
+) -> None:
+    """A bad value is a fault to name, never a traceback (2026-09-21).
+
+    Reading it as a number one line after the check above had appended the right
+    sentence turned the whole report — every other file's included — into a
+    stack trace, so a folder with one bad file reported nothing about any of the
+    others.
+    """
+    wrong = broken_into(
+        tmp_path, lambda lines: [one.replace('"at": 0', '"at": "x"') for one in lines]
+    )
+
+    faults = replay.faults_in(wrong, current_prompt_hash=prompt_hash())
+
+    assert any("not a number" in one for one in faults)
+
+
+def test_a_refusal_that_says_nothing_at_all_is_named(tmp_path: Path) -> None:
+    """INV-generation.26: a refusal carries the rules' own code and sentence.
+
+    A refusal **by the vendor** legitimately carries no violation — our rules
+    never saw it — but it always carries the sentence the service gave. One with
+    neither says nothing to anybody.
+    """
+    silent = broken_into(
+        tmp_path,
+        lambda lines: [
+            one.replace('"violations"', '"nothing"').replace(
+                '"claim_in_words": "', '"claim_in_words": "" , "was": "'
+            )
+            if '"proposal_rejected"' in one
+            else one
+            for one in lines
+        ],
+    )
+
+    faults = replay.faults_in(silent, current_prompt_hash=prompt_hash())
+
+    assert any("says nothing at all" in one for one in faults)
