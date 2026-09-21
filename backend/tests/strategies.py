@@ -950,8 +950,16 @@ def _a_pair_nothing_joins_yet(draw: Any, graph: Graph) -> tuple[str, str]:
 
 
 def _break_duplicate_link(draw: Any, graph: Graph) -> Graph:
-    """Draw a second arrow between a pair of claims one arrow already joins."""
-    already = draw(st.sampled_from(graph.links))
+    """Draw a second arrow between a pair of claims one arrow already joins.
+
+    Only over an arrow whose two ends are both on the map: doubling a dangling
+    one would double its own complaint as well, and each breaker here damages a
+    map in exactly one way.
+    """
+    on_the_map = {one.id for one in graph.propositions}
+    joining = [one for one in graph.links if one.source in on_the_map and one.target in on_the_map]
+    assume(joining)
+    already = draw(st.sampled_from(joining))
     again = draw(
         links(
             identifier=_added_arrow_id(graph),
