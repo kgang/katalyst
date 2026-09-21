@@ -20,18 +20,70 @@ help: ## Show this list
 		| awk 'BEGIN { FS = ":.*## " }; { printf "  %-17s  %s\n", $$1, $$2 }'
 
 # --- running the app --------------------------------------------------------
+#
+# The three tasks below all run in the foreground and all end the same way:
+# Ctrl+C stops both halves AND removes their containers, so the machine is left
+# as it was found.
+#
+# Stopping is not the same as removing. Docker Compose on its own stops the
+# containers and leaves them lying about, still carrying the image and the
+# environment they were made with — so a later start can quietly be running
+# something other than what you just edited. `make down` already promises
+# removal; Ctrl+C now keeps the same promise. `docker compose watch`, which
+# `dev` used to be, is worse still: Ctrl+C ends only the watching and leaves
+# both containers running. `docker compose up --watch` does the same file
+# copying while holding the terminal, so stopping it stops the app.
+#
+# Two traps do that, and they are worth reading once:
+#
+#   trap 'docker compose down' EXIT   whatever ends this task — Ctrl+C, a crash,
+#                                     a clean exit — take the containers down.
+#   trap 'exit 0' INT                 Ctrl+C reaches every program in the
+#                                     terminal at once. Compose catches it and
+#                                     stops the containers; this keeps the shell
+#                                     from being killed by the same signal, so
+#                                     make does not sign off a deliberate Ctrl+C
+#                                     with `*** [dev] Error 130`. A real failure
+#                                     is untouched: the trap never runs.
+#
+# WHERE is the two addresses, printed before Compose's own output starts:
+#
+#   * the browser app, on port 5173;
+#   * the Python server's own page listing every route, with a box beside each
+#     one for calling it from the browser, on port 8000.
+#
+# That second page is NOT reachable through port 5173. The dev server forwards
+# only addresses beginning with `/api` to the Python server and answers
+# everything else with the app's own page, so `localhost:5173/docs` gives you
+# the app, not the routes.
+#
+# The lines are printed once, up front, rather than again when the two halves
+# report themselves healthy. Printing them a second time means a background
+# process polling a health route while Compose holds the terminal, and a
+# background process that can outlive the task it was helping is worse than a
+# line you scroll back to.
+WHERE = printf '\n  The app                      http://localhost:5173/\n  The server'"'"'s routes, to try  http://localhost:8000/docs\n\n  Press Ctrl+C to stop everything.\n\n'
 
-dev: ## Start both halves in Docker and reload them as you edit (http://localhost:5173)
-	docker compose watch
+dev: ## Start both halves in Docker, reload them as you edit, and stop them on Ctrl+C (http://localhost:5173/)
+	@$(WHERE)
+	@trap 'docker compose down' EXIT; trap 'exit 0' INT; docker compose up --watch
 
-up: ## Start both halves in Docker, without watching for edits
-	docker compose up
+up: ## The same, without watching for edits (http://localhost:5173/)
+	@$(WHERE)
+	@trap 'docker compose down' EXIT; trap 'exit 0' INT; docker compose up
 
 down: ## Stop both halves and remove their containers
 	docker compose down
 
-prod: ## Build and run the packaged versions of both halves (http://localhost:8080)
-	docker compose -f compose.yaml -f compose.prod.yaml up --build
+# The packaged run publishes one address and one port: a small web server holds
+# the built browser files and hands anything beginning with `/api` to the Python
+# server over the private network between the two containers. The server is not
+# published on this machine at all, so there is no route list to open here.
+prod: ## Build and run the packaged versions of both halves (http://localhost:8080/)
+	@printf '\n  The packaged app  http://localhost:8080/\n\n  Press Ctrl+C to stop everything.\n\n'
+	@trap 'docker compose -f compose.yaml -f compose.prod.yaml down' EXIT; \
+		trap 'exit 0' INT; \
+		docker compose -f compose.yaml -f compose.prod.yaml up --build
 
 # --- checks -----------------------------------------------------------------
 
