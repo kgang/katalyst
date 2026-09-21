@@ -30,18 +30,52 @@
  * calls nothing.
  */
 
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
+
+/*
+ * ---- Waiting, and why every read below does it --------------------------
+ *
+ * **Nothing here reads a value the page has not settled on.** This test drives
+ * two servers, a background layout thread and a drawing library that measures
+ * its own boxes, so at any moment the screen may be showing the answer to the
+ * question before last. Every read goes through one of the helpers below, and
+ * each of them waits for a *named* signal rather than for a number of
+ * milliseconds — a sleep is a guess, and the build machine is about two and a
+ * half times slower than the machine it was guessed on.
+ *
+ * Two traps in particular are what these exist for.
+ *
+ * **`innerText` is not `textContent`.** `innerText` is what the page *renders*,
+ * so it comes back empty for a tile the drawing library has not measured yet —
+ * which is how a chip that plainly reads `.19` was read as `""`. Nothing below
+ * calls `innerText`; the reads wait for the element to be visible and then take
+ * `textContent`, which is the same string by then.
+ *
+ * **The old numbers stay on screen until the new ones arrive.** An edit asks
+ * for a whole new world and a whole new difference, and until they come back
+ * the map is still drawing the previous answer. So waiting for *a* number is
+ * not waiting: each edit below waits for the thing that **changes** — the
+ * sentence the map says out loud for that edit — before anything is read.
+ */
 
 /**
- * Wait until the map has been laid out.
+ * Wait until the map has been laid out, with every tile in a place of its own.
  *
  * Where the tiles go is worked out on a background thread, so for a moment after
- * the map appears every tile is still stacked in the same place. Waiting for the
- * tiles to be somewhere is the honest signal that the layout has landed —
- * waiting a fixed number of milliseconds is a guess that is wrong on a slow
- * machine.
+ * the map appears the tiles are still stacked. Waiting for **every** tile to be
+ * somewhere different is the honest signal, and it is the one that survives a
+ * second layout: after a branch opens the tiles are already spread out from the
+ * layout before it, so "more than one place" is satisfied before the new answer
+ * has landed and says nothing at all.
+ *
+ * @param page The page the map is on.
+ * @param tiles How many tiles this map has. A layered layout gives every tile a
+ *   place of its own — two tiles on one spot is the collision the layout exists
+ *   to prevent — so the count of places is the count of tiles exactly when the
+ *   layout has landed.
  */
-async function waitForTheLayout(page: Page): Promise<void> {
+async function waitForTheLayout(page: Page, tiles: number): Promise<void> {
+  await expect(page.locator(".react-flow__node")).toHaveCount(tiles);
   await expect
     .poll(
       () =>
@@ -52,7 +86,82 @@ async function waitForTheLayout(page: Page): Promise<void> {
           ),
       { timeout: 30_000, message: "the map was never laid out" },
     )
-    .toBeGreaterThan(1);
+    .toBe(tiles);
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+}
+
+/**
+ * Read one value off the screen, once the screen has settled on it.
+ *
+ * The shape is not decoration: it is what "settled" means here. A chip holds an
+ * absence, then a number; waiting for the number's shape is waiting for the
+ * engine. And the read itself is `textContent` rather than `innerText`, which
+ * is empty until the drawing library has measured the tile.
+ *
+ * @param where The one element the value is in.
+ * @param shape What the value looks like once it is there.
+ */
+async function readWhenReady(where: Locator, shape: RegExp): Promise<string> {
+  await expect(where).toBeVisible();
+  await expect(where).toHaveText(shape);
+  return ((await where.textContent()) ?? "").trim();
+}
+
+/**
+ * Wait until the engine has answered for this branch and the map has been laid
+ * out again.
+ *
+ * The line under the map names the branch it folded on, and it is written from
+ * the world the engine handed back — so it is there exactly when that world is.
+ *
+ * @param page The page the map is on.
+ * @param branch The branch's name, as the reader typed it.
+ * @param tiles How many tiles the map has with this branch folded on.
+ */
+async function waitForTheBranch(page: Page, branch: string, tiles: number): Promise<void> {
+  await expect(page.locator(".map-bar__where")).toContainText(branch);
+  await expect(page.locator(".map-origin")).toContainText(`the branch "${branch}" folded onto it`);
+  await waitForTheLayout(page, tiles);
+}
+
+/**
+ * Wait until the map has said, out loud, what this edit did.
+ *
+ * This is the signal an edit is finished. The counts in the sentence are the
+ * engine's own, one per claim it called shifted, so the sentence cannot be there
+ * until the difference is — and it is a *different* sentence from the one before
+ * the edit, which is what makes waiting for it waiting rather than passing.
+ *
+ * @param page The page the map is on.
+ * @param sentence The whole line, word for word.
+ */
+async function waitForTheAnswer(page: Page, sentence: string): Promise<void> {
+  await expect(page.locator(".map-live")).toHaveText(sentence);
+}
+
+/**
+ * Wait until the map has stopped moving, and say where it came to rest.
+ *
+ * Framing the map is an animation, so the transform is read twice and believed
+ * only when the two agree. What it is for is the claim that flipping between the
+ * two worlds moves nothing: a transform read mid-frame would make that claim
+ * about two different moments.
+ */
+async function whereTheMapCameToRest(page: Page): Promise<string> {
+  const viewport = page.locator(".react-flow__viewport");
+  let last = "";
+  await expect
+    .poll(
+      async () => {
+        const now = (await viewport.getAttribute("style")) ?? "";
+        const settled = now !== "" && now === last;
+        last = now;
+        return settled;
+      },
+      { timeout: 30_000, message: "the map never stopped moving" },
+    )
+    .toBe(true);
+  return last;
 }
 
 /** Which claim the keyboard is standing on, or nothing when it is off the map. */
@@ -60,6 +169,97 @@ function standingOn(page: Page): Promise<string | undefined> {
   return page.evaluate(
     () => document.activeElement?.closest<HTMLElement>(".react-flow__node")?.dataset.id,
   );
+}
+
+/**
+ * Put the keyboard on one claim's tile, the way a reader would, and wait until
+ * it is there.
+ *
+ * **A map key only works when the keyboard is on the map**, and that is the
+ * product's rule rather than this test's convenience: Space belongs to whatever
+ * button the keyboard is on, so `useMapKeys` hands it over when there is one and
+ * flips the two worlds only when there is not. Where focus happens to be after
+ * a command has run is not something a test may assume — under load it is
+ * sometimes a button, and then the keystroke is correctly ignored and the test
+ * fails for a reason that is not a fault.
+ *
+ * @param page The page the map is on.
+ * @param claim The claim whose tile the keyboard should stand on.
+ */
+async function standOn(page: Page, claim: string): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        // The focusing is inside the poll, not before it. A re-render replaces
+        // the tile's element and the keyboard falls back to the page, so asking
+        // again and again whether it landed would ask for ever; what has to be
+        // retried is the standing, not the looking.
+        await page.locator(`.react-flow__node[data-id="${claim}"]`).focus();
+        return await standingOn(page);
+      },
+      { timeout: 15_000, message: `the keyboard never stood on ${claim}` },
+    )
+    .toBe(claim);
+}
+
+/**
+ * Flip to one of the two maps with the keyboard, the way a reader does.
+ *
+ * The press is retried rather than assumed, and what is being retried is the
+ * keyboard's place: a re-render landing between standing on the map and
+ * pressing the key takes the keyboard off the map, and a map key pressed off
+ * the map is *correctly* ignored. It presses only while the wrong map is in
+ * front, so it can never press twice for one flip and land back where it
+ * started.
+ *
+ * @param page The page the map is on.
+ * @param side Which of the two maps should be in front afterwards, in the words
+ *   the map bar uses for it.
+ */
+async function flipTo(page: Page, side: "as it was written" | "with your edits"): Promise<void> {
+  const shown = page.locator(".map-bar__side");
+  const inFront = async () => ((await shown.textContent()) ?? "").trim();
+  await expect
+    .poll(
+      async () => {
+        if ((await inFront()) === side) {
+          return side;
+        }
+        await page.locator('.react-flow__node[data-id="H"]').focus();
+        if ((await standingOn(page)) !== "H") {
+          return await inFront();
+        }
+        await page.keyboard.press("Space");
+        // A moment for the press to land before it is called lost, so that a
+        // slow render is never mistaken for a keystroke that went nowhere.
+        await expect(shown)
+          .toHaveText(side, { timeout: 2_000 })
+          .catch(() => undefined);
+        return await inFront();
+      },
+      { timeout: 30_000, message: `the map never flipped to "${side}"` },
+    )
+    .toBe(side);
+}
+
+/**
+ * Wait until the keyboard has landed on one of these claims, and say which.
+ *
+ * Moving along a wire changes two things — what the line under the map says and
+ * where the keyboard is — and they are not written in the same breath. Reading
+ * the second the moment the first appears is reading one keystroke early.
+ *
+ * @param page The page the map is on.
+ * @param any The claims this step is allowed to land on.
+ */
+async function landedOn(page: Page, any: readonly string[]): Promise<string> {
+  await expect
+    .poll(() => standingOn(page) as Promise<string>, {
+      timeout: 15_000,
+      message: `the keyboard never landed on one of ${any.join(", ")}`,
+    })
+    .toMatch(new RegExp(`^(${any.join("|")})$`));
+  return (await standingOn(page)) as string;
 }
 
 /**
@@ -113,26 +313,32 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(page.locator(".map-origin")).toContainText("/api/fixtures/hormuz");
   await expect(page.locator(".map-origin")).toContainText("/api/worlds");
   await expect(page.locator(".map-origin")).toContainText("versions of the map");
-  await waitForTheLayout(page);
-  const drawn = await page.locator(".react-flow__node").count();
-  expect(drawn).toBe(7);
+  await waitForTheLayout(page, 7);
 
   // Every tile is a whole tile on the first frame, not a summary. The zoom is
   // held at the point where a tile's smallest words land at eleven pixels, and
-  // below that a tile changes what it draws rather than shrinking it.
-  const details = await page
-    .locator(".tile")
-    .evaluateAll((tiles) => tiles.map((tile) => (tile as HTMLElement).dataset.detail));
-  expect(new Set(details)).toEqual(new Set(["full"]));
+  // below that a tile changes what it draws rather than shrinking it. Counted
+  // rather than read into a list, so that "all seven of them" is what is waited
+  // for rather than what happened to be there when the list was taken.
+  await expect(page.locator('.tile[data-detail="full"]')).toHaveCount(7);
+  await expect(page.locator(".tile")).toHaveCount(7);
 
-  // A tile is 280 pixels wide, measured rather than eyeballed.
-  const width = await page.evaluate(() => {
-    const tile = document.querySelector(".tile");
-    const view = document.querySelector<HTMLElement>(".react-flow__viewport");
-    const zoom = Number(/scale\(([0-9.]+)\)/.exec(view?.style.transform ?? "")?.[1] ?? 1);
-    return (tile?.getBoundingClientRect().width ?? 0) / zoom;
-  });
-  expect(Math.round(width)).toBe(280);
+  // A tile is 280 pixels wide, measured rather than eyeballed — and measured
+  // only once the framing animation has stopped, because a width read against a
+  // zoom that is still changing is two measurements of different moments.
+  await whereTheMapCameToRest(page);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const tile = document.querySelector(".tile");
+          const view = document.querySelector<HTMLElement>(".react-flow__viewport");
+          const zoom = Number(/scale\(([0-9.]+)\)/.exec(view?.style.transform ?? "")?.[1] ?? 1);
+          return Math.round((tile?.getBoundingClientRect().width ?? 0) / zoom);
+        }),
+      { timeout: 15_000, message: "a tile was never 280 wide" },
+    )
+    .toBe(280);
 
   // Every key, on one sheet — and it says out loud that tiles do not move.
   await page.keyboard.press("?");
@@ -152,13 +358,12 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // causes. Which one it is falls out of which is nearest on the glass, and that
   // rule is checked over every claim and both directions in
   // `src/keyboard/__tests__/focusMap.test.ts`.
-  const landed = await standingOn(page);
-  expect(["B", "C", "N1"]).toContain(landed);
+  await landedOn(page, ["B", "C", "N1"]);
 
   // And back along a wire, toward what causes it.
   await page.keyboard.press("h");
   await expect(page.locator(".map-status")).toContainText("along an arrow");
-  expect(["H", "C", "R"]).toContain(await standingOn(page));
+  await landedOn(page, ["H", "C", "R"]);
 
   // Down the column, which is about the picture rather than about the wires.
   await page.keyboard.press("j");
@@ -170,50 +375,39 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // test compares against this rather than against a number typed in here: the
   // stored example's numbers are curated and have already changed once, and the
   // claim being made is "the same number as before", not "this particular number".
-  // Wait for the engine's answer before reading anything. The map draws at once
-  // and the numbers arrive a moment later; a text read once, straight away, is
-  // sometimes read before they do, and on a slower build machine often.
-  await expect(
+  // Each of the three waits for the engine's answer in the shape it arrives in
+  // before it is read. The map draws at once and the numbers come a moment
+  // later, and a tile the drawing library has not measured renders as nothing at
+  // all — so a value taken the instant the tile exists is sometimes taken from a
+  // tile that is not showing anything yet.
+  const opecBefore = await readWhenReady(
     page.locator('.react-flow__node[data-id="R"] .belief-chip__reading').first(),
-  ).toHaveText(/^\.\d+$/);
-  await expect(
-    page.locator('.react-flow__node[data-id="H"] .belief-chip__reading').first(),
-  ).toHaveText(/^\.\d+$/);
-  const opecBefore = await page
-    .locator('.react-flow__node[data-id="R"] .belief-chip__reading')
-    .first()
-    .innerText();
-  expect(opecBefore).toMatch(/^\.\d+$/);
+    /^\.\d+$/,
+  );
 
   // And what the hypothesis reads before the branch, for the same reason: the
   // flip back to the map as it was written has to land on the very same number.
-  const hypothesisBefore = await page
-    .locator('.react-flow__node[data-id="H"] .belief-chip__reading')
-    .first()
-    .innerText();
-  expect(hypothesisBefore).toMatch(/^\.\d+$/);
+  const hypothesisBefore = await readWhenReady(
+    page.locator('.react-flow__node[data-id="H"] .belief-chip__reading').first(),
+    /^\.\d+$/,
+  );
 
   // And the band around that number, so that "the same number as before" means
   // the same number *and* the same band: a claim an edit cannot reach is
   // identical, not merely close.
-  const opecBandBefore = await page
-    .locator('.react-flow__node[data-id="R"] .belief-chip__under')
-    .first()
-    .innerText();
-  expect(opecBandBefore).toMatch(/^\.\d+–\.\d+$/);
+  const opecBandBefore = await readWhenReady(
+    page.locator('.react-flow__node[data-id="R"] .belief-chip__under').first(),
+    /^\.\d+–\.\d+$/,
+  );
 
   await page.keyboard.press("Meta+k");
   await expect(page.getByText(/Every command, by name/)).toBeVisible();
   await page.keyboard.type("Hormuz opens");
   await page.keyboard.press("Enter");
   // The union of the two worlds is laid out again, once, before anything on it
-  // can be read.
+  // can be read — eight tiles now, each in a place of its own.
   await expect(page.locator('.react-flow__node[data-id="S"]')).toBeVisible();
-  await waitForTheLayout(page);
-
-  // The branch is open, and the map says which branch and which of the two
-  // worlds is in front.
-  await expect(page.locator(".map-bar__where")).toContainText("Hormuz opens, then Iran is struck");
+  await waitForTheBranch(page, "Hormuz opens, then Iran is struck", 8);
   // What the branch did, said out loud for a reader who is not looking at the
   // picture — the whole sentence, against the real engine. How many claims moved
   // is the engine's own count of the claims it called shifted, which is the same
@@ -266,12 +460,11 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // it was; the rule joining the two readings is checked claim by claim in
   // `src/graph/__tests__/diffState.test.ts`, and this is where it is checked
   // against the engine itself.
-  const states = await page
-    .locator(".tile")
-    .evaluateAll((tiles) => tiles.map((tile) => (tile as HTMLElement).dataset.diff));
-  expect(states.filter((state) => state === "untouched")).toHaveLength(1);
-  expect(states.filter((state) => state === "added")).toHaveLength(1);
-  expect(states.filter((state) => state === "shifted")).toHaveLength(6);
+  await expect(page.locator('.tile[data-diff="untouched"]')).toHaveCount(1);
+  await expect(page.locator('.tile[data-diff="added"]')).toHaveCount(1);
+  await expect(page.locator('.tile[data-diff="shifted"]')).toHaveCount(6);
+  // And those are all of them, so no tile is in a fourth state unaccounted for.
+  await expect(page.locator(".tile")).toHaveCount(8);
 
   // The rail beside the map lists the endings, in the engine's own order, with
   // the two columns that are never folded into it.
@@ -283,6 +476,9 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // Three endings, each with a change, a width and a share — every one of them
   // the engine's, and none of them typed in here.
   await expect(rail.locator(".delta-rail__row")).toHaveCount(3);
+  // Counted before they are walked: a list taken while the rows are still
+  // arriving is a list that agrees with itself and says nothing.
+  await expect(rail.locator(".delta-rail__values")).toHaveCount(3);
   for (const cell of await rail.locator(".delta-rail__values").all()) {
     // The change, then how firm, then the share that moved the same way. Every
     // one at two significant figures, and a share that is not quite all of them
@@ -292,20 +488,26 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
 
   // The two worlds, flipped with one key, as a hard switch that moves nothing.
   await page.locator(".react-flow__pane").click({ position: { x: 12, y: 12 } });
-  const before = await page.locator(".react-flow__viewport").getAttribute("style");
-  await page.keyboard.press("Space");
-  await expect(page.locator(".map-bar__side")).toHaveText("as it was written");
+  // On the map first, and the map at rest, before its place is written down.
+  // Space is a map key, and a map key pressed while the keyboard is on a button
+  // belongs to the button — which is the rule in `useMapKeys` rather than a
+  // shortfall, and the reason this step used to fail about once in a hundred.
+  await standOn(page, "H");
+  const before = await whereTheMapCameToRest(page);
+  await flipTo(page, "as it was written");
   // The map as it was written: the hypothesis has its own number back — the one
   // it read before the branch was opened, compared with itself rather than with
   // a number typed in here — and the strike is a ghost rather than a tile that
   // vanished.
   await expect(hypothesis.locator(".belief-chip__reading").first()).toHaveText(hypothesisBefore);
   await expect(strike.locator(".tile")).toBeVisible();
-  // Nothing moved. Every difference you can see is a real difference.
-  expect(await page.locator(".react-flow__viewport").getAttribute("style")).toBe(before);
+  // Nothing moved. Every difference you can see is a real difference — and this
+  // is asserted rather than read, so a transform still being written when the
+  // switch lands is waited out rather than caught half-done.
+  await expect(page.locator(".react-flow__viewport")).toHaveAttribute("style", before);
 
   // The map as a list, which is the same world read rather than drawn.
-  await page.keyboard.press("Space");
+  await flipTo(page, "with your edits");
   await page.keyboard.press("O");
   const outline = page.getByRole("tree");
   await expect(outline).toBeVisible();
@@ -314,10 +516,9 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
 
   // And nothing anywhere on the screen is a pop-up: no dialog, and none of the
   // six operations' code names.
-  expect(await page.getByRole("dialog").count()).toBe(0);
-  const words = ((await page.locator("body").textContent()) ?? "").toLowerCase();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   for (const code of ["observe", "retune", "refine"]) {
-    expect(words).not.toContain(code);
+    await expect(page.locator("body")).not.toContainText(new RegExp(code, "i"));
   }
 });
 
@@ -345,17 +546,34 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
     .getByRole("button", { name: /Strait of Hormuz/ })
     .first()
     .click();
-  await waitForTheLayout(page);
+  await waitForTheLayout(page, 7);
 
   // A branch of the reader's own, and then the news, on the Brent claim.
   await page.locator('.react-flow__node[data-id="B"]').click();
   await page.keyboard.press("b");
   await page.getByLabel(/What is this branch called/).fill("Brent settled below $68");
   await page.getByRole("button", { name: "Start this branch" }).click();
+  // The branch is folded on and the map is laid out again before the claim is
+  // pointed at, because pointing at a tile that is still being placed points at
+  // wherever it used to be.
+  await waitForTheBranch(page, "Brent settled below $68", 7);
+  await waitForTheAnswer(page, "Branch created. No claims moved.");
 
   await page.locator('.react-flow__node[data-id="B"]').click();
   await page.keyboard.press("e");
+  // The six things you can do, and the panel says which claim it will do them
+  // to — so the news below cannot land on a claim the pointer missed.
+  await expect(page.locator(".intervene")).toContainText(
+    "Brent crude settles below $68 for five sessions.",
+  );
   await page.getByRole("button", { name: /^This happened/ }).click();
+
+  // **The edit is finished when the map says what it did.** Until the new world
+  // and the new difference come back the rail is still showing the answer to
+  // the question before this one, and "no claims moved" is a different sentence
+  // from this one — so waiting for it is waiting rather than passing.
+  await waitForTheAnswer(page, "Branch created. Three claims moved.");
+  await waitForTheLayout(page, 7);
 
   // Both contracts hang off that claim, so both of them move — and the rail is
   // where a move turns into something a reader can act on. A rail that stayed
@@ -364,9 +582,9 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   await expect(rail.locator('.delta-rail__row[data-moved="yes"]')).toHaveCount(2);
   await expect(rail).toContainText("In the order the engine put them in");
   // Every reading on those rows is the engine's, and none is typed in here.
-  for (const cell of await rail
-    .locator('.delta-rail__row[data-moved="yes"] .delta-rail__values')
-    .all()) {
+  const moved = rail.locator('.delta-rail__row[data-moved="yes"] .delta-rail__values');
+  await expect(moved).toHaveCount(2);
+  for (const cell of await moved.all()) {
     await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+\.\d+[<>]?\d+%$/);
   }
 });
@@ -377,7 +595,7 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
     .getByRole("button", { name: /Strait of Hormuz/ })
     .first()
     .click();
-  await waitForTheLayout(page);
+  await waitForTheLayout(page, 7);
 
   // The news is the insurance premium falling. Nothing on this map pushes on
   // the strait's own likelihood — it is the claim the map starts from — so the
@@ -386,9 +604,19 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
   await page.keyboard.press("b");
   await page.getByLabel(/What is this branch called/).fill("The premium fell");
   await page.getByRole("button", { name: "Start this branch" }).click();
+  await waitForTheBranch(page, "The premium fell", 7);
+  await waitForTheAnswer(page, "Branch created. No claims moved.");
+
   await page.locator('.react-flow__node[data-id="C"]').click();
   await page.keyboard.press("e");
+  await expect(page.locator(".intervene")).toContainText(
+    "Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.",
+  );
   await page.getByRole("button", { name: /^This happened/ }).click();
+
+  // The edit is finished when the map says what it did, and not before.
+  await waitForTheAnswer(page, "Branch created. Two claims moved.");
+  await waitForTheLayout(page, 7);
 
   // The panel, on the strait itself, word for word.
   await page.locator('.react-flow__node[data-id="H"]').click();
@@ -418,11 +646,18 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
       '.react-flow__node[data-id="N1"] .tile__badge[data-badge="movement"]',
     );
     await expect(talks.locator(".tile__badge-words")).toHaveText("no change");
-    const why = (await talks.getAttribute("title")) ?? "";
-    expect(why).toMatch(/reports no change on this claim: it read \.\d+ then \.\d+/);
-    expect(why).toMatch(/of the versions of the map moved the same way/);
+    // Asserted on the element rather than read off it, so that a sentence still
+    // being written when the badge's words land is waited out.
+    await expect(talks).toHaveAttribute(
+      "title",
+      /reports no change on this claim: it read \.\d+ then \.\d+/,
+    );
+    await expect(talks).toHaveAttribute("title", /of the versions of the map moved the same way/);
+    await expect(talks).toHaveAttribute(
+      "title",
+      /Which of the two it was is the engine's to say, and it does not say\./,
+    );
     // It names no half of the engine's test, because the engine names none.
-    expect(why).not.toMatch(/did not move by enough/);
-    expect(why).toContain("Which of the two it was is the engine's to say, and it does not say.");
+    await expect(talks).not.toHaveAttribute("title", /did not move by enough/);
   });
 });
