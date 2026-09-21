@@ -1,0 +1,20 @@
+Could you please read these docs
+
+
+
+<pasted_content id="cfb3">
+/Users/kentgang/git3/katalyst/plans/RESUME-stack-04.md
+/Users/kentgang/git3/katalyst/plans/HANDOFF.md
+/Users/kentgang/git3/katalyst/plans/STATUS.md
+/Users/kentgang/git3/katalyst/plans/README.md
+</pasted_content id="cfb3">
+
+
+and other relevant docs to hydrate your context and better understand this project?
+Afterwards, can you lay out to me what remain of stack 4 per the resume stack 4 doc?
+I'd like you to orchestrate the completion of it using opus sub-agents to parallelize as much as possible, while centralizing test runs and other resource management to avoid unnecessary slow downs.
+Aim for a principled but simple as possible project to understand and maintain.
+
+---
+
+Let's keep the recordings to just the hormuz example until my explicit approval. I am concerned that recording all four scenarios will take too long
