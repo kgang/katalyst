@@ -673,7 +673,26 @@ async def _written_out(request: Request, asked: GenerateRequest) -> AsyncIterato
     finally:
         if coming is not None:
             coming.cancel()
+        _let_go_of(stepping)
+
+
+def _let_go_of(stepping: Generator[Event, None, None]) -> None:
+    """Close the run, and never raise at a reader who has already gone.
+
+    **A reader can go away while a model call is still in flight**, which is most
+    of the time: the call is running on another thread, and a generator cannot be
+    closed while it is running. There is nothing useful to do about it here — the
+    call finishes, the money it spent is already on the transcript, and the walk
+    is let go of when the thread comes back — and a complaint on the way out would
+    reach a log as if something had broken.
+
+    Args:
+        stepping: The run to close.
+    """
+    try:
         stepping.close()
+    except ValueError:
+        logging.getLogger(__name__).info("a reader went away while a call was still in flight")
 
 
 def _said_since(doing: "WhatTheCallsAreDoing | None") -> list[Activity]:
