@@ -46,7 +46,7 @@ A branch that only *adds* a claim fixes no value, so it passes the first row: no
 
 ### B1 — A quote, and nothing supposed
 
-The reader selects an ending a venue quotes on the Hormuz map. The card shows the model's number, the venue's bid and offer with their date, the fee, and the better of the two edges. Two things stop it being headlined, and the card says which bit: a gap narrower than one **tick** — the smallest price step the venue trades in, one cent on its Hormuz market — and a gap whose sign changes between the two ends of the model's own stated range.
+The reader selects an ending a venue quotes on the curated Hormuz map — the one ending there is, added by Kent's decision R30, which names the real Polymarket contract on the map's own hypothesis and takes that contract's resolution test as the claim's. The card shows the model's number, the venue's bid and offer with their date, the fee, and the better of the two edges. Two things stop it being headlined, and the card says which bit: a gap narrower than one **tick** — the smallest price step the venue trades in, one cent on its Hormuz market — and a gap whose sign changes between the two ends of the model's own stated range.
 
 ### B2 — After *Suppose this is true*
 
@@ -56,7 +56,7 @@ The two terms are an **explanation**, not an identity, and the card never claims
 
 ### B3 — No contract quotes this claim
 
-The Brent ending, and every ending on the recorded map. Nothing on the venue quotes Brent crude. The card prints *no contract quotes this claim — edge not calculable*, names the instrument the payoff does name, and stops. The break-even for that kind of trade arrives with the reader's position, in the next chapter.
+The curated map's Brent ending, and every ending on the recorded map. Nothing on the venue quotes Brent crude. The card prints *no contract quotes this claim — edge not calculable*, names the instrument the payoff does name, and stops. The break-even for that kind of trade arrives with the reader's position, in the next chapter.
 
 ### B4 — A price the reader typed
 

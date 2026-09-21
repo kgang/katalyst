@@ -3,14 +3,24 @@
 status: proposed
 date: 2026-09-21
 decision-makers: Kent Gang
-consulted: Kent's decision of 2026-09-21 (row R11 of plans/notes/2026-09-21-decisions-after-review.md); plans/analysis/2026-09-21-polymarket-look.md and its saved raw responses under plans/analysis/scripts/polymarket-look/; plans/analysis/2026-09-21-digest-finance.md §2.4 and finding A13; plans/analysis/2026-09-21-review-adr-06.md; ADR-0010, which this record amends; ADR-0012
-informed: agents working in backend/src/katalyst/grounding and backend/src/katalyst/thesis; whoever writes the Inspector's market chip; the engine lane, which owns the fixture edits this record implies
+consulted: Kent's decisions of 2026-09-21 (rows R11, R23 and R30 of plans/notes/2026-09-21-decisions-after-review.md); plans/analysis/2026-09-21-polymarket-look.md and its saved raw responses under plans/analysis/scripts/polymarket-look/; plans/analysis/2026-09-21-digest-finance.md §2.4 and finding A13; plans/analysis/2026-09-21-review-adr-06.md; ADR-0010, which this record amends; ADR-0012
+informed: agents working in backend/src/katalyst/grounding and backend/src/katalyst/thesis; whoever writes the Inspector's market chip; the engine lane, which owns the fixture edits this record implies and makes them at the one shape freeze
 supersedes: none
 superseded-by: none
-spec-impact: spec/thesis/quotes.md (new), spec/thesis/edge.md (new), spec/graph/belief.md (*The market voice*), ADR-0010 (Semantics, rate limits, the spread, FRED, Kalshi), PRODUCT_REQUIREMENTS.md FR-26
+spec-impact: spec/thesis/quotes.md (new), spec/thesis/edge.md (new), spec/thesis/README.md, spec/graph/belief.md (*The market voice*), backend/src/katalyst/fixtures/hormuz.py (the engine lane's, at the freeze — wording on the owed list), ADR-0010 (Semantics, rate limits, the spread, FRED, Kalshi), PRODUCT_REQUIREMENTS.md FR-26
 ---
 
 # ADR-0020: A quote is recorded first and fetched second; a FRED figure is an observation, not a belief
+
+> **`proposed`.** Kent's decision R11 settles what this record is about; R23 and R30, taken the same day, are written into it below.
+
+> **In short.** A price comes from a **committed dated file** first, an opt-in live read second, and the reader's own typing always — so the demo and the build run with no key and no network. A quote carries its venue, its three identifiers, both sides of the book, the venue's own question and rules, and where it came from. A **venue's number is a point, never a range**: the gap between bid and offer is what dealing costs. A measured economic level is an **observation**, not a belief. **A dated quote file may be committed, for research and development** (R23). The curated Hormuz hypothesis is **rewritten to the venue's own test and gains a `market` ending naming the real contract** (R30).
+>
+> **On screen.** `Polymarket · .07 · recorded 2026-09-21`, in one type size. Where nothing quotes a claim: *no contract quotes this claim — edge not calculable*, and a break-even.
+>
+> **What it costs.** The committed quote ages, and the card says so for ever. Kalshi is cut. The fee is unknown until somebody reads the schedule.
+>
+> **Open for Kent.** Nothing.
 
 ## Context and Problem Statement
 
@@ -71,7 +81,23 @@ The Federal Reserve Bank of St. Louis's economic-data service publishes **measur
 
 Read 2026-09-21 at 14:48 UTC, saved raw. **Nothing quotes Brent** — the venue's only crude contracts are on WTI, in *did it touch a level* form — so the curated example's Brent ending names a contract that cannot be made real, and the **recorded** map, the one the walk opens, has no contract ending at all: eleven tradeable endings, every one naming an instrument (`backend/recordings/hormuz.jsonl`). Nothing quotes the fund pair, the insurance premium or OPEC+ output either.
 
-**The hypothesis has a real, liquid contract**: *"Strait of Hormuz traffic returns to normal by October 31?"*, market id `3501950`, best bid `.06`, best offer `.08`, resting size about $119k and traded volume about $755k (`liquidityNum`, `volumeNum`), ending on the claim's own resolve-by day. **But the hypothesis is not a tradeable ending and carries no payoff, so nothing on the card prices it today.** The worked example therefore shows **two** things, not three: an honest *no contract*, and a real contract no card row can yet reach.
+**The hypothesis has a real, liquid contract**: *"Strait of Hormuz traffic returns to normal by October 31?"*, market id `3501950`, best bid `.06`, best offer `.08`, resting size about $119k and traded volume about $755k (`liquidityNum`, `volumeNum`), ending on the claim's own resolve-by day. As the fixture stands the hypothesis is not a tradeable ending and carries no payoff, so nothing on the card prices it — which is what R30 changes.
+
+### The curated map takes the venue's own question
+
+**Kent's decision R30:** rewrite the curated Hormuz hypothesis to Polymarket's own test, and give the map a `market` ending naming the real contract.
+
+So in `backend/src/katalyst/fixtures/hormuz.py`: the hypothesis's resolution test becomes **the venue's, word for word** — a seven-day moving average of transit calls at or above sixty on any date up to 31 October 2026, as IMF PortWatch publishes it — which is what record 0018's curation rule demands before an ending may name a contract. Beside it the map gains one ending of kind `market`, carrying that same test and a payoff naming contract `3501950`, because a hypothesis carries no payoff and no card row can reach one. The arrow between them is **elicited in the one shape freeze, not typed by hand.**
+
+**Be exact about what this buys.** The **curated** fixture then carries **one** comparable venue price, so the card's *what is priced in* row has something real on one ending: the model's number against `.06` bid and `.08` offer, read 2026-09-21 at 14:48 UTC. It does **not** change the **recorded** map — the one the walk opens — which still has eleven endings naming instruments, no contract, and therefore eleven honest refusals. That changes only at the one paid re-recording after the freeze (Kent's decision R5), whose prompt already asks the model to name a real venue contract where one exists.
+
+**The fixture edit is the engine lane's, at the flip**, and its exact wording, identifiers and dates are on the owed list in `plans/notes/2026-09-21-stack-06-docs-owed.md`. **One knock-on goes with it:** the hypothesis's prior, its base rate and its two pieces of evidence were all written for the **old** test — fourteen consecutive days of unrestricted transit — and the venue's test is a different and easier one, so whoever makes the edit re-examines them rather than carrying them across. The gap they would leave is not small: the fixture's own comment says the prior sits below its base rate *because* the old test was harder.
+
+### The committed quote file, and why it may be committed
+
+**Kent's decision R23, in his words:** *"On the terms of service, we can commit a dated quote for research and development purposes."* The committed file and this record both state that purpose in one line, and nothing else about the file changes: it is named by the venue's market identifier, it carries the instant it was read, and the card goes on printing *recorded 2026-09-21*.
+
+The context stays on the record, because it is a fact and not a blocker: **nobody has read the venue's terms of use.** The page is served as an empty shell and rendered in the browser, so it could not be read and was not guessed; no required attribution line was found either, and an absence is not permission. Kent took this decision with that in front of him.
 
 ### Kalshi is cut from version one
 
@@ -79,17 +105,7 @@ One venue that works beats two that half-work, and FR-26's cross-venue line is h
 
 ### Open for Kent
 
-**1. Which map carries a venue price on the walk?** The walk runs on the **recorded** map, which has eleven instrument endings and no contract, so step 5 shows eleven refusals and no venue price at all.
-
-* **Recommended: make the walk honest with no venue price, and let the freeze try for one.** Step 5 ranks the endings, prints *no contract quotes this claim* on each, and shows what is computable; the freeze's prompt already asks the model to name a real venue contract where one exists, so the re-recording may produce one at no extra cost. **Cost:** the demo's strongest sentence is not guaranteed. **Buys:** the walk depends on no third party, and the recorded map stays what the model drew.
-* Alternative: add a contract ending to the recorded map by hand — it then stops being what the model drew, which is the walk's claim to being auditable.
-* Alternative: rewrite the **curated** hypothesis to the venue's test, add a contract ending on it, and let the walk cross to that map — two maps in one walk, and the same claim goes with it. (Those fixture edits belong to the lane that owns the fixture.)
-
-**2. May a dated quote file be committed to a public repository?** Nobody has read the venue's terms of use: the page is served as an empty shell and rendered in the browser, so it could not be read and was not guessed. No required attribution line was found either, and an absence is not permission.
-
-* **Recommended: a person reads the terms before the quote file is committed** — about fifteen minutes, and the one precondition in front of the recorded path. Cost: those minutes, and the possibility that the answer is no.
-* Alternative: ship with a reader-entered quote only and commit no venue file, which costs the keyless demo its venue price entirely.
-* Not recommended: commit now and read later — a redistribution decision taken without reading the licence.
+**Nothing open.** **R30** answered which map carries a venue price — the curated one, rewritten to the venue's question, while the recorded map stays what the model drew until the freeze re-records it. Declined: adding a contract ending to the recorded map by hand, which would cost the walk its claim to showing what the model actually drew. **R23** answered whether a dated quote file may be committed — it may, for research and development. Declined: waiting on a reading of the terms before committing, and shipping with a reader-entered price only.
 
 ### Consequences
 
@@ -103,7 +119,8 @@ One venue that works beats two that half-work, and FR-26's cross-venue line is h
 * `test_the_best_bid_is_the_last_bid`, `test_a_settled_market_is_read_from_its_flags` — over saved responses where the first bid and the best bid differ, and where a settled market still serves a plausible book.
 * `test_a_market_belief_has_no_invented_range` — a belief built from a quote has `lo` and `hi` equal to its midpoint; the two sides of the book appear only in the buying and selling edges.
 * `test_a_fred_figure_never_fills_a_market_belief`, `test_a_reader_entered_price_is_not_a_market_belief` — source walks in the manner of `test_beliefs_never_merged` (the test that exists; record 0010's planned twin is not written), landing with the spot anchor and the card. `test_a_failed_refresh_keeps_the_recorded_quote` lands with the route, in the card pull request.
-* Review item: the FRED attribution line is present wherever a FRED value is rendered (record 0010's check, kept).
+* `test_a_contract_ending_asks_the_venues_question` — for every ending on a committed fixture that names a venue contract, the ending's own resolution test is the venue's stored question and rules, compared against the committed quote file rather than against anything typed. The curation rule, checked where it can be.
+* Review item: the FRED attribution line is present wherever a FRED value is rendered (record 0010's check, kept). And the committed quote file's first line states the purpose R23 gives it — research and development — so the file says why it is in the repository.
 
 ## More Information
 
@@ -115,6 +132,6 @@ One venue that works beats two that half-work, and FR-26's cross-venue line is h
 4. ***FRED*** — a spot anchor with its attribution, not a belief; archived vintages deferred.
 5. ***Kalshi*** — cut from version one.
 
-* **Kent's decision, 2026-09-21, row R11:** look at the venue, and name a real contract if one exists; if none does, the card says *no contract quotes this claim — edge not calculable* and prints a break-even. The look was done: no Brent contract exists, and a contract on the hypothesis does.
-* Related: **0018** (the two edges, the break-even, the tick rule), **0013**, **0012**, **0008**. **Records 0016 and 0017 are forthcoming.**
-* **Not established, and named rather than guessed:** the venue's terms of use, and its fee schedule — so the fee in an edge is zero today and the card says it is unknown.
+* **Kent's decisions, 2026-09-21. Row R11:** look at the venue, and name a real contract if one exists; if none does, the card says *no contract quotes this claim — edge not calculable* and prints a break-even. The look was done: no Brent contract exists, and a contract on the hypothesis does. **Row R23:** a dated quote file may be committed, for research and development. **Row R30:** the curated hypothesis takes the venue's test and the map gains a `market` ending naming the contract.
+* Related: **0018** (the two edges, the break-even, the tick rule), **0019** (the market's chance of a claim also sets what the price path gives back, and it reads a quote from here first), **0013**, **0012**, **0008**. **Records 0016 and 0017 are forthcoming.**
+* **Not established, and named rather than guessed:** the venue's terms of use — read by nobody, and no longer a blocker under R23 — and its fee schedule, so the fee in an edge is zero today and the card says it is unknown.

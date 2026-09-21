@@ -12,6 +12,16 @@ spec-impact: spec/thesis/edge.md (new), spec/thesis/card-and-export.md (new), sp
 
 # ADR-0018: Like with like — an edge is computed from the world with no supposition in force, against the price you would actually trade at
 
+> **`proposed`.** The one question this record held open was answered by Kent the same day (R20).
+
+> **In short.** An **edge** — the model's number for a claim against what a venue charges for the same claim — is read only from the world with **nothing fixed by an edit**, and one function with two required world arguments makes any other reading impossible to write. There are **two** edges, because you buy at the offer and sell at the bid, and the only cost term is the venue's fee: the spread is already inside the two prices. Where an edge cannot be built, the card prints a **named refusal and a break-even**, which is a value and never a blank.
+>
+> **On screen.** After *Suppose this is true* the edge does not move, and the supposed reading appears beside it as a **mixture** — an explanation with a measured residual, never the number compared against a price.
+>
+> **What it costs.** Every caller must have the base world in hand, about one extra solve per card, and every reader of an edge branches on two shapes.
+>
+> **Open for Kent.** Nothing.
+
 ## Context and Problem Statement
 
 The reader's first finance question is *what is already priced in?* The product answers it by putting the model's number for a claim beside what a venue charges for the same claim and calling the difference the **edge** — the only thing that word means here.
@@ -124,7 +134,7 @@ Measured on today's engine (`plans/analysis/scripts/finance/review/mixture_seeds
 
 ### Open for Kent
 
-Nothing. The one question this record held open — whether **This happened** should be treated more leniently than *Suppose this is true* — is answered above (R20). The choices the venue forced are in record 0020.
+**Nothing open.** The one question this record held — whether **This happened** should be treated more leniently than *Suppose this is true* — was closed by **R20**: refuse both, one conservative rule, written above with the cost he accepted and the leniency he declined. The choices the venue forced are in record 0020; the greyed size ceiling that reuses this record's model-range threshold is in record 0019 (**R29**).
 
 ### What this record does not decide
 

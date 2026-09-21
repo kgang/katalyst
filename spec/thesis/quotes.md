@@ -31,7 +31,7 @@ A **spot anchor** is a separate, smaller shape in `fred.py`: a series name, a le
 
 ### B1 — Recorded first, fetched second
 
-A committed, dated file under `backend/recordings/quotes/`, named by the venue's market identifier, holds the quotes the worked example needs; continuous integration, the Docker build and the keyless walk read it and nothing else, and no test makes a network call. It is written by a command only the coordinator runs.
+A committed, dated file under `backend/recordings/quotes/`, named by the venue's market identifier, holds the quotes the worked example needs; continuous integration, the Docker build and the keyless walk read it and nothing else, and no test makes a network call. It is written by a command only the coordinator runs, and **its first line says why it is in the repository**: a dated quote kept for research and development (Kent's decision R23 of 2026-09-21).
 
 One route refreshes a quote — never on page load, never in a test, never in the build. **When it fails, the recorded quote stays and the card says the refresh failed**; the date on screen is still true. On the machine this was written on the refresh *will* fail, because the local resolver returns no address for the venue's hosts, which is why recorded-first is the rule rather than a fallback.
 
@@ -41,7 +41,9 @@ A reader can type a price on any claim, on any map, with no venue and no key: *t
 
 ### B3 — What the venue quotes, on the worked maps
 
-Read from the venue on 2026-09-21 and saved raw; record 0020 has the detail. **Nothing quotes Brent crude**, so the curated map's Brent ending — and all eleven endings on the **recorded** map the walk opens — run on *no contract quotes this claim*, permanently. The venue does quote the curated map's **hypothesis**, with the same deadline and a different resolution test; the hypothesis is not a tradeable ending, so no card row reaches it today.
+Read from the venue on 2026-09-21 and saved raw; record 0020 has the detail. **Nothing quotes Brent crude**, so the curated map's Brent ending — and all eleven endings on the **recorded** map the walk opens — run on *no contract quotes this claim*, permanently.
+
+The venue does quote the curated map's **hypothesis**, with the same deadline and a different resolution test. Kent's decision R30 takes that test as the map's own and adds one ending of kind `market` naming the contract, so the **curated** fixture carries exactly one comparable venue price. The **recorded** map is untouched until the one paid re-recording after the freeze.
 
 ### B4 — A market belief is a point, and the spread is a cost
 
@@ -91,6 +93,7 @@ Written *for all inputs drawn from generator S, statement P holds*. This chapter
 
 *Raised 2026-09-21.*
 
-1. **May a dated quote file be committed to a public repository?** Nobody has read the venue's terms of use — the page is rendered in the browser and serves no text — and no required attribution line was found, which is not permission. A person reads the terms first.
-2. **What does dealing actually cost?** The fee schedule has not been read, so the fee is zero and the card says so.
-3. **Which map carries a venue price on the walk?** On Kent's list in record 0020.
+1. **What does dealing actually cost?** The fee schedule has not been read, so the fee is zero and the card says so.
+2. **How stale is too stale?** The committed quote carries its day and the card says so, but nothing refuses a quote for being old.
+
+*(Two questions this chapter used to raise were answered on 2026-09-21. Whether a dated quote file may be committed: it may, for research and development — Kent's decision R23; nobody has read the venue's terms of use, which is context and not a blocker. Which map carries a venue price: the curated one, under R30, written into B3 above.)*
