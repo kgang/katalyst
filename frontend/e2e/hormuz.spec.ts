@@ -166,7 +166,6 @@ async function tabOntoTheMap(page: Page): Promise<string> {
 async function openThePanelOnTheArrow(page: Page, id: string): Promise<void> {
   const arrow = page.locator(`.react-flow__edge[data-id="${id}"]`);
   const panel = page.locator(".intervene");
-  const wanted = `The arrow from ${id.replace("->", " to ")}.`;
   const tried: string[] = [];
   // **The arrow is on the glass, or this fails here and says which arrow.**
   // This used to wait the missing arrow out and report what each attempt saw,
@@ -207,13 +206,20 @@ async function openThePanelOnTheArrow(page: Page, id: string): Promise<void> {
       await page.keyboard.press("Enter");
     }
     await page.keyboard.press("e");
-    const said = ((await panel.textContent()) ?? "").trim();
-    if (said.includes(wanted)) {
+    // **Which arrow the panel is open on is read off the panel itself**, from
+    // the identifier it carries for exactly this purpose — never from its
+    // words. The words name an arrow by the claims at its two ends, in their own
+    // sentences, because an identifier is never put on the screen; a test that
+    // matched those words would break the day a claim was reworded, and one that
+    // matched an identifier in them would be asking the screen to break its rule.
+    const about = await panel.getAttribute("data-about").catch(() => null);
+    const said = ((await panel.textContent().catch(() => "")) ?? "").trim();
+    if (about === id) {
       return;
     }
     tried.push(
       `point ${on === null ? "none on the glass" : `${Math.round(on.x)},${Math.round(on.y)}`}` +
-        ` · keyboard ${standingOnIt ?? "off the map"} · panel "${said.slice(0, 70)}"`,
+        ` · keyboard ${standingOnIt ?? "off the map"} · panel on ${about ?? "nothing"} "${said.slice(0, 50)}"`,
     );
     await page.waitForTimeout(250);
   }

@@ -40,6 +40,7 @@ import type { components } from "../api/schema";
 import { toDay } from "../graph/diff/days";
 import { pushAsNumber, pushInWords } from "../graph/wires/encodings";
 import type { BranchView, Edit, Selection, WorldView } from "../world";
+import { inFewWords, NOT_ON_THIS_MAP } from "../world/naming";
 import { AddAClaim } from "./AddAClaim";
 import "./branchPanel.css";
 
@@ -322,8 +323,25 @@ export function InterventionPanel({
     return true;
   };
 
+  /**
+   * A claim named for a reader: its own words, in few enough of them to fit.
+   * Never its identifier — on a generated map that is a string of machine
+   * letters, and even on the stored example "H" tells a reader nothing.
+   */
+  const nameOf = (id: string): string => {
+    const found = world.claims.find((one) => one.id === id);
+    return found === undefined ? NOT_ON_THIS_MAP : inFewWords(found.claim);
+  };
+
   return (
-    <section className="intervene" aria-label="Change this claim">
+    <section
+      className="intervene"
+      aria-label="Change this claim"
+      // What the panel is open on, by its identifier — for a test or a tool to
+      // read, the way a tile and a wire already carry theirs. An identifier is
+      // never WORDS on the screen; the sentence below names the subject.
+      data-about={claim?.id ?? wire?.id ?? ""}
+    >
       <header className="intervene__head">
         <h2 className="intervene__heading">Change this</h2>
         <button className="intervene__close" type="button" onClick={onClose}>
@@ -335,7 +353,11 @@ export function InterventionPanel({
         {claim !== undefined
           ? claim.claim
           : wire !== undefined
-            ? "The arrow you have selected on the map."
+            ? // An arrow is named the way the Inspector names it: by the words of
+              // the claim at each end, never by an identifier. "The arrow you have
+              // selected" told a reader nothing about WHICH arrow they were about
+              // to change.
+              `${nameOf(wire.source)} → ${nameOf(wire.target)}`
             : "Choose a claim or an arrow on the map first — click it, or reach it with the keyboard."}
       </p>
 

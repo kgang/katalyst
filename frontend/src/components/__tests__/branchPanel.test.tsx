@@ -241,6 +241,32 @@ describe("the six things you can do", () => {
     expect(screen.queryByText(/stack \d/i)).toBeNull();
   });
 
+  it("test_an_arrow_is_named_by_the_claims_at_its_two_ends_never_by_an_identifier", () => {
+    open("wire");
+    const panel = screen.getByRole("region", { name: "Change this claim" });
+    const subject = panel.querySelector(".intervene__subject")?.textContent ?? "";
+
+    // Which arrow a reader is about to change is said in the two claims' own
+    // words, the way the Inspector's head says it.
+    expect(subject).toContain("The Strait of Hormuz reopens.");
+    expect(subject).toContain("→");
+    expect(subject).toContain("Brent crude settles below $68");
+    // An identifier is never words on the screen — and "H->B" is one.
+    expect(subject).not.toContain("H->B");
+    expect(subject).not.toMatch(/\bH\b|\bB\b/);
+    // It is carried where a test or a tool can read it, the way a tile carries
+    // its own: the end-to-end suite asks the panel which arrow it is open on.
+    expect(panel).toHaveAttribute("data-about", "H->B");
+  });
+
+  it("test_the_panel_says_which_claim_it_is_open_on", () => {
+    open("claim");
+    expect(screen.getByRole("region", { name: "Change this claim" })).toHaveAttribute(
+      "data-about",
+      "B",
+    );
+  });
+
   it("test_change_this_push_asks_for_an_arrow_instead_of_going_inert", () => {
     const made = open();
     fireEvent.click(screen.getByRole("button", { name: /^Change this push/ }));
