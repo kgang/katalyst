@@ -70,28 +70,19 @@ jobs:
       - name: Check types
         run: uv run mypy src
 
-      # The worked example's numbers are generated from the engine and committed,
-      # exactly as the browser's types are. These two steps work them out again and
-      # fail if the result differs, which is what stops a chapter quoting a figure
-      # the engine stopped producing. Neither needs a key: they read a stored map
-      # and do arithmetic.
+      # The worked example's numbers are generated from the engine and committed.
+      # This works them out again and compares them with what is committed, which
+      # is what stops a chapter quoting a figure the engine stopped producing. It
+      # needs no key: it reads a stored map and does arithmetic, and it writes no
+      # file, so it can sit anywhere in this job.
       #
-      # **These two steps must stay in this order and stay ahead of the tests.**
-      # The first overwrites the file in the working tree, so the second is the
-      # only thing that can still see whether what was committed was stale. Move
-      # the pair after `Run the tests` and the suite's own check compares the
-      # program with the file the first step has just rewritten, agrees with
-      # itself, and passes on a stale commit.
-      #
-      # The `working-directory` override on the second step is load-bearing too:
-      # this job runs from `backend/`, where the path below matches nothing at all
-      # and `git diff` cheerfully exits 0 without looking at anything.
-      - name: Work out every number the worked example quotes
-        run: uv run python -m katalyst.engine.worked_numbers
-
+      # It compares numbers **as numbers, with room**, and everything else
+      # character for character. An earlier version compared the file byte for
+      # byte and went red here over a number that differs from the one a Mac
+      # computes in its eighth decimal place — true, reproducible, and about
+      # nothing anybody changed. Stale has to mean a number moved.
       - name: docs/worked-numbers.txt is stale — run `make numbers` and commit the result
-        run: git diff --exit-code -- docs/worked-numbers.txt
-        working-directory: ${{ github.workspace }}
+        run: uv run python -m katalyst.engine.worked_numbers --check
 
       - name: Run the tests
         # `--record-mode=none` means a test may only replay an exchange that is

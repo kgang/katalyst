@@ -1,9 +1,16 @@
 """The worked example's numbers, checked the way the build checks them: as a program.
 
-`docs/worked-numbers.txt` is generated and committed, and the build regenerates it
-and fails on any difference — the same bargain `types-fresh` already strikes for
-the browser's types. This file is what makes a developer find that out on their
-own machine in a second rather than on a pull request ten minutes later.
+`docs/worked-numbers.txt` is generated and committed, and the build works every
+number out again and fails when one has moved. This file is what makes a
+developer find that out on their own machine in a second rather than on a pull
+request ten minutes later.
+
+**Stale means a number moved — not that a machine's last bit differed.** The
+first version of this compared the file character for character and went red on
+Linux over a number that differs from this machine's in its eighth decimal place.
+So the comparison is tolerant on numbers and exact on everything else, and the
+three tests at the bottom are the whole contract: a last bit of disagreement is
+forgiven, a real move is caught and named, and a word that changed is caught.
 
 **Started as a program, in its own process, on purpose.** A `__main__` guard sits
 below everything it calls, so importing the module defines every name before
@@ -18,20 +25,21 @@ asserted is a name, a word or an ordering.
 """
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
+from katalyst.domain.diff import MOVED_AT_LEAST
 from katalyst.engine.worked_numbers import (
     BRANCHES,
-    DIGITS,
-    HOW_CLOSE_IS_TOO_CLOSE,
+    TOLERANCE,
     WHERE,
     WORLD_NAMES,
-    computed_numbers,
-    margin_of,
+    _line,
+    _read_line,
+    facts_in,
+    faults_against,
 )
 from katalyst.fixtures.hormuz import HORMUZ
 
@@ -88,17 +96,15 @@ def _named(lines: list[str]) -> list[str]:
     return names
 
 
-def test_the_file_on_disk_is_what_the_program_prints_now(tmp_path: Path) -> None:
-    """Run the program and compare it with what is committed, byte for byte.
+def _run(*arguments: str) -> subprocess.CompletedProcess[str]:
+    """Start the program the way the build starts it, with no key of any kind.
 
-    With no key of any kind in its environment, because it needs none, and under a
-    hash seed it has never seen, because a file whose lines depend on how this
-    machine happens to order a set is a file that goes red on somebody else's
-    machine for no reason anybody changed. It writes into a throwaway directory:
-    a test that rewrote the committed file would pass by repairing what it is
-    supposed to be checking.
+    Args:
+        *arguments: What to put on its command line.
+
+    Returns:
+        The finished process, with whatever it wrote to both streams.
     """
-    written = tmp_path / "worked-numbers.txt"
     environment = {
         **{
             key: value
@@ -107,23 +113,27 @@ def test_the_file_on_disk_is_what_the_program_prints_now(tmp_path: Path) -> None
         },
         "PYTHONHASHSEED": "7919",
     }
-    finished = subprocess.run(
-        [sys.executable, "-m", "katalyst.engine.worked_numbers", str(written)],
+    return subprocess.run(
+        [sys.executable, "-m", "katalyst.engine.worked_numbers", *arguments],
         capture_output=True,
         text=True,
         cwd=BACKEND,
         env=environment,
         check=False,
     )
-    assert finished.returncode == 0, finished.stderr
-    printed = written.read_text(encoding="utf-8")
 
-    if printed != _committed():
-        pytest.fail(
-            f"{WHERE.name} is stale: the engine no longer prints what is committed. "
-            "Run `make numbers` and commit the result — the diff of that one file is "
-            "the whole list of numbers that moved, and it is meant to be reviewed."
-        )
+
+def test_the_committed_file_still_says_what_the_engine_says() -> None:
+    """Run the check the way the build runs it, as a program, and expect nothing wrong.
+
+    Under a hash seed it has never seen, because a file whose lines depend on how
+    this machine happens to order a mapping is a file that goes red on somebody
+    else's machine for no reason anybody changed.
+    """
+    finished = _run("--check")
+
+    assert finished.returncode == 0, finished.stdout + finished.stderr
+    assert "still says what the engine says" in finished.stdout
 
 
 def test_inputs_and_computed_numbers_are_labelled_apart() -> None:
@@ -186,42 +196,114 @@ def test_a_supposed_claim_reads_the_word_and_never_the_one_behind_it() -> None:
     assert ".99" not in reading
 
 
-def test_no_computed_number_sits_on_a_rounding_boundary() -> None:
-    """Every number the file prints is far enough from a boundary to survive another machine.
+def test_a_last_bit_of_disagreement_between_machines_is_not_a_number_moving() -> None:
+    """Nudge every number by one float32 step and the check still passes.
 
-    **What this is really checking.** The file has to come out byte-identical on
-    the build machine and on the machine it was written on, or the staleness check
-    is noise. What decides that is not how big the disagreement between two
-    maths libraries is — it is how close each printed number sits to a **rounding
-    boundary**, the halfway point where one more hair of movement tips the last
-    digit printed. A number a tenth away from a boundary survives anything; a
-    number a hundred-millionth away survives nothing.
-
-    The bar is one step of the float32 grid the engine samples on, because
-    replacing `numpy.exp` with one returning the next representable number up —
-    a worst case stand-in for a different maths library — moved no number here
-    further than exactly that.
-
-    **This is measured, not proved.** It passes today with about a step and a bit
-    to spare. A future engine will produce different numbers and one of them may
-    land on a boundary, which is the day this test is supposed to go red.
+    This is the test the broken version of this check would have failed, and the
+    reason the check was rebuilt. One step of the grid the engine samples on is
+    the most two maths libraries were measured to disagree by, and nothing
+    amplifies it. The *text* of the file does change — some number always sits
+    near enough to a rounding boundary for that — and that is exactly the point:
+    a file that reads differently is not the same as a number that moved.
     """
-    close = [(one, margin_of(one)) for one in computed_numbers()]
-    offending = sorted(
-        ((room, one) for one, room in close if room < HOW_CLOSE_IS_TOO_CLOSE),
-    )
+    step = 2.0**-24
+    flip = [0]
 
-    if offending:
-        listed = "\n".join(f"    {one!r} is {room:.3g} from a boundary" for room, one in offending)
-        pytest.fail(
-            f"{len(offending)} of {len(close)} computed numbers sit closer than "
-            f"{HOW_CLOSE_IS_TOO_CLOSE:.3g} to a {DIGITS}-place rounding boundary:\n{listed}\n\n"
-            "That means docs/worked-numbers.txt is no longer reproducible: a machine whose "
-            "exponential differs in the last bit will print a different file, and the build "
-            "will go red for a reason nobody changed.\n"
-            "Do one of two things. Print fewer places — lower DIGITS in "
-            "backend/src/katalyst/engine/worked_numbers.py and run `make numbers` — which "
-            "is what was done when six places had this problem. Or decide the risk is "
-            "acceptable for these particular numbers, widen HOW_CLOSE_IS_TOO_CLOSE, and "
-            "write down in its docstring why."
+    def nudged(found: re.Match[str]) -> str:
+        flip[0] += 1
+        return f"{float(found.group()) + (step if flip[0] % 2 else -step):.5f}"
+
+    committed = WHERE.read_text(encoding="utf-8")
+    perturbed = re.sub(r"(?<![\d.])-?\d\.\d{5}(?![\d])", nudged, committed)
+
+    assert perturbed != committed, "the perturbation must actually change the file's text"
+    assert faults_against(perturbed) == []
+
+
+def test_a_number_that_really_moved_fails_the_check_and_names_its_line(tmp_path: Path) -> None:
+    """Move one number by a fifth of what the screen can show, and the program says which.
+
+    Run as a program, because the exit code is what the build reads, and the
+    sentence is what a developer reads.
+    """
+    committed = WHERE.read_text(encoding="utf-8")
+    line = next(
+        one for one in committed.splitlines() if one.startswith("M1 · strike · change list rank")
+    )
+    moved = line.replace("0.04746", "0.04756")
+    assert moved != line, "the committed rank is no longer the number this test moves"
+    written = tmp_path / "worked-numbers.txt"
+    written.write_text(committed.replace(line, moved), encoding="utf-8")
+
+    finished = _run("--check", str(written))
+
+    assert finished.returncode == 1
+    assert "M1 · strike · change list rank moved by 0.0001" in finished.stdout
+    assert "Run `make numbers` and commit the result" in finished.stdout
+
+
+def test_a_fact_in_words_that_changed_fails_the_check() -> None:
+    """A state word, and the words of the sentence beside a change list, are exact.
+
+    Numbers get room; words get none. The sentence is the interesting case: its
+    own two-figure numbers are rounded, so they are left alone and checked in full
+    precision on the lines that own them — but if the sentence starts saying
+    something else, that is a real change and it is caught.
+    """
+    committed = WHERE.read_text(encoding="utf-8")
+
+    state = next(
+        one for one in committed.splitlines() if one.startswith("B · strike · what happened")
+    )
+    assert faults_against(committed.replace(state, state.replace("shifted", "unchanged"))) == [
+        "B · strike · what happened says 'unchanged' in the file and 'shifted' now."
+    ]
+
+    sentence = next(
+        one for one in committed.splitlines() if one.startswith("strike · the sentence beside")
+    )
+    reworded = sentence.replace("moves A Polymarket", "shifts A Polymarket")
+    assert len(faults_against(committed.replace(sentence, reworded))) == 1
+
+    # …and a two-figure number inside it rounding the other way is not a change.
+    rounded = sentence.replace("from .50 to .42", "from .51 to .42")
+    assert faults_against(committed.replace(sentence, rounded)) == []
+
+
+def test_every_line_of_the_file_reads_back_into_what_wrote_it() -> None:
+    """One function writes a line and one reads it back, and they agree on every real line.
+
+    A comparison of a parsed file is only as good as its parser, so the parser is
+    held to the writer over the whole of the real file rather than over an example
+    somebody made up.
+    """
+    committed = WHERE.read_text(encoding="utf-8")
+
+    facts = 0
+    for line in committed.splitlines():
+        read_back = _read_line(line)
+        if read_back is None:
+            continue
+        facts += 1
+        assert _line(read_back.name, read_back.printed, read_back.value) == line, (
+            f"this line does not write back to itself: {line!r}"
         )
+
+    assert facts == len(facts_in(committed))
+    assert facts > 200, "the parser found almost nothing, so it is not reading the file"
+
+
+def test_the_tolerance_sits_between_what_machines_differ_by_and_what_a_reader_can_see() -> None:
+    """The three sizes the tolerance has to live between, asserted rather than described.
+
+    Above half a printed step, because the file stores five places and the check
+    compares that against a full-precision number. Above what two machines were
+    measured to disagree by. And well below the smallest move the rules layer will
+    call a shift, which is the smallest difference anybody acts on.
+    """
+    half_a_printed_step = 0.5 * 10.0**-5
+    one_float32_step = 2.0**-24
+
+    assert half_a_printed_step < TOLERANCE
+    assert one_float32_step * 100 < TOLERANCE
+    assert TOLERANCE < MOVED_AT_LEAST / 100

@@ -109,11 +109,12 @@ make test     # every test, server and browser app. No key, no network
 make lint     # style, formatting, types. Changes no file
 make types    # rewrite the browser app's types from the server's description of itself
 make numbers  # rewrite the one file that owns every number the worked example quotes
+make numbers-check  # check that file still says what the engine says. Changes no file
 make eval     # says out loud that it is not written yet, rather than pretending
 make          # the whole list of tasks
 ```
 
-**Two of these tasks rewrite a committed file from the code itself, and the build fails when either output goes stale.** `make types` rewrites `frontend/src/api/schema.ts` from the server's own description of itself, which is what stops the two halves drifting apart. `make numbers` rewrites [`docs/worked-numbers.txt`](docs/worked-numbers.txt), which holds every number the Strait of Hormuz example quotes — each claim's reading, what the strike branch did to it, the number on every arrow — with the numbers a person typed into the example kept separately from the numbers the engine worked out. Prose quotes a computed number only where that file is one link away, so that the day the arithmetic changes, the diff of one file is the whole list of what moved. Neither task needs a key or the network.
+**Two of these tasks rewrite a committed file from the code itself, and the build fails when either output goes stale.** `make types` rewrites `frontend/src/api/schema.ts` from the server's own description of itself, which is what stops the two halves drifting apart. `make numbers` rewrites [`docs/worked-numbers.txt`](docs/worked-numbers.txt), which holds every number the Strait of Hormuz example quotes — each claim's reading, what the strike branch did to it, the number on every arrow — with the numbers a person typed into the example kept separately from the numbers the engine worked out. Prose quotes a computed number only where that file is one link away, so that the day the arithmetic changes, the diff of one file is the whole list of what moved. `make numbers-check` is what the build runs: it works every number out again and compares numbers *as numbers*, so "stale" means a number moved rather than that one machine's last bit differed from another's. None of the three needs a key or the network.
 
 **Three tasks call a model and spend real money**, and none of them runs unless you ask for it. Everything else in this repository runs with no key at all.
 

@@ -11,7 +11,7 @@
 
 # These are names of tasks, not names of files to build. Saying so means `make
 # test` still works if a file called `test` ever appears.
-.PHONY: help dev up down prod test lint types numbers eval record-cassettes record-demo run-demo
+.PHONY: help dev up down prod test lint types numbers numbers-check eval record-cassettes record-demo run-demo
 
 help: ## Show this list
 	@echo "Katalyst — make <task>"
@@ -50,11 +50,21 @@ types: frontend/node_modules ## Rewrite the browser app's types from the server'
 
 # One generated file owns every number the worked example quotes, so that the day
 # the engine's arithmetic changes, the diff of that one file is the whole story.
-# Same bargain as `types` above: the output is committed, and the build fails when
-# regenerating it produces something different. Needs no key and no network.
+# `numbers` writes it and you review the diff; `numbers-check` is what the build
+# runs. Neither needs a key or the network.
+#
+# The check compares numbers **as numbers, with room**, and everything else
+# character for character. It does not compare the file byte for byte, and that is
+# not laziness: the first version did, and went red on the build machine over a
+# number that differs from this one's in its eighth decimal place. Stale has to
+# mean a number moved, not that a machine's last bit differed.
 numbers: ## Rewrite the one file that owns every number the worked example quotes
 	cd backend && env -u ANTHROPIC_API_KEY -u FRED_API_KEY \
 		uv run python -m katalyst.engine.worked_numbers
+
+numbers-check: ## Check that file still says what the engine says. Changes no file
+	cd backend && env -u ANTHROPIC_API_KEY -u FRED_API_KEY \
+		uv run python -m katalyst.engine.worked_numbers --check
 
 eval: ## Score what the language model proposes against saved examples
 	@echo "make eval arrives in the next pull request of this stack: the four saved"
