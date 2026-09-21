@@ -1,0 +1,10 @@
+# A slow, diffuse, long-horizon hypothesis — the kind that tempts a model into
+# vague claims. Every claim it produces still has to be checkable.
+id: photonics
+hypothesis: Photonic chips get adopted faster than expected.
+door: explore
+target: null
+unreachable: false
+# Reads as the day the example is set on: 1 July 2028, far enough out that an
+# adoption curve has somewhere to go.
+seed: 20280701

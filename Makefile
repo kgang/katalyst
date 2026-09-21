@@ -66,9 +66,37 @@ numbers-check: ## Check that file still says what the engine says. Changes no fi
 	cd backend && env -u ANTHROPIC_API_KEY -u FRED_API_KEY \
 		uv run python -m katalyst.engine.worked_numbers --check
 
-eval: ## Score what the language model proposes against saved examples
-	@echo "make eval arrives in the next pull request of this stack: the four saved"
-	@echo "examples, scored on structure and never on wording."
+# `eval` runs the saved examples live and scores what comes back on **structure,
+# never on wording**: no loops, an ending that names a trade, a reason on every
+# arrow, a test on every claim, a graded route or an honest refusal, the cache
+# actually being read back, a named reason for stopping inside the ceiling, and a
+# page behind every count of past cases. Not one check is a judgement about a
+# sentence, because a test that judges a sentence fails when somebody improves
+# the prompt.
+#
+#   make eval                     every case, at the ceiling written in code
+#   make eval ONLY=hormuz         one of them
+#   make eval CAP=5               the same, with a lower ceiling
+#   make eval EFFORT=medium       the same, thinking less hard
+#
+# The same three flags as `record-demo`, meaning the same three things. CAP can
+# only lower the $15 hard stop written in code, never lift it. Which model
+# answers is the KATALYST_MODEL setting and nothing else, so the bill and the
+# scorecard's own column can never name two different models.
+#
+# It prints a scorecard, writes one row per case into `evals/runs/<date>.tsv`, and
+# exits non-zero if any check did not hold. **Every run is kept under
+# `backend/.runs/` whatever it scores**, exactly as a recorded run is.
+#
+# It is deliberately **not** in the build: it costs money, it needs a key, and
+# the same prompt scores slightly differently twice — so a merge would be blocked
+# by a model's mood. The build's check on the model boundary is the recorded
+# exchanges under `backend/tests/cassettes/`, and nothing else.
+
+eval: ## Score what the language model proposes against saved examples. Spends money; needs a key
+	cd backend && PYTHONPATH=.. uv run python -m evals.run \
+		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),) \
+		$(if $(EFFORT),--effort $(EFFORT),)
 
 # --- the two tasks that spend money -----------------------------------------
 #

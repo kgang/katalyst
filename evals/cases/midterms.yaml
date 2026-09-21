@@ -1,0 +1,10 @@
+# A hypothesis in a different domain entirely, with no oil in it. It is here to
+# catch a prompt that has quietly learned one subject.
+id: midterms
+hypothesis: Republicans win the House but Democrats take the senate during the Midterm.
+door: explore
+target: null
+unreachable: false
+# Reads as the day the example is set on: 3 November 2026, the day the midterm
+# elections are held.
+seed: 20261103

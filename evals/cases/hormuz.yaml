@@ -1,0 +1,13 @@
+# The assignment's own first use case, word for word: does the strait opening
+# logically lead to oil prices falling? A route should exist, and the harness
+# asserts only that a graded route or an honest refusal comes back — never which
+# route, because that would be grading the model's answer rather than its shape.
+id: hormuz
+hypothesis: The Strait of Hormuz is going to open next week.
+door: verify
+target: Brent crude settles below $68 for five sessions.
+unreachable: false
+# Written down rather than drawn, so two runs of this case differ only by the
+# model. It reads as the day the example is set on: 1 October 2026, the same day
+# the stored Hormuz example uses.
+seed: 20261001
