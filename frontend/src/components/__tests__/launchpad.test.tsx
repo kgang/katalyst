@@ -133,15 +133,23 @@ describe("with no model key", () => {
     expect(recorded.textContent).toContain("replay");
     expect(recorded.textContent).toContain("2026-09-18");
 
-    // The three with nothing recorded are not buttons at all: they read *not yet
-    // live*, with the reason underneath. There is no control that accepts an
-    // interaction and does nothing.
-    const notYet = container.querySelectorAll('[data-state="not-yet"]');
-    expect(notYet).toHaveLength(STARTING_SENTENCES.length - 1);
-    for (const card of notYet) {
-      expect(card.querySelector("button")).toBeNull();
-      expect(card.textContent).toContain("not yet live");
-      expect(card.textContent).toContain("no model key");
+    // **The three with nothing recorded get no card at all.** They used to be
+    // three rows reading *not yet live*, side by side with the one door, taking
+    // the whole of this column — a graveyard with a door in it. What is left of
+    // them is the line under the card, which already named them: *the other
+    // three have nothing recorded yet*. Nothing on this screen accepts an
+    // interaction and does nothing, and now nothing on it is a row that cannot
+    // be taken up either.
+    expect(container.querySelectorAll('[data-state="not-yet"]')).toHaveLength(0);
+    expect(container.querySelectorAll(".example")).toHaveLength(
+      // The one recorded sentence, and the one map that is already drawn.
+      2,
+    );
+    expect(container.textContent).not.toContain("not yet live");
+    expect(container.textContent).toContain("the other three have nothing recorded yet");
+    // And the three sentences themselves are not on the screen as dead text.
+    for (const gone of STARTING_SENTENCES.slice(1)) {
+      expect(container.textContent).not.toContain(gone.sentence);
     }
 
     // The field for a sentence of the reader's own is visibly disabled, and it
@@ -156,15 +164,50 @@ describe("with no model key", () => {
     );
   });
 
-  it("test_with_no_key_and_no_recording_every_card_says_so", () => {
+  it("test_with_no_key_and_no_recording_the_section_says_so_in_one_line", () => {
     const { container } = draw(NOTHING);
-    expect(container.querySelectorAll('[data-state="not-yet"]')).toHaveLength(
-      STARTING_SENTENCES.length,
+    // No cards, because there is nothing to offer — and a heading reading *or
+    // watch one build itself* over an empty list is worse than a sentence.
+    expect(container.querySelectorAll("[data-state]")).toHaveLength(0);
+    expect(container.textContent).toContain(
+      "No model key configured, and nothing recorded — so none of these four can be shown " +
+        "building here.",
     );
+    // It points at the thing that does work with neither, which is the whole
+    // multiverse from a file on disk.
+    expect(container.textContent).toContain("The map above is already drawn and needs neither.");
     // And the shared sentence is not printed, because there is no day to name and
     // nothing it would be true of.
     expect(container.textContent).not.toContain("run from recordings made on");
     expect(screen.getByRole("button", { name: "Build the map" })).toBeDisabled();
+  });
+
+  it("test_nothing_is_claimed_before_the_server_has_answered", () => {
+    // **Null is not "no key".** Until the readiness answer arrives, nothing is
+    // known about a key or a recording, and a screen that reads *no model key*
+    // in the meantime is asserting something nobody told it — which is the
+    // traceability rule, on the first screen a reviewer sees.
+    const { container } = render(
+      <Launchpad
+        examples={EXAMPLES}
+        failure={null}
+        readiness={null}
+        onOpen={() => undefined}
+        onBuild={() => undefined}
+      />,
+    );
+    expect(container.textContent).not.toContain("No model key configured");
+    expect(container.textContent).not.toContain("not yet live");
+    // Every sentence is still on the screen, each saying what is being waited
+    // for — and none of them is a control yet.
+    expect(container.querySelectorAll('[data-state="asking"]')).toHaveLength(
+      STARTING_SENTENCES.length,
+    );
+    for (const one of STARTING_SENTENCES) {
+      expect(container.textContent).toContain(one.sentence);
+    }
+    expect(screen.getByLabelText("An event you think will happen")).toBeDisabled();
+    expect(container.textContent).toContain("Asking the server whether a model key is configured.");
   });
 
   it("test_a_recording_that_would_not_play_is_named_and_hides_nothing", () => {
@@ -205,5 +248,32 @@ describe("with a model key", () => {
     expect(container.querySelectorAll('[data-state="not-yet"]')).toHaveLength(0);
     expect(container.textContent).not.toContain("No model key configured");
     expect(screen.getByLabelText("An event you think will happen")).not.toBeDisabled();
+
+    // **All four are offered, and every one of them is a control.** With a key
+    // there is nothing this copy cannot run, so nothing is collapsed away — the
+    // rule is *a card for everything this copy can do*, and with a key that is
+    // all of them.
+    expect(container.querySelectorAll('[data-state="live"]')).toHaveLength(
+      STARTING_SENTENCES.length,
+    );
+    for (const one of STARTING_SENTENCES) {
+      expect(screen.getByRole("button", { name: new RegExp(one.sentence) })).not.toBeDisabled();
+    }
+  });
+
+  it("test_a_key_and_some_recordings_still_offers_all_four_live", () => {
+    // The fourth case: a key **and** recordings. The key wins — every card runs
+    // live — and nothing says *replay*, because nothing is being replayed.
+    const { container } = draw({
+      status: "ready",
+      model_key_present: true,
+      replayable: [{ example: "hormuz", recording_date: "2026-09-18" }],
+      unreadable: [],
+    });
+    expect(container.querySelectorAll('[data-state="live"]')).toHaveLength(
+      STARTING_SENTENCES.length,
+    );
+    expect(container.textContent).not.toContain("replay");
+    expect(container.textContent).not.toContain("No model key configured");
   });
 });

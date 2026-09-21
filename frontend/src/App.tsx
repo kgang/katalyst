@@ -108,28 +108,38 @@ function useAnswer<Reading>(ask: () => Promise<Reading>): Answer<Reading> {
   return answer;
 }
 
-/** The row that says whether the server answered at all. */
-function serverReading(answer: Answer<Health>): Reading {
-  switch (answer.state) {
-    case "asking":
-      return {
-        label: "server",
-        value: null,
-        glyph: "○",
-        state: "asking the server",
-        tone: "quiet",
-      };
-    case "answered":
-      return {
-        label: "server",
-        value: answer.value.status,
-        glyph: "●",
-        state: "reachable",
-        tone: "good",
-      };
-    case "failed":
-      return { label: "server", value: "—", glyph: "○", state: answer.reason, tone: "loud" };
-  }
+/**
+ * Whether the server answered, and which build answered — in one quiet line.
+ *
+ * **They were two rows of the strip, and they are two facts a reader of this
+ * screen is not making a decision about.** A route name and a build number
+ * under the first screen make a take-home read as an implementation showcase at
+ * the moment it should read as a decision tool. Nothing is lost: both readings
+ * are still here, still the server's own, still traceable to the address the
+ * line under them names. They are simply not given the weight of a labelled row
+ * beside the one reading that changes what a reader can do, which is whether
+ * there is a model key.
+ *
+ * Each half says where it has got to for itself, so a failure of one is not
+ * hidden by the other answering.
+ *
+ * @param health What `/api/healthz` said, or where that question has got to.
+ * @param about What `/api/about` said, or where that question has got to.
+ */
+function serverAndBuild(health: Answer<Health>, about: Answer<About>): string {
+  const reachable =
+    health.state === "asking"
+      ? "Asking the server whether it is there."
+      : health.state === "answered"
+        ? `Server ${health.value.status}.`
+        : health.reason;
+  const build =
+    about.state === "asking"
+      ? "Asking which build answered."
+      : about.state === "answered"
+        ? `Build ${about.value.version}, reported by ${about.value.name}.`
+        : about.reason;
+  return `${reachable} ${build}`;
 }
 
 /** The row that says whether a key for the language model is configured. */
@@ -166,30 +176,6 @@ function modelKeyReading(answer: Answer<Readiness>): Reading {
           };
     case "failed":
       return { label: "model key", value: "—", glyph: "○", state: answer.reason, tone: "loud" };
-  }
-}
-
-/** The row that says which build answered. */
-function versionReading(answer: Answer<About>): Reading {
-  switch (answer.state) {
-    case "asking":
-      return {
-        label: "version",
-        value: null,
-        glyph: "○",
-        state: "asking the server",
-        tone: "quiet",
-      };
-    case "answered":
-      return {
-        label: "version",
-        value: answer.value.version,
-        glyph: "●",
-        state: `reported by ${answer.value.name}`,
-        tone: "good",
-      };
-    case "failed":
-      return { label: "version", value: "—", glyph: "○", state: answer.reason, tone: "loud" };
   }
 }
 
@@ -381,10 +367,13 @@ export function App({
     [],
   );
 
-  const readings = useMemo(
-    () => [serverReading(health), modelKeyReading(readiness), versionReading(about)],
-    [health, readiness, about],
-  );
+  // **One labelled row, and one quiet line.** The row is the model key, because
+  // it is the one reading on this screen that changes what a reader can do — it
+  // is why a sentence has a recording behind it or nothing at all. Whether the
+  // server answered and which build answered are still here, in the line under
+  // it, where they are traceable without being the first thing read.
+  const readings = useMemo(() => [modelKeyReading(readiness)], [readiness]);
+  const behind = useMemo(() => serverAndBuild(health, about), [health, about]);
 
   if (screen.at === "growing") {
     return (
@@ -471,6 +460,7 @@ export function App({
               <StatusRow key={reading.label} reading={reading} />
             ))}
           </dl>
+          <p className="provenance">{behind}</p>
           <p className="provenance">
             Every reading above came from the server, at <code>/api/healthz</code>,{" "}
             <code>/api/readyz</code> and <code>/api/about</code>. The examples came from{" "}

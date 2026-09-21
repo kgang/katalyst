@@ -172,7 +172,7 @@ beforeEach(() => {
 });
 
 describe("the launchpad", () => {
-  it("test_the_launchpad_offers_the_one_example_that_opens_and_says_the_rest_are_not_live", async () => {
+  it("test_the_launchpad_offers_the_one_example_that_opens_and_says_what_it_cannot", async () => {
     serverAnswersNormally();
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
 
@@ -183,20 +183,20 @@ describe("the launchpad", () => {
       screen.getByText("If the Strait of Hormuz reopens, what happens to crude?"),
     ).toBeInTheDocument();
 
-    // The four sentences from the brief each build a map. This server has no key
-    // and nothing recorded, so all four say plainly that there is nothing they
-    // could honestly show — never silently doing nothing.
+    // **This server has no key and nothing recorded, so there is nothing the
+    // four sentences could honestly show and none of them is drawn as a card.**
+    // They used to be four rows reading *not yet live* — four things a reader
+    // counted and could not take up, under a heading offering to build them a
+    // map. One sentence says it instead, and points at the thing that does work
+    // with neither a key nor a recording.
     expect(
-      screen.getByText("Photonic chips get adopted faster than expected."),
+      await screen.findByText(/No model key configured, and nothing recorded/),
     ).toBeInTheDocument();
-    expect(document.querySelectorAll(".example__badge")).toHaveLength(4);
-    expect(
-      await screen.findAllByText("no model key, and nothing recorded for this one"),
-    ).toHaveLength(4);
-    // And what those four words mean, said once in full under them.
-    expect(screen.getByText(/A card reads/).textContent).toContain(
-      "nobody has recorded that example",
+    expect(screen.getByText(/No model key configured, and nothing recorded/).textContent).toContain(
+      "The map above is already drawn and needs neither.",
     );
+    expect(screen.queryByText("Photonic chips get adopted faster than expected.")).toBeNull();
+    expect(document.querySelectorAll(".example__badge")).toHaveLength(0);
 
     // Both doors are named and explained.
     expect(screen.getByText("Explore")).toBeInTheDocument();
@@ -385,10 +385,20 @@ describe("the strip at the foot of the launchpad", () => {
     serverAnswersNormally();
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
 
-    expect(await screen.findByText("reachable")).toBeInTheDocument();
-    expect(screen.getByText("0.1.0")).toHaveClass("status-value");
+    // **One labelled row, and it is the model key** — the one reading on this
+    // screen that changes what a reader can do.
     expect(
-      screen.getByText("no key configured, and nothing recorded to play instead"),
+      await screen.findByText("no key configured, and nothing recorded to play instead"),
     ).toBeInTheDocument();
+    expect(document.querySelectorAll(".status-row")).toHaveLength(1);
+
+    // Whether the server answered and which build answered are still here, in
+    // one quiet line, still the server's own words and still traceable to the
+    // addresses named under them. Nothing was dropped; it was given the weight
+    // it has.
+    expect(screen.getByText(/Server ok\./).textContent).toContain(
+      "Build 0.1.0, reported by Katalyst.",
+    );
+    expect(document.querySelector(".status-value")?.textContent).toBe("absent");
   });
 });

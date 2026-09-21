@@ -175,13 +175,9 @@
   font-family: var(--font-mono);
 }
 
-.example__action--waiting {
-  color: var(--text-muted);
-  flex-wrap: wrap;
-}
-
-/* Said out loud rather than implied by a greyed-out button: this one is not
- * built yet, and the words beside it say what is missing. */
+/* A card that is going to play a recording rather than call a model says so on
+ * its own face, in a word with a hairline round it, beside the day it was
+ * made. */
 .example__badge {
   padding: 0 var(--space-hair);
   border: 1px solid var(--hairline);
@@ -209,8 +205,6 @@
   text-wrap: pretty;
 }
 
-/* A card that is going to play a recording rather than call a model says so on
- * its own face, beside the day it was made. */
 .example[data-state="replay"] .example__badge {
   color: var(--text-muted);
 }
@@ -231,9 +225,9 @@
   row-gap: var(--space-2);
 }
 
-/* The second of the two sentences under the four cards: what *not yet live*
- * means, said once in full. Quieter than the first, because the first is about
- * this copy and this one is about a word on a card. */
+/* A second sentence under the cards, where there is one: today, the server's own
+ * words about a recording it could not read. Quieter than the first, because the
+ * first is about what this copy can do and this one is about one file in it. */
 .launchpad__keyless--quiet {
   color: var(--text-muted);
 }

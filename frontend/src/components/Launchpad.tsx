@@ -5,10 +5,18 @@
  * explained in a line each, the stored example opens a map that is already drawn,
  * and the four sentences from the brief each build one in front of you.
  *
- * **A card has three states and no others.** It runs live, it runs from a
- * recording, or it reads *not yet live* — and that last one now means one thing
- * only: **no model key and no recording**, an example nobody has recorded yet,
- * which is an honest state rather than the catch-all it used to be.
+ * **A card is only ever something you can take up.** It runs live or it runs
+ * from a recording. A sentence this copy can do neither with gets no card at
+ * all: it is named, with the others in its position, in the one line under the
+ * cards that says what this copy can play. Three headstones beside one door,
+ * taking the whole of the right-hand column, is what a reviewer with thirty
+ * minutes met before — and *not yet live* on a row you cannot press is a
+ * control a reader counted and cannot use.
+ *
+ * **Before the server has answered, every sentence says that is what is
+ * happening.** Nothing is known about a key or a recording until the readiness
+ * answer arrives, and a screen that says *no model key* in the meantime is
+ * asserting something nobody told it.
  *
  * **With no key, the four run from recordings through the same route, the same
  * eight events and the same canvas.** The sentence that says so is record 0012's,
@@ -138,8 +146,22 @@ export function whatThisCopyCanPlay(days: readonly string[], outOf: number): str
   );
 }
 
-/** What each card can do, which is one of exactly three things. */
-type CardState = "live" | "replay" | "not-yet";
+/**
+ * What this copy can do with one of the brief's sentences.
+ *
+ * Four, and the last two never draw a card. **`not-yet` draws nothing at all**:
+ * an example this copy can neither run nor play is not a card a reader can take
+ * up, and three of them side by side under a heading that offers to build you a
+ * map is a graveyard with a door in it. What is left of them is one quiet line
+ * under the cards that do work, naming how many there are and why — which is the
+ * same sentence that was already printed there, in `whatThisCopyCanPlay`.
+ *
+ * **`asking` is the state before the server has answered**, and it draws the
+ * sentence with one line saying what is being waited for. Without it the screen
+ * asserts *no model key* in the moment before it has been told anything, which
+ * is a state nobody can trace to an input.
+ */
+type CardState = "live" | "replay" | "not-yet" | "asking";
 
 /** What the launchpad needs to draw itself. */
 export interface LaunchpadProps {
@@ -176,7 +198,12 @@ export function Launchpad({ examples, failure, readiness, onOpen, onBuild }: Lau
   );
   const canPlay = whatThisCopyCanPlay(playable, STARTING_SENTENCES.length);
   const stateOf = (example: string): CardState =>
-    hasKey ? "live" : recorded.has(example) ? "replay" : "not-yet";
+    readiness === null ? "asking" : hasKey ? "live" : recorded.has(example) ? "replay" : "not-yet";
+  // The sentences that get a card: the ones this copy can actually do something
+  // with, and — while the server is still being asked — all of them, because
+  // nothing is yet known about any of them. The rest are named in one line under
+  // the cards rather than drawn as rows nobody can press.
+  const shown = STARTING_SENTENCES.filter((one) => stateOf(one.example) !== "not-yet");
 
   return (
     <div className="launchpad">
@@ -228,71 +255,82 @@ export function Launchpad({ examples, failure, readiness, onOpen, onBuild }: Lau
         <h2 className="section-heading" id="build-heading">
           Or watch one build itself
         </h2>
-        <ul className="examples">
-          {STARTING_SENTENCES.map((one) => {
-            const state = stateOf(one.example);
-            const day = recorded.get(one.example);
-            return (
-              <li key={one.example}>
-                {state === "not-yet" ? (
-                  <div className="example example--waiting" data-state="not-yet">
-                    <span className="example__claim">{one.sentence}</span>
-                    <span className="example__line">
-                      Would be turned into a map of what it causes, ending in trades.
-                    </span>
-                    <span className="example__action example__action--waiting">
-                      <span className="example__badge">not yet live</span>
-                      no model key, and nothing recorded for this one
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    className="example example--live"
-                    type="button"
-                    data-state={state}
-                    onClick={() =>
-                      onBuild({ hypothesis: one.sentence, target: null, belief: null })
-                    }
-                  >
-                    <span className="example__claim">{one.sentence}</span>
-                    <span className="example__line">
-                      {state === "replay"
-                        ? "Plays the recording of this run back, claim by claim, through the same route and the same canvas."
-                        : "Builds a map of what it would cause, claim by claim, ending in trades."}
-                    </span>
-                    {/* Not **Build the map**: that is the one button on the
-                        input bar, and a word that names two controls names
-                        neither. A card is a sentence somebody already typed. */}
-                    <span className="example__action">
-                      {state === "replay" ? (
-                        <>
-                          <span className="example__badge">replay</span>
-                          {day === undefined ? "Watch it build" : `recorded ${day}`}
-                        </>
-                      ) : (
-                        "Watch it build"
-                      )}
-                    </span>
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        {/* **Only what this copy can actually do gets a card.** The four
+            sentences used to be four cards whatever the answer was, and with one
+            recording committed that is one door and three headstones taking the
+            whole of this column. What is left of the three is the line under the
+            cards, which already named them.
 
-        {/* Record 0012's sentence, word for word, under the four cards — and
-            again under the field below, which is disabled with it. */}
-        {canPlay === null || hasKey ? null : <p className="launchpad__keyless">{canPlay}</p>}
-        {/* What *not yet live* means, said once in full rather than three times
-            over: each card carries the short form, and this is the whole of it.
-            It is the honest state now, not a catch-all — a key would run it, and
-            a recording would play it, and this copy has neither. */}
-        {hasKey || STARTING_SENTENCES.every((one) => recorded.has(one.example)) ? null : (
-          <p className="launchpad__keyless launchpad__keyless--quiet">
-            A card reads <b>not yet live</b> when this copy has no model key and nobody has recorded
-            that example, so there is nothing it could honestly show you.
+            With nothing at all to offer there is no list, because an empty list
+            under a heading that says *or watch one build itself* is worse than
+            a sentence saying so. */}
+        {shown.length === 0 ? (
+          <p className="launchpad__keyless">
+            {`No model key configured, and nothing recorded — so none of these ` +
+              `${countInWords(STARTING_SENTENCES.length)} can be shown building here. The map ` +
+              `above is already drawn and needs neither.`}
           </p>
+        ) : (
+          <ul className="examples">
+            {shown.map((one) => {
+              const state = stateOf(one.example);
+              const day = recorded.get(one.example);
+              return (
+                <li key={one.example}>
+                  {state === "asking" ? (
+                    // Before the server has answered, nothing is known about
+                    // this sentence — not whether a key is configured, not
+                    // whether there is a recording. Saying either would be the
+                    // screen asserting something nobody told it.
+                    <div className="example example--waiting" data-state="asking">
+                      <span className="example__claim">{one.sentence}</span>
+                      <span className="example__line">
+                        Asking the server whether this one can be run here: whether a model key is
+                        configured, and whether there is a recording of it to play.
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      className="example example--live"
+                      type="button"
+                      data-state={state}
+                      onClick={() =>
+                        onBuild({ hypothesis: one.sentence, target: null, belief: null })
+                      }
+                    >
+                      <span className="example__claim">{one.sentence}</span>
+                      <span className="example__line">
+                        {state === "replay"
+                          ? "Plays the recording of this run back, claim by claim, through the same route and the same canvas."
+                          : "Builds a map of what it would cause, claim by claim, ending in trades."}
+                      </span>
+                      {/* Not **Build the map**: that is the one button on the
+                          input bar, and a word that names two controls names
+                          neither. A card is a sentence somebody already typed. */}
+                      <span className="example__action">
+                        {state === "replay" ? (
+                          <>
+                            <span className="example__badge">replay</span>
+                            {day === undefined ? "Watch it build" : `recorded ${day}`}
+                          </>
+                        ) : (
+                          "Watch it build"
+                        )}
+                      </span>
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
+
+        {/* Record 0012's sentence, word for word, under the cards — and again
+            under the field below, which is disabled with it. It is also what
+            names the sentences that have no card: *…the other three have
+            nothing recorded yet* is the whole of what there is to say about
+            them, and it was already being said here. */}
+        {canPlay === null || hasKey ? null : <p className="launchpad__keyless">{canPlay}</p>}
         {/* **A recording that would not play is named, in the server's own
             sentence.** A reviewer who put a file in the recordings folder and
             then counts three cards where they expected four is owed the reason
@@ -318,11 +356,13 @@ export function Launchpad({ examples, failure, readiness, onOpen, onBuild }: Lau
         </h2>
         <InputBar
           disabledBecause={
-            hasKey
-              ? null
-              : canPlay === null
-                ? "This copy has no model key and no recordings, so a sentence of your own cannot be turned into a map."
-                : `${canPlay} A sentence of your own needs the model, and there is no recording of one.`
+            readiness === null
+              ? "Asking the server whether a model key is configured. A sentence of your own needs the model, and nothing recorded can stand in for one."
+              : hasKey
+                ? null
+                : canPlay === null
+                  ? "This copy has no model key and no recordings, so a sentence of your own cannot be turned into a map."
+                  : `${canPlay} A sentence of your own needs the model, and there is no recording of one.`
           }
           onBuild={onBuild}
         />
