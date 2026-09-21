@@ -1,0 +1,98 @@
+<pasted_content id="9d5b">
+ start from plans/RESUME-stack-04.md.
+
+What is on disk now
+
+File: plans/RESUME-stack-04.md
+What it holds: Rewritten from scratch. It opens with a check of git and the queue before anything else. It gives the
+state of each branch and the exact commands to land it. It lists the evals branch's twelve remaining steps in
+order. It records what was found today so nobody re-finds it. It says what to look at on the polish screens, and
+it has the new working rules.
+────────────────────────────────────────
+File: plans/PLAN.md
+What it holds: The NOW table is updated to match the resume note. The three-tier browser-testing rule is added to
+the working rules.
+────────────────────────────────────────
+File: plans/STATUS.md
+What it holds: New entries record your words, the merges, where my handling slipped, and the questions waiting on
+you.
+────────────────────────────────────────
+File: plans/HANDOFF.md
+What it holds: Lessons 22–23 are added: a green bar here is not a green bar on CI, and the whole suite runs before
+every push.
+────────────────────────────────────────
+File: plans/README.md
+What it holds: Now points at the resume note first. The old note is archived under history/.
+────────────────────────────────────────
+File: plans/analysis/scripts/, scripts/bars/, notes/msgs/, logs/
+What it holds: Analysts' scripts, bar scripts, PR bodies and merge messages, and logs. All are outside the
+scratchpad, which vanished mid-session.
+
+State left behind
+- Four of the tail's pull requests are merged: #41, #42, #44 and #43. main is 90001b1. #43, the growing map, merged while I was writing the handoff.
+- No pull request is open, no agent is running, and the queue is free. Nothing was spent this session.
+- I rebased Polish onto the new main and verified it: 350 browser tests pass, and lint is clean apart from two warnings. It still needs:
+  - one cold run of all the end-to-end tests, which includes its four new, never-run browser tests
+  - a look at its nine screens
+  - a short re-review, then its pull request
+- Evals is the last big piece. Its twelve steps are in the resume note and end with make eval ONLY=hormuz, which will be the first spend.
+- After that comes M4. You look at the strike branch with the spread on.
+</pasted_content id="9d5b">
+
+---
+
+<task-notification>
+<task-id>bnaa8pvxa</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/bnaa8pvxa.output</output-file>
+<status>completed</status>
+<summary>Background command "Run all end-to-end tests once, cold, on the polish branch through the queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ad0896b72ac047579</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/ad0896b72ac047579.output</output-file>
+<status>completed</status>
+<summary>Agent "Re-review polish fix commit" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Verdict: READY AFTER MUST-FIX (one item, one line of test code)
+
+### MUST-FIX
+
+**The geometric check still can't see its own motivating defect.** `frontend/e2e/hormuz.spec.ts:290` scrolls each control into view before measuring; `frontend/src/styles/app.css:232` gives `.dock` `overflow-y: auto` and no `overflow-x`, and CSS computes `overflow-x: visible` → `auto` when the other axis is not visible. So the panel **does** scroll sideways — contradicting the docstring at `hormuz.spec.ts:262-264` and the same sentence in `spec/workbench/README.md:75`. Revert `minmax(0, 1fr)`: the third *My own number* field overflows, `scrollIntoViewIfNeeded` scrolls the dock right, the field lands inside the client box, the centre hit-test finds the field, and the check passes. `theScreenFitsItsWindow` can't see it either — the dock clips, so `documentElement.scrollWidth` is unchanged.
+Smallest fix, inside the same helper: `expect(await dock.evaluate((e) =&gt; e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1)`, plus correcting the two sentences.
+
+### SHOULD-FIX
+
+1. **Two paths still end on `&lt;body&gt;`, both via the palette** (`MapScreen.tsx:456-463`). (a) ⌘K → *Change this claim* with nothing selected: `cameFrom` is the palette field (unmounted), `theWayIn` is null because the Inspector is in its "Nothing selected" branch (`Inspector.tsx:985-992`), so Done/Escape focuses nothing. (b) Panel open → ⌘K → *Read the map as a list* or *Show or hide the panel*: `dock` changes, the panel unmounts, `intervening` stays `true` (`MapScreen.tsx:563-566, 571, 713`), the effect never fires, and `focusRing.ts:64` refocuses a detached section. Fix: a final fallback in the effect, and `setIntervening(false)` in those two commands.
+2. `App.test.tsx:223` hand-types `4`; `STARTING_SENTENCES.length` is exported and used that way in `launchpad.test.tsx:257`.
+3. *The ask did not come back* never stops being true: `App.tsx:89-106` asks once, nothing re-asks, yet `Launchpad.tsx:434` reads "Until it answers…". Offer an *Ask again* control or drop the implied retry.
+4. The sweep missed one: `refusal.css:12-15` still has `flex`, `min-height`, `overflow-y`, dead by exactly the proof used for the other five (`MapScreen.tsx:634` makes it a direct `.dock` child).
+5. `everyControlInThePanelIsWhole` no longer polls; a re-render mid-loop is now a hard failure.
+6. `hormuz.spec.ts:393-405`: if `.outline` itself were zero-wide, `room / 3` is 0 and every item passes.
+
+### Checked, sound
+
+- `684fc76` cannot change the cascade: `.example--waiting .example__claim` (0,2,0) beats `.example__claim` (0,1,0) by specificity in either order, nothing between them sets `color` (`launchpad.css:150-164`); the optional chain is equivalent.
+- The six states are total and exclusive (`Launchpad.tsx:277-291`); rejection, non-2xx and 502/503/504 all become rejections in `client.ts` `read()`, so every failure reaches `no-answer`.
+- Nothing inert in that state: four plain `&lt;div&gt;`s, field disabled with a reason.
+- Panel-takes-focus wins the race with the palette's restore (React flushes passive cleanups before mounts).
+- Dead-declaration removals safe: every section is a direct `.dock` child under `.page--map` in both `MapFrame` sites.
+- `elementFromPoint` overlap test is a genuine tooth; edge rules are `pointer-events: none` on `.dock-frame`.
+- No file outside `frontend/`, `spec/workbench/`, `spec/vocabulary.md`.
+- Lint and typecheck clean; `launchpad.test.tsx` 10/10, `App.test.tsx` 11/11.</result>
+<usage><subagent_tokens>150775</subagent_tokens><tool_uses>37</tool_uses><duration_ms>450261</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ba6a7d2ps</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/ba6a7d2ps.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for the build's checks on the polish pull request, then squash-merge it" completed (exit code 0)</summary>
+</task-notification>
