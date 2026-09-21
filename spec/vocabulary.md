@@ -64,7 +64,7 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 
 ## The trade
 
-The words stack 06 adds, from decision records 0018 (like with like), 0019 (a stop is a price the reader owns) and 0020 (a quote is recorded first). **None of this is in the build yet**; the words are settled here first, as this document's own rule asks.
+The words stack 06 adds, from decision records 0018 (like with like), 0019 (a stop is a price the reader owns) and 0020 (a quote is recorded first). **The price half is built** — *quote*, *edge*, *break-even*, *no-trade band*, *fee*, *tick* and *not comparable* are in `backend/src/katalyst/grounding/` and `thesis/edge.py`. **The rest is not in the build yet**; the words are settled here first, as this document's own rule asks.
 
 **Edge.** The model's **unconditional** number for a claim against a price somebody will actually deal at: *buying* = model − the best offer − any fee; *selling* = the best bid − model − any fee. Computed only from the world with nothing fixed by an edit, by one function that takes that world and the world on screen as two separate arguments (decision record 0018). Signed, and a negative edge is a complete answer. Never used for an arrow on the map, and never for the gap between the model and a reader's own belief.
 
