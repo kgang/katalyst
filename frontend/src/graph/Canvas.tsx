@@ -57,6 +57,7 @@ import {
 } from "./geometry";
 import { assignLayers } from "./layers";
 import { useLayout } from "./layoutRunner";
+import { type PlacedBox, whatIsOnTheGlass } from "./onTheGlass";
 import { mayLandAgain } from "./theKeyboard";
 import {
   type ClaimNode,
@@ -249,44 +250,29 @@ function MapSurface({
     return placed;
   }, [world]);
 
-  // **A box with no place of its own is never drawn in another box's place.**
+  // **Which boxes are on the glass, and where.** The rule is `onTheGlass.ts`'s
+  // and the whole of it is there: a box is drawn where the layout put it, a
+  // reserved rectangle stands until the claim it was holding a place for is
+  // drawn, and before the layout has answered anything the map puts its own
+  // first rectangle at the origin.
   //
-  // Every unplaced box used to be drawn at the map's origin, which is where the
-  // hypothesis is: each arriving claim was painted on top of the first one for
-  // as long as the layout took to answer. Unthrottled that is less than a frame
-  // and invisible; at six times slower it is thirty-seven to ninety
-  // milliseconds of one tile sitting on another, on the one screen whose whole
-  // promise is that nothing already placed ever moves.
-  //
-  // Nothing is lost by waiting **once there is a map to wait on**. The reserved
-  // rectangle for an arriving claim is already standing in the column that
-  // claim is about to land in — it is the whole reason the rectangles exist —
-  // so the growing edge keeps saying where the map is going while the layout
-  // works, and the claim appears where it belongs rather than appearing
-  // somewhere else first.
-  //
-  // **The first box is the exception, and it has to be.** When nothing is
-  // placed, the origin is nobody's place: there is no box to be drawn on top
-  // of, and the box in question is the rectangle held open for the reader's own
-  // sentence. Making it wait for a layout would mean the first paint of a
-  // generation is an empty stage — which is the one thing B1 and
-  // INV-workbench.61 forbid, and it is what happened here: under six browsers
-  // at once the layout of a single box lost the race to the first proposal, and
-  // the screen went from nothing to a map with a claim already on it.
-  const nothingIsPlaced = layout.positions.size === 0;
+  // **The rectangles standing are carried from one answer to the next**, which
+  // is why a ref and not a piece of state: it is not something the screen reacts
+  // to, it is the last answer being handed back to work out the next one, and
+  // asking for a second render to do it would paint the wrong frame first.
+  const standing = useRef<readonly PlacedBox[]>([]);
+  const glass = useMemo(
+    () => whatIsOnTheGlass(drawing.nodes, layout.positions, standing.current),
+    [drawing, layout],
+  );
+  standing.current = glass.rectangles;
+
   const nodes: MapNode[] = useMemo(
     () =>
-      drawing.nodes.flatMap((node, place) => {
-        const at =
-          layout.positions.get(node.id) ??
-          (nothingIsPlaced && place === 0 ? { x: 0, y: 0 } : undefined);
-        if (at === undefined) {
-          return [];
-        }
+      glass.boxes.map((node) => {
         const ghost = node.type === "claim" && node.data.claim.ghost === true;
         return {
           ...node,
-          position: at,
           selected: selection?.kind === "claim" && selection.id === node.id,
           // Two classes and not one: the hover lens and the other world are both
           // opacity, and a tile that is off the hovered path *and* in the other
@@ -307,7 +293,7 @@ function MapSurface({
             .join(" "),
         };
       }),
-    [drawing, layout, lens, nothingIsPlaced, selection],
+    [glass, lens, selection],
   );
 
   const edges: MapEdge[] = useMemo(() => {

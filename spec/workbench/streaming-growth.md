@@ -610,6 +610,33 @@ downstream of the map so far — a `ClaimProposal` brings one claim and the one 
 arrow's source is always a claim that already exists — which is exactly the precondition
 INV-workbench.22 names. A late arrival finds a gap; nothing above it, beside it or before it shifts.
 
+**The layout answers later, and a box waits for its place rather than borrowing one** *(added
+2026-09-21)*. The layout runs on a background thread, so between a claim arriving on the stream and
+that claim being drawn there is always a gap — a frame on this machine, most of a second on a tired
+one. What the map does in that gap is the whole of `frontend/src/graph/onTheGlass.ts`, and it is one
+rule: **a box is drawn where the layout put it, and a reserved rectangle stands until the claim it
+was holding a place for is drawn.** Not until the event carrying that claim arrived — those are two
+different moments, and everything between them would otherwise be a map with a claim on its way and
+no rectangle anywhere, which is a growing map that has stopped saying where it is going. It is not a
+corner case: a generated map's frontier is usually one claim wide, so it turns over completely every
+few proposals, and each turnover is one of these moments.
+
+The rectangle goes the instant the map is whole again, so this can never become a way of leaving one
+up: a rectangle whose claim closed with nothing coming after it — a third refusal, a broken run, the
+likelihoods landing — goes at once, because then nothing on the map is waiting for a place.
+
+**The one box the map places itself is a rectangle, and it is the first.** Before the layout has
+answered even once the origin is nobody's place: there is nothing to be drawn on top of, and a
+generation's first paint may not be an empty stage (B1). So the map puts the rectangle held open for
+the reader's own sentence there itself. It was *the first box* rather than *the first rectangle*
+until 2026-09-21, and on a machine where the first answer lost its race to the first proposal that
+box was the claim. Two promises broke at once. The growing edge went quiet, which is what continuous
+integration read. And the claim was drawn at the origin, which is not where the layout puts the first
+box of a map — the layout leaves a margin of its own around what it lays out, so the tile then moved
+by that margin, and *nothing already drawn moves* is the loudest promise this part makes. How far it
+moved was read off the page by the end-to-end test itself, which is what caught it: it holds the
+first tile's place and compares it with itself at the end of the run.
+
 **A wire draws only after both of its ends exist.** In practice the engine makes this true by
 construction, twice over: a `ClaimProposal` brings the claim and the arrow into it in one event, and
 an arrows-only proposal names two claims that are already on the map. The reducer does not rely on
@@ -1102,7 +1129,7 @@ names below: **growth** is `frontend/src/stream/__tests__/growth.test.ts`, **rea
 `frontend/src/stream/__tests__/noSpinner.test.ts`, **strip**
 `frontend/src/stream/__tests__/strips.test.tsx`.
 
-Local numbers in this part are `INV-workbench.<n>`. This chapter holds **60 – 74**;
+Local numbers in this part are `INV-workbench.<n>`. This chapter holds **60 – 79**;
 [`tiles-ports-wires.md`](tiles-ports-wires.md) holds 1 – 12,
 [`color-motion-type.md`](color-motion-type.md) 13 – 19, [`layout-and-zoom.md`](layout-and-zoom.md)
 20 – 30, [`keyboard-and-access.md`](keyboard-and-access.md) 31 – 39,
@@ -1280,6 +1307,24 @@ happened last, after a minute of things they already knew. *Tests:*
 `frontend/src/a11y/__tests__/growth.test.ts` › `test_a_refusal_is_read_out_once_and_not_again`,
 `test_every_claim_that_arrives_is_announced_by_its_own_words`.
 
+**INV-workbench.79 — a box waits for its place, and a rectangle waits for its claim** *(added
+2026-09-21)*. For every stream and every moment in it, including the moments between an event
+arriving and the layout answering for it: every box on the map is drawn at the place the layout gave
+it and at no other place; no claim is drawn that the layout has not placed; while any box on the map
+is still waiting for a place, every reserved rectangle that was standing goes on standing where it
+stood; and once no box is waiting, the rectangles are exactly the ones the frontier asks for — so a
+map that is still growing always has one, and a map that is finished, broken or ended early has none.
+The one box the map places itself is the rectangle held open for the reader's own sentence, at the
+origin, before the layout has answered anything at all; it is never a claim. *Test:*
+`frontend/src/graph/__tests__/onTheGlass.test.ts` ›
+`test_a_rectangle_stands_at_every_moment_the_map_is_still_growing`,
+`test_no_rectangle_stands_once_nothing_more_is_coming`,
+`test_a_claim_is_only_ever_drawn_where_the_layout_put_it`,
+`test_the_first_rectangle_keeps_the_readers_own_words_until_the_layout_answers`,
+`test_no_two_boxes_are_ever_drawn_in_one_place`, each walked over two runs with the layout answering
+late; `frontend/e2e/generate.spec.ts`, whose `heldWhenEachClaimArrived` is the same statement read off
+a real browser.
+
 ---
 
 ## ANTI-PATTERNS
@@ -1339,6 +1384,13 @@ happened last, after a minute of things they already knew. *Tests:*
     number in the request that nobody elicited, and it would sit on the hypothesis as a `user` belief
     for the rest of the session. **Instead:** send no user belief at all, and let the slot read its
     own absence.
+
+12. **Do not give a box a place because the layout has not answered yet** *(added 2026-09-21)*.
+    *Because* the only place available to give is the map's origin, which either belongs to a box
+    already standing there or is about to belong to this one at coordinates the layout chose — so the
+    box lands where it does not belong and then moves, on the one screen whose whole promise is that
+    nothing already drawn moves. **Instead:** draw nothing that has no place, and let the rectangle
+    already standing go on saying where the claim is going until the claim itself is drawn.
 
 ---
 

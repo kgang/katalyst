@@ -51,7 +51,7 @@ function free(port: number): boolean {
     execFileSync(process.execPath, ["-e", asking], { stdio: "ignore" });
     return true;
   } catch (whatever) {
-    return (whatever as { status?: number }).status === 1 ? false : true;
+    return (whatever as { status?: number }).status !== 1;
   }
 }
 

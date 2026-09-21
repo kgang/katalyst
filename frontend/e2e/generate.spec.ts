@@ -494,16 +494,26 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   //
   // The last claim is the exception and the only one: the frontier empties when
   // it closes, and no rectangle may stand where nothing is coming.
+  //
+  // **Continuous integration read a zero here, at the first claim, on 2026-09-21
+  // and nowhere else.** The layout answers on a background thread, and on a
+  // machine where its first answer lost the race to the first proposal the map
+  // had no place for anything — so the claim was painted at the origin, where
+  // the rectangle carrying the reader's own sentence had been, and the growing
+  // edge went quiet. `frontend/src/graph/onTheGlass.ts` is the rule that is no
+  // longer possible under, and `graph/__tests__/onTheGlass.test.ts` is the same
+  // statement made without a browser.
   expect(saw.mostRectangles).toBeGreaterThan(0);
   expect(saw.heldWhenEachClaimArrived.length).toBe(claims);
   for (const [step, held] of saw.heldWhenEachClaimArrived.slice(0, -1).entries()) {
     expect(held, `no rectangle stood when claim ${step + 1} arrived`).toBeGreaterThan(0);
   }
   // **And no box was ever drawn in another box's place.** A box the layout has
-  // not placed is not drawn at all — except the very first, where the origin is
-  // nobody's place and the alternative is a first paint with nothing on it. It
-  // used to be every box: each arriving claim sat on the hypothesis for as long
-  // as the layout took to answer.
+  // not placed is not drawn at all — except the very first, which is a reserved
+  // rectangle and never a claim: the origin is nobody's place before the layout
+  // has answered anything, and the alternative is a first paint with nothing on
+  // it. It used to be every box: each arriving claim sat on the hypothesis for
+  // as long as the layout took to answer.
   expect(saw.everStacked).toBe(false);
   // **The claims arrived one at a time.** The count went 0, 1, 2, … and reached
   // the number on screen by rising by exactly one each time: a map that appeared
