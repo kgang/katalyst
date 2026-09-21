@@ -188,16 +188,33 @@ export const WHILE_IT_GROWS: Absence = absence(
     "question about a map that will not exist in a second.",
 );
 
-/** The one sentence under a growing map saying where everything on it came from. */
-function originWhileGrowing(generationId: string | null, seed: string | null): string {
-  const named = generationId === null ? "a generation that has not started yet" : generationId;
-  const from = seed === null ? "a seed the engine has not named yet" : `seed ${seed}`;
-  return (
-    `Every claim and arrow on this map arrived from /api/generate, in generation ${named}, ` +
-    `at ${from}. Nothing here was typed in, and no likelihood has been worked out yet: the ` +
-    `engine works them through the whole map at once, when the map is finished.`
-  );
-}
+/**
+ * The one sentence *Run details* carries while a map is still being built.
+ *
+ * **It does not say that anything has arrived**, because for the first
+ * twenty-odd seconds of a run nothing has. The line this replaced read *"Every
+ * claim and arrow on this map arrived from /api/generate…"* and it was written
+ * from the run's first event onward — that is, over an empty map, asserting
+ * arrivals that had not happened. What is true from the first event is where
+ * the map is being built and how: nothing on it is typed in, and no likelihood
+ * has been worked out yet.
+ *
+ * The route, the run's own name and the seed are printed beside it as three
+ * readings rather than folded into the prose, so a reader can copy one.
+ */
+export const NOTHING_HERE_WAS_TYPED_IN =
+  "Nothing on this map is typed in: every claim and every arrow on it was proposed by the model " +
+  "and accepted by the map's own rules.";
+
+/**
+ * The second sentence *Run details* carries, and only until the numbers land.
+ *
+ * It is true while the map is being built and false the moment the engine's
+ * world arrives, so it is printed for exactly that long.
+ */
+export const NO_LIKELIHOOD_YET =
+  "No likelihood has been worked out yet: the engine works them through the whole map at once, " +
+  "when the map is finished.";
 
 /** An empty map, in the shape the canvas draws, with the reader's sentence as its title. */
 function nothingYet(hypothesis: string): WorldView {
@@ -213,7 +230,10 @@ function nothingYet(hypothesis: string): WorldView {
     hypothesisId: "",
     claims: [],
     links: [],
-    origin: originWhileGrowing(null, null),
+    // Where this map came from is read in *Run details*, in the panel, from the
+    // run's own name and seed. The map itself has no origin sentence of its own
+    // until the engine hands one over with the likelihoods.
+    origin: `${NOTHING_HERE_WAS_TYPED_IN} ${NO_LIKELIHOOD_YET}`,
   };
 }
 
@@ -359,7 +379,6 @@ function started(was: Growth, event: GenerationStarted): Growth {
       // happens to be a string of the same shape — and it would do it on
       // exactly the two screens where the map is half-built.
       title: event.hypothesis,
-      origin: originWhileGrowing(event.generation_id, seedOf(event)),
     },
     skeletons: [{ id: FIRST_RECTANGLE, words: event.hypothesis, after: null }],
   };

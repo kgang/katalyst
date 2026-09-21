@@ -51,6 +51,7 @@ import { Inspector } from "./Inspector";
 import { MapFrame } from "./MapFrame";
 import { Outline } from "./Outline";
 import { Refusal } from "./Refusal";
+import { RunStrip } from "./RunStrip";
 import { ShortcutsSheet } from "./ShortcutsSheet";
 
 /** How long the wires take to arrive, column by column, before the map settles. */
@@ -695,7 +696,27 @@ export function MapScreen({
         </>
       }
       status={status}
-      saying={announcement}
+      // The same one strip the generating screen has, in the same place, with
+      // the same polite line inside it — so a reader who has learned one of
+      // these screens has learned the other.
+      //
+      // **No seconds here.** This screen is not waiting on a model: asking the
+      // engine for a branch's world takes a fraction of a second, and a reading
+      // that says *nothing new for 0 s* and then goes is a number that changed
+      // for no reason. What it says instead is the state, in a word.
+      // **The sentence is the one this screen already said**, word for word. A
+      // second sentence swapped in while the engine is being asked would be a
+      // second thing announced to a screen reader for one edit, and the line
+      // already says the numbers are on their way.
+      strip={
+        announcement === "" ? null : (
+          <RunStrip
+            word={answer.at === "asking" ? "asking" : "stored"}
+            saying={announcement}
+            arrivals={null}
+          />
+        )
+      }
       panel={dock === "away" ? null : THE_PANEL}
       origin={
         <>

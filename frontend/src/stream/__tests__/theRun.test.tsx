@@ -161,15 +161,22 @@ describe("a stream that ends without saying why", () => {
     fireEvent.change(field, { target: { value: THE_SENTENCE } });
     fireEvent.click(screen.getByRole("button", { name: "Build the map" }));
 
-    // One plain sentence, in the one place under the map that says why a run
-    // ended — never a second strip of prose saying the same thing.
+    // One plain sentence, in the one strip at the foot of the map that says
+    // what this run is doing — never a second strip of prose saying the same
+    // thing, which is what the foot used to be. The sentence is printed where
+    // it is spoken: one element, so the two cannot drift apart.
     const said = await waitFor(() => {
-      const line = document.querySelector('.done-line[data-kind="ended_early"]');
-      expect(line).not.toBeNull();
+      const line = document.querySelector(".run-strip .map-live");
+      expect(line?.textContent ?? "").toContain(THE_STREAM_ENDED_EARLY);
       return line as HTMLElement;
     });
-    expect(said.textContent).toContain(THE_STREAM_ENDED_EARLY);
-    expect(document.querySelectorAll(".done-line")).toHaveLength(1);
+    expect(said.getAttribute("aria-live")).toBe("polite");
+    // And it is printed exactly once on the page.
+    const whole = document.body.textContent ?? "";
+    expect(whole.split(THE_STREAM_ENDED_EARLY)).toHaveLength(2);
+    // The strip says which kind of ending this was, in one word.
+    expect(document.querySelector(".run-strip")?.getAttribute("data-state")).toBe("ended early");
+    expect(document.querySelectorAll('.done-line[data-kind="ended_early"]')).toHaveLength(1);
     // And no rectangle is left standing.
     expect(screen.getByTestId("the-map").textContent).toContain("0 rectangles");
 

@@ -6,8 +6,9 @@
  * the same screen, and it was written twice. A bar with the way back and the
  * map's name; the map filling everything under it, with whatever opens over the
  * stage and one line saying what the last keystroke did; the panel beside it in
- * the frame that carries the *there is more this way* rules; one polite line
- * said out loud; and, at the foot, where every number on this map came from.
+ * the frame that carries the *there is more this way* rules; one strip saying
+ * what is happening to the map, with the polite spoken line inside it; and, at
+ * the foot, where every number on this map came from.
  *
  * Two copies of that drifted the moment either was improved. The panel's frame
  * landed on one screen a round before the other; the error boundary landed on
@@ -58,17 +59,16 @@ export interface MapFrameProps {
   readonly status: string;
   /** The panel beside the map, or nothing when the reader has put it away. */
   readonly panel: ReactNode;
-  /** The one line said out loud. Empty says nothing rather than saying nothing loudly. */
-  readonly saying: string;
   /**
-   * True when that line is spoken only.
+   * The one strip that says what is happening to this map, or nothing when
+   * there is nothing to say.
    *
-   * A generated map draws the same facts on the canvas, in the panel and under
-   * the map, so printing them again made the foot of the screen three strips of
-   * prose saying one thing three times. A stored map prints it, because nothing
-   * else on that screen says what an edit just did.
+   * Each screen builds its own, because only the screen knows what state the
+   * map is in — but both build it out of the same component, and inside it is
+   * the one polite region this frame used to own. There is no state in which
+   * the only account of what a run is doing is spoken.
    */
-  readonly spokenOnly?: boolean;
+  readonly strip: ReactNode;
   /** Where every number on this map came from, and anything still on its way. */
   readonly origin: ReactNode;
 }
@@ -83,8 +83,7 @@ export function MapFrame({
   overlay,
   status,
   panel,
-  saying,
-  spokenOnly = false,
+  strip,
   origin,
 }: MapFrameProps) {
   const { panel: scroller, edges } = useTheEdgesOfThePanel();
@@ -132,18 +131,14 @@ export function MapFrame({
           )}
         </div>
 
-        {/* Said out loud for a reader who is not looking at the picture.
-            Polite: it waits for a pause rather than cutting across whatever is
-            being read. */}
-        <p className={spokenOnly ? "map-live map-live--spoken" : "map-live"} aria-live="polite">
-          {saying}
-        </p>
+        {/* What is happening to this map, in one strip, with the polite line
+            inside it. There is no spinner here and never will be: a spinner
+            says "wait" without saying what for, and this says what is being
+            waited for and how long it has been waited for. */}
+        {strip}
 
         {/* Where every number on this map came from, and anything that is still
-            on its way. There is no spinner here and never will be: a spinner
-            says "wait" without saying what for, so the line says what has been
-            asked and at which address, and the map keeps drawing the last
-            answer while it waits. */}
+            on its way. */}
         <div className="map-origin">{origin}</div>
       </IfTheScreenBreaks>
     </main>
