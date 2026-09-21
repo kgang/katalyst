@@ -1,9 +1,6 @@
 """How a claim's window is cut up, and what each arrow does to the claim's rate.
 
-**Stubs.** Every function below raises `NotImplementedError`. The shapes, the names
-and the plain-words meaning are settled here so that the four people writing the
-arithmetic can import each other's work from the first minute. Decision record 0016
-is what this file implements.
+Decision record 0016 is what this file implements.
 
 What a rate is
 --------------
@@ -48,6 +45,7 @@ The conventions every array in the new engine obeys
   state stopped, it means *still holding*.
 """
 
+import itertools
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -88,20 +86,49 @@ field that carries it on a claim arrives with the flip (decision record 0017,
 `persistence` required on every claim) and this file lands before that.
 """
 
+_LIKELIHOOD_FLOOR: Final = 1e-9
+"""How close to nought or to one a stated chance is allowed to get.
+
+The same value, for the same reason, as the floor the engine on `main` puts under
+a likelihood before it takes its logarithm (`propagation.py`, `_log_odds`). A
+chance of exactly nought or exactly one has no logarithm, and a map is allowed to
+carry both. Keeping the two floors the same is what makes `stated_chance_with`
+below the very arithmetic today's engine does, rather than a second version of it.
+"""
+
+_NOT_ZERO: Final = 1e-12
+"""A floor under a divisor that can honestly come out at nought.
+
+An arrow whose push lands entirely after its target's deadline has no push at all
+over the window, and a claim whose deadline is day zero has no window. Dividing by
+either is a fault in the map, not in the arithmetic; the floor answers with a very
+large rate instead of with `inf`, and the claim's own number then comes out at one,
+which is what a map that says a thing is certain deserves.
+"""
+
 
 @dataclass(frozen=True)
 class Window:
-    """The stretch of days every claim on one map is worked out over, cut into slices.
+    """A stretch of days from day zero to a resolve-by day, cut into equal slices.
 
-    One window is built per map, not per claim. Claims differ only in where their
-    own deadline falls inside it.
+    **Every claim is worked out on its own window, cut from its own resolve-by
+    day** — never on a grid the rest of the map decides. That is what makes a claim
+    an edit cannot reach come out byte for byte the same: inserting a claim judged
+    six months later changes the map's longest window, and if every claim were cut
+    from that, every slice boundary on the map would move and claims the insertion
+    cannot reach would move with them. The repository has been bitten by exactly
+    that once already, when thinning a series' drawn days re-timed a claim in a
+    wholly separate piece of the map.
+
+    `window_of` gives the **map's** window, which is the longest of them and is what
+    the reader is shown; `shapes_of` cuts each claim's own.
     """
 
     day_zero: date
     """The day the window starts on. Passed in, never read off a clock."""
 
     days: int
-    """How many whole days from day zero to the latest resolve-by day on the map."""
+    """How many whole days from day zero to the resolve-by day this window ends at."""
 
     slices: int
     """How many equal pieces the window is cut into. `SLICES` unless a test says otherwise."""
@@ -172,13 +199,27 @@ class ClaimShapes:
     """The claim these shapes belong to."""
 
     deadline: int
-    """Which day of the window this claim's own resolve-by day is."""
+    """How many whole days from day zero to this claim's own resolve-by day."""
+
+    edges: NDArray[numpy.float64]
+    """`(slices + 1,)` the day each of **this claim's** slice boundaries falls on.
+
+    Cut from day zero to this claim's own deadline and from nothing else, so that
+    nothing else on the map can move them.
+    """
+
+    middle_day: NDArray[numpy.float64]
+    """`(slices + 1,)` the day that stands for this claim happening in each of its slices.
+
+    The middle of the slice, never its end. The last entry is positive infinity and
+    means *the claim never happened*.
+    """
 
     width: NDArray[numpy.float64]
-    """`(slices,)` how many days of **this** claim's window fall in each slice.
+    """`(slices,)` how many days of this claim's window fall in each of its slices.
 
-    Clipped at the claim's deadline, so a slice past the deadline is zero days wide
-    and a slice the deadline falls inside counts only the part before it.
+    Every slice is the same width, because the window is cut from the claim's own
+    deadline: the last slice ends exactly on it, and nothing is ever counted past it.
     """
 
     points: NDArray[numpy.float64]
@@ -220,6 +261,12 @@ class ClaimShapes:
 
     The second shape is slices **cubed**, and it is the cost `needs_the_joint`
     exists so that a state nobody reads the stretch of never pays.
+
+    **Everything that reads one of these reads the leading axes flattened**, into
+    one *cause-time* axis of `slices + 1` entries for the first shape and
+    `(slices + 1) * (slices + 1)` for the second — the very layout a claim's times
+    are held in (`states.Times.spread`), so a cause's times and the push its arrow
+    carries are contracted against each other with no unpacking on either side.
     """
 
     area: Mapping[int, float]
@@ -260,6 +307,9 @@ class Rates:
     the number stated for it, even with the rate suppressed entirely while the cause
     is on. Where this is true the claim comes out **above** the number stated, and
     `clamped` turns that into a sentence the reader sees.
+
+    One entry per arrow that holds its claim back, and none for any other kind:
+    a helping arrow and an ending arrow are both fitted with nothing clamped.
     """
 
 
@@ -285,7 +335,12 @@ class Clamp:
 class AddedUp:
     """Each rate added up across the window, ready to be turned into survival by one exponential.
 
-    `combos` counts the combinations of arrival slices of the arrows that **hold the
+    **A running total from day zero to the end of each slice**, with every entry a
+    rate already multiplied through — so the chance a claim has not happened by the
+    end of a slice is the exponential of minus the entries added together, and
+    nothing that reads this has to take a running total or multiply by a rate first.
+
+    `combos` counts the combinations of arrival times of the arrows that **hold the
     claim back**. Those are the one place the cost still multiplies out: three of
     them cost about twice a plain pass and ten cost about seventy times it. Every
     other kind of arrow is averaged one cause at a time, which is exact because the
@@ -293,18 +348,113 @@ class AddedUp:
     """
 
     leak: NDArray[numpy.float64]
-    """`(versions, combos, slices)` the no-cause rate added up over each slice."""
+    """`(versions, combos, slices)` the no-cause rate, added up to the end of each slice."""
 
     helps: Mapping[int, NDArray[numpy.float64]]
-    """Arrow -> `(versions, combos, slices + 1, slices)` a helping cause's rate added up per slice.
+    """Arrow -> `(versions, combos, cause times, slices)` a helping cause's rate added up.
 
-    The third axis is the slice its cause arrived in; its last index means the cause
-    never came, and the added-up rate there is zero.
+    The third axis is **when its cause happened**, in the flattened layout
+    `ClaimShapes.carried` describes: `slices + 1` entries for an arrow that reads
+    only the day its cause came on, and `(slices + 1) * (slices + 1)` for one that
+    reads its cause's whole stretch. The entries where the cause never came hold
+    nought, so the exponential of minus them is one and such a cause pushes nothing.
     """
 
 
+def _log_odds(likelihood: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
+    """Turn a chance into log-odds: the scale on which separate pushes add up.
+
+    The same two lines, and the same floor, as the engine on `main`. Log-odds is
+    the logarithm of the ratio of a chance to its opposite.
+    """
+    kept = numpy.clip(likelihood, _LIKELIHOOD_FLOOR, 1.0 - _LIKELIHOOD_FLOOR)
+    turned: NDArray[numpy.float64] = numpy.log(kept / (1.0 - kept))
+    return turned
+
+
+def _likelihood_of(log_odds: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
+    """Turn log-odds back into a chance between nought and one."""
+    turned: NDArray[numpy.float64] = 1.0 / (1.0 + numpy.exp(-log_odds))
+    return turned
+
+
+def _push_at(arrow: Link, elapsed: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
+    """How big one arrow's push is, as a share of its full size, some days after its cause.
+
+    The same three shapes, with the same meanings, that the engine on `main` reads
+    (`propagation.py`, `_shape_row`), so one arrow means one thing whichever engine
+    is running. A **step** is nothing through the delay, then full size, held. A
+    **spike** is nothing through the delay, then full size, halving every half-life.
+    A **ramp** climbs from nothing to full size across the delay, then holds.
+
+    A ramp with no delay needs no rule of its own: with the delay at nothing there
+    are no days left to climb over, and the shape is a step as a consequence rather
+    than as a special case. A spike that does not say how fast it fades is a fault
+    in the map, refused by the map's own rules long before this; the line that holds
+    the push rather than dividing by nothing is the net under a map that arrived
+    some other way.
+
+    Args:
+        arrow: The arrow.
+        elapsed: How many days after its cause became true each reading day is.
+            Negative infinity where the cause never became true, which lands in
+            *before the delay* and so pushes nothing.
+
+    Returns:
+        One share between nought and one for each reading day.
+    """
+    landed = elapsed >= arrow.lag
+    held: NDArray[numpy.float64] = numpy.where(landed, 1.0, 0.0)
+    if arrow.shape == "step":
+        return held
+    if arrow.shape == "ramp":
+        climbing = (elapsed >= 0.0) & ~landed
+        climbed: NDArray[numpy.float64] = numpy.where(
+            climbing, elapsed / max(arrow.lag, _NOT_ZERO), held
+        )
+        return climbed
+    half_life = arrow.half_life
+    if half_life is None or half_life <= 0.0:
+        return held
+    # The exponent is read as nought on the days the push has not landed on, so that
+    # a cause that never came — whose elapsed days are negative infinity — raises two
+    # to the power of nothing rather than to the power of infinity. Either way the
+    # line below throws the answer away on those days.
+    since = numpy.where(landed, elapsed - arrow.lag, 0.0)
+    faded: NDArray[numpy.float64] = numpy.where(landed, 2.0 ** (-since / half_life), 0.0)
+    return faded
+
+
+def window_cut_to(day_zero: date, days: int, slices: int) -> Window:
+    """Cut one stretch of days, from day zero to a resolve-by day, into equal slices.
+
+    Args:
+        day_zero: The day the stretch starts on. This layer reads no clock.
+        days: How many whole days it runs for.
+        slices: How many equal pieces to cut it into.
+
+    Returns:
+        The window, with the day each slice boundary falls on and the day that
+        stands for an arrival in each slice.
+    """
+    edges = numpy.linspace(0.0, float(days), slices + 1)
+    middles = 0.5 * (edges[:-1] + edges[1:])
+    return Window(
+        day_zero=day_zero,
+        days=days,
+        slices=slices,
+        edges=edges,
+        middle_day=numpy.append(middles, numpy.inf),
+    )
+
+
 def window_of(graph: Graph, day_zero: date, *, slices: int = SLICES) -> Window:
-    """Cut one window, covering every claim on the map, into equal slices.
+    """Cut the map's own window — day zero to the last day anything on it is judged.
+
+    **This is the window the reader is shown, not the grid any claim is worked out
+    on.** Each claim is cut from its own resolve-by day by `shapes_of`, so that
+    inserting a claim judged long after everything else cannot move a claim the
+    insertion has no arrow to.
 
     Args:
         graph: The map. Its latest resolve-by day is where the window ends.
@@ -312,31 +462,49 @@ def window_of(graph: Graph, day_zero: date, *, slices: int = SLICES) -> Window:
         slices: How many equal pieces to cut it into.
 
     Returns:
-        The window, with the day each slice boundary falls on and the day that
-        stands for an arrival in each slice.
+        The map's window.
     """
-    raise NotImplementedError
+    days = max(max(0, (one.resolution.by - day_zero).days) for one in graph.propositions)
+    return window_cut_to(day_zero, days, slices)
 
 
 def shapes_of(
     claim: Proposition,
     arrows: Sequence[Link],
     source_persistence: Mapping[LinkId, Persistence],
+    source_deadline: Mapping[LinkId, int],
     window: Window,
     *,
     persistence: Persistence,
 ) -> ClaimShapes:
     """Work out everything about one claim's arrows that no version can change.
 
+    **What an arrow does is settled here, once, from the numbers as they were
+    stated** — the claim's own chance and, through `stated_chance_with`, the chance
+    with that one cause on. A version redraws both, and a redraw can put a helping
+    arrow's chance below the claim's own; the calibration below answers that with a
+    push of nothing rather than by moving the arrow into another list, because an
+    arrow that changes what it is from version to version is not one arrow.
+
+    **The claim is cut from its own deadline**, and each arrow's cause from that
+    cause's own deadline. Nothing else on the map touches either grid, which is what
+    makes a claim an edit cannot reach come out byte for byte the same when a claim
+    judged much later is inserted somewhere else.
+
     Args:
         claim: The claim being worked out. Its own stated chance is what each
-            arrow's number is compared against to decide what that arrow does.
+            arrow's number is compared against to decide what that arrow does, and
+            its own resolve-by day is where its window ends.
         arrows: The arrows into this claim, which become the cause axes in the order
             given here.
         source_persistence: For each of those arrows, which kind of truth its
             **source** is. A `sustain` arrow out of a state is the one case that
             needs its cause's whole stretch rather than the moment it came on.
-        window: The map's window, already cut into slices.
+        source_deadline: For each of those arrows, how many whole days from day zero
+            to its **source's** resolve-by day. It is what says which day a cause
+            arriving in one of its own slices actually arrived on.
+        window: Any window on this map, read only for the day it starts on and how
+            many slices to cut into. The claim's own window is cut here.
         persistence: Which kind of truth **this** claim is. It is what tells a
             holding-back arrow from an ending one: an arrow stated below the claim's
             own chance scales down an event's rate and adds to a state's stopping
@@ -344,10 +512,58 @@ def shapes_of(
             carries it arrives with the flip.
 
     Returns:
-        This claim's shapes: the arrow order, which arrow does what, each arrow's
-        push carried to the claim's own reading days, and each arrow's area.
+        This claim's shapes: its own grid, the arrow order, which arrow does what,
+        each arrow's push carried to the claim's own reading days, and each arrow's
+        area.
     """
-    raise NotImplementedError
+    deadline = max(0, (claim.resolution.by - window.day_zero).days)
+    mine = window_cut_to(window.day_zero, deadline, window.slices)
+    starts = mine.edges[:-1]
+    width = mine.edges[1:] - starts
+    inside = (numpy.arange(POINTS_IN_A_SLICE) + 0.5) / POINTS_IN_A_SLICE
+    points = starts[:, None] + inside[None, :] * width[:, None]
+
+    own = numpy.array([float(claim.prior.p)])
+    helps: list[int] = []
+    holds_back: list[int] = []
+    ends: list[int] = []
+    carried: dict[int, NDArray[numpy.float64]] = {}
+    area: dict[int, float] = {}
+    for position, arrow in enumerate(arrows):
+        with_it = stated_chance_with(own, numpy.array([float(arrow.strength)]))
+        if float(with_it[0]) >= float(own[0]):
+            helps.append(position)
+        elif persistence == "state":
+            ends.append(position)
+        else:
+            holds_back.append(position)
+
+        theirs = window_cut_to(window.day_zero, source_deadline[arrow.id], window.slices)
+        pushed = _push_at(arrow, points[None, :, :] - theirs.middle_day[:, None, None])
+        if arrow.mode == "sustain" and source_persistence[arrow.id] == "state":
+            # The push is dead once its cause stops holding, so it is read for every
+            # pair of *came on in this slice, went off in that one*. The last index of
+            # the off axis is *still holding*, whose day is positive infinity, and a
+            # reading day is always before that.
+            still_on = points[None, None, :, :] < theirs.middle_day[None, :, None, None]
+            pushed = pushed[:, None, :, :] * still_on
+        carried[position] = pushed
+        area[position] = float((width * _push_at(arrow, points).mean(axis=1)).sum())
+
+    return ClaimShapes(
+        claim=claim.id,
+        deadline=deadline,
+        edges=mine.edges,
+        middle_day=mine.middle_day,
+        width=width,
+        points=points,
+        arrows=tuple(arrow.id for arrow in arrows),
+        helps=tuple(helps),
+        holds_back=tuple(holds_back),
+        ends=tuple(ends),
+        carried=carried,
+        area=area,
+    )
 
 
 def rates_of(
@@ -377,6 +593,12 @@ def rates_of(
     rate suppressed entirely while the cause is on — the claim comes out above the
     number stated, and the arrow is marked in `Rates.saturated`.
 
+    **A version that redraws a number the wrong side of the claim's own gets a push
+    of nothing**, not a push the other way: a helping arrow's rate stops at nought,
+    a holding-back arrow's share stops at the whole of the rate, and an ending
+    arrow's chance of stopping stops at nought. What each arrow *is* was settled by
+    `shapes_of` from the numbers as stated, and no draw moves it.
+
     Args:
         shapes: This claim's shapes, which say what each arrow does and how big its
             push is over the window.
@@ -388,12 +610,69 @@ def rates_of(
 
     Returns:
         The claim's rates, one column per version.
+
+    Raises:
+        ValueError: If the shapes were worked out for the other kind of truth —
+            an event with an arrow that ends it, or a state with one that holds it
+            back. The two lists are filled by `shapes_of` from this same word, so a
+            mismatch means two callers disagreed about one claim.
     """
-    raise NotImplementedError
+    misplaced = shapes.ends if persistence == "event" else shapes.holds_back
+    if misplaced:
+        raise ValueError(
+            f"claim '{shapes.claim}' was worked out as a {persistence} but carries "
+            f"{len(misplaced)} arrow(s) of the other kind; the shapes and the rates must be "
+            f"asked for with the same kind of truth"
+        )
+
+    window_days = max(float(shapes.width.sum()), _NOT_ZERO)
+    own = numpy.clip(own_chance, 0.0, 1.0 - _LIKELIHOOD_FLOOR)
+    leak = -numpy.log1p(-own) / window_days
+
+    helps: dict[int, NDArray[numpy.float64]] = {}
+    leaves: dict[int, NDArray[numpy.float64]] = {}
+    ends: dict[int, NDArray[numpy.float64]] = {}
+    saturated: dict[int, NDArray[numpy.bool_]] = {}
+
+    for position in shapes.helps:
+        area = max(shapes.area[position], _NOT_ZERO)
+        with_it = numpy.clip(with_this_cause[position], 0.0, 1.0 - _LIKELIHOOD_FLOOR)
+        helps[position] = numpy.maximum((numpy.log1p(-own) - numpy.log1p(-with_it)) / area, 0.0)
+
+    for position in shapes.holds_back:
+        area = max(shapes.area[position], _NOT_ZERO)
+        with_it = numpy.clip(with_this_cause[position], 0.0, 1.0 - _LIKELIHOOD_FLOOR)
+        gap = (window_days + numpy.log1p(-with_it) / numpy.maximum(leak, _NOT_ZERO)) / area
+        saturated[position] = gap > 1.0
+        leaves[position] = numpy.clip(1.0 - gap, 0.0, 1.0)
+
+    for position in shapes.ends:
+        area = max(shapes.area[position], _NOT_ZERO)
+        with_it = numpy.clip(with_this_cause[position], 0.0, 1.0 - _LIKELIHOOD_FLOOR)
+        stops = numpy.clip(
+            1.0 - with_it / numpy.maximum(own, _NOT_ZERO), 0.0, 1.0 - _LIKELIHOOD_FLOOR
+        )
+        ends[position] = -numpy.log1p(-stops) / area
+
+    return Rates(leak=leak, helps=helps, leaves=leaves, ends=ends, saturated=saturated)
+
+
+def _cause_times(pushes: NDArray[numpy.float64]) -> int:
+    """How many different *when its cause happened* an arrow's push is held for."""
+    return int(numpy.prod(pushes.shape[:-2]))
 
 
 def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
     """Add each rate up across the window, once, so the forward pass is gathers and products.
+
+    **Why the arrows that hold a claim back are the expensive ones.** The rate is
+    the share those arrows leave, multiplied by the leak plus the helping arrows'
+    pushes. Multiplying that out turns the share they leave into a sum over every
+    *subset* of them, and each term is a product of pushes that no version changes —
+    so a version enters as one number multiplying arrays built once. What does not
+    collapse is *when* each of those arrows' causes happened: every combination of
+    their arrival times is carried through, which is where the cost of three of them
+    (about twice a plain pass) and of ten (about seventy times it) comes from.
 
     Args:
         shapes: This claim's shapes.
@@ -401,26 +680,109 @@ def added_up(shapes: ClaimShapes, rates: Rates) -> AddedUp:
 
     Returns:
         The added-up rates, with the arrows that hold the claim back multiplied out
-        over their arrival slices and every other kind of arrow left one at a time.
+        over their arrival times and every other kind of arrow left one at a time.
     """
-    raise NotImplementedError
+    versions = int(rates.leak.shape[0])
+    slices = int(shapes.width.shape[0])
+    held = shapes.holds_back
+    per_held = tuple(_cause_times(shapes.carried[position]) for position in held)
+    combos = int(numpy.prod(per_held)) if held else 1
+
+    # Which arrival time each holding-back arrow has in each combination: one row
+    # per arrow, one column per combination.
+    every = (
+        numpy.indices(per_held).reshape(len(held), -1)
+        if held
+        else numpy.zeros((0, 1), dtype=numpy.int64)
+    )
+
+    flat = {
+        position: pushes.reshape(_cause_times(pushes), slices, POINTS_IN_A_SLICE)
+        for position, pushes in shapes.carried.items()
+    }
+
+    leak_total = numpy.zeros((versions, combos, slices))
+    help_totals = {
+        position: numpy.zeros((versions, combos, _cause_times(shapes.carried[position]), slices))
+        for position in shapes.helps
+    }
+
+    for size in range(len(held) + 1):
+        for term in itertools.combinations(range(len(held)), size):
+            coefficient = numpy.ones(versions)
+            product = numpy.ones((1, slices, POINTS_IN_A_SLICE))
+            for slot in term:
+                coefficient = coefficient * -(1.0 - rates.leaves[held[slot]])
+                block = flat[held[slot]]
+                product = (product[:, None, :, :] * block[None, :, :, :]).reshape(
+                    -1, slices, POINTS_IN_A_SLICE
+                )
+            here = (
+                numpy.ravel_multi_index(
+                    tuple(every[slot] for slot in term), tuple(per_held[slot] for slot in term)
+                )
+                if term
+                else numpy.zeros(combos, dtype=numpy.int64)
+            )
+            spread = shapes.width[None, :] * product.mean(axis=2)
+            leak_total += coefficient[:, None, None] * spread[here][None, :, :]
+            for position in shapes.helps:
+                together = product[:, None, :, :] * flat[position][None, :, :, :]
+                both = shapes.width[None, None, :] * together.mean(axis=3)
+                help_totals[position] += (
+                    coefficient[:, None, None, None] * both[here][None, :, :, :]
+                )
+
+    return AddedUp(
+        leak=rates.leak[:, None, None] * numpy.cumsum(leak_total, axis=-1),
+        helps={
+            position: rates.helps[position][:, None, None, None] * numpy.cumsum(total, axis=-1)
+            for position, total in help_totals.items()
+        },
+    )
 
 
-def clamped(shapes: ClaimShapes, rates: Rates) -> tuple[Clamp, ...]:
+def clamped(
+    shapes: ClaimShapes, rates: Rates, with_this_cause: Mapping[int, NDArray[numpy.float64]]
+) -> tuple[Clamp, ...]:
     """List the arrows that could not hold this claim back as far as their numbers ask.
 
     One entry per arrow that fell short, with both numbers, so the assembly can put
     a sentence naming the arrow on the world's warnings. An arrow that fell short in
     no version is not listed.
 
+    **Both numbers are read at the version where the miss is largest**, because a
+    warning names the worst of what it is warning about. The version is chosen by
+    that rule rather than fixed, so nothing here is a number somebody picked.
+
     Args:
         shapes: This claim's shapes.
         rates: This claim's rates, whose `saturated` entries are what this reads.
+        with_this_cause: Arrow position -> `(versions,)` the chance stated for this
+            claim with that one cause on. It is what the arrow **asked** for, and it
+            cannot be read back out of a rate that has already been clamped.
 
     Returns:
         One entry per arrow that fell short, in the arrow order of `shapes`.
     """
-    raise NotImplementedError
+    window_days = max(float(shapes.width.sum()), _NOT_ZERO)
+    fell_short: list[Clamp] = []
+    for position in shapes.holds_back:
+        short = rates.saturated[position]
+        if not bool(short.any()):
+            continue
+        asked = numpy.clip(with_this_cause[position], 0.0, 1.0 - _LIKELIHOOD_FLOOR)
+        left = window_days - (1.0 - rates.leaves[position]) * shapes.area[position]
+        delivered = 1.0 - numpy.exp(-rates.leak * left)
+        worst = int(numpy.argmax(numpy.where(short, delivered - asked, -numpy.inf)))
+        fell_short.append(
+            Clamp(
+                arrow=shapes.arrows[position],
+                asked=float(asked[worst]),
+                delivered=float(delivered[worst]),
+            )
+        )
+    return tuple(fell_short)
 
 
 def stated_chance_with(
@@ -452,4 +814,4 @@ def stated_chance_with(
     Returns:
         `(versions,)` the chance the claim reaches its deadline with that one cause on.
     """
-    raise NotImplementedError
+    return _likelihood_of(_log_odds(claim_prior) + strength)
