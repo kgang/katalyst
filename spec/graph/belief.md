@@ -116,7 +116,9 @@ There is still a violation code `belief_out_of_range` — rule 11 in [`validity.
 
 Averaging them destroys the only thing the map is for. If the model says `.61`, the market says `.48` and you say `.30`, the average `.46` is a number nobody holds, describing nobody's view, and it deletes the two gaps that are the actual output: **model minus market is the edge you might trade; user minus model is the argument you are having with the tool.** This is invariant INV-11, and it is enforced by a test that inspects our own source code rather than by good intentions — see INV-graph.13 below.
 
-The rule is narrow and absolute: **no function in `domain/` takes beliefs of two different owners and returns one number.** Showing them next to each other is encouraged. Subtracting one from the other for display — the thesis card's `edge` column — happens outside the domain and is labelled as a difference, not as a belief.
+**The first of those two gaps has a condition on it** *(added 2026-09-21, decision record 0018)*. A venue's price is the chance of the claim in the world as it stands. So the model's side of that subtraction must be read from the world with **no supposition in force** — never from a world where *Suppose this is true* has pinned something — or the difference is between two different questions. The rule is carried by the signature of the one function that builds an edge, which takes the unsupposed world and the world on screen as two separate, required arguments; where the two numbers cannot honestly be compared it returns a named refusal and a break-even instead of a difference. The thesis part of the spec spells it out.
+
+The rule is narrow and absolute: **no function in `domain/` takes beliefs of two different owners and returns one number.** Showing them next to each other is encouraged. Subtracting one from the other for display — the thesis card's `edge` column — happens outside the domain, is handed the unsupposed world to read the model's number from, and is labelled as a difference, not as a belief.
 
 ### `prior` versus `beliefs.model`
 
@@ -134,9 +136,11 @@ Keeping both is what lets the Inspector answer "why is this `.71` when the base 
 
 ### The market voice
 
-A `market` belief is a live, read-only price at a real venue — Polymarket first, the Federal Reserve's FRED economic-data service second (decision record 0010). The mid-price of a contract on Polymarket — halfway between the best bid and the best offer — becomes `p`; where the venue publishes a spread, that becomes `lo` and `hi`; its provenance is `market_implied`, meaning "this came from a price, not from an argument".
+A `market` belief is a read-only price at a real venue — Polymarket (decision record 0010). The mid-price of a contract — halfway between the best bid and the best offer — becomes `p`; its provenance is `market_implied`, meaning "this came from a price, not from an argument".
 
-Two things follow. **Absent is a state, not a gap.** `beliefs.market is None` renders as the words *"no market"* with the reason beside it, never as a blank chip and never as a placeholder number. Many honest hypotheses have no contract — that is the path to a `not_tradeable` terminal, and it is information. **Two venues are two rows.** If Polymarket and Kalshi both quote a claim, both are shown and the spread between them is called out as a signal. They are not averaged into a single market number, for the same reason the three owners are not.
+**It has no range** *(corrected 2026-09-21, decision record 0020)*. The sentence that stood here — the quoted spread becomes `lo` and `hi` — is withdrawn. The difference between the best bid and the best offer is what it **costs to deal**, not how unsure the venue is, and the venue publishes no interval at all, so `lo` and `hi` equal `p` and the chip says in words that no interval was published rather than implying certainty. What the two sides of the book differ by shows up on the thesis card, where you buy at the offer and sell at the bid, giving a gain from buying and a gain from selling with no spread term beside them. Record 0020 also makes a measured economic level — what a barrel actually settled at — an **observation** that never fills this slot; it anchors a price ending instead, with its own attribution line.
+
+Two things follow. **Absent is a state, not a gap.** `beliefs.market is None` renders as the words *"no market"* with the reason beside it, never as a blank chip and never as a placeholder number. Many honest hypotheses have no contract — that is the path to a `not_tradeable` terminal, and it is information. **Two venues are two rows.** If two venues ever quote one claim, both are shown and the gap between them is called out as a signal. They are not averaged into a single market number, for the same reason the three owners are not. Version one asks one venue — Kalshi is cut (decision record 0020) — so the card says which venue quoted the claim and that no other was asked.
 
 ### The user voice
 
@@ -159,6 +163,8 @@ That is a rendering rule, and the rendering lives in the workbench spec. What be
 ## Behaviour
 
 ### B1 — Three numbers, side by side, on one claim
+
+*(2026-09-21: the market row below still shows a range. Under the correction above a market belief has none — that table belongs to the sweep that owns this example's numbers and moves with it.)*
 
 The Hormuz map reaches terminal M1, *a Polymarket contract "Brent below $70 on 2026-10-31" resolves YES*. Its tile shows three chips. The numbers below are an **illustration of the form**, taken from research report 02 §3 before there was an engine; the shipped engine computes `.46 (.32–.60)` for this claim (seed 20261001), and until a world has been computed the stored example shows the claim's own prior, `.40 (.28–.55)`, under a label saying the range is stated and not computed:
 
