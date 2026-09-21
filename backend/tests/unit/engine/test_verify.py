@@ -107,8 +107,13 @@ def test_verify_returns_no_path_rather_than_a_bridge() -> None:
     assert SOMEWHERE_ELSE in answer.why
 
 
-def test_when_nothing_touches_the_destination_the_verdict_says_how_far_the_story_got() -> None:
-    """Closest has no meaning on that map, so a computed answer to a real question is given."""
+def test_when_nothing_touches_the_destination_the_verdict_says_what_it_did_reach() -> None:
+    """Closest has no meaning on that map, so a computed answer to a real question is given.
+
+    It names what the story reaches along its **best-backed** route, and says so:
+    the sentence used to say "got as far as", which reads as furthest and is not
+    what is ranked (2026-09-20).
+    """
     with_a_destination = HORMUZ.model_copy(
         update={"propositions": (*HORMUZ.propositions, a_claim_nobody_reaches())}
     )
@@ -118,7 +123,7 @@ def test_when_nothing_touches_the_destination_the_verdict_says_how_far_the_story
     assert answer.nearest in {one.id for one in HORMUZ.propositions}
     assert answer.nearest != HORMUZ.hypothesis_id
     assert "no arrow on it touches that claim at all" in answer.why
-    assert "got as far as" in answer.why
+    assert "best-backed thing the story does reach" in answer.why
 
 
 def test_when_something_does_touch_the_destination_the_nearest_claim_is_a_real_distance() -> None:

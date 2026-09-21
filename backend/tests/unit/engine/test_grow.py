@@ -797,3 +797,38 @@ def test_a_service_that_never_answers_ends_the_run_saying_which_it_was() -> None
     assert finished.reason == "refusal_cap"
     assert finished.graph is None
     assert "could not be reached" in finished.why
+
+
+def test_a_claims_run_of_refusals_starts_again_the_moment_it_is_answered() -> None:
+    """Three **in a row**, not three in all — and nothing pinned that until now.
+
+    A line that is refused twice, answered, and then refused twice more has had
+    four refusals and is still open, because none of its runs reached three. The
+    counter is reset where the acceptance is folded; a counter that only ever
+    went up would close a productive line on its fourth mistake of the afternoon
+    (2026-09-20).
+    """
+    refused = an_answer(a_link(STARTED_AT, STARTED_AT))
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                refused,
+                refused,
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                refused,
+                refused,
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_stop()),
+            ],
+            A_STEP: [an_answer(a_stop())],
+        }
+    )
+
+    steps = walk(told, at_once=1, width=3)
+    finished = ending(steps)
+
+    assert finished.graph is not None
+    assert finished.refused == 4
+    assert len(finished.graph.propositions) == 3
+    # Four refusals and the line was never closed for refusing.
+    assert finished.reason != "refusal_cap"

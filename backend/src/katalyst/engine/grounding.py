@@ -61,7 +61,7 @@ def keep_cited(
     """Split what an arrow cites into what we can stand behind, and what we drop.
 
     Matching is an exact comparison of the address, after trimming surrounding
-    whitespace and one trailing slash. Nothing cleverer: deciding that two
+    whitespace and any trailing slashes. Nothing cleverer: deciding that two
     slightly different addresses are "the same page" is a judgement, and a
     judgement is how a dropped citation quietly comes back.
 
@@ -145,9 +145,12 @@ def provenance_of(draft: LinkDraft, kept: tuple[Source, ...]) -> Provenance:
 def same_address(url: str) -> str:
     """Put one address into the form two addresses are compared in.
 
-    Surrounding whitespace and one trailing slash come off, and nothing else. A
-    page written with something extra on the end — a tracking parameter, say —
-    loses its citation and the arrow falls back to saying it argued rather than
+    Surrounding whitespace and **every** trailing slash come off, and nothing
+    else. Every rather than one, because `…/reports/` and `…/reports//` are the
+    same page and nobody would say otherwise; the docstring used to say one, and
+    a rule described wrongly is a rule nobody can rely on (2026-09-20). A page
+    written with something extra on the end — a tracking parameter, say — loses
+    its citation and the arrow falls back to saying it argued rather than
     documented. That is the safe direction to be wrong in.
 
     Args:

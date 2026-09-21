@@ -174,17 +174,13 @@ def prompt_hash() -> str:
     # Imported inside the function rather than at the top of the file, because the
     # seam reads this module and this line reads the seam. Both are fully loaded
     # by the time anybody asks for a fingerprint.
-    from katalyst.engine.client import OneProposal, wire_schema
-    from katalyst.engine.proposal import StartingClaim
+    #
+    # It asks the seam for the shapes rather than naming them, so this file still
+    # does not know what the wire forced on them — the envelope is the seam's
+    # business and nothing outside it names it (2026-09-20).
+    from katalyst.engine.client import what_goes_out
 
-    shapes = json.dumps(
-        {
-            "proposal": wire_schema(OneProposal),
-            "starting_claim": wire_schema(StartingClaim),
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    )
+    shapes = json.dumps(what_goes_out(), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256((STANDING_TEXT + shapes).encode("utf-8")).hexdigest()
 
 

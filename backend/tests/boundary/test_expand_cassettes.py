@@ -37,7 +37,10 @@ import pytest
 
 from katalyst.engine.client import Model, live_answerer
 from katalyst.engine.expand import expand
-from katalyst.engine.outcome import Accepted, Refused
+from katalyst.engine.grounding import found_in, keep_cited, provenance_of, same_address
+from katalyst.engine.outcome import Accepted, Refused, Said
+from katalyst.engine.prompt import expanding_question
+from katalyst.engine.proposal import ClaimProposal, LinkProposal
 from katalyst.fixtures import HORMUZ
 
 CASSETTES = Path(__file__).resolve().parents[1] / "cassettes"
@@ -107,6 +110,43 @@ def ask(answerer: Model, frontier: str = "C") -> object:
     )
 
 
+RECORD_IT_AGAIN = (
+    "This recording came back with no proposal in it, so the rule below was never "
+    "put to anything. A test that passes because there was nothing to check is a "
+    "test that has stopped working without saying so — record it again."
+)
+"""What a recording that proves nothing is told, instead of being skipped.
+
+Three tests here used to `skip` or quietly do nothing when a re-recording came
+back as a `Stop` or a refusal. A green suite that had checked nothing is the
+worst of both worlds: it costs the same and says the same as one that did
+(2026-09-20).
+"""
+
+
+def asking(answerer: Model, frontier: str = "C") -> Said:
+    """Put one question straight to the seam, so the test can read what the search found.
+
+    The same one recorded exchange `ask` uses, and one call's worth of the
+    cassette. Reading `said.found` is the only way to check the grounding rules
+    against **what the tool actually returned** rather than against a
+    re-statement of the rule in the test.
+    """
+    return answerer.proposal(
+        expanding_question(
+            HORMUZ, frontier, target=None, ending_only=False, today=THE_DAY_THE_RUN_HAPPENED
+        ),
+        may_search=True,
+    )
+
+
+def what_it_proposed(said: Said) -> ClaimProposal | LinkProposal:
+    """Take the proposal out of an answer, or say loudly that there is not one."""
+    proposed = said.answered
+    assert isinstance(proposed, ClaimProposal | LinkProposal), RECORD_IT_AGAIN
+    return proposed
+
+
 # --- Recorded from a real call ---------------------------------------------
 
 
@@ -117,27 +157,29 @@ def test_expand_returns_one_proposal_per_call(answerer: Model) -> None:
 
     assert outcome.calls >= 1  # type: ignore[union-attr]
     result = outcome.result  # type: ignore[union-attr]
-    if isinstance(result, Accepted):
-        assert len(result.links) <= 1
-        assert result.proposition is None or isinstance(result.proposition.claim, str)
+    assert isinstance(result, Accepted), RECORD_IT_AGAIN
+    assert len(result.links) <= 1
+    assert result.proposition is None or isinstance(result.proposition.claim, str)
 
 
 @pytest.mark.vcr
 def test_provenance_is_written_from_what_was_found(answerer: Model) -> None:
-    """The word on an accepted arrow is what the rule gives for that call's own results."""
-    outcome = ask(answerer)
+    """The word on an arrow is the one our rule gives for that call's own search results.
 
-    result = outcome.result  # type: ignore[union-attr]
-    if not isinstance(result, Accepted):
-        pytest.skip("this recording holds a refusal, which the refusal tests cover")
-    for arrow in result.links:
-        if arrow.sources:
-            assert arrow.provenance == "documented"
-        elif arrow.rationale.strip():
-            assert arrow.provenance == "argued"
-        else:
-            assert arrow.provenance == "asserted"
-        assert arrow.provenance not in ("historical", "market_implied", "user", "simulated")
+    Read against `said.found` — the tool's own result set out of this very
+    recording — rather than against the rule written out a second time in the
+    test. A test that re-states the rule agrees with the code by construction and
+    would agree with it just as readily if both were wrong (2026-09-20).
+    """
+    said = asking(answerer)
+    draft = what_it_proposed(said).link
+    found = found_in(said, on=THE_DAY_THE_RUN_HAPPENED)
+
+    kept, _ = keep_cited(draft, found)
+    word = provenance_of(draft, kept)
+
+    assert word == ("documented" if kept else "argued" if draft.rationale.strip() else "asserted")
+    assert word not in ("historical", "market_implied", "user", "simulated")
 
 
 @pytest.mark.vcr
@@ -156,17 +198,21 @@ def test_generation_receipt_records_cache_reads(answerer: Model) -> None:
 
 @pytest.mark.vcr
 def test_a_source_is_only_ever_one_the_search_tool_returned(answerer: Model) -> None:
-    """Read against the tool's own result set, out of the same recording."""
-    outcome = ask(answerer)
+    """Read against the tool's own result set, out of the same recording.
 
-    result = outcome.result  # type: ignore[union-attr]
-    if not isinstance(result, Accepted):
-        pytest.skip("this recording holds a refusal, which the refusal tests cover")
-    # There is nothing else in a recording a source could have come from.
-    for arrow in result.links:
-        for source in arrow.sources:
-            assert source.retrieved == THE_DAY_THE_RUN_HAPPENED
-            assert source.url.startswith(("http://", "https://"))
+    Every address that survives is one this very call's search returned, compared
+    against `said.found` rather than against a shape the test asserts for itself.
+    """
+    said = asking(answerer)
+    draft = what_it_proposed(said).link
+    found = found_in(said, on=THE_DAY_THE_RUN_HAPPENED)
+    returned = {same_address(one.url) for one in found}
+
+    kept, dropped = keep_cited(draft, found)
+
+    assert all(same_address(one.url) in returned for one in kept)
+    assert all(same_address(one) not in returned for one in dropped)
+    assert all(one.retrieved == THE_DAY_THE_RUN_HAPPENED for one in found)
 
 
 # --- Shaped by hand from one of the recordings above ------------------------

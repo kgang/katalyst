@@ -119,18 +119,19 @@ def verdict(
                 "from it."
             ),
         )
-    furthest = _furthest_reached(graph, routes)
-    if furthest is None:
+    best_backed = _best_backed_end(graph, routes)
+    if best_backed is None:
         return Verdict(
             kind="no_path",
             why=f"Nothing on this map reaches {wanted}. The story never left where it started.",
         )
     return Verdict(
         kind="no_path",
-        nearest=furthest,
+        nearest=best_backed,
         why=(
             f"Nothing on this map reaches {wanted}, and no arrow on it touches "
-            f"that claim at all. The story got as far as {claims[furthest].claim}."
+            f"that claim at all. The best-backed thing the story does reach is "
+            f"{claims[best_backed].claim}."
         ),
     )
 
@@ -206,12 +207,15 @@ def _nearest_to(
     return None, 0
 
 
-def _furthest_reached(graph: Graph, routes: Mapping[PropositionId, Route]) -> PropositionId | None:
-    """Find how far the story actually got: the best-backed route that runs longest.
+def _best_backed_end(graph: Graph, routes: Mapping[PropositionId, Route]) -> PropositionId | None:
+    """Find where the story gets to along its best-backed route.
 
-    Used only when nothing on the map touches the destination at all, so "closest"
-    has no meaning there. Saying how far the story did get is still a computed
-    answer to a real question, and it is what the sentence beside it says.
+    Used only when nothing on the map touches the destination at all, so
+    "closest" has no meaning there. **It orders by how well-backed a route is
+    first and by how long it is only to separate two equally backed ones** — the
+    name used to say "furthest reached", which reads as longest and is not what
+    this does. Where the story got to along the road with the highest low bridge
+    is the honest answer to "and what did it reach instead?" (2026-09-20).
 
     Args:
         graph: The finished map.

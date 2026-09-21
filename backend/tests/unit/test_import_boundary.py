@@ -13,8 +13,11 @@ surely as `import katalyst.engine`, and so is the relative form `from ..api
 import main`). If any of them lands inside a forbidden package, the test fails
 and names the file and the line.
 
-The check is close to empty today, because the rules layer has no code in it
-yet. It is load-bearing from the first line onwards.
+The rules layer is no longer close to empty — propositions, links, beliefs,
+validity, propagation, branches, worlds and diffs all live in it — so this check
+walks real files and has real work to do. The sentence here used to say the
+opposite, which was true when it was written in stack 01 and stopped being true
+in 02 (2026-09-20).
 """
 
 import ast

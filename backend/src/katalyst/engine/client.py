@@ -207,6 +207,32 @@ class OneProposal(BaseModel):
     proposal: Proposal = Field(description="The one thing this answer is.")
 
 
+# NOTE: **this class's docstring goes over the wire.** A shape's docstring is its
+# description in the request body, so editing one changes the bytes the service
+# sees, invalidates every cassette and changes the prompt's fingerprint. Found on
+# 2026-09-20 by adding one paragraph to it and watching four recordings stop
+# matching. Say things about a shape in a comment like this one, not in its
+# docstring, unless the model is meant to read them.
+
+
+def what_goes_out() -> dict[str, dict[str, Any]]:
+    """Every description of an answer this program sends, as the library sends them.
+
+    Here rather than in `prompt.py`, which needs them for the prompt's
+    fingerprint: the envelope a proposal travels in is this file's business and
+    nothing outside it names one. A caller asks what goes out and is told. That
+    is what keeps `OneProposal`'s "nothing outside this file knows the envelope
+    exists" true — `prompt.py` used to import it by name (2026-09-20).
+
+    Returns:
+        One entry per question this program asks, keyed by what it asks for.
+    """
+    return {
+        "proposal": wire_schema(OneProposal),
+        "starting_claim": wire_schema(StartingClaim),
+    }
+
+
 def wire_schema(shape: Any) -> dict[str, Any]:
     """Return the exact description of an answer that the library will send.
 
