@@ -478,3 +478,1759 @@ Visual review on my own pictures: `VR1`–`VR13` unaffected (the change only rem
 **What is deliberately not here.** The panel's empty `user` row becoming **My own number** (it rewrites `Inspector.tsx`, which the run-strip branch has open). The model-facing copies of the two metaphors in `domain/link.py` and `engine/prompt.py` — they move the prompt's fingerprint and ride stack 05's one freeze. The glossary and the dotted-underline word control (R36). Deleting the now-unreachable *add yours* from `BeliefChip`, which would leave `spec/vocabulary.md` false; it goes with the panel's way in.</result>
 <usage><subagent_tokens>249462</subagent_tokens><tool_uses>133</tool_uses><duration_ms>1030569</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>bdk8nhui2</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/bdk8nhui2.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the tile lane's whole browser suite once, cold, through the queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a8b9ccc21502a5291</task-id>
+<tool-use-id>toolu_01M224EzwtRYThn2fytrfqK9</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/a8b9ccc21502a5291.output</output-file>
+<status>completed</status>
+<summary>Agent "Read-only review of D1 docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Review — `adr/04-what-the-run-says-and-when-a-tile-moves` (docs only)
+
+### Must-fix
+
+**1. `spec/workbench/streaming-growth.md:1348–1360` — INV-workbench.64's clause 1 contradicts its clause 3.**
+Preamble: *"For every stream and **every event in it**, three things hold together."* Clause 1: *"Every tile that had a vertical position before the event has the identical vertical position after it."* Clause 3: *"At the moment the run stops … **every pin is cleared**, the map is laid out once, whole."* The settle is an event in the stream, and the branch's own figures say it moves rows — height `2 640 → 2 010 px` on the recording, 18 tiles of 18, furthest 1 968 px. ADR-0024:91 has the scope the chapter dropped: *"pinned from the moment it is first drawn and are never taken from it **while the map grows**."*
+*Fix:* add "while the map grows" to clause 1.
+
+**2. `spec/workbench/layout-and-zoom.md:220` — the new half of INV-workbench.23 is false in two places.**
+Amended to: *"For every map and **every re-layout of it**, no already-placed tile changes its order within its column — and, from 2026-09-21, **its vertical position too**."* But (a) the settle clears every pin and lays the map out whole (`streaming-growth.md:1357–1360`), and (b) opening a branch already drops every pin and lays out the union — `B-layout.md:78`: *"opening a branch already drops every pin (`layoutRunner.ts:174`) under `layout-and-zoom.md` B7."* The new test the same row names is already scoped: `test_a_tile_keeps_its_row_while_the_map_grows`.
+*Fix:* "For every map and every re-layout of it **while the map is growing**…". `spec/workbench/README.md:75` (VR13) carries the same unscoped clause — *"No tile that was already placed changed row"* — and a person checking a picture taken after the settle would fail it; scope it the same way.
+
+**3. "The first event arrives about twenty-three seconds after the press" is wrong, and the branch says it both ways.**
+`streaming-growth.md:1277`, `ARCHITECTURE.md:308`, `0023:21` say *first **event***; `streaming-growth.md:509` and `PRODUCT_REQUIREMENTS.md:167` say *first **proposal***. The chapter's own B1 (`:476–477`) says `generation_started` *"comes back at once — the engine emits it before its first call"*, and the whole design depends on it (`0023:118`: *"fold `generation_started`, advance 23 seconds"*). The source is the coordinator's loose wording (`2026-09-21-kent-m4-feedback.md:9`).
+*Fix:* "first proposal" in all three places.
+
+**4. B11's prose and B11's table disagree about when seconds are shown.**
+`streaming-growth.md:1221–1222`: *"then, **only while a live run is open**, the count of seconds since the last event."* Table row `streaming-growth.md:1243`: `| stored map, the engine asked | asking | … | **yes** |`. Same pair at `0023:64` / `0023:71`; `ARCHITECTURE.md:308` and `PRD:167` both say "on a live run only". The table is the faithful half — `A-live-status.md:51` gives that state `nothing new for 0.4 s`. INV-workbench.80 (`:1547–1552`) licenses the reading only "while a live run is open" and forbids it only for a replay, so it does not cover `asking` either.
+*Fix:* prose and INV-80 → "while the screen is waiting on the server — a live run, or a stored map whose world is being worked out — and never on a replay".
+
+**5. `streaming-growth.md:1368–1371` — INV-workbench.64 names no test for its two new clauses.**
+Its *Tests:* line lists `test_a_tile_keeps_its_row_while_the_map_grows`, `test_nothing_moves_except_a_column_until_the_run_stops`, `test_no_two_tiles_in_a_column_collide`, `generate.spec.ts`. The two flagship tests — `test_no_arrow_points_backwards_at_any_moment` and `test_no_arrow_points_backwards_once_the_run_has_stopped` (`0024:132–133`, and PLAN item 4, *"the test that would have caught what Kent saw"*) — are absent, and clause 2 (*no arrow points backwards at any moment*) is the whole point of the record.
+*Fix:* add both names to the Tests line.
+
+**6. `docs/adr/0024:6` and `:179` cite the wrong RT section.** Both say *"item 4 (one live Verify run committed as a test fixture)"*. `RT-red-team.md` item 4 is *"Four files have three owners."* The fixture ask is RT **question 4** (*"May one live Verify run be committed as a test fixture?"*). *Fix:* "question 4". (Items 1 and 2 are cited correctly.)
+
+**7. `docs/adr/0023:166` cites the wrong RT section.** *"item 1 (the plan is sound after changes)"* — RT item 1 is *"B's evidence is not in the repository"*, which is about plan B. A's "SOUND AFTER CHANGES" verdict is the verdict table's first row. `consulted:` at `:6` repeats "items 1, 5 and 7". *Fix:* cite the verdict table; 5(c) and 7 are right.
+
+### Could-fix
+
+- `layout-and-zoom.md:126` — *"gains **four** arrows from claims placed **to its right**"*. `B-layout.md:17` says that, but B's own table gives that run 3 backwards + 1 same-column, so at most three came from the right. `streaming-growth.md:641` words it safely ("four arrows into it"). Suggest "four arrows, three of them from claims placed to its right".
+- `layout-and-zoom.md:118` — heading *"B3 — A later tile does not reshuffle an earlier column"* is the old promise left standing; it survives only on the technicality that an arrows-only proposal is not "a later tile". Consider "…does not reshuffle an earlier **row**".
+- `streaming-growth.md:639` vs `:709` — "the Explore run **this chapter** walks" (the six-claim B3 table) and "**this chapter's** eighteen-claim Explore recording" (`hormuz.jsonl`) are different maps with the same possessive, seventy lines apart, while `:614` says the walk *"is not the shipped fixture and does not pretend to be"*. Name the second "the committed Hormuz recording".
+- `streaming-growth.md:1560–1566` — INV-workbench.81 states a new frontend-wide timer rule and a new architectural test flatly, while `0023:97` says honestly that it is an *addition* that should be withdrawn if Kent reads R35's *"no architectural test changes"* as forbidding it. The chapter should carry that caveat or Kent will read the rule as settled.
+- `0023:123` says VR2 *"is checked on a picture of a live run"* and INV-80 cites VR2, but `README.md:62` (VR2) is unchanged — only VR13 gained the live-run clause.
+- `0023:40` attributes both paces to `playwright.config.ts:209`, which holds only the 0.4; the 0.6 default is `backend/src/katalyst/settings.py:25` (`A_COMFORTABLE_PACE = 0.6`).
+- `0024:10` spec-impact names `ARCHITECTURE.md §10`; the record is also written into §1 (`ARCHITECTURE.md:51`).
+
+### Checked and fine
+
+- **Every measured number traced to `B-layout.md` / `A-live-status.md` / `RT-red-team.md` and matches, on the right map**: 44/14, 5/3, 3/2 · 18/4/4 and one arrival · 1 968 px and 800 px · 159/45/25 · wire 11 264→5 567, 5 729→2 973, 2 930→1 773 · heights 2 640→2 010, 824→491, 824→298 · crossings 2→5, 8→2, 2→1 · 7 853 px · zero pin drops in 25, 14 and 12 passes · 3 of 9 and 2 of 5 · 26 events, `at` 0→22, claims 0→18, 29 calls against 23 growth events · 51.98 s and 109.65 s · 0.6 s and 0.4 s. Explore-recording figures are never stated of a Verify run or the reverse, and RT's correction (item 2) is quoted, not buried.
+- **Code citations spot-checked, all true**: `BELIEF_RAIL = 69` (`geometry.ts:73`), `A_COMFORTABLE_PACE = 0.6`, `playwright.config.ts:209` = 0.4, `generationDock.css:38` clips `.map-live--spoken` to 1 px, `generate.spec.ts:230` asserts that clipping, `at_once` default 3 (`outcome.py:311`).
+- **R35 honoured**: nothing spins, pulses or sweeps; a replay shows no seconds (`:1270`, INV-80, VR13); no server change, eight events, no ninth (`:1290`, open question 1, `0023:89`).
+- **R37 honoured**: column freed during the run, row kept, one settle at the stop; `diff-view.md` INV-workbench.40 explicitly untouched (`0024:105`) and `diff-view.md` is not edited on the branch.
+- **Counts match their lists**: four dock sections / four-row table; "three clauses" / three numbered; "the six blocks named next" / six chapters; "now there are two" strips; eight states, word for word identical between `0023`'s table and B11's.
+- **Section and number references**: anti-pattern 12 is indeed *"do not give a box a place because the layout has not answered yet"*; B11 is the next free section after B10; INV 80 and 81 are free repo-wide; the two different B3s are each cited from inside their own chapter.
+- **Decided-not-built is flagged**: chapter header `:27–36`, both records `proposed` in `docs/adr/README.md`, and both `ARCHITECTURE.md` entries `[planned]` with what the code does today.
+- **No document on the branch restates the old promise** except as a quoted, dated rewrite. `0007:47`'s Decision body keeps *"a newly streamed tile never reshuffles an existing layer"*, which is correct ADR practice — `0007:99` quotes and amends it.</result>
+<usage><subagent_tokens>148681</subagent_tokens><tool_uses>28</tool_uses><duration_ms>412667</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a350df416ede232e6</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/a350df416ede232e6.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane D1: records 0023, 0024" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All seven must-fixes and all seven could-fixes applied, plus lane D2's pointer. One commit, `1af4e7f`, on top of your `5a60602`. Nothing pushed, nothing rebased or amended, tree clean.
+
+## Must-fixes, one line each
+
+1. **INV-workbench.64 clause 1 scoped.** Now *"the row is kept, while the map grows"* — "for every event up to and not including the one that stops the run" — and it states why in the chapter's own figure (height 2 640 → 2 010 px at the settle cannot happen with every row held). Clause 3 now reads *"the settle is the only moment a tile may change row, and the only moment every tile may move"*, and says rows do not change at all before it. You were right that record 0024 already carried the scope the chapter dropped.
+2. **The same scope on the other two restatements.** `layout-and-zoom.md` INV-workbench.23's new half is now *"for every re-layout while a map is still growing"*, and names the two moments a pin is dropped outright (a branch opening, B7; the settle). `README.md` VR13 now opens *"While the map was still growing, no tile that was already placed changed row"* and ends *"a picture taken after the settle is checked for the arrows, not for the rows."*
+3. **"First event" → "first proposal".** Confirmed in the code myself before changing it (`_lived` yields `GenerationStarted` before it even constructs `grow`). Fixed in `streaming-growth.md` B11 and `ARCHITECTURE.md` §10; record 0023 keeps the measurement and adds the clause saying the note wrote *event* and meant the first proposal, with the reason. The PRD and B1 were already right. The remaining "first event" hits are correct ones: `spec/generation/streaming.md` (pre-existing, about `generation_started`, which *is* the first event), the typed-event comment at `streaming-growth.md:340`, and 0023's line about a ninth event being the first to carry activity.
+4. **The seconds rule is now the table's rule everywhere.** *"Whenever the screen is waiting on the server — a live run that has not stopped, or a stored map whose world is being worked out — and never on a replay, whose pace we set ourselves."* Changed in B11's prose, INV-workbench.80, record 0023's *What ships*, UX-8 and `ARCHITECTURE.md`; VR13 carried the same overclaim and got the same fix.
+5. **INV-workbench.64's *Tests:* line** now leads with `test_no_arrow_points_backwards_at_any_moment` and `test_no_arrow_points_backwards_once_the_run_has_stopped`, saying which clause each carries and that they run with no browser through the app's own layout code.
+6. **0024's fixture citation** is now RT **question 4** of its five questions to Kent, in both the `consulted:` line and *More Information*; item 1 and item 2 of *what must change* are kept, correctly labelled as that list.
+7. **0023's verdict citation** is now *the first row of its verdict table* (quoted), in both places; 5(c) and 7 are kept and now say they are items of *what must change*.
+
+## Could-fixes
+
+- **"Four arrows, three of them from the right"** in all three places (`layout-and-zoom.md`, open question 2, record 0024) — record 0024 also names the fourth as same-column, which is what B's table measured.
+- **B3's heading** is now *"A later tile does not move an earlier one's row"* (your "row", worded so the body supports it).
+- **The two Explore maps are named apart:** the second is *"the committed Hormuz recording, an eighteen-claim Explore run and not the six-claim one walked above"*.
+- **INV-workbench.81 carries the caveat**, in the chapter, not only in the record: an addition, not an amendment, flagged against R35, and the invariant goes if Kent reads R35 as forbidding it.
+- **VR2 gained the clause 0023 claimed it had** — checked on a picture of a run that is *waiting*, since the wait is the only place a spinner could be — and 0023's Confirmation now says the clause lands in the same pull request rather than asserting it already exists.
+- **The two replay paces are cited where each lives:** 0.6 s from `A_COMFORTABLE_PACE` in `backend/src/katalyst/settings.py` (verified: `= 0.6`, and the field default), 0.4 s from `playwright.config.ts:209`.
+- **0024's `spec-impact`** now names `ARCHITECTURE.md` §1 and §10; 0023's now names VR2 as well as VR13.
+
+## Lane D2's pointer — done, with one judgement call
+
+B9 gains an opening paragraph: this chapter keeps the **replay badge**, and the first screen itself moves to `spec/workbench/first-screen.md`, *"which arrives in this same round with decision record 0012's dated amendment"*, plus a sentence saying the cards are described below until that chapter is on `main` and that neither chapter then says the other's half twice.
+
+**I wrote the chapter name in backticks, not as a markdown link**, so the pointer is true and unbroken whichever pull request lands first. Nothing in the build checks markdown links (I looked — `ci.yml` has no markdown job), but a dangling link in the book is still a defect. **Worth one line from whoever lands second:** turn it into `[first-screen.md](first-screen.md)`.
+
+## What I disagreed with — nothing, with one note
+
+Every must-fix was a real defect and I have applied all seven as specified. On could-fix 5 I took the more useful of the two branches you offered: rather than deleting 0023's claim about VR2, I added the clause to VR2 and made the record say it lands in the same pull request. VR2 is arguably at the edge of my ownership (*"passages that restate the rules these records change"*) — 0023 is precisely about where the no-spinner rule's boundary lies, and INV-workbench.80 cites VR2, so I judged it in scope. Revert that one hunk if you disagree; the record still reads correctly without it if you also drop its Confirmation bullet.
+
+## Re-checks
+
+```
+structural check (fences balanced, table column counts):
+  spec/workbench/streaming-growth.md: fences=14 (ok) tables=6 badrows=0
+  spec/workbench/layout-and-zoom.md:  fences=6  (ok) tables=6 badrows=0
+  spec/workbench/README.md:           fences=0  (ok) tables=3 badrows=0
+  docs/adr/0023-…md:                  fences=0  (ok) tables=1 badrows=0
+  docs/adr/0024-…md:                  fences=0  (ok) tables=2 badrows=0
+  docs/adr/README.md:                 fences=0  (ok) tables=1 badrows=0
+  ARCHITECTURE.md:                    fences=6  (ok) tables=4 badrows=0
+  PRODUCT_REQUIREMENTS.md:            fences=2  (ok) tables=4 badrows=2 ← pre-existing escaped pipes at :65,:67, not mine
+
+grep "first event"            — 5 hits, all correct (listed above)
+grep "never moves" / "changed row" / "nothing already placed moves"
+                              — every hit is either a quotation of the OLD promise inside the
+                                rewrite, or INV-workbench.33 (keyboard focus, unrelated)
+grep "only while a live run" / "on a live run only"  — no hits
+```
+
+```
+git diff --stat HEAD~1
+ ARCHITECTURE.md                                   |  2 +-
+ PRODUCT_REQUIREMENTS.md                           |  2 +-
+ docs/adr/0023-what-the-run-says-while-it-waits.md | 14 ++---
+ docs/adr/0024-when-a-tile-may-move.md             | 10 ++--
+ spec/workbench/README.md                          |  4 +-
+ spec/workbench/layout-and-zoom.md                 |  6 +--
+ spec/workbench/streaming-growth.md                | 64 ++++++++++++++++-------
+ 7 files changed, 65 insertions(+), 37 deletions(-)
+```
+
+One thing for you rather than for me: my three earlier commits and this one sign off `Co-Authored-By: Claude Opus 5 (1M context)`, per the harness instruction in force in my session; yours and every commit on `main` use `Claude Fable 5.1`. Say the word if you want the branch made uniform — I will not amend pushed commits on my own.</result>
+<usage><subagent_tokens>309204</subagent_tokens><tool_uses>33</tool_uses><duration_ms>254715</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>af31f1854503fd6ca</task-id>
+<tool-use-id>toolu_01RRgEmfMZmhiqEDLFqbx1RE</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/af31f1854503fd6ca.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane D2: what a start is" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All four items are done. Worktree clean, three commits, nothing pushed.
+
+## Commit list and the split point
+
+| | Commit | Contents |
+|---|---|---|
+| 1 | `b49ce1f` `adr:` | record 0012's amendment + one index clause |
+| 2 | `590e66b` `spec:` | `spec/workbench/first-screen.md` + one line in `spec/workbench/README.md` |
+| | **← split here** | **pull request 1 is `03794cf..590e66b`, docs only, 4 files** |
+| 3 | `4bdbb51` `feat(generate):` | everything server, plus the browser's three lines and the docs that describe shipped behaviour |
+
+`git diff --stat 03794cf 590e66b` → `docs/adr/0012-*.md | 48 ++`, `docs/adr/README.md | 2 +-`, `spec/workbench/README.md | 1 +`, `spec/workbench/first-screen.md | 273 ++` — 4 files, 323 insertions, no code.
+
+## The four items
+
+**1 — renumbered.** `INV-workbench.82` and `.83` throughout `first-screen.md` (5 citations). I read D1's chapter: `.80` is *the foot of the map says what the run is doing, in ink* and `.81` is *the only thing that changes on a timer is a measured reading*, both dated 2026-09-21 under record 0023. My chapter's INVARIANTS section now opens with a short paragraph naming both and saying why a number is never reused. Nothing outside `first-screen.md` cited them — the record and `ARCHITECTURE.md` never did. I grepped the whole worktree; the only `workbench.80`/`.81` hits left are D1's own, which this branch does not carry.
+
+**2 — a keyed browser is not regressed.** `start: hasKey ? "live" : "replay"` in App's `build`, the expression the route used to compute, now said by the caller. Today's behaviour is identical with and without a key. Pinned by two new tests in `src/App.test.tsx` — `test_the_press_says_how_the_run_starts_rather_than_leaving_it_to_the_key` (readiness says a key is present → body carries `start: "live"`) and `test_a_copy_with_no_key_asks_for_the_recording_by_name` (→ `"replay"`), both stubbing global fetch so nothing reaches a network — plus `test_how_the_run_starts_is_sent_when_the_caller_said_and_left_out_when_they_did_not` in `generate.test.ts`. The `eventsMatchSchema.test-d.ts` comment now reads *five of the seven*.
+
+**3 — the receipt figures.** `RecordingSummary` gains `calls`, `seconds`, `dollars`, **the receipt's own field names and units** (I checked the committed line: `calls: 29`, `seconds: 2179.02` wall-clock seconds, `dollars: 4.0441…` US dollars) — so nothing converts on the way. One builder, `replay.summary_of`, used by both `replay.summaries()` and `readyz`; the route used to assemble its own summary, which was a second answer waiting to disagree. Absent together when a file's receipt cannot be read, and the chapter says the live row then prints nothing. `test_a_summary_quotes_the_recorded_runs_own_receipt` runs on the committed `hormuz.jsonl` and compares each figure with the very line it came from — no number is typed; it would still hold if the run were re-made at a different price. Plus the absent-receipt case, and two lines added to `test_readyz_says_what_can_be_replayed_before_anything_runs` comparing the route's three against the recording's own receipt.
+
+**4 — done.** `spec/generation/streaming.md`'s route table lists `start?` with what it means and what leaving it out does.
+
+## Three things you should know
+
+1. **Two files beyond the grant, both forced.** `frontend/src/stream/theRun.ts` (one line in `theRequest`) and `frontend/src/components/InputBar.tsx` (one optional field on the exported `Asked`): App's `build` hands `Asked` to `askForAMap`, which builds the request itself, so there is no path from App to `bodyOf` without them. Putting it on `Asked` is what keeps App.tsx to one expression and makes `runAgain` work unchanged — and it is the field the first-screen lane fills from the reader's press instead of from the key.
+2. **`spec/workbench/streaming-growth.md` — 7 lines, and I had no choice.** `frontend/src/stream/__tests__/theChapterAndTheCode.test.ts` compares that chapter's hand-written `GenerateRequest` block field-for-field with `src/stream/events.ts`, so adding `start` to the code turned it red. I added the one field to that code block only — **not** §B9 and not the pointer, which stay yours. Expect a small conflict with D1/#51 there; keep both sides.
+3. **A pre-existing ordering bug, fixed in passing.** `uv run pytest tests/unit/test_replay.py tests/api/test_health.py` fails **on `main` too** — I stashed and confirmed it. `test_health.py` pointed itself at an empty recordings folder with an environment variable, but settings are read once and cached, so whichever module ran first decided. Its autouse fixture now clears the cache on the way in and out. That file's tests were granted to me for item 3.
+
+## Verification tails
+
+```
+All checks passed!                             # ruff check
+99 files already formatted                     # ruff format --check
+Success: no issues found in 45 source files    # mypy src
+
+646 passed, 1 warning in 141.04s (0:02:21)     # whole server suite, through heavy.sh
+domain/ coverage TOTAL 1345 0 354 0 100%
+
+&gt; tsc -b --noEmit                              # no output
+Checked 169 files in 43ms. No fixes applied.   # biome ci + no-library-stylesheet
+
+Test Files  8 passed (8)                       # npx vitest run src/stream src/App.test.tsx
+     Tests  74 passed (74)
+Test Files  9 passed (9)                       # npx vitest run src/components (InputBar changed)
+     Tests  103 passed (103)
+
+33 passed in 1.89s                             # fingerprint + wire-schema + nine cassette tests
+1c224cc32fb0e3f3b8b2508158affca16a3cc839d6a015d410e080ec276516ed  # == hormuz.jsonl header
+
+gen-types: wrote .../frontend/src/api/schema.ts
+```
+
+No browser end-to-end file was touched. This lane still cost **$0**.
+
+---
+
+## Draft pull request 1 — docs (`03794cf..590e66b`)
+
+**What.** A dated amendment to decision record 0012, written `proposed`: a generation is asked for as a live run or as a recording, the request says which, and the server does what it was asked or says plainly why it cannot — it never chooses and never substitutes. A reader choosing a recording, labelled a replay, is not a fallback; what the record forbids is the server choosing on the reader's behalf, and reading the key to do it is exactly that. Nothing above the amendment was rewritten. Plus a new chapter, `spec/workbench/first-screen.md`: one first screen, four ways to start — the finished map (free, instant), the recording (free, badged a replay), a live run that states its price and its length before the press, and a sentence of your own — reading the same with a key and without one, differing only in what is enabled and why.
+
+**Which invariant it satisfies.** It writes two. **INV-workbench.82** — the same ways are drawn in the same order in the same words for both states of the key, and a way that cannot be taken carries its reason beside itself. That is the invariant Kent's walk broke: with a key all four cards ran live and the committed recording was unreachable; with none, three were not drawn at all. **INV-workbench.83** — every duration and every price the screen prints came from the server's answer about itself and is printed with the day it was measured, which is the traceability rule applied to the first thing a reviewer reads. They are numbered 82 and 83 because `streaming-growth.md` took 80 and 81 the same day; the chapter says so, since a citation must not quietly come to mean another statement.
+
+**What is deliberately not here.** No code — this is the bottom of the stack and Kent accepts before the server lands. No Help page (it rides after the first screen exists). No word glossary (record 0025, stack 05's freeze). No new recordings (R9). No change to pacing, to what a recording contains, or to `make record-demo`. And no edit to `streaming-growth.md` §B9, which owes a one-line pointer and belongs to the lane editing that file.
+
+## Draft pull request 2 — the server half (`4bdbb51`)
+
+**What.** `GenerateRequest` gains one field, `start`, either `replay` or `live`, and the generate route reads it instead of reading the key. Four honest cases: a recording asked for plays whether or not a key is present; a live run asked for with no key ends in a receipt of zeroes and one plain sentence that names what is missing and says nothing was substituted; the two cases that worked before are unchanged. The default is `replay`, because a request that did not ask to spend money must never spend it. The browser now says which — `hasKey ? "live" : "replay"`, the route's old expression moved to the side that knows what was pressed — so behaviour today moves not at all. `RecordingSummary` carries the recorded run's `calls`, `seconds` and `dollars`, read off the file's own receipt by one builder the readiness route shares, so the first screen can state a price before the press. `schema.ts` regenerated; ARCHITECTURE.md and the two spec passages say who chooses now.
+
+**Which invariant it satisfies.** Record 0012's amended rule — *the server never chooses and never substitutes* — in both directions, pinned by `test_a_recording_plays_when_the_request_asks_for_one_and_a_key_is_present` (a key really configured, the seam handed a script, and the script asked nothing) and `test_a_live_run_with_no_key_is_refused_in_words` (receipt then a sentence, and the recording of that very sentence sitting on disk unplayed). It builds the server half of **INV-workbench.83**: the only measured price and duration this product owns now reach the screen from the server, compared in the test against the line they were read from rather than against a typed number. **R5's freeze is untouched and proven**: the prompt fingerprint is byte-for-byte the one in the committed recording's header, and the fingerprint, wire-schema and cassette tests pass with no edit.
+
+**What is deliberately not here.** The first screen itself — `Launchpad.tsx` and the four rows are a later lane's; App.tsx carries one expression, not a choice. Stack 07's third value, which the field is shaped for but does not carry. No change to the pacing, which stays a server setting and never a field on a request. And no recording of the other three example sentences: R9 holds until the freeze, so a live row is all they get.</result>
+<usage><subagent_tokens>294455</subagent_tokens><tool_uses>77</tool_uses><duration_ms>732051</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bmz2a36o0</task-id>
+<tool-use-id>toolu_01H5MEg9T99y3D95D8ETA3Um</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/bmz2a36o0.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the server branch's whole browser suite once, cold, through the queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b44li2w2m</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/b44li2w2m.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the whole server suite and the frontend check through the queue before pushing" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+How can I test out the latest batch of changes
+
+---
+
+The probabilities look wonky (the range is overflowing outside the box
+
+
+<pasted_content id="5ced">
+REDACTED
+REDACTED
+8WVJR1cV3sypsQQJd95XvzfXPnv/REDACTED
+REDACTED/9/REDACTED
+REDACTED/REDACTED
+eyTlzdDCPEiiG2gDZyTrtRnp3+lk/k3zfQRTT4/cwSrYhks5ACxXJrLn/N/puN/l7xcxfAc1rCqZ8
+REDACTED/IAx
+REDACTED
+REDACTED
+mKG7HfnyYdjx45liXkRQ/hSflZciCpX2CMBf9B/REDACTED
+ieNN8/RjUWt5PmRg3Z4/REDACTED
+REDACTED/wV4RKID8p1GskhOP
+REDACTED/+ERH1YBjCEXVmX/v+eH2S8MBzLhQ4xieEYWf
+REDACTED
++dH9wKarri/rg3VIfKOBM3AA64C5yHg/REDACTED
+7DdcRFWWuv86Pytf0kXxzR3pGz8/REDACTED
+REDACTED/JZHPjHELF4EoHjOJazk7MbA
+Mr/j+rz9ip68L+CMNu/REDACTED
+REDACTED
+REDACTED
+SBmyGqlEtiG1yI/IIeQ4chbpRG4i95Ee5E/REDACTED
+REDACTED/2DifiDJ
+yFO8AVHILH4wJ8Jr4AX4ZX4jV4I34Sv4zfx/vwzwQawZBgT/Ak8AhJhEzCLEIJoZywk3CQcAq+S92
+REDACTED
+REDACTED
+REDACTED/qf6KRqNZ0f
+REDACTED
+coFmleUjzuma/REDACTED
+REDACTED/xmgMZ4xozNIx9WMuj
+XmjN1bPT0+kV6rXoHdV770+Sz9QP0d/lX6T/REDACTED/7C1D1N
+REDACTED/REDACTED
+REDACTED/CxGKyxTyLOotblhRLtmWW5XrL05Zv
+REDACTED
+REDACTED/Pf6zk6tTrtMOp9sTtCeETi
+REDACTED/c3N1kbvVuPe4W7mnuG92
+vs3XYUexl7DMeBA9/j4UerR7vPN088z33e/7h5eCV47Xb6+kk60miSTsmPfQ28+Z7b/Pu8mH5pPls
+REDACTED/nL/A/6v+F6cudzjwVgAcEBpQEdgdqB8YGVgfeCz
+REDACTED
+REDACTED/REDACTED
+REDACTED/REDACTED
+Pp0//REDACTED/2Ea4U9Im/RatGTDO+M1RlPM70z12T2ZPlml
+REDACTED
+spR+RT5c35OnCj366wUXyjuF/REDACTED/m4nMFc9vmmc5bPO/
+REDACTED/FjkVrS76a0nikpZio+JFxQ+/Cf6mrkSjRFZy/Vuv
+b7d8h38n/REDACTED/REDACTED
+REDACTED/qmGj4calG99sEm
+66tNlvc/REDACTED
+REDACTED/Zj247X9YfvbDrAP1P9k+dPGg4yDpY1I
+REDACTED
+REDACTED/+Kvrrwc73DoaL7hfaL7ocb
+REDACTED/duN66vWuG8IbT2/m3nx5q+DWh9uL7hDulN7VvFt+z/B
+e9W+2vzV0uXUdvh9wv/1B7IPbDwUPnz+SP/REDACTED
+tX7f+MLmxU9/+P3R3pfU1/1S9nLgz2Wv9F/t+svlr7b+qP57r/Nef3hT+lb/bc079rvT7xPfP/kw6
+yPpY8Un208tn8M+3xnIGxiQ8mX8wa0ABpRHmwwA/REDACTED
+xw51IP9/REDACTED/+mqM6kX/k
+9ugVKVRcwuv0XrAmDFMiZ08AAAAAEY0lDUAwNAAFuA+PvAAAAimVYSWZNTQAqAAAACAAEARoABQAA
+AAEAAAA+ARsABQAAAAEAAABGASgAAwAAAAEAAgAAh2kABAAAAAEAAABOAAAAAAAAAJAAAAABAAAAk
+AAAAAEAA5KGAAcAAAASAAAAeKACAAQAAAABAAABgqADAAQAAAABAAAB8AAAAABBU0NJSQAAAFNjcm
+VlbnNob3SS/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+PVAAAAAIAAAAAAAAA+AAAACgAAAD4AAAA+AAAY+yxIxE5AABAAElEQVR4AexdBZjcNhOdNMzM2FDb
+MDMzMzMzMzPThZmZuWG8MHOTNEmbtGFmTu/REDACTED
+g+xMAKMACPACPywCARzhghChAhBP/30E+EYLFiwHxY8fnBGgBFgBNyJwJcvX+i//77Q5884/ueyWz
+REDACTED/p5csXLiEEu4g
+REDACTED/o48ePVmLaF2wX
+REDACTED
+REDACTED
+REDACTED
+IkSisGHa8ePHCqcw5ESPACDACjMC3RwCu/REDACTED
+AUbAPQhEjRqF7t+969TNbBJB9BgxpL/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED/REDACTED
+fP3926735ZowAIxD0EQh0RBA/REDACTED/du+vLli83a
+W7duLYUPF840zn///UdPnj6lB/REDACTED/W3dlmGZ
+8iQgWrVrEnZs2eTJIBAPNO/t2/REDACTED
+Fb8s8//1D79h3o2vXrVqMdPXKYIkSIYPW6/REDACTED
+REDACTED
+REDACTED
+2SgJ4KPHz/REDACTED
+REDACTED
+REDACTED
+REDACTED
+z49LVq4QGv0Vq5aRUOGDLXa6P3yyy80U/SqYVyFHDx4iFq0bOkHF/+IQCXIIshg1swZ2mijR89etH
+REDACTED
+REDACTED
+6tu3nzzHP1cQAQze+/REDACTED
+OBSLySMoioJ43mSJIkpUaLEMu979+7Rfu/REDACTED
+qUPHkyUd//REDACTED
+p0tAJKFumjHiWhKJuoglbzEP666+/REDACTED
+REDACTED/+e5uuXL1CK1euIox2/ZOkSZNS1SpVZJ3EECrKu2Kke
+v3GDdq1axdduHDRv+RSfZs3X1769ZdfCR22Dx8/0I3rNwjqzQ0bN1p9P/zNmCMEGAGPJgKoe7z376
+REDACTED
+REDACTED
+REDACTED
+REDACTED/REDACTED
+/REDACTED
+REDACTED/AX8HQ0o
+REDACTED/jrI2gn2j0qlWrJvPcu3cftRUf3beSb0EE/fv3k
+z1FVWZ4Mf355zVhqwkne37/REDACTED
+REDACTED/ixIhpxfLlFE/0mpV8+vSJbt66RcmTJbN
+REDACTED
+REDACTED
+REDACTED
+REDACTED/+3eo4cYPfw
+hG+qff/REDACTED/CNFiiQbs1KlSmrJzEZEY8eMFnNUiss4
+aLCGDB1G+/btkyM0eGyVKFGcunbpopHKVFF3U6dO0/REDACTED
+8cleeF6K2E/REDACTED
+an/REDACTED/70
+K/REDACTED/ftrPcGWLVtZuJDqiQC9T6hA/JMCBQtZRFmzepXsOSOw
+REDACTED/fjhncWvLT0oicC9L5LlipN9+/f1
+REDACTED/g3r12lp+giD/f
+REDACTED
+Fevldunaj7du3G5MT1D5egmAgIM/cefJqI/REDACTED
+REDACTED/
+REDACTED
+cOHTtZXFc/REDACTED
+REDACTED/tw5vio4
+REDACTED
+XU9Eag4to7o6dStW8/PbGU9EaB3CN2rf1JRzG3Qy/REDACTED
+REDACTED
+SlghiUKInAswAx8jNTDD/AjYfyG5hrG3foaMWDW7HuXLlkr/963joywxVHlR6SlxNBM5igo6QcrRw
+REDACTED
+Hzy/REDACTED
+REDACTED/hEB1H9
+REDACTED/kT6pLOXbqq
+REDACTED/26LjBBUe6uyMGJGwfB8EPJoIy
+pUrS8O+jgLg+YGXWd+Y24IM/s7wZoFgZi68EfSiJwJ4puhVQ//990X2VO4LXSV8zuHnbE1cQQSDBw
+REDACTED
+REDACTED
+REDACTED
+tM/SZ06NXXr5tsT/REDACTED/+yiPPx4yfCOk32SpfOna
+REDACTED//AC2qvURwQEy0U5M
+Ibc0jcIYIjDYyY/5aYW2cYKa7UiVipDh02DAbsf9/REDACTED
+REDACTED/REDACTED
+REDACTED/0L73xOjx5MOMUYvTCUXHh/rlpo6/3jScTgV71ZGzc1b
+Oo48IFCyhTpozy58RJk4Sv/REDACTED
+REDACTED
+REDACTED/P/y7x2uTc
+REDACTED
+REDACTED
+REDACTED/S5n7BnGPPm3Ywh4PBHg
+cbCMQvny5bQng/REDACTED
+QM3SA/REDACTED
+REDACTED
+REDACTED
+e+8hH/REDACTED/Yd8UFFED7MybV1WxAHPZ/+Qm9rNiEI178FE
+UC/REDACTED/REDACTED
+REDACTED
+REDACTED/pb
+REDACTED/cpY/REDACTED
+REDACTED/AxYAgECiLAI6K3NkjoxNUEM1uPjR4L/PGxb4E1+RZEYO
+1exnCoq7CKqplgOYDJkydJ/3uz6/ow9FihP8byA/YK1jTKnSunjD5MTKZy1KXQeJ+EYjLSjOnTtB6
+REDACTED
+REDACTED
+REDACTED
+REDACTED/txZWZTAQAQoKN6zJmLxuzy
+5c1s05lDZYcIfjMNmyzXIh/z6D50W7BuRPn06Uj1ezFj2Gj9BqtD0a/B8KyJQ5cHCb5glr+ZJqHB0
+REDACTED
+REDACTED/REDACTED
+REDACTED
+REDACTED
+REDACTED
+ARGRPg3I8AIMAI/GAJMBD9YhfPjMgKMACNgRICJwIgI/2YEGAFG4AdDgIngB6twflxGgBFgBIwIMB
+EYEeHfjAAjwAj8YAgwEfxgFc6PywgwAoyAEQEmAiMi/JsRYAQYgR8MASaCH6zC+XEZAUaAETAiwER
+gRIR/REDACTED/64fFnu
+REDACTED/955+37LFJfl6ciaeV
+REDACTED
+REDACTED
+2W7ZslVtouvoenF/REDACTED
+rY5cASETgStQ/REDACTED
+REDACTED/T3WrBgAZ0/f4F+/fVXKlmyBK
+REDACTED
+REDACTED
+HbHXb5UqVSh9uvRij9q4Yn/REDACTED/xCHz5+oBvXb
+0icN2zcSB8+fNCSBqSO5syZS1euXKH8+fNR/REDACTED
+REDACTED//+myZPniJsUKGocuVKlDd
+REDACTED
+REDACTED
+JE/REDACTED/ijWfMWdPjwYRmsv1fHTp0oVM
+hQNHjwIPmBG9OhAWrVurVpI3/REDACTED
+pfBWYMVNm+vTpk/REDACTED
+REDACTED
+YNPkSKFFmY8Wb9hA/Xt20/iob+mx2/REDACTED
+REDACTED/79T3Tu2cA8RoGe
+REDACTED//qyF4UTfODtKBOiNjhk9Sub3888/a/miJ3/r
+q094v/4DCL09iP5ec+bOpXp161LIkCFl7/vff/+16KEj/u3bt6lS5Sr09u1b/NQkIERQpUplql+vH
+unLi4z1DW/REDACTED
+dUrnw5wlEvFcqXpyFDBmtBr1+/REDACTED
+REDACTED/REDACTED
+5pRkcu/ePWlgxghByd27d6lW7TpyJIKwAf37y/REDACTED
+REDACTED/1t
+8LaaHCGDBwkCwzGq/REDACTED
+REDACTED
+REDACTED
+JFMz169ZRx1z6pC/QX1HAjxy5cvlD1HTnr//REDACTED
+REDACTED
+REDACTED
+tU/1GjXp0qVLMlqUKFHIe/REDACTED
+REDACTED
+REDACTED
+REDACTED/TE
+jJ74saNHtCRdunajbdu2ab/REDACTED
+REDACTED/sjaoW/TV9w2PMzMxYrI
+/REDACTED
+jXn3xooWUIUMGmRRqKBinMQpELxsGU//E0ToyNtz+5Y/rUO/Fjx9P/CWQDgyVKlXUVDfjx0+g2XPm
+REDACTED
+m3Thpo3byavb9++nTp36arF/REDACTED
+REDACTED
+REDACTED/f
+REDACTED
+PYGM0JAZJBB/wED/REDACTED/hFIEPBoIoCqQX1g8OqAH7
+REDACTED/2EgH08lGjRpX5qnkE6ia
+REDACTED
+ghhiLgxsT+HChZO3gPvvMuHKDCP1TTFZC88J6d+/REDACTED
+REDACTED/VxABZjA3beqrrrK40dcfu3buIHjBQIyjhx
+3bt2lzJ+rXb0CnTp/+mur/REDACTED/o3buX5pn08eN
+REDACTED
+p9njGmaWLhJGRjWXAL1R/ZR/REDACTED
+REDACTED
+eOtFuHp/REDACTED/C5cpKiFC6meCOypI1sjgvb
+REDACTED
+REDACTED
+PA864RNALpwyPnzF8SMUV9bgQwQ/9AAoSGCQAVRt159C1/33377VZR5DkWMGFHGwT8jERhHDMZGU0
+to48QRImjUqCFhIxYI/REDACTED
+REDACTED
+P34YBDyaCFALBQsWELNJ/REDACTED
+q5SwoQJCIvZIY89e/REDACTED
+7dRxcviTKLJQTy5c0r/REDACTED
+AjESAsIMHvKUxE+cwzGKhO/REDACTED
+REDACTED
+mKhPfT6IRgRrVu/REDACTED/Nu3b78cTQF/lBeC93CTUN2pZx
+kzZizNF+pUFkYACHg8EaCQcI/REDACTED
+REDACTED
+bCNmRICJW5jAZRR7N9ZxhAhwD0zqwzIQWHHVlvzzzz/UoWMnP6vGYuXUYeKZrS04p/KEzWiocLfVj
+REDACTED
+REDACTED
+UZkSAvLHOTY/REDACTED
+REDACTED
+REDACTED
+REDACTED
+IkEDbjwB7tJqt/REDACTED
+REDACTED
+Wt1ZG96YzzYXH4Vo8LnL55LQjKuGGuM/REDACTED/Q8BAIdEX
+REDACTED
+REDACTED
+REDACTED/ECDACjIBDCDAROAQXR2YEGAFGIOghw
+EQQ9OqUn4gRYAQYAYcQYCJwCC6OzAgwAoxA0EOAiSDo1Sk/ESPACDACDiHAROAQXByZEWAEGIGghw
+REDACTED/ESMACPACDiEABOBQ3BxZEaAEWAEgh4
+REDACTED
+REDACTED
+CHARBD06pSfiBFgBBgBhxDwWCKIFSumQw/CkRkBRoAR+NERePjwkVMQeCwROPU0nIgRYAQYAUbAYQ
+SYCByGjBMwAowAIxC0EGAiCFr1yU/DCDACjIDDCDAROAwZJ2AEGAFGIGghwEQQtOqTn4YRYAQYAYc
+RYCJwGDJOwAgwAoxA0EKAiSBo1Sc/DSPACDACDiPAROAwZJyAEWAEGIGghQATQdCqT34aRoARYAQc
+RoCJwGHIOAEjwAgwAkELASaCoFWf/DSMACPACDiMABOBw5BxAkaAEWAEghYCTARBqz75aRgBRoARc
+REDACTED
+BhBJgIHIaMEzACjICjCIQOHZqiRIlGjx49oP/++8/REDACTED
+IRc9EHh8/REDACTED
+REDACTED
+OnTR7r97z/0141r5L1vF3358kWfxM85GqniJctSipS/Ed7jYMGCyTgvnj+jf279TZs3raU3r22TAv
+REDACTED/REDACTED
+REDACTED
+/E+Cj7Bth+4y4mvxwo8Y2s//REDACTED
+K1l8uzpE5o/REDACTED
+e6adwwYcNS/REDACTED/
+REDACTED/yMBaz7VS1VqUKXM2Ge/C+TN00HsPPRUNf4QIESl9hiyU
+N38hQm//REDACTED/Y9
+REDACTED
+REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED
+UDjRGFUfQN/REDACTED/YsSISY2EGg42mZt/Xae
+REDACTED
+REDACTED/REDACTED
+Bno19/REDACTED/yEMc+/dvUOOEk
+REDACTED/Ic
+REDACTED
++/REDACTED
+Wh/REDACTED
+YkQcJEVEsYl6BDNBN4Oezc/REDACTED
+REDACTED/hUQdV
+REDACTED
+REDACTED/++yJZUB
+REDACTED
+REDACTED/ozCRGBE
+REDACTED/5s6e0x4JLKjyK0Aje/PsGz
+Z4xSbumToIyEYBou/YYQGHDhZPG8hlTx9O7d/a5eyp89Ec9EaROm54aNGktL2/fupF2bdusj+rn3K
+REDACTED/A7B
+REDACTED
+REDACTED
+REDACTED/1aE
+REDACTED/REDACTED
+koWrG9wIJjCOCcOHDU6++Q2X58Q/tETrDu3dtpXNn/k+YWgR/TvREULt+U2lER54jh/QWHdjHNlO7
+nQhWrVjk5yF/REDACTED
+REDACTED/tevUQ8YH28+Y4iVc3/z6S6
+sXGRExRFw0f6ZMo/REDACTED/hUqTJg3NmjlDjgKsRT579iw
+REDACTED/REDACTED
+REDACTED
+REDACTED/u7bRHGKbNBKOP9p19SQWMCbc1va
+REDACTED/REDACTED
+REDACTED/cBwjFp0p+pUKFCUh+Pi55CBkYi
+gJMDdNkQdLIG9esu1Vnq/Td792Xkr//0Lo/REDACTED
+iNILkYjerWs/REDACTED/z5ByL4IJ
+REDACTED/yUT+vbsaMqEGEZhOAWZMG6
+REDACTED/uKBFxbRtGLEg//REDACTED
+REDACTED
+06dZJg9RLB500ZKkiSJjH/w4CExguhKr8W3oCR58mQ0Y/p0aTdA2Jy5c8nLy/o7p9J9y6ORCNAAtx
+OGYdjH9J5E/REDACTED
+REDACTED/8yzOeIJKqwhYZU2gh4Hwzf/YUuiwm+9kj
+bh0RWGvAXEEEMLigcVcC/REDACTED
+tGIOyogH5CQEiYChYT7jtCJnz3j6/REDACTED/1+6TF
+mhGrQcyeJi0aJFyGucr1cMrhcsVNi0MyQzcsM/REDACTED
+a7Gz4/REDACTED/TnvSuCpOFuEuW0G4zUIm
+REDACTED
+/SDOyp660r0L+/hg/REDACTED
+REDACTED
+REDACTED
+S/REDACTED
+REDACTED/MRKBHxz3n6Km2bNmCpk6dZqHDdo
+QIGjZsoKmR1qxZS/0HDLBa+N27dmrqoUqVq9Cff/REDACTED
+REDACTED/IXX/Xl/r07aPP61foodp0HGSLA06pZ
+REDACTED/sBXXeiB/btpu3BndUaYC
+REDACTED/YmRg9q1VqF
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+hlV+SPr/+w6Flh8af3MtJfV+fK28/REDACTED
+mVcvWwP4B5xp4QpmJIklcA2F7C0/REDACTED
+REDACTED/REDACTED
+QjKV/CdSKd/REDACTED
+6do9p1/u+uGtDCK/REDACTED
+9cshbnuv/REDACTED
+4UmpF7131oMH92iS1//REDACTED
+REDACTED
+SuZh3fFxW/REDACTED/REDACTED
+REDACTED/o4hiATQYerGENN59LFNw4dwZ
+REDACTED/2ctq
+/REDACTED
+REDACTED/SqXDIpmfxcQ7axLkiACNfMXKNYV
+REDACTED
+rOwSMoHhH150eClt/REDACTED
+xn4E4Clorv3GmTx3mHxNzTe/REDACTED
+REDACTED
+REDACTED
+REDACTED/Q+g0bqFnTJ
+REDACTED/Hh3lRs00mIkjDW/oH71T82Enn
+spsYY+lnVBHurdRz5/i/Kg0bPl4YdywUWySLHSggySS1951aFCr/qmUKWiHMbVCMyex5VhAcEVbUA
+2sZNYIqF5wBwoCFYxwPd/REDACTED
+REDACTED
+rMSvP/OClQ8aMix/REDACTED/fzZvXljp2Z8oUkDQBxRWkCDd2Na
+REDACTED/YI27RtS/v27beVhK8xAlY
+REDACTED/REDACTED
+69bTX3/REDACTED/REDACTED
+REDACTED
+rTkSNH9EF+zhct9NtAY3JY/REDACTED
+FSNby5/REDACTED
+REDACTED
+REDACTED/EVHzrmxbZmRVHYw
+REDACTED
+REDACTED/5nxHRoAR
+REDACTED
+REDACTED/5nxHRo
+REDACTED
+REDACTED
+8qGf6O3bt+5/REDACTED/qg/mcE
+REDACTED
+REDACTED
+REDACTED
+dPDy5Sv677//REDACTED
+REDACTED/6+Okjq4sUOH
+xkBBgBRuAbIxAiRHAKGTIUkc9/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED/++ouuXbsWGKs7SJaZicDBai1UsC
+REDACTED
+REDACTED
+eWs/yWLFikWlS5eiK1eu0pEjR/REDACTED
+DoXI8BE4CCg35IIsJVnurRp6U/REDACTED
+REDACTED
+REDACTED/cRAQIkQI
+oQrKKK/hw84lhsjWRgRhw4alzKJX/vHjJ/rjjz/o9evXWp72NAaRI0emX375he7du0f//vuv3NM5a
+9as9Pz5c/REDACTED
+REDACTED
+uOd0zRn1HEM+O+v7vv/+0/REDACTED
+o1ImUb8vxLOfF/REDACTED
+vDincQzxY4dm7II/REDACTED
+REDACTED
+REDACTED/ld4u4
+REDACTED/REDACTED/3
+z+5SpXK1LlTJ/lRIRI+/REDACTED
+REDACTED//REDACTED/w
+REDACTED
+REDACTED
+Uokw/EsTZs2k4QgA8Q/REDACTED
+IsnypHq9ZtyNvb2+K59+/REDACTED/8oC+1KNGtW
+REDACTED/LkiVLtN94
+d/REDACTED
+REDACTED
+2k/REDACTED
+iWbhQIfISL8nff/REDACTED
+REDACTED
+REDACTED/zIkMc4Ly+aO3ee9k5OFY0FMKtarZrsIc
+REDACTED
+REDACTED/0rMuXK0eNGjWUIy/Y
+REDACTED
+REDACTED/NgKMtPU9dvlQun/qHQcOsG
+Hg2WHbqiMIF/REDACTED/vlnat+hgywjDM/z582VxNCv/wB
+REDACTED
+REDACTED/O/cc8Hn45
+REDACTED/0XOfJMlTyf
+REDACTED/RChkeP3EK+Xuv9xGLeKoMOFa
+oUkvGGTV2okWaew+f+ST/REDACTED
+B/REDACTED
+4o3dOQ4eb/REDACTED/5djp
+swmXx/REDACTED/
+REDACTED/a/FQF8i/
+REDACTED/MKnQ+eeMl7dBs1k/
+REDACTED/REDACTED
+turS33LzwYIlhjq4Ri2Pfw4f/REDACTED/+UrVCQ
+M/REDACTED
+REDACTED
+18aOWoULVq0WIuOHh10s0mT/ixtNyWKFyfomgPqPaPqQnnlqBtaGxF0FGq/nTt3qWhC5TeIKlaoIN
+REDACTED
+REDACTED/gOcC/0zJXqRqVX
+REDACTED
+lP31R8zC/REDACTED/aCxXfXceAjAi+OxHoGwb1Ik
+REDACTED/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED/HUcyFvW+0F
+REDACTED
+REDACTED
+vwsanRU0CJAL00fJhGIx90vmh8jMZi/REDACTED/
+REDACTED
+REDACTED
+aPALGETWrV6NQ0cOMgiL2s/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+E2WC4do/IrC3LqyV8VuF/3BEAD/REDACTED
+kWLFBW/oxL8xBURIG414TnTr28f6U+/REDACTED/+uy
+REDACTED/wJsEHBxKcOHESPX/xnDDxrqD4Q+NiiwjQ+BYTni5wUYSO3Ez
+REDACTED/Nnhngl/ffQm0QDBHx89
+REDACTED
+REDACTED
+REDACTED
+vkt823MnhYZQubTrxTTyRtiP/iADp7a0LxHWX/HBEAGBhsGkrPnIYNoMHDy7XDFohDFAYhuoFE9V6
+CcMw/REDACTED/QgVq9eI7O0pubR38/YW7KWxkw1hHxgL
+REDACTED
+3AV7xBg/qSmDHxC/REDACTED
+P2FzokDFPxVEiwCQxGEkxNwW2FDzvpk2b5LPIG4p/REDACTED
+REDACTED/dEZy58krVXcIV+pJOAXAOcCWo
+REDACTED
+REDACTED
+51i2/0ythUDd6canrxiPqTKnfjNec/REDACTED
+oL5fvnyljdzUPex5D/AeYZIg5lPg3f/eApUM6t3VdW/REDACTED
+REDACTED/dwM6JVwOWRgBRuD7IM
+REDACTED
+REDACTED
+REDACTED
+TNmoPdi2d2GDRuZ7oJknto3FOv/REDACTED
+REDACTED/f+//REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+fSrCBC3buwrrv2E1ICfYgyCxUGh8/fpL766ptCNV1a0esIY/REDACTED
+REDACTED
+REDACTED/gMSDSgybpq
+REDACTED
+REDACTED
+kLDREjYMUntFYI1/7FP86tVrodo7YzHyQdoIYutWpNW/REDACTED
+SA/bG/65u0bEe+y1XfFVl0YicCeOnf2u9c/REDACTED
+REDACTED/DYTvJD9xb655cuXl40D4mC
+REDACTED/REDACTED
+REDACTED/Z71gt
+REDACTED
+8YtnlMlCiRvI7NeZqI/REDACTED
+REDACTED
+REDACTED
+REDACTED/XOz/WrJUaVlF0CGOHTNang8eMo
+RWrPDdWxebjKOBy5svv/zQsAUftjxEA7pu/REDACTED
+REDACTED/KlX7Z0idzdyks0Vrdu3aRixYrJsmDP0/bt
+REDACTED/eMHrqIEjszYoRARoi7F/sjNgiAvQIl4qPbLPYz
+xYNihI0sNhbAD1dd+vLVaNw69Y/REDACTED
+REDACTED
+UnWMTdqjlCov9sTHixUhg/769Mg/REDACTED/t2vg27
+REDACTED
+REDACTED//m9x/+QAAQABJREFU7J
+REDACTED/+c7MOvdZXf
+REDACTED/5
+REDACTED
+REDACTED/REDACTED
+t2z8nKVat8TXTs0F6aNGkiDRs1lo8//th3/REDACTED
+aNWvJH3/8YU6lT59e5r0zV/bv/0zqP/REDACTED
+5s2b59fGDTfcYO5z2223SYcOHc04r7/+enn22WfkqSefNHW7de8u7767yO+6K/mjcOHC8ubYN2Tv3
+r1St159+d//zi/REDACTED/99yG7367ds9L8qadkyt
+SpMnz4i7567y9/REDACTED
+REDACTED/+9rzfrHrsUGDJ2Tn
+p5+aU08/REDACTED/Nl7+A/Pbbb75mFy9eJKlTpZLce
+REDACTED
+fuIkuWLr2kfR/Yj/REDACTED
+YcalQobwM14X+4osjZPKUKZI/f36ZOGG8fKPAMXXaNL/REDACTED
+REDACTED/REDACTED/b
+Z8DmQznZ89+2/Qlf4GC8tdff8l/REDACTED
+REDACTED/
+/REDACTED
+s0Z/REDACTED
+l/DF77Y9h4pWkx+/REDACTED
+REDACTED/arlWrptEcmE3vQrSzy+asULGS/en3+eADD+h
+REDACTED/3uyQ/b52HDh8vUqf7gZbWJ
+REDACTED/Ss0cPv9/R/fHnn3/6p
+REDACTED
+REDACTED
+D/QzWF84Fahi2vvcz2FxENecWCOyc016w/Rdu33v7EN+/REDACTED
+REDACTED
+QHpPZQaH6w/ANCMGdPlrbdmycBBg/yqLJg/X00PKQ1j+eeff/4zIMDEljlzJvn+u+/9zFloTJirkO
+5KlirtM2P5dfoK/YiKKViNIDr0DMZ8gnU/UiAY+8YbUqRIYSlarJj88MO/EnG5cmXlpREj5OWXX5E
+REDACTED/BqM+UYKBJg90fwA
+o1OnTvmGDhglSJDAJ8H/O67iOq4ffPUCvwTrC3WuNBBcyr4PHEN8/h1ngQA7J/bOVatXSwplPnXq1
+jPzNHnSRKMGF9MNhwkA0xAFO/REDACTED
+REDACTED/nmm02ff/75Z6l
+REDACTED/PcD4CgADfy6+//iaVHn3UZwJDA+uh
+voGJEyfJSy+/REDACTED
+REDACTED
+42rVu/REDACTED
+aO/REDACTED
+REDACTED
+REDACTED
+4YCvS1duZOL7wgjRo1NNLoKnWK339/esO8Tpw4IQ2eaCinT1+ZIAHTkSD/omIKViPg0kjpadfK6tV
+rZLOaZmbMmBHkzv/REDACTED/nr4nNwIH0jed911lxFOGql2
+REDACTED
+REDACTED/REDACTED
+kGKRqn8d9//REDACTED/REDACTED
+REDACTED/3591albSZ5u
+REDACTED/DQJ0KCqm4AUC6kdCT
+REDACTED
+REDACTED/wEKwvXBsJEASbC/Y
+REDACTED/yMTkmaNKkx
+REDACTED/MM5zJ6XLd63K0AxBGsuYYV+rUq
+XRtn7wsayuw75djLmKy7wP7ER9/REDACTED
+REDACTED
+REDACTED
+REDACTED
+aAabw4tW7as/REDACTED/TTTfJxzu2m+
+REDACTED
+REDACTED/Lh8+eWXvrrk7KU+eWD37t0rZAvzFtJg
+3qEZqsgARgKRvA8/REDACTED/p0iRwtQBk
+PZrusuvPbl0ybZGLuMff/xRPv/8c5Ng/CFNPn70yBG/JPO2Le8nqTRJ1wmNvv32WylQIL9JNLN160
+cmAQ9tkwQc2u/REDACTED
+bMMPlyplTU3Mm0rSO+/wSqNs67tNRwFHg8lAgzgFBcU3m/fqo12T2nDnSr19/QwWyDq1bu9aknqxc
+REDACTED
+REDACTED
+SQIW3uO+8YGvDdaisffrhBNqv/REDACTED//fmn
+REDACTED/PmaavN+kwweYLalcuXKhsbQa/Dg
+IeYwOWaf1/6T55cCUE+bPl1GaKrEQNA2Fdw/REDACTED
+REDACTED/KpIxzCoIypVf/
+TRNpN/REDACTED
+9dGs5eOiQ1KhR0zD8p1u3Nsfef/REDACTED
+kaRMmVJ6aD7hBQsXmvEF/REDACTED/yOTJkw0tO3Rob0CnUOEicubMG
+SPRjx/REDACTED/REDACTED
+PQHd/REDACTED
+REDACTED/cUNcCQbt2
+z8lKTS5ui2W2e/REDACTED
+REDACTED
+504YsFgo0bN0qLlq3MUfLUQj/REDACTED/u67i1SD6u5runr16qo
+REDACTED
+LFXafLp/jgKOApePAnESCGrXqiW9e/REDACTED
+TX7TJ4yRfLnzy8TJ4w3Jg1MG94ye/REDACTED
+uXsEAwWaV7/REDACTED/eXy4Y
+NG6Vlq/REDACTED/vvSps3T0lrbbfvMM7JmzVpb
+zVy3edNGo100bfakOW4B/REDACTED/egpmNUrjIIz5Q8
+REDACTED/REDACTED
+REDACTED
+XqvnoNgME3msDvz/4wAPa72HGWfvXX3+pQ/lr4yzHXxIIBN6+0Q4Oc/oYCRBg/nlR7fC2RAIEQ4cO
+MeBrTTv2Wj4BApzApUqXMYfLlClj/A1j3nhDXn99tEyaOMGYlJDyf/jhB8FhvmTxeckfM1Ww0qRpU
+/REDACTED
+REDACTED
+REDACTED
+REDACTED/xwFHAWuPAXiLBBYB+qq1aslhYZ41
+REDACTED
+yMHj3G3Aub/REDACTED
+OsQ4E0A/JfvOWLdK8eQvj3KZ/mIsYHzSBNrbQZ/rOmDn/zLPP+pz01MHvkVMjqWrXqWt8B/Y6TFKE
+REDACTED/vnnzXecxDB4W6x56ODBg+rYXWyihqqqv
+REDACTED/yJ9+nSyeP
+REDACTED/XrF1nooYqV35
+UDqkfoFGjxn5+lqxZs8rcOeejur7//REDACTED
+REDACTED
+REDACTED
+REDACTED/br3z/og2AAAWMJdE7TFgXHfts2bczzDPhl/vjjDwX9OYI
+REDACTED
+REDACTED/FHBAE
+P/REDACTED/REDACTED
+5TwAFB/REDACTED/x26EjgKOAo4CYSnggCAsedxJRwF
+REDACTED
+cScdBRwFHAXiPwUcEMT/REDACTED/3PsRugo4CjgKBCWA
+g4IwpLHnXQUcBRwFIj/REDACTED
+Me8/XXXy/p0meQxEnukc/REDACTED
+REDACTED
+kt9+u3ypJ6+mKbztttulcbOWBgR+0/Sat2rKyr/REDACTED/vzzT
+REDACTED/3TnDvni8/
+0KbAeCNlyoSDE5cfwbv/MNGj0lpFkd/REDACTED
+REDACTED
+uU7y/REDACTED
+REDACTED
+REDACTED/fVvfnmWyRVmvvk+Ddfyf80AT1S8U8//qC/v/b
+REDACTED/zWSOt6LkPi69x4sG9avlpUf
+REDACTED/REDACTED
+6qu76b6BW0GU8bpUyflzC8/REDACTED
+hpcfjgF5JAJdb0av46pN/PnPnFtB0VvVkTv/z8s3z/3bd+fTHrJd39cvbsL0aK/t///ud3nnnGtMQ
+REDACTED/mXIkFlKlCorH7y/RI4d
+REDACTED/r2TZ0oXyva6Fn7QvXiAINw7GCy2//upL26z5REtImSq1/KWa5
+REDACTED/fP1l0flW896tU3Qx3tTpzE0P3Xy+EV77Py83G
+REDACTED
+/jDS8/REDACTED
+3XX/vj2GUf/115+mWiR1bHv2kw2fRO36P//REDACTED
+UqSgOeXCoyUK1XXNH7hH/REDACTED
+/REDACTED/ty3zHzaSjBQpOTP9u8
+19nmYGAWpHOHkHxUoKDDhemqWS39/RmPOY10AFjOmjA/REDACTED
++82XnAr49MFbGC/ChQWCnZ/s8BvHnt07zdq147D1rAmJ8VZ4tKoUVt/BuXN/yQ033Gj21dy3p/nRy
+REDACTED/777/1njfIvr27jDbEbw
+r9RGM+qMJAmbIVjdDAujl29LDZA+x9V/wpEKeB4LkO3cxGmj5lnNx+xx3SpXt/Wbv6Az+pmeGWKlN
+BSpYubxj/REDACTED
+REDACTED/hX8dFqkr9gYXlp+MCwj
+REDACTED/ezObv3K2fMvAvZJZqOfyG9mg+c5
+S5fXXsqKRSSbBO/UbGPDFm1AjDbC0QwEwWL5pntIk/zdydU3CPek4CgSBwvSS48y4pWaa8ZMmaXca
+REDACTED
+/Z0xdbypE/jPjj2qdUe9+zNmliZKp/REDACTED
+REDACTED
+REDACTED/
+Q6Oe/REDACTED
+vfoNle3btsoitY/REDACTED
+REDACTED/3BZ8f5SA5LeijCGPg
+REDACTED
+REDACTED/REDACTED
+wWn/+++/REDACTED
+REDACTED
++zZc8po14dboQCc1D/REDACTED/D9+ieyD3w1KnXkMjGR05fND
+REDACTED/REDACTED
+wyp9eO3ckdYxjYX5BwjCRD//bK9R3QOlP++lMPve/REDACTED
+u/0C/REDACTED/vzkaLs/fgM5I58Q
+REDACTED/g
+REDACTED/TerKa4Bb46lXQ+c+veGdS/u++Y
+nQsAA/ObLWiy96pPgjDoZMlTGM3eG/REDACTED
+REDACTED
+REDACTED
+4WK3EZM/ZjfHW9EmCPZhyperae3o/S5QqJ/wNGdhT/REDACTED
+REDACTED/REDACTED
+REDACTED/rboNjY
+mOvYUmf/LEN0Z4OIXP7kL4rwHoJArQL/REDACTED
+REDACTED/fp3ZVrynItnuXmgJy
+REDACTED
+REDACTED/mHGdxMCDw1g9Fby9jCrde8GvgfL
+REDACTED/REDACTED
+REDACTED/ai74PFgPXk0yRcp7pW27TjJd/TL4Q1z5lwJxEgjqqXMo
+o9qJh+iDLYEheEheOM6w4/REDACTED
+OazjlZC/HLnyWsWqDfkjYUHMGHnjKSObT/wE2d4i1btiEOU8co8rE02sF6w3/ahuxk6/n17dpkq0I
+REDACTED/REDACTED
+REDACTED
+VLcl3DjCaQT4ahImSuQnBVu7/REDACTED
+jJscB8Tumrv7T7R7O6RL48ejREprrs7UTL/wGpPM2nSppVTp057jlyer0hUXXr0Vyb/sc/8422Zjd
+REDACTED
+REDACTED/qOmEGPpw
+REDACTED//7RxbMm31R2CN2+dx5HjZmlEMHD
+REDACTED
+REDACTED/REDACTED/379MQ56RqOisniXR
+uiAazDvTAgQXSm/ORAAHzDN0Wv/uOEd4AhVJlKqrWn8w4n71AcF/adEZIXLPqA8MLEBzYi5s0FHWp
+Riu54k+BOAcEVmK1ESP+wzn/q9Jj1VXaKirDFfl/REDACTED
+i4s1Jw5H5A7lSlgkiFaZcG8t/REDACTED
+REDACTED/r27HQR84D2FdRhDO3RBCg8RwDt8Xt
+REDACTED
+REDACTED/hN3pINSxoAx3xs2RVJ
+REDACTED
+REDACTED
+dnl6/SxkUUTYwseiUSNZddNqDOeJDi24/REDACTED
+REDACTED/WhwQRJ9m7gpHA
+UeBq5gCRC5hmg3m/REDACTED
+REDACTED
+REDACTED/REDACTED
+JNt2L6+KkGj/REDACTED/o69nClUJHictddd8nyZYvCV
+buqz/REDACTED
+REDACTED
+REDACTED
+REDACTED/9+adJRBPq3fKkN
+kSt+/XXs5q27YifCci7cf/5529Jm+5+8+7143rfSCUe3qPOdWfP/mIk4sBcBeR6ZUwkP2FMadOl1w
+REDACTED/BqtmUk6m0QxRpGc
+REDACTED
+REDACTED/AKmP
+V0DzMX92o/REDACTED/Kb1OHP/aVrnoE7qnTZfBpL
+YkuxkpUL2FJDw//fijScPIOqa+TSLPe/REDACTED
+CSk3/REDACTED/vn6y6PiTRHrvWeo9eOtw3fGTXvfaZZB
+EleFA4KkaoJMliyF2T+B9/REDACTED/Flik1Skvqp3TC7nY
+REDACTED/rL+k80NZuME9+ePiXjxo702+Tmgo
+B/lavWknz5C5nFS/REDACTED
+REDACTED
+z+eyJQtlw/REDACTED/20+bjpTczawdEpZQEAzIsUvWN
+REDACTED
+Gxu0Ovn3/REDACTED/REDACTED
+xZXxQ5hluniyT2/nJDr81Spa8t2dO8a1RW2/REDACTED
+REDACTED/5F9X6sRW5Hvpky57LHGIetm/bIrcqX0iqa
+REDACTED/REDACTED
+REDACTED/Nwm5a9V5QhInSSIjhvY
+REDACTED
+REDACTED/REDACTED/fxxprDd
+q5s3bwh8BLzGwZHnmgW/CLNF/REDACTED
+gRvo3Ts+9QwyzfUxBgM/REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED
+REDACTED
+REDACTED
+OHZz8Cr/REDACTED
+/WsSv9TDKMzF+q/REDACTED
+qOQ+2YSqFI+xQWUOYs2XQxd9XF/Kc5hlSD1ItUBLOmRDp+UzngHwm/SZXo1S6e69jdmEdCgZm1wSO
+97tl1HmRp9s47E/REDACTED
+REDACTED
+JD069XZ0N6uJ/REDACTED
+vHFwSduzXf88iXh/iOA+7kI/auA9/JC1+CzVO4Nbpj+xaTA5nLA5kh9C1b/lEZOrCXb82wB5RiPkn
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+qnTZxknsMXR5WMxvSsU3+HXgNNG//REDACTED
+YzCB9ww3L/REDACTED
+fW0AJy22PUDs4B52d/REDACTED
+REDACTED
+6j3T94JtBS540YYwc1D3gLa3bdlD/REDACTED
+54AAx0/REDACTED
+REDACTED
+REDACTED/REDACTED
+MCc+/REDACTED/MYT/Nlt/Q9bj6
+EgAiynmmucn4XcwBzz/8GyVLlvP5b/REDACTED
+cw6tIP1I9iYIgGCSNePpW+w/REDACTED
+REDACTED//995DzElMguCdZcmEBzZg6Qdh83lK
+REDACTED/REDACTED
+/REDACTED
+wEC25a9B5+sW/REDACTED/tWxr0x0nva73uweQq3Rq
+REDACTED/1hRHAME+1a68Bboj5FggwKGM/wAhMlwJRaN
+w18T2uTgJBDDyhBoyxoR4nUzY/4m6QAXG/INk5nUeQ2zseUWLl/YBgVW9vaYL6qXWcMViWm+pOoaR
+REDACTED
+REDACTED
+v0vZFB9pi1D1/U2IUDUZl8rEZg7cafqmPf6zcBuAE/y7xDtRcdjQD/AH4CW6ygYunI+unRZ4gASNY
+REDACTED
+REDACTED/ADYH5GewBEbcE/RgAIgh4RdaFoZOtfjZ9xE
+REDACTED
+REDACTED/REDACTED
+Gz30DC2PAH0J0A/ZQQKFUmYqq7iYzDrlQQJBO/RhPtWirDH672qrXm/BDNADsokTqALwUfB658zxs
+6H/REDACTED/YX++8oHUAzsU1egZzBmYTG+56uYGAf
+REDACTED
+NkLE/q3CEYQW9MgTj/REDACTED/T5JoMEZJNRMlUpoOGdAzpH8
+u2JgiAQLGEOn64Qlq/FjQF/REDACTED
+REDACTED
+2fOBzTK6C5TF+lp/REDACTED
+yHVEJkzPQDO3FWldj/VKAMBQRcT//REDACTED
+OzP278/REDACTED
+yJ2nocK/REDACTED/vlne43T87dff7WXX
+/REDACTED/0AYPpGIAUA/N7SRRpkks
+REDACTED/Tyd
+GVQgbZXPgrLsShYfc/REDACTED
+0tDLsO05+wmocH/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED/u+rpIM1xxtNyUS2b8+nId9qGG
+lbwdp3xy6mQNbsOfVtpT/qa76D58UlIU/REDACTED
+L4WuRX+AWfZPrgc/3h6/4H52NhA7/REDACTED/
+wgxu1kQen+z4KFa6SlKiXTs/REDACTED
+REDACTED
+REDACTED/r5+stjmtzlDx8FUY9JJuHNhHXHHXd
+REDACTED/ffzf9
+yZu/REDACTED
+9Wpk8fl229PWzKE/REDACTED
+5n/bJQYR7BVHbTzTfLl9r3cAyRzF1JtH/REDACTED
+REDACTED/REDACTED
+REDACTED
+vACb/5i0r+Sne/REDACTED/c+YX3/VX+kucAwLSx7V59gVNcTdTPt
+6+1dAH5tdDE8ST3al/REDACTED
+82SJZv3alud674M0B/REDACTED
+REDACTED
+zvrIibnbQgmznWAABnGAL79+/bI2zOnKPO/REDACTED
+REDACTED
+REDACTED
+tkVu1TlPqnmn/REDACTED/8i
+REDACTED/ZNLhz3p4ute
+REDACTED/dZUQ5/REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED/W3bv+kQSJkysSderC+uYtKP/JRAAQqlSp9F5ai8zpk2QzxQQGb
+REDACTED/oYcC/2z
+REDACTED//4w0/gMTe9gv/iJBAgjeR6
+REDACTED/REDACTED
+REDACTED/rS0k086cOZsMH9
+LXHCIp/REDACTED
+/REDACTED
+REDACTED/8jk/16HreUFj1jSTaL1n36GyauV7f
+REDACTED//MJV26NTDRK/9l0DAvS
+REDACTED
+REDACTED/8FyeBIJMy
+REDACTED/QVN5dcRgIzlDbOyZ/Xp1vihBOGh/6NABWaASHyVwo
+REDACTED/mZ47i5C0ajYM6i90RW23uPPlMhE
+REDACTED
+REDACTED
+REDACTED/zW/REDACTED
+REDACTED
+REDACTED/CDuBpttQ/REDACTED
+REDACTED/3p39hLJQ474Sx+MkEMCUu/UaKGtWf2DswAABmxZV
+uWGT5jKwb1epWLma3H9/REDACTED
+REDACTED/9Ru31/NTut1QV7HqTate
+REDACTED
+lM0ayOqyAjPR1+uRJeUv9Ad5C3/oOHCFrVr0vq1a8p/REDACTED
+/REDACTED/REDACTED
+REDACTED
+dbtG4nY0e/YvZN2fKPGg22bPnKcn+GjOb4cx27G7v+QvUdUSLdY5Y/IKQGBiCYhv6Df3ESCKBL/Se
+REDACTED/azSPt+BzoK41dXTvNUh2
+REDACTED/EDWKgjiyKKgcRQoVNQPCIhE6
+REDACTED/REDACTED
+REDACTED/MpVasoABX6/qLALoBOJacg7n/Zmj6sjPJE60F8f+aK
+REDACTED/gPfVZBry7gvveCwdkiVLYQA/
+Erp6x8r31urbwiGLmQatl4IPrlc/f+05Erqaiz3/REDACTED
+REDACTED/aihe/gKFjYR/RCVMilVFlyiT3rTh3ygca2
+REDACTED
+OCxSnOE5jr0ZA/5o82UpNJn/REDACTED
+EL2hpm3bdTLSjPVxPP5EM5VSk/REDACTED
+REDACTED/uETwa5tTYf0Edty/o
+REDACTED
+REDACTED
+BwSGXDH7h9MUCZMFNU2dhVZ1tVIiD+wM7t/REDACTED
+REDACTED
+IBXwQaUX61W+IcZUEGAgEO9Voajva///REDACTED
+REDACTED/ocx2b
+REDACTED
+REDACTED/REDACTED
+REDACTED/REDACTED
+uwgj7jsgzQo297Yfrh6VrpOuZ+/O0PNoi+2KgMnyrhWKdwK/mDZOmfqR7zAEB1LqEgs0O2/iAPl19
+ZhI2B+aDnR9vV6fiNL/REDACTED
+5QVMwlMjwWDU/REDACTED
+0pbAikYsBv0YK5fhFA52v/+x+toUbN+sY/REDACTED/
+REDACTED/onNoIHVsROtSoXV/vk908wEZ8/1szJ+uz
+REDACTED
+yzDsv0opVEq+VTbJUrm3Lm/5L2li3QsqZSe9/REDACTED
+REDACTED
+REDACTED/Ae+AA5n1COPuCaQ/U
+52Gz665TidXzFDjHAZ4b1Ol/REDACTED/Ew4KXaPqD6YEnmT9RZ/oj
+REDACTED/WVsx2WPRvU9M68
+REDACTED/HAU
+cBRwFrjkKOCC45qbcDdhRwFHAUcCfAg4I/REDACTED
+w/REDACTED
+REDACTED
+REDACTED/REDACTED
+0C683hwb3JEsmJ/REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED/JffSQu6a+fHfslbIrl/xsxZpW79RiZPxa+/nhXeyMmbVie
+REDACTED/REDACTED
+vMn1osH8BwccEESDyPEBCHzv4Z/REDACTED/sl4zeg
+jLvlN+xbYtJeMR7/8mCF/REDACTED
+j/REDACTED/REDACTED
+REDACTED/qE5
+REDACTED
+REDACTED/zCZOgi2xj5HL
+REDACTED
+REDACTED
+REDACTED/EbQTbyEfB2uctUnaUtbqb1rHrncvE
+REDACTED/jmlY
+REDACTED
+Gs2bV++bPtsdnsRJlpFSZ8ibRDb/ZsHvVN0De4EiAYO/e3SYdH2OjP8eOHjbpNb2MAYbRQFPpAYi2
+REDACTED/r27+EwjSNT8DRnY0ySaJ8FMw
+REDACTED/mKxasVwzoP
+REDACTED/aTJDv1dW3BSFkrABMS9Ix
+REDACTED
+REDACTED
+REDACTED/Xp1tj+vqc94AQQkO69Qqaph6Ns/2mImsEy5ip
+REDACTED/tklQnTBhYk0aX91I/T/88J0
+REDACTED
+lh++/REDACTED
+23Vpr0yngkmz7O1fb/QtY/REDACTED
+REDACTED/Dh/T
+REDACTED/QPNLcl1aBcrpK0p8bSb/+4/ieUsjg
+REDACTED/sc0VzZaWQ1lxGRrs/NuKsfgH8w6Y
+REDACTED
+8KUMvfW2z6UlwFgHyqsZB2FvMf/REDACTED/kmneM
+AAYwUxmYL6nATZWazZkw2TJ/REDACTED
+REDACTED
+jAh/REDACTED
+REDACTED/kGaYo5hQpnUJO4Al
+REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED
+REDACTED/qA
+REDACTED/RPMaPPlZDN
+REDACTED
+12g/REDACTED/wcFS1e2oADdAG
+REDACTED
+REDACTED
+REDACTED/j
+REDACTED/juXf/REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED
+/REDACTED//5oDATsaFz3i
+hEYDyRIcgQR3/REDACTED/5eJss
+REDACTED
+REDACTED/REDACTED
+REDACTED
+rHSr4CRaoQOEtgBMho6wZQk69a9Rbz/REDACTED
+4gUQEN0Co/REDACTED/60M4N
+REDACTED/REDACTED
+REDACTED
+REDACTED
+dURiIhrYt7vP/REDACTED
+REDACTED
+z527/myMA+x/REDACTED
+ntEDAwsQR/REDACTED/9GL
+REDACTED/REDACTED
+REDACTED
+HxY19TO/v5R+WJvX/REDACTED/XXGJEKUCXT2+pWi064
+Z/IV/rB8kdYIacL7ChLNky66hj6V13m6NNhAwT/UbNJVMKvSs/GCZiSLD4Q0daS+caehuFWCgDU55
+REDACTED
+REDACTED
+a5b8/REDACTED
+YqIdkWqZsJV/REDACTED
+REDACTED
+j6IFkm9SwECnj/REDACTED
+REDACTED
+REDACTED/YCP6NyGkeyHoIBAfd5QEOK
+REDACTED
+CAPxngfmgl2HRsywV13mfC/REDACTED
+REDACTED/qu8
+REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED/ibJ0l5E6Y3j3Fgncv1m3
+y/REDACTED/REDACTED
+EpkCcBAISW/REDACTED/THtE7oQTx78xuXZj2sbluI4Xf/Fq
+REDACTED/ss+R9qnUPVIaxmYu
+REDACTED
+nedamFTfyRvjP/REDACTED
+REDACTED/MO98zZMyi0vc5OXTwCwMUvG8d9Z0XV32tGa2C
+REDACTED/pPkLwhXSRfLufJtAhd/0h3zLvBM9bbr08t233
+REDACTED/DiLt6Pn1zNO/TJm6Yw1P
+0DjwMEZI/REDACTED
+REDACTED/5+0nYH9pZ63z5HMaYqUqTTRSlL5S3M/
+s56D5YCO7jqz/REDACTED///MPeyu/TzKuuMcpXmk3Mm6fiX2GOf
+Nf/Xs+a/N8//5NjRw/7tZVU5xIJ/REDACTED/2Ic0DAxLIgbG
+REDACTED
+REDACTED
+REDACTED
+REDACTED/uE0hMGbhk0dJ
+01Y5KfuSqBmuaaab5dMnJRjz+yqkF/REDACTED
+peZzJCmft4vSjfoMmZi3a9UPiohmaU/REDACTED
+/9s7E7irpv3/r2v4/REDACTED
+EOU0I0rfr/r/r/v7+N77LM7+zzneXqedGp9vXTOs8/aa6/9XWt9570/wXXw8rxZAq261Iagn0B6Xl
+SlRmy+MC7gW3C+aBieV4CY6I/REDACTED
+qDCn3CODSy/Nnu6vbtPOhIeVk8n/REDACTED/LmzNClVVJKVHTrd
+REDACTED
+B+qC3OubKz//N//REDACTED
+fXHtANG4L/REDACTED/FSBAAbhne5r1n1plqkTZq2VOU
+REDACTED/BOPiHeyQ8+F
+PyVKlhL0t2/crBenua++3OlKlCotm/REDACTED
+REDACTED/y7joV/8OBuE5jHMJh7rIF8sTFvEe
+UVntOZoug2rFujza/veLPO/REDACTED
+REDACTED/64vUxB5s3vasWN1jReLAPjx0VWy/h
+REDACTED
+JXdb+npdu78XLGgv/REDACTED/LaLfcgRRiuCTjz8SQfHbJr5GhD
+REDACTED/vPwa3t+ue/KObrpo3vxLhLOMl
+REDACTED/REDACTED
+REDACTED
+REDACTED
+B+LwH9SvocNXyAeiv0iddAkh582/0//REDACTED/7zR7
+REDACTED
+fVEgzNVve/REDACTED/8JPw4Z0FsNN5QI/Y0VpRUMa6IIOO4Vg
+REDACTED/O/REDACTED
+K151391e3GwuNcrJ0o3FzrJ5EiyC/x6HEPjrIm+tldrCFCJUFrNK6B/BFWBIxpyIgHFMHpzV/DRHY
+REDACTED/CioBYcw8JEW37cKubMnn8AR6BKe5E
+REDACTED/9tbLCZWpa97x7spj//rAqauhdf6
+REDACTED
+REDACTED
+REDACTED/zH
+REDACTED
+REDACTED/REDACTED
+REDACTED
+10ILtuO/REDACTED/PzX+0bgYvp1vn+E5tuPM
+REDACTED
+REDACTED
+REDACTED
+REDACTED
+OIjFI6hOK1BIK5b0xF//REDACTED
+REDACTED
+Mpgqee/REDACTED
+REDACTED/REDACTED
+EIk9BPFSScS9Jgm5RBQWEuG/7ZxUFEG/REDACTED
+REDACTED
+REDACTED
+REDACTED/REDACTED
+REDACTED/REDACTED
+REDACTED/CJOfUHlizR2+dE/t6lr3ljiyv
+REDACTED/HL8E+NiAjfM/7DgD/9t7VNRBG2uba+103NfelHLWnG
+REDACTED
+REDACTED/yLhgCUSkuP1DyhkksOrJG7/ssTvIcI3N
+REDACTED
+REDACTED
+REDACTED/L5WKoyJS4//ow/frOg0rAnhBcpvnhChm4Gl5cnI3
+dc2Yz9dFCe8UIV/REDACTED/iOJCWioA7a
+CglmlWqVpeKi1O1euMU+bylRy/REDACTED
+5RFBYS4b/REDACTED
+svvHy/AUPECWiZIoAi5rEMZsyqAjoB/7VqlPPFSx4uo6LZDuhDB6uM4I/8BcLtlXr6/Q7Za8bpapp
+noScKH00Yj20bHWNxvIR2gi/REDACTED
+VGyOTVFQB/REDACTED/A4lWwdBRUDbKlLSXL
+N2XX2WBwFPlc4CWe/REDACTED
+REDACTED
+REDACTED/U9P8kSdTMcjLwGoWCtxBUA
+OFrovzo07yK8O/REDACTED
+REDACTED/flwMI4GskEU0J6/2
+jhoog+i3v8vuOzF/dcyBnOOAVQc7w0fdyhHKA/AaxcSqKZshzCOEQyBF62/62jjIOeEVwlE24v92s
+cQAlkEdCR//REDACTED
+REDACTED/OfEj8hzwHPAcOKQc8IrgkLLbX8xzwH
+REDACTED
+4pOz2F/REDACTED
+fk/ULjeO8XbPImedo//REDACTED
+REDACTED/yPgGf/Y8Fasi0TvWY
+/REDACTED
+tagj4T/Bd/VFtD/REDACTED//e8v+t7/zOA+c3pNprr+DHrSv6tfp+uo
+/REDACTED
+REDACTED
+5t7KoLmE8YNjM8Zq8Iwhzxf/REDACTED
+REDACTED/co3ighf7
+REDACTED/NLuOljQcZCABYrdp7i/H7//b5gM0dIoLTgJ4MmtmL5E
+rdlyyb3haA0ce2gIgDc43SBMARpLBF4B/d2lqBZoeAIGYAYZoAtya4RNxj5g5BK/0EjxfJf5+YKip
+REDACTED
+REDACTED/NKSOizTz+R+c3revTs
+REDACTED
+REDACTED/AKEDxzh0YJ9YbB6rjP/vHX6Pgs3bpnvnHxsUXh
+JBDwFG//REDACTED
+jD99/REDACTED/REDACTED
+REDACTED
+REDACTED/REDACTED/QgQ
+REDACTED
+REDACTED
+sTF54hMqnK3/REDACTED
+N3R/REDACTED/REDACTED
+REDACTED/REDACTED
+REDACTED
+REDACTED
+REDACTED/V6rXc5QJ8P3/ubPf+pnf0vf4tWrZR5YiSyg7Sl/EjrAh27/
+pKwem3ffiBY/REDACTED/LWtz4zoa4zitWutC1advB3Xfv4MhQVsp
+REDACTED/vabr115UWxNm7VU7yCoCDCw
+REDACTED
+REDACTED
+REDACTED
+zcHCVse43rF8TA37vfPMtIjj/4yZNeDy2IBCCXbrfrn+bq09/UTkCrNFgdRJKCe/ioTEjtY/64qnU
+REDACTED
+BNPOkk/SewaARxeqlRZFWYci7qGtQ9/ojxB+TL6Zs/X7vFHx6qHZsey8mn8CCuCJW8skuTs/FhXCK
+REDACTED
+D9NJh/REDACTED
+REDACTED/Eo/
+REDACTED
+REDACTED/REDACTED
+QKD8sf34l98hD96n1bxtt6MC/REDACTED/nS12PH/59UQREiIG9B
+REDACTED/j3lqzw
+v6MKcawIpj67FNSsvturF2p0uVchxu6xNaI/REDACTED/S
+REDACTED
+REDACTED
+REDACTED/G2HInhwzAj1C
+Np3utkNH9zXNREhVLx4STf2/REDACTED/4ZiyMsqFASxFhJChKDpr
+REDACTED/y0hZ/II8DaWjD/pVhzeDho2P0xRcC9McYateppbmD
+REDACTED/u3CeB1/REDACTED
+REDACTED
+SmS7uEE+7lSPHBT19uc5Y3C/GGdEVZ8bspEG5Z+Gt/MI+AgOSFyY3XqNpDwYUH1SFE+i19/NfKZjf
+REDACTED/DSW/LHw7q3ysWQk312kdiu7RUBEwEiViqeYj
+71W/REDACTED
+REDACTED
+LTziB9NoERVDbHm3l7/REDACTED/YJ6
+edVkA9zOB5dk9BRRD8/REDACTED
+8wc8+jbc8M/REDACTED
+REDACTED
+l0QNzdCQJLQ2vz+Ro0F2wZKRRFQ9nfbX/REDACTED
+REDACTED/REDACTED
+REDACTED/0zb8w9plzDY/eMIXyPMdeFXB
+REDACTED
+REDACTED
+REDACTED/wRrTFE1YExOJx6f/4xxPc66+9InXwn8m
+rKYpoCSRhGfIchKGi+rN+g5/wolefgfLMwueSM1kizxFQW78/Vj6aLDRkAvWttSu1/A5vq1r12q6M
+REDACTED/QZFRpK9XqEtvDYo
+PMrXqDFCRQdfLpju/uv/REDACTED/kl1TRaSZz+6dLtdn2dZtX
+KZVo4ResKyp2zZQlth/REDACTED
+VbPUvaeRek/REDACTED
+REDACTED
+REDACTED
+REDACTED
+REDACTED/cUgRY+QiRRMR9DLg7Q7ja7zzQ
+WK/REDACTED
+REDACTED/REDACTED
+REDACTED
+REDACTED
+4zGrz/o40j7/REDACTED/waeZg3
+REDACTED/sfmcN/REDACTED
+8evl9fyxLVzh/PWQ54RZCz/REDACTED/aEscMArgiwwyzf1HPA
+REDACTED
+REDACTED/REDACTED
+REDACTED
+REDACTED/QfngLdw8qLAIKZ08Pej7XuqayO
+n+cIrzvcKdsjOL37DScjpa/REDACTED
+VN/1ciTcv91z1GfUq5+j2h/REDACTED
+E5XQgG+tWal473sRqlu9iPh/u2eoz69IojnTKprI/6sg//rUCuCRPvi4O/iyOghrRUBQuvMImcrXg
+REDACTED/REDACTED
+REDACTED/QEJyPcAzQAsrem4xQZf62u3e/RU/JyTeI19I
+zgO+EH4sePkl940gUu0VWMjgZv/ll//otQEewS0PvgQsfP92Ifh1hiBK/a+8y/0LOWf/jz/aTwk/A
+Tn51969ClRyXonSco3/U8hA7pP7IjzDO+k/F/zaIDSidcY9nykvKuNzl6C/hcHHbZwfCwwh932WzN
+REDACTED/wHEY97fXv92rhTChQ
+s5AoVKqz3n4hHvLu/QIFCruDpGYAweIGJ8CxsnxwvY/tU1nu4TXBtgCdQTJDFvt/3L0UbCw6IvXOO
+REDACTED/R/P3tFUEF1xY1TUTjF3AN
+hAu/P/REDACTED/yMYC0nH1iu
+REDACTED/zwvWKnbhG8WCOEFXCWQPo1btJc2/Ib8I7APNo
+REDACTED
+guMNXpPv8H69wAOi7OAh/REDACTED/
+AZ/NwMc6A+q3CdPfEKV66/REDACTED/dG2rbF+WY
+sggB0nYDHWbrFAOwKuEkWMAeWxR/CqqwjkJNS/z1/REDACTED
+REDACTED/uDXRTzCO4fUzk/6u65KDLa4E
+REDACTED/5GWioCEZscburoNY
+kGBIYzlWaVaDQVfX/REDACTED
+ErqVqNOrqIwWdlUwHpWPgM+uqu/UYBfdM/REDACTED
+REDACTED
+REDACTED
+REDACTED
+FjVMGGhqV/wtsSJUu5Le+/REDACTED/qAr
+quWKE/EcEbc06F7s/NbpcxnB/REDACTED
+REDACTED/REDACTED
+TmYw60EEwBYSVuPNEQJwA+wAlCWDWQt12/REDACTED
+REDACTED/TUtFcINYF1hEjz0yJmYhMouAeX/
+REDACTED
+3/jEKh4wZJRbv26t4BJPj/REDACTED
+uDW4lU9NGakdhe+/REDACTED/j
+REDACTED/VasUcPNElIy3G9avcXNmZcwNQuz
+REDACTED/REDACTED
+REDACTED/xABfF/jX
+REDACTED
+MUQcY4hirw/REDACTED
+boSDoydqGFQFtCbeQVyD+SszygspVFZ/REDACTED/8Wl9EZ75
+REDACTED
+i0coZhB/e/REDACTED/vZoRhPgm4+PxJuO1
+NyEvlPK+gKnV5Ywg/REDACTED/HvifjLaDpzI8Rypt5Ywzwopx4SHh
+/j//tAUdVGesR/iAoN6xboyETFFo4Dm/REDACTED
+REDACTED
+LiIcCpz8+fbernV4lV88fmndln9xJt4f9NGN/REDACTED
+REDACTED
+REDACTED/D+ofy/deBmCIo+GOIL3h/VJuCS7iiC4
+REDACTED
+REDACTED
+REDACTED
+C+Rq+TLZP4OVNXW9zE/REDACTED/REDACTED
+REDACTED/aeQTcRd/+wzS+TlggGQWFU
+REDACTED/REDACTED
+Cx/REDACTED/D438aKZR7v0vYbOEJ
+zKC/REDACTED
+zZtf+7e2mX2iPEuXPd/REDACTED
+REDACTED
+REDACTED
+F0G+ACMK318Xiu/REDACTED/HU1EE5AvIEYyTZKORxafh
+W9gjID8QNAhMUE9//REDACTED
+0rRAp5TIooaA3mAho2aauw/REDACTED
+REDACTED/fbxeoPV4b
+REDACTED
+REDACTED/3WS8NWqIYmFs8jz5M3rSDybm
+x0lKFJRBG2uba/REDACTED
+ipKALG2UTKVYkb/REDACTED
+REDACTED
+REDACTED
+5NE+KxQ3sLW8hqp/REDACTED
+REDACTED
+rZsECgCj7/FaERk1ZvIdKEXDdqrLwatWppyV/REDACTED
+REDACTED/iHuXkZDMzyKMw4qAEsfWo
+vhI/REDACTED
+REDACTED/7737HLBvcJ7VAay5a87t6VtW8
+UtTb4nXAqYVWe/9j+azWencdnFSlnrlm7roaK6B++L5B7D/REDACTED
+ZMliu1anG7tLyW9pVYTbP/nIDsc+UxlHon2B8sSDGS/REDACTED/SJc
+MHK/H7fvt/REDACTED/UecjPLgedfTcQ5jCwg
+REDACTED
+Db6k++R6+TmZ/k1A/REDACTED/gb7v9I/Tvt
+REDACTED
+REDACTED/REDACTED
+KEh/1NpMkAvSJIk4nyw/REDACTED
+QW5z1/REDACTED/Qc8Bzw
+REDACTED/XoOeA54DqQJB7wiSJOJ8
+REDACTED/Qc8BzwHMgtDnhFkFuc9f16DngOeA6kCQ
+REDACTED/REDACTED
+REDACTED/Zs9faHPPkK/REDACTED
+cOyxx7q8efK4Lz7/LFujSaoIThMNA9D0jz/uz1bn/iTPAc8BzwHPgdznwAkn/NGhDPZkM4KTVBGcd
+REDACTED/1r73fuhx9+yNb5/x9pmqEKFQpQoAAAAABJRU
+5ErkJggg==
+</pasted_content id="5ced">
+
+
+In addition, the pop-out callout with additional information 
+
+Also, I currently have the key defined. When I click the first scenario for "watch one build itself" I don't see the new status bar (I think?) or there doesn't seem to be anything immediately happening or informing me that anything is being generated
+
+---
+
+The probabilities look wonky (the range is overflowing outside the box
+[Image #3]
+In addition, the pop-out callout with additional information 
+
+Also, I currently have the key defined. When I click the first scenario for "watch one build itself" I don't see the new status bar (I think?) or there doesn't seem to be anything immediately happening or informing me that anything is being generated
+
+---
+
+<task-notification>
+<task-id>a5e3aad84064b54e2</task-id>
+<tool-use-id>toolu_011G3EQccNeumXRuJ6XhqFhf</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/a5e3aad84064b54e2.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane 3: the run strip" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Servers are down, the tree is clean, and everything is committed. Final report:
+
+---
+
+**What the coordinator must run to check me** (in order, from `/Users/kentgang/git3/katalyst-wt/feat-04-the-run-strip`):
+
+```bash
+cd frontend &amp;&amp; npm ci
+/Users/kentgang/git3/katalyst/plans/scripts/heavy.sh "04c-3 review: frontend check" -- npm run check
+# browser, coordinator only — now FOUR web servers and TWO projects; needs ports 8015, 5187, 8016, 5188 free:
+cd /Users/kentgang/git3/katalyst-wt/feat-04-the-run-strip/frontend &amp;&amp; npx playwright test
+# or, to see just the new one (it starts all four servers regardless):
+cd /Users/kentgang/git3/katalyst-wt/feat-04-the-run-strip/frontend &amp;&amp; npx playwright test --project=chromium-slow-replay
+cd /Users/kentgang/git3/katalyst-wt/feat-04-the-run-strip/frontend &amp;&amp; npm run build
+```
+
+## What I built
+
+**One strip at the foot of both map screens** (`components/RunStrip.tsx` + `runStrip.css`): the state as one word in the mono box the *last key* line already uses, then the run's own sentence — which **is** the `aria-live="polite"` region, not a copy of it — then, beside it and outside the region, `nothing new for N s`. `spokenOnly` and the one-pixel clip are deleted, not guarded. `MapFrame` lost `saying`/`spokenOnly` and gained a `strip` slot; each screen builds its own.
+
+**The sentence names what is open**, from the `frontier` both growth events carry (`a11y/growth.ts`): *"A claim arrived: "X". One claim so far. Working on what follows from it."* — or *"…from "Y" and two others."* when the open claim is not the one that just arrived. It counts proposals; nothing counts calls.
+
+**The seconds.** Counted by the browser's own clock, reset by every arrival, drawn while the screen is waiting on the server — a live run, or a stored map whose world is being worked out (`asking`) — and **never on a replay**. That follows the coordinator's mid-lane correction and record 0023's table, not the brief's narrower "only on a live run"; the `asking` case cost about six lines.
+
+**Provenance → *Run details*** (`Inspector.tsx`, a plain always-present section): route, generation, seed, and *"Nothing on this map is typed in…"*. It asserts no arrivals on an empty map. Once the numbers land it prints the engine's own origin sentence instead, so the foot of a generated map is now just *last key* + the strip.
+
+***Read the working of this run*** is gated on `finished`, in the panel and in the command palette.
+
+**Tests.** `src/stream/__tests__/theRunStrip.test.tsx` — five, fake timers, real fold, real screen. **All five fail on the base** (`git checkout 1e4e4a5 -- frontend/src`, run, restore): the first with *"there is no strip at the foot of the screen"*, three with null-dereferences on `.run-strip`, one with *"Unable to find an element with the text: Run details"*. `noSpinner.test.ts` gains `test_the_only_thing_that_changes_on_a_timer_is_a_measured_reading` — a walk for `setInterval`/`setTimeout` in product code against a named list (three entries, each saying what it measures), and the list is checked for staleness too.
+
+**End-to-end.** `generate.spec.ts`'s `toHaveClass(/map-live--spoken/)` is deleted and inverted at the gap the suite already brackets; its `howOften === 1` claim survives as *printed exactly once*. New `e2e/slowReplay.spec.ts` sits out three seconds of a real eight-second gap against a **second pair of servers** (`playwright.config.ts`, `e2e/ports.ts`): the server refuses a per-request pace by design, so that is the only honest way without touching it.
+
+**Docs.** `spec/workbench/inspector.md` gains B8 (*Run details*) and the passage about the gated control; `ARCHITECTURE.md` §3 gains one passage marking the strip built.
+
+**Pictures** (`…/scratchpad/strip/`, keyless, replay at 6 s, 1600×1000 and 1280×800): the silence, after an arrival, *Run details*, finished, the stored map's foot, the stored map `asking` (which **does** show `nothing new for 0 s` — so the reading is photographed even though a replay has none), and the strip in the light theme. Against `spec/workbench/README.md`: VR1, VR2, VR3, VR5, VR7, VR10 hold; VR4 is untouched (a count of seconds is not a likelihood); VR13 unchanged. Servers stopped.
+
+## What is rough
+
+1. **Two rows of record 0023's state table are unbuilt, both on the stored map.** The record says a stored map at rest shows the strip carrying *the map's own origin*, and a replay's strip carries *the replay sentence*. I built neither: on a stored map the strip is drawn only when there is a sentence (a branch announcement, or `asking`), and both origin sentences stay in the `.map-origin` block. The reason is real rather than laziness — with a branch open the strip must carry the branch announcement, so `world.origin` needs `.map-origin` anyway, and moving it would make the foot change shape as branches open and close. It also breaks four assertions in `e2e/hormuz.spec.ts` and `e2e/waiting.ts:81`, neither of which my brief gives me. **The stored map's foot is a genuine loose end and should be one small follow-up**, not a rebase of this branch.
+2. **I cannot see the seconds on a replay.** Every picture of a generated map above is a replay, which by design shows none. What stands in for it: the fake-timer test advances the clock 23 s and reads `nothing new for 23 s` back off the rendered strip (the number is the number it advanced by, never a figure typed into the test), and the stored map's `asking` picture shows a real reading in a real browser.
+3. **The slow-replay test is unrun.** I may not run Playwright. The pace is 8 s with the test sitting out 3 s, which leaves about 4.5 s of margin for page load; if the build machine is slower than that the test will report *"the gap was not a gap"* and the pace should go up, not the window down. It also inherits `theSuite.ts`'s dropped-frame guard without declaring an exception — one claim arriving should not cause one, but I have not seen it run.
+4. **The arrivals counter is in `GenerationScreen`, not on `Growth`.** It watches the run state's object identity, which `fold`'s own docstring guarantees changes for every event. The cleaner home is a field on `Growth` — I backed it out because `theChapterAndTheCode.test.ts` then requires a line in `spec/workbench/streaming-growth.md`, which is lane D1's file this round.
+5. **The generation identifier now appears twice in the panel** on a finished map — as the `generation` reading and inside the engine's own origin sentence. I relaxed `generate.spec.ts`'s "printed once" to "every identifier on the page is the same one, the run's own name", which is the invariant that actually matters. Someone may prefer it printed once.
+6. `DoneLine` is now the strip's tail (counts + the run-again offer) and no longer prints the reason; `.done-line` renders empty in the `failed` state and is hidden by `:empty`. Slightly odd shape for a component that kept its name.
+7. `.map-origin` is now empty on a live generated map and hidden by `:empty` — a rule that does nothing until a warning arrives.
+
+## Where I deviated and why
+
+- **Seconds on the stored map's `asking` state** — added, per the coordinator's mid-lane correction; the brief said live runs only.
+- **A third edit to `e2e/generate.spec.ts`** beyond the two the brief names: the identifier assertion read `.map-body`, which now contains the run's name because *Run details* moved into the panel. Left alone it would fail. It now reads `.map-stage` for "no identifier on the map" and checks the panel's identifiers are all one.
+- **`e2e/ports.ts`** gained two exported ports and two lines in the free check. The brief gave me `playwright.config.ts` for the slow-pace test; putting the ports anywhere else would have left them unchecked, which is the exact failure `ports.ts` exists to prevent.
+- **`DoneLine` absorbed into the strip.** Unavoidable: with the region printed, keeping `.done-line__why` put the same sentence on screen twice.
+- **The finished map's own origin sentence moved into *Run details*** — beyond the brief's list of four things, but it is R16's own sentence and leaving it under the map kept two strips of provenance prose at the foot.
+
+## What outside my files must change
+
+- Nothing blocking. **`e2e/hormuz.spec.ts` and `e2e/waiting.ts`** would need four `.map-origin` assertions retargeted for the stored-map rows of 0023's table to be built (item 1 above) — not done, not mine.
+- **`spec/workbench/streaming-growth.md`** is lane D1's and is correct as drafted; nothing I built contradicts it except the two stored-map rows. Its `Growth` interface block needs no change as I built it.
+- Its INV-workbench.80 says *"for every state of a map screen there is one visible strip"* — with item 1 unbuilt that is not yet true of a stored map at rest. Either the follow-up lands or the invariant is worded to the generating screen.
+
+## Files touched
+
+`git diff --stat 1e4e4a5..HEAD` — 22 files, +1268/−182. New: `RunStrip.tsx`, `runStrip.css`, `theRunStrip.test.tsx`, `slowReplay.spec.ts`. Six commits, none pushed.
+
+## Verification output
+
+```
+npm run check  →  biome ci: Checked 176 files. No fixes applied.
+                  tsc -b --noEmit: (no output)
+                  Test Files  43 passed (43)
+                       Tests  368 passed (368)
+npx playwright test --list → 15 tests in 4 files
+  [chromium] … 14 tests
+  [chromium-slow-replay] › slowReplay.spec.ts:47:1 › the foot of the screen says what is happening through a real silence
+base check (git checkout 1e4e4a5 -- frontend/src):
+  theRunStrip.test.tsx  Tests 5 failed (5)
+  "AssertionError: there is no strip at the foot of the screen: expected null not to be null"
+```
+
+## Draft pull request body
+
+**What** — One strip at the foot of both map screens says what the run is doing: the state as a word, the run's own sentence made visible (it *is* the polite live region, so printed and spoken can never drift again), and, while the screen is waiting on the server, how long it has been since anything arrived. The sentence names what is still open from the `frontier` the stream already carries. Provenance leaves the always-on foot for a *Run details* section of the panel and stops claiming arrivals over an empty map. *Read the working of this run* appears only once there is one. No server change, no ninth event, nothing spins.
+
+**Which invariant it satisfies** — INV-workbench.80 (the foot says what the run is doing, in ink; the seconds are a measurement beside the live region and never inside it; a replay shows none) and INV-workbench.81 (the only thing that changes on a timer is a measured reading, held by a named allowlist in `noSpinner.test.ts`). INV-workbench.78 is amended as record 0023 says: the spoken sentence is the printed sentence. INV-workbench.60, .18 and .73 and `motionBudget.test.ts` are untouched. R16 is brought forward.
+
+**What is deliberately not here** — No ninth `asking` event: it would make a replay visibly less alive than a live run, and it rides the one shape freeze. No progress bar, percentage, time remaining, or count of calls in flight — the browser can count proposals and cannot count calls. No seconds on a replay. No folding of the panel's sections; *Run details* is written to be folded and is not. And the stored map's own foot is left as it was: its origin line has not moved into the strip, which is the one part of record 0023's state table this branch does not build.</result>
+<usage><subagent_tokens>386530</subagent_tokens><tool_uses>220</tool_uses><duration_ms>2477637</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a95b9ee01c64c85e2</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/tasks/a95b9ee01c64c85e2.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane 6: one first screen" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is verified and the servers are stopped. Here is the report.
+
+---
+
+## What the coordinator must run to check me
+
+```bash
+cd /Users/kentgang/git3/katalyst-wt/feat-04-one-first-screen/frontend
+npm run check          # lint + typecheck + 368 browser tests — I ran this once through heavy.sh
+
+# Browser runs — I may not run these. All keyless, none costs anything:
+npx playwright test e2e/generate.spec.ts      # selectors changed here (5 tests)
+npx playwright test e2e/lateLayout.spec.ts    # one selector changed
+npx playwright test e2e/hormuz.spec.ts        # unchanged, but it presses the first screen
+# or all fourteen at once:  npx playwright test
+```
+
+Backend is untouched by me (`git diff 7df5f91..HEAD -- backend/` is empty).
+
+## What I built
+
+**One first screen, four ways to start, always the same four.** `1 · Open the map` (free · instant) · `2 · Watch the recording` (free, badged *replay*, `recorded 2026-09-21`) · `3 · Run it live` (calls a model) · `4 · Build the map` (calls a model). With a key and without one the ways, their order, their words and their prices are identical; only what is enabled changes, and every disabled way prints the reason beside itself.
+
+**The press names the start.** Way 2 sends `start: "replay"`, ways 3 and 4 send `start: "live"`. `App.tsx`'s stand-in `hasKey ? "live" : "replay"` is gone; `build` now passes what the reader asked for straight through, and the replay badge reads `screen.run.asked.start === "replay"` rather than `!model_key_present`. **Verified in the running app with a dummy key**: pressing *Watch the recording* posted exactly one `/api/generate` with `{"hypothesis":"…","start":"replay"}` and replayed 18 claims / 19 arrows / 3 refusals, receipt `mode: replay · recorded 2026-09-21`, `calls 0`, `cost $0.00`.
+
+**What a live run costs, before the press**, from the server: *"The recorded run of the strait made 29 model calls, took about 36 minutes and cost $4.04, on 2026-09-21."* — plus a note saying it was made at the effort a recording is made with, that a run started here asks for less, and that what it spends is not known until it has spent it. No figure is in any component: with no readable receipt the way prints *"No recording here carries a receipt this copy could read, so there is no measured price to state."*
+
+**Way 4 says it is a live run too** (red team 5(e)): its price is not known in advance, and the figures above are named as another example's measurement, not an estimate of theirs.
+
+**The two unpressable Explore / Verify rows are gone.** The destination field's own label already carries the door.
+
+**Tests.** `launchpad.test.tsx` rewritten: 16 tests, every key-dependent claim made **both ways**. It reads the expected figures off `backend/recordings/hormuz.jsonl` — the same receipt line the server reads — so no number is typed anywhere. A source check keeps `$`-figures and durations out of `Launchpad.tsx` and `launchpad.css`. `App.test.tsx` gains `test_a_key_and_a_recording_still_lets_the_reader_ask_for_the_recording`.
+
+## The two states, side by side (1600 × 1000)
+
+| | keyless | dummy key |
+|---|---|---|
+| ways drawn | `Open the map` · `Watch the recording` · `Run it live` · `Build the map` | **identical** |
+| prices | `free · instant` · `free` · `calls a model` · `calls a model` | **identical** |
+| measured line | `The recorded run of the strait made 29 model calls, took about 36 minutes and cost $4.04, on 2026-09-21.` | **identical** |
+| recording row | pressable, badged *replay* | **pressable, badged *replay*** ← the case that could not happen before |
+| way 3's four rows | drawn, **disabled**, reason under them | drawn, pressable |
+| the form | disabled, same reason | enabled |
+| extra sentence | *"No model key is configured, so this copy cannot call a model. The first two ways need none."* ×2 | absent |
+| spinners / dialogs / sideways scroll | 0 / 0 / no | 0 / 0 / no |
+
+Pictures and findings: `/private/tmp/claude-501/-Users-kentgang-git3-katalyst/a73625ea-375b-47a2-b223-9e9fce3d0d66/scratchpad/first/` (`keyless-*.png`, `keyed-*.png`, `keyed-replay-1600x1000.png`, `focus-1600x1000.png`, `*-findings.json`).
+
+Read against `spec/workbench/README.md`: VR1 ✓ (hairline rows, no fills, no shadows) · VR2 ✓ (0 spinners, 0 dialogs) · VR4/VR5 ✓ (every figure dated and attributed) · VR7 ✓ (smallest text 13 px; `--text-muted` 7.3:1, `--accent` 10.5:1) · VR9 ✓ (tab order 1→2→3→4, 2 px solid teal focus ring on every row) · VR10 ✓ (no motion added) · VR11 ✓ (**Build the map** unchanged). **VR3 is the weak one** — see below.
+
+## What is rough
+
+1. **VR3 (greyscale) is not fully earned.** An enabled row's action line is teal and a disabled one's is `--text-muted`; converted to greyscale they are two greys, and both still carry the `→`. What actually carries the difference is the sentence printed under the list, which is words — so I think it passes on the letter of the rule and not on the spirit. Dropping the arrow from disabled rows would fix it in one line; I did not, because the arrow is what makes the row read as a control at all.
+2. **The page scrolls.** 1314 px tall at 1600 × 1000 keyless (was 1414 before I made way 3's rows one line each). Everything a reader needs before deciding is above the fold — the four headings, the measured price, the whole form — but rows 2–4 of *Run it live* are below it. At 1280 × 800 roughly half is below. I judged that acceptable rather than cutting content; it is the first thing to revisit if Kent dislikes it.
+3. **The right column has dead air** under the form (roughly 500 px at 1600 × 1000). I tried grouping 1+2 left / 3+4 right and it measured no better, so I left the simpler arrangement.
+4. **The masthead wraps oddly** — *"trade."* alone on the third line. That is `.purpose { max-width: 46ch }` in `src/styles/app.css`, which is not my file, meeting the chapter's longer sentence.
+5. **The `?` key is not mentioned on the screen**, as instructed — it does nothing on my base.
+6. **I could not run Playwright.** Five press selectors and one whole assertion block changed; they typecheck and lint but have never executed.
+7. **Two of my three commits are slightly mixed** — the e2e selector changes rode in with the spec commit (the message says so).
+
+## Where I deviated, and why
+
+- **All four ways are always drawn**, including *Watch the recording* on a copy with nothing recorded (it then says so, naming the missing file rather than the missing key). The chapter's B1 read as if a way could vanish; INV-workbench.82 says in so many words that *the same ways are drawn*, so I followed the invariant and amended the chapter.
+- **A duration prints as a numeral** — *about 36 minutes*, not *about thirty-six minutes*. Counts, durations and dollars are measurements and the receipt strip already prints all three as numerals. Chapter amended in two places.
+- **The measured line belongs to the way, not to a row** (the chapter's open question 4, which I settled and dated). One line per recording that carries a receipt, each naming its own example. Printing the Hormuz figures beside an unrecorded sentence would be a number nobody computed next to the run somebody is about to start.
+- **The waiting / failure sentence sits once per way, not once per row**, and the two ways print *different* sentences, because watching a recording never needed a key.
+- **INV-workbench.83's source check reads two files, not every file drawing the screen.** `InputBar.tsx`'s placeholder is *"A Polymarket contract on Brent below $70"* — a price inside an example of a sentence somebody might type. Widening the check would catch it and the fix would be to make the example worse. The render half of the invariant covers the input bar instead. Written into the chapter with the reason.
+- **No change to `spec/vocabulary.md`.** The chapter says rows 1–3 start a run rather than edit a map and take no row in the Interface words table; row 4 is **Build the map**, already there.
+
+## What outside my files must change
+
+1. **`frontend/src/components/ReplayBadge.tsx:79`** (and `:70`, and the docstring at `:7`) — `replaySentence` says *"No model key is configured, so this map is a recording being played back…"*. **That is now false and visible**: it is printed under the map in my keyed replay screenshot while a key is configured. It should say the reader asked for the recording. The disagreement branch at `:70` (*"This session has no model key, so it played a recording — but the receipt says the run was live"*) has the same fault. **Not mine** (`components/ReplayBadge.tsx` is not in my list) — this is the one real defect I am leaving behind.
+2. **`frontend/src/stream/GenerationScreen.tsx:62`** — the `replaying` prop's docstring says *"True when this copy has no model key"*. It now means *the reader asked for a replay*. `stream/**` is not mine.
+3. **`spec/workbench/streaming-growth.md`** (D1's, hot) — three passages are now untrue: **§B9** describes the old six card states and record 0012's *"these four run from recordings made on &lt;date&gt;"* sentence, which no longer exists; **INV-workbench.71** and **INV-workbench.74** cite `launchpad.test.tsx › test_the_keyless_sentence_is_word_for_word` and `› test_nothing_is_silently_inert_without_a_key`, both of which I deleted; and INV-workbench.74's amendment *"A launchpad card is not on that list, because it is never disabled"* is now exactly backwards — way 3's rows are drawn disabled with the reason beside them. B9 should become the one-line pointer to `first-screen.md` that D2's analysis planned.
+4. **`spec/workbench/README.md`** — the chapter table still reads `first-screen.md … stack 04c — written, not built`. One word. Not in my list.
+5. **Lane K (#50) and I both rewrite `Launchpad.tsx`** — a whole-file conflict on rebase, but a mechanical one. K's 21 lines land in my version at three untouched points: the three imports (`useState`, `useEveryKey`, `ShortcutsSheet`) at the top; the `useEveryKey({ everyKey, escape })` block as the first statement in `Launchpad(...)`, before `const said: WhatTheServerSaid = …`; and the `{sheetIsUp ? &lt;div className="every-key-anchor"&gt;…&lt;/div&gt; : null}` block last, before the closing `&lt;/div&gt;`. **Once K is under me, one small line saying `?` lists every key becomes true and should be added** — I left it out because it is false on my base.
+
+## Files touched
+
+`git diff --stat 7df5f91..HEAD` (base = D2's tip):
+
+```
+ ARCHITECTURE.md                                    |   4 +-
+ frontend/e2e/generate.spec.ts                      |  57 +-
+ frontend/e2e/lateLayout.spec.ts                    |  13 +-
+ frontend/src/App.test.tsx                          | 107 ++--
+ frontend/src/App.tsx                               |  53 +-
+ frontend/src/api/client.ts                         |  12 +
+ frontend/src/components/Launchpad.tsx              | 629 +++++++++++----------
+ frontend/src/components/__tests__/launchpad.test.tsx | 618 +++++++++++-------
+ frontend/src/components/launchpad.css              | 254 ++++++---
+ spec/workbench/first-screen.md                     | 136 ++++-
+ 10 files changed, 1094 insertions(+), 789 deletions(-)
+```
+
+Three commits: `e284036` (the screen), `207b928` (the chapter as built + e2e selectors), `f5438b8` (density). `InputBar.tsx` needed no change — way 4 adds `start: "live"` as it hands the press on. Nothing pushed; working tree clean.
+
+## Verification output tails
+
+```
+$ npm run lint
+&gt; biome ci . &amp;&amp; node scripts/no-library-stylesheet.mjs
+Checked 169 files in 47ms. No fixes applied.
+
+$ npm run typecheck
+&gt; tsc -b --noEmit
+(no output)
+
+$ heavy.sh "lane 6 (one first screen): npm run check" -- npm run check
+ Test Files  41 passed (41)
+      Tests  368 passed (368)
+   Duration  3.50s
+```
+
+---
+
+## Draft pull request body
+
+### What
+
+One first screen. Kent ran the app with his real key and met a screen nobody had designed for him: every card called a model, the committed recording was unreachable, and a live run gave no idea what it would cost before he pressed. *"Why do i need to blank out the anthropic key?"* · *"How can i test out all the functionality if I run it with a valid anthropic key?"*
+
+The screen now offers **four ways to start** — the stored map, the committed recording badged *replay*, a live run of one of the four example sentences, and a sentence of your own — always the same four, in the same order, in the same words. What changes between a reader with a key and one without is only what is enabled and the reason printed beside what is not.
+
+Each press names how the run starts (`start: "replay"` or `"live"`), and `App.tsx` passes it through untouched; the expression that stood in for the reader's choice is gone, and the replay badge reads what was asked for rather than what a key implies. **With a key the recording is still reachable**, which is the case that could not happen before.
+
+What a live run costs and how long it takes is on screen **before the press**, read off the recorded run's own receipt as `GET /api/readyz` carries it, printed with the day it was measured, and absent with a reason where no recording carries a readable receipt. A sentence of your own says it is a live run too, and says honestly that its own price is not known until it has run.
+
+The two unpressable *Explore / Verify* rows are gone.
+
+### Which invariant it satisfies
+
+- **INV-workbench.82** — for every way to start, and for both states of `model_key_present`, the same ways are drawn, in the same order, with the same words; a way that cannot be taken is drawn disabled with the reason beside itself. Checked by `test_the_same_ways_in_the_same_order_in_the_same_words_for_both_states_of_the_key` and `test_a_way_that_cannot_be_taken_says_why_beside_itself`. **The keyed run is new**: every browser test in this repository had run keyless, which is why nobody saw what Kent saw.
+- **INV-workbench.83** — every duration and every price came from the server's answer about itself and is printed with the day it was measured. Checked by three render tests and one source check; the expected figures are read off `backend/recordings/hormuz.jsonl` rather than typed into a fixture.
+- **Record 0012, amended 2026-09-21** — a reader choosing a recording is not a fallback; the server never chooses and never substitutes.
+- **Red team item 5(e)** — row 4 no longer carries no price while row 3 quotes one.
+
+### What is deliberately not here
+
+- **No `?` hook-up and no key sheet.** `?` does nothing on the first screen on this base; `fix/04-the-question-mark` (#50) adds it, and a line saying so becomes true only once this is rebased over it.
+- **No help page.** It rides after this, with the words already drafted.
+- **No duration on the recording row.** It could be worked out from the event count times the replay pace, and neither is served — a duration this screen worked out itself would break INV-workbench.83.
+- **No figures for the three unrecorded sentences.** Printing another example's price beside the run somebody is about to start is close enough to a typed-in number to be refused on purpose.
+- **No mode switch, no product tour, no first-run hints, no modal.** Each way says what it is.
+- **No server change.** `GenerateRequest.start` and `RecordingSummary`'s three receipt fields landed in the pull request under this one.</result>
+<usage><subagent_tokens>320138</subagent_tokens><tool_uses>166</tool_uses><duration_ms>1418839</duration_ms></usage>
+</task-notification>
+
+---
+
+go ahead and remake the tryout branch.
+
+also, the note that says 2000 runs were used to find the cutoffs where 80% of run ended up for the probability interval, is that a determinstic /programmatic simulation or are there 2000 llm calls? how is it used to power the model?
