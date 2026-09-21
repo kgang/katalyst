@@ -78,7 +78,7 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 | Height | **Content-fit, clamped 152–320 px**, on the eight-pixel grid, and **computed from the content** — how many lines the claim takes, whether there are clippings, whether the tile carries its own reason, and what its badges have to say. Never measured from the screen, so layout stays a pure function and one number sets the box, the claim's line clamp and the height handed to the layout engine |
 | Internal padding | **12 px** — `--space-1` plus `--space-hair`, the one half-step the spacing scale allows |
 | Every other margin and gap | From the eight-pixel scale: `--space-1`, `--space-2`, `--space-3` |
-| Border | One hairline at `--hairline`, which is 10% of the text colour |
+| Border | One hairline, at `--hairline` — 10% of the text colour — except on the two kinds at the ends of a map, which take their kind's hue on that same one-pixel stroke, and on a tile an edit added or moved, which the diff draws *(amended 2026-09-22)* |
 | Shadow | **None.** Not a soft one, not a small one |
 | Corner | `--radius` (6 px), except where the kind silhouette changes the outline |
 
@@ -94,7 +94,7 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 | 2 | **The belief chips** — the model's, and the reader's and a venue's where they hold a number *(amended 2026-09-21)* | A row of columns in that order, sharing the row's width between however many are drawn. Each chip is three stacked lines: owner, number, range. Numbers and ranges in `--font-mono` with fixed-width digits, `--text-sm`; the number `--weight-medium` in `--text`, the owner and the range `--weight-regular` in `--text-muted`. On a `not_tradeable` ending the tile prints that claim's own stored reason in its foot — part of this region, not a seventh thing |
 | 3 | **Evidence clippings** | At most two. Each is a **letter monogram** plus one line: monogram in `--font-mono`, `--weight-semibold`, `--text-muted`; line in `--font-interface`, `--text-sm`, `--text-muted`, one line, ellipsized. A leading `+` or `−` says whether the item supports the claim or cuts against it |
 | 4 | **The resolve-by date** | `--font-mono`, `--text-sm`, `--text-muted`. The day we will know |
-| 5 | **A kind silhouette** | The tile's own outline, four of them. **Shape carries the kind; hue never does** |
+| 5 | **A kind silhouette** | The tile's own outline, four of them. **Shape carries the kind, always and on its own.** At the two ends of a map — the hypothesis and a tradeable outcome — a hue is drawn on that outline and on the kind's own word as well, so the eye lands there first; never the hue by itself *(amended 2026-09-22)* |
 | 6 | **Badges**, when it has any | `--font-interface`, `--text-sm`, `--weight-medium`, with any date in `--font-mono` |
 
 **Six things and no more, in this stack.** Anything else a reader wants is one click away in the Inspector. Two things are missing on purpose. There is **no density sparkline** yet: a sparkline draws a day-by-day series, and nothing here computes one — a curve shaped by hand would be a picture of numbers nobody worked out. UX-1 keeps the sparkline, and it arrives with the engine's world, which carries a `series` of one likelihood per day. And an evidence item's `weight` is not drawn, because a weight that moves nothing is a number pretending to be an input; it is listed in the Inspector, where it can be labelled for what it is.
@@ -103,16 +103,18 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 
 **The monogram is a letter, never a fetched favicon.** The packaged demo must draw its first frame with no request to anything outside it, and a favicon is such a request. The monogram is the first letter of the publisher's host name, with any leading `www.` dropped: `lloydslist.com` gives **L**, `bbc.com` gives **B**, `eia.gov` gives **E**.
 
-### The four kind silhouettes *(proposed here — decision record 0007 settles that there are four, not what they look like)*
+### The four kind silhouettes, and the hue two of them take *(decision record 0007 settles that there are four; the shapes are as built, and the hue is Kent's R42, 2026-09-22)*
 
-| `kind` | Silhouette | Why that shape |
-|---|---|---|
-| `hypothesis` | The top-left corner is cut off at 45°, like a flag | The map starts here; there is exactly one per map |
-| `event` | The plain rectangle | The ordinary claim, and the commonest |
-| `market` | The bottom edge is nicked by two small semicircles, like a ticket stub | Something you could actually hold |
-| `not_tradeable` | The right edge is open and hairline-dashed | The map stops here, and nothing leaves |
+| `kind` | Silhouette — the outline as `Tile.tsx` draws it | Ink | Why that shape |
+|---|---|---|---|
+| `hypothesis` | The left edge comes to a point: the two left corners run in to a single point halfway down, like the flag on a pennant | `--accent`, and a wash of the same accent behind the whole tile | The map starts here, and nothing points into it; there is exactly one per map |
+| `event` | A plain rectangle with 6 px corners | `--hairline` | The ordinary claim, and the commonest |
+| `market` | The top right corner is cut away at 45°, 18 px along each edge, the way a ticket is clipped; the other three corners are square | `--kind-market`, on the outline and again on that cut corner at twice the width | Something you could actually hold — and the corner is cut on the side a wire would leave from, because none does |
+| `not_tradeable` | The right edge is notched inward: a triangle 14 px deep at half the tile's height | `--hairline` | The map stops here, and nothing leaves |
 
-All four differ in outline alone, so all four survive a greyscale screenshot and survive the summary rendering that [`layout-and-zoom.md`](layout-and-zoom.md) switches to when you zoom out.
+**All four differ in outline alone**, so all four survive a greyscale screenshot and survive the summary rendering that [`layout-and-zoom.md`](layout-and-zoom.md) switches to when you zoom out — where the heading, and with it the printed kind, is not drawn and the silhouette is all there is.
+
+**Two of the four take a hue as well, and neither takes it alone.** The two ends of a map are the two tiles a reader is hunting for, so the hypothesis is drawn in the accent it already borrowed and a tradeable outcome in the one new hue in the product; the two in between keep the hairline, because if every kind were coloured none of them would stand out. On those two the hue reaches exactly three things — the outline, the cut corner, and the kind printed in the heading — and **never a number, a belief chip, a badge, a wire or a port**. Why hue is allowed to carry a second meaning at all, how the hue was chosen and what it measures against the six already in use are [`color-motion-type.md`](color-motion-type.md)'s, under *Hue says what kind of tile this is*.
 
 ### The belief chips
 
@@ -457,11 +459,14 @@ For every tile whose claim is supposed: the chip renders the word and the date, 
 - **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_a_supposed_claim_renders_the_word_not_a_number`.
 - **Also:** visual review checklist `VR12` — does a claim that was supposed and then overridden say so on its tile?
 
-### INV-workbench.8 — Kind rides shape, never hue
+### INV-workbench.8 — Kind rides shape first, and hue never alone *(amended 2026-09-22 — Kent, R42)*
 
-For all four kinds: the four rendered outlines differ from one another, and the four renderings are identical in every colour value.
+Two statements, and the first is the one that has not changed.
 
-- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_four_kinds_four_silhouettes_one_palette`.
+- For all four kinds: the four rendered outlines differ from one another, and the four kinds printed in the headings differ from one another — **with every colour value excluded from both comparisons**, so a kind is readable with no hue at all.
+- For every kind hue drawn: it is drawn only on a tile's outline, on that outline's cut corner, and on the kind printed in that tile's heading. No number, belief chip, badge, wire or port renders it, and no file outside `tile.css` names it.
+
+- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_a_tile_says_its_kind_with_no_hue_at_all` and `test_the_kind_hue_is_named_only_by_the_tiles_own_stylesheet`.
 - **Also:** visual review checklist `VR3` — the greyscale conversion.
 
 ### INV-workbench.9 — A clipping never reaches the network
