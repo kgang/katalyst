@@ -894,3 +894,35 @@ Nothing changed since my report. Restating the essentials:
 **Commit:** `feat(domain): draw worlds forward with weights, and the days stack 06 reads`</result>
 <usage><subagent_tokens>308176</subagent_tokens><tool_uses>117</tool_uses><duration_ms>1774723</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>aa6dbaed5934b8287</task-id>
+<tool-use-id>toolu_01RVitrc3WTjwZRkW1fhuQUc</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/aa6dbaed5934b8287.output</output-file>
+<status>completed</status>
+<summary>Agent "Docs owed by thesis lanes" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Two commits on `docs/06-owed` (`1aea9c6`, `e9204c7`), working tree clean, nothing pushed.
+
+**Placed**
+
+- **`ARCHITECTURE.md`** (5 passages): `grounding/`+`thesis/` marked built through card and export; the layer box and tree list all eight files; the shapes table's `Thesis` row became `Card`, `Export` with the tests that hold it; the "nothing is created before it holds something" paragraph now accounts for `thesis/export.schema.json`; the roadmap's thesis bullet rewritten. Planned stays planned and named: the `Draws` adapter, the two-way sweep, the five routes, the dock.
+- **`spec/vocabulary.md`**: **Thesis** and **Strategy export** rewritten; *The trade*'s built/planned opening corrected, with **spot anchor** and **watchlist** carrying their own not-built clauses.
+- **`thesis/__init__.py`**: *What lives here now* extended to `card.py` and `export.py`.
+- **`docs/adr/0010`**: five inline pointers plus one dated amendment at the foot (nothing rewritten); its index row gained the same clause.
+
+**Corrections to what was owed**
+
+- The *"This is the stop-loss"* vocabulary entry was **already fixed** (now **What to watch**, PR #57) — nothing to do.
+- T-land's claim that INV-14 "waits for code that does not exist" is wrong: the *no claim is a stop* half is held by `test_a_stop_is_never_derived` and its source walk. I marked INV-14 **half done** rather than built.
+- The lanes implied *what to watch* was built. `card_of` takes `watch:` rows as an argument; the two filters do not exist. Said so in all three places.
+- The table intro's "four rows carry a `[planned]` clause" counted three; it is four now.
+- **Named, not fixed** (other lanes' files): record 0018's *In short* contradicts `edge.py`'s table on a supposed base world.
+
+**Verified**: pre-commit clean on all five files; `ruff`, `ruff format --check`, `mypy --strict src/katalyst/thesis` clean; `pytest tests/thesis -q --no-cov` → **293 passed**.
+
+**Tails**: `plans/notes/msgs/pr-06-owed-body.md` and `merge-06-owed.txt`.</result>
+<usage><subagent_tokens>154952</subagent_tokens><tool_uses>80</tool_uses><duration_ms>496737</duration_ms></usage>
+</task-notification>
