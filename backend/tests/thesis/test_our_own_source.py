@@ -41,6 +41,9 @@ AN_EDGE = "Edge"
 TWO_WORLDS = ("base", "shown")
 """The two worlds `priced` takes, in order. Both required, and the first is read."""
 
+THE_FEE = "fee"
+"""What the venue charges on a filled trade. Named by every caller, never defaulted."""
+
 
 @dataclass(frozen=True)
 class BuiltElsewhere:
@@ -134,6 +137,32 @@ def test_the_one_builder_takes_two_required_worlds() -> None:
     # up with the *last* parameters, so two worlds first means no default can reach
     # them unless everything after them has one too.
     assert len(builder.args.defaults) <= len(taken) - len(TWO_WORLDS)
+
+
+def test_the_fee_must_be_said_out_loud() -> None:
+    """The fee is named by every caller, because a silent nothing is a number nobody computed.
+
+    Nobody has read the venue's schedule, so the honest answer today is *unknown* —
+    and a default of nought would let a card print a net-looking number that is not
+    net of anything. So the fee is keyword-only, has **no default**, and a caller
+    who has not read the schedule says `None` in as many characters.
+    """
+    tree = ast.parse(WHERE_AN_EDGE_IS_BUILT.read_text(encoding="utf-8"))
+    builder = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == THE_ONE_BUILDER
+    )
+    named = [one.arg for one in builder.args.kwonlyargs]
+    defaults = dict(zip(named, builder.args.kw_defaults, strict=True))
+
+    assert THE_FEE in named, "the fee is keyword-only, so a call site always spells it"
+    assert defaults[THE_FEE] is None, "the fee has no default at all"
+    assert "float | None" in [
+        ast.unparse(one.annotation) if one.annotation else ""
+        for one in builder.args.kwonlyargs
+        if one.arg == THE_FEE
+    ], "an unknown fee has to be expressible"
 
 
 def _write_pretend_source(tmp_path: Path, body: str) -> Path:

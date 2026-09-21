@@ -32,21 +32,21 @@ What this layer must never do
 """
 
 from katalyst.thesis.edge import (
-    UNKNOWN_FEE,
     BreakEven,
     Edge,
     Mixture,
     NotComparable,
     NotComparableReason,
     priced,
+    what_this_side_pays_on,
 )
 
 __all__ = [
-    "UNKNOWN_FEE",
     "BreakEven",
     "Edge",
     "Mixture",
     "NotComparable",
     "NotComparableReason",
     "priced",
+    "what_this_side_pays_on",
 ]
