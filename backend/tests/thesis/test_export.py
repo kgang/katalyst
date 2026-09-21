@@ -349,13 +349,23 @@ def test_the_document_carries_every_refusal_the_not_advice_line_and_the_executio
 
 
 def test_a_leg_is_complete_on_its_own_and_the_exit_does_not_repeat_it() -> None:
-    """The size and the ceiling are on the leg, so a program reading one looks nowhere else."""
-    export = export_of(a_rich_card())
+    """The size and the ceiling are on the leg, so a program reading one looks nowhere else.
+
+    And they are the card's own two, not some other number that happens to be to
+    hand: the size is what the reader's risk budget implies, and the ceiling is
+    the greyed one with its label.
+    """
+    card = a_rich_card()
+
+    export = export_of(card)
 
     assert {"size", "ceiling"} <= set(Leg.model_fields)
     assert {"size", "ceiling", "implied_size"}.isdisjoint(set(RiskExit.model_fields))
-    assert export.legs[0].size == export_of(a_rich_card()).legs[0].size
+    assert export.legs[0].size == card.your_exit.implied_size
+    assert export.legs[0].ceiling == card.your_exit.ceiling
     assert export.legs[0].ceiling.warning
+    assert export.risk_exit.entry == card.your_exit.entry
+    assert export.legs[0].priced_in == card.priced_in
 
 
 def test_the_same_card_writes_the_same_bytes() -> None:
