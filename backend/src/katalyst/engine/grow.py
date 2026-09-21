@@ -1,49 +1,39 @@
 """The walk: which claim is asked about next, and what makes a run stop.
 
-`expand.py` answers one question. This walks the whole map: it turns the person's
-sentence into the claim the map starts from, keeps asking about whichever lines
-are still open, folds every answer in, and stops with **one** reason a person can
-read.
+`expand.py` answers one question. This walks the whole map — it turns the
+person's sentence into the claim the map starts from, keeps asking about
+whichever lines are still open, folds every answer in, and stops with **one**
+reason a person can read.
 
-Reading order
--------------
-`grow` first, because it is the story. `_Walk` under it, because it is the
-bookkeeping that story leans on: which claims are still open, how far each sits
-from the start, how many proposals in a row have failed for each, what closed the
-last one to close, and what the run has spent. Then the one rule that picks the
-reason.
-
-Three things worth knowing before reading it
----------------------------------------------
+Four things worth knowing before reading it
+-------------------------------------------
 **The order is fixed even though three lines are asked about at once.** A round
-takes the first few open claims in frontier order and asks about them at the same
-time; their answers are folded **in that same frontier order**, whichever came
-back first. The map depends on the answers and never on the weather.
+takes the first few open claims in frontier order and asks about them at the
+same time; their answers are folded in that same order, whichever came back
+first. The map depends on the answers and never on the weather.
 
 **An answer is judged twice: when it comes back, and where the map changes.** A
 round hands one snapshot of the map to all its calls, so two answers can each be
 legal against that snapshot and illegal together — a loop, or the same arrow
-drawn twice. Every accepted answer is checked again against the map as it stands
-at the moment it is folded, and one that has stopped being legal is refused there
-like any other: shown, counted, never repaired (2026-09-20).
+twice. Every accepted answer is checked again at the fold, and one that has
+stopped being legal is refused there like any other: shown, counted, never
+repaired.
 
 **No answer ever says "this claim is closed".** Every outcome carries the
-frontier as it stands once it was folded in, and a claim leaving that list is how
-a reader learns it has closed.
+frontier as it stands once it was folded in, and a claim leaving that list is
+how a reader learns it has closed.
 
-**The spending cap is checked after every call, and inside one.** A question is
-told what is left in the purse before it is put, so `client.py` can stop between
-its own rounds of research rather than only at the end (Kent, 2026-09-20).
-**The spending cap is checked after every call.** A round's calls are already in
-flight when the first of them is folded, so a run can pass its ceiling by at most
-the calls that were in the air with it.
+**Nothing a run paid for is ever lost.** A round's calls are all made and billed
+before the first of them is folded, so a reader who goes away, a cap that trips
+mid-round and a question that fails all leave every answer folded — into the map
+where it belongs, and onto the bill always.
 
 What this file must never do
 ----------------------------
 - Never write a claim or an arrow the model did not propose — not to make a map
   end somewhere, and not to make a Verify run reach its destination.
-- Never talk over the network, and never name a type from the library we call the
-  model with.
+- Never talk over the network, and never name a type from the library we call
+  the model with.
 - Never read a clock. The day a run happened is passed in.
 - Never give two reasons for stopping, or a reason nothing can produce.
 """
@@ -716,11 +706,9 @@ def _never_answered(failed: BaseException) -> Outcome:
 def _still_room_to_search(left: int) -> bool:
     """Say whether a call may use the search tool with this much budget unspent.
 
-    The whole of what one call could spend has to fit: a call is told once, before
-    it goes out, and nothing can stop it at search twelve. So the last searches of
-    a run's budget go unspent — which is the price of never passing the ceiling,
-    and a cheap one, since the figure itself is a first guess the first run under
-    it resets.
+    The whole of what one call could spend has to fit, because a call is told
+    once before it goes out and nothing can stop it at search twelve. So the last
+    call's worth goes unspent: the price of never passing the ceiling.
 
     Args:
         left: How many searches of the run's budget are unspent and unreserved.
@@ -785,23 +773,11 @@ def _walk_onward(
 def _why_it_stopped(walk: _Walk, graph: Graph) -> StoppingReason:
     """Pick the one reason a run gives for stopping.
 
-    **The rule: the reason names what closed the last claim that was still open**,
-    with two overrides above it. One rule, so two readers cannot get two answers.
-
-    1. **The money ran out.** An override, because it stops the run wherever it
-       happens to be and nothing further is asked.
-    2. **The map ends nowhere you can act on**, even after the last ending-seeking
-       call. An override, because it is the most important thing a reader can be
-       told about a finished map.
-    3. **A cap closed the last open claim** — the map was full, it sat at the
-       depth cap, it already had its full width of arrows, or three proposals in a
-       row for it failed. Our limit, under its own name.
-    4. **The last open claim had nothing more to say.** The model answered that
-       this part of the story was finished, which is the ordinary, good ending,
-       and it is the fall-through.
-
-    Reaching the cap on searches can never appear: it stops searching rather than
-    closing a claim.
+    **The rule: the reason names what closed the last claim that was still
+    open** — with the money and the map ending nowhere overriding it, in that
+    order, because each stops the run wherever it happens to be. One rule, so two
+    readers cannot get two answers. Reaching the cap on searches can never
+    appear: it stops the searching and not the run.
 
     Args:
         walk: What this walk remembers, including what closed the last claim.

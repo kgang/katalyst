@@ -1,73 +1,37 @@
 """The one place this program talks to a model, and the one place its types appear.
 
 Everything else in the pipeline is arithmetic and rules over values already in
-hand. This file is the seam. On one side a question written as plain text; on the
-other a `Said` — our own small shape holding what was answered, what the search
+hand. This file is the seam: a question as plain text on one side, a `Said` on
+the other — our own small shape holding what was answered, what the search
 returned, whether the model declined, and what the call cost. **The library's own
-types are named here and nowhere else in this program**, and a test reads the
-layer's source to keep it so.
+types are named here and nowhere else**, and a test reads the layer's source to
+keep it so.
 
-Why a seam and not a function
------------------------------
-`expand.py` takes an *answerer* as an argument rather than reaching for a client
-itself. Three things follow, and each of them is the point:
-
-* The tests are fast and exact. A test that wants a refusal writes a refusal; it
-  does not hope one turns up in a recording.
-* Nothing below this line can start calling a model by accident.
-* Playing back a recorded run plugs in where the live answerer does, with no
-  second path through the pipeline.
-
-`what_it_said` is the translation, and it is a pure function of an answer. The
-tests build answers in the library's own types and put them through this same
-function, so what they exercise is what a real call exercises.
-
-The search tool, and the two states it has
--------------------------------------------
-The tool, its version and its per-call limit were re-read from the `claude-api`
-reference bundle on 2026-09-17. Three things about it are decisions rather than
-defaults: one search per call, nothing declared alongside it, and no fetching of
-a page of our own choosing.
-
-Once a run has spent its whole budget of searches, the tool stays declared and is
-**forbidden** for the rest of the run rather than removed from the list. The two
-look the same to the model and cost very differently: the tool list is written at
-the very front of a request, so removing it would stop the service recognising
-the prefix it has been reading back at a tenth of the price all run, while
-forbidding it leaves that prefix untouched.
-
-The money stop is inside a call as well as between them
--------------------------------------------------------
-One question can now run twenty-five searches over five rounds, so a single call
-can cost a dollar on its own. A ceiling checked only between calls would be a
-ceiling the most expensive thing in the program steps straight over. Before each
-question the walk says what it has spent and what it may spend (`watching`), and
-between rounds this file prices the rounds so far against that. Over the line,
-the answer is taken as it stands: what has been paid for is kept, and nothing is
-thrown away for being interrupted (Kent, 2026-09-20).
-
-When the service does not answer at all
----------------------------------------
-A 429 or a 529 on call twenty of forty is ordinary, and it used to take the whole
-run with it — no partial map, no receipt, and the round's other two paid answers
-dropped unread. Every failure the library raises is turned into one of ours here,
-with a plain sentence a person could read, so the pipeline can fold it like any
-other thing that is not an accepted proposal (Kent, 2026-09-20).
-
-How long a call waits, and how often it tries again, are decisions rather than
-inherited defaults. Both read from the `claude-api` reference bundle on
-2026-09-20: the library waits ten minutes and tries twice more by itself, on 408,
-409, 429, every 5xx and every connection failure.
+`expand.py` takes an *answerer* as an argument rather than reaching for a client,
+which is what lets a test write the refusal it wants instead of hoping one turns
+up, stops anything below this line calling a model by accident, and lets a
+recording plug in where the live answerer does. `what_it_said` is the
+translation and it is pure, so a test's hand-written answer goes through exactly
+what a real one does.
 
 What this file must never do
 ----------------------------
 - Never decide anything about a map. It asks, it translates, it hands back.
-- Never read an environment variable itself; `katalyst.settings` is the one place
-  that does.
-- Never hide a refusal or a part-finished answer. Both come back for the pipeline
-  to report.
+- Never read an environment variable itself; `katalyst.settings` does that.
+- Never hide a refusal or a part-finished answer. Both come back for the
+  pipeline to report.
 - Never declare a place to run code beside the search tool, and never declare a
-  tool that fetches a page of our choosing.
+  tool that fetches a page of our choosing. Both were decided in record 0006.
+- Never take the search tool **out** of the list to stop a run searching. The
+  tool list is the very front of a request, so removing it throws away the
+  prefix the service has been reading back at a tenth of the price; forbidding
+  it with `tool_choice` leaves that prefix untouched. The two look identical
+  from here and cost very differently.
+
+Everything the service can do to a call — declining, pausing part-finished,
+rate-limiting, falling over, not answering — comes back through here as one of
+our own shapes with a plain sentence on it. Nothing above this file should ever
+have to know whose exception it was.
 """
 
 import time
@@ -426,12 +390,9 @@ class Model:
     def starting_claim(self, question: str, *, may_search: bool = True) -> Said:
         """Ask for one typed sentence, written as a claim anybody could settle.
 
-        **Searching is allowed here**, which it was not at first. The question is
-        partly what the person meant, which the web has nothing to say about — and
-        partly how often this kind of thing has happened before, which is exactly
-        what the web is for. The first claim of a map is the one every number
-        below it hangs off, and it was the one claim nobody could look anything up
-        for.
+        **Searching is allowed here**, which it was not at first: how often this
+        kind of thing has happened before is exactly what the web is for, and
+        this is the claim every number below it hangs off.
 
         Args:
             question: The varying half of the request, from `prompt.py`.
@@ -458,15 +419,11 @@ class Model:
     def _ask(self, question: str, shape: Any, *, may_search: bool) -> Said:
         """Put one question, sending a part-finished answer back until it finishes.
 
-        The shape is handed to the client library, which turns it into the
-        description of what an answer must look like, sends it with the request,
-        and checks what comes back against it before returning.
-
-        The shape goes on `output_format`, which is what `messages.parse` takes;
-        the reference bundle's note that `output_format` is deprecated is about
-        `messages.create`, where the same thing is spelled `output_config.format`.
-        `messages.parse` merges the two itself. Do not "fix" this to the other
-        spelling — decision record 0006 names this call.
+        The shape goes on `output_format`, which is what `messages.parse` takes.
+        The reference bundle's note that `output_format` is deprecated is about
+        `messages.create`, where the same thing is spelled `output_config.format`;
+        `messages.parse` merges the two itself. **Do not "fix" this to the other
+        spelling** — record 0006 names this call.
 
         Args:
             question: The varying half of the request.

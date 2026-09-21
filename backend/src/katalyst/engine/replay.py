@@ -3,40 +3,29 @@
 Somebody clones this repository, starts it, opens the browser — and has no reason
 to spend money on a model key. Everything this prototype is judged on lives past
 that point: a map drawing itself claim by claim, the rules refusing the model in
-public, a step changed and the trades moving.
+public, a step changed and the trades moving. **Replay puts all of it in front of
+them**, through the same route, the same stream and the same canvas the live path
+uses. The only substitution is where the bytes came from, and the screen says so.
 
-**Replay puts all of it in front of them**, through the same route, the same
-stream and the same canvas the live path uses. The only substitution anywhere is
-where the bytes came from, and the screen says so.
-
-The file
---------
-`backend/recordings/<example>.jsonl` — one JSON object per line, no surrounding
-array and no commas between lines, so a file can be written a line at a time
-while a run is still going, read a line at a time without holding it all in
-memory, and read as text in a diff.
-
-**Line one is the header; every line after it is one event.** They are told apart
-by one thing: an event line has an `event` key and the header does not. An event
-line carries exactly the two fields the wire carries, so the replayer writes them
-straight out without re-deriving anything — which is what makes "a recording is
-the stream, line for line" literally true rather than nearly true.
+The file is `backend/recordings/<example>.jsonl`: one JSON object per line, no
+array and no commas, so it can be written a line at a time while a run is still
+going and read as text in a diff. **Line one is the header; every line after it
+is one event**, told apart by the `event` key the header does not have. An event
+line carries exactly the two fields the wire carries, which is what makes "a
+recording is the stream, line for line" literally true.
 
 Two events are not re-emitted from the file
 --------------------------------------------
-**The receipt is rebuilt.** A replay made no calls, so it says exactly that: zero
-calls, zero tokens, zero searches, zero dollars, the header's date and prompt
-fingerprint, and `mode: "replay"`. The whole tally is zeroed together rather than
-the dollars alone — a receipt showing tokens with no dollars would contradict its
-own price table. The model is copied from the recorded receipt, because the
-reader is entitled to know which model wrote this map, and the seconds are this
-replay's own clock.
+**The receipt is rebuilt**, because a replay made no calls: zeroes throughout,
+the header's date and prompt fingerprint, `mode: "replay"`, and the model copied
+from the recorded one — a reader is entitled to know which model wrote this map.
+The tally is zeroed all together; a receipt showing tokens with no dollars would
+contradict its own price table.
 
 **The likelihoods are recomputed, and therefore never stored.** The header
-carries the seed, the accepted proposals carry the map, and the rules layer does
-the rest. So a recording holds no world at all: the files stay small, and replay
-and live agree by construction rather than by care. Store the numbers instead and
-the day propagation changes, the demo shows numbers the engine no longer
+carries the seed and the accepted proposals carry the map, so the rules layer
+does the rest and a recording holds no world at all. Store the numbers instead
+and the day propagation changes, the demo shows numbers the engine no longer
 produces and nothing goes red.
 
 What this file must never do
@@ -44,12 +33,15 @@ What this file must never do
 - Never write a recording. `make record-demo` is the only writer, and a
   hand-edited file is a piece of state that traces to nobody.
 - Never guess which recording to play. The match is the person's own sentence,
-  exact after trimming — playing the Hormuz map back at somebody who asked about
-  photonic chips is worse than saying no, and afterwards it is indistinguishable
-  from the product working.
+  exact after trimming: playing the Hormuz map back at somebody who asked about
+  photonic chips is worse than saying no, and afterwards indistinguishable from
+  the product working.
 - Never let the pacing change an event, an order or a number. It is cosmetic.
-- Never honour a seed from the request. The header's seed is the one the recorded
-  run had, and the numbers are recomputed from it.
+- Never honour a seed from the request. The header's is the one the recorded run
+  had, and the numbers are recomputed from it.
+- Never raise at a file it cannot read. A recording outlives the code that wrote
+  it, so meeting an old one is ordinary: it comes back as `CannotBeRead` with a
+  sentence, and the good files beside it still play.
 """
 
 import json
