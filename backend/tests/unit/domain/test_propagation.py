@@ -577,6 +577,57 @@ def test_an_observation_moves_a_cause_even_when_no_arrow_pushes(data: st.DataObj
     assert any(learned.beliefs[one] != base.beliefs[one] for one in causes)
 
 
+# The two tests are a pair, and only one of them can be true at a time. The one
+# above says what today's engine does; the one below says what decision record
+# 0016's engine does. When that engine becomes the default, the one above is
+# **deleted** and the `xfail` mark comes off the one below, in the same pull
+# request — which is why the two are written to the same map and the same budget.
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Decision record 0016 removes the mechanism this is the reversal of. Today an "
+        "observation reaches a causeless claim through the version weights, which record "
+        "0014's amendment of 2026-09-17 decided deliberately; under record 0016 the "
+        "weights go, an arrow of no strength is a claim's cause in name only, and an "
+        "observation reaches nothing no arrow reaches."
+    ),
+)
+@given(st.data())
+@a_few
+def test_an_observation_moves_nothing_no_arrow_reaches(data: st.DataObject) -> None:
+    """With every arrow flattened to nothing, an observation moves nothing but itself.
+
+    The reversal of the test above, on the same maps and at the same budget, and
+    the sharper statement of what a lever and a piece of news are each allowed to
+    do. An arrow of strength nought and no arrow at all are the same thing to the
+    arithmetic, so a map whose every arrow pushes nothing is a heap of claims that
+    have nothing to do with one another. Learning one of them is news about that
+    one claim and about nothing else, and every other claim has to come back
+    **bit for bit** — the same likelihood, the same range, the same claim by claim.
+
+    Today it fails, and by design rather than by accident: observing something
+    throws away the worlds it did not happen in, each version is then counted by
+    the share of its worlds that survived, and counting the versions differently
+    moves every number those versions average. Record 0016 deletes that
+    mechanism — the two nested loops, the version weights and the noise
+    correction all go — and with them the last way a number can move without an
+    arrow to move along.
+    """
+    graph = _pushing_nothing(data.draw(graphs(priors=uncertain_beliefs())))
+    assert all(one.strength == 0.0 for one in graph.links), "every arrow pushes nothing"
+    target = _a_claim_with_causes(data, graph)
+    others = [one.id for one in graph.propositions if one.id != target]
+
+    base = _folded(graph, **FULL)
+    learned = _folded(graph, Observe(target=target, value=True), **FULL)
+
+    moved = [one for one in others if learned.beliefs[one] != base.beliefs[one]]
+    assert not moved, (
+        "every arrow on this map pushes nothing, so an observation reaches nothing but "
+        f"the claim observed — and yet these moved: {sorted(moved)}"
+    )
+
+
 def _two_pieces() -> Graph:
     """A map in two halves with nothing joining them: `near -> far`, and `other -> beyond`.
 
