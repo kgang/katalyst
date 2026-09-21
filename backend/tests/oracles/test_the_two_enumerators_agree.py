@@ -324,6 +324,57 @@ def test_an_impossible_report_is_refused_rather_than_divided_by_zero() -> None:
         by_summing(tables, {"cause": Pin(True, "observe")})
 
 
+# --- Which window a claim is cut from ---------------------------------------
+
+
+def test_each_claim_is_cut_from_its_own_deadline() -> None:
+    """The default grid ends every claim's last slice exactly on the day it is judged.
+
+    Cut from the map's longest deadline instead, every claim's boundaries move when
+    somebody inserts a claim judged far later — including claims that insertion has
+    no arrow to. Cut from a claim's own deadline, nothing else on the map can move
+    one, which is how the engine makes locality a shape of the arithmetic rather
+    than a promise. The oracle has to follow, or it would judge the engine on a grid
+    the engine does not run on.
+    """
+    for name, graph in generated.a_few_of_each():
+        for claim, written in graph.items():
+            edges = integrating.slice_edges(written.deadline, generated.GRID)
+            assert edges[0] == 0.0, (name, claim)
+            assert edges[-1] == written.deadline, (name, claim)
+            middles = integrating.middle_days(written.deadline, generated.GRID)
+            assert middles[-1] == np.inf, (name, claim)
+            assert np.all(middles[:-1] > edges[:-1]) and np.all(middles[:-1] < edges[1:]), (
+                name,
+                claim,
+            )
+
+
+def test_the_two_cuts_are_a_real_choice_and_not_the_same_grid() -> None:
+    """The shared window is kept runnable, and it is genuinely a different grid.
+
+    A named choice nobody can tell apart is a comment. On any map whose claims are
+    not all judged on the same day, the two cuts put a claim's boundaries in
+    different places and answer differently — which is exactly why the committed
+    comparison against the spike's scratch judge names the window it was measured
+    on rather than taking whatever the default happens to be.
+    """
+    shared = integrating.Grid(days=generated.WINDOW, cut=integrating.ONE_SHARED)
+    apart = 0
+    for _name, graph in generated.a_few_of_each():
+        late = max(one.deadline for one in graph.values())
+        early = [name for name, one in graph.items() if one.deadline < late]
+        if not early:
+            continue
+        for claim in early:
+            deadline = graph[claim].deadline
+            mine = integrating.slice_edges(deadline, generated.GRID)
+            theirs = integrating.slice_edges(deadline, shared)
+            assert not np.allclose(mine, theirs)
+            apart += 1
+    assert apart, "no map in the set had two claims judged on different days"
+
+
 # --- Against the judge every published measurement was taken with -----------
 
 
@@ -339,15 +390,20 @@ def test_by_integrating_reproduces_the_scratch_judge() -> None:
     nothing else. Re-run that script to rebuild the file and to compare the two
     programs directly.
 
-    The comparison is on one grid, stated whole: twenty-four slices of a sixty-day
-    window, eight points inside each slice, an arrival taken at the **middle** of
-    its slice, and an arrow that ends a state read as *the chance it stops*.
+    The comparison is on one grid, stated whole: **twenty-four slices of one
+    sixty-day window shared by every claim** — which is what the scratch judge cut,
+    and not what the engine cuts — eight points inside each slice, an arrival taken
+    at the **middle** of its slice, and an arrow that ends a state read as *the
+    chance it stops*. The grid is read out of the recorded file rather than assumed,
+    so the day the default changed under this test it said so instead of drifting.
     """
     recorded = json.loads(WHAT_THE_JUDGE_SAID.read_text())
+    assert recorded["cut"] == integrating.ONE_SHARED, "this regression is the shared window"
     grid = integrating.Grid(
         days=recorded["window_days"],
         slices=recorded["slices"],
         points=recorded["points_in_a_slice"],
+        cut=recorded["cut"],
     )
     chosen = dict(generated.a_few_of_each(recorded["maps_from_how_many"]))
     assert sorted(chosen) == sorted(recorded["answers"]), "the maps are not the recorded maps"

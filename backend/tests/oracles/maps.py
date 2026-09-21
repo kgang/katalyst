@@ -46,7 +46,12 @@ WINDOW = 60.0
 """The map's whole stretch in days, as every measurement in the spike ran at."""
 
 GRID = Grid(days=WINDOW)
-"""The window at the engine's own twenty-four slices and eight points in a slice."""
+"""The engine's own grid: twenty-four slices of **each claim's own** window.
+
+Day zero to that claim's resolve-by day, eight points inside each slice, an arrival
+at the middle of its slice. `Grid(days=WINDOW, cut=ONE_SHARED)` is the map's shared
+window instead, which is what the spike's scratch judge cut.
+"""
 
 SHAPES = ("step", "impulse", "ramp")
 EVENT = "event"

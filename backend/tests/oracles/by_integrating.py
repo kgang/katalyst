@@ -24,14 +24,23 @@ needs no root finding (record 0017, Kent's decision R26).
 **A claim's number.** For an event, the chance it has happened by its deadline;
 for a state, the chance it is still holding on its deadline.
 
-**The one grid, said in one sentence.** This enumerator runs at **the same number
-of slices as the engine and the same within-slice convention** — twenty-four
-slices of the map's whole window, an arrival taken at the **middle** of its slice
-rather than its end — so a disagreement between the two is a disagreement about
-the arithmetic and never about the grid. At twenty-four slices the middle-day
-convention is the difference between a gap of `.0290` and one of `.0027` against
-a fine reference, so running the two on different conventions would swallow every
-tolerance in the stack whole.
+**The one grid, said in one sentence.** This enumerator runs on **the same slices
+as the engine and the same within-slice convention** — twenty-four slices of each
+claim's **own** window, day zero to that claim's own resolve-by day, with an
+arrival taken at the **middle** of its slice rather than its end and read off the
+window of the claim that arrived — so a disagreement between the two is a
+disagreement about the arithmetic and never about the grid. At twenty-four slices
+the middle-day convention alone is the difference between a gap of `.0290` and one
+of `.0027` against a fine reference, so running the two on different conventions
+would swallow every tolerance in the stack whole.
+
+**Why each claim's own window and not the map's.** Cut from the map's longest
+deadline, every claim's grid moves when somebody inserts a claim judged far later,
+including claims that insertion has no arrow to — which this repository has
+already paid for once. Cut from a claim's own deadline, nothing else on the map
+can move a boundary, and locality stops being a property somebody has to keep true.
+The map's shared window is still reachable, as `Grid(cut=ONE_SHARED)`, because the
+stack-05 spike's scratch judge used it and that comparison is kept runnable.
 
 **What it costs.** An event is one variable with twenty-five values — the slice
 it happened in, or *never*. A state is one variable with six hundred and
@@ -60,7 +69,7 @@ from dataclasses import dataclass
 import numpy as np
 
 SLICES = 24
-"""How many pieces the map's whole window is cut into. The engine's number."""
+"""How many equal pieces a claim's window is cut into. The engine's number."""
 
 POINTS_IN_A_SLICE = 8
 """Where inside each slice the rate is read. The engine's number."""
@@ -117,18 +126,42 @@ Map = dict[str, Claim]
 """A whole map: every claim by name."""
 
 
+EACH_CLAIMS_OWN = "each claim's own window"
+"""Every claim is cut from day zero to **its own** resolve-by day, and nothing else.
+
+What the engine does, and the default here. A claim inserted with a deadline far
+past everything else re-grids nothing it has no arrow to, so locality stops being
+a property somebody has to keep true and becomes a shape of the arithmetic.
+"""
+
+ONE_SHARED = "one shared window"
+"""Every claim is cut from day zero to the **map's** last resolve-by day.
+
+What the stack-05 spike's scratch judge did, and what the committed comparison
+against it was measured on. Kept as a named choice so that regression stays
+runnable; nothing the engine is judged on uses it.
+"""
+
+
 @dataclass(frozen=True)
 class Grid:
-    """The window and how finely it is cut, which both oracles and the engine share."""
+    """How finely the window is cut, and which window each claim is cut from."""
 
     days: float
-    """The map's whole stretch, day zero to its latest resolve-by day."""
+    """The map's whole stretch, day zero to its latest resolve-by day.
+
+    Read only when `cut` is `one shared window`. Under `each claim's own window` a
+    claim's grid comes from its own deadline and this is carried for the record.
+    """
 
     slices: int = SLICES
-    """How many equal pieces that stretch is cut into."""
+    """How many equal pieces a window is cut into."""
 
     points: int = POINTS_IN_A_SLICE
     """How many places inside each piece the rate is read at."""
+
+    cut: str = EACH_CLAIMS_OWN
+    """Which window each claim is cut from: `EACH_CLAIMS_OWN` or `ONE_SHARED`."""
 
 
 Pinned = Mapping[str, bool | tuple[bool, int]]
@@ -183,7 +216,11 @@ def prepare(graph: Map, grid: Grid) -> Prepared:
         causes = tuple(arrow.source for arrow in claim.causes)
         axes[name] = (*causes, name)
         factor[name] = _one_claims_block(
-            claim, fit(claim, grid), [is_a_state(graph[who]) for who in causes], grid
+            claim,
+            fit(claim, grid),
+            [is_a_state(graph[who]) for who in causes],
+            [graph[who].deadline for who in causes],
+            grid,
         )
     return Prepared(
         grid=grid,
@@ -282,14 +319,38 @@ def is_a_state(claim: Claim) -> bool:
     return claim.persistence == "state"
 
 
-def middle_days(grid: Grid) -> np.ndarray:
-    """The day that stands for an arrival in each slice: the slice's **middle**.
+def slice_edges(deadline: float, grid: Grid) -> np.ndarray:
+    """Where one claim's slice boundaries fall, from day zero to the end of its window.
+
+    Which day that window ends on is the grid's one named choice: under
+    `EACH_CLAIMS_OWN` it is **this claim's own deadline**, so nothing else on the
+    map can move a boundary; under `ONE_SHARED` it is the map's last resolve-by day,
+    which is what the spike's scratch judge did.
+
+    Args:
+        deadline: This claim's own resolve-by day, counting from day zero.
+        grid: How finely to cut, and which window to cut.
+
+    Returns:
+        `(slices + 1,)` the day each boundary falls on, the first being day zero.
+    """
+    ends_at = deadline if grid.cut == EACH_CLAIMS_OWN else grid.days
+    return np.linspace(0.0, ends_at, grid.slices + 1)
+
+
+def middle_days(deadline: float, grid: Grid) -> np.ndarray:
+    """The day that stands for an arrival in each of one claim's slices: its **middle**.
 
     One entry per slice, then a last entry of infinity meaning *it never happened*.
     The middle rather than the last day is the convention record 0016 adopted, and
-    the engine runs on the same one.
+    the engine runs on the same one — **on the claim's own grid**, so a cause's
+    arrival day is read off the cause's window and never off its effect's.
+
+    Args:
+        deadline: The claim's own resolve-by day, counting from day zero.
+        grid: How finely to cut, and which window to cut.
     """
-    edges = np.linspace(0.0, grid.days, grid.slices + 1)
+    edges = slice_edges(deadline, grid)
     return np.append(0.5 * (edges[:-1] + edges[1:]), np.inf)
 
 
@@ -389,11 +450,13 @@ def _areas(claim: Claim, grid: Grid) -> list[float]:
 def _window_of(deadline: float, grid: Grid) -> tuple[np.ndarray, np.ndarray]:
     """This claim's own window: days in each slice, and the days the rate is read at.
 
-    The slices are the map's, so every claim is on one grid; each claim's own
-    window is clipped at its deadline, because nothing accrues past the day a
-    claim is judged.
+    Under `EACH_CLAIMS_OWN` the boundaries run from day zero to this claim's
+    deadline, so every slice is the same width and the last one ends exactly on the
+    day the claim is judged — nothing is ever counted past it and the clipping below
+    does nothing. Under `ONE_SHARED` the boundaries are the map's, and a claim
+    judged early has its last slices clipped to nothing.
     """
-    edges = np.linspace(0.0, grid.days, grid.slices + 1)
+    edges = slice_edges(deadline, grid)
     low, high = edges[:-1], np.minimum(edges[1:], deadline)
     width = np.clip(high - low, 0.0, None)
     inside = (np.arange(grid.points)[None, :] + 0.5) * (width[:, None] / grid.points)
@@ -479,7 +542,9 @@ def own_times(claim: Claim, f: Fitted, on, off, grid: Grid) -> np.ndarray:
     if not is_a_state(claim):
         return came_on
     last = grid.slices
-    days = middle_days(grid)
+    # The state's OWN grid: the day it came on is the middle of one of its own
+    # slices, and that is the day its stopping rate starts accruing from.
+    days = middle_days(claim.deadline, grid)
     pairs = np.zeros((last + 1, last + 1))
     endable = bool(f.ends) and any(np.isfinite(on[index]) for index in f.ends)
     for slot in range(last):
@@ -503,9 +568,20 @@ def _how_many_values(claim: Claim, grid: Grid) -> int:
     return (grid.slices + 1) ** 2 if is_a_state(claim) else grid.slices + 1
 
 
-def _times_of(value: int, from_a_state: bool, grid: Grid) -> tuple[float, float]:
-    """Read one value of a cause's time variable back as a switch-on and switch-off day."""
-    days = middle_days(grid)
+def _times_of(value: int, deadline: float, from_a_state: bool, grid: Grid) -> tuple[float, float]:
+    """Read one value of a cause's time variable back as a switch-on and switch-off day.
+
+    **Read off the cause's own grid, never its effect's.** A cause arriving in its
+    third slice arrived on the middle day of the third slice of the window cut to
+    *that cause's* deadline, and the effect it pushes may be judged much later.
+
+    Args:
+        value: One value of the cause's time variable.
+        deadline: The **cause's** own resolve-by day, counting from day zero.
+        from_a_state: Whether the cause is a state, and so carries two times.
+        grid: How finely to cut, and which window to cut.
+    """
+    days = middle_days(deadline, grid)
     if not from_a_state:
         return float(days[value]), float(np.inf)
     on, off = divmod(value, grid.slices + 1)
@@ -513,9 +589,17 @@ def _times_of(value: int, from_a_state: bool, grid: Grid) -> tuple[float, float]
 
 
 def _one_claims_block(
-    claim: Claim, f: Fitted, causes_are_states: Sequence[bool], grid: Grid
+    claim: Claim,
+    f: Fitted,
+    causes_are_states: Sequence[bool],
+    cause_deadlines: Sequence[float],
+    grid: Grid,
 ) -> np.ndarray:
-    """One claim's times for every combination of its causes' times."""
+    """One claim's times for every combination of its causes' times.
+
+    Each cause's arrival day is read off **that cause's** own window, which is why
+    its deadline has to be handed in alongside whether it is a state.
+    """
     mine = _how_many_values(claim, grid)
     theirs = [
         (grid.slices + 1) ** 2 if a_state else grid.slices + 1 for a_state in causes_are_states
@@ -526,7 +610,9 @@ def _one_claims_block(
     for combination in itertools.product(*[range(size) for size in theirs]):
         on, off = [], []
         for place, value in enumerate(combination):
-            came_on, went_off = _times_of(value, causes_are_states[place], grid)
+            came_on, went_off = _times_of(
+                value, cause_deadlines[place], causes_are_states[place], grid
+            )
             on.append(came_on)
             off.append(went_off)
         block[combination] = own_times(claim, f, on, off, grid)

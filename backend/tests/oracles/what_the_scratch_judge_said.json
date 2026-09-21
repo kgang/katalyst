@@ -1593,6 +1593,7 @@
    }
   }
  },
+ "cut": "one shared window",
  "maps_from": "tests/oracles/maps.py, a_few_of_each()",
  "maps_from_how_many": 4,
  "points_in_a_slice": 8,
