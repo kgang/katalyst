@@ -1039,16 +1039,28 @@ def test_a_longer_window_moves_nothing_it_cannot_reach() -> None:
     (INV-4, locality: an edit changes only what is still connected to its subject)
     failing through the sampling grid rather than along the arrows.
 
-    The fix is the one rule in `propagation.md` B5: **the day cap is a cap on what
-    is sent, never on what is computed.** Every day of the window is worked out, so
-    a push fires on the true day its cause settles; only the series handed to a
-    reader is thinned. Lengthening a window then adds days at the end, where they
-    can re-time nothing that was already happening.
+    The fix is the one rule in `propagation.md` B5: **the day cap decides where a
+    series is drawn, never when a push fires.** Every day the arithmetic reads by
+    name — the day each claim's clock starts, the day each observation speaks — is
+    on the grid exactly, so a push fires on the true day its cause settles.
+    Re-spacing the drawn points by lengthening a window then re-times nothing,
+    because nothing that fires was ever read off them.
 
     **The repair that looks obvious is not the repair**, and was tried: keeping
-    every settled day among the drawn points makes the grid depend on the settled
-    days, so a supposition — which cuts arrows and so moves them — re-spaces the grid
-    and shifts a claim's own ancestors, breaking INV-3, assert is not observe.
+    every settled day among the days a reader is *sent* makes the drawn points
+    depend on the settled days, so a supposition — which cuts arrows and so moves
+    them — re-spaces the series and shifts a claim's own ancestors, breaking INV-3,
+    assert is not observe.
+
+    *(Amended 2026-09-21. This docstring first said every day of the window is
+    worked out, which was true of the engine that shipped the repair. Two sets of
+    days have to be told apart and were not: the days a reader is **drawn** a line
+    through, which move when the window's length moves and may, and the days the
+    numbers are **computed** on, which must land exactly on every day the
+    arithmetic names and must not. The first repair made both sets every day of
+    the window, which was correct and cost 5 892 MB on a five-year map; the grid
+    is now the sent days plus the named ones, at 958 MB, and the narrow difference
+    from the rejected repair above is which of the two sets the settled days join.)*
     """
     far_side = (
         _claim("cause", kind="event", prior=(0.5, 0.25, 0.75), days=0),

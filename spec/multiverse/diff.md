@@ -164,7 +164,7 @@ A claim is `shifted` when the move is at least `0.005` in size **and** agreement
 
 *(Kent, 2026-09-17 — G2. This closes open question 7, below.)*
 
-A world does not always count every version equally. When something was **observed**, the worlds it did not happen in are thrown away, and each version then counts by **the share of its worlds that survived** — but only for the claims that observation is evidence about ([`propagation.md`](propagation.md) B6). Every other claim, and every claim under every other edit, is read with each version counting the same.
+A world does not always count every version equally. When something was **observed**, the worlds it did not happen in are thrown away, and each version then counts by **the share of its worlds that survived** — but a claim is weighted only by the observations that are evidence about *that claim*, each with its own surviving worlds, never by one pooled mask over all of them ([`propagation.md`](propagation.md) B6). Every claim no observation is evidence about, and every claim under every other edit, is read with each version counting the same.
 
 The direction is counted the same way as the number, in one sentence: **a version counts for the move by as much as it counted for the two numbers — the smaller of the two weights it carried — so a version with no surviving world counts for nothing and does not vote.** A version can only speak about a difference as far as it counted in *both* numbers.
 

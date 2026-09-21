@@ -110,12 +110,17 @@ NINETIETH_PERCENTILE = 1.2816
 SERIES_CAP = 180
 """The most **evenly spaced** points a series is drawn at, however long the window is.
 
-A cap on what is sent to a reader, never on what is worked out. And a cap on the
-evenly spaced points alone: **every claim's resolve-by day is kept whatever the
-cap says**, because a tile's headline is read on that day and it has to be a
-point of the line drawn beneath it. A map with more than 180 claims judged on
-180 different days therefore sends one point per judged day and no more — more
-than this number, and every one of them earning its place. See `_days_to_send`.
+A cap on the evenly spaced points alone, and on both counts it is not a ceiling:
+**every claim's resolve-by day is kept whatever the cap says**, because a tile's
+headline is read on that day and it has to be a point of the line drawn beneath
+it. A map with more than 180 claims judged on 180 different days therefore sends
+one point per judged day and no more — more than this number, and every one of
+them earning its place. See `_days_to_send`.
+
+It bounds what is **worked out** as well, because the days worked out are the
+days sent plus the handful the arithmetic must land on exactly. What it must
+never do is decide the *timing* of anything: every day a push fires on is on the
+grid exactly, whatever this number is and however long the window runs.
 """
 
 LOWEST_SURVIVAL = 0.02
@@ -412,9 +417,10 @@ def propagate(
 
     Returns:
         One world: a likelihood and a range for every claim on the day it is
-        judged, a likelihood and a named state for every day of the window, every
-        supposition that was undermined, and a sentence for anything the reader
-        should be told.
+        judged, a likelihood and a named state for every day the series is drawn
+        at — every day of the window until the window outruns the cap, and then
+        the days `series_days` names — every supposition that was undermined, and
+        a sentence for anything the reader should be told.
 
     Raises:
         ValueError: If a supposition was undermined by an arrow that `introduced_by`
@@ -634,6 +640,12 @@ def _prepare(
         else _days_to_send(claims, as_of, days)
     )
     must_be_exact = {min(max(0, one), days) for one in settled.values()}
+    # An observation carries no date today — `Observe` has no `at`, so it always
+    # speaks on day zero, which is already on the grid as the first sent day. This
+    # term is therefore dead, and it is written anyway: the day an observation
+    # speaks is a day the arithmetic reads by name, and the moment `Observe` grows
+    # a date the grid must already be landing on it. Adding it later, after the
+    # field existed, would be a defect waiting to be found twice.
     for stretches in spells.values():
         must_be_exact |= {
             min(max(0, one.starts), days) for one in stretches if one.kind == "observe"
@@ -749,17 +761,22 @@ def _days_to_send(
 ) -> NDArray[numpy.int64]:
     """Choose which days of the window a claim's series carries to the reader.
 
-    **A cap on what is sent, never on what is worked out**, and a cap on the evenly
-    spaced points alone. Ordinarily every day of the window. Past 180 days that is
-    more points than anybody scrubs through, so a series is drawn at 180 evenly
-    spaced days instead — **and every claim's own resolve-by day is kept whatever
-    the cap says**, so a map judged on more than 180 different days sends one point
-    per judged day, which is more than the cap and is the honest answer. That is not a nicety: a
+    **A cap on the evenly spaced points alone**, and never a decision about timing.
+    Ordinarily every day of the window. Past 180 days that is more points than
+    anybody scrubs through, so a series is drawn at 180 evenly spaced days instead
+    — **and every claim's own resolve-by day is kept whatever the cap says**, so a
+    map judged on more than 180 different days sends one point per judged day,
+    which is more than the cap and is the honest answer. That is not a nicety: a
     tile's headline number is read on the claim's own resolve-by day, and if that
     day were not on the claim's own series the number on the tile would not be a
     point of the line drawn beneath it.
 
-    It was once the grid the whole engine worked on, and that was a defect. A push
+    These days are not, by themselves, the days the engine works out: `_prepare`
+    adds to them every day the arithmetic must land on exactly. So the cap does
+    bound the work — the days worked out are these plus that handful — but it is
+    never what decides when a push fires.
+
+    It was once the whole grid the engine worked on, and that was a defect. A push
     fires on the day its cause is settled, read off the days worked out — so
     thinning them made that day depend on how long the window was, and an edit at
     one end of a map could re-time a claim at the other end that nothing connected

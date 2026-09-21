@@ -20,9 +20,9 @@ read off those points, rounded up to the next one along. So the window's length
 decided the timing of every push, and the window is a property of the whole map: an
 inserted claim judged a year out, stretching a window from 31 days to 365, moved a
 claim in a wholly separate piece by `.096`. The rule that fixed it is in
-`spec/multiverse/propagation.md` B5 — *the day cap is a cap on what is sent, never
-on what is computed* — and `test_a_longer_window_moves_nothing_it_cannot_reach`
-pins it.
+`spec/multiverse/propagation.md` B5 — *the day cap decides where a series is
+drawn, never when a push fires; every day the arithmetic reads by name is on the
+grid exactly* — and `test_a_longer_window_moves_nothing_it_cannot_reach` pins it.
 
 **And the worlds an observation threw away used to be pooled across every
 observation on the branch**, so a claim that *some* observation was evidence about
@@ -56,7 +56,8 @@ def every_version_answered_the_same(first: World, second: World, claims: Iterabl
     Only the days both worlds drew are compared, which is every day either of them
     would be shown on: a series is drawn at up to 180 points and a claim an edit
     added brings a resolve-by day of its own, so the two worlds can be *drawn* at
-    slightly different days even though both are worked out on every day.
+    different days — sometimes at very few of the same ones — even where their
+    arithmetic agrees.
 
     Args:
         first: One world.

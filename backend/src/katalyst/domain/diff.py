@@ -557,12 +557,16 @@ def _days_both_worlds_drew(
     The two are the same days whenever the two worlds' windows are, which is every
     edit but one. An `insert` can make the window longer — the window runs to the
     last day anything is judged — and past 180 days a series is drawn at evenly
-    spaced points, so **the two can then share very few days indeed**: measured, a
-    31-day window drawn at 32 points and a 365-day one drawn at 178 share only 18.
-    Both worlds are still worked out on every day their own arithmetic needs; it is
-    the *drawing* that parts company. Comparing the days they share is every day
-    either of them would show side by side, and it is the whole of what a change
-    list can honestly read.
+    spaced points, so **the two can then share very few days indeed**: measured on
+    the two-piece map of `test_a_longer_window_moves_nothing_it_cannot_reach`, a
+    31-day window drawn at 32 points and a 365-day one drawn at 178 share 18. How
+    few depends entirely on the map's own dates, so that figure is an illustration
+    of the shape of the problem and not a property of the engine.
+
+    Both worlds are still worked out on every day their own arithmetic reads by
+    name; it is the *drawing* that parts company. Comparing the days they share is
+    every day either of them would show side by side, and it is the whole of what a
+    change list can honestly read.
 
     Args:
         world_a: The world to compare from.
