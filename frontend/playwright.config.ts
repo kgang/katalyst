@@ -23,7 +23,13 @@
  */
 
 import { defineConfig, devices } from "@playwright/test";
-import { assertPortsAreFree, BACKEND_PORT, FRONTEND_PORT } from "./e2e/ports.js";
+import {
+  assertPortsAreFree,
+  BACKEND_PORT,
+  FRONTEND_PORT,
+  SLOW_BACKEND_PORT,
+  SLOW_FRONTEND_PORT,
+} from "./e2e/ports.js";
 
 /**
  * **Both ports come from the environment, and nothing is ever reused.**
@@ -40,6 +46,36 @@ import { assertPortsAreFree, BACKEND_PORT, FRONTEND_PORT } from "./e2e/ports.js"
  */
 const SERVER_PORT = BACKEND_PORT;
 const APP_PORT = FRONTEND_PORT;
+
+/**
+ * **The one test that watches a recording play slowly, and the file it lives
+ * in.**
+ *
+ * Every other test here plays a recording at four tenths of a second an event,
+ * which is why this suite had never met a silence — and a live run is fifty to a
+ * hundred and ten seconds between events. How fast a replay plays is one setting
+ * read from the environment and deliberately not a field on the request
+ * (`backend/src/katalyst/engine/replay.py` says why in its own words), so the
+ * only way to give one test a different pace without touching the server is a
+ * second server, with a second browser app pointed at it, on ports of their own.
+ *
+ * That is what the project and the two extra web servers below are. Nothing on
+ * the server side changed, no model key is involved and nothing is spent.
+ */
+const THE_SLOW_ONE = "**/slowReplay.spec.ts";
+
+/**
+ * How slowly that one server plays a recording back, in seconds between events.
+ *
+ * The shipped product is six tenths of a second and the rest of this suite is
+ * four. Eight is chosen for a margin rather than for the number itself: the test
+ * sits out three seconds of one gap, and the rest is room for the page to load
+ * and the first assertions to run before that window opens — so a slow machine
+ * still spends the whole window inside one gap. The test is over in about twelve
+ * seconds, which is what the longest test in this suite already costs, and it
+ * runs beside the others.
+ */
+const A_SLOW_PACE = "8";
 
 // Asked before anything is started, because nothing later is early enough.
 assertPortsAreFree();
@@ -140,6 +176,20 @@ export default defineConfig({
       // The window last, on purpose: the device preset carries one of its own,
       // and the whole interface was measured against this one.
       use: { ...devices["Desktop Chrome"], viewport: { width: 1600, height: 1000 } },
+      // Every file but the slow one, which needs a server paced differently and
+      // gets the project below.
+      testIgnore: THE_SLOW_ONE,
+    },
+    {
+      // The same browser and the same window, pointed at the pair of servers
+      // that plays a recording slowly — so that one test meets a real silence.
+      name: "chromium-slow-replay",
+      testMatch: THE_SLOW_ONE,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1600, height: 1000 },
+        baseURL: `http://localhost:${SLOW_FRONTEND_PORT}`,
+      },
     },
   ],
   webServer: [
@@ -217,6 +267,34 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120_000,
       env: { KATALYST_API_URL: `http://localhost:${SERVER_PORT}` },
+    },
+    {
+      // **The second pair, for the one test that needs a real silence.**
+      //
+      // The same server, the same recordings, the same empty keys — one setting
+      // apart. Pacing is not a field on the request and must not become one, so
+      // a test that wants a different pace needs a process that was started with
+      // one.
+      command: `uv run uvicorn katalyst.api.main:app --port ${SLOW_BACKEND_PORT}`,
+      cwd: "../backend",
+      url: `http://localhost:${SLOW_BACKEND_PORT}/api/healthz`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: {
+        ANTHROPIC_API_KEY: "",
+        FRED_API_KEY: "",
+        KATALYST_REPLAY_PACE: A_SLOW_PACE,
+      },
+    },
+    {
+      // And its browser app, pointed at it. The address the app forwards `/api`
+      // to is read when the development server starts, so one app cannot serve
+      // two servers.
+      command: `npm run dev -- --port ${SLOW_FRONTEND_PORT} --strictPort`,
+      url: `http://localhost:${SLOW_FRONTEND_PORT}/`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: { KATALYST_API_URL: `http://localhost:${SLOW_BACKEND_PORT}` },
     },
   ],
 });

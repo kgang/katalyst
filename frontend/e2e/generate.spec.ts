@@ -119,6 +119,24 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // before the first claim replaces it with the frontier's.
   await expect(page.locator(".skeleton-tile").first()).toBeVisible();
 
+  // **And the foot of the screen says, in words, what is being waited for.**
+  // Until 2026-09-21 this line asserted the opposite — that the sentence about
+  // the run carried `map-live--spoken`, the class that clipped it to a
+  // one-pixel box — which is why no test in this suite could catch the thing
+  // Kent saw with his own key: a screen that says nothing at all for
+  // twenty-three seconds. It is visible now, it is the same element a screen
+  // reader hears, and it names what is being held open.
+  const runStrip = page.locator(".run-strip");
+  await expect(runStrip).toBeVisible();
+  const runSentence = runStrip.locator(".map-live");
+  await expect(runSentence).toBeVisible();
+  await expect(runSentence).toHaveAttribute("aria-live", "polite");
+  await expect(runSentence).toContainText(/held open|Working on what follows from/);
+  // A replay counts no seconds: it is paced by us, so the number would reset
+  // twice a second and would be measuring our own pacing rather than a wait.
+  await expect(runStrip).toHaveAttribute("data-state", "replay");
+  await expect(page.locator(".run-strip__waited")).toHaveCount(0);
+
   // The badge says this session is a replay, from the first frame, before the
   // receipt that also says so has arrived — and it is beside the map's name
   // rather than over the map, because nothing in this product sits over the map.
@@ -219,33 +237,49 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // failure a growing map makes that a finished one never does.
   expect(await boxesRunningIntoEachOther(page)).toEqual([]);
 
-  // And not one claim's or arrow's identifier reached the map or the panel
-  // beside it. On a generated map they are twenty-six characters of the engine's
-  // own bookkeeping, and a reader learns nothing from one.
-  //
-  // **The run's own name is the exception, and it is deliberate.** The line under
-  // the map exists so that somebody can ask for this answer again — the map, the
-  // seed, and the working — and the working is asked for by the generation's
-  // name. It is printed once, there, beside the seed, and nowhere else.
-  const onTheMap = (await page.locator(".map-body").textContent()) ?? "";
+  // And not one claim's or arrow's identifier reached the map. On a generated
+  // map they are twenty-six characters of the engine's own bookkeeping, and a
+  // reader learns nothing from one.
+  const onTheMap = (await page.locator(".map-stage").textContent()) ?? "";
   expect(onTheMap).not.toMatch(/\b01[0-9A-HJKMNP-TV-Z]{24}\b/);
 
-  // Why the run stopped, in the engine's words for that reason — **printed once**
-  // and said once. The live region is still a live region and still reads the
-  // whole line out; what it no longer does is print it, because the same sentence
-  // in two of three stacked strips of prose is the foot of the screen repeating
-  // itself.
-  const why = page.locator(".done-line__why");
+  // **The run's own name is the exception, and it is deliberate.** Somebody has
+  // to be able to ask for this answer again — the map, the seed and the working
+  // — and the working is asked for by the generation's name. It is printed once,
+  // in *Run details* in the panel, beside the route and the seed, and nowhere
+  // else. It moved there from the foot of the screen on 2026-09-21 (R16), where
+  // it stood in a strip of prose that also claimed, over an empty map, that
+  // every claim on it had already arrived.
+  const names =
+    ((await page.locator(".map-body").textContent()) ?? "").match(
+      /\b01[0-9A-HJKMNP-TV-Z]{24}\b/g,
+    ) ?? [];
+  expect(names).toHaveLength(1);
+  await expect(page.locator(".inspector")).toContainText("Run details");
+  await expect(page.locator(".inspector")).toContainText("/api/generate");
+
+  // Why the run stopped, in the engine's words for that reason — **printed once
+  // and said once, in one element.** The polite region is now the printed
+  // sentence rather than a one-pixel box beside a copy of it, which is the whole
+  // of what this branch changed: until 2026-09-21 this line asserted that the
+  // live region carried `map-live--spoken`, so the suite was holding the fault
+  // in place. What it holds now is that the sentence is visible and appears
+  // exactly once on the page.
+  const why = page.locator(".run-strip .map-live");
   await expect(why).toBeVisible();
+  await expect(why).toHaveAttribute("aria-live", "polite");
   const stopped = ((await why.textContent()) ?? "").trim();
   expect(stopped).not.toBe("");
-  await expect(page.locator(".map-live")).toHaveClass(/map-live--spoken/);
-  const howOften = await page.evaluate((sentence) => {
-    const times = (text: string): number => text.split(sentence).length - 1;
-    const spoken = document.querySelector(".map-live")?.textContent ?? "";
-    return times(document.body.textContent ?? "") - times(spoken);
-  }, stopped);
+  const howOften = await page.evaluate(
+    (sentence) => (document.body.textContent ?? "").split(sentence).length - 1,
+    stopped,
+  );
   expect(howOften).toBe(1);
+
+  // The state, in one word, in front of it — and a finished run counts no
+  // seconds, because nothing is being waited for.
+  await expect(page.locator(".run-strip")).toHaveAttribute("data-state", "finished");
+  await expect(page.locator(".run-strip__waited")).toHaveCount(0);
 
   // The map says where it is cut. A ten-claim map framed so its tiles stay
   // readable does not fit the stage, and a map that is cut with nothing saying
