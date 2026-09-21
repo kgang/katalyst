@@ -52,6 +52,7 @@ import {
 } from "./geometry";
 import { assignLayers } from "./layers";
 import { useLayout } from "./layoutRunner";
+import { mayLandAgain } from "./theKeyboard";
 import {
   type ClaimNode,
   type MapEdge,
@@ -417,6 +418,12 @@ function MapSurface({
    * gone if it did not take — and only if it is still the move the reader last
    * asked for, so that two quick steps do not drag the keyboard back to the
    * first one.
+   *
+   * **And only from nowhere.** The second landing waits on animation frames,
+   * and frames are not a clock: a browser produces none while nothing on the
+   * page is changing, so it can run long after it was scheduled — and the frame
+   * that finally runs it is very often one the reader caused by doing something
+   * else. `theKeyboard.ts` has the rule and the reason.
    */
   const putTheKeyboardOn = useCallback(
     (id: string): void => {
@@ -425,7 +432,15 @@ function MapSurface({
       land();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          if (wantedTile.current !== id || standingOn() === id) {
+          if (
+            !mayLandAgain({
+              wanted: wantedTile.current,
+              forTile: id,
+              standingOn: standingOn(),
+              active: document.activeElement,
+              surface: surface.current,
+            })
+          ) {
             return;
           }
           land();
@@ -550,8 +565,25 @@ function MapSurface({
     // selected and rebuilds the wire's element from it a frame later, so putting
     // focus back on the element that is there right now would put it on the one
     // about to be thrown away.
+    //
+    // And the same rule as a tile's landing: two frames later can be much later,
+    // because a browser produces no frames while nothing changes — so this takes
+    // the keyboard back from nowhere and never from somewhere.
     const frame = requestAnimationFrame(() => {
-      requestAnimationFrame(() => onTheGlass("edge", id)?.focus());
+      requestAnimationFrame(() => {
+        if (
+          !mayLandAgain({
+            wanted: id,
+            forTile: id,
+            standingOn: undefined,
+            active: document.activeElement,
+            surface: surface.current,
+          })
+        ) {
+          return;
+        }
+        onTheGlass("edge", id)?.focus();
+      });
     });
     return () => cancelAnimationFrame(frame);
   }, [selection, onTheGlass]);

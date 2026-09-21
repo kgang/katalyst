@@ -382,6 +382,48 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     await expect(page.locator(".map-status")).not.toContainText("nothing causes this claim");
   });
 
+  await test.step("test_the_palette_takes_the_keyboard_and_the_map_leaves_it_alone", async () => {
+    // **A move, and the palette opened in the same breath.** Putting the
+    // keyboard on a tile is done twice — once now, and once after the drawing
+    // library has rebuilt that tile's element — and the second landing waits on
+    // animation frames. Frames are not a clock: a browser produces none while
+    // nothing on the page is changing, so a landing scheduled by this move can
+    // run at whatever frame comes next, and the frame that comes next is the
+    // one the palette's arrival causes. A map that landed then would take the
+    // keyboard straight out of the palette's field, and every letter the reader
+    // typed would be read as a map shortcut while the palette sat there looking
+    // open and doing nothing at all.
+    //
+    // Nothing is waited for between the two presses, which is what a reader
+    // reaching for the palette does and what any reader at all gets on a
+    // machine slow enough to deliver both keys inside one task.
+    const before = await landedOn(page, ["H", "C", "R"]);
+    await page.keyboard.press("l");
+    await page.keyboard.press("Meta+k");
+    await expect(page.getByText(/Every command, by name/)).toBeVisible();
+
+    // Four letters, and every one of them is also a key on the map: o swaps the
+    // panel for the map as a list, e opens the six things you can do to a
+    // claim, p says where the panel is. So the field holding them and the map
+    // holding still are the same statement made twice.
+    const field = page.getByLabel("Type a few letters of a command");
+    // Asked three times, because the map can take the keyboard back at any of
+    // the frames in between: the palette has it, it still has it after four
+    // keystrokes, and the four keystrokes are in it.
+    await expect(field).toBeFocused();
+    await page.keyboard.type("open");
+    await expect(field).toHaveValue("open");
+    await expect(field).toBeFocused();
+    await expect(page.locator(".outline")).toHaveCount(0);
+    await expect(page.locator(".intervene")).toHaveCount(0);
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByText(/Every command, by name/)).toHaveCount(0);
+    // And the keyboard goes back where this step found it, so what follows
+    // walks from the same place it always did.
+    await standOn(page, before);
+  });
+
   // Down the column, which is about the picture rather than about the wires.
   await page.keyboard.press("j");
   await expect(page.locator(".map-status")).toContainText("column");
