@@ -94,3 +94,35 @@ Please do a principled analysis on what work can be done right now on stack 5 an
 <status>completed</status>
 <summary>Background command "Re-run the evidence script behind the stack-05 records, in the background" completed (exit code 0)</summary>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ae7ac9a335781e12f</task-id>
+<tool-use-id>toolu_01QrGYpgSME8PPhPTY3xopiw</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/ae7ac9a335781e12f.output</output-file>
+<status>completed</status>
+<summary>Agent "Draft records 0018-0020, thesis chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me, in this order**
+
+1. `cd /Users/kentgang/git3/katalyst/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync python /Users/kentgang/git3/katalyst/plans/analysis/scripts/finance/check_stop_claims.py` — prints every measured number in record 0019.
+2. `git -C /Users/kentgang/git3/katalyst-wt/adr-06-the-trade status --short` and `git diff spec/graph/belief.md` (10 lines, two dated amendments).
+3. Read `docs/adr/0019-…`, then `0018-…`, `0020-…`, then `spec/thesis/README.md` and its five chapters.
+4. `plans/notes/2026-09-21-stack-06-docs-owed.md`.
+
+**Written** — records `0018-an-edge-is-computed-from-the-unsupposed-world.md`, `0019-a-stop-is-a-price-the-reader-owns.md`, `0020-a-quote-is-recorded-first-and-fetched-second.md`, all `proposed`; chapters `edge.md`, `quotes.md`, `position.md`, `what-takes-you-out.md`, `card-and-export.md`; `spec/thesis/README.md` rewritten (the "derived, not guessed" sentence withdrawn with a dated note). **Kept all five proposed chapters, no merge or split**: each is one record's idea or one pull request's surface, and splitting card from export would leave two chapters that only reference each other.
+
+**Measured myself** (script above, `main` = 48eb562): the only claim resolving strictly before the contract ending is B, the step the thesis rests on; all seven claims sit below one half so all seven sweep rows flip *to true*; the recorded map's payoff kinds are `{'price': 11}`. I also re-checked every Polymarket figure I quote against the raw files and corrected P once — the first bid is `.01`, not `.04`.
+
+**Tokens left** — three, all the same spike: `docs/adr/0019-…:87`, `spec/thesis/position.md:28`, `spec/thesis/what-takes-you-out.md:26`. Every `&lt;&lt;R11&gt;&gt;` is filled from P's report. 0019 says it cannot be accepted in full until the spike lands, and marks which parts are independent of it.
+
+**Resolved by me** — the digest defines break-even two incompatible ways (`quote + costs`, and "worth buying below 44¢"). I took the second: a *price*, from the model and costs alone, so it survives the missing-quote case. Flagged in 0018 with the rejected reading.
+
+**Open for Kent** — 0019: greyed Kelly ceiling (recommend: out). 0020: rewrite the hypothesis to the venue's test and add a contract ending (recommend: yes; fixture edit, engine lane); and **a person must read Polymarket's terms before any quote file is committed**.
+
+**Owed** (not applied): nine PRD edits word for word, `vocabulary.md` additions, `ARCHITECTURE.md`, three index rows, `diff.md`'s two stop-loss passages, five fixture fixes, plus "06-1, ready to build" — new packages and tests only, **no route**, because a route regenerates `schema.ts`.
+
+**Not checked**: I ran no test suite and no linter; the named tests do not exist yet.</result>
+<usage><subagent_tokens>284125</subagent_tokens><tool_uses>93</tool_uses><duration_ms>1349101</duration_ms></usage>
+</task-notification>
