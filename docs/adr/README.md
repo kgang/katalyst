@@ -28,3 +28,5 @@ Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes
 | [0020](0020-a-quote-is-recorded-first-and-fetched-second.md) | A quote is recorded first and fetched second; a FRED figure is an observation, not a belief | accepted | 2026-09-21 |
 | [0021](0021-what-version-one-does-not-build.md) | What version one does not build — FR-17, FR-18, FR-20, part of FR-24, FR-29, FR-30 cut; INV-10 by a named refusal; FR-31 shrunk | accepted | 2026-09-21 |
 | [0022](0022-chains-are-worked-out-not-multiplied.md) | Chains are worked out, not multiplied — the path product replaced by the shift, the joint and the weakest arrow | accepted | 2026-09-21 |
+| [0023](0023-what-the-run-says-while-it-waits.md) | What the run says while it waits: one strip at the foot of the map, the sentence a screen reader already hears, and a count of seconds — nothing spins, and provenance moves into *Run details* | proposed | 2026-09-21 |
+| [0024](0024-when-a-tile-may-move.md) | A tile moves only when an arrow would otherwise point backwards, and once when the run stops (rewrites *a placed tile never moves*) | proposed | 2026-09-21 |
