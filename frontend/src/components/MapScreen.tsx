@@ -802,7 +802,12 @@ export function MapScreen({
           onStatus={setStatus}
           onOverflow={(column) => {
             setOnlyColumn(column);
+            // Pressing a collapsed tile is the reader asking for the claims
+            // behind it, so the panel comes back if it was put away and turns
+            // to the list those claims are on.
+            setAway(false);
             setDock("outline");
+            setStatus(PANEL_IN_WORDS.outline);
           }}
           arriving={arriving}
         />
