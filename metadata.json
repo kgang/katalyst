@@ -3,7 +3,7 @@
   "checkpoint_id": "01M3274VHPZDXNP65NVD4X7XNV",
   "strategy": "manual-commit",
   "branch": "fix/04-vanishing-wire",
-  "checkpoints_count": 1,
+  "checkpoints_count": 4,
   "files_touched": null,
   "sessions": [
     {
@@ -12,20 +12,27 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 12,
-    "cache_creation_tokens": 73745,
-    "cache_read_tokens": 836308,
-    "output_tokens": 31390,
-    "api_call_count": 6,
+    "input_tokens": 40,
+    "cache_creation_tokens": 95144,
+    "cache_read_tokens": 6661585,
+    "output_tokens": 43013,
+    "api_call_count": 17,
     "subagent_tokens": {
-      "input_tokens": 128,
-      "cache_creation_tokens": 528602,
-      "cache_read_tokens": 5571594,
-      "output_tokens": 21584,
-      "api_call_count": 64
+      "input_tokens": 378,
+      "cache_creation_tokens": 865042,
+      "cache_read_tokens": 22221457,
+      "output_tokens": 133922,
+      "api_call_count": 189
     }
   }
 }
