@@ -352,4 +352,20 @@ describe("the six things you can do", () => {
       expect(button).not.toBeDisabled();
     }
   });
+
+  it("test_the_two_that_are_easiest_to_confuse_say_the_difference_before_the_press", () => {
+    // **The distinction this product beats every competitor on, said before the
+    // choice rather than after it.** Both buttons fix a claim's value; they
+    // differ in what else may move, and until now the only place that was said
+    // was the line printed *after* the press — by which time the reader has
+    // already chosen. Each subtitle is the shared vocabulary's own meaning for
+    // that operation, word for word from the *Interface words* table.
+    open();
+    expect(screen.getByRole("button", { name: /^Suppose this is true/ })).toHaveTextContent(
+      "Take this as given, and do not tell me what caused it",
+    );
+    expect(screen.getByRole("button", { name: /^This happened/ })).toHaveTextContent(
+      "This is news — update what came before it too",
+    );
+  });
 });

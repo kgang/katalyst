@@ -234,6 +234,23 @@ jobs:
         run: npx playwright test
         working-directory: frontend
 
+      # **What a failure leaves behind.** Two failures in this suite were lost
+      # last week with nothing kept about either: a line of output, and no
+      # screen, network or console to look at afterwards. Playwright keeps a
+      # trace for every test that fails and throws away the rest
+      # (`playwright.config.ts`), so there is something here exactly when there
+      # is a failure to read — open it with `npx playwright show-trace`. It runs
+      # even though the step above failed, which is the only time it has
+      # anything to do.
+      - name: Keep what the failures left behind
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces
+          path: frontend/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
   # The committed recordings a keyless clone plays back. It needs no key and has
   # none, and it passes on an empty folder, so it is green from the commit that
   # adds it and bites the moment the first recording lands.
