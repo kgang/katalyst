@@ -20,6 +20,16 @@ const EXAMPLES = [
   },
 ];
 
+/** What the server says when it has no key and all four examples recorded, one day. */
+const NO_KEY_ALL_FOUR: Readiness = {
+  status: "not_ready",
+  model_key_present: false,
+  replayable: STARTING_SENTENCES.map((one) => ({
+    example: one.example,
+    recording_date: "2026-09-18",
+  })),
+};
+
 /** What the server says about itself when it has no key and one recording. */
 const NO_KEY_ONE_RECORDING: Readiness = {
   // Deliberately `not_ready`: this screen reads what can be replayed and whether
@@ -48,29 +58,45 @@ function draw(readiness: Readiness) {
 
 describe("with no model key", () => {
   it("test_the_keyless_sentence_is_word_for_word", () => {
-    draw(NO_KEY_ONE_RECORDING);
+    draw(NO_KEY_ALL_FOUR);
 
     // Record 0012's sentence, word for word, with the day taken from the
     // readiness answer — never from a file name, a build date or a clock. It is
-    // said twice: under the four cards, and again under the field it disables.
+    // under the four cards, and the field it disables carries it too.
     expect(
-      screen.getAllByText(
+      screen.getByText(
         "No model key configured — these four run from recordings made on 2026-09-18.",
       ),
-    ).toHaveLength(2);
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("An event you think will happen")).toBeDisabled();
   });
 
-  it("test_the_shared_sentence_names_the_oldest_day_it_describes", () => {
-    draw({
-      ...NO_KEY_ONE_RECORDING,
-      replayable: [
-        { example: "photonics", recording_date: "2026-09-20" },
-        { example: "hormuz", recording_date: "2026-09-18" },
-      ],
+  it("test_the_shared_sentence_is_printed_only_when_it_is_true", () => {
+    // **One recording out of four.** Record 0012's sentence would be a screen
+    // claiming something a reader can see is false — three cards reading *not
+    // yet live* under a line saying these four run from recordings.
+    const { container } = draw(NO_KEY_ONE_RECORDING);
+    expect(container.textContent).not.toContain("these four run from recordings");
+    expect(
+      screen.getByText(
+        "No model key configured — one of these four runs from recordings, made on " +
+          "2026-09-18; the other three have nothing recorded yet.",
+      ),
+    ).toBeInTheDocument();
+
+    // **All four, but not all on one day.** The sentence is never more current
+    // than the oldest thing it describes, and it says there is more than one day.
+    const several = draw({
+      ...NO_KEY_ALL_FOUR,
+      replayable: STARTING_SENTENCES.map((one, place) => ({
+        example: one.example,
+        recording_date: place === 0 ? "2026-09-18" : "2026-09-20",
+      })),
     });
-    // Never more current than the oldest thing it describes.
-    expect(screen.getAllByText(keylessSentence("2026-09-18")).length).toBeGreaterThan(0);
-    expect(screen.queryByText(keylessSentence("2026-09-20"))).toBeNull();
+    expect(several.container.textContent).toContain(
+      "No model key configured — these four run from recordings, the oldest made on 2026-09-18.",
+    );
+    expect(several.container.textContent).not.toContain(keylessSentence("2026-09-20"));
   });
 
   it("test_nothing_is_silently_inert_without_a_key", () => {
@@ -97,12 +123,15 @@ describe("with no model key", () => {
     }
 
     // The field for a sentence of the reader's own is visibly disabled, and it
-    // carries the same sentence saying why.
+    // says why in the same words, with the one thing that is true of it added:
+    // there is no recording of a sentence somebody just typed.
     const field = screen.getByLabelText("An event you think will happen");
     expect(field).toBeDisabled();
     const build = screen.getByRole("button", { name: "Build the map" });
     expect(build).toBeDisabled();
-    expect(container.textContent).toContain(keylessSentence("2026-09-18"));
+    expect(container.textContent).toContain(
+      "A sentence of your own needs the model, and there is no recording of one.",
+    );
   });
 
   it("test_with_no_key_and_no_recording_every_card_says_so", () => {

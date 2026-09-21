@@ -34,12 +34,34 @@ export interface RefusalStripProps {
   readonly onOpen?: (at: number) => void;
   /** Which line the panel beside the map is open at, when it is open at one. */
   readonly openAt?: number | null;
+  /**
+   * True once the run is over.
+   *
+   * A run that has refused nothing **so far** is not a run that refused nothing:
+   * while it is still going, the strip has nothing to say and takes no room. The
+   * moment it is over, "nothing was refused" is a finding, and a finding is said
+   * out loud rather than left as an empty space a reader has to interpret.
+   */
+  readonly finished?: boolean;
 }
 
 /** One row per refusal. Nothing is trimmed, merged or summarised away. */
-export function RefusalStrip({ refusals, onOpen, openAt }: RefusalStripProps) {
+export function RefusalStrip({ refusals, onOpen, openAt, finished }: RefusalStripProps) {
   if (refusals.length === 0) {
-    return null;
+    // Nothing yet, and the run is still going: there is nothing to say.
+    if (finished !== true) {
+      return null;
+    }
+    // Nothing at all, and the run is over. **Kent decided a recording need not
+    // contain a refusal**, so this is an ordinary outcome rather than a missing
+    // one — and it is said, because an empty space where the refusals go reads
+    // as a strip that failed to draw.
+    return (
+      <section className="refusal-strip" aria-label="Proposals the rules refused">
+        <h3 className="refusal-strip__heading">Refused by the rules</h3>
+        <p className="refusal-strip__line">The rules refused nothing in this run.</p>
+      </section>
+    );
   }
   return (
     <section className="refusal-strip" aria-label="Proposals the rules refused">

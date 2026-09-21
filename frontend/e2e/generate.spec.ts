@@ -64,15 +64,23 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
     "This server has no committed recording to play, so there is no generation to watch.",
   );
 
-  // The first screen says what this copy is, word for word, with the day taken
-  // from the server's own readiness answer. It is said twice — under the four
-  // cards, and again under the field it disables — and both are checked, because
-  // a field that takes typing and then does nothing reads as a broken tool.
-  const keyless = page.getByText(
-    /^No model key configured — these four run from recordings made on \d{4}-\d{2}-\d{2}\.$/,
-  );
-  await expect(keyless).toHaveCount(2);
+  // The first screen says what this copy is, and says only what is true. Record
+  // 0012's sentence — *these four run from recordings made on <day>* — is
+  // printed word for word when all four can be played and all four were made on
+  // one day; anything else says how many there really are, in the same voice.
+  // Either way it names a day from the server's own readiness answer, and either
+  // way the field for a sentence of your own is disabled with it, because a
+  // field that takes typing and then does nothing reads as a broken tool.
+  const keyless = page.getByText(/^No model key configured — /);
   await expect(keyless.first()).toBeVisible();
+  const said = (await keyless.first().textContent()) ?? "";
+  expect(said).toMatch(/\d{4}-\d{2}-\d{2}/);
+  if (replayable.length === 4) {
+    expect(said).toContain("these four run from recordings");
+  } else {
+    expect(said).not.toContain("these four run from recordings");
+  }
+  await expect(page.getByLabel("An event you think will happen")).toBeDisabled();
 
   // The card that has a recording. It sends its sentence, exactly as a reader
   // would type it — the same request a live run sends.
@@ -106,17 +114,27 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // whole map at once, when the map is finished.
   await expect(page.locator(".tile").first()).toContainText("no engine yet");
 
-  // Nothing that was already placed moves. Where the first tile sits is read
-  // before the rest arrive and compared with itself afterwards.
+  // Nothing that was already placed moves, and nothing lands on anything else.
+  // Where the first tile sits is read before the rest arrive and compared with
+  // itself afterwards; the boxes are compared with each other at the end.
   const firstTile = page.locator(".react-flow__node.react-flow__node-claim").first();
   const wasAt = await firstTile.getAttribute("style");
 
-  // Every proposal the rules refused is on screen, in the validator's own words.
+  // Every proposal the rules refused is on screen, in the validator's own words
+  // — and a run that refused nothing says that, rather than leaving an empty
+  // space a reader has to interpret. Which of the two this recording shows is
+  // the recording's business: **a recording need not contain a refusal** (Kent,
+  // 2026-09-20), and what is checked here is that the strip is never silent.
+  const strip = page.locator(".refusal-strip");
+  await expect(strip).toBeVisible({ timeout: 120_000 });
   const refusals = page.locator(".refusal-strip__row");
-  await expect(refusals.first()).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator(".refusal-strip__reason").first()).not.toBeEmpty();
+  if ((await refusals.count()) > 0) {
+    await expect(page.locator(".refusal-strip__reason").first()).not.toBeEmpty();
+  } else {
+    await expect(strip).toContainText("The rules refused nothing in this run.");
+  }
   // The rule's stable code is carried on the event and drawn nowhere.
-  await expect(page.locator(".refusal-strip")).not.toContainText("cycle");
+  await expect(strip).not.toContainText("cycle");
 
   // The receipt, when the run is over: nine labelled readings, every one a field.
   const receipt = page.locator(".receipt-strip");
@@ -153,6 +171,35 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
 
   // And the tile that was placed first is exactly where it was.
   expect(await firstTile.getAttribute("style")).toBe(wasAt);
+
+  // No two boxes on the map overlap. A claim drawn on top of another is the one
+  // failure a growing map makes that a finished one never does.
+  const overlaps = await page.locator(".react-flow__node").evaluateAll((boxes) => {
+    const seen = boxes.map((box) => box.getBoundingClientRect());
+    const found: string[] = [];
+    for (let one = 0; one < seen.length; one += 1) {
+      for (let other = one + 1; other < seen.length; other += 1) {
+        const a = seen[one] as DOMRect;
+        const b = seen[other] as DOMRect;
+        if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
+          found.push(`${one} runs into ${other}`);
+        }
+      }
+    }
+    return found;
+  });
+  expect(overlaps).toEqual([]);
+
+  // And not one claim's or arrow's identifier reached the map or the panel
+  // beside it. On a generated map they are twenty-six characters of the engine's
+  // own bookkeeping, and a reader learns nothing from one.
+  //
+  // **The run's own name is the exception, and it is deliberate.** The line under
+  // the map exists so that somebody can ask for this answer again — the map, the
+  // seed, and the working — and the working is asked for by the generation's
+  // name. It is printed once, there, beside the seed, and nowhere else.
+  const onTheMap = (await page.locator(".map-body").textContent()) ?? "";
+  expect(onTheMap).not.toMatch(/\b01[0-9A-HJKMNP-TV-Z]{24}\b/);
 
   // Why the run stopped, in the engine's words for that reason.
   await expect(page.locator(".done-line")).toBeVisible();

@@ -20,7 +20,7 @@
  */
 
 import { useId, useState } from "react";
-import type { Drafted } from "../stream/insert";
+import type { Drafted, DraftedClaim } from "../stream/insert";
 import { draftAClaim } from "../stream/insert";
 import "./addAClaim.css";
 
@@ -28,14 +28,28 @@ import "./addAClaim.css";
 export interface AddAClaimProps {
   /** The map the new claim would go onto. */
   readonly baseId: string;
+  /** Where in the branch the new edit goes: the number of edits already in it. */
+  readonly position?: number;
   /** What to do with a claim that was drafted and passed the rules. */
-  readonly onDrafted?: (drafted: Drafted) => void;
+  readonly onDrafted?: (drafted: DraftedClaim) => void;
+  /**
+   * One line about what happens to a claim once it is drafted, in the words of
+   * the screen this control is on. Beside a stored map it goes onto the branch;
+   * beside a map that has just been generated there is no branch panel yet.
+   */
+  readonly andThen: string;
   /** How the request is made. The real one by default; a test hands in its own. */
   readonly draft?: typeof draftAClaim;
 }
 
 /** *"…but this also happens"*. */
-export function AddAClaim({ baseId, onDrafted, draft = draftAClaim }: AddAClaimProps) {
+export function AddAClaim({
+  baseId,
+  position = 0,
+  onDrafted,
+  andThen,
+  draft = draftAClaim,
+}: AddAClaimProps) {
   const fieldId = useId();
   const [words, setWords] = useState("");
   const [asking, setAsking] = useState(false);
@@ -53,10 +67,12 @@ export function AddAClaim({ baseId, onDrafted, draft = draftAClaim }: AddAClaimP
           }
           setAsking(true);
           setAnswer(null);
-          draft({ base_id: baseId, claim_in_words: words.trim() }).then((drafted) => {
+          draft({ base_id: baseId, claim_in_words: words.trim(), position }).then((drafted) => {
             setAsking(false);
             setAnswer(drafted);
-            onDrafted?.(drafted);
+            if (drafted.state === "drafted") {
+              onDrafted?.(drafted.insert);
+            }
           });
         }}
       >
@@ -105,7 +121,7 @@ export function AddAClaim({ baseId, onDrafted, draft = draftAClaim }: AddAClaimP
         </div>
       ) : (
         <p className="add-a-claim__line" data-answer="drafted">
-          {`Drafted and checked: "${answer.insert.proposition.claim}". It is on your branch, like every other edit.`}
+          {`Drafted and checked: "${answer.insert.proposition.claim}" ${andThen}`}
         </p>
       )}
     </section>

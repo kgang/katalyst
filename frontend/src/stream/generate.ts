@@ -106,7 +106,17 @@ export function joined(name: string, data: string): ReadEvent {
     // same situation as a name it does not know: count it, change nothing.
     return { event: "unknown", name };
   }
-  return { ...(payload as object), event: name } as ReadEvent;
+  const joinedOn = { ...(payload as object), event: name } as ReadEvent;
+  if (joinedOn.event !== "generation_started") {
+    return joinedOn;
+  }
+  // The seed, as its digits rather than as what JavaScript made of them. A whole
+  // number longer than sixteen digits is already rounded by the time `JSON.parse`
+  // hands it back, and the seed is printed under every map so a reader can ask
+  // for the same one again — so a rounded seed is a number on screen that is
+  // simply wrong. Nothing computes with it; it is read off the wire and printed.
+  const digits = /"seed"\s*:\s*(-?\d+)/.exec(data)?.[1];
+  return digits === undefined ? joinedOn : { ...joinedOn, seed_as_written: digits };
 }
 
 /**

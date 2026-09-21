@@ -26,3 +26,23 @@
   min-height: 0;
   overflow: visible;
 }
+
+/* ---- The foot of a generated map ----------------------------------------- *
+ * What the run is doing is said in three channels, and each says it once: the
+ * canvas draws it, the panel lists it, and the line under the map says why it
+ * stopped. The live region is the fourth — the spoken one — and on this screen
+ * it is spoken only. Printing it as well put the same sentence on the page
+ * twice, in two of three stacked strips of prose at the foot of the screen.
+ *
+ * It is still a live region, still polite, and still read out in full. */
+.map-live--spoken {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

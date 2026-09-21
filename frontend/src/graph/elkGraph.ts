@@ -175,14 +175,63 @@ export function toElkGraph(
 }
 
 /**
- * Read the layout engine's answer back, keeping every tile that was already
- * placed exactly where it was.
+ * The gap the layout leaves between two boxes in one column.
  *
- * The hint above asks the engine to leave placed tiles alone, and it mostly
- * does — but "mostly" is not a promise, and losing your place because a new
- * tile arrived is the thing this is here to prevent. So the rule is made
- * absolute on our side: **a tile that had a position keeps that position, to
- * the pixel, and only a tile that had none takes a new one.**
+ * The same forty-eight pixels `LAYOUT_OPTIONS` asks the engine for, written here
+ * as a number because the rule below has to leave it too, and one gap written in
+ * two places is two gaps waiting to disagree.
+ */
+export const COLUMN_GAP = Number(LAYOUT_OPTIONS["elk.spacing.nodeNode"]);
+
+/** Do these two boxes stand in the same column? */
+function sameColumn(one: Placed, other: Placed): boolean {
+  return Math.abs(one.at.x - other.at.x) < TILE_WIDTH;
+}
+
+/** Do these two boxes overlap, or touch, once the column's gap is counted? */
+function runsInto(one: Placed, other: Placed): boolean {
+  return (
+    sameColumn(one, other) &&
+    one.at.y < other.at.y + other.height + COLUMN_GAP &&
+    other.at.y < one.at.y + one.height + COLUMN_GAP
+  );
+}
+
+/** One box, where it is and how tall it is. */
+interface Placed {
+  readonly id: string;
+  readonly at: Position;
+  readonly height: number;
+}
+
+/**
+ * Read the layout engine's answer back, keeping every tile that was already
+ * placed exactly where it was — and making a tile that has just arrived find a
+ * gap rather than land on one of them.
+ *
+ * The hint in `toElkGraph` asks the engine to leave placed tiles alone, and it
+ * mostly does — but "mostly" is not a promise, and losing your place because a
+ * new tile arrived is the thing this is here to prevent. So the rule is made
+ * absolute on our side: **a tile that had a position keeps that position, to the
+ * pixel, and only a tile that had none takes a new one.**
+ *
+ * **That half alone is not enough, and a map that builds itself is where it
+ * shows.** `elk.position` is a hint about the *order* of a column, not a
+ * coordinate the engine is bound by: it lays the whole map out freshly, moving
+ * the placed tiles as it sees fit, and then we put those back where they were.
+ * The tile that arrived keeps a coordinate worked out for an arrangement that no
+ * longer exists — and the two meet in the middle, which on the Hormuz run put
+ * one claim exactly on top of another.
+ *
+ * So the arriving tiles are settled afterwards, in the order the engine proposed
+ * them: each keeps its column, starts where the engine put it, and slides **down**
+ * until it clears every box already settled by the column's own gap. Nothing that
+ * was already placed moves a pixel; the late arrival finds a gap, which is what
+ * the chapter says happens and what nothing was making happen.
+ *
+ * Reserved rectangles are boxes here like any other. A claim drawn on top of the
+ * rectangle that was held open for it is the same mistake as two claims on top of
+ * each other.
  *
  * @param laidOut What the layout engine returned.
  * @param placed Where tiles already sat before it ran.
@@ -192,14 +241,37 @@ export function readPositions(
   laidOut: ElkNode,
   placed: ReadonlyMap<string, Position>,
 ): Map<string, Position> {
-  const positions = new Map<string, Position>();
+  const settled: Placed[] = [];
+  const arriving: Placed[] = [];
+
   for (const child of laidOut.children ?? []) {
+    const height = child.height ?? 0;
     const pinned = placed.get(child.id);
     if (pinned !== undefined) {
-      positions.set(child.id, pinned);
-      continue;
+      settled.push({ id: child.id, at: pinned, height });
+    } else {
+      arriving.push({ id: child.id, at: { x: child.x ?? 0, y: child.y ?? 0 }, height });
     }
-    positions.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
   }
-  return positions;
+
+  // The engine's own order, so the same map always settles the same way. The
+  // identifier breaks a tie, because two boxes proposed at the same height must
+  // not depend on which the engine happened to list first.
+  arriving.sort((one, other) => one.at.y - other.at.y || one.id.localeCompare(other.id));
+
+  for (const box of arriving) {
+    let at = box.at;
+    // Each pass can only push the box further down, and there are finitely many
+    // boxes below it, so this always settles.
+    for (let pass = 0; pass <= settled.length; pass += 1) {
+      const inTheWay = settled.find((other) => runsInto({ ...box, at }, other));
+      if (inTheWay === undefined) {
+        break;
+      }
+      at = { x: at.x, y: inTheWay.at.y + inTheWay.height + COLUMN_GAP };
+    }
+    settled.push({ ...box, at });
+  }
+
+  return new Map(settled.map((box) => [box.id, box.at]));
 }

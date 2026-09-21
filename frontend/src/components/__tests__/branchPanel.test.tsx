@@ -212,18 +212,19 @@ describe("the six things you can do", () => {
     expect(screen.getByText(/Take this as given/)).toBeInTheDocument();
   });
 
-  it("test_add_a_claim_says_what_it_needs_rather_than_half_doing_it", () => {
+  it("test_add_a_claim_opens_the_one_field_that_needs_the_model", () => {
     // A claim is not its wording: it is the wording plus the test that settles
-    // it, who judges it and by when. Nothing in this build drafts those, and a
-    // branch holding a half-written claim could not be folded onto the map at
-    // all — so the button says so and records nothing.
+    // it, who judges it and by when. Those are drafted by the one part of this
+    // product that calls the model, and this is the one control that asks it.
+    // Nothing is recorded by pressing the button — a sentence has to be typed
+    // first, and what comes back has to pass the same rules as any proposal.
     const made = open();
     const add = screen.getByRole("button", { name: /^Add a claim/ });
-    expect(add).toHaveTextContent("needs the part that drafts a claim");
+    expect(add).toHaveTextContent("…but this also happens");
     expect(add).not.toBeDisabled();
     fireEvent.click(add);
     expect(made).toEqual([]);
-    expect(screen.getByText(/no edit was recorded/)).toBeInTheDocument();
+    expect(screen.getByLabelText("…but this also happens")).toBeInTheDocument();
     // And no stack number on screen: a reader does not know what a stack is.
     expect(screen.queryByText(/stack \d/i)).toBeNull();
     expect(screen.queryByText(/pull request/i)).toBeNull();

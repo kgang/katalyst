@@ -166,14 +166,18 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
               <span>same direction</span>
             </div>
             <ul className="delta-rail__rows">
-              {rows.map((row) => (
+              {rows.map((row, place) => (
                 <li
                   className="delta-rail__row"
                   key={row.claimId}
                   data-moved={row.noChange === true ? "no" : "yes"}
                 >
                   <p className="delta-rail__label">
-                    <span className="delta-rail__id">{row.claimId}</span>
+                    {/* Where this ending sits in the engine's own order, which is
+                        what the rail is for. It was the claim's identifier, and on
+                        a generated map that is twenty-six characters nobody reads
+                        (`world/naming.ts`). */}
+                    <span className="delta-rail__id">{place + 1}</span>
                     {row.label}
                     <span className="delta-rail__kind">{KIND_WORDS[row.kind] ?? row.kind}</span>
                     {row.move.reading === undefined ? null : (

@@ -40,8 +40,11 @@ function asCount(value: number): string {
  * decision a belief chip makes — the value itself is carried at whatever
  * precision it arrived with and nothing downstream reads this string.
  */
-function asMeasurement(value: number, most: number): string {
-  return value.toLocaleString("en-GB", { minimumFractionDigits: 1, maximumFractionDigits: most });
+function asMeasurement(value: number, least: number, most: number): string {
+  return value.toLocaleString("en-GB", {
+    minimumFractionDigits: least,
+    maximumFractionDigits: most,
+  });
 }
 
 /** One labelled reading off the receipt. */
@@ -74,8 +77,11 @@ export function receiptLines(receipt: Receipt): readonly Line[] {
       field: "cache_read_tokens",
     },
     { label: "web searches", reading: asCount(receipt.searches), field: "searches" },
-    { label: "cost", reading: `$${asMeasurement(receipt.dollars, 4)}`, field: "dollars" },
-    { label: "took", reading: `${asMeasurement(receipt.seconds, 1)}s`, field: "seconds" },
+    // Money prints as money: two places at the least and four at the most, so a
+    // run that spent nothing reads $0.00 and one that spent a third of a penny
+    // still says so.
+    { label: "cost", reading: `$${asMeasurement(receipt.dollars, 2, 4)}`, field: "dollars" },
+    { label: "took", reading: `${asMeasurement(receipt.seconds, 1, 1)}s`, field: "seconds" },
     { label: "mode", reading: modeLine(receipt), field: "mode" },
   ];
 }

@@ -32,7 +32,7 @@ import { Outline } from "./components/Outline";
 import { ReceiptStrip } from "./components/ReceiptStrip";
 import { Refusal } from "./components/Refusal";
 import { RefusalStrip } from "./components/RefusalStrip";
-import { ReplayBadge } from "./components/ReplayBadge";
+import { ReplayBadge, replaySentence } from "./components/ReplayBadge";
 import { ShortcutsSheet } from "./components/ShortcutsSheet";
 import { VerdictCard } from "./components/VerdictCard";
 import "./components/generationDock.css";
@@ -1045,15 +1045,35 @@ function GenerationScreen({
   // already brings whatever the keyboard is on into view, so nothing here
   // re-frames the map and nothing re-lays it out. A tile that is already placed
   // stays exactly where it is; what moves is where the reader is looking.
-  const newest = growth.world.claims[growth.world.claims.length - 1]?.id ?? null;
+  // A claim that has just **arrived** takes focus, and nothing else does. The
+  // count is what says one arrived: when the likelihoods land, the engine's own
+  // world replaces the drawing and its claims come back in the map's order
+  // rather than the order they were proposed in — which is not an arrival, and
+  // moving the view for it would slide the map sideways at the very moment it
+  // stopped changing.
+  const howManyClaims = growth.world.claims.length;
+  const seenSoFar = useRef(0);
   const lastArrived = useRef<string | null>(null);
   useEffect(() => {
-    if (newest === null || newest === lastArrived.current) {
+    if (howManyClaims <= seenSoFar.current) {
       return;
     }
-    lastArrived.current = newest;
-    setFocused(newest);
-  }, [newest]);
+    seenSoFar.current = howManyClaims;
+    const arrived = growth.world.claims[howManyClaims - 1]?.id ?? null;
+    lastArrived.current = arrived;
+    setFocused(arrived);
+  }, [howManyClaims, growth.world.claims]);
+
+  // And it lets go the moment the run stops. Focus is also what the hover lens
+  // reads, and a lens left on a claim the machine chose would dim the whole
+  // finished map to fifteen per cent at exactly the moment the reader starts
+  // reading it. If the reader has moved since, their focus is theirs and stays.
+  useEffect(() => {
+    if (!finished) {
+      return;
+    }
+    setFocused((was) => (was === lastArrived.current ? null : was));
+  }, [finished]);
 
   const pick = useCallback((id: string) => {
     setFocused(id);
@@ -1087,6 +1107,16 @@ function GenerationScreen({
         </button>
         <h1 className="map-bar__title">{growth.world.title}</h1>
         <p className="map-bar__where">
+          {/* Nothing sits over the map: the mark that says this run is a
+              recording is a badge up here, and the sentence explaining it is in
+              the line under the map with every other sentence about where this
+              map came from. */}
+          {replaying ? (
+            <ReplayBadge
+              recordingDate={growth.receipt?.recording_date ?? null}
+              receiptMode={growth.receipt?.mode ?? null}
+            />
+          ) : null}
           {asked.target === null ? "Explore" : "Verify"}
           <span className="map-bar__side">
             {asked.target === null ? "what your sentence would cause" : asked.target}
@@ -1111,14 +1141,10 @@ function GenerationScreen({
             onOverflow={() => setStatus("every claim is in the list beside the map")}
             arriving={!finished}
             reserved={growth.skeletons}
-            badge={
-              replaying ? (
-                <ReplayBadge
-                  recordingDate={growth.receipt?.recording_date ?? null}
-                  receiptMode={growth.receipt?.mode ?? null}
-                />
-              ) : undefined
-            }
+            // Framed once when the first rectangle is drawn, and once more when
+            // the run stops — the one moment nothing on the map is moving and
+            // the reader is about to start reading it.
+            frameAgainOn={finished ? "the run stopped" : undefined}
           />
           {overlay === "sheet" ? (
             <ShortcutsSheet open={true} onClose={() => setOverlay(null)} />
@@ -1151,6 +1177,7 @@ function GenerationScreen({
 
               <RefusalStrip
                 refusals={growth.refusals}
+                finished={finished}
                 openAt={openAt}
                 onOpen={(at) => {
                   setOpenAt(at);
@@ -1169,7 +1196,15 @@ function GenerationScreen({
               )}
 
               {finished && growth.world.baseId !== "" ? (
-                <AddAClaim baseId={growth.world.baseId} />
+                // The same control, the same words and the same refusals as the
+                // one on a stored map's six-button panel. What differs is only
+                // what happens next: a generated map has no branch panel on this
+                // screen yet, so the claim is drafted, checked and said, and
+                // putting it on a branch of this map is the next piece of work.
+                <AddAClaim
+                  baseId={growth.world.baseId}
+                  andThen="It is checked against this map and ready to go onto a branch of it."
+                />
               ) : null}
 
               <Inspector
@@ -1187,12 +1222,25 @@ function GenerationScreen({
         </aside>
       </div>
 
-      <p className="map-live" aria-live="polite">
+      {/* Said out loud, and said once. On a stored map this line is on the page
+          as well; here the same facts are already drawn — the claims on the
+          canvas, the refusals in the panel, why the run stopped under the map —
+          so printing them again made the foot of the screen three strips of
+          prose saying the same thing twice. It stays the spoken channel. */}
+      <p className="map-live map-live--spoken" aria-live="polite">
         {announcement}
       </p>
 
       <div className="map-origin">
         <p className="map-origin__line">{growth.world.origin}</p>
+        {replaying ? (
+          <p className="map-origin__line">
+            {replaySentence({
+              recordingDate: growth.receipt?.recording_date ?? null,
+              receiptMode: growth.receipt?.mode ?? null,
+            })}
+          </p>
+        ) : null}
         <DoneLine done={growth.done} failure={growth.failure} />
         {(growth.world.warnings ?? []).map((warning) => (
           <p className="map-origin__line" key={warning}>

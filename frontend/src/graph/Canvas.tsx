@@ -45,6 +45,7 @@ import { TileOverflow } from "../components/TileOverflow";
 import type { MapKeys } from "../keyboard/useMapKeys";
 import { useMapKeys } from "../keyboard/useMapKeys";
 import type { Selection, WorldView } from "../world";
+import { NOT_ON_THIS_MAP } from "../world/naming";
 import {
   firstFrame,
   LARGEST_ZOOM,
@@ -149,6 +150,20 @@ interface SurfaceProps {
    * nothing.
    */
   readonly badge?: ReactNode;
+  /**
+   * A word that changes when the map should be framed again.
+   *
+   * The map is framed once, when it is first drawn, and never again — losing
+   * your place because the map was rearranged is the most disorienting thing a
+   * canvas can do. A map that **builds itself** has one more moment worth
+   * framing: the one where it stops. Nothing on it moves then, the reader is
+   * about to start reading, and a four-column map framed for its first single
+   * rectangle is a map they would otherwise have to hunt around.
+   *
+   * It is a word rather than a flag so that the effect has something to compare:
+   * the map is framed once for each value it has ever had.
+   */
+  readonly frameAgainOn?: string;
 }
 
 /** The surface itself. Lives inside the provider so it can move the view. */
@@ -166,6 +181,7 @@ function MapSurface({
   arriving,
   reserved,
   badge,
+  frameAgainOn,
 }: SurfaceProps) {
   const flow = useReactFlow();
   const surface = useRef<HTMLDivElement>(null);
@@ -200,10 +216,22 @@ function MapSurface({
   // looks like when the reader is not pointing at anything. The claim the
   // keyboard is on counts as being pointed at, so the lens is not a mouse-only
   // feature.
-  const lens = useMemo(
-    () => onThePathFrom(pointingAt ?? focused, world.links),
-    [pointingAt, focused, world.links],
-  );
+  const lens = useMemo(() => {
+    // **The lens only ever reads a claim that is on the map.** A box can leave
+    // under the pointer — a reserved rectangle becomes a tile, a claim is
+    // dropped by a branch — and the mouse never leaves it, because there is
+    // nothing left to leave. What was pointed at is then a name the map does not
+    // hold, nothing is on its path, and the whole map dims to fifteen per cent
+    // with nothing lit. That is the lens answering a question about something
+    // that is not there.
+    const under = world.claims.some((claim) => claim.id === pointingAt) ? pointingAt : null;
+    // **While a map is still arriving the lens is off unless the reader points
+    // at something.** Focus moves by itself on a map that is building — every
+    // claim that arrives takes it, so the view can follow the growing edge — and
+    // dimming the rest of the map because the machine moved is the lens
+    // answering a question nobody asked. Pointing at a tile still works.
+    return onThePathFrom(under ?? (arriving ? null : focused), world.links);
+  }, [pointingAt, focused, world.claims, world.links, arriving]);
 
   // Which column each claim sits in, for the one animation this map spends on
   // causality: the wires arrive in the order the argument runs, a column at a
@@ -329,7 +357,14 @@ function MapSurface({
     // Only once the positions really are this map's. Framing from the positions
     // worked out for the map before the branch would frame the wrong thing, and
     // the right thing would then arrive underneath it.
-    if (layout.runs === 0 || layout.laidOutFor !== mapKey || framed.current === mapKey) {
+    // Which framing this would be. While a map is being asked to frame again —
+    // which is only ever when a generation has stopped — the layout's own run
+    // count is part of the answer, so that a frame taken while the last claims
+    // were still being placed is taken again when they have been. Nothing lays a
+    // finished map out again, so this settles after one or two.
+    const frameFor =
+      frameAgainOn === undefined ? mapKey : `${mapKey}:${frameAgainOn}:${layout.runs}`;
+    if (layout.runs === 0 || layout.laidOutFor !== mapKey || framed.current === frameFor) {
       return;
     }
     const frame = mapBounds();
@@ -344,14 +379,22 @@ function MapSurface({
     flow.setViewport(firstFrame(frame, { width: room.width, height: room.height }), {
       duration: 0,
     });
-    framed.current = mapKey;
+    framed.current = frameFor;
     justFramed.current = true;
-  }, [layout.runs, layout.laidOutFor, flow, mapBounds, mapKey]);
+  }, [layout.runs, layout.laidOutFor, flow, mapBounds, mapKey, frameAgainOn]);
 
   // The view follows whatever the keyboard is on, so a step along a wire never
-  // walks off the edge of the glass. It does not fight the framing above: when a
-  // branch has just arrived and moved focus to the claim it added, the whole map
-  // has already been framed and that claim is in it.
+  // walks off the edge of the glass — and so that a map building itself does not
+  // build its fourth column off the side of the window while the reader watches
+  // an empty one. Every claim that arrives takes focus, which is the rule
+  // `layout-and-zoom.md` already states for a newly created claim; this is the
+  // other half of the same rule, that the focused tile stays in the viewport.
+  //
+  // **It brings the tile in rather than centring on it.** The promise is that
+  // the focused tile is on the glass, not that it is in the middle of it, and a
+  // view that recentred on every arrival would yank the map out from under
+  // somebody reading a tile that was perfectly visible. So: already on the
+  // glass, nothing happens; off the edge, it is brought to the middle, once.
   useEffect(() => {
     if (focused === null || layout.runs === 0 || centredOn.current === focused) {
       // Only when the keyboard has actually moved. Flipping between the two
@@ -365,16 +408,36 @@ function MapSurface({
       centredOn.current = focused;
       return;
     }
-    const node = flow.getNode(focused);
-    if (node === undefined) {
+    // Where the layout put it, not where the drawing library thinks it is: a
+    // tile that has just arrived is in the layout's answer a render before the
+    // library has it, and reading the library's copy too early gave the origin
+    // — which is how a map ended up centred on an empty corner.
+    const at = layout.positions.get(focused);
+    const room = surface.current?.getBoundingClientRect();
+    if (at === undefined || room === undefined) {
+      // Not placed yet. The layout runs again and this runs with it.
       return;
     }
     centredOn.current = focused;
-    flow.setCenter(node.position.x + TILE_WIDTH / 2, node.position.y + heightOf(focused) / 2, {
-      zoom: flow.getZoom(),
-      duration: 0,
-    });
-  }, [focused, flow, heightOf, layout.runs]);
+
+    const middle = { x: at.x + TILE_WIDTH / 2, y: at.y + heightOf(focused) / 2 };
+    const view = flow.getViewport();
+    const onTheGlass = {
+      x: at.x * view.zoom + view.x,
+      y: at.y * view.zoom + view.y,
+      width: TILE_WIDTH * view.zoom,
+      height: heightOf(focused) * view.zoom,
+    };
+    const inside =
+      onTheGlass.x >= 0 &&
+      onTheGlass.y >= 0 &&
+      onTheGlass.x + onTheGlass.width <= room.width &&
+      onTheGlass.y + onTheGlass.height <= room.height;
+    if (inside) {
+      return;
+    }
+    flow.setCenter(middle.x, middle.y, { zoom: view.zoom, duration: 0 });
+  }, [focused, flow, heightOf, layout]);
 
   /** Show the claims a column had no room for, as a list. */
   const openColumn = useCallback(
@@ -561,7 +624,7 @@ function MapSurface({
   }, [layout, heightOf]);
 
   const claimWords = useCallback(
-    (id: string) => world.claims.find((claim) => claim.id === id)?.claim ?? id,
+    (id: string) => world.claims.find((claim) => claim.id === id)?.claim ?? NOT_ON_THIS_MAP,
     [world],
   );
 

@@ -8,6 +8,7 @@
 
 import type { Node } from "@xyflow/react";
 import type { ClaimView, WorldView } from "../world";
+import { NOT_ON_THIS_MAP } from "../world/naming";
 import type { LayoutEdge, LayoutTile } from "./elkGraph";
 import { TILE_MIN_HEIGHT, TILE_WIDTH, tileHeight } from "./geometry";
 import { assignLayers, capLayers } from "./layers";
@@ -175,8 +176,8 @@ export function toFlow(
         // What a reader who never sees the picture hears instead. Everything
         // the stroke says, said in words.
         ariaLabel:
-          `arrow from ${claimWords.get(link.source) ?? link.source} ` +
-          `to ${claimWords.get(link.target) ?? link.target}`,
+          `arrow from ${claimWords.get(link.source) ?? NOT_ON_THIS_MAP} ` +
+          `to ${claimWords.get(link.target) ?? NOT_ON_THIS_MAP}`,
         data: {
           shape: link.shape,
           strength: link.strength,

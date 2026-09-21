@@ -52,6 +52,7 @@ import type {
   Selection,
   WorldView,
 } from "../world";
+import { inFewWords, NOT_ON_THIS_MAP } from "../world/naming";
 import { toMovement, toReading, toShare, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
@@ -248,6 +249,7 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
   const pushes = into.filter((wire) => !wire.reflexive);
   const fedBackBy = into.filter((wire) => wire.reflexive);
   const result = claim.beliefs.model;
+  const byId = new Map(world.claims.map((one) => [one.id, one]));
 
   return (
     <Section title="Why this number">
@@ -299,8 +301,11 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
         ) : (
           pushes.map((wire) => (
             <Fragment key={wire.id}>
+              {/* The cause, named by its own words. Never by its identifier:
+                  on a generated map that is twenty-six characters nobody can
+                  read (`world/naming.ts`). */}
               <dt className="inspector__step-label">
-                <span className="inspector__mono">{wire.source}</span> pushes
+                {inFewWords(byId.get(wire.source)?.claim ?? NOT_ON_THIS_MAP)} pushes
               </dt>
               <dd className="inspector__step">
                 <span className="inspector__mono">{pushAsNumber(wire.strength)}</span>
@@ -317,7 +322,7 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
                     arrive. */}
                 {wire.conditional.reading === undefined ? null : (
                   <span className="inspector__reason">
-                    {`with ${wire.source} supposed true this claim reads ${toReading(
+                    {`with that cause supposed true this claim reads ${toReading(
                       wire.conditional.reading.p,
                       wire.conditional.reading.lo,
                       wire.conditional.reading.hi,
@@ -567,15 +572,11 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
   return (
     <>
       <header className="inspector__head">
-        <p className="inspector__claim">
-          <span className="inspector__mono">{wire.source}</span> {from?.claim ?? wire.source}
-        </p>
+        <p className="inspector__claim">{from?.claim ?? NOT_ON_THIS_MAP}</p>
         <p className="inspector__arrow" aria-hidden="true">
           →
         </p>
-        <p className="inspector__claim">
-          <span className="inspector__mono">{wire.target}</span> {to?.claim ?? wire.target}
-        </p>
+        <p className="inspector__claim">{to?.claim ?? NOT_ON_THIS_MAP}</p>
       </header>
 
       <Section title="Why">
@@ -630,9 +631,9 @@ function WireDetail({ world, wire }: { world: WorldView; wire: LinkView }) {
               <span className="inspector__owner"> model</span>
             </p>
             <p className="inspector__reason">
-              {`What ${wire.target} comes to when ${wire.source} is taken as given — supposed, ` +
-                `never observed, because an arrow claims a mechanism and how often two things ` +
-                `show up together is a different question.`}
+              {`What the claim this arrow ends at comes to when the one it starts at is taken ` +
+                `as given — supposed, never observed, because an arrow claims a mechanism and ` +
+                `how often two things show up together is a different question.`}
             </p>
           </>
         )}

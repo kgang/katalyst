@@ -117,11 +117,32 @@ const RANKED: DeltaRow[] = [
   },
 ];
 
+/**
+ * Which endings the rail listed, in the order it drew them.
+ *
+ * Read off each row's own words rather than off an identifier: the rail names an
+ * ending by what it says, and numbers the rows by where they sit in the order it
+ * was given. On a generated map an identifier is twenty-six characters nobody
+ * reads, so none is printed anywhere (`world/naming.ts`).
+ */
+function inOrder(): string[] {
+  const which = (words: string): string =>
+    words.includes("Polymarket")
+      ? "M1"
+      : words.includes("energy fund")
+        ? "M2"
+        : words.includes("talks")
+          ? "N1"
+          : words;
+  return [...document.querySelectorAll(".delta-rail__label")].map((one) =>
+    which(one.textContent ?? ""),
+  );
+}
+
 describe("the rail beside the map", () => {
   it("test_lists_reachable_terminals_in_map_order", () => {
     render(<DeltaRail rows={ROWS} ranked={false} summary={SUMMARY} />);
-    const listed = screen.getAllByText(/^(M1|M2|N1)$/).map((one) => one.textContent);
-    expect(listed).toEqual(["M1", "M2", "N1"]);
+    expect(inOrder()).toEqual(["M1", "M2", "N1"]);
     expect(screen.getByText(/In map order/)).toBeInTheDocument();
     expect(screen.getByText(/Nothing has ranked these/)).toBeInTheDocument();
   });
@@ -131,22 +152,14 @@ describe("the rail beside the map", () => {
     // them, and nothing here re-ranks them: a ranking is a claim about which
     // change matters most, and it is the engine's claim to make.
     const { rerender } = render(<DeltaRail rows={RANKED} ranked={true} summary={SUMMARY} />);
-    expect(screen.getAllByText(/^(M1|M2|N1)$/).map((one) => one.textContent)).toEqual([
-      "M1",
-      "M2",
-      "N1",
-    ]);
+    expect(inOrder()).toEqual(["M1", "M2", "N1"]);
 
     // Hand the same three rows over in a different order and the rail draws
     // them in that order too — which is what says the order on screen is the
     // one it was given rather than one it worked out.
     const shuffled = [RANKED[2], RANKED[0], RANKED[1]] as DeltaRow[];
     rerender(<DeltaRail rows={shuffled} ranked={true} summary={SUMMARY} />);
-    expect(screen.getAllByText(/^(M1|M2|N1)$/).map((one) => one.textContent)).toEqual([
-      "N1",
-      "M1",
-      "M2",
-    ]);
+    expect(inOrder()).toEqual(["N1", "M1", "M2"]);
 
     // And it says whose order it is, rather than letting the reader guess.
     expect(screen.getByText(/In the order the engine put them in/)).toBeInTheDocument();
@@ -164,11 +177,7 @@ describe("the rail beside the map", () => {
 
     // Widest band first would be N1, M2, M1; most agreement first would be N1,
     // M1, M2. The rail shows neither, because it shows the order it was given.
-    expect(screen.getAllByText(/^(M1|M2|N1)$/).map((one) => one.textContent)).toEqual([
-      "M1",
-      "M2",
-      "N1",
-    ]);
+    expect(inOrder()).toEqual(["M1", "M2", "N1"]);
 
     // Both are printed at two significant figures, like every number on screen,
     // and a share is printed as a whole percentage because it is counted rather

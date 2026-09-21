@@ -40,6 +40,7 @@ import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
 import { NO_CHANGE, noChangeReason } from "../graph/diff/noChange";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
+import { NOT_ON_THIS_MAP } from "./naming";
 import type { FixtureBundle, WorldSource } from "./source";
 import type {
   Badge,
@@ -371,7 +372,7 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
     const claim = byId.get(row.target);
     return {
       claimId: row.target,
-      label: claim?.claim ?? row.target,
+      label: claim?.claim ?? NOT_ON_THIS_MAP,
       kind: claim?.kind ?? "market",
       move: {
         reading: {

@@ -21,6 +21,7 @@
  * of the product does none of it.
  */
 
+import { toClaim, toLink } from "./fromTheServer";
 import type { BranchHue, BranchView, Edit, WireBranch, WireEdit } from "./types";
 
 /**
@@ -134,6 +135,11 @@ function asWireEdit(edit: Edit): WireEdit | null {
         belief: { p: edit.belief.p, lo: edit.belief.lo, hi: edit.belief.hi, owner: "user" },
       };
     case "insert":
+      // A claim somebody asked for can be written the server's way exactly when
+      // the engine drafted it: the answer it sent back **is** the wire form. A
+      // branch whose insert carries only the reader's words cannot be folded
+      // onto a map, and says so rather than sending half of itself.
+      return edit.drafted ?? null;
     case "refine":
       return null;
   }
@@ -178,7 +184,22 @@ export function appendEdit(shop: Workshop, edit: Edit): Workshop {
     ...shop,
     branches: shop.branches.map((branch) =>
       branch.id === shop.openId
-        ? { ...branch, edits: [...branch.edits, edit], wire: wireWith(branch, edit) }
+        ? {
+            ...branch,
+            edits: [...branch.edits, edit],
+            wire: wireWith(branch, edit),
+            // A drafted claim is drawn on the map like any other, so the branch
+            // carries its drawable form too — read through the same two
+            // functions every claim and arrow on this canvas goes through.
+            claims:
+              edit.op === "insert" && edit.drafted !== undefined
+                ? [...branch.claims, toClaim(edit.drafted.proposition)]
+                : branch.claims,
+            links:
+              edit.op === "insert" && edit.drafted !== undefined
+                ? [...branch.links, ...edit.drafted.links.map(toLink)]
+                : branch.links,
+          }
         : branch,
     ),
   };

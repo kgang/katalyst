@@ -682,6 +682,17 @@ export type Edit =
       readonly words: string;
       /** The arrows that attach it. */
       readonly arrows: readonly AddedArrow[];
+      /**
+       * The whole claim and its arrows, exactly as the engine drafted them.
+       *
+       * Present when the part of this product that drafts a claim answered, and
+       * absent on a branch a stored example shipped with. It is what lets this
+       * edit be written the server's way and folded back onto the map: a claim is
+       * not its wording, it is the wording plus how it is judged, by whom, by
+       * when and what it started from, and a branch carrying only the words
+       * cannot be folded at all.
+       */
+      readonly drafted?: components["schemas"]["Insert"];
     }
   /** One number on one arrow moves. */
   | {

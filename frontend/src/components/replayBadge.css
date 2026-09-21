@@ -1,39 +1,24 @@
 /*
- * The mark in the top-right corner of the map saying this run is a recording.
+ * The mark beside the map's name saying this run is a recording.
  *
- * **Top right, and that is the whole of the reasoning.** The map is laid out
- * left to right and grows rightwards, so its first claim is drawn at the left and
- * the first thing on screen is the rectangle held open for it. A badge in that
- * corner would sit on top of the one thing the reader is waiting for. The
- * right-hand corner is the last part of the map to fill and the first to be
- * scrolled past, and the zoom buttons already have the bottom left.
- *
- * It is a plain block of words with one hairline, like every other thing in this
- * product that says something about the session.
+ * **In the bar, never over the map.** Nothing in this product sits on top of the
+ * canvas: a mark floating over it covers a tile the moment the map is bigger than
+ * three claims, and the map is the thing the reader came for. So it is a word and
+ * a day, up with the title, and the sentence explaining it is in the line under
+ * the map where every other sentence about where this map came from lives.
  */
 
 .replay-badge {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  z-index: 5;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: var(--space-1);
-  row-gap: var(--space-hair);
+  display: inline-flex;
   align-items: baseline;
-  max-width: 34rem;
-  margin: 0;
-  padding: var(--space-1) var(--space-2);
-  background: var(--surface-raised);
+  gap: var(--space-1);
+  padding: 0 var(--space-hair);
   border: 1px solid var(--hairline);
-  border-radius: var(--radius);
+  border-radius: 2px;
+  white-space: nowrap;
 }
 
-/* The word itself, in the number face and spaced out, so it reads as a label on
- * the session rather than as something anybody claimed. */
 .replay-badge__word {
-  grid-column: 1;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -42,27 +27,33 @@
   color: var(--text);
 }
 
-.replay-badge__line {
-  grid-column: 2;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  text-wrap: pretty;
-}
-
 /* The day the recording was made, in the number face because it is a reading off
  * the receipt rather than a word. */
 .replay-badge__day {
-  grid-column: 2;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--text-sm);
-  color: var(--text);
+  color: var(--text-muted);
 }
 
-/* The two sources disagreed. The badge is drawn with a doubled left edge rather
- * than a colour, so it survives a grey print, and the sentence beside it already
- * says what happened. */
+/* The two sources disagreed. A doubled left edge rather than a colour, so it
+ * survives a grey print, and the sentence under the map says what happened. */
 .replay-badge[data-disagreed="yes"] {
   border-left-width: 4px;
   border-left-style: double;
+}
+
+/* Read out loud, never drawn: the badge is two words on the glass and a whole
+ * sentence to a reader who is listening. The same sentence is printed in full
+ * under the map, so nobody is told it only one way. */
+.replay-badge__spoken {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }

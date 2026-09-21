@@ -19,12 +19,17 @@
  * what moved. Nothing on this side works out a number — appending an edit is the
  * whole of what a button does.
  *
- * **Two of the six say what they cannot do rather than doing it quietly.**
- * *Split this claim* is not built. *Add a claim* needs the part of this product
- * that drafts a whole claim — the wording, the test that settles it, its judge
- * and its date — and that is not connected. Neither is greyed out: a disabled
- * control says "not for you" and nothing else, and cannot even be asked about
- * with the keyboard.
+ * **One of the six says what it cannot do rather than doing it quietly.**
+ * *Split this claim* is not built. It is not greyed out: a disabled control says
+ * "not for you" and nothing else, and cannot even be asked about with the
+ * keyboard.
+ *
+ * **One of the six needs the model, and only that one.** *Add a claim* sends the
+ * sentence you type to the part of this product that drafts a whole claim — the
+ * wording, the test that settles it, its judge, its date and what it started
+ * from — and appends what comes back to the branch like any other edit. The
+ * other five are arithmetic in the engine's pure core, which is why a reader
+ * with no key still gets the whole multiverse at full fidelity.
  *
  * **Nothing here opens over the map.** No dialog, no scrim, nothing to dismiss:
  * the fields below appear inside this panel, beside the map, which stays live.
@@ -34,6 +39,7 @@ import { useState } from "react";
 import { toDay } from "../graph/diff/days";
 import { pushAsNumber, pushInWords } from "../graph/wires/encodings";
 import type { BranchView, Edit, Selection, WorldView } from "../world";
+import { AddAClaim } from "./AddAClaim";
 import "./branchPanel.css";
 
 /**
@@ -251,6 +257,8 @@ export function BranchPanel({
 export interface InterventionPanelProps {
   /** The world on screen. */
   readonly world: WorldView;
+  /** How many edits the open branch already holds, which is where the next one goes. */
+  readonly editsSoFar?: number;
   /** What the map is open on: the claim or the arrow the buttons act on. */
   readonly selection: Selection;
   /** Append an edit to the open branch. */
@@ -265,10 +273,17 @@ export interface InterventionPanelProps {
  * Never a pop-up: it appears in the panel, the map keeps drawing beside it, and
  * closing it loses nothing because nothing is left half-done.
  */
-export function InterventionPanel({ world, selection, onEdit, onClose }: InterventionPanelProps) {
+export function InterventionPanel({
+  world,
+  selection,
+  editsSoFar = 0,
+  onEdit,
+  onClose,
+}: InterventionPanelProps) {
   const [ownNumber, setOwnNumber] = useState(false);
   const [reading, setReading] = useState({ p: "", lo: "", hi: "" });
   const [pushing, setPushing] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [push, setPush] = useState("");
   const [said, setSaid] = useState<string | null>(null);
 
@@ -309,7 +324,7 @@ export function InterventionPanel({ world, selection, onEdit, onClose }: Interve
         {claim !== undefined
           ? claim.claim
           : wire !== undefined
-            ? `The arrow from ${wire.source} to ${wire.target}.`
+            ? "The arrow you have selected on the map."
             : "Choose a claim or an arrow on the map first — click it, or reach it with the keyboard."}
       </p>
 
@@ -353,27 +368,24 @@ export function InterventionPanel({ world, selection, onEdit, onClose }: Interve
         >
           {BUTTONS.happened}
         </button>
-        {/* **Add a claim** is the one edit this build cannot hand to the
-            engine, and it says so rather than half-doing it. A claim is not its
-            wording: it is the wording plus how it will be judged, by whom, by
-            when, and what it started from. Drafting those needs the part of
-            this product that writes a claim, and that is the next pull request.
-            A branch holding a half-written claim could not be folded onto the
-            map at all, so nothing is recorded. */}
+        {/* **Add a claim** is the one of the six that needs the model, and it
+            is now connected: the sentence goes to the one route that drafts a
+            claim, the same rules every proposal passes check what comes back,
+            and the edit is appended to the branch like any other. It is the same
+            control, with the same words and the same refusals, on a stored map
+            and on one that has just built itself.
+
+            It is a field rather than a button because a claim starts with a
+            sentence somebody types, and the other five act on what is already
+            selected. */}
         <button
           className="intervene__button"
           type="button"
-          data-live="no"
-          onClick={() =>
-            say(
-              "Adding a claim of your own needs the part of this product that drafts one — the " +
-                "wording, the test that settles it, who judges it and by when. That is not " +
-                "connected yet, so no edit was recorded and nothing on the map has changed.",
-            )
-          }
+          onClick={() => setAdding((was) => !was)}
+          aria-expanded={adding}
         >
           {BUTTONS.addClaim}
-          <span className="intervene__hint">needs the part that drafts a claim</span>
+          <span className="intervene__hint">…but this also happens</span>
         </button>
         <button
           className="intervene__button"
@@ -392,6 +404,27 @@ export function InterventionPanel({ world, selection, onEdit, onClose }: Interve
         >
           {BUTTONS.changePush}
         </button>
+        {adding ? (
+          <AddAClaim
+            baseId={world.baseId}
+            position={editsSoFar}
+            andThen="It is on your branch, like every other edit."
+            onDrafted={(drafted) => {
+              setAdding(false);
+              onEdit({
+                op: "insert",
+                claimId: drafted.proposition.id,
+                words: drafted.proposition.claim,
+                arrows: drafted.links.map((link) => ({
+                  id: link.id,
+                  source: link.source,
+                  target: link.target,
+                })),
+                drafted,
+              });
+            }}
+          />
+        ) : null}
         <button
           className="intervene__button"
           type="button"

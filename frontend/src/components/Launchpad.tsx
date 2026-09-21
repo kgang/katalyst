@@ -27,6 +27,7 @@
 
 import type { FixtureSummary } from "../api/client";
 import type { Readiness } from "../stream/readiness";
+import { countInWords } from "../world/naming";
 import type { Asked } from "./InputBar";
 import { InputBar } from "./InputBar";
 import "./launchpad.css";
@@ -85,10 +86,57 @@ export const STARTING_SENTENCES: readonly StartingSentence[] = [
 /**
  * Record 0012's sentence, word for word, with the day the readiness answer gave.
  *
- * @param day The oldest day among the recordings this copy can play.
+ * **It is printed only when it is true**: when all four of the sentences below
+ * can be played and all four were recorded on the same day. Anything else and it
+ * would be a screen claiming something a reader can see is false — three cards
+ * reading *not yet live* under a line saying these four run from recordings — and
+ * the one screen this product cannot afford to be caught out on is the one that
+ * exists to say what this copy can honestly do.
+ *
+ * @param day The day the recordings were made.
  */
 export function keylessSentence(day: string): string {
   return `No model key configured — these four run from recordings made on ${day}.`;
+}
+
+/**
+ * What this copy can play, in one or two sentences, and always true.
+ *
+ * Four shapes, and the first is record 0012's own words. The others say the same
+ * kind of thing in the same voice: how many of the four can be played, how many
+ * cannot, and the day — the **oldest** day, where there is more than one, so the
+ * sentence is never more current than the oldest thing it describes.
+ *
+ * @param days The day each playable example was recorded on, in any order.
+ * @param outOf How many sentences the screen offers altogether.
+ */
+export function whatThisCopyCanPlay(days: readonly string[], outOf: number): string | null {
+  if (days.length === 0) {
+    return null;
+  }
+  const sorted = [...days].sort();
+  const oldest = sorted[0] as string;
+  const allOfThem = days.length === outOf;
+  const oneDay = sorted[sorted.length - 1] === oldest;
+
+  if (allOfThem && oneDay) {
+    return keylessSentence(oldest);
+  }
+  if (allOfThem) {
+    return (
+      `No model key configured — these ${countInWords(outOf)} run from recordings, the oldest ` +
+      `made on ${oldest}.`
+    );
+  }
+  const rest = outOf - days.length;
+  const canPlay = days.length === 1 ? "runs" : "run";
+  const cannot = rest === 1 ? "has" : "have";
+  const theRest = rest === 1 ? "the other one" : `the other ${countInWords(rest)}`;
+  const when = oneDay ? `made on ${oldest}` : `the oldest made on ${oldest}`;
+  return (
+    `No model key configured — ${countInWords(days.length)} of these ${countInWords(outOf)} ` +
+    `${canPlay} from recordings, ${when}; ${theRest} ${cannot} nothing recorded yet.`
+  );
 }
 
 /** What each card can do, which is one of exactly three things. */
@@ -114,12 +162,6 @@ export interface LaunchpadProps {
   readonly onBuild: (asked: Asked) => void;
 }
 
-/** The oldest day among the recordings this copy can play, or null when there are none. */
-export function oldestRecordingDay(readiness: Readiness | null): string | null {
-  const days = (readiness?.replayable ?? []).map((one) => one.recording_date).sort();
-  return days[0] ?? null;
-}
-
 /** The first screen. */
 export function Launchpad({ examples, failure, readiness, onOpen, onBuild }: LaunchpadProps) {
   // The two facts this screen reads, and the one it deliberately does not.
@@ -127,7 +169,13 @@ export function Launchpad({ examples, failure, readiness, onOpen, onBuild }: Lau
   const recorded = new Map(
     (readiness?.replayable ?? []).map((one) => [one.example, one.recording_date]),
   );
-  const oldest = oldestRecordingDay(readiness);
+  // The day each of the four sentences was recorded on, for the ones that were.
+  // Read off the cards rather than off the whole answer, so a recording of
+  // something this screen does not offer cannot make its sentence wrong.
+  const playable = STARTING_SENTENCES.map((one) => recorded.get(one.example)).filter(
+    (day): day is string => day !== undefined,
+  );
+  const canPlay = whatThisCopyCanPlay(playable, STARTING_SENTENCES.length);
   const stateOf = (example: string): CardState =>
     hasKey ? "live" : recorded.has(example) ? "replay" : "not-yet";
 
@@ -235,9 +283,7 @@ export function Launchpad({ examples, failure, readiness, onOpen, onBuild }: Lau
 
         {/* Record 0012's sentence, word for word, under the four cards — and
             again under the field below, which is disabled with it. */}
-        {oldest === null || hasKey ? null : (
-          <p className="launchpad__keyless">{keylessSentence(oldest)}</p>
-        )}
+        {canPlay === null || hasKey ? null : <p className="launchpad__keyless">{canPlay}</p>}
         {/* What *not yet live* means, said once in full rather than three times
             over: each card carries the short form, and this is the whole of it.
             It is the honest state now, not a catch-all — a key would run it, and
@@ -261,9 +307,9 @@ export function Launchpad({ examples, failure, readiness, onOpen, onBuild }: Lau
           disabledBecause={
             hasKey
               ? null
-              : oldest === null
+              : canPlay === null
                 ? "This copy has no model key and no recordings, so a sentence of your own cannot be turned into a map."
-                : keylessSentence(oldest)
+                : `${canPlay} A sentence of your own needs the model, and there is no recording of one.`
           }
           onBuild={onBuild}
         />

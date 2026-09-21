@@ -9,12 +9,14 @@
 
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { outlineOf } from "../../a11y/sentences";
 import { Inspector } from "../../components/Inspector";
 import { ReceiptStrip } from "../../components/ReceiptStrip";
 import { RefusalStrip } from "../../components/RefusalStrip";
 import { ReplayBadge } from "../../components/ReplayBadge";
 import { VerdictCard } from "../../components/VerdictCard";
 import { foldAll, waitingFor } from "../growth";
+import { A_REAL_RUN, THE_REAL_SENTENCE } from "./aRealRun";
 import {
   BELIEFS,
   NO_PATH,
@@ -183,11 +185,18 @@ describe("the Verify door's two answers", () => {
       <VerdictCard verdict={REACHED} target="the Polymarket contract" world={world} />,
     );
 
-    // The steps of the route the engine named, in the engine's order.
+    // The route the engine named, in the engine's order — each claim in its own
+    // words, numbered by where it sits. **No identifier is printed**: on a
+    // generated map an identifier is twenty-six characters nobody reads.
     const steps = [...container.querySelectorAll(".verdict-card__step-id")].map(
       (one) => one.textContent,
     );
-    expect(steps).toEqual([...REACHED.path]);
+    expect(steps).toEqual(["start", "1", "2"]);
+    const named = [...container.querySelectorAll(".verdict-card__step-claim")].map(
+      (one) => one.textContent,
+    );
+    expect(named).toEqual(REACHED.path.map((id) => world.claims.find((c) => c.id === id)?.claim));
+    expect(container.textContent).toContain("two steps from the hypothesis");
 
     // The number is the one on the verdict, at two significant figures, and the
     // honest wart is beside it in the one place it is written.
@@ -234,5 +243,125 @@ describe("the replay badge", () => {
     const { container } = render(<ReplayBadge recordingDate={null} receiptMode="live" />);
     expect(container.firstElementChild).toHaveAttribute("data-disagreed", "yes");
     expect(container.textContent).toContain("the receipt says the run was live");
+  });
+});
+
+/**
+ * Not one identifier reaches the screen, on a real generated map.
+ *
+ * On the stored example the identifiers are `H`, `C` and `M1`, which read like
+ * names — and that accident let them onto a dozen surfaces. On a generated map
+ * the same code prints `01M2QYMMJYA27CAZ91N8VPA6NK`, which is not a name but a
+ * piece of the engine's bookkeeping. So every surface is drawn from a real
+ * ten-claim run and the whole rendering is searched for one.
+ */
+describe("a generated map never prints an identifier", () => {
+  /** Every identifier the real run minted, claims and arrows alike. */
+  function everyIdentifier(): string[] {
+    const found = new Set<string>();
+    for (const event of A_REAL_RUN) {
+      if (event.event === "proposal_accepted") {
+        if (event.proposition !== null) {
+          found.add(event.proposition.id);
+        }
+        for (const link of event.links) {
+          found.add(link.id);
+        }
+      }
+      if (event.event === "generation_started") {
+        found.add(event.generation_id);
+      }
+    }
+    return [...found];
+  }
+
+  it("test_no_identifier_reaches_the_screen", () => {
+    const grown = foldAll(waitingFor(THE_REAL_SENTENCE, null), A_REAL_RUN);
+    const claims = grown.world.claims;
+    // The run really is the one this test is about: ten claims, nine arrows,
+    // identifiers nobody could read, and not one refusal.
+    expect(claims).toHaveLength(10);
+    expect(grown.world.links).toHaveLength(9);
+    expect(claims.every((one) => one.id.length === 26)).toBe(true);
+    expect(grown.refusals).toEqual([]);
+
+    const drawn: string[] = [];
+    const take = (markup: { container: HTMLElement }) =>
+      drawn.push(markup.container.textContent ?? "");
+
+    take(render(<RefusalStrip refusals={grown.refusals} finished={true} />));
+    take(render(<ReceiptStrip receipt={grown.receipt as never} />));
+    take(
+      render(
+        <VerdictCard
+          verdict={{
+            event: "verdict",
+            kind: "reached",
+            path: [claims[0]?.id ?? "", claims[3]?.id ?? "", claims[6]?.id ?? ""],
+            product: 0.0412,
+            nearest: null,
+            why: "The story reaches it in 2 steps, along the best-backed route on this map.",
+          }}
+          target="a contract on European gas"
+          world={grown.world}
+        />,
+      ),
+    );
+    take(
+      render(
+        <VerdictCard
+          verdict={{
+            event: "verdict",
+            kind: "no_path",
+            path: [],
+            product: null,
+            nearest: claims[6]?.id ?? "",
+            why: "Nothing on this map reaches it.",
+          }}
+          target="a contract on European gas"
+          world={grown.world}
+        />,
+      ),
+    );
+    for (const claim of claims) {
+      take(render(<Inspector world={grown.world} selection={{ kind: "claim", id: claim.id }} />));
+    }
+    for (const wire of grown.world.links) {
+      take(render(<Inspector world={grown.world} selection={{ kind: "wire", id: wire.id }} />));
+    }
+    take(
+      render(
+        <Inspector
+          world={grown.world}
+          selection={{ kind: "generation", id: grown.generationId ?? "" }}
+          generation={{
+            receipt: grown.receipt,
+            working: { state: "reading" },
+            unknown: new Map(),
+            openAt: null,
+          }}
+        />,
+      ),
+    );
+
+    // The reserved rectangles the map held open while it grew, and every
+    // sentence the outline reads out.
+    const everyRectangle = A_REAL_RUN.reduce(
+      (so, event) => [...so, ...foldAll(waitingFor(THE_REAL_SENTENCE, null), [event]).skeletons],
+      [] as { words: string }[],
+    );
+    drawn.push(everyRectangle.map((one) => one.words).join(" "));
+    drawn.push(
+      outlineOf(grown.world)
+        .map((one) => one.sentence)
+        .join(" "),
+    );
+
+    const whole = drawn.join("\n");
+    for (const identifier of everyIdentifier()) {
+      expect(whole, `an identifier reached the screen: ${identifier}`).not.toContain(identifier);
+    }
+    // And nothing that merely looks like one, either.
+    expect(whole).not.toMatch(/\b01[0-9A-HJKMNP-TV-Z]{24}\b/);
   });
 });

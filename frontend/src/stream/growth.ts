@@ -31,6 +31,7 @@
 import type { WorldSummary } from "../world/apiSource";
 import { toWorldView } from "../world/apiSource";
 import { toClaim, toLink } from "../world/fromTheServer";
+import { inFewWords, NOT_ON_THIS_MAP } from "../world/naming";
 import type { Absence, ClaimView, LinkView, WorldView } from "../world/types";
 import type {
   Done,
@@ -83,10 +84,16 @@ export interface Growth {
   /** The engine's name for this run. Null until the run has started. */
   readonly generationId: string | null;
   /**
-   * The seed every likelihood in this run was worked out from, as the engine
-   * reported it. Null until the run has started; never worked out here.
+   * The seed every likelihood in this run was worked out from, exactly as the
+   * engine wrote it — its digits, not a number.
+   *
+   * A seed can be nineteen digits long and JavaScript holds a whole number
+   * exactly only up to sixteen, so the parsed value is already rounded. Nothing
+   * here computes with a seed; it is printed under the map so a reader can ask
+   * for the same one again, and what is printed is what came off the wire.
+   * Null until the run has started; never worked out here.
    */
-  readonly seed: number | null;
+  readonly seed: string | null;
   /** The sentence the reader typed, as the run's first event repeated it back. */
   readonly hypothesis: string;
   /** The destination the reader named, or null on the Explore door. */
@@ -143,7 +150,7 @@ export const WHILE_IT_GROWS: Absence = {
 };
 
 /** The one sentence under a growing map saying where everything on it came from. */
-function originWhileGrowing(generationId: string | null, seed: number | null): string {
+function originWhileGrowing(generationId: string | null, seed: string | null): string {
   const named = generationId === null ? "a generation that has not started yet" : generationId;
   const from = seed === null ? "a seed the engine has not named yet" : `seed ${seed}`;
   return (
@@ -223,7 +230,7 @@ function rectanglesFor(
   const words = new Map(claims.map((claim) => [claim.id, claim.claim]));
   return frontier.map((id) => ({
     id: rectangleFor(id),
-    words: `one step on from "${words.get(id) ?? id}"`,
+    words: `one step on from "${inFewWords(words.get(id) ?? NOT_ON_THIS_MAP)}"`,
     after: id,
   }));
 }
@@ -281,20 +288,32 @@ function hypothesisAmong(claims: readonly ClaimView[], sofar: string): string {
   return claims.find((claim) => claim.kind === "hypothesis")?.id ?? "";
 }
 
+/**
+ * The seed this run drew with, as its digits.
+ *
+ * The reader puts the digits on the event because JavaScript cannot hold a
+ * nineteen-digit whole number exactly. A caller that handed the events over by
+ * hand has no digits to give, and the parsed number is then the whole of what is
+ * known.
+ */
+function seedOf(event: GenerationStarted): string {
+  return event.seed_as_written ?? String(event.seed);
+}
+
 /** The run has started: a name, a seed, and one rectangle carrying the reader's own words. */
 function started(was: Growth, event: GenerationStarted): Growth {
   return {
     ...was,
     phase: "growing",
     generationId: event.generation_id,
-    seed: event.seed,
+    seed: seedOf(event),
     hypothesis: event.hypothesis,
     target: event.target,
     world: {
       ...was.world,
       baseId: event.generation_id,
       title: event.hypothesis,
-      origin: originWhileGrowing(event.generation_id, event.seed),
+      origin: originWhileGrowing(event.generation_id, seedOf(event)),
     },
     skeletons: [{ id: FIRST_RECTANGLE, words: event.hypothesis, after: null }],
   };
@@ -326,9 +345,11 @@ export function fold(was: Growth, event: ReadEvent): Growth {
           ...was.world,
           hypothesisId: hypothesisAmong(claims, was.world.hypothesisId),
           claims,
-          // Every arrow that can be drawn, drawn once. The list is rebuilt rather
-          // than appended to because an arrow held back earlier joins it here.
-          links: drawn,
+          // The arrows already on the map, and every one that can now be drawn:
+          // the ones this event brought, and any that were held back waiting for
+          // their second end. A held arrow was never on the map, so nothing is
+          // drawn twice.
+          links: [...was.world.links, ...drawn],
         },
         skeletons: rectanglesFor(event.frontier, claims),
         waitingWires: waiting,
@@ -360,7 +381,13 @@ export function fold(was: Growth, event: ReadEvent): Growth {
         id: event.world.base_id,
         title: was.hypothesis,
         day: event.world.day_zero,
-        origin: originOfTheFinishedMap(was, event.world.seed, event.world.versions),
+        // The seed the run reported, not the one on the world: both are the
+        // same seed, and only the first was read as its digits.
+        origin: originOfTheFinishedMap(
+          was,
+          was.seed ?? String(event.world.seed),
+          event.world.versions,
+        ),
       };
       return {
         ...was,
@@ -403,7 +430,7 @@ export function fold(was: Growth, event: ReadEvent): Growth {
 }
 
 /** The one sentence under a finished map, saying where every number on it came from. */
-function originOfTheFinishedMap(was: Growth, seed: number, versions: number): string {
+function originOfTheFinishedMap(was: Growth, seed: string, versions: number): string {
   const spelled = versions.toLocaleString("en-GB").replace(/,/g, " ");
   return (
     `Every claim and arrow on this map was proposed at /api/generate and accepted by the map's ` +

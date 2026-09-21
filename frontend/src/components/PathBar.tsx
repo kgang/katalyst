@@ -35,6 +35,7 @@
 
 import { originStep } from "../graph/wires/encodings";
 import type { ClaimView, LinkView, WorldView } from "../world";
+import { countInWords } from "../world/naming";
 import { toTwoFigures } from "./BeliefChip";
 import "./pathBar.css";
 
@@ -182,9 +183,18 @@ export interface PathBarProps {
   readonly claimId: string | null;
 }
 
-/** The line of identifiers a route reads as: `H → B → M1`. */
-function routeLine(route: Route): string {
-  return [route.from.id, ...route.steps.map((step) => step.claim.id)].join(" → ");
+/**
+ * How long the route is, in words: *three steps from the hypothesis*.
+ *
+ * This used to be the line of identifiers `H → B → M1`. On the stored example
+ * those read like names; on a generated map they are twenty-six characters of
+ * plumbing, and **no identifier is printed on any screen in this product**
+ * ([`world/naming.ts`](../world/naming.ts)). How many steps there are is the fact
+ * that line was really carrying, and the numbered list underneath is the route.
+ */
+function howLong(route: Route): string {
+  const steps = route.steps.length;
+  return `${countInWords(steps)} ${steps === 1 ? "step" : "steps"} from the hypothesis`;
 }
 
 /** The bar beside the story: one route, and what its steps come to together. */
@@ -240,16 +250,19 @@ export function PathBar({ world, claimId }: PathBarProps) {
     <section className="path-bar" aria-label="How likely the whole chain is">
       <h3 className="path-bar__heading">Path from the hypothesis</h3>
 
-      <p className="path-bar__route">{routeLine(route)}</p>
+      <p className="path-bar__route">{howLong(route)}</p>
 
+      {/* The route, one claim per row, each named by its own words and numbered
+          by where it sits in the route. A number is a fact about this list; an
+          identifier is a fact about the engine's bookkeeping. */}
       <ol className="path-bar__steps">
         <li className="path-bar__step">
-          <span className="path-bar__step-id">{route.from.id}</span>
+          <span className="path-bar__step-id">start</span>
           <span className="path-bar__step-claim">{route.from.claim}</span>
         </li>
-        {route.steps.map((step) => (
+        {route.steps.map((step, place) => (
           <li className="path-bar__step" key={step.wire.id}>
-            <span className="path-bar__step-id">{step.claim.id}</span>
+            <span className="path-bar__step-id">{place + 1}</span>
             <span className="path-bar__step-claim">{step.claim.claim}</span>
           </li>
         ))}

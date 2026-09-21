@@ -19,6 +19,7 @@
 
 import type { Verdict } from "../stream/events";
 import type { WorldView } from "../world";
+import { countInWords, NOT_ON_THIS_MAP } from "../world/naming";
 import { toTwoFigures } from "./BeliefChip";
 import { PATH_PRODUCT_WART } from "./PathBar";
 import "./verdictCard.css";
@@ -33,6 +34,12 @@ export interface VerdictCardProps {
   readonly world: WorldView;
   /** Put the panel and the map on one claim. */
   readonly onSelect?: (claimId: string) => void;
+}
+
+/** How long the route is, in words: *two steps from the hypothesis*. */
+function howLong(claims: number): string {
+  const steps = Math.max(0, claims - 1);
+  return `${countInWords(steps)} ${steps === 1 ? "step" : "steps"} from the hypothesis`;
 }
 
 /** The Verify door's answer, in whichever of its two shapes arrived. */
@@ -86,13 +93,17 @@ export function VerdictCard({ verdict, target, world, onSelect }: VerdictCardPro
       <p className="verdict-card__target">{target}</p>
       <p className="verdict-card__why">{verdict.why}</p>
 
-      <p className="verdict-card__route">{verdict.path.join(" → ")}</p>
+      {/* How long the route is, and then the route itself — one claim per row,
+          named by its own words and numbered by where it sits. **No identifier
+          is printed**: on a generated map they are twenty-six characters of the
+          engine's own bookkeeping, and a reader learns nothing from one. */}
+      <p className="verdict-card__route">{howLong(verdict.path.length)}</p>
       <ol className="verdict-card__steps">
-        {verdict.path.map((id) => (
+        {verdict.path.map((id, place) => (
           <li className="verdict-card__step" key={id}>
             <button className="verdict-card__pick" type="button" onClick={() => onSelect?.(id)}>
-              <span className="verdict-card__step-id">{id}</span>
-              <span className="verdict-card__step-claim">{words.get(id) ?? id}</span>
+              <span className="verdict-card__step-id">{place === 0 ? "start" : place}</span>
+              <span className="verdict-card__step-claim">{words.get(id) ?? NOT_ON_THIS_MAP}</span>
             </button>
           </li>
         ))}

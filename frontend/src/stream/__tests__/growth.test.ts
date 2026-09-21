@@ -11,9 +11,11 @@
 import { describe, expect, it } from "vitest";
 import { type PinnedTile, type Position, pinsFor, readPositions } from "../../graph/elkGraph";
 import { toFlow } from "../../graph/toFlow";
+import { inFewWords } from "../../world/naming";
 import type { ProposalAccepted, StreamEvent } from "../events";
 import type { Growth } from "../growth";
 import { fold, foldAll, waitingFor } from "../growth";
+import { A_REAL_RUN } from "./aRealRun";
 import { B, BELIEFS, EVERY_ARROW, H, STARTED, THE_GROWTH, THE_SENTENCE, theWorld } from "./aStream";
 
 /** Where a generation starts: a request has gone and nothing has come back. */
@@ -55,7 +57,7 @@ describe("the first rectangle", () => {
         // sentence, or the open claim's own words quoted back.
         const open = state.world.claims.find((one) => one.id === box.after);
         expect(box.words).toBe(
-          box.after === null ? THE_SENTENCE : `one step on from "${open?.claim}"`,
+          box.after === null ? THE_SENTENCE : `one step on from "${inFewWords(open?.claim ?? "")}"`,
         );
         // There is no likelihood on it to be a number nobody computed, because
         // there is no slot on it at all.
@@ -182,6 +184,24 @@ describe("a wire and its two ends", () => {
     });
     expect(joined.world.links.map((one) => one.id)).toEqual(["H->B"]);
     expect(joined.waitingWires).toEqual([]);
+  });
+
+  it("test_every_arrow_that_arrived_is_still_drawn", () => {
+    // The arrows accumulate. An earlier version of this reducer replaced the
+    // list with whatever the latest event brought, so a map five claims deep was
+    // drawn with one arrow — which the chapter's three-claim run was too small
+    // to show and the real ten-claim run showed at once.
+    const grown = foldAll(fresh(), A_REAL_RUN);
+    expect(grown.world.claims).toHaveLength(10);
+    expect(grown.world.links).toHaveLength(9);
+    expect(new Set(grown.world.links.map((one) => one.id)).size).toBe(9);
+
+    // And they arrive one at a time, never all at the end: the count only ever
+    // goes up, it goes up more than once, and it ends where the map ends.
+    const counts = everyStateOf(A_REAL_RUN).map((state) => state.world.links.length);
+    expect(counts).toEqual([...counts].sort((one, other) => one - other));
+    expect(counts.at(-1)).toBe(grown.world.links.length);
+    expect(new Set(counts).size).toBeGreaterThan(2);
   });
 
   it("test_the_engines_own_run_never_holds_a_wire_back", () => {

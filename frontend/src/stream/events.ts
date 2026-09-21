@@ -57,6 +57,22 @@ export interface GenerationStarted {
    * it was.
    */
   readonly seed: number;
+  /**
+   * The same seed, exactly as it was written on the wire.
+   *
+   * **Put here by the reader, not by the server**, like the `event` field above
+   * — and for a reason worth writing down. A seed is a whole number the engine
+   * draws with, and it can be nineteen digits long; JavaScript holds a whole
+   * number exactly only up to sixteen, so `seed` above is already rounded by the
+   * time any code here sees it. The run this build was first watched on drew with
+   * 4 803 646 386 380 448 080, and the browser's own reading of that ends 000.
+   *
+   * The browser never computes with a seed — it prints it, so that a reader can
+   * ask for the same map again — so the honest thing to print is the digits that
+   * came off the wire. Absent only when a reader handed the events over by hand
+   * rather than reading them from a stream.
+   */
+  readonly seed_as_written?: string;
   /** The sentence the reader typed, in their own words. */
   readonly hypothesis: string;
   /** The Verify door's destination, in their words. Null when they used the Explore door. */
