@@ -214,6 +214,21 @@ body {
    appear on a gesture, because *there is more below* is the whole of what a
    reader needs to know and a bar that is only there while you scroll says it
    only to somebody who already knew. */
+/* **The panel and the names at its head, as one column.**
+ *
+ * The width lives here rather than on the scrolling box below, so the row of
+ * names is exactly as wide as the panel it names and neither can drift from the
+ * other. The names take the room they need; the scrolling box takes the rest,
+ * which is what keeps the head of the panel on the glass however long the panel
+ * gets. */
+.dock-column {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: 336px;
+  min-height: 0;
+}
+
 .dock {
   flex: 0 0 auto;
   display: flex;
@@ -224,7 +239,8 @@ body {
      scrolling thing does — and without a line there the cut half and the next
      section's first line read as one word printed over another. */
   gap: 1px;
-  width: 336px;
+  /* The whole of the column it is in, whose width is the panel's own 336. */
+  width: 100%;
   min-width: 0;
   overflow-y: auto;
   border-left: 1px solid var(--hairline);
@@ -258,7 +274,9 @@ body {
    shadow is a veto condition. */
 .dock-frame {
   position: relative;
-  flex: 0 0 auto;
+  /* It takes whatever height the names at the head of the column leave, so the
+     panel that scrolls is the only thing that ever has to give. */
+  flex: 1 1 auto;
   display: flex;
   align-items: stretch;
   min-height: 0;

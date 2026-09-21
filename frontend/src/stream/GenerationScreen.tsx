@@ -24,6 +24,7 @@ import { DoneLine } from "../components/DoneLine";
 import { Inspector } from "../components/Inspector";
 import { MapFrame } from "../components/MapFrame";
 import { Outline } from "../components/Outline";
+import { type PanelChoice, PanelSwitch, theLabelFor } from "../components/PanelSwitch";
 import { ReceiptStrip } from "../components/ReceiptStrip";
 import { RefusalStrip } from "../components/RefusalStrip";
 import { ReplayBadge, replaySentence } from "../components/ReplayBadge";
@@ -87,6 +88,25 @@ export function theWordFor(phase: Phase, replaying: boolean): string {
   }
 }
 
+/**
+ * The three panels this screen has, by the name it keeps them under.
+ *
+ * **Three, because there are three things beside this map to read**: whatever
+ * the reader has pointed at, the run that is building it, and the map as a list.
+ * There is no fourth: a generated map has no branches to open, so no panel
+ * offers any. What this screen used to do was stack the first two in one column
+ * with the run's half on top, so a click on a tile filled the bottom of a panel
+ * nobody could see the bottom of.
+ */
+type PanelName = "subject" | "run" | "outline";
+
+/** What the line under the map says when the reader turns to each panel. */
+const PANEL_IN_WORDS: Record<PanelName, string> = {
+  subject: "the claim or arrow you are on, in the panel beside the map",
+  run: "what this run is doing, in the panel beside the map",
+  outline: "the map as a list",
+};
+
 /** What the screen needs. */
 export interface GenerationScreenProps {
   /** The run, already asked for by the press that opened this screen. */
@@ -110,7 +130,10 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
   const [selection, setSelection] = useState<Selection>(null);
   const [focused, setFocused] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<"sheet" | "palette" | null>(null);
-  const [dock, setDock] = useState<"panel" | "outline">("panel");
+  // Which of this screen's three panels is on the glass. It opens on the run,
+  // because at that moment the run is the only thing there is to read: nothing
+  // is selected and there is no map yet.
+  const [dock, setDock] = useState<PanelName>("run");
   const [openAt, setOpenAt] = useState<number | null>(null);
   const [status, setStatus] = useState(
     "Press ? for every key. j and k walk a column; h and l follow the wires.",
@@ -228,6 +251,31 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
     setSelection({ kind: "claim", id });
   }, []);
 
+  // **Choosing something is the one thing that moves the panel on its own.**
+  //
+  // Pointing at a tile or an arrow, or reaching one with the keyboard, puts what
+  // you chose at the top of the panel at once — which is the whole of what was
+  // wrong before: the click did select the tile, and the answer arrived at the
+  // bottom of a column nothing scrolled.
+  //
+  // It follows the selection **object** rather than what is in it, because a
+  // second press on the same tile is a second act of the reader's and must land
+  // them back on what they asked for. Nothing else here ever calls for a panel:
+  // a refusal arriving, the verdict landing and the receipt coming back all
+  // change a panel the reader may not be looking at, and each of them says so on
+  // that panel's own label and in the strip at the foot.
+  const lastChosen = useRef(selection);
+  useEffect(() => {
+    if (selection === lastChosen.current) {
+      return;
+    }
+    lastChosen.current = selection;
+    if (selection === null) {
+      return;
+    }
+    setDock(selection.kind === "generation" ? "run" : "subject");
+  }, [selection]);
+
   // Nothing on this screen is bound to the map's own six operations yet, so the
   // keys that open them say so rather than doing nothing.
   /**
@@ -251,15 +299,15 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
         does: "The same as pressing O. Every claim, one sentence each, in the order they arrived.",
         run: () => {
           setDock("outline");
-          setStatus("the map as a list");
+          setStatus(PANEL_IN_WORDS.outline);
         },
       },
       {
-        name: "Read the panel beside the map",
-        does: "The same as pressing O again. What this run refused, what it cost, and why.",
+        name: "Read what this run is doing",
+        does: "What it refused, what it cost, and where it came from. Also a name at the head of the panel.",
         run: () => {
-          setDock("panel");
-          setStatus("the panel beside the map");
+          setDock("run");
+          setStatus(PANEL_IN_WORDS.run);
         },
       },
       // **Only once there is a working.** It is read back from the server when
@@ -274,7 +322,6 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
               does: "Every call it made, in order. The same as the control in the panel.",
               run: () => {
                 setOpenAt(null);
-                setDock("panel");
                 setSelection({ kind: "generation", id: generationId });
               },
             },
@@ -300,15 +347,46 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
       flipWorlds: () => setStatus("there is nothing to flip to — no branch is open"),
       outline: () =>
         setDock((was) => {
-          const next = was === "outline" ? "panel" : "outline";
-          setStatus(next === "outline" ? "the map as a list" : "the panel beside the map");
+          const next: PanelName = was === "outline" ? "subject" : "outline";
+          setStatus(PANEL_IN_WORDS[next]);
           return next;
         }),
-      panel: () => setStatus("the panel is beside the map"),
+      panel: () => setStatus("the panel is beside the map · press N for the next one"),
       palette: () => setOverlay("palette"),
     }),
     [],
   );
+
+  /**
+   * The three panels, and what each one's name carries beside it.
+   *
+   * **The name follows the subject** — *This claim* or *This arrow* — because
+   * the name is what says what the panel is about, and an arrow is not a claim.
+   *
+   * **The count is read off the run, never written down.** It is how many
+   * proposals the rules refused, which is the length of the list the panel
+   * itself prints — so a reader who is on another panel is told the same number
+   * they would count by hand, and told it without being pulled off what they
+   * were reading.
+   */
+  const panels: readonly PanelChoice[] = useMemo(
+    () => [
+      { name: "subject", label: selection?.kind === "wire" ? "This arrow" : "This claim" },
+      {
+        name: "run",
+        label: "The run",
+        ...(growth.refusals.length === 0 ? {} : { mark: `refused ${growth.refusals.length}` }),
+      },
+      { name: "outline", label: "Outline" },
+    ],
+    [selection, growth.refusals.length],
+  );
+
+  const turnTo = useCallback((name: string) => {
+    const to = name as PanelName;
+    setDock(to);
+    setStatus(PANEL_IN_WORDS[to]);
+  }, []);
 
   return (
     <MapFrame
@@ -392,6 +470,11 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
           }
         />
       }
+      // The names of the three panels, at the head of the panel and outside the
+      // part of it that scrolls, so the way to the other two is always on the
+      // glass. This is the whole answer to *how do I know what panels exist*.
+      panelHead={<PanelSwitch panels={panels} showing={dock} onShow={turnTo} />}
+      panelNamedBy={theLabelFor(dock)}
       panel={
         /* The map as a list, in place of the panel, exactly as it is on a
            stored map: press O for it, press O again for the panel. It grows as
@@ -400,6 +483,13 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
            by a finished list. */
         dock === "outline" ? (
           <Outline items={outline} onPick={pick} focused={focused} />
+        ) : dock === "subject" ? (
+          /* Whatever the reader pointed at, and nothing else in front of it.
+             **This is the fix.** The panel used to be one column with the run's
+             own sections stacked above this one, so a click on a tile filled the
+             bottom of a box nothing scrolled — the answer arrived and the click
+             looked dead. The run is a panel of its own now, one name away. */
+          <Inspector world={growth.world} selection={selection} />
         ) : (
           <>
             {/* The Verify door's answer, at the top, when a destination was named. */}
@@ -447,7 +537,6 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
                   type="button"
                   onClick={() => {
                     setOpenAt(null);
-                    setDock("panel");
                     setSelection({ kind: "generation", id: generationId });
                   }}
                 >
@@ -469,15 +558,27 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
               // broke or whose stream was dropped never gets one, and offering
               // to add a claim to a map that has no identifier would send the
               // *run's* name to a route that asks for the map's.
+              //
+              // **It is on this panel rather than on a name of its own**, at the
+              // end of what the run did, because a panel is a place and this is
+              // an act. It is the one thing here judged rather than derived, and
+              // it is the first thing to move if Kent reads it the other way.
               <AddAClaim
                 baseId={growth.world.baseId}
                 andThen="It is checked against this map and ready to go onto a branch of it."
               />
             ) : null}
 
+            {/* Where this map is coming from, and — once the reader asks for it
+                — every call the run made. **This panel is only ever about the
+                run**, so it is handed the run's own selection and nothing else:
+                a claim the reader chose is read out on its own panel, one name
+                away, and reading it here as well would be one answer printed in
+                two places. */}
             <Inspector
               world={growth.world}
-              selection={selection}
+              about="the run"
+              selection={selection?.kind === "generation" ? selection : null}
               generation={{
                 generationId,
                 seed: growth.seed,

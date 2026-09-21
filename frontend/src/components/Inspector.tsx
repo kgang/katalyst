@@ -119,6 +119,19 @@ export interface InspectorProps {
    * every proposal it made.
    */
   readonly generation?: GenerationDetail;
+  /**
+   * What this drawing of the panel is for, when a screen has more than one of
+   * them and shows one at a time.
+   *
+   * The screen a map builds itself on now offers two panels that are both this
+   * component: one reading out whatever the reader selected, one reading out
+   * the run that built the map. **"Nothing selected" is an answer the first of
+   * those owes and the second does not** — a panel about the run telling a
+   * reader to choose a claim would be answering a question nobody asked, in the
+   * one place they came to read something else. Left out, the panel is the only
+   * one on its screen and says both.
+   */
+  readonly about?: "whatever is selected" | "the run";
 }
 
 /** Everything the panel knows about the run that produced this map. */
@@ -1040,6 +1053,7 @@ export function Inspector({
   world,
   selection,
   generation,
+  about,
   onChangeThis,
   changeRef,
 }: InspectorProps) {
@@ -1071,7 +1085,7 @@ export function Inspector({
         />
       ) : wire !== undefined ? (
         <WireDetail world={world} wire={wire} onChangeThis={onChangeThis} changeRef={changeRef} />
-      ) : (
+      ) : about === "the run" ? null : (
         <div className="inspector__empty">
           <h2 className="inspector__empty-heading">Nothing selected</h2>
           <p className="inspector__body">
