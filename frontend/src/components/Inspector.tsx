@@ -30,6 +30,7 @@
  */
 
 import { Fragment, type ReactNode } from "react";
+import { NO_CHANGE, noChangeReason } from "../graph/diff/noChange";
 import {
   inDays,
   likelihoodStep,
@@ -389,14 +390,15 @@ function WhatYourEditDid({ claim }: { claim: ClaimView }) {
         <span className="inspector__mono">
           {toMovement(moved.from, moved.to, moved.by, moved.way)}
         </span>
-        <span className="inspector__moved-word">{counted ? moved.way : "no change"}</span>
+        <span className="inspector__moved-word">{counted ? moved.way : NO_CHANGE}</span>
       </p>
-      {counted || reweighted ? null : (
-        <p className="inspector__reason">
-          The engine compared the two worlds and reports no change on this claim: a move counts only
-          when the versions of the map agree on which way it went, and these did not.
-        </p>
-      )}
+      {/* Why the engine says it did not move. The sentence is not written here:
+          the tile's line and the rail's greyed row say the same thing, and one
+          verdict said three ways is three chances to name a cause the engine
+          never gave. A claim that moved only by reweighting is the exception —
+          its sentence is at the head of the decomposition, where the chapter
+          puts it, and saying it twice on one screen is noise. */}
+      {counted || reweighted ? null : <p className="inspector__reason">{noChangeReason(moved)}</p>}
       {reweighted ? null : (
         <>
           <dl className="inspector__pairs">

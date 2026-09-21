@@ -65,17 +65,20 @@ export interface Ranged {
  * - `not_said` — nobody has given a number. The one dash on screen with a
  *   meaning: the reader's own empty slot, inviting a number.
  */
-export type AbsenceKind = "no_engine" | "no_market" | "not_said";
+export type AbsenceKind = "no_engine" | "no_market" | "not_said" | "ask_failed";
 
 /**
  * A number that is not here, and why.
  *
  * `words` is what the reader sees where the number would have been — "no
  * market", "no engine yet", or a dash. `reason` is the sentence that says why,
- * so no slot on screen is ever merely empty. `kind` is which of the three this
+ * so no slot on screen is ever merely empty. `kind` is which of the four this
  * is, so that code can tell one absence from another without reading its words
  * back — the dash that invites a number is not the dash that means nothing was
- * computed.
+ * computed, and neither of those is `ask_failed`: the engine is there and it
+ * was asked, and one attempt did not come back. That last one is the only
+ * absence that is not a fact about the map, so it is the only one that is never
+ * kept — ask again and it may well be gone.
  */
 export interface Absence {
   /** Which absence this is. */

@@ -210,6 +210,30 @@ describe("asking the engine", () => {
     expect(strike?.standing?.reason).toContain("settled in every version of the map");
   });
 
+  it("test_a_claim_judged_on_a_day_the_series_does_not_draw_is_read_the_engines_way", async () => {
+    // A window longer than 180 days is drawn at fewer points, so a claim's own
+    // resolve-by day is not always one of them. The engine pins the day inside
+    // the window and takes the first drawn day at or after it; the browser used
+    // to want an exact match and gave up when it did not get one — which left
+    // the reader looking at a flat 1 with no word beside it to say why.
+    vi.mocked(readWorld).mockResolvedValue({
+      ...WORLD,
+      graph: {
+        ...BUNDLE.graph,
+        propositions: [
+          proposition("H", "2026-11-01", { kind: "hypothesis" }),
+          // Judged on a day the series does not draw: between the second and
+          // the third of the three points this world was worked through at.
+          proposition("S", "2026-10-15"),
+        ],
+      },
+    } as unknown as World);
+
+    const world = await new ApiWorldSource().readWorld({ baseId: "example", branch: BRANCH });
+    const strike = world.claims.find((claim) => claim.id === "S");
+    expect(strike?.standing?.words).toBe("Supposed \u00b7 Oct 2");
+  });
+
   it("test_an_observed_claim_gets_the_word_too", async () => {
     // One rule, not a rule about suppositions. A claim the reader reported as
     // news is true in every version of the map that survived the report, so the

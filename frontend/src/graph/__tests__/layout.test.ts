@@ -29,6 +29,7 @@ import {
   claimLines,
   firstFrame,
   LARGEST_ZOOM,
+  roomFor,
   SMALLEST_ZOOM,
   SUMMARY_BELOW_ZOOM,
   smallestTextAt,
@@ -220,6 +221,31 @@ describe("how tall a tile is", () => {
     ).toBeGreaterThan(tileHeight(claimOf(short, { beliefs: noMarket })));
   });
 
+  it("test_room_for_a_movement_line_stays_inside_the_ceiling", () => {
+    // The busiest tile on the map: the two badges the strike branch earns and a
+    // line saying how far the number moved. The height it needs is worked out
+    // once and bounded once — bounded heights added and subtracted count the
+    // floor twice and are held under no ceiling at all.
+    const busiest = claimOf(
+      "The Strait of Hormuz reopens to unrestricted commercial transit for shipping of every flag.",
+      {
+        badges: [
+          { words: "Supposed \u00b7 Oct 1" },
+          {
+            words:
+              'Retracted \u00b7 Oct 2 \u00b7 by "a confirmed military strike on Iranian territory"',
+          },
+          { words: ".41 \u25b2 .62", movement: true },
+        ],
+      },
+    );
+    expect(roomFor(busiest)).toBeLessThanOrEqual(TILE_MAX_HEIGHT);
+    expect(roomFor(busiest) % 8).toBe(0);
+    // And it is still the taller of the two readings: the movement line is on a
+    // line of its own rather than packed in with the words.
+    expect(roomFor(busiest)).toBeGreaterThanOrEqual(tileHeight(busiest));
+  });
+
   it("test_tile_height_is_content_fit_within_152_and_320", () => {
     // The two numbers in this test's name are the two in the chapter, so they
     // are checked rather than taken on trust: a floor and a ceiling that drifted
@@ -328,16 +354,50 @@ describe("sorting a map into columns", () => {
 });
 
 describe("the union of two worlds", () => {
-  /** The stored example's shape, as a list of tiles and the arrows between them. */
-  const BASE: [string, number][] = [
-    ["H", 280],
-    ["C", 192],
-    ["B", 176],
-    ["R", 152],
-    ["M1", 192],
-    ["M2", 192],
-    ["N1", 216],
+  /**
+   * The stored example's eight claims, in the words the map serves them in.
+   *
+   * **Not one height below is written down.** Every tile is measured by the same
+   * function the page measures it with, from the claim itself — so a change to
+   * what a tile holds moves this test with it rather than leaving it asserting
+   * against numbers that were true once.
+   */
+  const HORMUZ: ClaimView[] = [
+    aClaim({
+      id: "H",
+      kind: "hypothesis",
+      claim: "The Strait of Hormuz reopens to unrestricted commercial transit.",
+    }),
+    aClaim({
+      id: "C",
+      claim: "War-risk insurance premia for Gulf transits fall by half.",
+    }),
+    aClaim({ id: "B", claim: "Brent crude settles below $68 for five sessions." }),
+    aClaim({ id: "R", claim: "OPEC+ announces output restraint." }),
+    aClaim({ id: "M1", kind: "market", claim: "The tanker-rate market settles lower." }),
+    aClaim({ id: "M2", kind: "market", claim: "The insurance market reprices Gulf hulls." }),
+    aClaim({
+      id: "N1",
+      kind: "not_tradeable",
+      claim: "Freight forwarders resume booking Gulf routes at pre-closure volumes.",
+    }),
+    aClaim({ id: "S", claim: "A confirmed military strike on Iranian territory." }),
   ];
+
+  /** One claim of the map, by its identifier. */
+  function claimAt(id: string): ClaimView {
+    const found = HORMUZ.find((claim) => claim.id === id);
+    if (found === undefined) {
+      throw new Error(`no claim ${id} on this map`);
+    }
+    return found;
+  }
+
+  /** The stored example's shape, as a list of tiles and the arrows between them. */
+  const BASE: [string, number][] = HORMUZ.filter((claim) => claim.id !== "S").map((claim) => [
+    claim.id,
+    tileHeight(claim),
+  ]);
   const BASE_ARROWS: LayoutEdge[] = [
     { id: "H->B", source: "H", target: "B" },
     { id: "H->C", source: "H", target: "C" },
@@ -354,7 +414,7 @@ describe("the union of two worlds", () => {
     // cause cannot be drawn to the right of what it causes. What must **not**
     // happen is the two worlds being laid out separately, because then every
     // tile would appear to have moved and the diff would say nothing.
-    const union: [string, number][] = [...BASE, ["S", 208]];
+    const union: [string, number][] = [...BASE, ["S", tileHeight(claimAt("S"))]];
     const unionArrows: LayoutEdge[] = [
       ...BASE_ARROWS,
       { id: "S->B", source: "S", target: "B" },
@@ -453,16 +513,27 @@ describe("the union of two worlds", () => {
     // saying how far its number moved. **That is the case this test exists for.**
     // Those tiles are placed on the branch's own layout and never at coordinates
     // worked out for the shorter boxes, so the gap survives the growth.
-    const grown: [string, number][] = [
-      ["H", 320],
-      ["C", 224],
-      ["B", 208],
-      ["R", 152],
-      ["M1", 224],
-      ["M2", 224],
-      ["N1", 248],
-      ["S", 208],
-    ];
+    // The seven tiles the strike can reach each carry a line saying how far
+    // their number moved; OPEC's announcement is the one it cannot reach, so it
+    // keeps the box it had. Both heights are the ones the page reserves.
+    const reached = new Set(["H", "C", "B", "M1", "M2", "N1", "S"]);
+    const grown: [string, number][] = HORMUZ.map((claim) => [
+      claim.id,
+      reached.has(claim.id)
+        ? roomFor({ ...claim, badges: [{ words: ".41 \u25b2 .62", movement: true }] })
+        : tileHeight(claim),
+    ]);
+    // The point of this case, asserted rather than assumed: a tile the edit can
+    // reach really is taller on the branch than it was on the base map. If the
+    // movement line ever stops taking room, this test stops testing anything
+    // and should say so here rather than passing quietly.
+    const before = new Map(BASE);
+    for (const [id, height] of grown) {
+      if (reached.has(id) && before.has(id)) {
+        expect(height).toBeGreaterThan(before.get(id) as number);
+      }
+    }
+
     const branchArrows: LayoutEdge[] = [
       ...BASE_ARROWS,
       { id: "S->B", source: "S", target: "B" },
@@ -506,7 +577,10 @@ describe("the union of two worlds", () => {
     const placed = new Map(
       [...first].map(([id, at]) => [id, { at, height: new Map(BASE).get(id) ?? 0 }]),
     );
-    const withOneMore: [string, number][] = [...BASE, ["M3", 192]];
+    const withOneMore: [string, number][] = [
+      ...BASE,
+      ["M3", tileHeight(aClaim({ id: "M3", kind: "market", claim: "One more market reprices." }))],
+    ];
     const tiles = withOneMore.map(([id, height]) => ({ id, height }));
 
     const holding = pinsFor(placed, tiles);

@@ -38,6 +38,7 @@ import type { ClaimDiff, Diff, World } from "../api/client";
 import { readConditional, readDiff, readExample, readWorld } from "../api/client";
 import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
+import { NO_CHANGE, noChangeReason } from "../graph/diff/noChange";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
 import type { FixtureBundle, WorldSource } from "./source";
 import type {
@@ -66,19 +67,31 @@ import type {
  * prints. So the word beside that number has to be read on the same day, or the
  * tile would say *Supposed* over a number worked out for a different morning.
  *
+ * **This is the engine's own rule, written again.** `_read_on` in
+ * `backend/src/katalyst/domain/diff.py` pins the day inside the window, then
+ * takes the first drawn day at or after it, and never falls off the end. The
+ * browser asked for an exact match instead, so a claim judged on a day the
+ * series does not carry — a window longer than 180 days is drawn at fewer
+ * points, and a claim added on a branch brings its own resolve-by day — got no
+ * word beside its number at all, while the engine happily read one. Two rules
+ * for *which day is this claim's day* is one too many, so this is that one.
+ *
  * @param world The world as the engine built it.
  * @param resolvesBy The claim's own resolve-by day.
  * @returns Where that day sits among the days the world was worked through, or
- *   nothing at all when the day is outside the window or was not one of the days
- *   drawn.
+ *   nothing at all when the date cannot be read or the world drew no days.
  */
 function whereItsDaySits(world: World, resolvesBy: string): number | null {
-  const day = daysApart(world.day_zero, resolvesBy);
-  if (day === null) {
+  const offset = daysApart(world.day_zero, resolvesBy);
+  const drawn = world.series_days;
+  if (offset === null || drawn.length === 0) {
     return null;
   }
-  const at = world.series_days.indexOf(day);
-  return at === -1 ? null : at;
+  // Inside the window first — a claim judged before day zero is read on day
+  // zero, and one judged after the last day is read on the last day.
+  const wanted = Math.min(Math.max(0, offset), world.days);
+  const at = drawn.findIndex((day) => day >= wanted);
+  return at === -1 ? drawn.length - 1 : at;
 }
 
 /**
@@ -128,7 +141,7 @@ function badgesFromTheWorld(
         supposedOn.set(fixed.target, day);
       }
     } else {
-      add(fixed.target, happened(day));
+      add(fixed.target, happened(day, fixed.value));
     }
   }
 
@@ -168,8 +181,12 @@ function standingFromTheWorld(
   claims: readonly ClaimView[],
   badges: ReadonlyMap<string, readonly Badge[]>,
 ): Map<string, Standing> {
-  const observed = new Set(
-    world.assignments.filter((fixed) => fixed.kind === "observe").map((fixed) => fixed.target),
+  // What each observed claim was reported to be, so the word beside it is the
+  // one the engine was actually told rather than the one the button says.
+  const observed = new Map(
+    world.assignments
+      .filter((fixed) => fixed.kind === "observe")
+      .map((fixed) => [fixed.target, fixed.value] as const),
   );
   const standing = new Map<string, Standing>();
   for (const claim of claims) {
@@ -179,7 +196,7 @@ function standingFromTheWorld(
     if (!isSupposed && !isNews) {
       continue;
     }
-    const word = isSupposed ? "Supposed" : "Happened";
+    const word = isSupposed ? "Supposed" : observed.get(claim.id) ? "Happened" : "Did not happen";
     const said = (badges.get(claim.id) ?? []).find((badge) => badge.words.startsWith(word));
     standing.set(claim.id, {
       words: said?.words ?? word,
@@ -362,11 +379,14 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
       move: {
         absence: {
           kind: "no_engine" as const,
-          words: "no change",
+          words: NO_CHANGE,
+          // One sentence for *why the engine says it did not move*, written in
+          // one place and read here, and then the one thing that is true of the
+          // rail alone: why a row that held still is in a list of rows that did
+          // not.
           reason:
-            "This ending is on the map and your edit did not move it: the engine compared the " +
-            "two worlds and found no move worth reporting. It is listed so that holding still " +
-            "cannot be mistaken for not being here.",
+            `${noChangeReason(changed.get(claim.id)?.moved)} It is listed so that holding still ` +
+            `cannot be mistaken for not being here.`,
         },
       },
       rangeWidth: {

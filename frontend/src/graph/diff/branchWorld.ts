@@ -44,6 +44,7 @@ import type {
 } from "../../world/types";
 import { badgesByClaim, standingByClaim } from "./badges";
 import { readDiff } from "./diffState";
+import { NO_CHANGE, noChangeReason } from "./noChange";
 import type { Arrow } from "./reach";
 
 /**
@@ -142,23 +143,28 @@ export function tileState(
  * claim moved, *no change* when the engine says it did not, and the reason it is
  * not there yet while the engine is being asked.
  *
- * @param moved The engine's reading of how far this claim moved, when it did.
- * @param waiting What to say instead when there is no reading: the engine's own
- *   word for where it has got to, or nothing when it has answered and the claim
- *   simply held still.
+ * @param moved What the engine read on this claim — carried whether or not it
+ *   called the claim shifted, because the sentence behind *no change* is built
+ *   from the very same two numbers.
+ * @param shifted Whether the engine called this claim shifted. The browser reads
+ *   the verdict off the engine's word and never decides it by comparing the two
+ *   numbers itself.
+ * @param waiting What to say instead when the engine has not answered: its own
+ *   word for where it has got to.
  */
-function movedBadge(moved: Movement | undefined, waiting: Absence | undefined): Badge {
-  if (moved === undefined) {
-    return waiting === undefined
-      ? {
-          words: "no change",
-          reason:
-            "Your edit can reach this claim and the engine compared the two worlds: its " +
-            "likelihood did not move by enough to report. The two numbers behind that are in " +
-            "the panel beside the map.",
-          movement: true,
-        }
-      : { words: waiting.words, reason: waiting.reason, movement: true };
+function movedBadge(
+  moved: Movement | undefined,
+  shifted: boolean,
+  waiting: Absence | undefined,
+): Badge {
+  if (waiting !== undefined) {
+    return { words: waiting.words, reason: waiting.reason, movement: true };
+  }
+  if (!shifted || moved === undefined) {
+    // Why it did not move is one sentence written in one place, because the
+    // engine gives one verdict — and four sentences apart from one another is
+    // how three of them came to name causes the engine never gave.
+    return { words: NO_CHANGE, reason: noChangeReason(moved), movement: true };
   }
   const agreed = moved.sameDirection.reading;
   return {
@@ -248,11 +254,13 @@ export function railRows(painted: WorldView, change: DiffView): readonly DeltaRo
       move: {
         absence: {
           kind: "no_engine" as const,
-          words: "no change",
+          words: NO_CHANGE,
+          // The same sentence the tile carries, and then the one thing that is
+          // true of the rail and not of the tile: why a row that did not move is
+          // in a list of rows that did.
           reason:
-            "This ending is on the map and your edit did not move it: the engine compared the " +
-            "two worlds and said so itself. It is listed so that holding still cannot be " +
-            "mistaken for not being here.",
+            `${noChangeReason(change.claims.get(claim.id)?.moved)} It is listed so that holding ` +
+            `still cannot be mistaken for not being here.`,
         },
       },
       rangeWidth: {
@@ -461,7 +469,8 @@ export function branchWorld(base: WorldView, branch: BranchView, engine?: Engine
           ...(reserves && engine !== undefined
             ? [
                 movedBadge(
-                  state === "shifted" ? moved : undefined,
+                  moved,
+                  state === "shifted",
                   engine.at === "waiting" ? engine.absence : undefined,
                 ),
               ]

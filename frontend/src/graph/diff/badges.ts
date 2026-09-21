@@ -78,13 +78,33 @@ export function supposed(at: string, value: boolean): Badge {
   };
 }
 
-/** The badge the news earns. Exported for the same reason the one above is. */
-export function happened(at: string): Badge {
+/**
+ * The badge the news earns. Exported for the same reason the one above is.
+ *
+ * **News can be that something did not happen, and the word for that is not
+ * settled.** `spec/vocabulary.md` gives one badge for `observe` — *Happened ·
+ * date* — and the panel only ever sends `value: true`, so no button on this
+ * canvas can reach the other case. A branch written elsewhere can: the wire
+ * format carries the value, the engine acts on it, and the world comes back
+ * with it. Reading that world and printing *Happened* over it would be the
+ * canvas telling the reader the opposite of what the engine was told.
+ *
+ * So the negative reads *Did not happen · date* here, and **that wording is
+ * this file's guess and not Kent's**: the vocabulary has no row for it. It is
+ * raised in the report for the chapter to settle, and when it does, this is the
+ * one place the words change.
+ *
+ * @param at The day the news is reported on.
+ * @param value What was reported: that it happened, or that it did not.
+ */
+export function happened(at: string, value: boolean): Badge {
   return {
-    words: `Happened · ${toDay(at)}`,
-    reason:
-      `You reported this as news on ${toDay(at)}, so what came before it is read again in ` +
-      `the light of it, not only what comes after.`,
+    words: `${value ? "Happened" : "Did not happen"} · ${toDay(at)}`,
+    reason: value
+      ? `You reported this as news on ${toDay(at)}, so what came before it is read again in ` +
+        `the light of it, not only what comes after.`
+      : `You reported on ${toDay(at)} that this did not happen, so what came before it is read ` +
+        `again in the light of that, not only what comes after.`,
   };
 }
 
@@ -163,7 +183,7 @@ export function badgesByClaim(edits: readonly Edit[], context: BadgeContext): Ma
         }
         break;
       case "observe":
-        add(edit.target, happened(edit.at));
+        add(edit.target, happened(edit.at, edit.value));
         if (edit.value) {
           retractIfUndermined(edit.target, edit.at);
         }

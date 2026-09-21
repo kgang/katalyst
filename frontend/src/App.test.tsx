@@ -272,6 +272,28 @@ describe("opening a map", () => {
     expect(asked?.branch?.edits).toHaveLength(1);
   });
 
+  it("test_an_ask_that_did_not_come_back_is_asked_again", async () => {
+    serverAnswersNormally();
+    const source = sourceThatAnswers();
+    vi.mocked(source.readConditional).mockRejectedValueOnce(new Error("The server did not answer."));
+    render(<App source={source} listExamples={async () => EXAMPLES} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    await screen.findByTestId("the-map");
+
+    // The first ask does not come back. What the panel says is what happened —
+    // the attempt failed — and not that nothing has worked the number out.
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    expect(await screen.findByText(/The server did not answer\./)).toBeInTheDocument();
+    expect(screen.queryByText("no engine yet")).toBeNull();
+
+    // Select it again and it is asked again. A failure kept in the cache would
+    // tell a reader for the rest of the session that a number the engine can
+    // work out cannot be worked out.
+    fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
+    await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(".58 (.42\u2013.73)")).toBeInTheDocument();
+  });
+
   it("test_a_wires_number_belongs_to_the_map_that_is_showing", async () => {
     serverAnswersNormally();
     const source = sourceThatAnswers();

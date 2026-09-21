@@ -22,10 +22,12 @@
 
 import { describe, expect, it } from "vitest";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
-import type { BranchView, DiffView, Edit } from "../../world";
+import { toShare } from "../../components/BeliefChip";
+import type { BranchView, DiffView, Edit, Movement } from "../../world";
 import { disagreements, type EngineState } from "../diff/agreement";
 import { badgesByClaim, standingByClaim } from "../diff/badges";
 import { bothPaintings, branchWorld, railRows } from "../diff/branchWorld";
+import { noChangeReason } from "../diff/noChange";
 import { readDiff } from "../diff/diffState";
 import { endings } from "../diff/endings";
 import type { Arrow } from "../diff/reach";
@@ -293,6 +295,96 @@ describe("the second world", () => {
     const listed = railRows(now, engineSays);
     expect(listed[0]?.move.reading).toBeUndefined();
     expect(listed[0]?.move.absence?.words).toBe("Supposed · Oct 1");
+  });
+
+  /**
+   * Why the engine says a claim did not move — the one sentence, in one place.
+   *
+   * The engine calls a claim `shifted` only when **both** halves of its test
+   * pass: the move clears its floor, and the versions of the map agree on which
+   * way it went. `unchanged` is the default, and it does not say which half
+   * failed. Neither does the wire: the floor and the bar are constants inside
+   * the engine and are nowhere in its answer.
+   *
+   * So the browser may report the verdict and the engine's own numbers, and it
+   * may not name a cause. Naming one means guessing, and guessing here means
+   * printing a sentence that is flatly false about half the claims it appears
+   * on — which is the traceability veto in plain sight.
+   */
+  describe("why the engine reports no change", () => {
+    /** The engine's answer: every claim untouched but one, which it calls unchanged. */
+    function saysUnchanged(moved: Movement, id = "B"): DiffView {
+      return {
+        claims: new Map([[id, { state: "unchanged" as const, moved }]]),
+        rows: [],
+        summary: { reading: "Nothing it can reach moved." },
+        warnings: [],
+      };
+    }
+
+    /** B's tile line, as the tile draws it, for one reading of the engine's. */
+    function tileLine(moved: Movement) {
+      const now = branchWorld(base(), branch(), {
+        at: "answered",
+        now: base(),
+        change: saysUnchanged(moved),
+      });
+      const b = now.claims.find((claim) => claim.id === "B");
+      return (b?.badges ?? []).find((badge) => badge.movement === true);
+    }
+
+    it("test_the_no_change_reason_names_no_cause_the_engine_did_not_give", () => {
+      // It moved .41 to .46 and only .62 of the versions went the same way. The
+      // half that failed is the agreement, so "it did not move by enough to
+      // report" is false of this claim.
+      const disagreed = tileLine({
+        from: 0.41,
+        to: 0.46,
+        way: "up",
+        by: 0.05,
+        sameDirection: { reading: 0.62 },
+      });
+      expect(disagreed?.words).toBe("no change");
+      expect(disagreed?.reason).not.toMatch(/did not move by enough/i);
+
+      // And this one moved a hair with the versions all but unanimous. The half
+      // that failed is the floor, so "the versions did not agree" is false of
+      // it — and the same sentence has to be true of both.
+      const aHair = tileLine({
+        from: 0.41,
+        to: 0.412,
+        way: "up",
+        by: 0.002,
+        sameDirection: { reading: 0.99 },
+      });
+      expect(aHair?.reason).not.toMatch(/did not agree|these did not/i);
+
+      // What it may say is the verdict and the engine's own two numbers.
+      expect(disagreed?.reason).toContain(".41");
+      expect(disagreed?.reason).toContain(".46");
+      expect(disagreed?.reason).toContain(toShare(0.62));
+    });
+
+    it("test_the_tile_and_the_rail_give_one_reason_and_not_two", () => {
+      const moved: Movement = {
+        from: 0.41,
+        to: 0.46,
+        way: "up",
+        by: 0.05,
+        sameDirection: { reading: 0.62 },
+      };
+      const line = tileLine(moved);
+      // The rail lists endings, so this half of the test asks about one: M1, a
+      // market the strike can reach through B.
+      const change = saysUnchanged(moved, "M1");
+      const held = railRows(
+        branchWorld(base(), branch(), { at: "answered", now: base(), change }),
+        change,
+      ).find((row) => row.claimId === "M1");
+      expect(held?.move.absence?.words).toBe("no change");
+      expect(held?.move.absence?.reason).toContain(noChangeReason(moved));
+      expect(line?.reason).toBe(noChangeReason(moved));
+    });
   });
 
   it("test_the_map_as_it_was_written_keeps_its_own_numbers", () => {

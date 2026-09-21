@@ -30,7 +30,7 @@ import { ShortcutsSheet } from "./components/ShortcutsSheet";
 import { MapCanvas } from "./graph/Canvas";
 import { bothPaintings, type Engine, railRows } from "./graph/diff/branchWorld";
 import { endings, NO_SUMMARY_YET } from "./graph/diff/endings";
-import { tileHeight } from "./graph/geometry";
+import { roomFor } from "./graph/geometry";
 import type { MapKeys } from "./keyboard/useMapKeys";
 import {
   type Absence,
@@ -334,37 +334,6 @@ function engineState(answer: Answered): Engine | undefined {
   }
 }
 
-/**
- * How tall a box this claim's tile needs, with room for how far its number
- * moved.
- *
- * A tile is as tall as its own content, and the layout has to know that before
- * the browser has drawn one — so the height is a plain function of the claim.
- * This adds one thing to it: **how far the number moved gets a line of its own**
- * under whatever the edits had to say. On the busiest tile on the map, *Supposed
- * · Oct 1 → Retracted · Oct 2 · by "…"* already runs to three lines, and
- * stringing a reading on the end of that run pushes a line out of the box.
- *
- * The extra line is measured rather than written down: the words' block and the
- * reading's block are each measured on their own and the empty tile is counted
- * once. So if the badge line height ever changes, this changes with it, and
- * there is no second copy of a number here to fall out of step.
- *
- * @param claim The claim the tile is for.
- */
-function roomFor(claim: ClaimView): number {
-  const badges = claim.badges ?? [];
-  const said = badges.filter((badge) => badge.movement !== true);
-  const moved = badges.filter((badge) => badge.movement === true);
-  if (said.length === 0 || moved.length === 0) {
-    return tileHeight(claim);
-  }
-  const withWords = tileHeight({ ...claim, badges: said });
-  const withReading = tileHeight({ ...claim, badges: moved });
-  const withNeither = tileHeight({ ...claim, badges: [] });
-  return withWords + withReading - withNeither;
-}
-
 /** Turn whatever the engine threw into either a list of reasons or one sentence. */
 function asAnswer(reason: unknown): Answered {
   if (reason instanceof RefusedBranch) {
@@ -453,13 +422,21 @@ function MapScreen({
     // a button is a new question here, and nothing else is.
   }, [source, base.baseId, open]);
 
-  const engine = engineState(answer);
+  // Held still between renders, because both paintings of the map hang on it: a
+  // fresh object every render would lay the whole map out again on every keypress
+  // for an answer that has not changed.
+  const engine = useMemo(() => engineState(answer), [answer]);
   const computed = answer.at === "answered" ? answer.computed : undefined;
 
   // The numbers on the arrows, one at a time, kept once they arrive. Each one
   // costs a whole extra run of the map, so it is asked for when a reader selects
   // that arrow and never again for the same branch, seed and arrow.
   const [wireNumbers, setWireNumbers] = useState<ReadonlyMap<string, Known<Ranged>>>(new Map());
+  // The last ask that did not come back, which is shown and never kept. A
+  // failure is a fact about one attempt, not about the number: keeping it would
+  // mean the reader who selects the arrow again after the server comes back is
+  // told for the rest of the session that it cannot be worked out.
+  const [wireFailed, setWireFailed] = useState<{ key: string; absence: Absence } | undefined>();
   const paintings = useMemo(
     () => (open === undefined ? null : bothPaintings(base, open, engine)),
     [base, open, engine],
@@ -502,17 +479,23 @@ function MapScreen({
   // The map as it is drawn: the world above, with any arrow number already
   // fetched put back on its own arrow.
   const world = useMemo((): WorldView => {
-    if (wireNumbers.size === 0) {
+    if (wireNumbers.size === 0 && wireFailed === undefined) {
       return painted;
     }
     return {
       ...painted,
       links: painted.links.map((link): LinkView => {
-        const asked = wireNumbers.get(wireKey(link.id));
-        return asked === undefined ? link : { ...link, conditional: asked };
+        const key = wireKey(link.id);
+        const asked = wireNumbers.get(key);
+        if (asked !== undefined) {
+          return { ...link, conditional: asked };
+        }
+        return wireFailed?.key === key
+          ? { ...link, conditional: { absence: wireFailed.absence } }
+          : link;
       }),
     };
-  }, [painted, wireNumbers, wireKey]);
+  }, [painted, wireNumbers, wireFailed, wireKey]);
 
   /**
    * One box per claim, tall enough for whichever of the two paintings needs more
@@ -571,23 +554,30 @@ function MapScreen({
       return;
     }
     let stillWanted = true;
-    source
-      .readConditional({ baseId: base.baseId, branch: shownBranch, linkId: selection.id })
-      .then(
-        (slot) => slot,
-        (failure: unknown): Known<Ranged> => ({
-          absence: {
-            kind: "no_engine",
-            words: "no engine yet",
-            reason: inWords(failure),
-          },
-        }),
-      )
-      .then((slot) => {
+    source.readConditional({ baseId: base.baseId, branch: shownBranch, linkId: selection.id }).then(
+      (slot) => {
         if (stillWanted) {
           setWireNumbers((was) => new Map(was).set(key, slot));
+          setWireFailed((was) => (was?.key === key ? undefined : was));
         }
-      });
+      },
+      (failure: unknown) => {
+        // Shown, and not filed with the answers. The engine is there and it was
+        // asked — what is missing is this one attempt's reply, which is a
+        // different thing from "nothing has worked this number out", and which
+        // stops being true the moment the reader asks again.
+        if (stillWanted) {
+          setWireFailed({
+            key,
+            absence: {
+              kind: "ask_failed",
+              words: "the ask did not come back",
+              reason: `${inWords(failure)} Select this arrow again to ask once more.`,
+            },
+          });
+        }
+      },
+    );
     return () => {
       stillWanted = false;
     };
