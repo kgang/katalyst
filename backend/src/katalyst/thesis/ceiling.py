@@ -69,6 +69,17 @@ THE_RANGE_DISAGREES = (
 )
 """What is printed when the edge changes sign across the model's stated range."""
 
+NOTHING_WORTH_TAKING = (
+    "At the unfavourable end of the model's range this number sits inside the venue's own "
+    "bid and offer, fees paid, so neither side is worth taking and there is nothing to put "
+    "a ceiling on."
+)
+"""What is printed when the arithmetic ran and came out at nothing to put on.
+
+A complete answer rather than a gap, and a different one from the range
+disagreeing: here the range agrees, and what it agrees on is *not at this price*.
+"""
+
 A_CEILING_NEEDS_AN_EDGE = "A ceiling needs an edge."
 """What every absent ceiling says first, before the refusal's own sentence.
 
@@ -132,4 +143,40 @@ def ceiling_of(priced: Edge | NotComparable) -> Ceiling:
         A ceiling: a quartered fraction, or zero with its reason, or nothing at all
         with the refusal's own sentence.
     """
-    raise NotImplementedError
+    if isinstance(priced, NotComparable):
+        return Ceiling(
+            fraction=None,
+            taken_by=None,
+            at=None,
+            warning=NEVER_SIZE_TO_THIS,
+            sentence=f"{A_CEILING_NEEDS_AN_EDGE} {priced.sentence}",
+        )
+    if priced.inside_the_model_range:
+        return Ceiling(
+            fraction=0.0,
+            taken_by=None,
+            at=None,
+            warning=NEVER_SIZE_TO_THIS,
+            sentence=THE_RANGE_DISAGREES,
+        )
+
+    paid = priced.fee or 0.0
+    cost = priced.quote.offer + paid
+    proceeds = priced.quote.bid - paid
+    buying = (priced.pays_on.lo - cost) / (1.0 - cost) if cost < 1.0 else 0.0
+    selling = (proceeds - priced.pays_on.hi) / proceeds if proceeds > 0.0 else 0.0
+    if max(buying, selling) <= 0.0:
+        return Ceiling(
+            fraction=0.0,
+            taken_by=None,
+            at=None,
+            warning=NEVER_SIZE_TO_THIS,
+            sentence=NOTHING_WORTH_TAKING,
+        )
+    return Ceiling(
+        fraction=max(buying, selling) / QUARTER,
+        taken_by="buying" if buying >= selling else "selling",
+        at=priced.pays_on.lo if buying >= selling else priced.pays_on.hi,
+        warning=NEVER_SIZE_TO_THIS,
+        sentence=None,
+    )
