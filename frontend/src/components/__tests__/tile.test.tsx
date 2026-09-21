@@ -453,4 +453,35 @@ describe("the belief columns a tile draws", () => {
     }, 0);
     expect(drawn).toBe(map.claims.length);
   });
+
+  it("test_the_reserved_height_is_the_same_whether_one_column_is_drawn_or_three", () => {
+    // **The map measures nothing**, so a tile that changed size when a column
+    // went would be a tile drawn in a box of another size — two tiles on one
+    // spot, which is the collision the layout exists to prevent. The belief rail
+    // is a constant: the same room is held whatever the chips hold, and a number
+    // arriving later widens the survivors and re-lays out nothing.
+    //
+    // Checked over the whole generated map rather than one claim, so that
+    // "whatever the claim" is checked against eighteen of them, each a different
+    // length. The readings written over the top are the same slot the claim
+    // already carries, so nothing here types a number.
+    const stated = aClaim().beliefs.model;
+    for (const quiet of theGeneratedMap().claims) {
+      const quoted: ClaimView = {
+        ...quiet,
+        beliefs: { model: quiet.beliefs.model, user: stated, market: stated },
+      };
+
+      // The height the layout reserves is worked out from the claim, and the
+      // claim is the same one.
+      expect(tileHeight(quoted)).toBe(tileHeight(quiet));
+
+      // And the box the browser is told to draw is the same box, both ways.
+      const one = draw(quiet).container.querySelector<HTMLElement>(".tile");
+      const three = draw(quoted).container.querySelector<HTMLElement>(".tile");
+      expect(columnsOf(draw(quoted).container)).toHaveLength(3);
+      expect(three?.style.height).toBe(one?.style.height);
+      expect(three?.style.width).toBe(one?.style.width);
+    }
+  });
 });
