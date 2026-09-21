@@ -72,7 +72,27 @@ from katalyst.engine.events import (
 from katalyst.settings import get_settings
 
 RECORDINGS = Path(__file__).resolve().parents[3] / "recordings"
-"""Where the committed recordings live: `backend/recordings/`."""
+"""Where the committed recordings live when nothing says otherwise.
+
+`backend/recordings/`. The settings can point somewhere else — which is what lets
+a test, and the one browser test that drives both halves, run against a folder of
+their own without touching the committed one.
+"""
+
+
+def where_they_live() -> Path:
+    """Where this running program reads its recordings from.
+
+    Read when asked rather than when this module was written, so that pointing a
+    program at another folder is a setting and not a patch.
+
+    Returns:
+        The folder, from the settings when they name one and `backend/recordings/`
+        when they do not.
+    """
+    said = get_settings().KATALYST_RECORDINGS
+    return Path(said) if said else RECORDINGS
+
 
 A_COMFORTABLE_PACE = 0.6
 """Seconds between events when a recording is played at human speed.
@@ -190,7 +210,7 @@ def every_recording(folder: Path | None = None) -> tuple[Recording, ...]:
     """
     # Resolved when asked rather than when this function was written, so that
     # where the recordings live is a fact about the running program.
-    looking_in = RECORDINGS if folder is None else folder
+    looking_in = where_they_live() if folder is None else folder
     if not looking_in.is_dir():
         return ()
     return tuple(read(one) for one in sorted(looking_in.glob("*.jsonl")))
@@ -405,11 +425,6 @@ def faults_in(recording: Recording, *, current_prompt_hash: str) -> list[str]:
         found.append(
             f"{recording.example} stores likelihoods. They are recomputed from the seed, "
             "so a stored one could disagree with the engine that is running."
-        )
-    if events.NAMES[events.ProposalRejected] not in names:
-        found.append(
-            f"{recording.example} shows no refusal. Watching the rules refuse the model is "
-            "half of what this product is, so every recording must hold at least one."
         )
     if recording.header.prompt_hash != current_prompt_hash:
         found.append(

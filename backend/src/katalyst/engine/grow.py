@@ -24,6 +24,9 @@ back first. The map depends on the answers and never on the weather.
 frontier as it stands once it was folded in, and a claim leaving that list is how
 a reader learns it has closed.
 
+**The spending cap is checked after every call, and inside one.** A question is
+told what is left in the purse before it is put, so `client.py` can stop between
+its own rounds of research rather than only at the end (Kent, 2026-09-20).
 **The spending cap is checked after every call.** A round's calls are already in
 flight when the first of them is folded, so a run can pass its ceiling by at most
 the calls that were in the air with it.
@@ -161,7 +164,9 @@ def grow(
 
     # The claim the map starts from, and the destination when there is one.
     started = yield from _keep_asking(
-        lambda: start_the_map(hypothesis, is_the_hypothesis=True, answerer=answerer, on=on), walk
+        lambda: start_the_map(hypothesis, is_the_hypothesis=True, answerer=answerer, on=on),
+        walk,
+        answerer,
     )
     if started is None:
         yield Finished(
@@ -182,7 +187,9 @@ def grow(
     destination: PropositionId | None = None
     if target is not None and not walk.spent:
         asked_for = yield from _keep_asking(
-            lambda: start_the_map(target, is_the_hypothesis=False, answerer=answerer, on=on), walk
+            lambda: start_the_map(target, is_the_hypothesis=False, answerer=answerer, on=on),
+            walk,
+            answerer,
         )
         if asked_for is not None:
             wanted, its_outcome = asked_for
@@ -199,6 +206,7 @@ def grow(
                 break
 
             asking = list(walk.frontier[: caps.at_once])
+            walk.watch(answerer)
             answers = _ask_about_each(
                 pool,
                 graph,
@@ -221,6 +229,7 @@ def grow(
             for claim_id in _lines_with_no_ending(graph):
                 if walk.spent:
                     break
+                walk.watch(answerer)
                 outcome = expand(
                     graph,
                     claim_id,
@@ -264,6 +273,19 @@ class _Walk:
         self.closed_last: str | None = None
         self.spent = False
         self.filled_up = False
+
+    def watch(self, answerer: Answerer) -> None:
+        """Say what has been spent and what may be, before a question is put.
+
+        A question can now run twenty-five searches over five rounds, so one call
+        can cost a dollar by itself and a ceiling checked only between calls is a
+        ceiling the dearest thing in the program steps over. Saying it here means
+        the answerer can stop between rounds of its own (Kent, 2026-09-20).
+
+        Args:
+            answerer: Whatever this run asks its questions of.
+        """
+        answerer.watching(self.receipt, self.caps.dollars)
 
     @property
     def stopped(self) -> bool:
@@ -368,7 +390,7 @@ class _Walk:
 
 
 def _keep_asking(
-    ask: Callable[[], Outcome], walk: _Walk
+    ask: Callable[[], Outcome], walk: _Walk, answerer: Answerer
 ) -> Generator[Outcome, None, tuple[Proposition, Outcome] | None]:
     """Ask for a starting claim until one comes back, or until the tries run out.
 
@@ -382,6 +404,8 @@ def _keep_asking(
     Args:
         ask: The question to put, as something that can be called again.
         walk: What this walk has spent and refused so far. Changed as it goes.
+        answerer: Whatever this run asks its questions of. Told what is left in
+            the purse before each attempt.
 
     Yields:
         Each refused attempt's outcome.
@@ -391,6 +415,7 @@ def _keep_asking(
         came back with none.
     """
     for _ in range(walk.caps.refusals_in_a_row):
+        walk.watch(answerer)
         outcome = ask()
         walk.receipt = fold(walk.receipt, outcome)
         walk.spent = walk.spent or over_the_cap(walk.receipt, walk.caps.dollars)

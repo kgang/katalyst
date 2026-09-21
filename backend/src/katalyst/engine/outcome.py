@@ -147,6 +147,15 @@ class Accepted(BaseModel):
             "is told so."
         ),
     )
+    base_rate_dropped: str | None = Field(
+        default=None,
+        description=(
+            "The reference class of a count that was thrown away because nothing "
+            "the search returned backs it. The claim is accepted without it and "
+            "the screen says honestly that there is no reference class, rather "
+            "than showing a number that looks measured and was remembered."
+        ),
+    )
 
 
 class Refused(BaseModel):
@@ -292,12 +301,17 @@ class Caps(BaseModel):
     )
     at_once: int = Field(default=3, description="How many lines are expanded at the same time.")
     searches: int = Field(
-        default=30,
+        default=150,
         description=(
-            "How many web searches the whole run may make. It is the claims cap: "
-            "one search's worth of budget for each claim the map is allowed to "
-            "hold, so it adds no new number to the product. Reaching it turns "
-            "searching off; it never ends the run."
+            "How many web searches the whole run may make. Counting a reference "
+            "class means finding the cases, so one search a claim was nowhere near "
+            "enough — the first measured run (2026-09-17) came back with eight "
+            "counts and no sources at all. At the price a search is billed at, 150 "
+            "is about a tenth of what a run may spend, which leaves the rest for "
+            "the tokens; over the dozen or so calls a map takes it is roughly ten "
+            "a call, while the per-call ceiling lets an early claim research hard "
+            "and a later one coast. Reaching it turns searching off; it never ends "
+            "the run. The first run under it resets this number."
         ),
     )
     dollars: float = Field(

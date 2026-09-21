@@ -26,6 +26,7 @@ What this file must never do
 - Never name a type from the library we call the model with.
 """
 
+from collections.abc import Sequence
 from datetime import date
 
 from katalyst.domain import Provenance, Source
@@ -84,6 +85,31 @@ def keep_cited(
             dropped.append(cited.url)
         elif match not in kept:
             kept.append(match)
+    return tuple(kept), tuple(dropped)
+
+
+def keep_returned(
+    cited: Sequence[str], found: tuple[Source, ...]
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Split plain addresses into the ones the search returned and the ones it did not.
+
+    The same rule `keep_cited` applies to an arrow's citations, over the bare
+    strings a base rate's sources are. **One rule, used for both**, because a
+    count somebody cannot open a page for and a mechanism somebody cannot open a
+    page for are the same failure wearing two hats — and the first measured run
+    produced eight of the second kind in ten claims.
+
+    Args:
+        cited: The addresses as they were written.
+        found: What the search tool returned in that same call.
+
+    Returns:
+        The addresses the search returned, in the order they were cited, and the
+        ones it did not.
+    """
+    returned = {same_address(source.url) for source in found}
+    kept = [one for one in cited if same_address(one) in returned]
+    dropped = [one for one in cited if same_address(one) not in returned]
     return tuple(kept), tuple(dropped)
 
 

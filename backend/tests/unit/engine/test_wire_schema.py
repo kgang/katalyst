@@ -19,6 +19,7 @@ reference bundle, read on 2026-09-17, or from the service's own sentence above.
 One 400 at a time is an expensive way to learn a schema.
 """
 
+import json
 from typing import Any
 
 import pytest
@@ -168,3 +169,42 @@ def test_a_single_shape_needs_no_envelope() -> None:
 
     assert "claim" in sent["properties"]
     assert "proposal" not in sent["properties"]
+
+
+THE_HERO_CASE = (
+    "Hormuz",
+    "Strait",
+    "Brent",
+    "Iran",
+    "Lloyd",
+    "OPEC",
+    "XLE",
+    "tanker",
+    "oil",
+)
+"""Every word the stored example's own claims are made of.
+
+One word of it is deliberately not here. `ContractPayoff.venue` still says "by
+the venue's own name: 'Polymarket', 'Kalshi'", and the stored example's trade is
+on Polymarket. That is a venue example rather than a Hormuz example — it names
+the *kind* of answer wanted and there is no way to ask for a venue's own name
+without naming one — and the field it sits on belongs to the rules layer, so it
+is reported rather than changed (2026-09-20).
+"""
+
+
+@pytest.mark.parametrize("shape", EVERY_SHAPE_WE_SEND, ids=lambda one: one.__name__)
+def test_no_description_hands_the_model_the_stored_example(shape: Any) -> None:
+    """Measured, 2026-09-17: the model gave back the schema's own example as a fact.
+
+    A claim came back counting "37 of 41 cases since 1980", and "since 1980" was
+    a phrase from the description of the field it filled in. A field description
+    that carries a worked example is a field description the model will fill in
+    with that example. So every description says what a good answer is *like* and
+    none of them says what one *is* — least of all in the words of the example
+    map this program ships (Kent, 2026-09-20).
+    """
+    written = json.dumps(wire_schema(shape)).lower()
+    found = sorted(one for one in THE_HERO_CASE if one.lower() in written)
+
+    assert found == []

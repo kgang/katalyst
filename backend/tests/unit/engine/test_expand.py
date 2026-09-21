@@ -9,8 +9,8 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from katalyst.domain import validate
-from katalyst.engine.client import AnswerWeCouldNotRead, _did_not_fit_the_shape
-from katalyst.engine.expand import expand
+from katalyst.engine.client import AnswerWeCouldNotRead, _did_not_fit_the_shape, what_it_said
+from katalyst.engine.expand import add_a_claim, expand
 from katalyst.engine.outcome import Accepted, Refused, Stopped
 from katalyst.engine.proposal import Proposal
 from katalyst.fixtures import HORMUZ
@@ -20,6 +20,7 @@ from tests.unit.engine.answers import (
     a_claim,
     a_declined_answer,
     a_link,
+    a_starting_claim,
     a_stop,
     an_answer,
 )
@@ -202,3 +203,113 @@ def test_the_last_call_asks_only_for_an_ending() -> None:
     ordinary, last = answerer.asked
     assert "answer only with an ending" not in ordinary
     assert "answer only with an ending" in last
+
+
+# --- Adding one claim by hand ----------------------------------------------
+#
+# Kent, 2026-09-20: the one edit that needs a model, and it needed no new shape.
+# One starting-claim call writes the sentence; then the ordinary arrow shape,
+# one arrow per call, until the model says it is joined or the width cap does.
+
+
+THE_ADDED = "Tanker charter rates for the Gulf fall back to their 2024 average."
+
+
+class Joiner:
+    """Answers both questions of an add, reading the new claim's name off the second.
+
+    Written out here rather than scripted, because the name an arrow must use is
+    minted in the middle of the call: no answer written beforehand could know it.
+    A fake that has to read the question is also the only way to prove the
+    question really does name the claim.
+    """
+
+    def __init__(self, sources: list[str]) -> None:
+        """Set out which claims the arrows come from, one per call, then a stop."""
+        self._sources = list(sources)
+        self.asked: list[str] = []
+        self.purse: list[tuple[object, float]] = []
+
+    def watching(self, spent: object, cap: float) -> None:
+        """Take note of the purse and do nothing with it."""
+        self.purse.append((spent, cap))
+
+    def starting_claim(self, question: str, *, may_search: bool = True) -> object:
+        """Write the typed sentence as a claim."""
+        self.asked.append(question)
+        return what_it_said([an_answer(a_starting_claim(THE_ADDED))])
+
+    def proposal(self, question: str, *, may_search: bool) -> object:
+        """Join the claim the question names to one already on the map."""
+        self.asked.append(question)
+        added = question.split("The claim ", 1)[1].split(" has just been added", 1)[0]
+        if not self._sources:
+            return what_it_said([an_answer(a_stop())])
+        return what_it_said([an_answer(a_link(self._sources.pop(0), added))])
+
+
+def add(answerer: object, *, width: int = 3) -> tuple[object, tuple[object, ...]]:
+    """Add one typed sentence to the stored example's map."""
+    return add_a_claim(
+        HORMUZ,
+        THE_ADDED,
+        answerer=answerer,  # type: ignore[arg-type]
+        on=THE_DAY_THE_RUN_HAPPENED,
+        width=width,
+    )
+
+
+def test_adding_a_claim_uses_the_starting_shape_and_then_the_arrow_shape() -> None:
+    """No third shape: a sentence becomes a claim, then arrows join it, one per call."""
+    answerer = Joiner(["C"])
+
+    insert, spent = add(answerer)
+
+    assert insert is not None
+    assert insert.proposition.claim == THE_ADDED  # type: ignore[attr-defined]
+    assert len(insert.links) == 1  # type: ignore[attr-defined]
+    assert insert.links[0].source == "C"  # type: ignore[attr-defined]
+    # One call to write it, one to join it, one to be told it is joined enough.
+    assert sum(one.calls for one in spent) == 3  # type: ignore[attr-defined]
+
+
+def test_the_arrows_stop_at_the_width_cap_however_willing_the_model_is() -> None:
+    """A model that would go on joining for ever is stopped by the map's own ceiling."""
+    answerer = Joiner(["C", "B", "R", "N1"])
+
+    insert, _ = add(answerer, width=2)
+
+    assert insert is not None
+    assert len(insert.links) == 2  # type: ignore[attr-defined]
+    assert len(answerer.asked) == 1 + 2
+
+
+def test_a_claim_that_joins_to_nothing_is_not_added_but_is_still_paid_for() -> None:
+    """The map's own rules would refuse a claim hanging off nothing, so say so here."""
+    answerer = Joiner([])
+
+    insert, spent = add(answerer)
+
+    assert insert is None
+    assert sum(one.calls for one in spent) == 2  # type: ignore[attr-defined]
+
+
+def test_a_sentence_that_could_not_be_written_as_a_claim_adds_nothing() -> None:
+    """A refusal on the first call ends it: there is nothing to join."""
+    answerer = Scripted(starting=[a_declined_answer("I will not write that as a claim.")])
+
+    insert, spent = add(answerer)
+
+    assert insert is None
+    assert len(spent) == 1
+
+
+def test_adding_a_claim_re_prompts_nothing_but_the_claim_it_touches() -> None:
+    """The one exception to 'never re-prompt a whole map' is over one claim only."""
+    answerer = Joiner(["C"])
+
+    add(answerer)
+
+    for asked in answerer.asked[1:]:
+        assert THE_ADDED in asked
+        assert "rewrite" not in asked.lower()

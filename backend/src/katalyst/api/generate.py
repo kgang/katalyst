@@ -60,8 +60,9 @@ from katalyst.engine.events import (
     Receipt,
     growth_event,
 )
+from katalyst.engine.expand import add_a_claim
 from katalyst.engine.grow import Finished, grow
-from katalyst.engine.ids import mint_id, mint_seed
+from katalyst.engine.ids import BIGGEST_SEED, mint_id, mint_seed
 from katalyst.engine.outcome import Caps
 from katalyst.engine.prompt import prompt_hash
 from katalyst.engine.transcript import (
@@ -118,12 +119,16 @@ class GenerateRequest(BaseModel):
     )
     seed: int | None = Field(
         default=None,
+        ge=0,
+        le=BIGGEST_SEED,
         description=(
             "The one number every likelihood is worked out from. **Leave it out and "
             "the server mints one**, and the first event says which, so the run is "
             "reproducible from the moment it starts. Send one only to reproduce a run "
             "you were handed: a number invented by whoever is asking is a number "
-            "nobody computed sitting inside the reproducibility of the answer."
+            "nobody computed sitting inside the reproducibility of the answer. It "
+            "is bounded by the largest whole number a browser holds exactly, "
+            "because a seed that comes back rounded is a seed nobody ran."
         ),
     )
     versions: int = Field(
@@ -143,7 +148,15 @@ class GenerateRequest(BaseModel):
 class InsertRequest(BaseModel):
     """What it takes to draft one claim a person asked for."""
 
-    base_id: str = Field(description="The map the new claim is going onto.")
+    base_id: str = Field(
+        description=(
+            "The map the new claim is going onto, by **the map's own identifier** — "
+            "the one a world carries as its `base_id`, and the one the stored "
+            "examples answer to. Not the generation's identifier: a generation is "
+            "a run and a map is a thing it built, and one run can hand its map to "
+            "any number of later questions."
+        )
+    )
     branch: Branch | None = Field(default=None, description="The branch built so far, sent whole.")
     claim_in_words: str = Field(
         min_length=1, description='What the person typed: "…but Iran is struck the next day".'
@@ -224,11 +237,35 @@ def draft_a_claim(asked: InsertRequest) -> Insert:
     """
     onto = engine.example_named(asked.base_id)
     if onto is None:
-        raise HTTPException(status_code=404, detail=engine.no_such_example(asked.base_id))
+        raise HTTPException(status_code=404, detail=_no_such_map(asked.base_id))
 
-    drafted = _scripted_insert(asked.claim_in_words)
-    if drafted is None:
-        raise HTTPException(status_code=501, detail=NO_KEY_FOR_A_NEW_CLAIM)
+    answerer = live_answerer()
+    if answerer is None:
+        drafted = _scripted_insert(asked.claim_in_words)
+        if drafted is None:
+            raise HTTPException(status_code=501, detail=NO_KEY_FOR_A_NEW_CLAIM)
+    else:
+        drafted, _ = add_a_claim(
+            onto.graph,
+            asked.claim_in_words,
+            answerer=answerer,
+            on=_today(),
+            width=Caps().width,
+        )
+        if drafted is None:
+            raise HTTPException(
+                status_code=422,
+                detail=[
+                    {
+                        "code": "edit_not_applicable",
+                        "subject": asked.base_id,
+                        "message": (
+                            "That sentence could not be written as a claim this map "
+                            "could carry, or nothing on the map turned out to join it."
+                        ),
+                    }
+                ],
+            )
 
     refused = _what_it_would_break(onto.graph, drafted)
     if refused:
@@ -411,8 +448,19 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
         return
 
     started = time.monotonic()
+    # Filed under the identifier the stream *announces*, not the map's. They are
+    # two different things, and keying it by the map meant every replayed run's
+    # transcript answered 404 to the identifier the browser had just been handed.
+    announced = next(
+        (
+            payload["generation_id"]
+            for name, payload in recording.lines
+            if name == events.NAMES[GenerationStarted]
+        ),
+        recording.header.base_id,
+    )
     working = Transcript(
-        generation_id=recording.header.base_id,
+        generation_id=announced,
         hypothesis=recording.hypothesis,
         target=None,
         seed=recording.header.seed,
@@ -496,6 +544,21 @@ def _scripted_insert(claim_in_words: str) -> Insert | None:
             drafted = recording.header.insert.answer
             return drafted
     return None
+
+
+def _no_such_map(base_id: str) -> str:
+    """Say that no map answers to that name, and say what a caller should send.
+
+    The commonest wrong answer is a *generation's* identifier: a run and the map
+    it built are two different things, and one run's map outlives the question
+    that made it. So the sentence names both, rather than leaving somebody to
+    guess which of two identifiers they are holding.
+    """
+    return (
+        f"{engine.no_such_example(base_id)} If you are holding a map this program "
+        "generated, send the map's own identifier — the one a world carries as its "
+        "`base_id` — and not the identifier of the generation that built it."
+    )
 
 
 def _today() -> date:

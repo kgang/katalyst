@@ -24,8 +24,9 @@ from katalyst.engine.client import (
     AnswerWeCouldNotRead,
     Model,
 )
-from katalyst.engine.pricing import MODEL
 from katalyst.engine.prompt import STANDING_TEXT
+from katalyst.engine.receipt import nothing_spent_yet
+from katalyst.settings import get_settings
 from tests.unit.engine.answers import a_claim, a_starting_claim, an_answer
 
 
@@ -59,7 +60,7 @@ def test_the_part_the_service_remembers_is_the_same_bytes_on_every_call() -> Non
     assert first["system"][0]["text"] == STANDING_TEXT
     assert first["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert first["tools"] == second["tools"] == [SEARCH_TOOL]
-    assert first["model"] == second["model"] == MODEL
+    assert first["model"] == second["model"] == get_settings().KATALYST_MODEL
 
 
 def test_a_run_that_has_spent_its_searches_forbids_the_tool_rather_than_removing_it() -> None:
@@ -76,10 +77,25 @@ def test_a_run_that_has_spent_its_searches_forbids_the_tool_rather_than_removing
     assert with_none["tools"] == [SEARCH_TOOL]
 
 
-def test_the_question_about_what_somebody_meant_never_searches() -> None:
-    """The web has nothing to say about what a person meant by their own sentence."""
+def test_the_first_claim_of_a_map_may_research_like_any_other() -> None:
+    """It was the one claim nobody could look anything up for, and it showed.
+
+    The question is partly what the person meant, which the web cannot answer,
+    and partly how often this kind of thing has happened before, which is exactly
+    what the web is for. A run that could not search here produced a first claim
+    with a two-character test and no reference class (2026-09-17).
+    """
     wire = Wire([an_answer(a_starting_claim())])
     Model(wire).starting_claim("what did they mean")  # type: ignore[arg-type]
+
+    assert wire.sent[0]["tool_choice"] == MAY_SEARCH
+    assert wire.sent[0]["tools"] == [SEARCH_TOOL]
+
+
+def test_a_run_with_no_searches_left_forbids_them_on_the_first_claim_too() -> None:
+    """One budget, and the first claim spends from it like any other."""
+    wire = Wire([an_answer(a_starting_claim())])
+    Model(wire).starting_claim("what did they mean", may_search=False)  # type: ignore[arg-type]
 
     assert wire.sent[0]["tool_choice"] == MAY_NOT_SEARCH
 
@@ -119,6 +135,42 @@ def test_every_round_trip_is_on_the_bill() -> None:
 
     assert said.input_tokens == 11 + 13
     assert said.output_tokens == 7 + 5
+
+
+def test_a_question_stops_between_its_own_rounds_when_the_money_runs_out() -> None:
+    """Kent, 2026-09-20: twenty-five searches over five rounds can cost a dollar.
+
+    A ceiling checked only between calls is a ceiling the dearest thing in the
+    program steps over. The walk says what is left in the purse; this stops.
+    """
+    paused = an_answer(a_claim("Half.", cause="C"), stopped="pause_turn", written=1_000_000)
+    asking = Model(Wire([paused, paused, paused]))  # type: ignore[arg-type]
+    asking.watching(nothing_spent_yet("claude-sonnet-5"), 5.0)
+
+    said = asking.proposal("q", may_search=True)
+
+    # One round of a million written tokens is $10 on Sonnet 5, so the second
+    # never goes out, and what the first one cost is still on the bill.
+    assert said.calls == 1
+    assert said.output_tokens == 1_000_000
+
+
+def test_a_question_with_money_left_runs_its_rounds_out() -> None:
+    """The same check, from the other side: a cheap round is not interrupted."""
+    paused = an_answer(a_claim("Half.", cause="C"), stopped="pause_turn", written=100)
+    finished = an_answer(a_claim("Whole.", cause="C"), written=100)
+    asking = Model(Wire([paused, finished]))  # type: ignore[arg-type]
+    asking.watching(nothing_spent_yet("claude-sonnet-5"), 15.0)
+
+    assert asking.proposal("q", may_search=True).calls == 2
+
+
+def test_a_question_nobody_told_about_a_purse_is_not_stopped() -> None:
+    """A seam built and asked directly — every request test above — spends freely."""
+    paused = an_answer(a_claim("Half.", cause="C"), stopped="pause_turn", written=1_000_000)
+    finished = an_answer(a_claim("Whole.", cause="C"))
+
+    assert Model(Wire([paused, finished])).proposal("q", may_search=True).calls == 2  # type: ignore[arg-type]
 
 
 def test_what_the_model_wrote_and_what_the_search_returned_arrive_apart() -> None:

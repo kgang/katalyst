@@ -22,15 +22,15 @@ It refuses to start with no key. It will not raise the spending ceiling: the
 argument may lower the figure written in code, never lift it, because a cap a
 caller can raise is not a cap.
 
-What it cannot do yet
----------------------
-Each recording is meant to carry **one scripted intervention** — the "…but X
-happens" its card offers — drafted live at record time. Drafting a claim somebody
-named, with arrows in both directions onto a finished map, is a different question
-from any this program asks today, and no chapter defines that shape. So writing a
-recording stops before it and says so, rather than inventing one;
-`--without-the-scripted-insert` writes the file anyway for whoever has decided
-that is the right trade.
+The one scripted intervention
+-----------------------------
+Each recording carries **one scripted intervention** — the "…but X happens" its
+card offers — drafted live at record time by `expand.add_a_claim`, which needed
+no shape of its own: one starting-claim call writes the sentence, then ordinary
+arrows join it one per call. A run whose insert could not be drafted does not
+become a recording, because a keyless reviewer would press the card's button and
+get nothing. There is no flag to write the file anyway: the whole point of the
+file is that the button works (Kent, 2026-09-20).
 """
 
 import argparse
@@ -43,7 +43,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from katalyst.domain import Graph
+from katalyst.domain import Graph, Insert
 from katalyst.engine import events
 from katalyst.engine.client import Answerer, live_answerer
 from katalyst.engine.events import (
@@ -55,10 +55,13 @@ from katalyst.engine.events import (
     Receipt,
     growth_event,
 )
+from katalyst.engine.expand import add_a_claim
 from katalyst.engine.grow import Finished, grow
 from katalyst.engine.ids import mint_id, mint_seed
 from katalyst.engine.outcome import Caps, Outcome
 from katalyst.engine.prompt import prompt_hash
+from katalyst.engine.receipt import Receipt as RunningTotal
+from katalyst.engine.receipt import fold, nothing_spent_yet
 from katalyst.engine.replay import RECORDINGS
 from katalyst.engine.transcript import Transcript, line_for, makes_an_event
 from katalyst.engine.verify import verdict
@@ -71,8 +74,10 @@ THE_FOUR = {
 }
 """The four example hypotheses, word for word from the assignment.
 
-The key is the file's short name and the launchpad card's; the sentence is what a
-run is asked for and what a replay is matched on.
+**The keys are the four the launchpad's cards use**, so a card and a recording
+find each other by the same name; the sentence is what a run is asked for and,
+letter for letter, what a replay is matched on. Change either half here and
+nowhere else.
 """
 
 KEPT_RUNS = Path(__file__).resolve().parents[3] / ".runs"
@@ -97,16 +102,18 @@ ENOUGH_OF_A_CLAIM = 64
 NO_KEY = "This calls a model and spends money, and no key is configured. Nothing was run."
 """What it says when it cannot start at all."""
 
-NO_SCRIPTED_INSERT = (
-    "No recording was written: it would have to carry a scripted intervention, and "
-    "drafting a claim somebody named onto a finished map is a question this program "
-    "does not ask yet. Inventing one here would put wording in front of a reviewer "
-    "that no chapter agreed to.\n"
-    "  Two ways on, and it is not this file's decision which: add that third answer "
-    "shape and its prompt in the batched prompt round, or record without it for now "
-    "with --without-the-scripted-insert."
-)
-"""What it says when everything worked except the one thing nobody has designed."""
+THE_ONE_THEY_OFFER = {
+    "hormuz": "…but Iran is struck the next day",
+    "midterms": "…but the Senate result is contested into January",
+    "export-controls": "…but the restrictions are stayed by a court within a month",
+    "photonics": "…but the packaging supply chain cannot keep up",
+}
+"""The one "…but X happens" each card offers a reviewer with no key.
+
+Product text: it is what the button fills the field with, word for word, and what
+a keyless run matches on letter for letter. One per example, drafted live when
+the recording is made and answered from the file afterwards.
+"""
 
 
 class KeptRun(BaseModel):
@@ -161,6 +168,7 @@ class Run(BaseModel):
     events: tuple[Event, ...]
     transcript: Transcript
     finished: Finished | None
+    scripted_insert: Insert | None = None
 
 
 def run_one(
@@ -199,6 +207,10 @@ def run_one(
     telling(f"  at a ceiling of ${ceiling:.2f}, seed {its_seed}, as of {today}")
 
     started = time.monotonic()
+    # The running total, folded here as each answer lands. It used to be read off
+    # the transcript's own receipt, which is only filled in at the very end — so
+    # every progress line said $0.00 while the run spent real money.
+    so_far = nothing_spent_yet()
     working = Transcript(
         generation_id=mint_id(),
         hypothesis=hypothesis,
@@ -219,6 +231,7 @@ def run_one(
             if isinstance(step, Finished):
                 finished = step
                 break
+            so_far = fold(so_far, step)
             working = working.plus(line_for(step, at if makes_an_event(step) else None))
             if not makes_an_event(step):
                 telling("     ·      the model had nothing more to say about that line")
@@ -228,9 +241,27 @@ def run_one(
             telling(_progress(grown, step))
             at += 1
             if at % DOLLARS_EVERY == 0:
-                telling(_so_far(working, time.monotonic() - started))
+                telling(_so_far(so_far, working, time.monotonic() - started))
     finally:
         walking.close()
+
+    drafted: Insert | None = None
+    if finished is not None and finished.graph is not None:
+        telling(f"  drafting the one intervention the card offers: {THE_ONE_THEY_OFFER[example]!r}")
+        drafted, its_calls = add_a_claim(
+            finished.graph,
+            THE_ONE_THEY_OFFER[example],
+            answerer=answerer,
+            on=today,
+            width=Caps().width,
+        )
+        for one in its_calls:
+            so_far = fold(so_far, one)
+            working = working.plus(line_for(one, None))
+        telling("    drafted" if drafted is not None else "    it could not be drafted")
+        finished = finished.model_copy(
+            update={"receipt": _with_the_insert(finished.receipt, its_calls)}
+        )
 
     if finished is not None:
         working = working.model_copy(
@@ -256,18 +287,25 @@ def run_one(
         events=tuple(written),
         transcript=working,
         finished=finished,
+        scripted_insert=drafted,
     )
 
 
-def faults_of(run: Run, *, needs_a_scripted_insert: bool) -> tuple[str, ...]:
+def faults_of(run: Run) -> tuple[str, ...]:
     """List every reason this run may not become a recording, in plain sentences.
 
     Every reason at once, never the first — the same rule a refused proposal gets.
 
+    **A run that showed no refusal is not one of them** (Kent, 2026-09-20). The rule
+    used to be that every recording must hold one, and in twenty-six live
+    proposals across two runs the model never once gave the validator something
+    to refuse. Re-running until it errs is waiting for a mistake and calling it
+    evidence, and it is the one thing on this list that would have been staged. A
+    recording shows every refusal that happened; when none did, the screen says so
+    in a line.
+
     Args:
         run: What the run produced.
-        needs_a_scripted_insert: Whether to insist on the one scripted
-            intervention the chapter requires.
 
     Returns:
         One sentence per reason, or nothing at all when it may.
@@ -277,14 +315,12 @@ def faults_of(run: Run, *, needs_a_scripted_insert: bool) -> tuple[str, ...]:
         found.append("The run did not finish, so there is no map to play back.")
     if not any(isinstance(one, Done) for one in run.events):
         found.append("The run did not end where a generation ends.")
-    if not any(isinstance(one, ProposalRejected) for one in run.events):
+    if run.scripted_insert is None:
         found.append(
-            "This run produced no refusal, and every recording must show one — watching "
-            "the rules refuse the model is half of what this product is. Run it again; "
-            "never edit the file."
+            "The one scripted intervention this recording offers could not be "
+            "drafted, so a keyless reviewer would press the card's button and get "
+            "nothing. Run it again."
         )
-    if needs_a_scripted_insert:
-        found.append(NO_SCRIPTED_INSERT)
     return tuple(found)
 
 
@@ -352,7 +388,14 @@ def write_recording(run: Run, *, folder: Path | None = None) -> Path:
         "seed": run.seed,
         "recording_date": run.on.isoformat(),
         "prompt_hash": prompt_hash(),
-        "insert": None,
+        "insert": (
+            None
+            if run.scripted_insert is None
+            else {
+                "claim_in_words": THE_ONE_THEY_OFFER[run.example],
+                "answer": json.loads(run.scripted_insert.model_dump_json()),
+            }
+        ),
     }
     written.write_text(
         "\n".join(
@@ -394,15 +437,21 @@ def _progress(grown: ProposalAccepted | ProposalRejected, outcome: Outcome) -> s
     return f"  {grown.at:>3}  refused   {codes}  ({outcome.seconds:.0f}s)"
 
 
-def _so_far(working: Transcript, seconds: float) -> str:
-    """One line saying what the run has spent so far, and how long it has been going."""
-    spent = sum(one.input_tokens for one in working.lines)
-    written = sum(one.output_tokens for one in working.lines)
+def _so_far(so_far: RunningTotal, working: Transcript, seconds: float) -> str:
+    """One line saying what the run has spent so far, and how long it has been going.
+
+    The money is read off a receipt folded as the run goes, not off the
+    transcript's own, which is filled in only at the end — that was the bug that
+    printed `$0.00` on every line of a run that spent $1.32. The thinking is read
+    off the transcript, because it is not on a receipt and deliberately never will
+    be: the receipt's shape is settled, and a number shown in two places is two
+    numbers that eventually disagree.
+    """
     thinking = sum(one.thinking_tokens for one in working.lines)
-    dollars = 0.0 if working.receipt is None else working.receipt.dollars
     return (
-        f"       so far: {len(working.lines)} calls, ${dollars:.2f}, "
-        f"{spent:,} in / {written:,} out ({thinking:,} of it thinking), "
+        f"       so far: {so_far.calls} calls, ${so_far.dollars:.2f}, "
+        f"{so_far.searches} searches, {so_far.input_tokens:,} in / "
+        f"{so_far.output_tokens:,} out ({thinking:,} of it thinking), "
         f"{int(seconds // 60)}m{int(seconds % 60):02d}s"
     )
 
@@ -516,9 +565,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Run it as a measurement: keep everything, write no recording.",
     )
     asking.add_argument(
-        "--without-the-scripted-insert",
-        action="store_true",
-        help="Write a recording even though it carries no scripted intervention.",
+        "--effort",
+        default="",
+        choices=["", "low", "medium", "high", "xhigh", "max"],
+        help=(
+            "How hard the model tries, pinned for this whole run. Empty leaves the "
+            "service's own default and sends nothing."
+        ),
     )
     said = asking.parse_args(argv)
 
@@ -532,7 +585,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    answerer = live_answerer()
+    answerer = live_answerer(effort=said.effort or None)
     if answerer is None:
         print(NO_KEY, file=sys.stderr)
         return 1
@@ -543,7 +596,7 @@ def main(argv: list[str] | None = None) -> int:
         for line in what_it_cost(run):
             print(line, file=sys.stderr)
 
-        faults = faults_of(run, needs_a_scripted_insert=not said.without_the_scripted_insert)
+        faults = faults_of(run)
         if said.measure_only:
             faults = ("This was a measurement run, so no recording was written.",)
         kept = keep(run, faults)
@@ -563,3 +616,14 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _with_the_insert(spent: RunningTotal, its_calls: tuple[Outcome, ...]) -> RunningTotal:
+    """Add what drafting the scripted intervention cost to what the run spent.
+
+    It is part of making the recording, so it is part of the bill. A cost that
+    happened and is not on the receipt is a cost somebody pays for twice.
+    """
+    for one in its_calls:
+        spent = fold(spent, one)
+    return spent

@@ -219,9 +219,9 @@ class ClaimProposal(BaseModel):
     question, one answer.
 
     A claim is something that will be plainly true or false by a date, settled by
-    a named source. Never a mood ("tensions ease"); always a check ("at least 14
-    consecutive days of unrestricted commercial transit through the Strait of
-    Hormuz per Lloyd's List, by 2026-11-01").
+    a named source, and it **stands on its own**: a plain statement of the thing
+    that happens, with no lead-in and no explanation attached. Somebody reads it
+    on a tile with nothing around it, and it has to make sense there.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -231,15 +231,26 @@ class ClaimProposal(BaseModel):
     )
     claim: str = Field(
         description=(
-            "The claim in one sentence, as a person would say it out loud. The "
+            "The thing that happens, as one plain standalone statement. No lead-in "
+            "and no explanation: not 'With the approval granted, stocks run "
+            "short', not 'Once it lands, stocks run short', not 'As a result, "
+            "stocks run short' — just 'Retail stocks of the treatment run short in "
+            "at least twenty states'. Why it happens belongs on the arrow, and "
+            "saying it twice gives a reader a box that argues with itself. The "
             "precise, settleable version goes in the test below."
         )
     )
     claim_kind: Literal["event", "market", "not_tradeable"] = Field(
         description=(
-            "What this claim is for. 'event': a step in the middle of the story. "
-            "'market': an ending that names something you could trade. "
-            "'not_tradeable': an ending that names why there is nothing to trade."
+            "What this claim is for. 'event': a step on the way, which is most of "
+            "them. 'market': an ending, and only when **this claim's own test is a "
+            "price or a contract outcome somebody could take a position on "
+            "today** — 'the front-month contract settles below ninety' is one; 'a "
+            "published storage figure reaches eighty per cent' is not, however "
+            "tradeable it feels, because what settles it is a figure and not a "
+            "price. 'not_tradeable': an ending that names why there is nothing to "
+            "trade. When in doubt it is an 'event': a map that reaches a trade in "
+            "one jump has skipped the argument that made the trade worth anything."
         )
     )
     resolution: Resolution = Field(
@@ -255,8 +266,11 @@ class ClaimProposal(BaseModel):
         default=None,
         description=(
             "How often this kind of thing has happened before: how many cases out "
-            "of how many, and what set was counted. Leave it out when there is no "
-            "honest set to count — absent is better than invented."
+            "of how many, and what set was counted. **Search for it, and cite the "
+            "pages the search returned.** A count with nothing behind it is "
+            "dropped: it looks like a measurement and it is a memory. Leave it out "
+            "when you cannot find an honest set to count — absent is better than "
+            "invented, and absent is what the screen will say."
         ),
     )
     payoff: Payoff | None = Field(

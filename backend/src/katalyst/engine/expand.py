@@ -44,6 +44,7 @@ from katalyst.domain import (
     Belief,
     Beliefs,
     Graph,
+    Insert,
     Link,
     Proposition,
     PropositionId,
@@ -52,10 +53,15 @@ from katalyst.domain import (
     validate,
 )
 from katalyst.engine.client import Answerer, AnswerWeCouldNotRead
-from katalyst.engine.grounding import found_in, keep_cited, provenance_of, same_address
+from katalyst.engine.grounding import found_in, keep_cited, keep_returned, provenance_of
 from katalyst.engine.ids import mint_id
-from katalyst.engine.outcome import Accepted, Outcome, Refused, Stopped, costing
-from katalyst.engine.prompt import expanding_question, starting_question
+from katalyst.engine.outcome import Accepted, Caps, Outcome, Refused, Stopped, costing
+from katalyst.engine.prompt import (
+    adding_question,
+    expanding_question,
+    joining_question,
+    starting_question,
+)
 from katalyst.engine.proposal import (
     ClaimProposal,
     LinkDraft,
@@ -64,6 +70,7 @@ from katalyst.engine.proposal import (
     StartingClaim,
     Stop,
 )
+from katalyst.engine.receipt import fold, nothing_spent_yet, over_the_cap
 
 
 def expand(
@@ -213,16 +220,18 @@ def _judge(
     Returns:
         The accepted claim and arrows, or every reason the map's rules gave.
     """
-    candidate, claim, arrows, dropped = _candidate_map(graph, proposal, found)
+    candidate, claim, arrows, dropped, no_class = _candidate_map(graph, proposal, found)
     introduced = _newly_wrong(validate(graph), validate(candidate))
     if introduced:
         return Refused(claim_in_words=_in_the_models_words(proposal), violations=introduced)
-    return Accepted(proposition=claim, links=arrows, sources_dropped=dropped)
+    return Accepted(
+        proposition=claim, links=arrows, sources_dropped=dropped, base_rate_dropped=no_class
+    )
 
 
 def _candidate_map(
     graph: Graph, proposal: ClaimProposal | LinkProposal, found: tuple[Source, ...]
-) -> tuple[Graph, Proposition | None, tuple[Link, ...], tuple[str, ...]]:
+) -> tuple[Graph, Proposition | None, tuple[Link, ...], tuple[str, ...], str | None]:
     """Put the proposal onto a copy of the map, minting what only we can mint.
 
     Args:
@@ -232,13 +241,20 @@ def _candidate_map(
 
     Returns:
         The map the proposal would leave behind, the new claim if there is one,
-        the arrows that arrived, and the addresses that were dropped.
+        the arrows that arrived, the addresses that were dropped, and the
+        reference class of a count that was thrown away, if one was.
     """
     if isinstance(proposal, LinkProposal):
         arrow, dropped = _arrow(proposal.link, proposal.source, proposal.target, found)
-        return graph.model_copy(update={"links": (*graph.links, arrow)}), None, (arrow,), dropped
+        return (
+            graph.model_copy(update={"links": (*graph.links, arrow)}),
+            None,
+            (arrow,),
+            dropped,
+            None,
+        )
 
-    claim = _claim(proposal, found)
+    claim, no_class = _claim(proposal, found)
     arrow, dropped = _arrow(proposal.link, proposal.cause, claim.id, found)
     return (
         graph.model_copy(
@@ -250,10 +266,11 @@ def _candidate_map(
         claim,
         (arrow,),
         dropped,
+        no_class,
     )
 
 
-def _claim(proposal: ClaimProposal, found: tuple[Source, ...]) -> Proposition:
+def _claim(proposal: ClaimProposal, found: tuple[Source, ...]) -> tuple[Proposition, str | None]:
     """Mint a claim from a proposal, stamping the two things the model may not say.
 
     The identifier is ours, and so is the name on the likelihood.
@@ -267,18 +284,28 @@ def _claim(proposal: ClaimProposal, found: tuple[Source, ...]) -> Proposition:
         proposal: The claim as the model wrote it.
         found: What the search tool returned in that call.
 
+    **A count nothing backs is thrown away**, and the claim is accepted without
+    it. The first measured run, on 2026-09-17, came back with eight counts like
+    "12 of 15" and not one source behind any of them: a number that looks measured
+    and is remembered is the state this product refuses to show, and an honest
+    "no reference class" on the screen beats a precise-looking lie. Kent settled
+    it on 2026-09-20. It is the same rule an arrow's citations are kept by, over
+    the bare addresses a count carries.
+
     Returns:
-        The claim, with an identifier nobody else could have given it.
+        The claim, with an identifier nobody else could have given it, and the
+        reference class of a count that was thrown away, if one was.
     """
     stated = Belief(p=proposal.prior.p, lo=proposal.prior.lo, hi=proposal.prior.hi, owner="model")
     base_rate = proposal.base_rate
+    thrown_away: str | None = None
     if base_rate is not None:
-        returned = {same_address(source.url) for source in found}
-        base_rate = base_rate.model_copy(
-            update={
-                "sources": tuple(url for url in base_rate.sources if same_address(url) in returned)
-            }
-        )
+        kept_addresses, _ = keep_returned(base_rate.sources, found)
+        if kept_addresses:
+            base_rate = base_rate.model_copy(update={"sources": kept_addresses})
+        else:
+            thrown_away = base_rate.reference_class
+            base_rate = None
     return Proposition(
         id=mint_id(),
         claim=proposal.claim,
@@ -290,7 +317,7 @@ def _claim(proposal: ClaimProposal, found: tuple[Source, ...]) -> Proposition:
         evidence=(),
         payoff=proposal.payoff,
         not_tradeable_reason=proposal.not_tradeable_reason,
-    )
+    ), thrown_away
 
 
 def _arrow(
@@ -361,3 +388,160 @@ def _in_the_models_words(proposal: Proposal) -> str:
     if isinstance(proposal, LinkProposal):
         return proposal.link.rationale
     return proposal.why
+
+
+# --- Adding a claim somebody asked for --------------------------------------
+
+
+def add_a_claim(
+    graph: Graph,
+    sentence: str,
+    *,
+    answerer: Answerer,
+    on: date,
+    width: int,
+    may_search: bool = True,
+    dollars: float | None = None,
+) -> tuple[Insert | None, tuple[Outcome, ...]]:
+    """Draft a claim somebody typed, join it to the map, and hand back one edit.
+
+    **The one edit that needs a model**, and it needs no shape of its own. One
+    call writes the sentence as a claim, using the same starting-claim shape the
+    first claim of any map uses, with the map shown beside it. Then the ordinary
+    machinery asks for its arrows **one per call**, each an ordinary arrow between
+    two claims already on the map, each checked by the map's own rules exactly as
+    any other proposal is, until the model says it is joined well enough or the
+    width cap says enough.
+
+    Nothing about the rest of the map is re-prompted: the one exception to "never
+    re-prompt for a whole map" is this, over the claim it touches and not one
+    claim more.
+
+    Args:
+        graph: The map the claim is going onto. It is never changed.
+        sentence: What the person typed.
+        answerer: Whatever this run asks its questions of.
+        on: The day this is happening.
+        width: How many arrows the new claim may have.
+        may_search: Whether there are searches left to spend.
+        dollars: What this edit may spend, in dollars. The same ceiling a whole
+            run gets when not said, which is the right one: an edit is asked for
+            by hand, one at a time, and there is no second loop above it.
+
+    Returns:
+        The edit, or nothing at all when the claim could not be written; and every
+        call it took, so the money is counted whatever the answer was.
+    """
+    cap = Caps().dollars if dollars is None else dollars
+    spent: list[Outcome] = []
+    running = nothing_spent_yet()
+    answerer.watching(running, cap)
+    drafting = _drafted(graph, sentence, answerer=answerer, on=on, may_search=may_search)
+    spent.append(drafting)
+    running = fold(running, drafting)
+    written = drafting.result
+    if not isinstance(written, Accepted) or written.proposition is None:
+        return None, tuple(spent)
+
+    added = written.proposition
+    joined: list[Link] = []
+    so_far = graph.model_copy(update={"propositions": (*graph.propositions, added)})
+    for _ in range(width):
+        if over_the_cap(running, cap):
+            break
+        answerer.watching(running, cap)
+        outcome = expand_toward(so_far, added.id, answerer=answerer, on=on, may_search=may_search)
+        spent.append(outcome)
+        running = fold(running, outcome)
+        result = outcome.result
+        if isinstance(result, Stopped):
+            break
+        if not isinstance(result, Accepted):
+            continue
+        joined.extend(result.links)
+        so_far = so_far.model_copy(update={"links": (*so_far.links, *result.links)})
+
+    if not joined:
+        # A claim joined to nothing is not part of the story, and the map's own
+        # rules would refuse it anyway. Say so by handing back nothing.
+        return None, tuple(spent)
+    return Insert(proposition=added, links=tuple(joined)), tuple(spent)
+
+
+def expand_toward(
+    graph: Graph,
+    added: PropositionId,
+    *,
+    answerer: Answerer,
+    on: date,
+    may_search: bool = True,
+) -> Outcome:
+    """Ask for one arrow with a named claim at one end, and judge it like any other.
+
+    The claim is named in the question rather than pinned by a field on a shape,
+    because a shape is forever and a sentence is not.
+
+    Args:
+        graph: The map, with the new claim already on it.
+        added: The claim the arrow must touch.
+        answerer: Whatever this run asks its questions of.
+        on: The day this is happening.
+        may_search: Whether there are searches left to spend.
+
+    Returns:
+        What happened, and what the call cost.
+    """
+    question = joining_question(graph, added, today=on)
+    try:
+        said = answerer.proposal(question, may_search=may_search)
+    except AnswerWeCouldNotRead as did_not_fit:
+        return Outcome(result=Refused(claim_in_words=did_not_fit.why), about=added, calls=1)
+    if said.declined is not None:
+        return costing(Refused(claim_in_words=said.declined), added, said)
+    proposed = said.answered
+    if isinstance(proposed, Stop):
+        return costing(Stopped(why=proposed.why), added, said)
+    if not isinstance(proposed, LinkProposal):
+        return costing(
+            Refused(
+                claim_in_words=(
+                    "This call asked for one arrow between two claims already on the "
+                    "map, and the answer was something else."
+                )
+            ),
+            added,
+            said,
+        )
+    if added not in (proposed.source, proposed.target):
+        return costing(
+            Refused(
+                claim_in_words=(
+                    "This arrow does not touch the claim that was just added, so it "
+                    "is not part of adding it."
+                )
+            ),
+            added,
+            said,
+        )
+    return costing(_judge(graph, proposed, found_in(said, on=on)), added, said)
+
+
+def _drafted(
+    graph: Graph, sentence: str, *, answerer: Answerer, on: date, may_search: bool
+) -> Outcome:
+    """Write one sentence somebody typed as a claim, with the map shown beside it."""
+    question = adding_question(graph, sentence, today=on)
+    try:
+        said = answerer.starting_claim(question, may_search=may_search)
+    except AnswerWeCouldNotRead as did_not_fit:
+        return Outcome(result=Refused(claim_in_words=did_not_fit.why), calls=1)
+    if said.declined is not None:
+        return costing(Refused(claim_in_words=said.declined), None, said)
+    drafted = said.answered
+    if not isinstance(drafted, StartingClaim):
+        return costing(
+            Refused(claim_in_words="The model gave no answer to this question."), None, said
+        )
+    return costing(
+        Accepted(proposition=_starting_claim(drafted, is_the_hypothesis=False)), None, said
+    )

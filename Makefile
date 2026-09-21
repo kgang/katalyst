@@ -60,6 +60,15 @@ eval: ## Score what the language model proposes against saved examples
 #   make record-demo                  every example, at the ceiling written in code
 #   make record-demo ONLY=hormuz      one of them
 #   make record-demo CAP=5            the same, with a lower ceiling
+#   make run-demo EFFORT=medium       the same run, thinking less hard
+#   make run-demo MODEL=claude-opus-5 the same run, on the other model
+#
+# EFFORT and MODEL are pinned for the whole of one run and never varied between
+# its calls: both are read once when the run starts, and changing either mid-run
+# would throw away the remembered prefix the run is reading back at a tenth of
+# the price. Left unset, EFFORT sends no such field at all and the service's own
+# default stands, so the request is byte for byte what it was before anybody had
+# an opinion (Kent, 2026-09-20).
 #
 # CAP can only lower the $15 hard stop that is written in code, never lift it: a
 # cap a caller can raise is not a cap. A run that reaches it stops and says what
@@ -94,12 +103,15 @@ eval: ## Score what the language model proposes against saved examples
 # words is a recording of a question we no longer ask.
 
 record-demo: ## Record an example running for real, so a keyless clone can watch it. Spends money; needs a key
-	cd backend && uv run python -m katalyst.engine.record \
-		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),)
+	cd backend && $(if $(MODEL),KATALYST_MODEL=$(MODEL) ,)uv run python -m katalyst.engine.record \
+		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),) \
+		$(if $(EFFORT),--effort $(EFFORT),)
 
 run-demo: ## Run an example for real as a measurement, and write no recording. Spends money; needs a key
-	cd backend && uv run python -m katalyst.engine.record --measure-only \
-		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),)
+	cd backend && $(if $(MODEL),KATALYST_MODEL=$(MODEL) ,)uv run python -m katalyst.engine.record \
+		--measure-only \
+		$(if $(ONLY),--only $(ONLY),) $(if $(CAP),--cap $(CAP),) \
+		$(if $(EFFORT),--effort $(EFFORT),)
 
 record-cassettes: ## Record the model's real answers for the tests to replay. Spends money; needs a key
 	cd backend && uv run pytest tests/boundary -m "not handmade" --record-mode=rewrite

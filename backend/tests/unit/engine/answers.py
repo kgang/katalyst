@@ -45,6 +45,7 @@ from katalyst.engine.proposal import (
     StartingClaim,
     Stop,
 )
+from katalyst.engine.receipt import Receipt
 
 FROM_THE_QUESTION = "<the claim this question is about>"
 """What a story writes where a real answer would copy a short name out of the question.
@@ -310,11 +311,21 @@ class Scripted:
         self._lock = Lock()
         self.asked: list[str] = []
         self.searched: list[bool] = []
+        self.purse: list[tuple[Receipt, float]] = []
 
-    def starting_claim(self, question: str) -> Said:
+    def watching(self, spent: Receipt, cap: float) -> None:
+        """Take note of the purse and do nothing with it.
+
+        A fake answers from a list and cannot run up a bill between rounds, so the
+        only thing worth keeping is that it was told — which a test can then read.
+        """
+        self.purse.append((spent, cap))
+
+    def starting_claim(self, question: str, *, may_search: bool = True) -> Said:
         """Answer the question that turns one typed sentence into a claim."""
         with self._lock:
             self.asked.append(question)
+            self.searched.append(may_search)
             if self._raises is not None:
                 raise self._raises
             return what_it_said([self._next(self._starting)])
@@ -359,6 +370,7 @@ class Storyteller:
         story: dict[str, list[ParsedMessage[Proposal]]] | None = None,
         *,
         starting: list[ParsedMessage[Proposal]] | None = None,
+        joining: list[ParsedMessage[Proposal]] | None = None,
         otherwise: ParsedMessage[Proposal] | None = None,
     ) -> None:
         """Set out the story this answerer tells.
@@ -369,20 +381,34 @@ class Storyteller:
                 way a claim the story never mentioned is answered.
             starting: The answers to the questions that turn a person's own
                 sentences into claims, in order.
+            joining: The answers to the questions that ask for one arrow onto a
+                claim somebody has just added — the questions that name no claim
+                to expand, so the story cannot be keyed by one.
             otherwise: What to say about a claim the story does not mention.
         """
         self._story = {claim: list(said) for claim, said in (story or {}).items()}
         self._starting = list(starting or [])
+        self._joining = list(joining or [])
         self._otherwise = otherwise or an_answer(a_stop())
         self._lock = Lock()
         self.asked: list[str] = []
         self.asked_about: list[str] = []
         self.searched: list[bool] = []
+        self.purse: list[tuple[Receipt, float]] = []
 
-    def starting_claim(self, question: str) -> Said:
+    def watching(self, spent: Receipt, cap: float) -> None:
+        """Take note of the purse and do nothing with it.
+
+        A fake answers from a list and cannot run up a bill between rounds, so the
+        only thing worth keeping is that it was told — which a test can then read.
+        """
+        self.purse.append((spent, cap))
+
+    def starting_claim(self, question: str, *, may_search: bool = True) -> Said:
         """Answer the question that turns one typed sentence into a claim."""
         with self._lock:
             self.asked.append(question)
+            self.searched.append(may_search)
             if not self._starting:
                 return what_it_said([an_answer(a_starting_claim())])
             if len(self._starting) > 1:
@@ -390,8 +416,20 @@ class Storyteller:
             return what_it_said([self._starting[0]])
 
     def proposal(self, question: str, *, may_search: bool) -> Said:
-        """Answer the question that asks for the one next piece of the map."""
+        """Answer the question that asks for one next piece of the map.
+
+        A question that names no claim to expand is the one that asks for an arrow
+        onto a claim somebody has just added, so it is answered from its own list.
+        """
         with self._lock:
+            if ASKING_ABOUT not in question:
+                self.asked.append(question)
+                self.searched.append(may_search)
+                said = self._joining.pop(0) if self._joining else self._otherwise
+                # Both ends of a joining arrow are written as claims' own words,
+                # including the one just added, whose short name was minted while
+                # the run was happening.
+                return what_it_said([_pointing_at(said, question, "")])
             about = question.split(ASKING_ABOUT, 1)[1].splitlines()[0]
             self.asked.append(question)
             self.asked_about.append(about)

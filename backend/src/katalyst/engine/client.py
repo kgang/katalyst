@@ -36,6 +36,16 @@ the very front of a request, so removing it would stop the service recognising
 the prefix it has been reading back at a tenth of the price all run, while
 forbidding it leaves that prefix untouched.
 
+The money stop is inside a call as well as between them
+-------------------------------------------------------
+One question can now run twenty-five searches over five rounds, so a single call
+can cost a dollar on its own. A ceiling checked only between calls would be a
+ceiling the most expensive thing in the program steps straight over. Before each
+question the walk says what it has spent and what it may spend (`watching`), and
+between rounds this file prices the rounds so far against that. Over the line,
+the answer is taken as it stands: what has been paid for is kept, and nothing is
+thrown away for being interrupted (Kent, 2026-09-20).
+
 What this file must never do
 ----------------------------
 - Never decide anything about a map. It asks, it translates, it hands back.
@@ -49,7 +59,7 @@ What this file must never do
 
 import time
 from collections.abc import Sequence
-from typing import Any, Literal, Protocol
+from typing import Any, Protocol
 
 import anthropic
 from anthropic import Omit, omit
@@ -70,9 +80,9 @@ from anthropic.types import (
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from katalyst.engine.outcome import FoundPage, Said
-from katalyst.engine.pricing import MODEL
 from katalyst.engine.prompt import STANDING_TEXT
 from katalyst.engine.proposal import Proposal, StartingClaim
+from katalyst.engine.receipt import Receipt, fold, nothing_spent_yet, over_the_cap
 from katalyst.settings import get_settings
 
 ROOM_FOR_AN_ANSWER = 16_000
@@ -85,26 +95,34 @@ never cut off in the middle, small enough that the request cannot sit past the
 client library's own patience.
 """
 
-SEARCHES_INSIDE_ONE_CALL = 1
+SEARCHES_INSIDE_ONE_CALL = 25
 """How many web searches the model may run while answering one question.
 
-One proposal per call, one search per proposal. One answer is one claim and the
-one arrow that reaches it, so it is checking one mechanism, and a budget of one
-look keeps the bill in step with the work. It is raised only when a measurement
-says it should be, never because a run felt thin.
+One search was enough to check an arrow's mechanism and nowhere near enough to
+**count a reference class**. The first measured run proved it: eight of ten
+claims came back with a count like "12 of 15" and not one source behind it,
+because the one search had gone to the arrow. Counting how often something has
+happened before means finding the cases, and finding cases takes looking.
 
 Fixed for the whole of a run, on purpose. A figure that counted down per call
-would change the tool list, and the tool list is the very front of the request.
+would change the tool list, and the tool list is the very front of the request —
+so the whole remembered prefix would be thrown away mid-run.
 """
 
-TIMES_A_PART_FINISHED_ANSWER_IS_SENT_BACK = 3
-"""How often a part-finished answer is handed straight back to be continued.
+ROUNDS_OF_RESEARCH = 5
+"""How many times a part-finished answer is handed back to be continued.
 
-A question that uses the search tool can come back with the search half done and
-no answer yet. The service expects exactly one thing in reply: the same
-conversation with its own part-finished turn on the end, and no new instruction —
-it picks up where it left off. This is how many times we will do that before
-treating the answer as one we never got.
+The service runs the search tool in a loop of its own and stops after a while,
+handing back a part-finished answer. Sending it straight back — the same
+conversation with its own turn on the end and no new instruction — lets it carry
+on where it left off. Each of those is a round: search, read, decide whether to
+look again.
+
+**At the cap the answer is taken as it stands.** Whatever the model has by then
+is what we read: if it found a countable class it says so, and if it did not, the
+claim arrives without a base rate and the transcript says why. Nothing is retried
+and nothing is asked a second time, because both would be paying twice for the
+same question.
 """
 
 SEARCH_TOOL: WebSearchTool20260209Param = {
@@ -123,27 +141,6 @@ for to support a conclusion we already had.
 
 A search that fails does not raise. The answer comes back normally and the result
 block holds one error instead of a list of results, which reads as nothing found.
-"""
-
-HOW_HARD_TO_TRY: Literal["low", "medium", "high", "xhigh", "max"] | None = None
-"""How hard the model tries, pinned for the whole program rather than per call.
-
-`None` means the setting is not sent at all, which is where it stands today: the
-service's own default is `high`, and naming a value here — even the same one —
-puts a field in the request that was not there before. The request is what a
-recorded exchange is matched on, so changing this re-records every cassette and
-every demo recording, and that is a decision with a bill attached rather than a
-tuning knob.
-
-**It is a constant on purpose.** Changing how hard the model tries between calls
-would throw away the remembered prefix the whole run is reading back at a tenth
-of the price, so this may be edited but never varied.
-
-The reason to reach for it: the first five recorded calls spent **half to
-two-thirds of their written tokens thinking**, and took about a minute each.
-`medium` is the first thing to measure against the default, and the transcript
-now carries the thinking tokens and the seconds per call so that measurement
-needs no second experiment.
 """
 
 MAY_SEARCH: ToolChoiceParam = {"type": "auto"}
@@ -245,7 +242,15 @@ class Answerer(Protocol):
     fit the shape.
     """
 
-    def starting_claim(self, question: str) -> Said:
+    def watching(self, spent: Receipt, cap: float) -> None:
+        """Say what the run has spent and what it may spend, before the next question.
+
+        Called before every question. An answerer that cannot go over a budget —
+        every fake in the tests — may do nothing with it.
+        """
+        ...
+
+    def starting_claim(self, question: str, *, may_search: bool = True) -> Said:
         """Ask for one typed sentence, written as a claim anybody could settle."""
         ...
 
@@ -267,31 +272,65 @@ class Model:
     `expand.py`, which can be tested without spending a penny.
     """
 
-    def __init__(self, client: anthropic.Anthropic, *, model: str = MODEL) -> None:
+    def __init__(
+        self,
+        client: anthropic.Anthropic,
+        *,
+        model: str | None = None,
+        effort: str | None = None,
+    ) -> None:
         """Wrap a client.
 
         Args:
             client: The vendor's client, already built and already holding
                 whatever credentials it needs.
-            model: Which model to ask. The default is the one decision record
-                0006 chose and `pricing.py` prices.
+            model: Which model to ask. The one the settings name when not said.
+            effort: How hard it should try. The one the settings name when not
+                said, and nothing at all when neither says — which leaves the
+                service's own default and puts no field in the request.
         """
         self._client = client
-        self._model = model
+        settings = get_settings()
+        self._model = model or settings.KATALYST_MODEL
+        chosen: Any = effort if effort is not None else settings.KATALYST_EFFORT
+        # Pinned for the whole run and never varied between calls: changing it
+        # mid-run would throw away the remembered prefix the run is reading back
+        # at a tenth of the price. Left empty it is not sent at all, so the
+        # request is byte for byte what it was before anybody had an opinion.
+        self._trying: OutputConfigParam | Omit = (
+            OutputConfigParam(effort=chosen) if chosen else omit
+        )
+        self._spent = nothing_spent_yet(self._model)
+        self._cap = float("inf")
 
-    def starting_claim(self, question: str) -> Said:
+    def watching(self, spent: Receipt, cap: float) -> None:
+        """Take note of what the run has spent and what it may spend.
+
+        Args:
+            spent: What the run had spent before this question was put.
+            cap: What the whole run may spend, in dollars.
+        """
+        self._spent = spent
+        self._cap = cap
+
+    def starting_claim(self, question: str, *, may_search: bool = True) -> Said:
         """Ask for one typed sentence, written as a claim anybody could settle.
 
-        Searching is forbidden on this call. The question is what the person
-        meant, and the web has nothing to say about that.
+        **Searching is allowed here**, which it was not at first. The question is
+        partly what the person meant, which the web has nothing to say about — and
+        partly how often this kind of thing has happened before, which is exactly
+        what the web is for. The first claim of a map is the one every number
+        below it hangs off, and it was the one claim nobody could look anything up
+        for.
 
         Args:
             question: The varying half of the request, from `prompt.py`.
+            may_search: Whether this run still has searches left.
 
         Returns:
             The answer, in our own words.
         """
-        return self._ask(question, StartingClaim, may_search=False)
+        return self._ask(question, StartingClaim, may_search=may_search)
 
     def proposal(self, question: str, *, may_search: bool) -> Said:
         """Ask for the one next piece of the map.
@@ -330,14 +369,10 @@ class Model:
         Raises:
             AnswerWeCouldNotRead: If what came back did not fit the shape.
         """
-        # Sent only when somebody has decided to send it; see `HOW_HARD_TO_TRY`.
-        trying: OutputConfigParam | Omit = (
-            {"effort": HOW_HARD_TO_TRY} if HOW_HARD_TO_TRY is not None else omit
-        )
         conversation: list[MessageParam] = [{"role": "user", "content": question}]
         rounds: list[ParsedMessage[Any]] = []
         started = time.monotonic()
-        for _ in range(TIMES_A_PART_FINISHED_ANSWER_IS_SENT_BACK + 1):
+        for _ in range(ROUNDS_OF_RESEARCH + 1):
             try:
                 answer = self._client.messages.parse(
                     model=self._model,
@@ -352,17 +387,35 @@ class Model:
                     tool_choice=MAY_SEARCH if may_search else MAY_NOT_SEARCH,
                     messages=conversation,
                     output_format=shape,
-                    output_config=trying,
+                    output_config=self._trying,
                 )
             except ValidationError as did_not_fit:
                 raise AnswerWeCouldNotRead(_did_not_fit_the_shape(did_not_fit)) from did_not_fit
             rounds.append(answer)
             if answer.stop_reason != "pause_turn":
                 return what_it_said(rounds, seconds=time.monotonic() - started)
+            if self._out_of_money(rounds):
+                # The rounds already paid for are kept and read as they stand.
+                return what_it_said(rounds, seconds=time.monotonic() - started)
             # Part finished. The service picks up from its own turn, and adding a
             # "carry on" of our own would only confuse it.
             conversation = [*conversation, {"role": "assistant", "content": answer.content}]
         return what_it_said(rounds, seconds=time.monotonic() - started)
+
+    def _out_of_money(self, rounds: Sequence[ParsedMessage[Any]]) -> bool:
+        """Say whether the rounds so far have taken the run past what it may spend.
+
+        Priced through the same receipt the run itself is priced through, so the
+        figure that stops a question mid-flight and the figure on the bill are
+        worked out by one piece of code.
+
+        Args:
+            rounds: Every round trip this question has made so far.
+
+        Returns:
+            True once this question's rounds have carried the run over its cap.
+        """
+        return over_the_cap(fold(self._spent, what_it_said(rounds)), self._cap)
 
 
 def what_it_said(rounds: Sequence[ParsedMessage[Any]], *, seconds: float = 0.0) -> Said:
@@ -498,12 +551,16 @@ def _did_not_fit_the_shape(problem: ValidationError) -> str:
     return f"The model's answer did not fit the shape this call asked for, at: {named}."
 
 
-def live_answerer() -> Model | None:
+def live_answerer(*, effort: str | None = None) -> Model | None:
     """Build the live answerer, or say plainly that there is no key for one.
 
     The one function that knows whether this program can call a model at all.
     Nothing here raises and nothing here prints: a missing key is an ordinary fact
     about how the program was started, and the screen says so rather than failing.
+
+    Args:
+        effort: How hard the model should try on this run, when a measurement run
+            has said. The settings decide when it has not.
 
     Returns:
         A live answerer, or nothing at all when no key is configured.
@@ -511,4 +568,4 @@ def live_answerer() -> Model | None:
     key = get_settings().ANTHROPIC_API_KEY
     if not key:
         return None
-    return Model(anthropic.Anthropic(api_key=key))
+    return Model(anthropic.Anthropic(api_key=key), effort=effort)

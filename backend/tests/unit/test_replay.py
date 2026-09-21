@@ -15,6 +15,7 @@ import pytest
 from katalyst.engine import events, replay
 from katalyst.engine.events import BeliefsPropagated, Done, ProposalRejected, Receipt
 from katalyst.engine.prompt import prompt_hash
+from katalyst.settings import get_settings
 from tests.unit.engine.a_recording import MADE_ON, THE_SENTENCE, written_to
 
 SMALL = (16, 4)
@@ -78,13 +79,20 @@ def test_replay_is_labelled_in_receipt(recorded: replay.Recording) -> None:
     assert receipt.model
 
 
-def test_every_recording_shows_a_miss(recorded: replay.Recording) -> None:
-    """Watching the rules refuse the model is half of what this product is."""
+def test_every_refusal_a_recording_shows_names_what_it_broke(
+    recorded: replay.Recording,
+) -> None:
+    """Kent, 2026-09-20: a recording shows the refusals that happened, and no others.
+
+    The rule used to be that every recording must show at least one. It made the
+    only staged thing on the disk: a run re-run until the model erred. So the rule
+    is now about honesty rather than quantity — a refusal in the file must name the
+    rules it broke, and a run where the model never erred is a recording too.
+    """
     refusals = [
         payload for name, payload in recorded.lines if name == events.NAMES[ProposalRejected]
     ]
 
-    assert refusals
     assert all(one["violations"] for one in refusals)
 
 
@@ -103,8 +111,12 @@ def test_a_recording_made_against_another_prompt_is_named_as_stale(
     assert any("Record it again" in one for one in faults)
 
 
-def test_a_recording_that_shows_no_miss_is_named(tmp_path: Path) -> None:
-    """The fence against recording only the runs that went beautifully."""
+def test_a_recording_that_shows_no_miss_is_sound(tmp_path: Path) -> None:
+    """The other half of the same decision, from the reading end.
+
+    A run in which the rules never had to refuse anything is a true run, and its
+    recording plays back like any other.
+    """
     written = written_to(tmp_path / "recordings")
     kept = [
         one
@@ -115,7 +127,7 @@ def test_a_recording_that_shows_no_miss_is_named(tmp_path: Path) -> None:
 
     faults = replay.faults_in(replay.read(written), current_prompt_hash=prompt_hash())
 
-    assert any("shows no refusal" in one for one in faults)
+    assert faults == []
 
 
 def test_a_recording_that_stores_likelihoods_is_named(tmp_path: Path) -> None:
@@ -165,3 +177,31 @@ def test_pacing_is_a_setting_and_never_a_field_on_a_request() -> None:
 def test_a_recording_ends_where_a_generation_ends(recorded: replay.Recording) -> None:
     """Every committed file ends in `done`; a run that broke is re-run, not committed."""
     assert recorded.lines[-1][0] == events.NAMES[Done]
+
+
+def test_where_recordings_are_read_from_is_a_setting_and_not_a_patch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A recording is checked by playing it, and that needs somewhere else to play it from.
+
+    Before this there was no way to point a running program at a folder of its
+    own: the path was decided when the module was written, so trying a recording
+    before committing it meant editing the code that reads it (2026-09-20).
+    """
+    somewhere_else = tmp_path / "somewhere-else"
+    written_to(somewhere_else)
+    monkeypatch.setenv("KATALYST_RECORDINGS", str(somewhere_else))
+    get_settings.cache_clear()
+
+    try:
+        assert replay.where_they_live() == somewhere_else
+        assert replay.find(THE_SENTENCE) is not None
+    finally:
+        get_settings.cache_clear()
+
+
+def test_with_no_setting_the_folder_is_the_one_that_ships() -> None:
+    """Empty means the committed folder, which is what a fresh clone has."""
+    get_settings.cache_clear()
+
+    assert replay.where_they_live() == replay.RECORDINGS

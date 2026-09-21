@@ -8,7 +8,7 @@ reading, which is the thing a source's own description already refuses.
 from katalyst.domain import BaseRate, Link, Source, validate
 from katalyst.engine.client import what_it_said
 from katalyst.engine.expand import expand
-from katalyst.engine.grounding import found_in, keep_cited, provenance_of
+from katalyst.engine.grounding import found_in, keep_cited, keep_returned, provenance_of
 from katalyst.engine.outcome import Accepted, Refused
 from katalyst.fixtures import HORMUZ
 from tests.unit.engine.answers import (
@@ -191,3 +191,58 @@ def test_a_refusal_keeps_the_arrow_off_the_map_sources_and_all() -> None:
 
     assert isinstance(outcome.result, Refused)  # type: ignore[union-attr]
     assert all(A_PAGE not in [s.url for s in one.sources] for one in HORMUZ.links)
+
+
+def test_a_count_whose_pages_the_search_never_returned_is_thrown_away() -> None:
+    """Measured, 2026-09-17: eight claims in ten carried a count behind no page.
+
+    One of them was "37 of 41 cases since 1980" — which is the schema's own
+    example wearing a number. A count nobody can open a page for is the same
+    failure as a mechanism nobody can open a page for, so it goes through the
+    same rule and the claim arrives without it.
+    """
+    counted = BaseRate(
+        reference_class="Closures of a major strait since 1980",
+        k=37,
+        n=41,
+        sources=(NEVER_RETURNED,),
+    )
+    answered = a_claim("A claim with a remembered count.", cause="C", counted=counted)
+
+    outcome = ask(Scripted([an_answer(answered, found=(A_PAGE,), searches=1)]))
+
+    accepted = outcome.result  # type: ignore[attr-defined]
+    assert isinstance(accepted, Accepted)
+    assert accepted.proposition is not None
+    assert accepted.proposition.base_rate is None
+    assert accepted.base_rate_dropped == "Closures of a major strait since 1980"
+
+
+def test_a_count_the_search_did_return_is_kept_with_only_those_pages() -> None:
+    """The other side of the same rule: a sourced count survives, minus what was not found."""
+    counted = BaseRate(
+        reference_class="Something somebody counted and published",
+        k=3,
+        n=10,
+        sources=(A_PAGE, NEVER_RETURNED),
+    )
+    answered = a_claim("A claim with a checkable count.", cause="C", counted=counted)
+
+    outcome = ask(Scripted([an_answer(answered, found=(A_PAGE,), searches=1)]))
+
+    accepted = outcome.result  # type: ignore[attr-defined]
+    assert isinstance(accepted, Accepted)
+    assert accepted.proposition is not None
+    assert accepted.proposition.base_rate is not None
+    assert accepted.proposition.base_rate.sources == (A_PAGE,)
+    assert accepted.base_rate_dropped is None
+
+
+def test_one_rule_splits_the_addresses_for_arrows_and_for_counts_alike() -> None:
+    """The reason there is one function: two failures, one law, one place to change it."""
+    found = (Source(url=A_PAGE, title="A page", retrieved_at=THE_DAY_THE_RUN_HAPPENED),)
+
+    kept, dropped = keep_returned((A_PAGE, NEVER_RETURNED), found)
+
+    assert kept == (A_PAGE,)
+    assert dropped == (NEVER_RETURNED,)

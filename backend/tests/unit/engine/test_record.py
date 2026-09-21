@@ -14,6 +14,9 @@ import json
 from datetime import date
 from pathlib import Path
 
+import pytest
+
+from katalyst.engine import record
 from katalyst.engine.record import (
     THE_FOUR,
     KeptRun,
@@ -28,6 +31,7 @@ from tests.unit.engine.answers import (
     Storyteller,
     a_claim,
     a_declined_answer,
+    a_link,
     a_starting_claim,
     a_stop,
     an_answer,
@@ -57,7 +61,11 @@ def a_run_that_shows_a_refusal() -> Storyteller:
                 an_answer(a_stop()),
             ],
         },
-        starting=[an_answer(a_starting_claim(HORMUZ), read_fresh=300, written=700)],
+        starting=[
+            an_answer(a_starting_claim(HORMUZ), read_fresh=300, written=700),
+            an_answer(a_starting_claim("Iran is struck the next day."), read_fresh=310),
+        ],
+        joining=[an_answer(a_link("Iran is struck the next day.", AN_ENDING))],
     )
 
 
@@ -78,7 +86,11 @@ def a_run_that_shows_none() -> Storyteller:
                 an_answer(a_stop()),
             ],
         },
-        starting=[an_answer(a_starting_claim(HORMUZ), read_fresh=300, written=700)],
+        starting=[
+            an_answer(a_starting_claim(HORMUZ), read_fresh=300, written=700),
+            an_answer(a_starting_claim("Iran is struck the next day."), read_fresh=310),
+        ],
+        joining=[an_answer(a_link("Iran is struck the next day.", AN_ENDING))],
     )
 
 
@@ -87,19 +99,23 @@ def a_run(told: Storyteller) -> object:
     return run_one("hormuz", answerer=told, cap=15.0, on=A_DAY, seed=20261001, say=lambda _: None)  # type: ignore[arg-type]
 
 
-def test_a_run_that_shows_no_refusal_writes_no_recording(tmp_path: Path) -> None:
-    """The rule itself, unchanged: every recording must show the rules refusing the model."""
+def test_a_run_that_shows_no_refusal_is_a_perfectly_good_recording() -> None:
+    """Kent, 2026-09-20: show what happened, honestly.
+
+    In twenty-six live proposals across two runs the model never once gave the
+    map's rules something to refuse. Re-running until it errs is waiting for a
+    mistake and calling it evidence — the one thing on the list that would have
+    been staged.
+    """
     run = a_run(a_run_that_shows_none())
 
-    faults = faults_of(run, needs_a_scripted_insert=False)  # type: ignore[arg-type]
-
-    assert any("no refusal" in one for one in faults)
+    assert faults_of(run) == ()  # type: ignore[arg-type]
 
 
-def test_a_run_that_shows_no_refusal_is_still_kept_in_full(tmp_path: Path) -> None:
+def test_a_run_is_kept_in_full_whatever_becomes_of_it(tmp_path: Path) -> None:
     """The money is spent either way, and the measurements are on no event."""
     run = a_run(a_run_that_shows_none())
-    faults = faults_of(run, needs_a_scripted_insert=False)  # type: ignore[arg-type]
+    faults = ("kept for a reason of somebody's own",)
 
     where = keep(run, faults, folder=tmp_path)  # type: ignore[arg-type]
 
@@ -120,6 +136,32 @@ def test_a_run_that_shows_no_refusal_is_still_kept_in_full(tmp_path: Path) -> No
     assert kept.events
 
 
+def test_the_running_total_is_the_money_actually_spent_so_far(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The bug this is a fence against: every progress line read $0.00.
+
+    A run that spent $1.32 printed a running total of nothing on every line of it,
+    because the figure was read off the transcript's own receipt, which is filled
+    in only at the very end. It is folded as the run goes now (2026-09-20).
+    """
+    monkeypatch.setattr(record, "DOLLARS_EVERY", 1)
+    said: list[str] = []
+    run_one(
+        "hormuz",
+        answerer=a_run_that_shows_none(),  # type: ignore[arg-type]
+        cap=15.0,
+        on=A_DAY,
+        seed=20261001,
+        say=said.append,
+    )
+
+    totals = [one for one in said if "so far:" in one]
+    assert totals
+    assert not any("$0.00" in one for one in totals)
+    assert all("calls" in one and "searches" in one for one in totals)
+
+
 def test_what_a_run_cost_is_said_out_loud_whatever_becomes_of_it() -> None:
     """A figure nobody wrote down is a figure somebody pays for twice."""
     said = what_it_cost(a_run(a_run_that_shows_none()))  # type: ignore[arg-type]
@@ -137,7 +179,7 @@ def test_a_run_that_shows_a_refusal_becomes_a_recording(tmp_path: Path) -> None:
     """And the header names the map's own minted identifier, never the example's name."""
     run = a_run(a_run_that_shows_a_refusal())
 
-    assert faults_of(run, needs_a_scripted_insert=False) == ()  # type: ignore[arg-type]
+    assert faults_of(run) == ()  # type: ignore[arg-type]
 
     written = write_recording(run, folder=tmp_path)  # type: ignore[arg-type]
     lines = written.read_text(encoding="utf-8").splitlines()

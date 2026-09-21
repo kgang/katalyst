@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field
 
 from katalyst.domain import Belief, Branch, Diff, LinkId, Violation, World
 from katalyst.engine import worlds as engine
+from katalyst.engine.ids import BIGGEST_SEED
 
 router = APIRouter(tags=["worlds"])
 
@@ -90,10 +91,14 @@ class WorldRequest(BaseModel):
         ),
     )
     seed: int = Field(
+        ge=0,
+        le=BIGGEST_SEED,
         description=(
             "The one number every random draw in the answer comes from. The same seed "
-            "always gives the same world."
-        )
+            "always gives the same world. Bounded by what a browser can hold exactly: "
+            "above it a browser rounds silently, asks for a world under a seed the "
+            "server never used, and every explanation of the numbers is then wrong."
+        ),
     )
     versions: int = Field(
         default=engine.VERSIONS,
@@ -141,7 +146,11 @@ class DiffRequest(BaseModel):
             "what the summary sentence calls the change."
         )
     )
-    seed: int = Field(description="The one seed both worlds are built from.")
+    seed: int = Field(
+        ge=0,
+        le=BIGGEST_SEED,
+        description="The one seed both worlds are built from, inside what a browser holds.",
+    )
     versions: int = Field(
         default=engine.VERSIONS,
         gt=0,

@@ -228,9 +228,12 @@ def test_the_same_ceilings_hold_on_the_world_routes() -> None:
 
 def test_the_transcript_of_a_generation_can_be_read_afterwards() -> None:
     """The working is a product artifact, not a log."""
-    stream()
+    read = stream()
+    announced = next(
+        payload["generation_id"] for name, payload in read if name == "generation_started"
+    )
 
-    working = client().get(f"/api/generate/{A_MAP}/transcript")
+    working = client().get(f"/api/generate/{announced}/transcript")
 
     assert working.status_code == 200
     assert working.json()["hypothesis"] == THE_SENTENCE
@@ -312,6 +315,27 @@ def test_an_insert_is_validated_like_any_other_proposal() -> None:
     )
 
     assert onto_a_map_that_does_not_exist.status_code == 404
+
+
+def test_a_generations_identifier_sent_as_a_map_is_told_which_it_wanted() -> None:
+    """The commonest wrong answer, answered rather than left to guess (2026-09-20).
+
+    A run and the map it built are two different things, and one run's map
+    outlives the question that made it — so an identifier that names the run gets
+    a sentence naming both, not a bare 404.
+    """
+    read = stream()
+    a_run = next(payload["generation_id"] for name, payload in read if name == "generation_started")
+
+    refused = client().post(
+        "/api/generate/insert",
+        json={"base_id": a_run, "claim_in_words": THE_SCRIPTED_INSERT, "position": 0},
+    )
+
+    assert refused.status_code == 404
+    said = refused.json()["detail"]
+    assert "generation" in said
+    assert "map" in said
 
 
 def test_readyz_says_what_can_be_replayed_before_anything_runs() -> None:

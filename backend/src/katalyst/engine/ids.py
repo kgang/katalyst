@@ -24,12 +24,18 @@ import secrets
 
 from ulid import ULID
 
-A_SEED_FITS_IN = 64
-"""How many bits a minted seed has.
+BIGGEST_SEED = 2**53 - 1
+"""The largest whole number that survives the trip to a browser and back.
 
-Wide enough that two runs started in the same second do not collide, and narrow
-enough to be an ordinary whole number a person can copy out of a screen and paste
-back into a request to reproduce a run.
+**This is not a style choice.** A browser holds every number as a double, and
+above this it starts rounding silently: the first measured run minted
+`4803646386380448080`, and JavaScript reads that back as `4803646386380448300`.
+Nothing errors. The browser then asks for a world under a seed the server never
+used, gets different numbers, and every explanation of why is wrong.
+
+So a seed is minted inside the range a browser can hold exactly, and every route
+that takes one refuses anything above it rather than accepting a number it knows
+will not come back the same.
 """
 
 
@@ -61,6 +67,7 @@ def mint_seed() -> int:
     computed sitting inside the reproducibility of the answer.
 
     Returns:
-        A whole number, positive, wide enough not to collide.
+        A whole number, positive, and small enough that a browser reads it back
+        unchanged.
     """
-    return secrets.randbits(A_SEED_FITS_IN)
+    return secrets.randbelow(BIGGEST_SEED) + 1

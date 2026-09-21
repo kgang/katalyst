@@ -36,13 +36,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from katalyst.engine.pricing import (
     A_MILLION,
     A_THOUSAND,
-    DOLLARS_PER_MILLION_CACHE_READ_TOKENS,
-    DOLLARS_PER_MILLION_CACHE_WRITE_TOKENS,
-    DOLLARS_PER_MILLION_INPUT_TOKENS,
-    DOLLARS_PER_MILLION_OUTPUT_TOKENS,
     DOLLARS_PER_THOUSAND_SEARCHES,
-    MODEL,
+    prices_for,
 )
+from katalyst.settings import get_settings
 
 
 class Counted(Protocol):
@@ -117,16 +114,18 @@ class Receipt(BaseModel):
     )
 
 
-def nothing_spent_yet(model: str = MODEL) -> Receipt:
+def nothing_spent_yet(model: str | None = None) -> Receipt:
     """Start a run's receipt at zero.
 
     Args:
-        model: Which model the run will ask.
+        model: Which model the run will ask. The one the settings name when not
+            said, because which model this is is a fact about how the program was
+            started rather than something a caller decides per run.
 
     Returns:
         A receipt with every counter at nothing.
     """
-    return Receipt(model=model)
+    return Receipt(model=model or get_settings().KATALYST_MODEL)
 
 
 def fold(receipt: Receipt, call: Counted) -> Receipt:
@@ -157,16 +156,21 @@ def dollars_for(receipt: Receipt) -> float:
     """Work out what a set of counters comes to, at the prices in `pricing.py`.
 
     Args:
-        receipt: The counters to price. Its own `dollars` is ignored.
+        receipt: The counters to price, and the model that charged for them. Its
+            own `dollars` is ignored.
 
     Returns:
         The total in dollars.
+
+    Raises:
+        KeyError: If nobody has read that model's prices.
     """
+    prices = prices_for(receipt.model)
     tokens = (
-        receipt.input_tokens * DOLLARS_PER_MILLION_INPUT_TOKENS
-        + receipt.output_tokens * DOLLARS_PER_MILLION_OUTPUT_TOKENS
-        + receipt.cache_read_tokens * DOLLARS_PER_MILLION_CACHE_READ_TOKENS
-        + receipt.cache_write_tokens * DOLLARS_PER_MILLION_CACHE_WRITE_TOKENS
+        receipt.input_tokens * prices.input_tokens
+        + receipt.output_tokens * prices.output_tokens
+        + receipt.cache_read_tokens * prices.cache_read_tokens
+        + receipt.cache_write_tokens * prices.cache_write_tokens
     ) / A_MILLION
     searching = receipt.searches * DOLLARS_PER_THOUSAND_SEARCHES / A_THOUSAND
     return tokens + searching

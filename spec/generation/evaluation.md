@@ -32,7 +32,7 @@ Already installed, already configured, and missing only the recordings themselve
 
 A cassette is raw: the request that went out and the answer that came back. It proves the code still handles the shape the vendor actually sends — which a hand-written stand-in never can, because a stand-in encodes our beliefs about the client library rather than its behaviour, and it rots without saying so.
 
-**`make record-cassettes` takes the same spending-cap argument as `make record-demo` and `make eval`** (*decided here*, on Kent's G5 principle): every command in this repository that can spend money takes the ceiling, checks the running receipt after every call, and stops with a plain sentence naming what was spent and what was got. Three commands, one rule, one argument name.
+**`make record-cassettes` takes the same spending-cap argument as `make record-demo` and `make eval`** (*decided here*, on Kent's G5 principle): every command in this repository that can spend money takes the ceiling, checks the running receipt after every call — and between the rounds of research inside one, since a single call may now search twenty-five times — and stops with a plain sentence naming what was spent and what was got. Three commands, one rule, one argument name.
 
 #### Every model call goes to the same URL — so the recorder must match on the body
 
@@ -189,7 +189,7 @@ make eval               # all four cases, at the cap written in code
 make eval CAP=…         # the same, with a lower ceiling
 ```
 
-* Runs **live**, against a real key. `CAP` is the run's spending ceiling in dollars; the default is the **$15 hard stop written in code** (Kent, G5), and the argument can only lower it. The running receipt is checked after every call.
+* Runs **live**, against a real key. `CAP` is the run's spending ceiling in dollars; the default is the **$15 hard stop written in code** (Kent, G5), and the argument can only lower it. The running receipt is checked after every call, and between the rounds of research inside one.
 * Prints the scorecard to the terminal, as a table a person reads.
 * Writes `evals/runs/<date>.tsv` — tab-separated, one header row, one row per case, `run_at` first. A second run on the same day **appends**; the rows are told apart by `run_at` and by `prompt_hash`. Tab-separated because it opens in a spreadsheet and still diffs as text in git.
 * Exits non-zero if any case failed a check, so it is usable from a script even though nothing schedules it.
