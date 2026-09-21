@@ -23,6 +23,7 @@ import { MapCanvas } from "../graph/Canvas";
 import { bothPaintings, type Engine, railRows } from "../graph/diff/branchWorld";
 import { endings, NO_SUMMARY_YET } from "../graph/diff/endings";
 import { roomFor } from "../graph/geometry";
+import { useEveryKey } from "../keyboard/everyKey";
 import type { MapKeys } from "../keyboard/useMapKeys";
 import {
   type Absence,
@@ -502,33 +503,18 @@ export function MapScreen({
   );
 
   // ⌘K, ? and Escape work wherever you are on the screen, not only on the map,
-  // because two of them are how you find out what the others do.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      const target = event.target as HTMLElement | null;
-      const typing =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable === true;
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setOverlay((was) => (was === "palette" ? null : "palette"));
-        return;
-      }
-      if (event.key === "Escape") {
-        setOverlay(null);
-        setIntervening(false);
-        setNaming(false);
-        return;
-      }
-      if (event.key === "?" && !typing) {
-        event.preventDefault();
-        setOverlay((was) => (was === "sheet" ? null : "sheet"));
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // because two of them are how you find out what the others do. They are bound
+  // by `keyboard/everyKey.ts`, which every screen in the app calls — this one
+  // held them alone once, and they were dead on the other two.
+  useEveryKey({
+    everyKey: () => setOverlay((was) => (was === "sheet" ? null : "sheet")),
+    palette: () => setOverlay((was) => (was === "palette" ? null : "palette")),
+    escape: () => {
+      setOverlay(null);
+      setIntervening(false);
+      setNaming(false);
+    },
+  });
 
   const commands: Command[] = useMemo(() => {
     const made: Command[] = [

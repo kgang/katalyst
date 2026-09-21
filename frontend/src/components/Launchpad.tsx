@@ -45,10 +45,13 @@
  * screen in the product.
  */
 
+import { useState } from "react";
 import type { FixtureSummary, Readiness } from "../api/client";
+import { useEveryKey } from "../keyboard/everyKey";
 import { countInWords } from "../world/naming";
 import type { Asked } from "./InputBar";
 import { InputBar } from "./InputBar";
+import { ShortcutsSheet } from "./ShortcutsSheet";
 import "./launchpad.css";
 
 /** One of the two ways into the tool. */
@@ -259,6 +262,15 @@ export function Launchpad({
   onOpen,
   onBuild,
 }: LaunchpadProps) {
+  // `?` opens the sheet of every key here too, from the one module that binds
+  // it on every screen. There is no palette of commands on this screen and no
+  // map to close, so ⌘K does nothing and Escape only puts the sheet away.
+  const [sheetIsUp, setSheetIsUp] = useState(false);
+  useEveryKey({
+    everyKey: () => setSheetIsUp((was) => !was),
+    escape: () => setSheetIsUp(false),
+  });
+
   // The two facts this screen reads, and the one it deliberately does not.
   const hasKey = readiness?.model_key_present === true;
   const recorded = new Map(
@@ -472,6 +484,15 @@ export function Launchpad({
           onBuild={onBuild}
         />
       </section>
+
+      {/* The sheet of every key, in a pane the size of the window because this
+          screen has no map stage to hang it in. It is drawn only when it is up,
+          so nothing lies over this screen until a reader asks for it. */}
+      {sheetIsUp ? (
+        <div className="every-key-anchor">
+          <ShortcutsSheet open={true} onClose={() => setSheetIsUp(false)} />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -30,6 +30,7 @@ import { ReplayBadge, replaySentence } from "../components/ReplayBadge";
 import { ShortcutsSheet } from "../components/ShortcutsSheet";
 import { VerdictCard } from "../components/VerdictCard";
 import { MapCanvas } from "../graph/Canvas";
+import { useEveryKey } from "../keyboard/everyKey";
 import type { MapKeys } from "../keyboard/useMapKeys";
 import type { Selection } from "../world";
 import { hasStopped } from "./growth";
@@ -86,6 +87,15 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
 
   const { generationId, phase } = growth;
   const finished = hasStopped(phase);
+
+  // The same three keys as every other screen, from the one module that binds
+  // them — this screen prints *Press ? for every key* under the map, and until
+  // that module existed the press did nothing here.
+  useEveryKey({
+    everyKey: () => setOverlay((was) => (was === "sheet" ? null : "sheet")),
+    palette: () => setOverlay((was) => (was === "palette" ? null : "palette")),
+    escape: () => setOverlay(null),
+  });
 
   // The working of the run, read once the run has finished. It is asked for then
   // rather than as it goes, because the server writes it from the same pass that
