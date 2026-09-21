@@ -133,6 +133,16 @@ class Transcript(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     generation_id: str = Field(description="The identifier this generation answers to.")
+    played_from: str | None = Field(
+        default=None,
+        description=(
+            "The identifier the recording this was played from carries, when this "
+            "is a replay. **Not the identifier of this viewing**: that is minted "
+            "per viewing, because a recording's own is a constant in a committed "
+            "file and two people opening one card would otherwise share a single "
+            "entry and overwrite each other's working (2026-09-20)."
+        ),
+    )
     hypothesis: str = Field(description="The sentence the person typed, unaltered.")
     target: str | None = Field(
         default=None, description="The place they asked whether the story gets to."
@@ -231,22 +241,51 @@ class Generations:
         self._keep = keep
         self._held: OrderedDict[str, tuple[Transcript, Graph | None]] = OrderedDict()
         self._which_generation: dict[str, str] = {}
+        self._watching: set[str] = set()
 
-    def remember(self, transcript: Transcript, graph: Graph | None) -> None:
+    def remember(
+        self, transcript: Transcript, graph: Graph | None, *, in_flight: bool | None = None
+    ) -> None:
         """Hold one generation's working and its map, dropping the oldest if full.
 
         Args:
             transcript: The working so far. Called again as it grows.
             graph: The map it built, once there is one.
+            in_flight: True while somebody is still watching this run arrive, and
+                False once it has ended. **A run still streaming is never
+                dropped**: a busy process used to forget one while it was still
+                writing into it, so the reader's own transcript answered 404
+                halfway through their map arriving (2026-09-20). Left unsaid, it
+                does not change.
         """
         self._held[transcript.generation_id] = (transcript, graph)
         self._held.move_to_end(transcript.generation_id)
+        if in_flight is True:
+            self._watching.add(transcript.generation_id)
+        elif in_flight is False:
+            self._watching.discard(transcript.generation_id)
         if graph is not None:
             self._which_generation[graph.id] = transcript.generation_id
-        while len(self._held) > self._keep:
-            _, (_, its_map) = self._held.popitem(last=False)
-            if its_map is not None:
+        self._drop_the_oldest()
+
+    def _drop_the_oldest(self) -> None:
+        """Forget the oldest generations nobody is watching, until the bound holds.
+
+        A map's name is only forgotten if **this** run still owns it. Two runs of
+        one stored example share a `base_id`, and popping it blindly made the
+        newer run's map unreachable while its own transcript was still held — a
+        map that outlives nothing, reachable by nobody (2026-09-20).
+        """
+        evictable = [one for one in self._held if one not in self._watching]
+        while len(self._held) > self._keep and evictable:
+            oldest = evictable.pop(0)
+            _, its_map = self._held.pop(oldest)
+            if its_map is not None and self._which_generation.get(its_map.id) == oldest:
                 self._which_generation.pop(its_map.id, None)
+
+    def how_many(self) -> int:
+        """How many generations this process is holding."""
+        return len(self._held)
 
     def working(self, generation_id: str) -> Transcript | None:
         """The working of one generation, or nothing at all if it is no longer held."""
@@ -271,6 +310,7 @@ class Generations:
         """Drop everything. For a test that wants a process which has just started."""
         self._held.clear()
         self._which_generation.clear()
+        self._watching.clear()
 
 
 held = Generations()

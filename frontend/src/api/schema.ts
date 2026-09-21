@@ -1541,6 +1541,11 @@ export interface components {
              */
             generation_id: string;
             /**
+             * Played From
+             * @description The identifier the recording this was played from carries, when this is a replay. **Not the identifier of this viewing**: that is minted per viewing, because a recording's own is a constant in a committed file and two people opening one card would otherwise share a single entry and overwrite each other's working (2026-09-20).
+             */
+            played_from?: string | null;
+            /**
              * Hypothesis
              * @description The sentence the person typed, unaltered.
              */

@@ -445,7 +445,7 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         on=today,
         mode="live",
     )
-    held.remember(working, None)
+    held.remember(working, None, in_flight=True)
     yield GenerationStarted(
         generation_id=generation_id, seed=seed, hypothesis=asked.hypothesis, target=asked.target
     )
@@ -469,7 +469,7 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         # working before it is let go of, which is what makes "a run that broke
         # after ten calls still cost ten calls" true of every ending there is.
         walking.close()
-        held.remember(watching.ended(), None)
+        held.remember(watching.ended(), None, in_flight=False)
 
     finished, broke = watching.finished, watching.broke
     if finished is None or finished.graph is None:
@@ -498,7 +498,7 @@ def _lived(asked: GenerateRequest, answerer: Answerer) -> Generator[Event, None,
         yield Failed(message=broke or (finished.why if finished is not None else WENT_WRONG))
         return
 
-    held.remember(watching.working, finished.graph)
+    held.remember(watching.working, finished.graph, in_flight=False)
     world = engine.build_world(
         finished.graph.id, None, seed, versions=asked.versions, worlds=asked.worlds
     )
@@ -537,10 +537,14 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
         )
         return
 
-    # Filed under the identifier the stream *announces*, not the map's. They are
-    # two different things, and keying it by the map meant every replayed run's
-    # transcript answered 404 to the identifier the browser had just been handed.
-    announced = next(
+    # **One identifier per viewing, minted here.** The recording's own is a
+    # constant in a committed file, so two people opening the same card shared
+    # one entry in the store and overwrote each other's working — and whichever
+    # finished last decided what both of them read afterwards (2026-09-20). The
+    # recording's own identifier is kept as a field, because it is what says
+    # which file this was.
+    announced = mint_id()
+    played_from = next(
         (
             payload["generation_id"]
             for name, payload in recording.lines
@@ -550,6 +554,7 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
     )
     working = Transcript(
         generation_id=announced,
+        played_from=played_from,
         hypothesis=recording.hypothesis,
         target=None,
         seed=recording.header.seed,
@@ -562,8 +567,13 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
         # Building the map from the file is as much "reading the recording" as
         # playing it is, so it sits inside the same guard.
         graph = replay.map_of(recording)
-        held.remember(working, graph)
+        held.remember(working, graph, in_flight=True)
         for event in replay.play(recording):
+            if isinstance(event, GenerationStarted):
+                # The reader is handed **this** viewing's identifier, which is
+                # what their transcript is filed under.
+                yield event.model_copy(update={"generation_id": announced})
+                continue
             if isinstance(event, ProposalAccepted | ProposalRejected):
                 working = working.plus(_line_from(event, at))
                 held.remember(working, graph)
@@ -581,6 +591,7 @@ def _replayed(asked: GenerateRequest) -> Generator[Event, None, None]:
                 yield event.model_copy(update={"seconds": time.monotonic() - started})
                 continue
             yield event
+        held.remember(working, graph, in_flight=False)
     except replay.CannotBeRead as unreadable:
         # Half a map and an open connection is the worst of both worlds. This
         # ends where it is, with what it spent — nothing — and one plain sentence

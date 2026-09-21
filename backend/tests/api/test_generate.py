@@ -890,3 +890,48 @@ def test_saying_nothing_stamps_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     started = world["world"]["graph"]["hypothesis_id"]
     its = next(one for one in world["world"]["graph"]["propositions"] if one["id"] == started)
     assert its["beliefs"]["user"] is None
+
+
+def test_two_viewings_of_one_card_do_not_share_a_transcript() -> None:
+    """A recording's own identifier is a constant in a committed file.
+
+    Two people opening the same card were filed under it, so they shared one
+    entry in the store and overwrote each other's working — and whichever
+    finished last decided what both of them read afterwards. One identifier is
+    minted per viewing now, and the recording's own is kept as a field so the
+    transcript still says which file it played (2026-09-20).
+    """
+    first = stream()
+    second = stream()
+
+    ids = [
+        next(payload["generation_id"] for name, payload in read if name == "generation_started")
+        for read in (first, second)
+    ]
+
+    assert ids[0] != ids[1]
+    for one in ids:
+        working = client().get(f"/api/generate/{one}/transcript").json()
+        assert working["lines"]
+        assert working["played_from"]
+
+
+def test_the_stand_in_answerer_can_never_reach_the_stream_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The veto, and the fence against it (2026-09-20).
+
+    `KATALYST_ANSWERER` exists so the recorder can be started as a program with
+    no key. It used to sit inside `live_answerer`, which this route calls — so a
+    deployed server with the setting on would have answered every reader from a
+    list in a test file, unlabelled, and the map would have looked generated.
+
+    With the setting on and no key, this route still replays. It does not
+    generate, and nothing it shows came from a stand-in.
+    """
+    monkeypatch.setenv("KATALYST_ANSWERER", "tests.unit.engine.stand_ins:a_whole_story")
+    get_settings.cache_clear()
+
+    read = stream()
+
+    assert next(payload for name, payload in read if name == "receipt")["mode"] == "replay"

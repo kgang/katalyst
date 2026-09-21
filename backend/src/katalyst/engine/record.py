@@ -46,7 +46,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from katalyst.domain import Graph, Insert
 from katalyst.engine import events
-from katalyst.engine.client import Answerer, live_answerer
+from katalyst.engine.client import Answerer, a_stand_in_answerer, live_answerer
 from katalyst.engine.events import (
     Done,
     Event,
@@ -777,7 +777,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    answerer = live_answerer(effort=said.effort or None)
+    # The stand-in is asked for **here and nowhere else**: the stream route calls
+    # `live_answerer`, and a seam that answered a reader from a test file would
+    # be a map that looked generated (Kent, 2026-09-20).
+    answerer = a_stand_in_answerer() or live_answerer(effort=said.effort or None)
     if answerer is None:
         print(NO_KEY, file=sys.stderr)
         return 1

@@ -669,6 +669,24 @@ def _did_not_fit_the_shape(problem: ValidationError) -> str:
     return f"The model's answer did not fit the shape this call asked for, at: {named}."
 
 
+def a_stand_in_answerer() -> Any | None:
+    """Build the stand-in `KATALYST_ANSWERER` names, when it names one.
+
+    **Only the recorder ever asks for this**, and it asks by name. It used to sit
+    inside `live_answerer`, which the stream route calls — so a deployed server
+    with the setting on would have answered every reader from a list in a test
+    file, unlabelled, and the map would have looked generated. That was a veto
+    (Kent, 2026-09-20), and this is how it is not one: the seam is reachable from
+    one program, which refuses to call a run answered this way a recording.
+
+    Returns:
+        The stand-in, or nothing at all when the setting is empty — which it is
+        everywhere but a test that starts the recorder as a program.
+    """
+    named = get_settings().KATALYST_ANSWERER
+    return _named(named) if named else None
+
+
 def _named(path: str) -> Any:
     """Build whatever `module:name` names, by calling it.
 
@@ -705,13 +723,6 @@ def live_answerer(*, effort: str | None = None) -> Model | None:
     Returns:
         A live answerer, or nothing at all when no key is configured.
     """
-    stand_in = get_settings().KATALYST_ANSWERER
-    if stand_in:
-        # The one seam that lets the recorder be started as a program in a test,
-        # with no key and no network. Empty everywhere but there, and a run
-        # answered this way can never become a recording — `record.py` names it
-        # as a fault (Kent, 2026-09-20).
-        return _named(stand_in)
     key = get_settings().ANTHROPIC_API_KEY
     if not key:
         return None
