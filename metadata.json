@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M32SQJ4HBGXXJ177NKNZHKTK",
+  "strategy": "manual-commit",
+  "branch": "adr/05-sound-numbers",
+  "checkpoints_count": 3,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 52681,
+    "cache_read_tokens": 10903599,
+    "output_tokens": 29441,
+    "api_call_count": 22,
+    "subagent_tokens": {
+      "input_tokens": 158,
+      "cache_creation_tokens": 193249,
+      "cache_read_tokens": 12273684,
+      "output_tokens": 90459,
+      "api_call_count": 79
+    }
+  }
+}

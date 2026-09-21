@@ -1,0 +1,681 @@
+<pasted_content id="9d5b">
+ start from plans/RESUME-stack-04.md.
+
+What is on disk now
+
+File: plans/RESUME-stack-04.md
+What it holds: Rewritten from scratch. It opens with a check of git and the queue before anything else. It gives the
+state of each branch and the exact commands to land it. It lists the evals branch's twelve remaining steps in
+order. It records what was found today so nobody re-finds it. It says what to look at on the polish screens, and
+it has the new working rules.
+────────────────────────────────────────
+File: plans/PLAN.md
+What it holds: The NOW table is updated to match the resume note. The three-tier browser-testing rule is added to
+the working rules.
+────────────────────────────────────────
+File: plans/STATUS.md
+What it holds: New entries record your words, the merges, where my handling slipped, and the questions waiting on
+you.
+────────────────────────────────────────
+File: plans/HANDOFF.md
+What it holds: Lessons 22–23 are added: a green bar here is not a green bar on CI, and the whole suite runs before
+every push.
+────────────────────────────────────────
+File: plans/README.md
+What it holds: Now points at the resume note first. The old note is archived under history/.
+────────────────────────────────────────
+File: plans/analysis/scripts/, scripts/bars/, notes/msgs/, logs/
+What it holds: Analysts' scripts, bar scripts, PR bodies and merge messages, and logs. All are outside the
+scratchpad, which vanished mid-session.
+
+State left behind
+- Four of the tail's pull requests are merged: #41, #42, #44 and #43. main is 90001b1. #43, the growing map, merged while I was writing the handoff.
+- No pull request is open, no agent is running, and the queue is free. Nothing was spent this session.
+- I rebased Polish onto the new main and verified it: 350 browser tests pass, and lint is clean apart from two warnings. It still needs:
+  - one cold run of all the end-to-end tests, which includes its four new, never-run browser tests
+  - a look at its nine screens
+  - a short re-review, then its pull request
+- Evals is the last big piece. Its twelve steps are in the resume note and end with make eval ONLY=hormuz, which will be the first spend.
+- After that comes M4. You look at the strike branch with the spread on.
+</pasted_content id="9d5b">
+
+---
+
+<task-notification>
+<task-id>bnaa8pvxa</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/bnaa8pvxa.output</output-file>
+<status>completed</status>
+<summary>Background command "Run all end-to-end tests once, cold, on the polish branch through the queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ad0896b72ac047579</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/ad0896b72ac047579.output</output-file>
+<status>completed</status>
+<summary>Agent "Re-review polish fix commit" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Verdict: READY AFTER MUST-FIX (one item, one line of test code)
+
+### MUST-FIX
+
+**The geometric check still can't see its own motivating defect.** `frontend/e2e/hormuz.spec.ts:290` scrolls each control into view before measuring; `frontend/src/styles/app.css:232` gives `.dock` `overflow-y: auto` and no `overflow-x`, and CSS computes `overflow-x: visible` → `auto` when the other axis is not visible. So the panel **does** scroll sideways — contradicting the docstring at `hormuz.spec.ts:262-264` and the same sentence in `spec/workbench/README.md:75`. Revert `minmax(0, 1fr)`: the third *My own number* field overflows, `scrollIntoViewIfNeeded` scrolls the dock right, the field lands inside the client box, the centre hit-test finds the field, and the check passes. `theScreenFitsItsWindow` can't see it either — the dock clips, so `documentElement.scrollWidth` is unchanged.
+Smallest fix, inside the same helper: `expect(await dock.evaluate((e) =&gt; e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1)`, plus correcting the two sentences.
+
+### SHOULD-FIX
+
+1. **Two paths still end on `&lt;body&gt;`, both via the palette** (`MapScreen.tsx:456-463`). (a) ⌘K → *Change this claim* with nothing selected: `cameFrom` is the palette field (unmounted), `theWayIn` is null because the Inspector is in its "Nothing selected" branch (`Inspector.tsx:985-992`), so Done/Escape focuses nothing. (b) Panel open → ⌘K → *Read the map as a list* or *Show or hide the panel*: `dock` changes, the panel unmounts, `intervening` stays `true` (`MapScreen.tsx:563-566, 571, 713`), the effect never fires, and `focusRing.ts:64` refocuses a detached section. Fix: a final fallback in the effect, and `setIntervening(false)` in those two commands.
+2. `App.test.tsx:223` hand-types `4`; `STARTING_SENTENCES.length` is exported and used that way in `launchpad.test.tsx:257`.
+3. *The ask did not come back* never stops being true: `App.tsx:89-106` asks once, nothing re-asks, yet `Launchpad.tsx:434` reads "Until it answers…". Offer an *Ask again* control or drop the implied retry.
+4. The sweep missed one: `refusal.css:12-15` still has `flex`, `min-height`, `overflow-y`, dead by exactly the proof used for the other five (`MapScreen.tsx:634` makes it a direct `.dock` child).
+5. `everyControlInThePanelIsWhole` no longer polls; a re-render mid-loop is now a hard failure.
+6. `hormuz.spec.ts:393-405`: if `.outline` itself were zero-wide, `room / 3` is 0 and every item passes.
+
+### Checked, sound
+
+- `684fc76` cannot change the cascade: `.example--waiting .example__claim` (0,2,0) beats `.example__claim` (0,1,0) by specificity in either order, nothing between them sets `color` (`launchpad.css:150-164`); the optional chain is equivalent.
+- The six states are total and exclusive (`Launchpad.tsx:277-291`); rejection, non-2xx and 502/503/504 all become rejections in `client.ts` `read()`, so every failure reaches `no-answer`.
+- Nothing inert in that state: four plain `&lt;div&gt;`s, field disabled with a reason.
+- Panel-takes-focus wins the race with the palette's restore (React flushes passive cleanups before mounts).
+- Dead-declaration removals safe: every section is a direct `.dock` child under `.page--map` in both `MapFrame` sites.
+- `elementFromPoint` overlap test is a genuine tooth; edge rules are `pointer-events: none` on `.dock-frame`.
+- No file outside `frontend/`, `spec/workbench/`, `spec/vocabulary.md`.
+- Lint and typecheck clean; `launchpad.test.tsx` 10/10, `App.test.tsx` 11/11.</result>
+<usage><subagent_tokens>150775</subagent_tokens><tool_uses>37</tool_uses><duration_ms>450261</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ba6a7d2ps</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/ba6a7d2ps.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for the build's checks on the polish pull request, then squash-merge it" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a4b57a0a453ee42ae</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/a4b57a0a453ee42ae.output</output-file>
+<status>completed</status>
+<summary>Agent "EB: browser follows strike branch" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>`npm run check` passed through the queue: biome ci + `tsc -b --noEmit` + 356 tests in 41 files, exit 0.
+
+## What the coordinator runs to check me
+
+```
+cd /Users/kentgang/git3/katalyst-wt/feat-04b-evals/frontend
+npm run check                          # biome ci · tsc -b --noEmit · vitest — send through heavy.sh
+npx playwright test e2e/hormuz.spec.ts # the one cold run; only you can run it
+```
+
+`npx tsc --noEmit -p .` from the brief cannot work — the root `tsconfig.json` is a solution file (`files: []`, two references). `npm run typecheck` is `tsc -b --noEmit`, and it is the one that also covers `e2e/`. `src/api/schema.ts` is fresh (it already carries `unchanged_because`, landed in `2139fa5`); no `make types` needed.
+
+## File by file
+
+**The wire → the browser.** `world/types.ts`: `Movement.unchangedBecause` (`under_the_floor | versions_disagree`), and `DeltaRow.noChangeBecause` — the row's half-line. `world/apiSource.ts`: `movement()` carries `row.unchanged_because` across untouched; the held rows carry the phrase. `graph/diff/branchWorld.ts`: same on `railRows`, which is the builder the screen actually uses.
+
+**`graph/diff/noChange.ts`** now owns both the sentence and a new `noChangeInAWord()` — one module, one rule, so the glance and the sentence behind it cannot disagree. Order mirrors the engine: reweighting outranks the word (`spec/multiverse/diff.md` line 217). Where the engine gives no word, neither does the browser.
+
+**R4, the greyed row** — `DeltaRail.tsx` + `deltaRail.css`. One `noteOn(row)` fills the *same* half-line for every row: *down · largest on Oct 4* where it moved, *barely moved* / *the versions disagreed which way* where it held. That is the one rule for both greys the brief asked for, and it is what makes greyed survive greyscale — the brightness rule is now the glance, not the message. Rows gained `data-about` so a test can name one without matching copy (`.intervene` already does this). `colourLaw`, `motionBudget`, `notByColourAlone` green.
+
+**Tests.** `diffState.test.ts`: the *"the wire does not carry it"* block rewritten — each word says its own true thing, neither says the other's, the missing word invents nothing, and `test_an_ending_the_versions_disagree_about_stays_on_the_list` pins R4 at the reducer. `deltaRail.test.tsx`: `test_the_no_change_sentence_comes_from_the_engines_own_word` (named by INV-workbench.46, previously absent), `test_a_greyed_row_is_not_greyed_by_colour_alone`; the `RANKED` fixture's story no longer claims N1 is a ranked row. `apiSource.test.ts`: two tests that the word arrives as it came and that silence stays silent.
+
+**Stale strings.** `a11y/announcement.ts` and `Inspector.tsx` (the `92% … 29 points to 8` comment) now cite `docs/worked-numbers.txt` by line name instead of printing a figure. `App.test.tsx`, `outline.test.ts`, `inspector.test.tsx`, `apiSource.test.ts` hold stand-ins, not readings — left alone; `deltaRail.test.tsx`'s docstring now says so explicitly.
+
+## The five end-to-end assertions, and what each catches
+
+No count is typed. `WHAT_THE_STRIKE_DID` waits on the sentence's *shape* (still a real wait — the pre-answer line says "claims your edit can reach"); `howManyTheMapSaidMoved` reads the engine's count back off `.map-live`. Then: **tiles** — `shifted` equals what the map said out loud (catches the spoken line and the picture disagreeing), `added` 1, `untouched` 1, the remainder all `downstream`, none `none` (catches a reachable claim drawn as unreachable, and a tile in an unaccounted state). **Rail** — row count equals the endings derived from the tiles' own `data-kind`/`data-diff` (catches *any* ending vanishing), `N1` present by `data-about`, every `data-moved="yes"` row still three readings, every `data-moved="no"` row reads "no change" and has a non-empty note. **Tile sentence** — names one of the engine's two halves and no longer says *"it does not say"*.
+
+**The brief's "`data-diff="untouched"` 1 → 3" is wrong.** Three claims are `unchanged` to the *engine* (B, N1, R), but `tileState` only lets the engine override with `added`/`killed`/`shifted`, so B and N1 fall back to the browser's structural `downstream`. Tiles are 4 shifted · 2 downstream · 1 added · 1 untouched. Saying `untouched` about B or N1 would tell the reader their edit cannot reach something it plainly can.
+
+## Outside `frontend/` — not changed, needs an owner
+
+- `spec/workbench/diff-view.md` "Data model": the `DeltaRow` block still shows `shifted: boolean` (drifted — the code has `noChange`) and should gain `noChangeBecause`. Its `ClaimDiffView.unchangedBecause` already matches the name I used. Agent ES is editing that file now.
+- `e2e/hormuz.spec.ts` still waits on four typed engine counts on the *other* branches ("Two/Three claims moved") — correct today against `docs/worked-numbers.txt`, but ES's live edits to `domain/belief.py` and `propagation.py` could move them.</result>
+<usage><subagent_tokens>272505</subagent_tokens><tool_uses>106</tool_uses><duration_ms>901315</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ad9791fa722f1090d</task-id>
+<tool-use-id>toolu_01LUCk4ekRoyPqFqe8viega2</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/ad9791fa722f1090d.output</output-file>
+<status>completed</status>
+<summary>Agent "ES: floats, number sweep, VR names" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Report follows.
+
+---
+
+**To check me** (from `/Users/kentgang/git3/katalyst-wt/feat-04b-evals`):
+```
+cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src
+cd backend &amp;&amp; uv run pytest tests/unit/domain/test_models.py tests/unit/domain/test_validity.py \
+  tests/unit/domain/test_propagation.py tests/unit/engine/test_worked_numbers_as_a_program.py
+make numbers-check
+```
+Already run: `ruff`/`mypy` clean · `161 passed` on those four files · `numbers-check` green · whole server suite through the queue: **630 passed**, `domain/` 100% lines and branches.
+
+**What I built.** (1) The three raw floats. `belief.py` gains `Belief._as_written()`; `validity.py`'s `belief_out_of_range` message (which reaches the browser in a 422) uses it; `propagation.py`'s loud-arrow warning uses a new `_push_as_written`, shared with `engine/worked_numbers.py`. Three tests, one each, that fail on the raw float. (2) The sweep, as quote-and-link. (3) The checklist named `VR1`–`VR13` in `spec/workbench/README.md`, re-cited by name in the seven files this branch already touches (36 citations); `layout-and-zoom.md` and `color-motion-type.md` are **not** swept.
+
+**Two deviations, both deliberate.** The brief says route all three through `_two_figures`. A **push** is not a likelihood — it runs to ±∞, so `_two_figures(5.2)` is `&gt;.99`, the opposite of what the warning means; it gets its own rule, one decimal place with its sign, the rule `worked_numbers.py` already used. And a number **outside 0–1** reads *outside 0 to 1* rather than `&gt;.99` inside a sentence saying it is out of range. Also: `_two_figures` lives in `diff.py`, which imports `belief.py`, so it is fetched inside the method — one place, explained there.
+
+**Converted** (file → named line now cited): `README.md` diff-summary block → `strike · the sentence beside the list`. `PRODUCT_REQUIREMENTS.md` FR-21 → `B · base · band from B`, `B · base · reading`. `spec/multiverse/propagation.md` range shares (stale **58%**, file says 57%) → same two lines. `spec/workbench/tiles-ports-wires.md` B2 (stale `.61 (.45–.74)`, "13 points") → `M1 · base · reading`. `spec/workbench/inspector.md` B3 reserved slot → same, now a shape not a sentence. `spec/multiverse/interventions.md` ×2 (stale `.08`) → `H · strike · reading`. `spec/workbench/keyboard-and-access.md` size table and `PRODUCT_REQUIREMENTS.md` NFR-1 (`.0090`, stale against `H · observed C · move` = `0.00879`) → decoupled from the example, now plainly illustrations. `ARCHITECTURE.md` engine timings (**544 ms** vs propagation.md's 0.49 s) → the owner cited, figures dropped. Four chapters gained a *one link away* paragraph. Two-figure printing fixed: `.18 (.080–.32)`, `.060 (.020–.14)`.
+
+**Left, with reasons.** `tiles-ports-wires.md:117–129` and `color-motion-type.md:67,130` — pre-engine illustrations; `beliefChip.test.tsx` asserts that exact string. "31 points wide to 16" (FR-21, propagation.md, inspector.md B3) — **dropped, not restated**: the pinned-prior band is computed nowhere, and giving it a line needs a second map in `worked_numbers.py`. `spec/graph/belief.md:220,279` — hands off; both say `.36 · up by .0090`, which should read `.0088`. All 18 tokens left: `README.md:170` (×3), `ARCHITECTURE.md:191` (×1), `:194` (×3), `docs/measurements.md:17,25–33,35` (×11).
+
+**Two tests were already red on this branch** (hand-typed engine numbers, stale since `c237de5`): both now derive their values from the file.
+
+**Dated note record 0014 needs** (I did not touch it): *"2026-09-21 — the figures this record quotes are no longer kept here. `docs/worked-numbers.txt`, written by `make numbers` and checked by the build, owns every engine-computed number on the Hormuz map; each line carries a citable name. The decision is unchanged. The chip sentence fixed word for word (`.35 (.20–.49)`) is a template whose numerals are that chip's own `p`, `lo`, `hi` — not a reading of any claim — and stays as written."*
+
+**For EB:** `notByColourAlone.test.tsx:11` and `colourLaw.test.ts:14` cite "line 3 of the visual review checklist" — that is now `VR3`; rename when you next touch them. I changed nothing under `frontend/`.</result>
+<usage><subagent_tokens>327288</subagent_tokens><tool_uses>157</tool_uses><duration_ms>1417297</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bj3j003wm</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/bj3j003wm.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the whole server suite, the whole browser suite and one cold end-to-end run on evals, one at a time through the queue" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a0e9e9472874a4836</task-id>
+<tool-use-id>toolu_01NvToxPWt3yrR2WJC573CnJ</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/a0e9e9472874a4836.output</output-file>
+<status>completed</status>
+<summary>Agent "ER: adversarial review of evals" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**READY AFTER MUST-FIX**
+
+## MUST-FIX
+
+**1. A killed ending vanishes from the change list — R4's own rule.** `backend/src/katalyst/domain/diff.py:1288` gives a row only to `shifted`; the browser adds a greyed row only for `unchanged` (`frontend/src/graph/diff/branchWorld.ts:267`, `frontend/src/world/apiSource.ts:406`). `killed` and `added` fall through both. Reproduced (`plans/analysis/scripts/evals-review/killed_ending_row.py`): suppose M1 false on the stored map →
+`M1: state=killed ranked_row=False greyed_row=False -&gt; VANISHES`, and the sentence beside the empty list reads *"…moves no ending and leaves 6 claims untouched."* The reader forced an ending false and the list says nothing happened. Smallest fix: widen the browser filter from `state === "unchanged"` to "not `shifted`", with `noChangeInAWord` giving `killed` its own words.
+
+**2. `spec/workbench/diff-view.md:148-158` is still stale, as reported.** It types `shifted: boolean`; `frontend/src/world/types.ts:812-857` has `noChange?: boolean`, `noChangeBecause?: string`, `kind`, and `move.way`/`move.by`. Worse, `:151-153` is inverted ("False draws a greyed row" — `noChange` is *true* on the greyed row), and INV-workbench.46 at `:525` still names "the `shifted` flag". This PR touches the chapter, so R15 applies to it.
+
+**3. Two end-to-end assertions have no teeth.** `frontend/e2e/hormuz.spec.ts:1126` `expect(said).not.toMatch(/did not move by enough/)` — that phrase exists nowhere in `frontend/src` or `backend/src`; it can never fail. `:941` loops over `.delta-rail__row[data-moved="no"]` — zero rows means zero assertions, and that greyed row is this branch's headline. Fix: `await expect(rail.locator('.delta-rail__row[data-moved="no"]')).toHaveCount(1)` before the loop, and delete the dead line.
+
+## SHOULD-FIX
+
+- **The sentence contradicts the list beside it** (`diff.py:1517`). Measured on the strike branch: summary *"…leaves 3 claims untouched"*, while B moved −.088 and N1 +.093 and only R held at .000. N1's greyed row sits right beside that sentence saying *the versions disagreed which way*. `untouched` is also the tiles' word for a claim the edit cannot reach — exactly one tile reads it. Kent's call on wording.
+- **`hormuz.spec.ts:456`** `WHAT_THE_STRIKE_DID` uses `\w+`, which matches `no`. The three window tests gate on it and never call `howManyTheMapSaidMoved`, so they would pass on an engine that moved nothing. Spell the numerals.
+- **`hormuz.spec.ts:881`** compares shifted tiles with the spoken count; both read `DiffView.claims[].state`, so they fail together. `:917` and `:926` replaced `toHaveCount(3)` with `toBeGreaterThan(0)`.
+- **`_two_figures` has a simpler home.** `belief.py:89` defers an import to reach `diff.py`'s private name; `validity.py:835` calls a private method. `belief.py` imports nothing from `domain/`, so moving the formatter into it and importing it from `diff.py` removes the cycle, the deferred import and the privacy breach in one move.
+- **`evals/run.py:1139`** starts a case whenever anything is left. With `--cap 0.0001` the program prints *"The round spent $0.01 of its $0.00 ceiling"* — a sentence that cannot be true. `--cap -1` is accepted and printed as `$-1.00`. Refuse a cap at or below zero.
+- **`test_the_eval_harness_as_a_program.py:223`** asserts `spent &lt; 2.0 * 4`, i.e. four ceilings, while its docstring promises "no more than a case's worth past its ceiling". Exact form: every case but the last must have started with money left.
+- **R9 vs the Makefile.** R9 says `make eval` runs `ONLY=hormuz` until the freeze. `Makefile:100` and `spec/generation/evaluation.md:218` still say all four.
+- **Citation debt (R14).** No typed number disagrees with `docs/worked-numbers.txt`, and `make numbers-check` is green — but ~60 engine figures are typed rather than cited in `spec/multiverse/diff.md`, `propagation.md`, `workbench/inspector.md`, `diff-view.md`. Sharpest: `diff.md:310-314` reprints the summary sentence verbatim, the very thing `README.md:71` was rewritten to stop doing. Also `spec/workbench/tiles-ports-wires.md:122-129` shows a model chip of `.61` beside M1's real market quote `.48 (.45–.52)`, contradicting `:313`.
+
+## Attacked and found sound
+
+**Locality, bit for bit, with the spread on** — `locality_bitwise.py` builds two disconnected pieces; `do`, `retune`, `observe`, adding an arrow, adding an `asserted` arrow, and re-wording a provenance all leave the far piece identical in every version's answer, every belief, every day and every state. Each arrow draws from its own stream (`propagation.py:1562`); `test_intervention_locality` runs through `propagate`, so the spread is on, and generated maps draw all seven provenance words. **Raw floats**: nothing left in `domain/` or `api/` prints one to a reader. **The cap**: `--cap` can only lower the $15 stop; `ONLY` does not skip accounting; `Following.follow` swallows exceptions so a broken run still keeps its receipt; the key reaches no log, scorecard or kept run; `__main__` is exercised in a subprocess. **Greyed is words, not brightness** (`DeltaRail.tsx:173`, `deltaRail.test.tsx`). **`ARCHITECTURE.md`** marks nothing built that is not here, and every README target dry-runs.</result>
+<usage><subagent_tokens>184945</subagent_tokens><tool_uses>73</tool_uses><duration_ms>548255</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a4b57a0a453ee42ae</task-id>
+<tool-use-id>toolu_01W69bWSCayYkzC6FWt4tU8P</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/a4b57a0a453ee42ae.output</output-file>
+<status>completed</status>
+<summary>Agent "EB: browser follows strike branch" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>`npm run check` green through the queue: 41 files, 358 tests, biome + `tsc -b` clean, exit 0.
+
+## What to run
+
+```
+cd /Users/kentgang/git3/katalyst-wt/feat-04b-evals/frontend
+npm run check                          # via heavy.sh
+npx playwright test e2e/hormuz.spec.ts # yours
+```
+
+## MUST-FIX 1 — the killed ending
+
+`railRows` now lists **every** ending the edit reaches; the filter asks only *where* the ending is, never what the engine called it. `noChange.ts` gained `quietRow(state, moved, standing)` — one rule, keyed on the engine's word: `unchanged` → *no change* + which half of the test; `killed` → the word its tile shows (*Supposed · Oct 1*, never a likelihood — the engine stores a flat 0); `added` → *Added*. The note reuses `agreement.ts`'s `ENGINE_IN_WORDS` (now exported) rather than a fourth table. `data-moved` → `data-ranked`, because "moved: no" was a plain untruth on a forced-false row; `DeltaRow.noChange`/`noChangeBecause` → `unranked`/`note`.
+
+I also **deleted the duplicate builder in `apiSource.ts`**: it appended its own quiet rows into `DiffView.rows`, which `railRows` then completed again. Two builders of one row is how the killed case got dropped by one and kept by neither; `rows` is now what its docstring says — the engine's ranking.
+
+Verified by temporarily restoring the old `state === "unchanged"` filter: both new tests (`…forced_false_stays_on_the_list_and_is_not_no_change`, `…even_with_no_word_to_show`) go red, then green again.
+
+## What each rewritten e2e assertion now catches
+
+- **Endings by name** (`onTheList` vs the set derived from tiles): a row that vanishes *or* one invented — a count let those cancel.
+- **N1 among the quiet rows**: the loop below can no longer pass on an empty list; red means the branch's headline case moved (`docs/worked-numbers.txt`, `N1 · strike · what happened`).
+- **`many * 3` cells**: a rail drawing one row and three cells passing for three rows.
+- **H and C `shifted` by id**: every count reading the same field and agreeing about nothing.
+- **`WHAT_THE_STRIKE_DID`** spells the numeral words: the three window tests can no longer sail past an engine that moved nothing.
+- **One `which half it failed`**, counted: replaces a guard on a phrase absent from the whole tree.
+
+`VR3` now cited by name in `colourLaw`/`notByColourAlone`.
+
+**Outside my lane:** `spec/workbench/diff-view.md` B5 + INV-workbench.46 still say the quiet row is only for an ending that *did not move*, and its `DeltaRow` block predates all of this.</result>
+<usage><subagent_tokens>372161</subagent_tokens><tool_uses>76</tool_uses><duration_ms>664382</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a4b57a0a453ee42ae</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/a4b57a0a453ee42ae.output</output-file>
+<status>completed</status>
+<summary>Agent "EB: browser follows strike branch" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>That notification was just my own leftover progress poll — it carries no new result. The authoritative run had already finished. Nothing changed; the work is done.
+
+## Fix round complete
+
+`npm run check` green through the queue: **41 files, 358 tests, biome + `tsc -b` clean, exit 0.**
+
+**What to run**
+
+```
+cd /Users/kentgang/git3/katalyst-wt/feat-04b-evals/frontend
+npm run check                          # via heavy.sh
+npx playwright test e2e/hormuz.spec.ts # yours — the one cold run
+```
+
+**MUST-FIX 1 — the killed ending.** `railRows` now lists every ending the edit reaches; the filter asks only *where* the ending is, never what the engine called it. `noChange.ts` gained `quietRow(state, moved, standing)` — one rule keyed on the engine's word: `unchanged` → *no change* plus which half of the test failed; `killed` → the word its tile shows (*Supposed · Oct 1*, never a likelihood — the engine stores a flat 0); `added` → *Added*. Notes reuse `agreement.ts`'s `ENGINE_IN_WORDS` rather than a fourth table of the same words. `data-moved` → `data-ranked`; `DeltaRow.noChange`/`noChangeBecause` → `unranked`/`note`. I also deleted the duplicate row-builder in `apiSource.ts`, so `rows` is what its docstring says. Proven by temporarily restoring the old filter: both new tests go red, then green.
+
+**What each rewritten e2e assertion catches:** endings compared *by name* (a vanished row and an invented one no longer cancel); N1 required among the quiet rows (the loop can't pass on an empty list); `many * 3` cells tied to rows read off the page; H and C `shifted` by id (counts can no longer agree about nothing); `WHAT_THE_STRIKE_DID` spells the numeral words so the window tests can't sail past an engine that moved nothing; one `which half it failed`, counted, replacing a guard on a phrase absent from the tree. `VR3` now cited by name.
+
+**One tension worth knowing:** the unit test pins *invent no note where the engine gave no word*; the e2e requires every quiet row to carry one. Both hold on the real map — if they ever conflict, the engine has stopped naming a half for a live row, and the e2e going red is the right signal.
+
+**Outside my lane:** `spec/workbench/diff-view.md` B5 and INV-workbench.46 still describe the quiet row as only for an ending that *did not move*, and its `DeltaRow` block predates all of this.</result>
+<usage><subagent_tokens>373170</subagent_tokens><tool_uses>77</tool_uses><duration_ms>692582</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ad9791fa722f1090d</task-id>
+<tool-use-id>toolu_01MfEwRqXc2p11gbakkQ6SEa</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/ad9791fa722f1090d.output</output-file>
+<status>completed</status>
+<summary>Agent "ES: floats, number sweep, VR names" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done.
+
+**To check me** (from `/Users/kentgang/git3/katalyst-wt/feat-04b-evals`):
+```
+cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src
+make numbers-check
+cd backend &amp;&amp; uv run pytest        # or the four files: test_diff, test_models, test_validity, tests/unit/evals
+```
+Run and green: `ruff`/`mypy` clean · `numbers-check` unchanged · **635 passed**, `domain/` **100%** lines and branches.
+
+**MUST-FIX 2.** `spec/workbench/diff-view.md` no longer pastes `DeltaRow`. A new *change list's row* section gives the shape and names the module, then states EB's rule as one sentence — *every ending the edit can reach has a row, whatever the engine called it* — with a four-row table keyed on the engine's word: `shifted` → ranked; `unchanged` → quiet, *no change* plus which half of the test; `killed` → quiet, **the word its tile shows, never a likelihood**; `added` → quiet, *Added*. It names `railRows` as the one builder (and says the `apiSource.ts` duplicate is gone, `DiffView.rows` being the ranking and nothing else), `quietRow` as the one writer, and `data-ranked` as the mark that replaced the untrue `data-moved`. B5's paragraph and INV-workbench.46 are widened to match, and INV-46 now cites the two forced-false tests. I re-read `types.ts`, `noChange.ts` and `branchWorld.ts` after EB finished; no stale field name survives in `spec/`.
+
+**(a)** `two_figures` now lives in `belief.py` — public, one docstring saying it is the one rule for writing a likelihood — with `OUT_OF_RANGE` beside it and `Belief.as_written()` public. `diff.py`, `worked_numbers.py`, `test_diff.py` and `strategies.py` import it; the deferred import is gone; it is exported from `katalyst.domain`. Three spec passages repointed. `spec/graph/belief.md:222` still says `_two_figures` in `diff.py` — hands off, needs the same one-line fix.
+
+**(b)** `--cap` at or below zero, or under half a penny, is refused before the key is looked for, with `CAP_IS_NOT_MONEY`; `SMALLEST_CAP = 0.005` is exactly the point where the ceiling stops printing as money (verified: `0.004 → $0.00`, `0.005 → $0.01`). Subprocess test over five figures asserts the sentence, exit 1 and an empty runs directory.
+
+**(c)** The loose `spent &lt; 2.0 * 4` is gone; it now asserts the promise exactly — `sum(paid[:-1]) &lt; 2.0`, receipts in run order, so every case that started, started with money left.
+
+**(d)** Makefile, `README.md` and `spec/generation/evaluation.md` all lead with `make eval ONLY=hormuz`, say why (one recording; the freeze), and say plainly the program's default is still all four.
+
+**(e)** `diff.md` cites `strike · the sentence beside the list` instead of reprinting it; the chip illustration in `tiles-ports-wires.md` no longer borrows M1's quote. **Roughly sixty other typed-but-agreeing figures are deliberately left: stack 05 moves every one and converts them then.**
+
+**Out of lane, for someone else:** `ARCHITECTURE.md:194` says 630 server tests (now 635) and `:192` presents `make eval` without the `ONLY=hormuz` instruction. Also: `evals/` at the repository root is linted by neither `make lint` nor CI, which run `ruff` inside `backend/` only — I checked it by hand.</result>
+<usage><subagent_tokens>454687</subagent_tokens><tool_uses>124</tool_uses><duration_ms>842279</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bhu6vs9fd</task-id>
+<tool-use-id>toolu_01BoRXVAouzDJRz79Ro5yGPk</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/bhu6vs9fd.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the whole server suite, the whole browser suite and one cold end-to-end run on the fix round" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+how long is the eval run expected to take?
+
+---
+
+Can we change over the default/standard for development to run with sonnet-5 and medium thinking to speed this up? Please record this decision in the spots as appropriate and re-run the eval
+
+---
+
+What are the two runs that are running?
+
+---
+
+<task-notification>
+<task-id>b8e5z2oe0</task-id>
+<tool-use-id>toolu_01MpCeMdaVUdC8ffuB8oc6kH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/b8e5z2oe0.output</output-file>
+<status>completed</status>
+<summary>Background command "Write the merge message, then wait for the paid run to finish" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bgshnr5vd</task-id>
+<tool-use-id>toolu_014VPp8Vhh4dhaWMDDGovXuc</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/bgshnr5vd.output</output-file>
+<status>completed</status>
+<summary>Background command "Lint, type-check, numbers-check, then run both whole suites and one cold end-to-end run on the final tree" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bimd1lrl1</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/bimd1lrl1.output</output-file>
+<status>completed</status>
+<summary>Background command "On the rebased tree: lint, types, numbers and generated-types freshness, both whole suites, one cold end-to-end run" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>br3zaclkt</task-id>
+<tool-use-id>toolu_01SXmWh9Xz2p42HZ6BW2MfCC</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/br3zaclkt.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for the build's checks on the evals pull request, then squash-merge it" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+After running make dev, how do i test out the app?
+
+---
+
+i don't see anything happening after pressing watch it build
+
+---
+
+Why do i need to blank out the anthropic key?
+
+---
+
+How can i test out all the functionality if I run it with a valid anthropic key?
+
+---
+
+I filled in the info I tried the explore door, but I don't see anything happening. I typed in what the example text stated
+
+---
+
+Oh I saw an event come through
+
+---
+
+Could we make adjustments on the holistic plans for these pieces of feedback?
+* The ? to open the hotkeys panel is not working
+* There needs to be better feedback/interactivity to show that the backend is running and to show what its doing while the user is waiting so they know it's working. Let's use the bottom bar to communicate real time statuses to the user and have spinners/animations to show what it's doing.
+* When running the hormuz/brent crude example live by typing it in, the boxes are a little chaotic and hard to read. Can we apply a heuristic to allow the graph/nodes to be redrawn so that it avoid arrows that loop back around? as much as possible, it should be oriented to be legible left to right and top to bottom. 
+* I think this info could be hidden, deprioritized in terms of importance
+
+
+<pasted_content id="9d5b">
+Every claim and arrow on this map arrived from /api/generate, in generation 01M32P9N2SWMR9C8J96DWQ71KR, at seed 4492837692168472. Nothing here was typed in, and no likelihood has been worked out yet: the engine works them through the whole map at once, when the map is finished.
+</pasted_content id="9d5b">
+
+* the side bar is pretty cluttered. Could we introduce optional tool tips that could be clicked to open a modal that explains in more detail what app-specific terminology like kind is? Let's also avoid the more idiosynractic examples of an apple on a desk and dominoes and aim to present vocabulary and concepts in a a more terse, professional manner.
+* please unify the demo and actual workflows in this UI. also put in minimal instruction and information like a tutorial or a help page for the user to understand how to use the tool and what to expect.
+* In each of the nodes, the empty user specfied values and the market values add visual clutter. The user and market values should only be viewable if they exist.
+
+Could you please dispatch sub-agents to analyze and brainstorm fixes for these pieces of feedback and write plans to one or more documents in plans/ for addressing them?
+General principles: less clutter, clearer flow for first time users, more progressive disclosure, more realtime feedback/explanations to the user, better starting screen that isn't dependent on whether the token is specified.
+
+Also, can the README be cleaned up/simplified/made easier to read? I think that make dev should kill or bring down the system on ctrl+c. In addition, it'd be nice to tell the user where they can navigate to the frontend at 
+
+<pasted_content id="9d5b">
+http://localhost:5173/
+</pasted_content id="9d5b">
+
+ and navigate to the backend docs api
+
+---
+
+<task-notification>
+<task-id>a175350704fba03c7</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/a175350704fba03c7.output</output-file>
+<status>completed</status>
+<summary>Agent "UA: live status and bottom bar" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Plan written to `/Users/kentgang/git3/katalyst/plans/ux-round/A-live-status.md` (~2 580 words — over the 1 500 bar, because the brief asked for the seven-state table, the motion rule, and two amendment tables on top of the common six sections). Evidence script at `/Users/kentgang/git3/katalyst/plans/analysis/scripts/ux-round/A/what_the_wire_already_says.py`. The repository is otherwise untouched (`git status` clean; `plans/` is git-ignored).
+
+## Five-line summary
+
+1. **The mechanism:** the one sentence about a live run exists and is clipped to one pixel (`frontend/src/components/generationDock.css:38`, `frontend/src/stream/GenerationScreen.tsx:304`), a browser test *asserts* that clipping (`frontend/e2e/generate.spec.ts:230`), and the foot instead carries a provenance line claiming arrivals on an empty map (`frontend/src/stream/growth.ts:192`) — while a call takes 51.98 s at `medium` and 109.65 s at the recorder's effort (`plans/logs/eval-hormuz-medium.log`, `plans/logs/eval-hormuz.log`).
+2. **Recommended:** one strip at the foot of both map screens, printing the sentence the live region already speaks plus `nothing new for N s`; provenance moves into *Run details* (R16, pulled forward from 06-4), which is what makes the un-hiding safe. No server change; ~2 sessions across two pull requests.
+3. **The motion line, testable:** *motion may carry information, never stand in for it* — `motionBudget` and `noSpinner` are unchanged, and `noSpinner` gains one allowlist check over timers, so a ticking measurement is legal and a pulse still is not.
+4. **The gap in the tests:** every browser test runs with an empty key and a 0.4 s replay pace (`frontend/playwright.config.ts:158,209`), so no test can see a live wait; a no-browser twin with fake timers is the one that would have caught this, and it is tier 2 of record 0008.
+5. **Waiting on Kent:** is a ticking number the motion he meant; may R16 come forward now; is the ninth event (`asking`) held for the one shape freeze or dropped — recommendations are yes, yes, hold.
+
+## Questions that wait on Kent
+
+1. **Is a number that ticks the motion you meant?** While the model works on the next three Hormuz claims the foot reads `live · One place is held open where the first claim will go. nothing new for 23 s`, seconds counting up; nothing spins or pulses. Recommended: yes. A visible non-textual mark as well is a separate question, because every honest version of one needs a number the server does not send.
+2. **Pull R16 forward into this stack?** The sentence naming `/api/generate`, generation `01M32NFP…` and seed `8945432650305861` leaves the foot for a *Run details* section of the panel. Recommended: yes — R16 already decided the move; this changes only when, and it is what makes showing the hidden sentence safe.
+3. **The ninth event (`asking`) — hold it for the one shape freeze, or drop it?** With it, the three rectangles in flight would read `ASKING` and the rest `HELD OPEN`. Recommended: hold and decide at the freeze — no committed recording carries it, so building it now would make a replay visibly less alive than a live run, breaking the promise record 0012 rests on.
+
+Two findings worth flagging beyond the brief: **"Read the working of this run →" is offered from the first event but its fetch is gated on the run finishing** (`GenerationScreen.tsx:96-99` vs `:346`), so pressing it mid-run shows *"Reading the working…"* forever — a one-line fix. And **polling the transcript mid-run would add nothing**: `transcript.py:60-120` gains a line only when a call returns, and every returning call that changes the map already makes an event.</result>
+<usage><subagent_tokens>209592</subagent_tokens><tool_uses>73</tool_uses><duration_ms>504038</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ab13a666bd1cb229c</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/ab13a666bd1cb229c.output</output-file>
+<status>completed</status>
+<summary>Agent "UD: one flow, help, ? key bug" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Plan written to `/Users/kentgang/git3/katalyst/plans/ux-round/D-one-flow.md`. Evidence under `/Users/kentgang/git3/katalyst/plans/analysis/scripts/ux-round/D/` (`qkey.test.tsx` — 4 tests, all pass; `whatARunCosts.py`). Repository otherwise untouched.
+
+## Five-line summary
+
+1. **The `?` bug is an absence, not a filter**: bound once, at `MapScreen.tsx:524`; the generation screen and the first screen have no keydown listener at all — while `GenerationScreen.tsx:83` prints *"Press ? for every key"* on the very screen where it is dead. Four passing tests in `plans/analysis/scripts/ux-round/D/qkey.test.tsx`, including a stored-map control proving the press lands.
+2. **Nothing pinned it** — the only `?` press in the suite is `e2e/hormuz.spec.ts:719`, on the stored map, and there is no component test for the generation screen. Fix: lift `?`, `⌘K` and `Escape` into `keyboard/everyKey.ts`. ⅓ session, straight onto `main`.
+3. **One first screen, three ways to start** — the finished map (free, instant), the recording (free, ~15 s, badged a replay), a live run (the recorded run made 29 calls, took 36 min, cost $4.04 on 2026-09-21), and a sentence of your own. It reads the same with and without a key and differs only in what is enabled and why.
+4. **The request names what it wants** — one required field on `GenerateRequest` replaces `generate.py:414`'s choice-by-key. Proposed dated amendment to record 0012: *a reader choosing a recording is not a fallback; the server never chooses and never substitutes.* Proven not to move the prompt fingerprint or the cassettes (R5); R9 honoured.
+5. **Help is one page, reached from `?` and the top bar**, absorbing the key sheet so a surface is removed rather than added; words drafted, 140 in all. **Three questions for Kent:** print the recorded run's real cost? fold the key sheet into Help? delete the two unpressable Explore/Verify rows?
+
+## Root cause of the `?` bug, in two sentences
+
+`?` is bound in exactly one place — a window listener inside the stored-map screen, `frontend/src/components/MapScreen.tsx:524` — and it is not in the shared key map (`keyboard/useMapKeys.ts:190–240` has no `"?"` case), so it simply does not exist on the map that is building itself or on the first screen, the two screens Kent was on. Those same screens advertise it anyway: `MapFrame.tsx:100` draws *Every key (?)*, `GenerationScreen.tsx:217` says *"The same as pressing ?"*, and `GenerationScreen.tsx:83` opens the line under the map with *"Press ? for every key"* — which is in his own capture at `plans/logs/m4-look/findings.json`.
+
+**What pins it today:** one line, `frontend/e2e/hormuz.spec.ts:719`, which presses `?` after walking the *stored* map — and that is the whole of it. There is no component test for `GenerationScreen` at all, and every browser test plays a recording to completion before touching a key, which is why the dead key survived.
+
+## Questions waiting on Kent
+
+1. **Does the live row quote the real money?** The only measured figure the product owns is the Hormuz recording's own receipt: 29 calls, 36 minutes, $4.04, on 2026-09-21. Recommended: print it, dated and labelled as the recorded run, with one clause saying a run today asks for less effort (R34). The alternative is a shape — *"minutes, and it spends"* — honest but useless to a reviewer. (Worth flagging: that $4.04/36 min differs sharply from record 0012's $1.32/10 min 54 s and from his own ~$1/~10 min M4 run, which is exactly why the number must be read from the file rather than remembered.)
+2. **Does `?` open one Help surface everywhere, replacing the key sheet?** Recommended yes: *Every key (?)* becomes *Help (?)*, the keys become Help's first section, and `?` starts working on the first screen too — a surface removed, not added.
+3. **Do the Explore and Verify rows go?** They are two rows you cannot press (`Launchpad.tsx:299–306`) at the top of the first screen, while what actually chooses the door is whether the second field is filled in. Recommended: delete them and let that field's label carry it; the first screen loses its top third.
+
+One note: the plan runs about 2 460 words by `wc -w` against the common brief's 1 500, of which roughly 700 are the ASCII sketch, the code extract, the two tables and the verbatim amendment text the brief asks for. Prose is near 1 700. Cutting further would have meant dropping mandated content (the drafted copy, the amendment wording, or the file:line evidence).</result>
+<usage><subagent_tokens>183998</subagent_tokens><tool_uses>85</tool_uses><duration_ms>579984</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a94164fba9876a1de</task-id>
+<tool-use-id>toolu_01CPFLWvD9W164WPuB4SfAJG</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/a94164fba9876a1de.output</output-file>
+<status>completed</status>
+<summary>Agent "UC: declutter panel, tile, vocabulary" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Plan written to `/Users/kentgang/git3/katalyst/plans/ux-round/C-declutter.md` (~3 700 words — over the 1 500 guide, because the brief commissioned two full inventories and eleven before/after pairs, which are tables). Evidence scripts kept at `/Users/kentgang/git3/katalyst/plans/analysis/scripts/ux-round/C/`. Repo otherwise untouched.
+
+## Five lines for the coordinator
+
+1. **Measured:** on the recorded generation a keyless reviewer walks, **18 of 18 tiles show both empty belief columns — 36 of 54 cells** are absences; the curated fixture every test plays hides it (12 of 21), which is why nobody saw it.
+2. **The tile:** one rule, no guard — *the model's column is always drawn; the reader's and a venue's are drawn when they hold a number.* It is layout-neutral (`geometry.ts:73` reserves 69 px whatever the chips hold), the `not_tradeable` finding already lives outside the chips, and the reasons keep their home in the panel.
+3. **The panel:** at least 427 words of its own prose; about **215 leave the always-on column** — seven sections fold behind a one-line summary, and *Where it sits* (105 words), the decomposition's closing paragraph and *Lines this build could not act on* are deleted outright.
+4. **The modal:** not needed. The palette and the key sheet already open over the map, so the real rule is *nothing waits on you* — a word's definition unfolds in place as a disclosure, with no focus trap, no Escape and no anti-pattern amendment; one file, `frontend/src/words/glossary.ts`, owns the sentences and a test holds it to `spec/vocabulary.md`.
+5. **The metaphors reach a reader in exactly one place** — `encodings.ts:298–306` — and the model-facing copies (`link.py:118`, `prompt.py:105`) must ride stack 05's one freeze (R5), which also renames `event` → `step` (R21); so the tile and the fold ship now, the glossary ships with the freeze.
+
+## Three questions that wait on Kent
+
+1. **A market ending nobody quotes — does its tile go quiet too?** *(Recommended: yes, one rule.)* The Polymarket ending keeps its `market .48` chip; *XLE underperforms SPY* has no quote, so its tile would show only the model's number and the panel would say *no venue quotes this claim*. The alternative is a per-kind guard. On screen: every tile quiet, or two of eighteen keeping two words.
+2. **Does the glossary wait for the freeze, or ship twice?** *(Recommended: tile and fold now, glossary with the freeze.)* Record 0017 renames the kind `event` → `step` and adds `persistence: event | state`, so a glossary written today defines *kind* wrongly one stack later.
+3. **Fold *Why this number*, or leave it open?** *(Recommended: fold it, with its result line as the summary.)* Folded, a claim's panel fits 1280×800 without scrolling; the risk is that the argument is the product and a reviewer never opens it.
+
+Two notes for you: the brief's pointer to `roomFor` in `graph/ports.ts` is off by a file — it is `graph/geometry.ts:241`, and the height constant lives at `geometry.ts:73`. And the next free decision-record number is **0023**, since 0016–0022 are the two ADR worktrees' drafts.</result>
+<usage><subagent_tokens>242015</subagent_tokens><tool_uses>66</tool_uses><duration_ms>628669</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a3b07b6b3b3d991b3</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/a3b07b6b3b3d991b3.output</output-file>
+<status>completed</status>
+<summary>Agent "UE: README rewrite and make dev" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Machine left clean: no containers, no networks, ports 5173/8000 free, dev images untouched (never built prod for real).
+
+## To check me
+
+```sh
+cd /Users/kentgang/git3/katalyst-wt/docs-04-readme-and-dev
+make -n dev up down prod help          # reads right
+make help                              # still true
+wc -l README.md                        # 140, was 217
+make dev                               # banner, then Ctrl+C -&gt; nothing left
+docker compose ps -a                   # empty
+```
+
+## `make dev`
+
+Was `docker compose watch`; now `docker compose up --watch` under two traps. Proven by running it four times and sending SIGINT to the whole process group: containers **and** the network removed every time, ports released, and `Watch enabled` plus real syncs (`touch` on `backend/src/.../main.py` and `frontend/src/App.tsx` → *Syncing service "backend"*, *"frontend"*, then uvicorn *Reloading…*). `trap 'docker compose down' EXIT` removes rather than merely stops, because `make down` already promises removal; `trap 'exit 0' INT` stops make signing off a deliberate Ctrl+C with `*** [dev] Error 130`. Same treatment on `up` (proven) and `prod` (dry-run + `config --quiet` only — a real prod build would overwrite your dev images).
+
+Banner before start: `http://localhost:5173/`, `http://localhost:8000/docs`, *Press Ctrl+C to stop everything.* Verified `/docs` is Swagger UI on 8000 and is **not** reachable via 5173 (the vite proxy forwards only `/api`; `5173/docs` returns the app's own page). No re-print when healthy — that needs a background health poller that can outlive the task; reasoning is in the Makefile comment.
+
+`compose.yaml`: header comment only, which had been telling readers to use `docker compose watch`.
+
+## Moves for you (I could not edit these)
+
+| From old README (`git show main:README.md`) | To |
+|---|---|
+| L35–76: the two `curl` recipes for `POST /api/worlds` and `/api/worlds/diff`, the `jq` pipeline, the "shape of the answer" blocks, the `M1 · base · reading` and `strike · the sentence beside the list` citations | `spec/multiverse/README.md` — nowhere else has them |
+| L165–167: the e2e port-collision paragraph and `KATALYST_E2E_BACKEND_PORT` / `KATALYST_E2E_FRONTEND_PORT` | prose home needed; only `frontend/playwright.config.ts` and `e2e/ports.ts` carry it. ADR 0008's 2026-09-21 amendment or ARCHITECTURE §7 |
+
+Everything else was already owned elsewhere and now sits behind a link: the screen-by-screen tour (`spec/workbench/*`), the generate stream (`spec/generation/streaming.md`, `replay.md`), the eval/record-demo prose (Makefile comments, ARCHITECTURE §7, `docs/measurements.md`), the test-layer detail (§7), "Not built yet" (§10).
+
+## Drift you must fix in the same PR
+
+- **ARCHITECTURE.md §6**, *Development* bullet still says "`docker compose watch` (or `make dev`)". Now wrong.
+- **ARCHITECTURE.md §7** (pre-existing): the browser-app row says **356**, the sentence below says **358**. README quotes 358.</result>
+<usage><subagent_tokens>126579</subagent_tokens><tool_uses>60</tool_uses><duration_ms>726516</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>adf0a2e7c04f106e3</task-id>
+<tool-use-id>toolu_01BRxF3F2EwxqLaDNRuv86q2</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/adf0a2e7c04f106e3.output</output-file>
+<status>completed</status>
+<summary>Agent "UB: legible generated-map layout" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The plan is written and every claim in it is measured. Here is the five-line summary and the questions.
+
+## `plans/ux-round/B-layout.md` — five lines for the coordinator
+
+1. **The mechanism:** a claim's column is frozen the moment it is first drawn, and a claim can only move *right* as later arrows arrive — so the pin holds it left of where it belongs and the arrow into it doubles back (`elkGraph.ts:240` pins x as well as y; `layers.ts:65` assigns columns by depth, not arrival order). Measured: **0 pin drops across all three real runs** — a tile reserves its belief rail while the map grows (`geometry.ts:177`), so `beliefs_propagated` changes no height, and the whole run is one unbroken chain of pins.
+2. **Worst on the Verify door Kent used:** the destination claim arrives at `at: 1` with no causes, is pinned in column 0 beside the hypothesis, and ends in column 3 — **3 of 9 arrows point backwards** on one kept live run, 2 of 5 on the other. The feedback-arrow rule is not involved: no generated map has one.
+3. **One whole layout at the end fixes every one:** 0 backwards, 0 same-column, wire length halved (11 264 → 5 567 px on the 18-claim recording), 630 px shorter — at the cost of one moment where 18 of 18 tiles move.
+4. **Recommendation: the map settles once when the run stops** — the moment `GenerationScreen.tsx:285` already re-frames at, so the settle and the re-frame cannot come apart. A cut, not an animation, so the motion budget is untouched. ~2.5 sessions over two pull requests (`adr/NN-the-map-settles` → `feat/NN-the-settle`).
+5. **One finding to hand on:** `streaming-growth.md` open question 2 was answered *"no, never re-lay out"* on a ten-claim Explore run and is false on a Verify run. Also handed on, not mine: the zoom buttons and `firstFrame` both use 16 px, so the bottom-left tile sits under the controls.
+
+## The three questions that wait on Kent
+
+1. **May the map arrange itself once, when the run stops?** Recommended yes — Hormuz with *Brent below $68* as the destination today leaves three arrows pointing right-to-left into a Brent tile beside the hypothesis; after the settle, none does.
+2. **Does it move, or does it cut?** Recommended cut — every tile in place in the same frame the chips fill, using only the 120 ms opacity change already budgeted. A tween would be a fourth animation and needs INV-workbench.18 amended.
+3. **Is the map acceptable *during* the run?** Recommended yes, accept it — the alternative (freeing the column every pass) measured at 44 tile-moves across 14 arrivals and costs the promise that a growing map never reshuffles.
+
+**What I would not do:** re-layout on every arrival (159 tile-moves), free the column mid-run (44), add a *Tidy the map* button (one rule over two), touch the feedback rule, or change the ELK options — `semiInteractive` off is byte-identical on all three maps. The options are not the problem; the pin is.
+
+**Evidence, re-runnable:** `plans/analysis/scripts/ux-round/B/run.sh` (`measure` · `anatomy` · `candidates`). It bundles the app's *own* `elkGraph.ts`, `layers.ts` and `geometry.ts` with `rolldown` and feeds them `backend/recordings/hormuz.jsonl` and the two kept live runs — nothing is reimplemented. Read-only: the only files written are the plan and those scripts.</result>
+<usage><subagent_tokens>255345</subagent_tokens><tool_uses>83</tool_uses><duration_ms>861294</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bo4x97d3w</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/bo4x97d3w.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for the build's checks on the README pull request, then squash-merge it" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>af5c36c1a95467bf0</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b3719e32-fae2-4866-b0f9-fedf04e7fad7/tasks/af5c36c1a95467bf0.output</output-file>
+<status>completed</status>
+<summary>Agent "RT: red-team the four UX plans" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Written to `/Users/kentgang/git3/katalyst/plans/ux-round/RT-red-team.md`. Nothing else in the repository changed (`git status` clean; `plans/` is git-ignored). I ran only the analysts' own scripts and one single-file vitest run — no browser, no server, no model.
+
+## Verdicts
+
+- **A — live status: SOUND AFTER CHANGES.** Every file:line verified (`generationDock.css:38`, `GenerationScreen.tsx:304/346`, `growth.ts:192`, `generate.spec.ts:230`). It answers *"spinners/animations"* with text, and never uses `frontier` — already on both growth events — which is the one thing on the wire that says what the run is doing.
+- **B — layout: SOUND AFTER CHANGES, two blocking.** The design reproduces exactly (I re-ran `run.sh` and `run.sh candidates`). Two holes below.
+- **C — declutter: SOUND.** 36 of 54 empty cells reproduced. The brief's doubt about width is unfounded: `Tile.tsx:241` writes `width: 280px` on the tile, so layout-neutrality holds for width as well as height.
+- **D — one flow: SOUND AFTER CHANGES.** `?` root cause confirmed (`MapScreen.tsx:524` is the only binding; only two keydown listeners exist in product code); its four tests pass on `main`; the fingerprint claim is verified at `prompt.py:184` + `conftest.py:21,91`.
+
+## The two blocking findings
+
+1. **B's evidence is git-ignored.** `measure.mjs:357,363` reads `backend/.runs/`, which `.gitignore:251` ignores. So *"3 of 9 arrows point backwards"* rests on files no clone or build machine has, and its flagship test — *"replays the two kept live streams"* — cannot be written. The only committed stream is an Explore run with 0 backwards arrows.
+2. **B argued down the option Kent asked for on the wrong map.** *Keep the row, free the column* costs **5 tile-moves across 3 arrivals** and **3 across 2** on the two Verify runs he typed. The plan's "44 across 14" is the Explore recording — the map he did not complain about.
+
+Also: two records both numbered 0023, four different stack numbers, `feat/06-*` colliding with the live `feat/06-quote` worktree; three plans writing `GenerationScreen.tsx` and `streaming-growth.md`; A and C both building R16's *Run details*; six earlier findings owned by nobody (alive only in `STATUS.md:68`). Kent's README/`make dev`/URLs ask is already done on `docs/04-readme-and-dev`.
+
+## The one ordering
+
+All branches renumbered `04` (this is M4 feedback on stack 04). One browser agent throughout; docs in parallel, code not.
+
+`fix/04-the-question-mark` → `adr/04-what-the-run-says-and-when-the-map-settles` (0023+0024, all four `streaming-growth.md` passages in one edit) → `feat/04-the-run-strip` (owns *Run details*) → `feat/04-the-settle` → `spec/04-a-quieter-panel` (0025) → `feat/04-the-quieter-tile` → `adr/04-what-a-start-is` → `feat/04-one-first-screen` (server half may start at once in the server lane) → `spec/04-help` → `feat/04-help-page` → `fix/04-owed`. C's glossary is held for stack 05's freeze.
+
+**Serial critical path ≈ 12.3 sessions of browser code, ≈ 16 with reviews.**
+
+## The honest cost
+
+Analysts' own sum is **13.7**, not 12. Plus omissions (+2.8), the read-only review each of ten pull requests gets (+4), a cold browser run each (+1), the six owed items (+1.5) → **about 25 sessions, ~21 before the freeze** — 1.6–1.8×, the same factor lesson 21 measured. Stack 05 and `feat/06-quote` run in parallel untouched; **stack 06-4 is the casualty** — A and C take two of its five items and the round holds the panel, tile and Inspector for twelve sessions.
+
+## Five questions for Kent
+
+1. **Is a ticking number the motion you meant?** Full-strength literal version: a hairline whose length is seconds-since-the-last-claim against this run's own longest gap — resets on arrival, never repeats, steps rather than slides under reduced motion — plus the strip naming what is being worked on from `frontier`. A's alternative: text only.
+2. **A word's definition — over the map, or in the panel?** Literal: click the dotted word, it opens in the same surface the key sheet already is (no scrim, nothing waits, Escape closes, never the only way in); the panel does not reflow and the overlay count stays at two because D folds the sheet into Help. C's alternative: unfolds in place.
+3. **Legible during the run, or only at the end?** Literal, measured: free the column every pass — 5 and 3 tile-moves on his own Verify runs, never a backwards arrow. B's alternative: one settle at the stop. Both together is tidiest.
+4. **May one live Verify run be committed as a fixture?** Otherwise nothing can pin the defect in Q3.
+5. **All of it now (~21 sessions, 06-4 gutted), or the three things visible in two minutes** — the `?` key, the quiet tile, the foot strip (~5 sessions) — with the rest riding 06-4 and the freeze where they were already planned?
+
+One more, free: the suite still never meets a wait. One end-to-end test with `KATALYST_REPLAY_PACE` set long would let it, with no key and no cost — nobody proposed it.</result>
+<usage><subagent_tokens>185210</subagent_tokens><tool_uses>62</tool_uses><duration_ms>693047</duration_ms></usage>
+</task-notification>
