@@ -812,3 +812,48 @@ No chapter or `belief.md` change was needed — they already cited records witho
 **No numbers changed.** Counts: 0018 2617 · 0019 3978 · 0020 3089. No git commands run; main checkout untouched.</result>
 <usage><subagent_tokens>277110</subagent_tokens><tool_uses>32</tool_uses><duration_ms>187550</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a8d683dc44ff898c9</task-id>
+<tool-use-id>toolu_01SELoFR2AukGohhqXfUCnEA</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b614e696-28f8-496c-b341-dd2bd0ba2a74/tasks/a8d683dc44ff898c9.output</output-file>
+<status>completed</status>
+<summary>Agent "Trim records 0016 and 0017" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me with:** `python3 /Users/kentgang/git3/katalyst/plans/analysis/scripts/adr-05/numbers_kept.py`, then `git diff` in the worktree, then the grep below.
+
+**`numbers_kept.py` (now covering all seven files) — no figure moved:**
+
+```
+0016  5436 → 5432   MISSING backticked: proposed
+0017  4121 → 4114   MISSING backticked: proposed
+0021  2496 → 2499   MISSING backticked: proposed
+0022  1540 → 1540   MISSING backticked: proposed
+0005  2679 → 2665   (nothing missing)
+0009  1913 → 1913   (nothing missing — untouched, as instructed)
+0014  6587 → 6575   (nothing missing)
+```
+
+The only token lost anywhere is the literal backticked word `` `proposed` ``, which is the change itself. No number, citation, script, test, requirement or decision row moved.
+
+```
+ 0005-link-semantics-and-propagation.md         | 10 +++++-----
+ 0014-a-supposition-ends-when-something-pushes-back.md |  8 ++++----
+ 0016-…-by-its-deadline.md                      | 11 +++++------
+ 0017-…-nothing-retracts-itself.md              | 17 +++++++++--------
+ 0021-what-version-one-does-not-build.md        | 13 +++++++------
+ 0022-chains-are-worked-out-not-multiplied.md   |  9 +++++----
+ 6 files changed, 35 insertions(+), 33 deletions(-)
+```
+
+**Rewritten sentences, by file.** *0016:* `status: accepted`; the `` `proposed` `` banner deleted (its only content was that the spike had reported, which the body says); "proposed record 0017's to write" → "record 0017's"; *Related* drops "proposed"; box's *Open for Kent* line → **Also decided**, carrying R25. *0017:* status; `consulted` "proposed record 0016" → "record 0016"; banner → "**This record exists because of record 0016**, accepted with it"; "Proposed record 0016 deletes…" → "Record 0016 deletes…"; "…and this record is accepted before that freeze is written" → sentence ends at "stack 05's shape freeze"; "The spike names this as a real gap, closed before this record is accepted" → "…and it is measured before the engine is built against this record"; *Related*; box → **Also decided** (R26, R27). *0021:* status; "written `proposed` here and accepted only when Kent accepts this record" → "was the coordinator's call, and Kent accepted it with this record on 2026-09-21"; the same in *Open for Kent*; two "proposed record 00NN" → "record 00NN"; *Related*; box → **Also decided** (R31). *0022:* status; banner → "**This record needs record 0016's exact core** to exist…"; *Related records*; box's *Open for Kent* line → **When.** *0005:* top pointer "Amendment proposed" → "Amended", "takes effect only when those records are accepted" → "**is in force from 2026-09-21**, when Kent accepted both"; amendment's own "**Proposed, not in force**" → "**In force from 2026-09-21**… (row R32)"; two sub-headings and one *Related* clause drop "proposed". *0014:* the same two status lines and two sub-headings. *0009:* untouched.
+
+**Acceptance, in the house style 0012 uses** — one *More Information* bullet per record, his words verbatim: `* **Accepted by Kent on 2026-09-21**, decisions note row **R32**, in his words: *"All these ADRs written are accepted!"*`. `date` is unchanged in all four.
+
+**Grep, five remaining hits, all historical:** `0009:118` "unlike the other amendments proposed that day" (why this one needed no record); `0016:152` a lever "not proposed" and `0016:154` a cap "not proposed here" (things this record declines to propose, not its status); `0017:123` "the spike proposed `sustain_from_an_event`" (the rejected name); `0014:294` "the count the engine digest proposed" (the superseded 200).
+
+**One thing I did not do.** 0018–0020 are not files in this worktree, so I removed "proposed" from `0021`'s reference to record 0019 as instructed but did **not** write anywhere that 0018–0020 are accepted — I have no record to trace that to. 0021's own box still says they are reserved for stack 06 and written when it opens; if they now exist elsewhere, that line and `0021:123` need one more pass.</result>
+<usage><subagent_tokens>362475</subagent_tokens><tool_uses>22</tool_uses><duration_ms>253805</duration_ms></usage>
+</task-notification>
