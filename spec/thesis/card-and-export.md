@@ -12,7 +12,9 @@ Two modules in `backend/src/katalyst/thesis/`: `card.py` builds what the panel d
 
 ### The card assembles; it computes nothing another module owns
 
-Every number on a card was worked out by the module whose subject it is — the edge by `edge.py`, the first-touch shares by `position.py`, the rail by `lift.py`, the greyed ceiling by `ceiling.py`, the shift by whatever owns the map's own verdict — and handed to `card_of`. One rule, and it is what keeps a card from becoming a second place any of that arithmetic lives. Two things the card does compute, because nobody else does: it ranks the tradeable endings, and it ranks the tails.
+Every number on a card was worked out by the module whose subject it is — the edge by `edge.py`, the first-touch shares by `position.py`, the rail by `lift.py`, the greyed ceiling by `ceiling.py`, the shift by whatever owns the map's own verdict — and is either handed to `card_of` or asked of that module by name. One rule, and it is what keeps a card from becoming a second place any of that arithmetic lives. Two things the card does compute, because nobody else does: it ranks the tradeable endings, and it ranks the tails.
+
+**Asking is not computing.** The size the reader's risk budget implies is the one number the card asks for rather than takes: `position.py` owns that sum — the share of capital whose loss from entry to stop is exactly the budget they typed — and the card calls it. The sum still lives in one place, and there is no argument through which a caller could put a size on a card that the reader's own two numbers do not imply. Everything else arrives already worked out, because everything else needs a sample of worlds the card is not given.
 
 ### Every number is a figure, and a figure cannot be built without an owner
 
@@ -35,14 +37,18 @@ The shapes underneath carry one row per drawn world; fifty thousand worlds by tw
 | **What is priced in** | The model's number, the venue's bid and offer with their source and day, the fee, both edges and the side to lead with — or the named refusal and the break-even | computed, and the venue's |
 | **What takes you out** | The claims over-represented where the stop went first: lift, interval, count, typical days ahead — or the reason there are none | computed |
 | **What to watch** | The adverse turn that resolves before the ending and can be seen; and, apart from it, what is adverse but unhedgeable, with the reason | computed |
-| **Your exit** | Stop, target, horizon, risk budget, the size those imply, the two first-touch shares, and a greyed **quartered-Kelly ceiling** under the words *never size to this* | **the reader's**, except the shares and the greyed ceiling, which are computed |
+| **Your exit** | Stop, target, horizon, risk budget, the size those imply, the two first-touch shares with the window they were read to, and a greyed **quartered-Kelly ceiling** under the words *never size to this* | **the reader's**, except the shares and the greyed ceiling, which are computed |
 | **Tails and shocks** | Claims that are unlikely and would hurt; and any shock the reader placed | the model's, and the reader's |
 | **What else can I trade** | Every tradeable ending on the map, ranked by two rules kept apart | computed |
 | **What this does not know** | The refusals in full sentences, the not-advice line, and the one execution sentence | ours |
 
 The card is a **state of the panel, never a dialog**, and the strip above it is the only pinned thing in the product.
 
-Two numbers carry sentences of their own. A **first-touch** number names in the same sentence both the sample its event days came from and **where the market's chance of each claim came from** — a venue quote on that claim, the model's own number from the world with nothing fixed by an edit, or the reader's override (record 0019). The **greyed ceiling** carries its label *never size to this* as a field on the value; it is a quartered Kelly at the unfavourable end of the model's stated range, reads **zero with a reason** where that range does not agree which side of the price to be, and is **absent with the refusal's sentence** wherever no edge can be built (Kent, R29). Zero and absent are different answers and the card says which.
+Two numbers carry sentences of their own. A **first-touch** number names in the same sentence both the sample its event days came from and **where the market's chance of each claim came from** (record 0019). There are four such sources and the card keeps all four apart: a **venue quote** on that claim; the **share of the drawn worlds** where the claim comes true inside the trade's own window, which is what the price paths read for themselves where nobody quotes it; the claim's **printed likelihood** from the world with nothing fixed by an edit, read on the claim's own resolve-by day; or a chance **the reader typed** over the top. The two readings of the model's own belief are two entries and not one, because only the first leaves the price path carrying no drift, and a card that could not tell them apart could not say whether the number beside it carries any (R41).
+
+A first-touch number also names **the window it was read to** — the reader's own horizon, counted in days from the day the window opened. The paths run as far as the drawn worlds do; the shares stop where the reader says they are out. Two shares over a window nobody named are two numbers nobody can check.
+
+The **greyed ceiling** carries its label *never size to this* as a field on the value; it is a quartered Kelly at the unfavourable end of the model's stated range, reads **zero with a reason** where that range does not agree which side of the price to be, and is **absent with the refusal's sentence** wherever no edge can be built (Kent, R29). Zero and absent are different answers and the card says which.
 
 ---
 
@@ -89,7 +95,7 @@ The whole document, at its top level: `schema` · `map` · `hypothesis` · `legs
 
 Each **leg** carries the ending, the instrument or contract, the side, the test that settles it, and then the whole of *what is priced in* — the model's number with its range, the mixture terms where the reader was in a supposed world, the quote with its venue, source and day, the fee, both edges, the break-even, or the named refusal that stands where no edge could be built. It also carries **the size the reader's risk budget implies** and **the greyed ceiling as a value with its label attached**, so a program that reads the number reads *never size to this* with it, or reads the reason it is zero or absent. A leg is complete on its own, which is why `risk_exit` does **not** repeat those two. One leg is what this version writes, because one position is what the reader holds; the field is a list so that two positions are two legs rather than a different document.
 
-The **conditions** are the computed lists, each row carrying what it rests on: what carries the leg, what takes you out (lift, interval, count), what to watch (dates, and how each is seen), what is unhedgeable and why, the tails, and any shock the reader placed. First-touch numbers carry the method that produced them: the barrier shift, the sample the event days came from, and **the market's chance of each claim with the source it came from**.
+The **conditions** are the computed lists, each row carrying what it rests on: what carries the leg, what takes you out (lift, interval, count), what to watch (dates, and how each is seen), what is unhedgeable and why, the tails, and any shock the reader placed. First-touch numbers carry the method that produced them: the barrier shift, the window they were read to, the sample the event days came from, and **the market's chance of each claim with the source it came from**.
 
 Every number in the document is a **figure**, exactly as on the card, so the owner survives the trip.
 
@@ -107,9 +113,13 @@ That third test is what makes the second honest. The reader understands only the
 
 Three things the description pins that an ordinary export would leave loose: the document's **own name** is a closed list of one, so a document calling itself something else is not a thesis; **`refuses` may not be empty**, because a document with no limits is a claim nobody here may make; and a shock's **`probability` is required and must be nothing**, because an absent field reads as an oversight where a null one reads as an answer.
 
-### B5a — What the card takes on trust, and says so
+### B5a — Where the market's chance came from is the walk's own record, not a caller's word
 
-**Where each claim's market chance came from is handed in and not checked.** The card names it beside every first-touch number, because record 0019 requires it, and nothing ties it to the price paths that were actually walked: the shape those paths come back in carries which decay shape each claim followed and not which market chance it used. So a caller that hands in sources the paths never used will have them printed. That is the one promise on this card that nothing enforces, and the honest close is for the paths to carry each claim's market-chance source the way they already carry its decay shape.
+Record 0019 requires the card to name, beside every first-touch number, where the market's chance of each claim came from. It would be easy to make that a promise: let the caller pass a list of source words and print them. Then a caller that named sources the price paths never used would have them printed, and nothing anywhere would notice.
+
+**It is not a promise; it is the record itself.** The shape the price paths come back in carries, for each claim that moves the price, the chance the walk applied and where that chance came from — including the ones the walk worked out for itself off the drawn worlds, which no caller could have typed because no caller knew them. The card takes that record whole and reads the sources out of it. A card on a contract ending, which is held to resolution and has no paths at all, passes nothing and says nothing.
+
+The test that holds it, `test_the_card_names_the_market_chances_the_price_paths_actually_applied`, takes the whole route rather than a shape built by hand: it draws worlds, walks paths through them where one claim's chance is handed in and another's is not, reads first touch off those paths, builds a card, and checks that the sentence beside the shares names exactly what the walk recorded — and that the second claim's number is the one the walk read off the sample.
 
 ### B6 — The page a person reads
 
@@ -145,7 +155,7 @@ Written *for all inputs drawn from generator S, statement P holds*. This chapter
 
 6. **Do not let the walk change maps.** Because *the map you were just shown* is the product's claim to being auditable. **Instead:** make an instrument ending a first-class trade, so the recorded map carries the last three steps on its own.
 
-7. **Do not compute on the card what another module owns.** Because a second place the arithmetic lives is a second place it can disagree with itself. **Instead:** the card is handed the edge, the shares, the rail, the ceiling and the shift, and it arranges them.
+7. **Do not compute on the card what another module owns.** Because a second place the arithmetic lives is a second place it can disagree with itself. **Instead:** the card is handed the edge, the shares, the rail, the ceiling and the shift, and it arranges them — or it calls the module that owns a sum, which leaves the sum where it is.
 
 8. **Do not carry an array onto a card.** Because the shapes underneath hold one row per drawn world, and no reader and no browser should ever be sent a million numbers. **Instead:** read the share, the count or the day off them, and leave the arrays where they are.
 
@@ -154,6 +164,8 @@ Written *for all inputs drawn from generator S, statement P holds*. This chapter
 10. **Do not print a number without saying what kind of number it is.** Because the rule that writes a likelihood turns `.0090` into `<.01`, which is true of a chance and a lie about an edge. **Instead:** every figure names its kind, and one table decides which rule writes it.
 
 11. **Do not maintain the document's description by hand.** Because it drifts, and the drift is silent. **Instead:** generate it from the shapes, commit it beside them, and let a test compare the two byte for byte.
+
+12. **Do not take a caller's word for where a number came from.** Because a source somebody types beside a number is a source nothing checks, and this product's whole claim is that every number can say why. **Instead:** take the record the module that produced the number hands back, and read the source out of that.
 
 ---
 
