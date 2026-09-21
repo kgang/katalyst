@@ -832,3 +832,38 @@ def test_a_claims_run_of_refusals_starts_again_the_moment_it_is_answered() -> No
     assert len(finished.graph.propositions) == 3
     # Four refusals and the line was never closed for refusing.
     assert finished.reason != "refusal_cap"
+
+
+def test_one_question_that_fails_never_discards_its_rounds_other_answers() -> None:
+    """The calls of a round go out together and are all billed together.
+
+    Reading them back with a comprehension meant the first exception the seam
+    had not converted threw away every other answer of that round — asked,
+    answered and paid for, and then on no receipt and in no transcript. Only a
+    bug of ours can reach this, since the seam converts everything the service
+    can do; a bug is not a reason to lose an afternoon's money (2026-09-20).
+    """
+    told = Storyteller(
+        {
+            STARTED_AT: [
+                an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
+                an_answer(a_claim(AN_ENDING, cause=FROM_THE_QUESTION, kind="market")),
+                an_answer(a_stop()),
+            ],
+            # Asked in the same round as the starting claim's second answer, and
+            # it fails in a way nothing downstream has a sentence for.
+            A_STEP: [RuntimeError("a bug nobody wrote a sentence for"), an_answer(a_stop())],
+        }
+    )
+
+    steps = walk(told, at_once=3)
+    finished = ending(steps)
+
+    outcomes = [one for one in steps[:-1] if isinstance(one, Outcome)]
+    # Every question asked is an outcome handed back and a call on the receipt,
+    # the one that failed included.
+    assert len(outcomes) == len(told.asked)
+    assert finished.receipt.calls == len(told.asked)
+    broke = [one for one in outcomes if "nobody chose" in getattr(one.result, "claim_in_words", "")]
+    assert len(broke) == 1
+    assert "a bug nobody wrote a sentence for" not in broke[0].result.claim_in_words  # type: ignore[union-attr]

@@ -48,6 +48,7 @@ What this file must never do
 - Never give two reasons for stopping, or a reason nothing can produce.
 """
 
+import logging
 from collections.abc import Callable, Generator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
@@ -634,7 +635,49 @@ def _ask_about_each(
         )
         for claim_id, may_search in zip(asking, allowed, strict=True)
     ]
-    return [one.result() for one in in_flight]
+    # **Every result is collected before any failure is dealt with.** Reading
+    # them with a comprehension meant one exception the seam had not converted
+    # threw away the round's other answers, which were asked, answered and
+    # billed — the money spent on them would have been on no receipt and in no
+    # transcript (2026-09-20).
+    answers: list[Outcome] = []
+    went_wrong: BaseException | None = None
+    for one in in_flight:
+        try:
+            answers.append(one.result())
+        except BaseException as failed:
+            went_wrong = went_wrong or failed
+            answers.append(_never_answered(failed))
+    if went_wrong is not None:
+        logging.getLogger(__name__).exception(
+            "a question failed in a way the seam did not convert", exc_info=went_wrong
+        )
+    return answers
+
+
+def _never_answered(failed: BaseException) -> Outcome:
+    """Turn a question that failed in a way nobody wrote a sentence for into an outcome.
+
+    The seam converts everything the service can do, so reaching here is a bug of
+    ours. It is still one call of the round, and the other calls of that round
+    are still owed their fold — so it becomes a refusal like any other and the
+    exception goes to the log.
+
+    Args:
+        failed: Whatever was raised.
+
+    Returns:
+        A refusal carrying one plain sentence and the one call it cost.
+    """
+    return Outcome(
+        result=Refused(
+            claim_in_words=(
+                "This question stopped for a reason nobody chose. The run carried "
+                "on with what its other questions came back with."
+            )
+        ),
+        calls=1,
+    )
 
 
 def _still_room_to_search(left: int) -> bool:

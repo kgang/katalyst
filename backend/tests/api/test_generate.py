@@ -670,3 +670,38 @@ def test_a_replay_with_nothing_to_play_still_says_what_it_spent() -> None:
     assert names[-2] == "receipt"
     assert read[-2][1]["calls"] == 0
     assert read[-2][1]["dollars"] == 0.0
+
+
+def test_a_reader_who_goes_away_mid_round_still_leaves_the_bill_behind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Through the route, which is where this was never checked (2026-09-20).
+
+    Three questions of a round go out together and are all billed before the
+    first of them is folded. A reader who closes the tab stops the **asking**;
+    it cannot unspend what is already spent, so everything paid for is on the
+    transcript and its receipt before the run is let go of.
+
+    The old test for this asserted on the engine and never touched the route:
+    deleting the disconnect check left it green.
+    """
+    told = a_story()
+    monkeypatch.setattr(generate, "live_answerer", lambda: told)
+
+    with client().stream(
+        "POST", "/api/generate", json={"hypothesis": STARTED_AT, **SMALL}
+    ) as answer:
+        assert answer.status_code == 200
+        announced = None
+        for line in answer.iter_lines():
+            if line.startswith("data: ") and announced is None:
+                announced = json.loads(line.removeprefix("data: "))["generation_id"]
+                break
+        # And here the reader goes away, mid-run, with the round in flight.
+
+    assert announced is not None
+    working = client().get(f"/api/generate/{announced}/transcript").json()
+
+    assert working["receipt"] is not None
+    assert working["receipt"]["calls"] == len(told.asked)
+    assert len(working["lines"]) == len(told.asked)
