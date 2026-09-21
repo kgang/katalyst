@@ -1,4 +1,4 @@
-# Streaming — eight events, one request, no spinner
+# Streaming — eight events that are recorded, one live line that never is, one request, no spinner
 
 ## Purpose
 
@@ -6,7 +6,9 @@ The user types *"The Strait of Hormuz is going to open next week"* and, within a
 
 That is one HTTP request. **The stream is the loading state** (FR-5, and UX-8 in `PRODUCT_REQUIREMENTS.md` §7: no spinner anywhere). A generation takes minutes and returns one whole proposal every few seconds (decision record 0006), so there is no honest way to show it as a single answer that arrives at the end — and a spinner followed by a finished map is a veto condition, not a design choice.
 
-This chapter settles what travels down that request: **eight named events**, the order they are allowed to come in, how they are framed on the wire, what a client does with an event name it has never heard of, what the server does when the client closes the tab, and the two other routes that sit beside the stream.
+This chapter settles what travels down that request: **eight named events and one live-only line**, the order they are allowed to come in, how they are framed on the wire, what a client does with an event name it has never heard of, what the server does when the client closes the tab, and the two other routes that sit beside the stream.
+
+**The eight and the one are different kinds of thing, and the whole chapter turns on the difference.** Each of the eight is a *decision* — the model's, the rules', the walk's — and a recording is exactly those, line for line. The ninth, `activity`, is what a model call is *doing this second*: the search it just ran, one thing that came back, the sentence it is thinking. It changes nothing, it is true only for the moment it is said, and it is **never written down** (decision record 0027, Kent's R44 and R47, 2026-09-22).
 
 It does **not** settle what the model is asked or what a proposal may contain — that is [`proposals.md`](proposals.md) — nor how evidence is attached — [`grounding.md`](grounding.md) — nor where the bytes come from when there is no key — [`replay.md`](replay.md).
 
@@ -93,6 +95,26 @@ class Failed(BaseModel):                # event: failed
 
 `Proposition`, `Link`, `Violation`, `World` and `PropositionId` are the rules layer's own types, defined in [`../graph/`](../graph/) and [`../multiverse/`](../multiverse/). Nothing here redefines them; the stream carries them whole, so what the browser draws is what `domain/` computed.
 
+### And one line that is never recorded
+
+```python
+class Activity(BaseModel):              # event: activity — a live run only
+    """What one model call is doing this second. Live only, and never written down."""
+    about: PropositionId | None         # the open claim this call is working on, one of the
+                                        # identifiers the latest frontier names — or None when
+                                        # the call is not about one claim, as the opening call is
+    kind: Literal["searching", "found", "thinking"]
+    text: str                           # the model's own words, or the search tool's own. Verbatim
+```
+
+**Every word of `text` is somebody else's.** `searching` carries the model's own web-search query as it wrote it. `found` carries the title of one thing the search returned, followed by ` · <host>` when the address has one. `thinking` carries the model's own summarised thinking — its most recent whole sentence, or the last of it cut at a word once the sentence has turned out to be all there is. Nothing here is composed by us and nothing here is an estimate: there is no percentage, no count of what is left and no guess at how long.
+
+**Ephemeral is six clauses, and each one is a test.** Sent only on a live run · never written to a recording, a transcript or a kept run · never sent by a replay and never invented by one · never billed · never counted by the `at` counter · never folded into the map. `activity` is deliberately **not** in `NAMES` or `BY_NAME` in `events.py` and **not** in the `Event` type: those three are what a recording is written and read through, so a name that is in none of them cannot be written into a recording by this program or read back out of one, whatever anybody remembers to check. A file that holds one anyway is refused by name, with a sentence saying why.
+
+**At most about one line a second per call, and the newest wins.** A call searching hard has something new to say several times a second and the strip shows one line, so each call's newest line goes and the rest are dropped where they were made. Nothing queues, nothing arrives late, and a reader who is slow costs the run nothing. There is no minimum: the first line of a call goes the moment it exists.
+
+**On screen it is two lines in the run strip and nothing anywhere else** — never on the map, never in the panel, both outside the polite live region because they change every few seconds and must not be announced, and neither animates. [`../workbench/streaming-growth.md`](../workbench/streaming-growth.md) owns what they say.
+
 ### Four things worth saying about the shapes
 
 **`GenerationStarted.seed` is always a number, even though the request's seed is optional.** A request may leave `seed` out, and then `engine/ids.py` mints one and this event says which — so the run is reproducible from the moment it starts, by the same `(base map, branch, seed)` triple as everything else (INV-5: every world replays from those three). **The browser never invents a seed.** It sends one only to reproduce a run it was handed, which is the one case where a seed means something to the person sending it; a browser that made one up would be putting a number nobody computed into the reproducibility triple. On replay, neither is used: the recording's header carries the seed the recorded run had, and that one wins ([`replay.md`](replay.md)).
@@ -153,6 +175,8 @@ growth   :=  ( proposal_accepted | proposal_rejected )*
 finish   :=  beliefs_propagated  verdict?  receipt  done
 ```
 
+`activity` is not in that grammar, because it is not part of what a generation is. On a **live** run it may appear anywhere between `generation_started` and the first event of `finish`, any number of times or not at all, and never after the ending has begun — a line saying a call is searching, arriving after the bill, would be about work already paid for. It carries no `at`, it is never required, and a stream with none of them is an ordinary stream. A replay has none.
+
 with five rules the grammar cannot carry on its own:
 
 1. **`failed` cuts.** After any event, `failed` may replace everything that was still expected. A stream that ends in `failed` is legal at any length; nothing follows it.
@@ -187,7 +211,7 @@ The three counts on `done` are written here as gaps on purpose: they are whateve
 * One event is `event:` then `data:` then a blank line. **The payload is one line of JSON** — never pretty-printed, never wrapped — so a reader never has to join two `data:` lines back together, and a recording can be one event per line ([`replay.md`](replay.md)).
 * The answer's media type is `text/event-stream` and it is sent with `Cache-Control: no-store`.
 * **The response is a plain `StreamingResponse`** (Kent, S5). Not `sse-starlette`: one fewer runtime dependency, and — the reason that decided it — a library that sends a periodic heartbeat comment line would put a line into every recording that means nothing, and a line in a file that means nothing is a line somebody eventually parses. The generator writes the two lines itself.
-* **There is no heartbeat, and no keep-alive line.** A generation emits something every few seconds by its nature, so there is nothing to keep alive.
+* **There is no heartbeat, and no keep-alive line.** A live run's `activity` lines are not one: a heartbeat says nothing but *still here*, and every one of these says a particular thing the model just did, in the model's own words. A run that says nothing sends none of them.
 * **Nothing between the server and the browser may buffer the body — a requirement on the packaged build, not just on the code.** A proxy that buffers holds every event until the last one is written and then delivers them all at once: the growing map becomes a spinner-then-dump, which is the exact thing FR-5 and UX-8 forbid, and it does it *silently in the packaged image while working perfectly in development*. `docker/nginx.conf` forwards `/api/` to the server and, as written today, buffers it. Switching buffering off on that location is part of the stream pull request, which owns the file.
 
   **The test that proves it is a timing one, and it is the only one in this chapter:** drive `POST /api/generate` through the packaged image and assert that **the first event is received before the last one is written**. It needs no fixed number of milliseconds — it is an ordering claim, not a latency claim — and it fails loudly on a buffering proxy, which no unit test can.
@@ -213,7 +237,7 @@ What exists instead is honest and smaller: **a dropped stream is a finished gene
 
 *Says so* means reported once per stream, not once per event: a count and the unknown names, written where a developer sees them. The point is not to recover — there is nothing to recover — it is that the browser's hand-written `events.ts` drifting from the server's `events.py` must show up as a visible number rather than as tiles that quietly never appear. The build's real guard is the type-level test named above; this is the guard for the running app. Test: `test_an_unknown_event_name_is_ignored_and_reported` (browser, stack 04a).
 
-This is what lets a ninth event be added later without a version number on the wire: old clients skip it and keep drawing.
+This is what lets a ninth kind of line be added without a version number on the wire: old clients skip it and keep drawing. `activity` is the first one to use it, and it is why the rule was written before there was anything to test it on.
 
 ### The three routes
 
@@ -221,7 +245,7 @@ All under `/api/`, like everything else, in `backend/src/katalyst/api/generate.p
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?, start?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed`. **`start` says how the run starts** — `live` calls a model, `replay` plays the committed recording of that sentence, and the route does what it was asked or says plainly why it cannot; left out it plays a recording, because a request that did not ask to spend money must never spend it (record 0012, amended 2026-09-21). **A live run here asks the model for `medium` effort** unless `KATALYST_EFFORT` says otherwise (Kent, G13): a reader is waiting, and the `receipt` event says which effort made the map |
+| `POST /api/generate` | `{hypothesis, target?, user_belief?, seed?, versions?, worlds?, start?}` | `text/event-stream` — the eight events, in the grammar above, ending in `done` or `failed`, and on a live run the `activity` lines described above, which are never recorded and never replayed. **`start` says how the run starts** — `live` calls a model, `replay` plays the committed recording of that sentence, and the route does what it was asked or says plainly why it cannot; left out it plays a recording, because a request that did not ask to spend money must never spend it (record 0012, amended 2026-09-21). **A live run here asks the model for `medium` effort** unless `KATALYST_EFFORT` says otherwise (Kent, G13): a reader is waiting, and the `receipt` event says which effort made the map |
 | `POST /api/generate/insert` | `{base_id, branch?, claim_in_words}` | A `DraftedInsert`: one `Insert` intervention — a claim and its arrows, drafted and already validated — **its own small receipt, and its own working** |
 | `GET /api/generate/{generation_id}/transcript` | — | The transcript of a generation this process still holds; `404` with a plain sentence when it does not |
 
@@ -370,7 +394,7 @@ Each statement holds for every input a named generator can produce, and each nam
 
 Two of the generators here are **finite corpora rather than Hypothesis strategies**, and deliberately: a stream needs either a model or a recording to exist at all, so there is no way to conjure one from nothing. They are `recordings()` — every file under `backend/recordings/` — and `cassettes()` — every recorded exchange under `backend/tests/cassettes/`. The third, `event_streams()`, is an ordinary Hypothesis strategy in `backend/tests/strategies.py`: it **builds** sequences by the grammar above rather than generating noise and discarding most of it, and `broken_streams(rule)` builds the same sequences with exactly one grammar rule broken — the shape `broken_graphs(rule)` already uses in [`../graph/validity.md`](../graph/validity.md).
 
-Local numbers in `spec/generation/` come from one shared pool. **This chapter holds `INV-generation.16` through `INV-generation.21`**; the split across all five chapters is on the [landing page](README.md).
+Local numbers in `spec/generation/` come from one shared pool. **This chapter holds `INV-generation.16` through `INV-generation.22`**; the split across all five chapters is on the [landing page](README.md).
 
 **INV-generation.16 — the grammar holds.** For all streams from `event_streams()` and all generations replayed from `recordings()`: the sequence of event names matches the grammar, `generation_started` is first and appears once, `beliefs_propagated` appears at most once and never before the last growth event, `verdict` appears exactly when the request named a target, and `receipt` is the second-to-last event. For all streams from `broken_streams(rule)`, the reader rejects the stream and names that rule. Test: `test_generate_streams_events_in_order`.
 
@@ -384,6 +408,8 @@ Local numbers in `spec/generation/` come from one shared pool. **This chapter ho
 
 **INV-generation.21 — every number a request can give is bounded at both ends.** For all integers outside `[1, MOST_VERSIONS]` given as `versions`, outside `[2, MOST_WORLDS]` given as `worlds`, and outside `[0, 2^53 − 1]` given as `seed`, on `POST /api/generate` and on the three world routes: the answer is `422` naming the field and the bound, and no run starts. No value is silently reduced to fit. And for all seeds `engine/ids.py` mints: the value is inside that same range, so a minted seed can always be sent back. Test: `test_a_run_above_the_loop_ceilings_is_refused_not_clamped`.
 
+**INV-generation.22 — an activity line is live, and nothing keeps it.** For every file under `backend/recordings/`, every transcript this process holds and every run kept under `backend/.runs/`: no `activity` line appears in any of them. For all generations replayed from `recordings()`: no `activity` event is emitted, and a file that holds one is refused by name rather than played. For a live run: `activity` never carries an `at`, is never counted by the transcript counter, never reaches the receipt, and never appears after the first event of the ending. Tests: `test_no_committed_recording_holds_an_activity_line`, `test_a_replay_invents_no_activity`, `test_an_activity_line_never_reaches_the_transcript_or_the_bill`, `test_nothing_is_said_after_the_run_starts_paying_off`.
+
 **Checked in the browser, listed here so the two halves agree.** `test_an_unknown_event_name_is_ignored_and_reported` (an unknown name is skipped and counted, never thrown) and `test_there_is_no_spinner_anywhere`, both in stack 04a's `../workbench/streaming-growth.md`.
 
 ---
@@ -392,7 +418,7 @@ Local numbers in `spec/generation/` come from one shared pool. **This chapter ho
 
 **1. Do not use `EventSource`.** *Because* it can only send a `GET` with no body, so the user's sentence would have to travel in a URL, and *because* it reconnects on its own — a dropped connection would start a second generation and pay for it, with nobody having asked. **Do** use `fetch`, read the body as it arrives, and keep the server-sent-event framing for the readability it costs nothing to have.
 
-**2. Do not add a heartbeat or any comment line to the stream.** *Because* a recording is this stream line for line, and a line that carries no event is a line that will eventually be parsed as one, filtered out by hand, or quietly counted. **Do** rely on the fact that a generation emits a real event every few seconds. If a proxy in front ever needs traffic to stay open, fix the proxy.
+**2. Do not add a heartbeat or any comment line to the stream.** *Because* a recording is the eight events line for line, and a line that carries no event is a line that will eventually be parsed as one, filtered out by hand, or quietly counted. **Do** send `activity` when there is something particular the model just did, in the model's own words, and nothing at all when there is not. A line that says only *still here* is a heartbeat whatever it is called. If a proxy in front ever needs traffic to stay open, fix the proxy.
 
 **3. Do not emit a belief when a claim arrives.** *Because* a chip that changes four times as its causes arrive has shown four numbers nobody computed, and only the last of them is the engine's answer. **Do** emit `beliefs_propagated` once, after the map is finished, as the grammar requires.
 
@@ -405,6 +431,8 @@ Local numbers in `spec/generation/` come from one shared pool. **This chapter ho
 **7. Do not put a stack trace, an exception class or an identifier in `Failed.message`.** *Because* it is interface text and the person reading it cannot act on any of the three. **Do** write one plain sentence, and keep the detail in the server's own log.
 
 **8. Do not resume a stream.** *Because* it needs a server-side store of events that outlives the request, which does not exist until stack 05, and a half-built resumption silently hands the browser a shorter map than the one that ran. **Do** say the stream ended early, and offer the transcript route and a fresh run.
+
+**9. Do not keep an `activity` line, anywhere, for any reason.** Not in a recording, not in a transcript, not in a kept run, not in a log somebody later reads as evidence, and not by folding one into the map. *Because* it is the one thing on this wire that is not a decision: it is true for the second it is said and unverifiable afterwards, and a replay that could show one would be pretending to work. **Do** write it out and let it go. *And do not paraphrase one on the way*: every word is the model's own or the search tool's own, and a line rewritten by us is a claim of ours with the model's name on it.
 
 ---
 

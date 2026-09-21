@@ -34,8 +34,16 @@ What this file must never do
   the only control anybody has is deleting a line from a file (Kent,
   2026-09-21; record 0012, amended the same day).
 - Never send a heartbeat, a comment line or anything that is not one of the eight
-  events. A recording is this stream line for line, and a line carrying no event
-  is a line somebody eventually parses as one.
+  events **or `activity`**. A recording is the eight line for line, and a line
+  carrying no event is a line somebody eventually parses as one. *(Amended
+  2026-09-22, record 0027, Kent's R44 and R47: one ninth kind of line, `activity`,
+  may be sent on a live run. It says what a model call is doing this second, in
+  the model's own words, and it is **never** written to a recording, a transcript
+  or a kept run, never replayed, never invented by a replay, never billed and
+  never counted by `at`. The eight are still what a recording is, line for line.)*
+- Never let saying what a call is doing slow a call, break a run, or outlive the
+  reader. It is swallowed and logged when it goes wrong, and it stops when the
+  stream does.
 - Never turn a refused proposal into an error. It is an event, the answer stays
   200, and the run carries on.
 - Never keep calling a model for a client that has gone away.
@@ -48,6 +56,7 @@ import logging
 import time
 from collections.abc import AsyncIterator, Generator
 from datetime import UTC, date, datetime
+from threading import Lock
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -58,8 +67,9 @@ from starlette.concurrency import run_in_threadpool
 from katalyst.domain import Belief, Branch, Graph, Insert, Violation, apply, validate
 from katalyst.engine import events, replay
 from katalyst.engine import worlds as engine
-from katalyst.engine.client import EFFORT_WHEN_LIVE, Answerer, live_answerer
+from katalyst.engine.client import EFFORT_WHEN_LIVE, Answerer, WhatItIsDoing, live_answerer
 from katalyst.engine.events import (
+    Activity,
     BeliefsPropagated,
     Done,
     Event,
@@ -260,7 +270,11 @@ class InsertRequest(BaseModel):
             "content": {"text/event-stream": {}},
             "description": (
                 "The eight events, in the order the grammar allows, one `event:` line "
-                "and one `data:` line each. A refusal is one of them, never an error."
+                "and one `data:` line each. A refusal is one of them, never an error. "
+                "A live run may also send `activity` — what a model call is doing this "
+                "second, in the model's own words — anywhere between the first event "
+                "and the ending. It is never recorded, never replayed and never "
+                "required, and a client that does not know it ignores it."
             ),
         }
     },
@@ -440,6 +454,151 @@ def transcript_of(generation_id: str) -> Transcript:
     return working
 
 
+# --- Saying what the calls are doing -----------------------------------------
+
+AT_MOST_ONE_A_SECOND = 1.0
+"""How often at most one line of activity leaves one call, in seconds.
+
+A model call searching hard has something new to say several times a second, and
+a strip at the foot of a map shows one line. So the newest of each call's lines
+wins and the rest are dropped where they were made: nothing queues, nothing is
+delivered late, and a reader who is slow costs the run nothing. There is no
+minimum — the first line of a call goes the moment it is there.
+"""
+
+ASKING_ABOUT = "We are asking about this claim: "
+"""The words `engine/prompt.py` writes before the claim a call is expanding.
+
+**This route reads a prompt it does not own**, because a model call is put with a
+question and nothing else, so the question is the only place the claim is named.
+It is the smallest reading that works and it is held by a test —
+`test_the_line_the_question_names_the_claim_with_is_still_there` builds a real
+expanding question and finds the claim through it — so the day the prompt is
+reworded the test says so rather than every activity line quietly losing its
+claim. The smallest thing that would remove the reading altogether: the walk
+telling the answerer which claim each call is for.
+
+A question with no such line — the opening call, which turns a person's sentence
+into a claim — is about no claim, and its activity says so with nothing at all.
+"""
+
+
+class WhatTheCallsAreDoing:
+    """Where the threads making model calls leave what they are doing, for the stream.
+
+    One per live run. The calls run in a pool of threads and the stream is
+    written on one loop, so this is the seam between them — and it is the only
+    thing in this file two threads touch.
+
+    **Nothing queues.** Only the newest line of each call is held, so a run that
+    says a hundred things while the reader is away leaves one of them behind per
+    call, not a hundred. Nothing here can grow without bound and nothing here can
+    make a call wait.
+
+    What it must never do
+    ---------------------
+    - Never raise at whoever is making a call. Everything that goes wrong is
+      swallowed and logged; the run goes on saying one thing less.
+    - Never hold anything a replay could read. A replay is given none of these at
+      all, which is why a replayed run cannot say what it is doing even by
+      accident.
+    """
+
+    def __init__(self) -> None:
+        """Start with nothing said and nothing known."""
+        self._lock = Lock()
+        self._newest: dict[str, WhatItIsDoing] = {}
+        self._said_at: dict[str, float] = {}
+        self._minted: dict[str, str] = {}
+        self._over = False
+
+    def put(self, doing: WhatItIsDoing) -> None:
+        """Take one line from the thread that is making a call. Any thread, any time.
+
+        Args:
+            doing: What that call is doing, in the model's own words.
+        """
+        try:
+            with self._lock:
+                self._newest[doing.question] = doing
+        except Exception:  # pragma: no cover - a lock that throws is not a run's problem
+            logging.getLogger(__name__).exception("a line of activity could not be taken")
+
+    def note(self, event: Event) -> None:
+        """Take note of one event on its way out, and stop once the run is ending.
+
+        Two things at once, because both are about the same list of events.
+
+        **Which identifier a claim's words were minted under**, read off the
+        stream's own events so nothing here is a second copy of anything: a call
+        can only be about a claim that has already been accepted and already gone
+        down the wire.
+
+        **And when to stop talking.** Activity may appear anywhere between the
+        first event and the ending, and nowhere after it: the ending is the
+        likelihoods, the verdict, the receipt and why it stopped, and a line
+        about a call that has already been paid for saying it is searching would
+        arrive after the bill.
+
+        Args:
+            event: One event, on its way out.
+        """
+        if isinstance(event, ProposalAccepted):
+            if event.proposition is not None:
+                self._minted[event.proposition.claim] = event.proposition.id
+            return
+        if isinstance(event, GenerationStarted | ProposalRejected):
+            return
+        self._over = True
+        with self._lock:
+            self._newest.clear()
+
+    def whatever_is_new(self, now: float) -> list[Activity]:
+        """Take the lines that are due to go out, newest per call, at most one a second.
+
+        Args:
+            now: The clock this stream is pacing itself by, in seconds.
+
+        Returns:
+            The events to write, or nothing at all.
+        """
+        if self._over:
+            return []
+        try:
+            with self._lock:
+                due = [
+                    doing
+                    for question, doing in self._newest.items()
+                    if now - self._said_at.get(question, float("-inf")) >= AT_MOST_ONE_A_SECOND
+                ]
+                for doing in due:
+                    self._said_at[doing.question] = now
+                    del self._newest[doing.question]
+            return [
+                Activity(about=self._about(doing.question), kind=doing.kind, text=doing.text)
+                for doing in due
+            ]
+        except Exception:
+            # One line of a strip may never take a generation with it.
+            logging.getLogger(__name__).exception("a line of activity could not be written")
+            return []
+
+    def _about(self, question: str) -> str | None:
+        """Say which open claim a call is working on, or nothing when it is not about one.
+
+        Args:
+            question: The varying half of the request that call was put with.
+
+        Returns:
+            The claim's identifier, or nothing at all.
+        """
+        at = question.find(ASKING_ABOUT)
+        if at < 0:
+            return None
+        named = question[at + len(ASKING_ABOUT) :].split("\n", 1)[0].strip()
+        return self._minted.get(named)
+
+
 # --- Writing the stream out -------------------------------------------------
 
 
@@ -457,6 +616,12 @@ async def _written_out(request: Request, asked: GenerateRequest) -> AsyncIterato
     run without one ends in a receipt of zeroes and a sentence, and never in a
     recording nobody asked for.
 
+    **A live run also says what it is doing while it waits.** The next event can
+    be minutes away, so this does not simply sit on it: it looks up about once a
+    second, writes whatever the calls have said about themselves since, and goes
+    back to waiting. A replay is handed nowhere to say anything, so a replay
+    cannot say it even by accident.
+
     Args:
         request: The request, which knows whether the client is still there.
         asked: What was asked for.
@@ -465,27 +630,65 @@ async def _written_out(request: Request, asked: GenerateRequest) -> AsyncIterato
         The wire's lines, one event at a time.
     """
     replaying = asked.start == "replay"
-    answerer = None if replaying else live_answerer(when_nothing_is_said=EFFORT_WHEN_LIVE)
+    doing = None if replaying else WhatTheCallsAreDoing()
+    answerer = (
+        None
+        if replaying
+        else live_answerer(
+            when_nothing_is_said=EFFORT_WHEN_LIVE,
+            on_activity=None if doing is None else doing.put,
+        )
+    )
     if replaying:
         stepping = _replayed(asked)
     elif answerer is None:
         stepping = _no_key_for_a_live_run()
     else:
         stepping = _lived(asked, answerer)
+    coming: asyncio.Task[Event | None] | None = None
     try:
         while True:
             if await request.is_disconnected():
                 # Nothing already in flight is retried and nothing further is
                 # asked. The transcript keeps what was built, as far as it got.
                 return
-            event = await run_in_threadpool(_next_or_nothing, stepping)
+            if coming is None:
+                coming = asyncio.ensure_future(run_in_threadpool(_next_or_nothing, stepping))
+            arrived, _ = await asyncio.wait({coming}, timeout=AT_MOST_ONE_A_SECOND)
+            for line in _said_since(doing):
+                yield events.framed(line)
+            if coming not in arrived:
+                continue
+            event = coming.result()
+            coming = None
             if event is None:
                 return
+            if doing is not None:
+                # Before the event goes out, not after: the ending closes the
+                # channel, and nothing may slip through behind it.
+                doing.note(event)
             yield events.framed(event)
             if events.name_of(event) not in (events.NAMES[Done], events.NAMES[Failed]):
                 await _pause(replaying)
     finally:
+        if coming is not None:
+            coming.cancel()
         stepping.close()
+
+
+def _said_since(doing: "WhatTheCallsAreDoing | None") -> list[Activity]:
+    """What the calls have said about themselves since the last look. Never anything else.
+
+    Args:
+        doing: The live run's own channel, or nothing at all on a replay and on a
+            live run this copy has no key for.
+
+    Returns:
+        The activity to write out, or nothing at all.
+    """
+    if doing is None:
+        return []
+    return doing.whatever_is_new(time.monotonic())
 
 
 def _next_or_nothing(stepping: Generator[Event, None, None]) -> Event | None:
