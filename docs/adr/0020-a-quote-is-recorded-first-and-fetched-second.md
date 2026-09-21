@@ -1,6 +1,6 @@
 ---
 # ADR-0020: A quote is recorded first and fetched second; a FRED figure is an observation, not a belief
-status: proposed
+status: accepted
 date: 2026-09-21
 decision-makers: Kent Gang
 consulted: Kent's decisions of 2026-09-21 (rows R11, R23 and R30 of plans/notes/2026-09-21-decisions-after-review.md); plans/analysis/2026-09-21-polymarket-look.md and its saved raw responses under plans/analysis/scripts/polymarket-look/; plans/analysis/2026-09-21-digest-finance.md §2.4 and finding A13; plans/analysis/2026-09-21-review-adr-06.md; ADR-0010, which this record amends; ADR-0012
@@ -12,7 +12,7 @@ spec-impact: spec/thesis/quotes.md (new), spec/thesis/edge.md (new), spec/thesis
 
 # ADR-0020: A quote is recorded first and fetched second; a FRED figure is an observation, not a belief
 
-> **`proposed`.** Kent's decision R11 settles what this record is about; R23 and R30, taken the same day, are written into it below.
+> **Accepted by Kent on 2026-09-21** (decisions note, row R32). His decision R11 settles what this record is about; R23 and R30, taken the same day, are written into it below.
 
 > **In short.** A price comes from a **committed dated file** first, an opt-in live read second, and the reader's own typing always — so the demo and the build run with no key and no network. A quote carries its venue, its three identifiers, both sides of the book, the venue's own question and rules, and where it came from. A **venue's number is a point, never a range**: the gap between bid and offer is what dealing costs. A measured economic level is an **observation**, not a belief. **A dated quote file may be committed, for research and development** (R23). The curated Hormuz hypothesis is **rewritten to the venue's own test and gains a `market` ending naming the real contract** (R30).
 >
@@ -124,6 +124,8 @@ One venue that works beats two that half-work, and FR-26's cross-venue line is h
 
 ## More Information
 
+* **Accepted by Kent on 2026-09-21** (decisions note, row R32), with records 0016–0022.
+
 **Amends ADR-0010** in five places, dated 2026-09-21; the pointer sentences for that record are held in `plans/notes/2026-09-21-stack-06-docs-owed.md`:
 
 1. ***Semantics*** — the `market` belief is filled only by a venue's own quote about this claim.
@@ -133,5 +135,5 @@ One venue that works beats two that half-work, and FR-26's cross-venue line is h
 5. ***Kalshi*** — cut from version one.
 
 * **Kent's decisions, 2026-09-21. Row R11:** look at the venue, and name a real contract if one exists; if none does, the card says *no contract quotes this claim — edge not calculable* and prints a break-even. The look was done: no Brent contract exists, and a contract on the hypothesis does. **Row R23:** a dated quote file may be committed, for research and development. **Row R30:** the curated hypothesis takes the venue's test and the map gains a `market` ending naming the contract.
-* Related: **0018** (the two edges, the break-even, the tick rule), **0019** (the market's chance of a claim also sets what the price path gives back, and it reads a quote from here first), **0013**, **0012**, **0008**. **Records 0016 and 0017 are forthcoming.**
+* Related: **0018** (the two edges, the break-even, the tick rule), **0019** (the market's chance of a claim also sets what the price path gives back, and it reads a quote from here first), **0013**, **0012**, **0008**, **0016** and **0017**.
 * **Not established, and named rather than guessed:** the venue's terms of use — read by nobody, and no longer a blocker under R23 — and its fee schedule, so the fee in an edge is zero today and the card says it is unknown.

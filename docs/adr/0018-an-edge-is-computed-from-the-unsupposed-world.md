@@ -1,6 +1,6 @@
 ---
 # ADR-0018: Like with like — an edge is computed from the world with no supposition in force, against the price you would actually trade at
-status: proposed
+status: accepted
 date: 2026-09-21
 decision-makers: Kent Gang
 consulted: plans/analysis/2026-09-21-digest-finance.md §2.1; the two independent midpoint reviews, which found this trap separately; plans/design-after-midpoint-review.md §3; plans/analysis/2026-09-21-polymarket-look.md (what the venue quotes); plans/analysis/2026-09-21-review-adr-06.md (the arithmetic review of this record's first draft)
@@ -12,7 +12,7 @@ spec-impact: spec/thesis/edge.md (new), spec/thesis/card-and-export.md (new), sp
 
 # ADR-0018: Like with like — an edge is computed from the world with no supposition in force, against the price you would actually trade at
 
-> **`proposed`.** The one question this record held open was answered by Kent the same day (R20).
+> **Accepted by Kent on 2026-09-21** (decisions note, row R32). The one question it held open he answered the same day (R20).
 
 > **In short.** An **edge** — the model's number for a claim against what a venue charges for the same claim — is read only from the world with **nothing fixed by an edit**, and one function with two required world arguments makes any other reading impossible to write. There are **two** edges, because you buy at the offer and sell at the bid, and the only cost term is the venue's fee: the spread is already inside the two prices. Where an edge cannot be built, the card prints a **named refusal and a break-even**, which is a value and never a blank.
 >
@@ -142,8 +142,9 @@ Where a quote comes from and what it carries (record 0020) · what a position is
 
 ## More Information
 
+* **Accepted by Kent on 2026-09-21** (decisions note, row R32), with records 0016–0022.
 * **Amends record 0010's *Semantics* bullet**, which defined the card's edge as the model's probability minus the market's. It now carries this record's rules: the model number is read from the world with nothing fixed by an edit; the comparison is against the offer for a buy and the bid for a sell, never the midpoint; the difference is built only by `priced`; and where it cannot be built, the card prints a named refusal and a break-even.
 * **Amends `spec/graph/belief.md`**, whose sentence *"model minus market is the edge you might trade"* gains the conditioning rule in the same pull request.
-* **Records 0016 and 0017 are forthcoming** — they belong to stack 05 and are not written. Nothing here depends on a number either of them will state.
+* **Records 0016 and 0017** belong to stack 05 and are accepted too; nothing here depends on a number either of them states.
 * Related: **0013** (the domain names the trade, the quote names the price), **0015** (a claim carries the range the model stated — the second threshold above), **0003** (`domain/` is pure), **0010** (grounding sources), **0020** (what a quote carries).
 * `plans/analysis/2026-09-21-digest-finance.md` §2.1 · `plans/analysis/2026-09-21-polymarket-look.md` · `plans/analysis/2026-09-21-review-adr-06.md`, whose measurements of the mixture are quoted above.

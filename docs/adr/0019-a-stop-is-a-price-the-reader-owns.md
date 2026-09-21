@@ -1,6 +1,6 @@
 ---
 # ADR-0019: A stop is a price the reader owns; what the map derives is what takes you out and what to watch
-status: proposed
+status: accepted
 date: 2026-09-21
 decision-makers: Kent Gang
 consulted: Kent's decisions of 2026-09-21 (rows R10, R28 and R29 of plans/notes/2026-09-21-decisions-after-review.md); plans/analysis/2026-09-21-digest-finance.md §2.2 and §2.3; plans/analysis/2026-09-21-red-team.md items S2 and S6; plans/analysis/2026-09-21-review-adr-06.md, whose measurements corrected this record's first draft and whose must-fix 8 named the double count; plans/analysis/2026-09-21-priced-in.md, the simulation behind R28; both midpoint reviews, which named the same defect independently
@@ -12,7 +12,7 @@ spec-impact: spec/thesis/position.md (new), spec/thesis/what-takes-you-out.md (n
 
 # ADR-0019: A stop is a price the reader owns; what the map derives is what takes you out and what to watch
 
-> **`proposed`.** Kent's decision R10 settles what this record is about; R28 and R29, taken the same day, are written into it below.
+> **Accepted by Kent on 2026-09-21** (decisions note, row R32). His decision R10 settles what this record is about; R28 and R29, taken the same day, are written into it below.
 
 > **In short.** The stop, the target and the horizon are numbers **the reader types**. What the map computes beside them is **what takes you out** — the claims over-represented in the worlds where that stop was touched first, ranked by *lift* — and **what to watch**, the one adverse turn that hurts most, resolves in time, and anybody can see. The simulated price path applies a claim's **surprise** rather than its whole stated move, so it manufactures no advantage of its own (R28). A **quartered Kelly ceiling** at the unfavourable end of the model's range sits greyed beside the reader's own arithmetic, labelled *never size to this* (R29).
 >
@@ -20,7 +20,7 @@ spec-impact: spec/thesis/position.md (new), spec/thesis/what-takes-you-out.md (n
 >
 > **What it costs.** The product stops answering *"where should my stop be?"* at all. About seventy lines of new arithmetic; the renaming is copy.
 >
-> **Open for Kent.** Nothing. R28's mechanism is the coordinator's answer to his direction, and he accepts or amends it on reading.
+> **Open for Kent.** Nothing — R10, R28 and R29 are all written in, and he accepted the record with them.
 
 ## Context and Problem Statement
 
@@ -97,7 +97,7 @@ Today's rule inflates *target first* by `+.1200 ± .0007`, **46% in relative ter
 
 **What it still gets wrong.** The stated move must be a **level gap** between a world where the claim is true and one where it is false — not the reaction on the announcement day, which is already the surprise and would be discounted twice, `2.80` points short at `q = .35`. That is one sentence in the one shape freeze. Moves must be **additive, in price units**: two correlated claims then need only their marginal chances (`−0.010 ± 0.018` points, zero within 0.55 standard errors, so no joint reaches this layer), where the same arithmetic on a percentage move puts back `+1.9%` of drift at 40%. And the decay's **shape is an assumption** — early rather than late arrivals move *stop first* by `.0456` — so the Inspector says which was used. The measurement checks a price path, not the engine: its event days are drawn from a simple distribution, and record 0016's caveat about the day table stands.
 
-**This mechanism is the coordinator's proposal answering Kent's direction, not yet his decision**, written out so he can accept, amend or reject it on reading. Everything else in this record stands without it.
+**Kent asked for this in R28; it was worked out and measured here, and he accepted it with the record (R32).** Acceptance softens none of the three conditions above — the level gap, additive moves in price units, and a named decay shape.
 
 ### The size ceiling the card greys out
 
@@ -145,13 +145,11 @@ The measure is total variation distance — half the summed absolute difference 
 
 So **`Draws.weight` is real, not all ones**, and **the 200-draw floor counts *effective* draws** — how many equally-weighted worlds the weighted sample is worth, measured at **96.7% of those drawn on average and 41.8% at worst** across 1 120 observations.
 
-**What this record still waits for.** It stays `proposed` until **proposed record 0016 is accepted**, because that record owns the sampler these numbers come from. Independent of it either way: the four things and their names; that the stop is typed; the two-way sweep and the watchlist, which read each claim's number on its own resolve-by day and no days at all; every cut above; and every requirement amendment.
+**Where these numbers come from.** **Record 0016**, accepted the same day, owns the sampler they are drawn from. Independent of it either way: the four things and their names; that the stop is typed; the two-way sweep and the watchlist, which read each claim's number on its own resolve-by day and no days at all; every cut above; and every requirement amendment.
 
 ### Open for Kent
 
-**Nothing open.** Both questions this record held are answered: **R28** closed the double count (the path applies the surprise, and Katalyst works out what is priced in rather than asking the reader), and **R29** put the greyed ceiling on the card, overturning this record's own recommendation. Both are written above.
-
-One thing awaits him, and it is not a question with options. **R28's mechanism — the surprise rule, where the market's chance comes from, and the day-by-day giveback — is the coordinator's proposal answering his direction, and he accepts, amends or rejects it on reading this record.** Declined along the way: asking the reader to state how much is priced in, which was this record's first recommendation and which R28 rules out by name.
+**Nothing open.** Both questions this record held are answered: **R28** closed the double count — the path applies the surprise, and Katalyst works out what is priced in rather than asking the reader — and **R29** put the greyed ceiling on the card, overturning this record's own recommendation. Both are written above, and Kent accepted the record with them on 2026-09-21 (**R32**). Declined along the way: asking the reader to state how much is priced in, which was this record's first recommendation and which R28 rules out by name.
 
 ### Consequences
 
@@ -173,7 +171,8 @@ One thing awaits him, and it is not a question with options. **R28's mechanism �
 
 ## More Information
 
+* **Accepted by Kent on 2026-09-21** (decisions note, row R32), with records 0016–0022.
 * **Kent's decision, 2026-09-21, row R10:** the reader's own price, plus two computed lists — *what takes you out* by lift, *what to watch* as the honest remnant of INV-14, and *your exit* typed and never derived. **Row R28:** Katalyst works out what is priced in; the reader is not relied on. **Row R29:** the greyed ceiling is shown, quartered Kelly at the unfavourable end of the model's range, labelled *never size to this*.
 * `plans/analysis/2026-09-21-digest-finance.md` §2.2 (lift, the draw floor) and §2.3 (the ceiling as first proposed) · `plans/analysis/2026-09-21-red-team.md` S2 and S6 · `plans/analysis/2026-09-21-review-adr-06.md` (the reflection measurement, the lift correction, and must-fix 8, which named the double count) · `plans/analysis/2026-09-21-priced-in.md` (the simulation behind R28).
-* Related: **0013** (a payoff names the trade), **0018** (the edge, why a supposed world prices nothing, and the model-range threshold the ceiling reuses), **0020** (where a quote comes from, and the rule that a contract must ask the claim's own question). **Records 0016 and 0017 are forthcoming**; the giveback's day-by-day schedule reads the arrival days record 0016 owns, and nothing else here depends on a number either will state.
+* Related: **0013** (a payoff names the trade), **0018** (the edge, why a supposed world prices nothing, and the model-range threshold the ceiling reuses), **0020** (where a quote comes from, and the rule that a contract must ask the claim's own question), **0016** (the engine, whose weighted forward sample supplies the arrival days the giveback's schedule reads) and **0017** (a claim is an event or a state). Nothing else here depends on a number either of the last two states.
 * Measurement scripts: `plans/analysis/scripts/finance/check_stop_claims.py`, the review's `first_touch_reflection.py` beside it, and `plans/analysis/scripts/finance/priced-in/priced_in.py` with its saved output.
