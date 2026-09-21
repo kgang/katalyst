@@ -139,7 +139,7 @@ The view model carries the number the world carries, at full precision. Only the
 
 Two things fall out of that, and both are worth saying plainly.
 
-- The `>.99` case catches **everything from .995 upward**, including 1 itself. A likelihood of 1 is a claim that something cannot fail, and this product does not make that claim about the world. (A claim whose value an edit fixed is different: it shows the word **Supposed** or **Happened**, not a number at all — `tiles-ports-wires.md`.)
+- The `>.99` case catches **everything from .995 upward**, including 1 itself. A likelihood of 1 is a claim that something cannot fail, and this product does not make that claim about the world. (A claim whose value an edit fixed is different: it shows the word **Supposed**, **Happened** or **Did not happen** (Kent, 2026-09-21), not a number at all — `tiles-ports-wires.md`.)
 - The `<.01` case catches **everything below a hundredth** *(Kent, 2026-09-20, G10; it previously caught only exactly zero)*. `.0099` reads `<.01`; `.010` reads `.010`; `.00996` rounds up onto the line and reads `.010`. The reason is the same as the top end's: a likelihood of three thousandths is a claim this product is not entitled to make about the world, and two figures on it would dress a guess as a measurement. `<.01` says "nothing here that we can see, and we are not calling it impossible".
 
 ### A size is not a likelihood
