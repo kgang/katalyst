@@ -27,6 +27,15 @@ Verify door, and the arrangement from `thesis/card.py`. What this file does is
 fetch the four things a route can reach that a pure function cannot — a world, a
 sample of drawn worlds, a recorded price, and a graded route — and hand them over.
 
+**The refusals, and the reader's own form, belong to the position route.**
+`api/thesis.py` owns the closed list of reasons a thesis route will not answer, the
+sentence each one prints, the `{code, field, sentence}` shape they arrive in, and
+the four checks both routes make of a request: which claim, what the reader typed,
+whether the day they expect to be out falls inside the window the map covers, and
+which worlds were drawn. Every one of them is imported from there rather than
+written again — a screen switching on a refusal code must never meet two spellings
+of one rule.
+
 **No price is ever fetched here.** A quote comes from the committed dated file and
 from nowhere else (decision record 0020), so these routes need no key and reach no
 network. Where no file holds a price for a contract, the card says *no price has
@@ -39,41 +48,27 @@ Nothing here asks a language model anything.
 import json
 from collections.abc import Mapping
 from datetime import date
-from typing import Annotated, Any, Final, Literal
+from typing import Annotated, Final
 
-import numpy
 from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from katalyst.api.worlds import RefusedEdit
+from katalyst.api.thesis import (
+    REFUSED,
+    draws_for,
+    the_ending_on,
+    the_horizon_is_inside_the_window,
+    the_position_from,
+)
 from katalyst.domain import (
-    SLICES,
-    Assignment,
     Branch,
     ContractPayoff,
     Graph,
     PricePayoff,
     Proposition,
     PropositionId,
-    Sample,
     World,
-    all_marginals,
-    sample_forward,
 )
-
-# Dated 2026-09-22. `_worked_out_by_deadline` is the by-deadline core's own single
-# route — the arithmetic of decision record 0016, reached directly. The Verify door
-# reaches it exactly this way and for exactly this reason: what a caller needs and a
-# finished world does not carry is the working underneath, and building a second
-# assembly here would be a second chance for this file and the tiles beside it to
-# disagree about the same map. `katalyst.domain.propagation` belongs to another lane
-# this week, so the name is reached as it stands; the one-line change that makes it a
-# public seam is recorded with this pull request. Until the flip lands, the drawn
-# worlds below come from the new core while the likelihood on the tile beside them
-# still comes from the old one; after the flip both are the same arithmetic. That is
-# the same state the Verify door's three numbers are already in, and it is said here
-# rather than left for a reader to discover.
-from katalyst.domain.propagation import SAMPLED_WORLDS, _worked_out_by_deadline
 from katalyst.engine import worlds as engine
 from katalyst.engine.ids import BIGGEST_SEED
 from katalyst.engine.verify import Verdict, verdict
@@ -92,7 +87,6 @@ from katalyst.thesis import (
     Paths,
     Position,
     Refusal,
-    RefusalCode,
     Shift,
     Shocked,
     WhatTakesYouOut,
@@ -102,24 +96,15 @@ from katalyst.thesis import (
     ceiling_of,
     export_of,
     first_touch,
-    position_on,
     priced,
     schema_json,
     walk,
     what_takes_you_out,
 )
 from katalyst.thesis.lift import THE_FLOOR
-from katalyst.thesis.position import REFUSALS
+from katalyst.thesis.position import REFUSALS, worth_of
 
 router = APIRouter(tags=["thesis"])
-
-DRAWN_WORLDS: Final = SAMPLED_WORLDS
-"""How many worlds the price paths are walked through.
-
-The same number the engine draws when something has been observed — fifty
-thousand, decision record 0016's figure — so the days a path steps over and the
-days the engine's own answers rest on are one sample and not two.
-"""
 
 WORKED_OUT_BY_THE_VERDICT: Final = (
     "the map's own verdict: the ending's chance with the hypothesis supposed true, "
@@ -148,92 +133,13 @@ rather than a `None` somebody may later fill in by accident.
 """
 
 
-AskedWrongHere = Literal[
-    "unknown_ending",
-    "the_ending_names_no_trade",
-    "horizon_outside_the_window",
-]
-"""The three refusals this route owns, as a closed list.
-
-They are about the **request** rather than about the form: an ending that is not on
-the map, an ending that names no trade, and a horizon outside the window the map
-covers.
-
-Dated 2026-09-22: these three codes and the sentences below are written character
-for character as the position route writes them, so that at the rebase one of the
-two copies is deleted and the other imported rather than reconciled. A screen
-switching on a code must never meet two spellings of one rule.
-"""
-
-AskedWrong = RefusalCode | AskedWrongHere
-"""Every reason this route will not answer, as one closed list of nine.
-
-Six are the position form's own, written once in `thesis/position.py` and
-reprinted rather than reworded; three are this route's.
-"""
-
-REFUSES: Final[dict[AskedWrongHere, str]] = {
-    "unknown_ending": "That claim is not on this map, so there is no position to take on it.",
-    "the_ending_names_no_trade": (
-        "This claim names nothing you could buy or sell, so there is no position to take on it."
-    ),
-    "horizon_outside_the_window": (
-        "The day you expect to be out is outside the window this map covers, so there is no "
-        "path to walk to it."
-    ),
-}
-"""What each of this route's own refusals says, in plain words the reader can act on."""
-
-
-class CardRefused(BaseModel):
-    """One thing this route will not do, the field at fault, and what it says.
-
-    A refusal is never a blank: it names a stable code a screen can switch on, the
-    field the reader should look at, and one plain sentence. Nothing is silently
-    repaired, and every fault the request has comes back together — a form that
-    reveals one mistake at a time is a form nobody finishes.
-
-    **A branch that does not fit the map is a different shape**, and deliberately:
-    it comes back as the list of violations the world routes already give, naming a
-    `subject` and a `message`, because that fault is about a claim or an arrow and
-    not about a field a reader can look at.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    code: AskedWrong = Field(description="Which rule this is, from the closed list of nine.")
-    field: str = Field(description="The field at fault, named as the reader sees it.")
-    sentence: str = Field(description="What the screen prints.")
-
-
-class RefusedCard(BaseModel):
-    """Every reason a card could not be built, in a settled order, never just the first."""
-
-    detail: tuple[CardRefused, ...] = Field(
-        description="Every reason at once, never just the first one found."
-    )
-
-
-REFUSED: dict[int | str, dict[str, Any]] = {
-    404: {
-        "description": (
-            "No example is stored under that name. The answer is one sentence naming the "
-            "examples this program does ship with."
-        )
-    },
-    422: {
-        "model": RefusedEdit | RefusedCard,
-        "description": (
-            "The request cannot be carried out as written, and there are two ways it can be. "
-            "A branch that does not fit the map comes back as the list of violations the "
-            "world routes give. A request or a form the reader can fix comes back as the "
-            "list of refusals — each with a stable code, the field at fault and one plain "
-            "sentence. Read the first entry to know which: a violation names a `subject` and "
-            "a `message`, a refusal names a `field` and a `sentence`."
-        ),
-    },
-}
-"""How a refused card is described to whatever generates the browser's types."""
+# The refusal vocabulary and the refusal envelope are the position route's, imported
+# rather than written again: the closed list of ten codes, the sentence each one
+# prints, the `{code, field, sentence}` shape they arrive in, and the description of
+# a refusal that whatever generates the browser's types reads. A reader who asks for
+# a position and then asks for the card of it must never be told the same thing twice
+# in two different wordings, and a screen switching on a code must never meet two
+# spellings of one rule.
 
 
 class ExitAsked(BaseModel):
@@ -349,6 +255,17 @@ class CardRequest(BaseModel):
         le=engine.MOST_WORLDS,
         description="The inner loop: how many worlds to run under each version.",
     )
+    drawn_worlds: int = Field(
+        default=engine.DRAWN_WORLDS,
+        gt=0,
+        le=engine.DRAWN_WORLDS,
+        description=(
+            "How many worlds to draw the event days from. A request above the ceiling is "
+            "refused rather than quietly made smaller; the ceiling is the count the engine "
+            "draws for itself, so the days this card reads and the days a claim's own "
+            "number was corrected by are one sample and not two."
+        ),
+    )
 
 
 @router.post("/thesis/card", responses=REFUSED)
@@ -460,12 +377,12 @@ def _card_for(request: CardRequest) -> Card:
     """
     plain = _built(request.base_id, None, request)
     shown = plain if request.branch is None else _built(request.base_id, request.branch, request)
-    ending = _the_ending(plain, request.ending)
+    ending = the_ending_on(plain, request.ending)
     position = _the_position(ending, request.exit)
 
     answers = _every_answer(plain, shown)
-    drawn = _drawn_worlds(shown)
-    _the_horizon_is_inside_the_window(position, drawn)
+    drawn = _drawn_worlds(request, request.branch)
+    the_horizon_is_inside_the_window(position, drawn)
     touch, rail, paths = _position_of(shown, ending, position, drawn)
     return card_of(
         shown,
@@ -487,30 +404,6 @@ def _card_for(request: CardRequest) -> Card:
         shocks=_every_shock(request, ending, position, touch, paths),
         costs=NOBODY_HAS_STATED_THE_COSTS,
     )
-
-
-def _the_horizon_is_inside_the_window(position: Position, drawn: Draws) -> None:
-    """Check the day the reader expects to be out falls inside the window the map covers.
-
-    **The form cannot ask this.** Its own `horizon_after_the_claim` compares the
-    horizon with the day the *claim* is judged, which is a different question: a map
-    whose furthest resolve-by date is earlier still has a shorter window, and a
-    horizon on or before the day the window opens leaves no days to walk at all.
-    Without this the paths are walked and `first_touch` raises, which reaches a
-    reader as a 500 — and a date picker defaulting to today is the obvious way there.
-
-    Args:
-        position: What the reader typed, read for their horizon.
-        drawn: The drawn worlds, read for the day the window opens and how long it
-            runs.
-
-    Raises:
-        HTTPException: 422 naming the field `horizon`, in the same words and under
-            the same code the position route uses for the same input.
-    """
-    through = (position.horizon - drawn.day_zero).days
-    if not 1 <= through <= drawn.days:
-        raise _refusing((_refusal("horizon_outside_the_window", "horizon"),))
 
 
 def _built(base_id: str, branch: Branch | None, request: CardRequest) -> World:
@@ -541,27 +434,12 @@ def _built(base_id: str, branch: Branch | None, request: CardRequest) -> World:
     return built
 
 
-def _the_ending(base: World, ending: PropositionId) -> Proposition:
-    """Find the ending the card leads with, or say plainly that the map does not carry it.
-
-    Args:
-        base: The world whose map to look in.
-        ending: The claim the reader took a position on.
-
-    Returns:
-        The claim.
-
-    Raises:
-        HTTPException: 422 naming the claim, when the map does not carry it.
-    """
-    found = next((one for one in base.graph.propositions if one.id == ending), None)
-    if found is None:
-        raise _refusing((_refusal("unknown_ending", "ending"),))
-    return found
-
-
 def _the_position(ending: Proposition, asked: ExitAsked) -> Position:
-    """Build the reader's position, or hand back everything wrong with their form at once.
+    """Build the reader's position from the exit they typed.
+
+    The six numbers and every rule over them belong to the position route, which
+    both routes under this heading share, so this only unpacks the form the card
+    takes them on.
 
     Args:
         ending: The claim they took a position on, whose payoff says what is traded
@@ -573,12 +451,9 @@ def _the_position(ending: Proposition, asked: ExitAsked) -> Position:
 
     Raises:
         HTTPException: 422 with every refusal the form has, each naming the field
-            the reader should look at; or with the one refusal that stands where
-            the claim names no trade at all.
+            the reader should look at.
     """
-    if ending.payoff is None:
-        raise _refusing((_refusal("the_ending_names_no_trade", "ending"),))
-    built = position_on(
+    return the_position_from(
         ending,
         entry=asked.entry,
         stop=asked.stop,
@@ -587,9 +462,6 @@ def _the_position(ending: Proposition, asked: ExitAsked) -> Position:
         risk_budget=asked.risk_budget,
         daily_move=asked.daily_move,
     )
-    if isinstance(built, tuple):
-        raise _refusing(tuple(_reprinted(one) for one in built))
-    return built
 
 
 def _every_answer(plain: World, shown: World) -> dict[PropositionId, Edge | NotComparable]:
@@ -721,81 +593,39 @@ def _the_ceiling(
 # --- The drawn worlds, and what the reader's exit does in them ---------------
 
 
-def _drawn_worlds(world: World) -> Draws:
+def _drawn_worlds(request: CardRequest, branch: Branch | None) -> Draws:
     """Draw worlds forward through this map and hand them over as the trade layer's contract.
 
-    `Draws` is the one thing the trade layer reads from the engine: for each drawn
-    world and each claim, the day it came on and the day it went off, with a weight
-    per world. Everything above it — the price paths, first touch, the rail — is
-    pure arithmetic over that table.
+    **The engine's own sampler, reached rather than copied.** `draws_for` asks
+    `engine.sample_of` for the draw from the same map, branch and seed the world
+    beside it was built from, and corrects it with the finished answers that world
+    carries — the numbers the reader is actually shown, rather than the uncorrected
+    ones the solve produces before what was reported is folded in. Under *This
+    happened* those are two different sets of numbers, and a second sampler here is
+    exactly the sort of thing that quietly picks the other one.
+
+    It also refuses by name where a *This happened* edit leaves no world at all, in
+    the same words and under the same code the position route uses.
 
     Args:
-        world: The world the card is about, read for its map, the values its edits
-            fixed, its first day, its seed and how many versions it tried.
+        request: The request, read for the map, the seed, the version count and how
+            many worlds to draw.
+        branch: The branch to draw through — the one in force, or one with a shock
+            folded on top of it.
 
     Returns:
         The drawn worlds.
+
+    Raises:
+        HTTPException: 404 for an unknown example, 422 for a branch that does not
+            fit the map or a map nothing on which agrees with what was recorded.
     """
-    # T2b: replace with the shared builder at the rebase. The lane building
-    # `POST /api/thesis/position` owns `thesis/adapter.py`, which is where this
-    # conversion belongs; it is written here so the card route does not wait on it,
-    # and it is deleted the moment that adapter lands.
-    sample = _the_sample(world.graph, world.assignments, world)
-    return Draws(
-        day_zero=sample.day_zero,
-        days=sample.days,
-        claims=sample.claims,
-        on_day=sample.on_day,
-        off_day=sample.off_day,
-        weight=sample.weight,
-        effective=sample.effective,
-        sample="weighted_forward_sample",
-    )
-
-
-def _the_sample(graph: Graph, fixed: tuple[Assignment, ...], world: World) -> Sample:
-    """Work the map through the exact core and draw worlds forward from what it built.
-
-    **The engine's own route, reached rather than copied.** The sample needs the
-    tables the forward pass built, which a finished world does not carry, so this
-    asks the assembly for its working rather than for its result — the same way the
-    Verify door does, and for the same reason: a second assembly here would be a
-    second chance for this file and the tiles beside it to disagree about one map.
-
-    Args:
-        graph: The map the fold left behind.
-        fixed: Every value that fold fixed.
-        world: The world whose first day, seed and version count this matches.
-
-    Returns:
-        The drawn worlds, their weights and the day every claim came on and went
-        off.
-    """
-    # T2b, at the rebase: this whole function goes and `engine.sample_of` takes its
-    # place. It is not a rename, and three things have to be taken deliberately.
-    # (1) It corrects the draw with `exact=worked.answers` — the answers the world
-    # shown actually carries — where this line passes the uncorrected marginals;
-    # under a *This happened* edit those are different numbers and the corrected ones
-    # are right. (2) It raises `ImpossibleObservation` where nothing here catches
-    # one, and the route must turn that into the named 422 the position route gives.
-    # (3) It takes `(base_id, branch, seed, …)` rather than a built world.
-    worked = _worked_out_by_deadline(
-        graph,
-        fixed,
-        as_of=world.day_zero,
-        seed=world.seed,
-        versions=world.versions,
-        slices=SLICES,
-        sampled_worlds=SAMPLED_WORLDS,
-    )
-    return sample_forward(
-        worked.forward,
-        worked.pinned,
-        window=worked.window,
-        version=0,
-        seed=world.seed,
-        worlds=DRAWN_WORLDS,
-        exact=all_marginals(worked.forward, worked.pinned),
+    return draws_for(
+        request.base_id,
+        branch,
+        request.seed,
+        versions=request.versions,
+        drawn=request.drawn_worlds,
     )
 
 
@@ -958,10 +788,10 @@ def _every_shock(
     if paths is None or isinstance(touch, Refusal) or not request.shocks:
         return ()
     moves = _what_moves_the_price(ending, position)
-    without = _worth_of(touch, paths, position)
+    without = worth_of(touch, paths, position)
     placed: list[Shocked] = []
     for shock in request.shocks:
-        drawn = _drawn_worlds(_built(request.base_id, _on_top_of(request.branch, shock), request))
+        drawn = _drawn_worlds(request, _on_top_of(request.branch, shock))
         walked = walk(
             drawn,
             moves,
@@ -975,7 +805,7 @@ def _every_shock(
         placed.append(
             Shocked(
                 name=shock.label,
-                change_to_the_position=_worth_of(after, walked, position) - without,
+                change_to_the_position=worth_of(after, walked, position) - without,
             )
         )
     return tuple(placed)
@@ -1006,76 +836,7 @@ def _on_top_of(branch: Branch | None, shock: Branch) -> Branch:
     )
 
 
-def _worth_of(touch: FirstTouch, paths: Paths, position: Position) -> float:
-    """What the position is worth: the average price it is closed at under the reader's exit.
-
-    The stop's own level where the stop went first, the target's level where the
-    target went first, and the price on the reader's horizon where neither was
-    touched — each weighted by how often that happened. Every one of the five numbers
-    is one `position.py` worked out over the drawn worlds; what is done here is
-    weighting them, which is the whole of what *what the position is worth* means and
-    which no module owns today.
-
-    **Why not the plain average price on the horizon.** Because it is the entry price,
-    exactly, in every branch: the price paths apply only a claim's surprise at a market
-    chance read off those same worlds, so they carry no drift by construction
-    (`INV-thesis.16`). A shock measured that way would report nothing at all, for ever.
-    The reader's own stop and target are what break that symmetry — they cut the two
-    tails at different distances — so the worth has to be read at the exit rather than
-    at the horizon.
-
-    Args:
-        touch: How often each end of the exit was reached first, and at which levels.
-        paths: The daily price path through every drawn world.
-        position: What the reader typed, read for their horizon.
-
-    Returns:
-        The average price the position is closed at, in the instrument's own units.
-    """
-    day = (position.horizon - paths.day_zero).days
-    held = float(numpy.average(paths.level[:, day], weights=paths.weight))
-    return (
-        touch.stop_first * touch.stop_at
-        + touch.target_first * touch.target_at
-        + touch.neither * held
-    )
-
-
 # --- Refusing, and the committed description of the document -----------------
-
-
-def _refusal(code: AskedWrongHere, field: str) -> CardRefused:
-    """One of this route's own refusals, with its sentence written once for every screen."""
-    return CardRefused(code=code, field=field, sentence=REFUSES[code])
-
-
-def _reprinted(one: Refusal) -> CardRefused:
-    """Reprint the position form's own refusal, keeping its code, its field and its words.
-
-    The sentence is `thesis/position.py`'s, unchanged. A second wording of the same
-    rule is exactly what a shared list of sentences exists to prevent.
-
-    Args:
-        one: What the form refused.
-
-    Returns:
-        The same refusal, as the shape this route answers with.
-    """
-    return CardRefused(code=one.code, field=one.field, sentence=one.sentence)
-
-
-def _refusing(reasons: tuple[CardRefused, ...]) -> HTTPException:
-    """Build the 422 that carries every reason at once.
-
-    Args:
-        reasons: Every reason, in a settled order.
-
-    Returns:
-        The exception to raise. Built and returned rather than raised here so the
-        caller's own line says `raise`, and a reader following the flow never has
-        to guess whether a helper returns.
-    """
-    return HTTPException(status_code=422, detail=[one.model_dump() for one in reasons])
 
 
 def _checked(document: Export) -> Export:

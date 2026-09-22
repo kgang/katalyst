@@ -30,21 +30,20 @@ import json
 from datetime import date
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from katalyst.api.main import app
+from katalyst.api.thesis import REFUSES, the_ending_on
 from katalyst.api.thesis_card import (
     NO_PATH_TO_RANK,
-    REFUSES,
     CardRequest,
     ExitAsked,
     _built,
     _drawn_worlds,
     _every_answer,
-    _the_ending,
     _the_position,
     _what_moves_the_price,
-    _worth_of,
 )
 from katalyst.domain import (
     Belief,
@@ -53,11 +52,15 @@ from katalyst.domain import (
     ContractPayoff,
     Do,
     Graph,
+    ImpossibleObservation,
     Link,
+    Observe,
     PricePayoff,
     Proposition,
+    PropositionId,
     Resolution,
     Retune,
+    Sample,
     Source,
     World,
 )
@@ -74,10 +77,12 @@ from katalyst.thesis import (
     first_touch,
     schema_json,
     walk,
+    what_takes_you_out,
 )
+from katalyst.thesis.adapter import draws_of
 from katalyst.thesis.edge import A_VALUE_IS_FIXED, NO_PRICE_READ
 from katalyst.thesis.export import EXPORT_SCHEMA_FILE
-from katalyst.thesis.position import REFUSALS
+from katalyst.thesis.position import REFUSALS, worth_of
 
 SEED = 20261001
 """The seed the worked example's demo uses, so a test and a screenshot agree."""
@@ -758,10 +763,10 @@ def _the_worth(branch: Branch | None) -> float:
         **SMALL,
     )
     world = _built("hormuz", branch, request)
-    ending = _the_ending(world, HORMUZ_PAIR)
+    ending = the_ending_on(world, HORMUZ_PAIR)
     position = _the_position(ending, request.exit)
     paths = walk(
-        _drawn_worlds(world),
+        _drawn_worlds(request, branch),
         _what_moves_the_price(ending, position),
         entry=position.entry,
         daily_move=position.daily_move,
@@ -769,7 +774,7 @@ def _the_worth(branch: Branch | None) -> float:
     )
     touch = first_touch(paths, position)
     assert not isinstance(touch, Refusal)
-    return _worth_of(touch, paths, position)
+    return worth_of(touch, paths, position)
 
 
 def test_a_shock_is_placed_on_top_of_the_branch_in_force() -> None:
@@ -872,7 +877,7 @@ def test_the_level_gap_carries_the_payoff_s_own_direction() -> None:
             exit=ExitAsked.model_validate(typed),
             **SMALL,
         )
-        ending = _the_ending(_built(FOUR_ENDINGS, None, request), name)
+        ending = the_ending_on(_built(FOUR_ENDINGS, None, request), name)
         payoff = ending.payoff
         assert isinstance(payoff, PricePayoff)
         position = _the_position(ending, request.exit)
@@ -901,3 +906,103 @@ def test_a_risk_budget_outside_its_own_range_is_refused_in_the_form_s_own_words(
     assert [one["code"] for one in reasons] == ["risk_budget_out_of_range"]
     assert reasons[0]["field"] == "risk budget"
     assert reasons[0]["sentence"] == REFUSALS["risk_budget_out_of_range"]
+
+
+# --- One sampler, and it is the engine's --------------------------------------
+
+
+def test_the_drawn_worlds_are_the_engine_s_own_sample_and_not_a_second_one() -> None:
+    """The days the card walks are the ones the engine drew for the map beside it.
+
+    A route that assembles its own draw is a second chance for the card and the
+    world on screen to disagree about one map. So the card asks
+    `engine.sample_of` — the same call the position route makes, from the same
+    map, branch and seed, corrected by the finished answers that world carries —
+    and this recomputes the whole chain from that call to check the shares on the
+    card came off it.
+
+    **The branch records something**, because that is the one condition under
+    which the answers a draw is corrected against are not the numbers the solve
+    produced before the report was folded in; a sampler that reached for the
+    uncorrected ones would still be reaching for them here.
+    """
+    reported = Branch(
+        id="obs_b",
+        label="Brent settled below $68",
+        interventions=(Observe(kind="observe", target="B", value=True),),
+    )
+    request = CardRequest(
+        base_id="hormuz",
+        seed=SEED,
+        ending=HORMUZ_PAIR,
+        branch=reported,
+        exit=ExitAsked.model_validate(an_exit()),
+        **SMALL,
+    )
+    sample = engine.sample_of(
+        "hormuz",
+        reported,
+        SEED,
+        versions=request.versions,
+        drawn=request.drawn_worlds,
+    )
+    assert isinstance(sample, Sample)
+    ending = the_ending_on(_built("hormuz", reported, request), HORMUZ_PAIR)
+    position = _the_position(ending, request.exit)
+    paths = walk(
+        draws_of(sample),
+        _what_moves_the_price(ending, position),
+        entry=position.entry,
+        daily_move=position.daily_move,
+        seed=SEED,
+    )
+    touch = first_touch(paths, position)
+    assert not isinstance(touch, Refusal)
+
+    with TestClient(app) as client:
+        card = a_card(client, branch=reported.model_dump(mode="json"))
+
+    assert card.your_exit.stop_first is not None
+    assert card.your_exit.target_first is not None
+    assert card.your_exit.stop_first.value == touch.stop_first
+    assert card.your_exit.target_first.value == touch.target_first
+    assert card.takes_you_out is not None
+    assert (
+        card.takes_you_out.draws.value
+        == what_takes_you_out(draws_of(sample), touch).effective_draws
+    )
+
+
+def test_a_map_nothing_agrees_with_is_a_sentence_rather_than_a_stack_trace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A *This happened* nothing on the map can produce leaves no world to read days off.
+
+    The engine says so by name and the routes turn it into words — the same word
+    and the same sentence the position route gives, because both reach the sampler
+    through one shared door. The condition is forced here rather than drawn,
+    because a map that contradicts its own recorded fact takes a likelihood of
+    exactly nothing, which no map this program ships or generates states.
+    """
+
+    def nothing_agrees(*_: Any, **__: Any) -> None:
+        raise ImpossibleObservation((PropositionId("B"),))
+
+    monkeypatch.setattr("katalyst.api.thesis.engine.sample_of", nothing_agrees)
+
+    with TestClient(app) as client:
+        answer = client.post("/api/thesis/card", json=asked())
+
+    assert answer.status_code == 422
+    reasons = answer.json()["detail"]
+    assert [one["code"] for one in reasons] == ["nothing_agrees_with_what_happened"]
+    assert reasons[0]["field"] == "branch"
+    assert reasons[0]["sentence"] == REFUSES["nothing_agrees_with_what_happened"]
+
+
+def test_a_draw_above_the_engine_s_own_ceiling_is_refused_rather_than_made_smaller() -> None:
+    """A caller who asks for one draw and silently gets another is reading the wrong numbers."""
+    with TestClient(app) as client:
+        answer = client.post("/api/thesis/card", json=asked(drawn_worlds=500_000))
+
+    assert answer.status_code == 422

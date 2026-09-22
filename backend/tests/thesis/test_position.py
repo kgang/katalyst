@@ -46,6 +46,7 @@ from katalyst.thesis.position import (
     position_on,
     what_the_form_refuses,
     what_your_risk_budget_implies,
+    worth_of,
 )
 from tests.thesis.synthetic import DAY_ZERO, draws, positions, worlds_of
 
@@ -565,6 +566,40 @@ def test_first_touch_over_a_walked_path_reads_the_claim_arithmetic() -> None:
     assert answer.stop_first == pytest.approx(0.75)
     assert answer.target_first == pytest.approx(0.25)
     assert answer.stop_first_on.tolist() == [NEVER, 4]
+
+
+# --- What the position is worth ----------------------------------------------
+
+
+def test_the_worth_is_the_exit_weighted_by_how_often_each_end_was_reached() -> None:
+    """Three worlds, written out day by day, and the weighting done again by hand.
+
+    A long position entered at a hundred, a stop at ninety-seven and a target at a
+    hundred and six, held to the third day. One world is stopped out on the first
+    day, one reaches the target on the first day, and one drifts up and touches
+    neither; the third counts double. With no day-to-day variability the levels are
+    checked where the reader put them, so the two exits are exactly their own
+    prices.
+
+    **The third term is the price on the horizon across every world**, not across
+    the worlds that reached neither end — which is what makes the worth a reading of
+    the whole sample at the reader's exit rather than three separate averages.
+    """
+    position = Position(**{**long_on().__dict__, "horizon": DAY_ZERO + timedelta(days=3)})
+    paths = paths_of(
+        [100.0, 96.0, 96.0, 96.0],
+        [100.0, 107.0, 107.0, 107.0],
+        [100.0, 101.0, 102.0, 103.0],
+        weight=[1.0, 1.0, 2.0],
+    )
+
+    touch = first_touch(paths, position)
+    assert isinstance(touch, FirstTouch)
+    assert (touch.stop_first, touch.target_first, touch.neither) == (0.25, 0.25, 0.5)
+
+    on_the_horizon = (96.0 + 107.0 + 2.0 * 103.0) / 4.0
+    assert worth_of(touch, paths, position) == 0.25 * 97.0 + 0.25 * 106.0 + 0.5 * on_the_horizon
+    assert worth_of(touch, paths, position) != on_the_horizon
 
 
 # --- What their own risk budget implies -------------------------------------

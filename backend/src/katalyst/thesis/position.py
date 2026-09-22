@@ -443,6 +443,42 @@ def first_touch(paths: Paths, position: Position) -> FirstTouch | Refusal:
     )
 
 
+def worth_of(touch: FirstTouch, paths: Paths, position: Position) -> float:
+    """What the position is worth: the average price it is closed at under the reader's exit.
+
+    The stop's own level where the stop went first, the target's level where the
+    target went first, and the price on the reader's horizon where neither was
+    touched — each weighted by how often that happened. Four of those five numbers
+    are ones this file has already worked out over the drawn worlds and the fifth is
+    read off the paths, so the weighting belongs here beside them.
+
+    **Why not the plain average price on the horizon.** Because it is the entry
+    price, exactly, on every branch: the price paths apply only a claim's surprise at
+    a market chance read off those same worlds, so they carry no drift by
+    construction. Anything measured as a difference of two average horizon prices
+    would therefore report nothing at all, for ever. The reader's own stop and target
+    are what break that symmetry — they cut the two tails at different distances — so
+    the worth has to be read at the exit rather than at the horizon.
+
+    Args:
+        touch: How often each end of the exit was reached first, and at which levels
+            — the answer `first_touch` above gave for this same position.
+        paths: The daily price path through every drawn world, read for the day the
+            window opens, the level on each day and each world's weight.
+        position: What the reader typed, read for their horizon.
+
+    Returns:
+        The average price the position is closed at, in the instrument's own units.
+    """
+    day = (position.horizon - paths.day_zero).days
+    held = float(numpy.average(paths.level[:, day], weights=paths.weight))
+    return (
+        touch.stop_first * touch.stop_at
+        + touch.target_first * touch.target_at
+        + touch.neither * held
+    )
+
+
 def what_your_risk_budget_implies(position: Position) -> float:
     """The share of capital whose loss from entry to stop is exactly the risk budget.
 

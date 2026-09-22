@@ -88,6 +88,7 @@ from katalyst.thesis.position import (
     position_on,
     what_the_form_refuses,
     what_your_risk_budget_implies,
+    worth_of,
 )
 
 __all__ = [
@@ -126,6 +127,7 @@ __all__ = [
     "what_this_side_pays_on",
     "what_your_risk_budget_implies",
     "wilson",
+    "worth_of",
 ]
 
 # --- The card and the export -------------------------------------------------

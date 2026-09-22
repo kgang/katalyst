@@ -1,5 +1,13 @@
 """The route that turns a map, a branch and the reader's own exit into a position.
 
+**This file is also where the thesis routes keep what they share.** The card and
+the export in `api/thesis_card.py` ask the same four questions of a request that
+this route does — which claim, what the reader typed, is the day they expect to be
+out inside the window the map covers, and which worlds were drawn — and answer a
+refusal in the same envelope. Every one of those is written here once and imported
+there, because two spellings of one rule is exactly what a screen switching on a
+refusal code cannot survive.
+
 One question, one route: **I am trading this ending, I get out here, how often does
 that happen, and what takes me out?** Everything it answers is worked out from the
 map the request names, the branch it sends, one seed, and the four numbers the
@@ -50,7 +58,6 @@ from katalyst.domain import (
     PricePayoff,
     Proposition,
     PropositionId,
-    Sample,
     Violation,
     World,
 )
@@ -72,10 +79,11 @@ from katalyst.thesis.card import (
     the_trade,
 )
 from katalyst.thesis.ceiling import ceiling_of
+from katalyst.thesis.draws import Draws
 from katalyst.thesis.edge import priced
 from katalyst.thesis.lift import what_takes_you_out
 from katalyst.thesis.paths import ClaimMove, MarketChanceFrom, Paths, walk
-from katalyst.thesis.position import Refusal, RefusalCode, first_touch, position_on
+from katalyst.thesis.position import Position, Refusal, RefusalCode, first_touch, position_on
 
 router = APIRouter(tags=["thesis"])
 
@@ -85,19 +93,23 @@ AskedWrongHere = Literal[
     "horizon_outside_the_window",
     "nothing_agrees_with_what_happened",
 ]
-"""The four refusals this route owns, as a closed list.
+"""The four refusals the thesis routes own, as a closed list.
 
 They are about the **request** rather than about the form: an ending that is not
 on the map or names no trade, a horizon outside the window the map covers, and a
 map on which nothing agrees with what *This happened* recorded.
+
+The position route and the card routes share this list rather than each keeping
+one. A reader who supposes something, asks for a position and then asks for the
+card of it must never be told the same thing twice in two different wordings.
 """
 
 AskedWrong = RefusalCode | AskedWrongHere
-"""Every reason this route will not answer, as one closed list of ten.
+"""Every reason a thesis route will not answer, as one closed list of ten.
 
 Six of them are the position form's own, written once in `thesis/position.py` and
-reprinted here rather than reworded; four are this route's. A screen switches on
-any of the ten the same way.
+reprinted here rather than reworded; four are the routes'. A screen switches on any
+of the ten the same way, whichever route it asked.
 """
 
 REFUSES: Final[dict[AskedWrongHere, str]] = {
@@ -114,9 +126,9 @@ REFUSES: Final[dict[AskedWrongHere, str]] = {
         "there are no worlds left to read days off."
     ),
 }
-"""What each of the route's own refusals says, in plain words the reader can act on.
+"""What each of the routes' own refusals says, in plain words the reader can act on.
 
-Written here, once, so the route, a screen and a test all print the same sentence
+Written here, once, so both routes, a screen and a test all print the same sentence
 and nobody writes a second wording of the same rule.
 """
 
@@ -135,8 +147,8 @@ owner with it.
 """
 
 
-class PositionRefused(BaseModel):
-    """One thing this route will not do, the field at fault, and what it says.
+class ThesisRefused(BaseModel):
+    """One thing a thesis route will not do, the field at fault, and what it says.
 
     A refusal is never a blank: it names a stable code a screen can switch on, the
     field the reader should look at, and one plain sentence. Nothing is silently
@@ -151,10 +163,10 @@ class PositionRefused(BaseModel):
     sentence: str = Field(description="What the screen prints.")
 
 
-class RefusedPosition(BaseModel):
-    """Every reason a position could not be worked out, in a settled order."""
+class RefusedThesis(BaseModel):
+    """Every reason a position or a card could not be worked out, in a settled order."""
 
-    detail: tuple[PositionRefused, ...] = Field(
+    detail: tuple[ThesisRefused, ...] = Field(
         description="Every reason at once, never just the first one found."
     )
 
@@ -167,7 +179,7 @@ REFUSED: dict[int | str, dict[str, Any]] = {
         )
     },
     422: {
-        "model": RefusedEdit | RefusedPosition,
+        "model": RefusedEdit | RefusedThesis,
         "description": (
             "The request cannot be carried out as written, and there are two ways it can be. "
             "A branch that does not fit the map comes back as the list of violations the "
@@ -179,7 +191,11 @@ REFUSED: dict[int | str, dict[str, Any]] = {
         ),
     },
 }
-"""How a refused position is described to whatever generates the browser's types."""
+"""How a refused thesis route is described to whatever generates the browser's types.
+
+Every route under this heading answers a refusal the same way, so every one of them
+is described by this one entry.
+"""
 
 
 class PositionRequest(BaseModel):
@@ -429,8 +445,8 @@ def take_a_position(request: PositionRequest) -> PositionAnswer:
     # reach `priced` as a claim it has never heard of. No edit that can be sent over
     # this wire adds a claim today, so the two maps carry the same claims; this is
     # the line that keeps it true the day one can.
-    ending = _the_ending(base, request.ending)
-    wanted = position_on(
+    ending = the_ending_on(base, request.ending)
+    wanted = the_position_from(
         ending,
         entry=request.entry,
         stop=request.stop,
@@ -439,18 +455,14 @@ def take_a_position(request: PositionRequest) -> PositionAnswer:
         risk_budget=request.risk_budget,
         daily_move=request.daily_move,
     )
-    if isinstance(wanted, tuple):
-        raise HTTPException(
-            status_code=422, detail=[_reprinted(one).model_dump() for one in wanted]
-        )
-
-    draws = draws_of(_drawn(request))
-    through = (wanted.horizon - draws.day_zero).days
-    if not 1 <= through <= draws.days:
-        raise HTTPException(
-            status_code=422,
-            detail=[_refusing("horizon_outside_the_window", "horizon").model_dump()],
-        )
+    draws = draws_for(
+        request.base_id,
+        request.branch,
+        request.seed,
+        versions=request.versions,
+        drawn=request.drawn_worlds,
+    )
+    the_horizon_is_inside_the_window(wanted, draws)
 
     moves = moves_on(ending, entry=wanted.entry)
     # A contract ending is walked and then refused, rather than never walked. The
@@ -495,8 +507,21 @@ def take_a_position(request: PositionRequest) -> PositionAnswer:
     )
 
 
-def _drawn(request: PositionRequest) -> Sample:
+def draws_for(
+    base_id: str,
+    branch: Branch | None,
+    seed: int,
+    *,
+    versions: int,
+    drawn: int,
+) -> Draws:
     """Draw the worlds the event days are read off, or refuse in words when there are none.
+
+    **One sampler, and it is the engine's.** `sample_of` draws from the same map,
+    branch and seed a world is built from and corrects the draw with the finished
+    answers that world carries, so the days a trade reads and the days a claim's own
+    number rests on are one sample and not two. Nothing under this heading draws a
+    second one.
 
     One thing a map can honestly do is contradict what was recorded on it: a *This
     happened* edit on a claim nothing this map produces agrees with leaves no
@@ -504,10 +529,15 @@ def _drawn(request: PositionRequest) -> Sample:
     turns that into a sentence the reader can act on rather than a server error.
 
     Args:
-        request: The map, the branch, the seed and how many worlds to draw.
+        base_id: The short name of the stored example.
+        branch: The branch to fold first, sent whole; nothing at all for the map
+            with nothing done to it.
+        seed: The one number every draw comes from.
+        versions: How many versions of the map to work the answers out across.
+        drawn: How many worlds to draw the event days from.
 
     Returns:
-        The drawn worlds.
+        The drawn worlds, as the one shape the trade layer reads.
 
     Raises:
         HTTPException: With status 404 when nothing is stored under that name, or
@@ -515,19 +545,10 @@ def _drawn(request: PositionRequest) -> Sample:
             agrees with what was recorded.
     """
     try:
-        drawn = engine.sample_of(
-            request.base_id,
-            request.branch,
-            request.seed,
-            versions=request.versions,
-            drawn=request.drawn_worlds,
-        )
+        sample = engine.sample_of(base_id, branch, seed, versions=versions, drawn=drawn)
     except ImpossibleObservation:
-        raise HTTPException(
-            status_code=422,
-            detail=[_refusing("nothing_agrees_with_what_happened", "branch").model_dump()],
-        ) from None
-    return _answered(drawn, request.base_id)
+        raise refused((refusing("nothing_agrees_with_what_happened", "branch"),)) from None
+    return draws_of(_answered(sample, base_id))
 
 
 def _the_recorded_price(ending: Proposition) -> Quote | None:
@@ -556,11 +577,15 @@ def _the_recorded_price(ending: Proposition) -> Quote | None:
     return recorded_quote(payoff.contract_id)
 
 
-def _the_ending(shown: World, wanted: PropositionId) -> Proposition:
+def the_ending_on(world: World, wanted: PropositionId) -> Proposition:
     """Find the claim being traded on the map, and refuse in words when there is no trade on it.
 
+    Shared by every route under this heading, so a claim that is not on the map and
+    a claim that names nothing anybody could buy or sell come back under one code
+    and in one sentence whether the reader asked for a position or for a card.
+
     Args:
-        shown: The world the reader is looking at, whose map holds the claim.
+        world: The world whose map holds the claim.
         wanted: The claim the request named.
 
     Returns:
@@ -571,17 +596,86 @@ def _the_ending(shown: World, wanted: PropositionId) -> Proposition:
             names nothing anybody could buy or sell. Both are things the reader can
             act on — ask for a different ending — so neither is a server error.
     """
-    found = next((one for one in shown.graph.propositions if one.id == wanted), None)
+    found = next((one for one in world.graph.propositions if one.id == wanted), None)
     if found is None:
-        raise HTTPException(
-            status_code=422, detail=[_refusing("unknown_ending", "ending").model_dump()]
-        )
+        raise refused((refusing("unknown_ending", "ending"),))
     if found.payoff is None:
-        raise HTTPException(
-            status_code=422,
-            detail=[_refusing("the_ending_names_no_trade", "ending").model_dump()],
-        )
+        raise refused((refusing("the_ending_names_no_trade", "ending"),))
     return found
+
+
+def the_position_from(
+    ending: Proposition,
+    *,
+    entry: float,
+    stop: float,
+    target: float,
+    horizon: date,
+    risk_budget: float,
+    daily_move: float,
+) -> Position:
+    """Build the reader's position from what they typed, or hand back every fault at once.
+
+    Shared by every route under this heading. The six numbers are checked by the
+    position form in `thesis/position.py`, which owns the rules and the sentences;
+    all this does is turn what it refuses into the envelope these routes answer in.
+
+    Args:
+        ending: The claim they took a position on, whose payoff says what is traded
+            and which way.
+        entry: The price they entered at, in the instrument's own units.
+        stop: The price at which they get out for a loss. Theirs.
+        target: The price at which they get out for a gain. Theirs.
+        horizon: The day they expect to be out. Theirs.
+        risk_budget: The share of capital they are prepared to lose on this trade.
+        daily_move: How far the instrument moves in a day, in price units.
+
+    Returns:
+        The position.
+
+    Raises:
+        HTTPException: With status 422 carrying every refusal the form has, each
+            naming the field the reader should look at and saying one plain sentence.
+    """
+    built = position_on(
+        ending,
+        entry=entry,
+        stop=stop,
+        target=target,
+        horizon=horizon,
+        risk_budget=risk_budget,
+        daily_move=daily_move,
+    )
+    if isinstance(built, tuple):
+        raise refused(tuple(reprinted(one) for one in built))
+    return built
+
+
+def the_horizon_is_inside_the_window(position: Position, drawn: Draws) -> None:
+    """Check the day the reader expects to be out falls inside the window the map covers.
+
+    **The form cannot ask this**, and neither can the position it builds. The form's
+    own `horizon_after_the_claim` compares the horizon with the day the *claim* is
+    judged, which is a different question: a map whose furthest judge-by date is
+    earlier still has a shorter window, and a horizon on or before the day the window
+    opens leaves no days to walk at all. Without this the paths are walked and the
+    first-touch arithmetic raises, which reaches a reader as a server error — and a
+    date picker defaulting to today is the obvious way there.
+
+    Shared by every route under this heading, so the same day on the same map is
+    refused under one code and in one sentence whatever was asked for.
+
+    Args:
+        position: What the reader typed, read for their horizon.
+        drawn: The drawn worlds, read for the day the window opens and how long it
+            runs.
+
+    Raises:
+        HTTPException: With status 422 naming the field `horizon`.
+    """
+    through = (position.horizon - drawn.day_zero).days
+    if not 1 <= through <= drawn.days:
+        raise refused((refusing("horizon_outside_the_window", "horizon"),))
 
 
 def _applied(shown: World, paths: Paths, move: ClaimMove, entry: float) -> WhatThePathApplied:
@@ -637,12 +731,12 @@ def _applied(shown: World, paths: Paths, move: ClaimMove, entry: float) -> WhatT
     )
 
 
-def _refusing(code: AskedWrongHere, field: str) -> PositionRefused:
-    """One of the route's own refusals, with its sentence written once for every screen."""
-    return PositionRefused(code=code, field=field, sentence=REFUSES[code])
+def refusing(code: AskedWrongHere, field: str) -> ThesisRefused:
+    """One of the routes' own refusals, with its sentence written once for every screen."""
+    return ThesisRefused(code=code, field=field, sentence=REFUSES[code])
 
 
-def _reprinted(one: Refusal) -> PositionRefused:
+def reprinted(one: Refusal) -> ThesisRefused:
     """Reprint the form's own refusal on the wire, keeping its code, its field and its words.
 
     The sentence is `thesis/position.py`'s, unchanged. A second wording of the same
@@ -652,9 +746,23 @@ def _reprinted(one: Refusal) -> PositionRefused:
         one: What the form refused.
 
     Returns:
-        The same refusal, as the shape this route answers with.
+        The same refusal, as the shape every thesis route answers with.
     """
-    return PositionRefused(code=one.code, field=one.field, sentence=one.sentence)
+    return ThesisRefused(code=one.code, field=one.field, sentence=one.sentence)
+
+
+def refused(reasons: tuple[ThesisRefused, ...]) -> HTTPException:
+    """Build the 422 that carries every reason at once.
+
+    Args:
+        reasons: Every reason, in a settled order.
+
+    Returns:
+        The exception to raise. Built and returned rather than raised here, so the
+        caller's own line says `raise` and a reader following the flow never has to
+        guess whether a helper returns.
+    """
+    return HTTPException(status_code=422, detail=[one.model_dump() for one in reasons])
 
 
 def _answered[Answer](outcome: Answer | list[Violation] | None, base_id: str) -> Answer:
