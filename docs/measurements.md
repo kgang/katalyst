@@ -59,6 +59,8 @@ The point of both changes is that they are the same sums in a different order, a
 
 **What was run.** `backend/benchmarks/by_deadline.py`, which is recorded and never gated: no test fails because a reading here is large. Code at `a5551f7`, before the performance work on `domain/forward.py` and `domain/states.py` that started the same day — **so the states rows below will be re-measured and this entry will get a successor**. Machine: Apple M3 Max, 14 cores, 38.65 GB, macOS 26.6.2, Python 3.12.4, numpy 2.5.3, nothing else of ours running. Raw output under `plans/analysis/scripts/stack-05-core/E/` (`bench-states.log`, `bench-events.log`, `bench-hormuz.log`, `the-strike-branch.log`), kept locally.
 
+**Corrected 2026-09-22, after review.** Three peak-memory figures in this entry had no log line behind them: `bench-events.log` and `bench-hormuz.log` were run without `/usr/bin/time -l` and print no memory at all, so nothing carried the two twenty-claim rows or the worked example's. They have been re-measured on the same benchmark, the same settings and the same code, under `/usr/bin/time -l`, `nice -n 10`, one process at a time, load average 3.06–3.45 throughout; the figures in the tables below are now those, and the log is `plans/analysis/scripts/stack-05-core/fix/memory-at-e1548eb.log`. Two of the three came back to the digit (2.77 GB, 1.36 GB) and the third moved by three hundredths (0.92 → **0.95 GB**), which is the only number in this entry that changed. **And the code is named one commit too early:** `a5551f7`'s benchmark raises `NotImplementedError` and does not know `--example`, so nothing above can have been run on it. The code these figures were taken on is **`e1548eb`**, the assembly commit — still before the day's performance work, so everything the entry says about *why* the numbers are what they are stands.
+
 **What each clock covers.** *The forward pass* is working out when every claim happens — one pass over the whole map, causes before effects, rates and shapes and all — at every version. *The exact solve* is one elimination per claim over the yes/no tables that pass leaves, at every version. *The weighted sample* is fifty thousand worlds drawn forward at **one** version, with one claim reported to have happened, and the correction it hands back. Nothing here times the drawing of the versions, which both engines share. *The whole world* is the sum of the three.
 
 ### The generated map, twenty claims
@@ -67,9 +69,11 @@ Every row: twenty claims, up to three causes each, 2 000 versions, 24 slices, se
 
 | | forward pass | exact solve | weighted sample | the whole world | peak memory |
 |---|---|---|---|---|---|
-| no states, nothing holding a claim back | 261.9 ms | 32.5 ms | 189.3 ms | **483.7 ms** | 0.92 GB |
+| no states, nothing holding a claim back | 261.9 ms | 32.5 ms | 189.3 ms | **483.7 ms** | 0.95 GB |
 | no states, three arrows holding a claim back | 752.4 ms | 31.7 ms | 194.1 ms | **978.2 ms** | 2.77 GB |
 | five states with a `sustain` arrow leaving each, three arrows holding a claim back | 7 226.0 ms | 33.8 ms | 231.0 ms | **7 490.8 ms** | 8.03 GB |
+
+The times come from `bench-events.log` and `bench-states.log`; the first two peak-memory figures come from the correction above (`fix/memory-at-e1548eb.log`), the third from `bench-states.log`'s own `maximum resident set size` line.
 
 Each figure is the fastest of the two repeats; the slowest were 280.2 / 823.2 / 7 759.0 ms on the forward pass and 505.6 / 1 056.7 / 8 024.9 ms on the whole world.
 
@@ -79,7 +83,7 @@ Each figure is the fastest of the two repeats; the slowest were 280.2 / 823.2 / 
 
 ### The committed worked example
 
-The base map, seven claims, end to end through `propagate(engine="by_deadline")` at 2 000 versions and 24 slices, three repeats: **380.1 ms** fastest, 443.6 ms slowest, 1.36 GB. The target for seven claims is 210 ms, so it is 1.8× over.
+The base map, seven claims, end to end through `propagate(engine="by_deadline")` at 2 000 versions and 24 slices, three repeats: **380.1 ms** fastest, 443.6 ms slowest (`bench-hormuz.log`), 1.36 GB (from the correction above, `fix/memory-at-e1548eb.log`). The target for seven claims is 210 ms, so it is 1.8× over.
 
 **The strike branch does not run at the shipped budget, and this is the finding of the day.** Folding *Hormuz opens, then Iran is struck* puts a **second** arrow that holds a claim back onto Brent — the base map's `R->B` and the branch's `S->B` — and the work multiplies out over every *combination* of the two arrivals. Two such arrows cost twenty-five times one rather than twice it:
 
