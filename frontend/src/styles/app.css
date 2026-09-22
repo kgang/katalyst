@@ -204,6 +204,20 @@ body {
   color: var(--text-muted);
 }
 
+/* What the key did, on one line, cut at the end when it runs past its share.
+ *
+ * **One line rather than as many as it wants.** Left to wrap, a long account of
+ * one keystroke — *your edit added this claim · A confirmed military strike on
+ * Iranian territory* — takes four lines of a narrow column beside a provenance
+ * that takes three, and the quiet row becomes the tallest thing at the foot for
+ * the most transient thing on it. The words that matter are the first ones. */
+.map-status__said {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* The one polite line, said out loud and printed.
  *
  * **It is a visible line as well as a spoken one, on every screen** — a reader
@@ -281,13 +295,16 @@ body {
  *
  * The word is set sideways because the tab is a column: turning the reader's
  * head is a smaller ask than a column of single letters, which is what a
- * horizontal word in 26 pixels would be. */
+ * horizontal word in 26 pixels would be. It is set in the middle of the edge
+ * rather than at the top of it, because a reader who has just folded the panel
+ * is looking at the map and a word at the top of a thousand-pixel edge is a word
+ * outside where anybody is looking. */
 .dock-tab {
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: var(--space-1);
   width: 26px;
   padding: var(--space-1) 0;

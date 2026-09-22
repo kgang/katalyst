@@ -45,6 +45,8 @@ const KEYS = {
 
 `N` is bound by the switcher at the head of the panel (`frontend/src/components/PanelSwitch.tsx`) rather than by the map, because it means nothing on a screen with no panels to step between — the first screen has none, and there the key does nothing rather than doing something else. Like the map's own keys it is left alone while the keyboard is in a field: **typing is never a shortcut**, and in a field an `n` is an `n`.
 
+**`P` is not the only way to fold the panel** *(2026-09-22)*. Every key here is a shortcut for something a reader can also reach by pointing, and `P` was the one exception: it put the panel away on the stored map with nothing on screen saying so, and on the screen a map builds itself on it did nothing at all. So the fold now has a control everywhere the key has: a chevron at the head of the panel's own names, a 26-pixel tab at the edge of the map while the panel is away, and a command by name in the palette. The key works on **both** map screens, and the sheet says where the controls are. Which way the panel is, is carried for a reader who hears the screen — each control is `aria-expanded` on the panel it controls.
+
 ### The two overlays
 
 ```ts
