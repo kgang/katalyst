@@ -252,7 +252,7 @@ export interface GenerateRequest {
   /** The Verify door's destination, in the reader's words. Absent is the Explore door. */
   readonly target?: string;
   /** The reader's own likelihood on the hypothesis. Absent when they chose "I don't know". */
-  readonly user_belief?: Ranged;
+  readonly user_belief?: Likelihood;
   /** Only when reproducing a run we were given a seed for. See below. */
   readonly seed?: number;
   /**
@@ -291,9 +291,11 @@ caller does: it sends its sentence. Nothing in the browser holds a table of file
 numbers the cards, and the live path and the replayed path send byte-identical requests — which is
 what makes the reviewer's replay evidence about the live route rather than about a second one.
 
-`Ranged` — a likelihood with its two range ends, at full precision — is
-`frontend/src/world/types.ts`'s, the same shape a belief chip takes
-([`tiles-ports-wires.md`](tiles-ports-wires.md)).
+`Likelihood` — one likelihood, at full precision — is `frontend/src/world/types.ts`'s, the same
+shape a belief chip takes ([`tiles-ports-wires.md`](tiles-ports-wires.md)). *(It was called `Ranged`
+and carried two range ends beside the number until 2026-09-22, Kent's R48. The route's `Belief` still
+takes a `lo` and a `hi`; the browser sends the reader's own number in all three places — a range of
+nothing — and both fields go when the engine half of the cut lands.)*
 
 ### The `growth` reducer
 
@@ -705,10 +707,10 @@ this part already ships: real claims, real arrows, real provenance marks, and an
 reason in every likelihood slot.
 
 **When `beliefs_propagated` arrives, they all fill at once.** One event, one world, every number.
-The chip's own sentence switches from the *stated* pair to record 0014's *computed* pair with no
-change to the component, because `WorldView.versions` arrives on the same world and that is the one
-field the chip reads to choose (Kent, K3; `tiles-ports-wires.md`, *What the model chip says about its
-own range*).
+*(The chip used to switch what it said about itself at this moment — from the *stated* pair to record
+0014's *computed* pair — picked by a count of versions on the world. A chip says nothing about itself
+any more: 2026-09-22, Kent's R48. What the world still carries is one flag, `workedOut`, and the only
+words it changes are the last line of the decomposition and the sentence in the branch list.)*
 
 **Never per tile, and never twice.** A likelihood that changed four times as its causes arrived would
 be four numbers nobody computed: the first three would each be the answer to a question about a map
@@ -824,11 +826,10 @@ Four things about it.
   billed apart from tokens: without that row, `dollars` is a number a reader could check against the
   token counts and find wrong.
 * **Checklist `VR4` is about likelihoods.** *"No number shows more than two significant figures, and
-  none is missing its range"* is the rule that stops a fake-precise `.347` reaching the screen
-  (NFR-1). A token count, a call count, a duration and a dollar figure are counts and measurements:
-  they are printed whole, in `--font-mono` with fixed-width digits, and they have no range because
-  nothing sampled them. The same reading already lets a lag chip say *14 days* and a tile be 280
-  pixels wide.
+  no range appears anywhere on the screen"* *(as rewritten 2026-09-22, R48)* is the rule that stops a
+  fake-precise `.347` reaching the screen. A token count, a call count, a duration and a dollar
+  figure are counts and measurements: they are printed whole, in `--font-mono` with fixed-width
+  digits. The same reading already lets a lag chip say *14 days* and a tile be 280 pixels wide.
 * **In replay the mode reads `replay`**, the recording's date sits beside it, and `cost` reads what
   the rebuilt receipt carries, which is zero. That zero is a computed zero — the recording was played,
   nothing was called, so nothing was spent — not an empty slot, and it is printed rather than hidden.
@@ -934,11 +935,11 @@ whose run broke after twenty claims keeps the twenty claims.
 
 1. **The sentence.** One line, the hypothesis, in the reader's own words.
 2. **Where it ends**, optional. The Verify door. One field, hinted with what it is for.
-3. **Your own likelihood.** A range with an explicit **I don't know** state (FR-2). Three handles on
-   one track — the number and the two ends of its range — spelled beside the track in exactly the
-   one-line form the chip uses, `.55 (.40–.70)`, under the same two-significant-figure rule and the
-   same certainty guard ([`keyboard-and-access.md`](keyboard-and-access.md) B6), so the control
-   cannot post a `1.0`.
+3. **Your own likelihood.** One number with an explicit **I don't know** state (FR-2). **One handle
+   on one track** *(amended 2026-09-22, Kent's R48; it was three — the number and the two ends of
+   its range)* — spelled beside the track the way the chip spells it, `.55`, under the same
+   two-significant-figure rule and the same certainty guard
+   ([`keyboard-and-access.md`](keyboard-and-access.md) B6), so the control cannot post a `1.0`.
 
 **The button is `Build the map`**, word for word, and it is the same button on both doors. Not
 *Generate*, which is the pipeline's word rather than the reader's, and not *Explore* or *Verify*,

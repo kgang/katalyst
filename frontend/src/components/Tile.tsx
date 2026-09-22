@@ -208,13 +208,6 @@ export interface TileProps {
   /** True when this claim is the one the reader started from. */
   readonly isHypothesis: boolean;
   /**
-   * How many versions of the map were run to produce this world's numbers.
-   *
-   * Absent means nothing computed them, and the model chip says so instead of
-   * describing a run that never happened.
-   */
-  readonly versions?: number;
-  /**
    * The height the map reserved for this tile.
    *
    * Usually the same as the tile's own content needs. It differs only in a
@@ -225,7 +218,7 @@ export interface TileProps {
 }
 
 /** One claim's tile. */
-export function Tile({ claim, isHypothesis, versions, height: reserved }: TileProps) {
+export function Tile({ claim, isHypothesis, height: reserved }: TileProps) {
   // How far the map is zoomed out. Below the threshold a tile stops showing
   // everything and shows a summary instead — the claim and the three chips —
   // because the alternative is type too small to read. The tile changes what it
@@ -335,12 +328,7 @@ export function Tile({ claim, isHypothesis, versions, height: reserved }: TilePr
             the column that says so. The reader's and a venue's are drawn only
             where they hold a number; where they do not, the absence and its
             reason are read in full in the panel beside the map. */}
-        <BeliefChip
-          owner="model"
-          slot={claim.beliefs.model}
-          standing={claim.standing}
-          versions={versions}
-        />
+        <BeliefChip owner="model" slot={claim.beliefs.model} standing={claim.standing} />
         {claim.beliefs.user.reading === undefined ? null : (
           <BeliefChip owner="user" slot={claim.beliefs.user} />
         )}

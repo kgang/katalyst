@@ -69,13 +69,16 @@
   row-gap: var(--space-1);
 }
 
-/* The three column labels, written once. `same direction` is the share of the
- * versions of the map that moved the same way; `how firm` is the width of this
- * world's own range on the claim. Neither is ever folded into an ordering. */
+/* The one column label, written once.
+ *
+ * **There were three** *(until 2026-09-22, R48)*: `change`, `how firm` — the
+ * width of the range around the new number — and `same direction`, the share of
+ * the versions of the map that moved the same way. The range and the versions
+ * are cut from this product, so one column is left and it takes the row. */
 .delta-rail__labels,
 .delta-rail__values {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1.3fr;
+  grid-template-columns: 1fr;
   column-gap: var(--space-1);
   align-items: baseline;
 }
@@ -135,7 +138,7 @@
  * judging day, and a number whose day is not said is a number nobody can check.
  *
  * On a row the engine ranked no move on it is the engine's own word for why —
- * *barely moved*, *the versions disagreed which way*, *it was supposed false*,
+ * *barely moved*, *it was supposed false*,
  * *it arrived with the edit*. That is what makes such a row survive being read
  * in grey and being read out loud: see `.delta-rail__row[data-ranked="no"]`
  * below, whose brightness says the same thing a second time and never alone. */

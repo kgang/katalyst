@@ -145,17 +145,12 @@
   border-radius: 2px;
 }
 
-/* A tile whose belief chip has opened its shelf has to be drawn over the tile
- * below it, or the shelf would slide out behind its neighbour. The drawing
- * library writes each tile's stacking order straight onto the element, and a
- * value written onto an element beats any rule written in a stylesheet — so
- * this one rule has to insist, and it is the only one in the product that does. */
-.canvas .react-flow__node:has(.belief-chip:hover),
-.canvas .react-flow__node:has(.belief-chip:focus-within),
-.canvas .react-flow__node:has(.belief-chip__note[data-pinned="yes"]) {
-  /* biome-ignore lint/complexity/noImportantStyles: the drawing library writes this tile's stacking order onto the element itself, and nothing in a stylesheet can otherwise reach past it. */
-  z-index: 20 !important;
-}
+/* **One rule used to live here and no longer does** *(2026-09-22, R48)*. A
+ * belief chip opened a shelf out of the bottom edge of its tile explaining the
+ * range under its number, and the tile had to be lifted over its neighbour or
+ * the shelf slid out behind it — the one `!important` in the product, because
+ * the drawing library writes each tile's stacking order onto the element
+ * itself. There is no range and no shelf, so nothing has to be lifted. */
 
 /* ---- The library's own furniture ---------------------------------------- *
  * Two pieces survive with the bare stylesheet: the zoom buttons and the

@@ -33,9 +33,9 @@ import {
   type Edit,
   forkBranch,
   type Known,
+  type Likelihood,
   type LinkView,
   openBranch,
-  type Ranged,
   type Reason,
   type Selection,
   type WorldSource,
@@ -304,7 +304,7 @@ export function MapScreen({
   // The numbers on the arrows, one at a time, kept once they arrive. Each one
   // costs a whole extra run of the map, so it is asked for when a reader selects
   // that arrow and never again for the same branch, seed and arrow.
-  const [wireNumbers, setWireNumbers] = useState<ReadonlyMap<string, Known<Ranged>>>(new Map());
+  const [wireNumbers, setWireNumbers] = useState<ReadonlyMap<string, Known<Likelihood>>>(new Map());
   // The last ask that did not come back, which is shown and never kept. A
   // failure is a fact about one attempt, not about the number: keeping it would
   // mean the reader who selects the arrow again after the server comes back is

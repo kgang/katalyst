@@ -18,7 +18,7 @@ For an interface chapter the data model is the tokens. A **token** is one of the
 
 | Meaning | Channel | Tokens | The redundant cue, which is never colour | In greyscale |
 |---|---|---|---|---|
-| **How likely a claim is** | Brightness — a five-step neutral ramp | `--p-0` … `--p-4` *(new in this stack)* | The number itself, at two significant figures with its range | Brightness *is* greyscale |
+| **How likely a claim is** | Brightness — a five-step neutral ramp | `--p-0` … `--p-4` *(new in this stack)* | The number itself, at two significant figures *(and no range, 2026-09-22, R48)* | Brightness *is* greyscale |
 | **Direction of financial effect** | Hue: blue up, amber down | `--dir-up`, `--dir-down` | A glyph (▲ / ▼) **and** a sign **and** a word — all three, always | The glyph and the sign |
 | **Tail risk** — a rare outcome big enough to matter | Texture: a diagonal hatch | `--tail` | The word *tail* beside it | The hatch |
 | **What kind of push an arrow is** | Stroke: pattern, width, doubling | none; the stroke takes `--text-muted` | The Inspector's words, and the midpoint chip's | Pattern, width and doubling |
@@ -73,7 +73,7 @@ It is drawn in exactly two places: the fill of the small bar inside a belief chi
 
 1. **It never carries text.** A number is always drawn in `--text`, so it always clears 4.5 to 1. The ramp paints a bar, which is a meaningful graphic and needs 3 to 1. Each token carries its measured ratio in a comment, as every existing token does.
 2. **It never paints a whole tile.** Tile-wide brightness and opacity are already spent: [`diff-view.md`](diff-view.md) paints the old world faint and desaturates a killed claim, and the hover lens dims everything off the path. Three meanings on one channel means none of them reads.
-3. **Five steps are a glance, never a reading.** The bar sits behind the chip's number line, and the exact number and its range are printed every time, so nobody is ever asked to tell `--p-2` from `--p-3` by eye.
+3. **Five steps are a glance, never a reading.** The bar sits behind the chip's number line, and the exact number is printed beside it every time, so nobody is ever asked to tell `--p-2` from `--p-3` by eye. *(It said "the exact number and its range" until 2026-09-22; R48 cut the range. **The ramp itself is untouched** — it paints one likelihood, which is exactly what a claim has now.)*
 
 ### Direction — and what is *not* direction
 
@@ -81,7 +81,7 @@ It is drawn in exactly two places: the fill of the small bar inside a belief chi
 
 The trap, and it is a live one on this map: **the sign of a push is not a direction of financial effect.** The arrow from *the strait reopens* to *Brent crude settles below $68* is `+1.6` — positive, because it makes that claim come out **true** more often — and the thing the claim describes is a **falling** price. Colour that arrow amber and you have said the opposite of what it means. A push's sign is carried by its printed sign and by a word (*toward* or *against*), never by a direction hue. The words are in [`tiles-ports-wires.md`](tiles-ports-wires.md).
 
-In this stack the direction channel has almost nothing to paint: there is no thesis card, no world-state strip, no live price, and the delta rail's `.61 → .18 ▼` needs the engine — as do its two columns, which read **how firm** and **same direction** on screen. The law is written now anyway, so that two unused tokens cannot be quietly borrowed for something else in the meantime.
+In this stack the direction channel has almost nothing to paint: there is no thesis card, no world-state strip, no live price, and the delta rail's `.61 → .18 ▼` needs the engine. *(Its two columns, **how firm** and **same direction**, were named here too and were cut on 2026-09-22, R48.)* The law is written now anyway, so that two unused tokens cannot be quietly borrowed for something else in the meantime.
 
 ### Tail risk — defined, and deliberately unused here
 
@@ -144,7 +144,7 @@ Worked on the Hormuz map (the cast is in [`README.md`](README.md)). This chapter
 
 The map draws. With no clicks at all a reader can tell four things:
 
-- **H is less likely than M1.** H's chip bar is `--p-1` (`.35`), M1's is `--p-3` (`.61`), and each chip prints its owner, its number and its range on three stacked lines over that bar.
+- **H is less likely than M1.** H's chip bar is `--p-1` (`.35`), M1's is `--p-3` (`.61`), and each chip prints its owner and its number on two stacked lines over that bar *(it was three, with the range last, until 2026-09-22; R48)*.
 - **H → B is a strong one-time shove; C → B is a gentler standing one.** H → B is dot-dash (an `impulse`: a spike that fades) and three steps wide. C → B is solid (a `step`: switched on and held), doubled because it is a `sustain` arrow, and two steps wide.
 - **Nothing on this map has a document behind it.** Every arrow's tail mark shows two dots (`argued` — a mechanism was stated, nothing was fetched), except H → N1, which shows one (`asserted` — a story rather than a mechanism).
 - **Where the map starts and where it could be traded.** H's outline and the word *hypothesis* in its heading are in `--accent`, and H alone carries a wash of that same accent. M1's and M2's outlines, their cut corners and the word *market* are in `--kind-market`. C, B, R and N1 keep the hairline. *(amended 2026-09-22 — R42.)*
