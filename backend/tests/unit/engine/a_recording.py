@@ -59,6 +59,7 @@ def a_claim(claim_id: str, claim: str, kind: str = "event") -> Proposition:
         id=claim_id,
         claim=claim,
         kind=kind,  # type: ignore[arg-type]
+        persistence="event",
         resolution=Resolution(
             criteria="A test two people reading it would agree on.",
             source="A named judge.",

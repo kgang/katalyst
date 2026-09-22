@@ -35,15 +35,39 @@ from pathlib import Path
 
 import pytest
 
+from katalyst.domain import Graph
 from katalyst.engine.client import Model, live_answerer
 from katalyst.engine.expand import expand
 from katalyst.engine.grounding import found_in, keep_cited, provenance_of, same_address
 from katalyst.engine.outcome import Accepted, Refused, Said
 from katalyst.engine.prompt import expanding_question
 from katalyst.engine.proposal import ClaimProposal, LinkDraft, LinkProposal
-from katalyst.fixtures import HORMUZ
 
 CASSETTES = Path(__file__).resolve().parents[1] / "cassettes"
+
+# **The map these tests ask about is a frozen copy, not the one the product
+# ships** *(2026-09-22)*. A recorded answer is found again by matching the whole
+# request body, and the request body writes the map out as text: every claim's
+# short name and sentence, and every arrow between them. The curated example was
+# rewritten on 2026-09-22 — claims renamed, two added, sentences changed — so
+# every recording here stopped matching the moment it was.
+#
+# Re-recording is held. Kent's decision, row R5 of the 2026-09-21 decisions note:
+# every change to what the model is asked for goes in **one freeze after the
+# engine's flip**, and only then is anything paid for again. So the tests' input
+# moves back instead: the file beside this one is the curated map exactly as it
+# stood on the day these exchanges were recorded, with one field written in that
+# the request body does not carry — `persistence`, which says whether a claim
+# happens once or holds for a while, required on every claim since decision
+# record 0017 and absent from the map when these were made. The freeze re-records
+# all of them against the map the product actually ships, and this file goes then.
+#
+# It was written by `plans/analysis/scripts/stack-05-flip/freeze_the_map_the_cassettes_saw.py`,
+# out of the fixture and the rules layer as they stood before the flip.
+THE_MAP_THE_RECORDINGS_WERE_MADE_AGAINST = Graph.model_validate_json(
+    (Path(__file__).resolve().parent / "the_map_the_cassettes_saw.json").read_text(encoding="utf-8")
+)
+"""The curated map as it was on 2026-09-17, the day these exchanges were recorded."""
 
 THE_DAY_THE_RUN_HAPPENED = date(2026, 9, 17)
 """The day these questions were asked, written onto anything the search found."""
@@ -102,7 +126,7 @@ def answerer(request: pytest.FixtureRequest) -> Model:
 def ask(answerer: Model, frontier: str = "C") -> object:
     """Put one question about the stored example's map."""
     return expand(
-        HORMUZ,
+        THE_MAP_THE_RECORDINGS_WERE_MADE_AGAINST,
         frontier,
         target=None,
         answerer=answerer,
@@ -134,7 +158,11 @@ def asking(answerer: Model, frontier: str = "C") -> Said:
     """
     return answerer.proposal(
         expanding_question(
-            HORMUZ, frontier, target=None, ending_only=False, today=THE_DAY_THE_RUN_HAPPENED
+            THE_MAP_THE_RECORDINGS_WERE_MADE_AGAINST,
+            frontier,
+            target=None,
+            ending_only=False,
+            today=THE_DAY_THE_RUN_HAPPENED,
         ),
         may_search=True,
     )
@@ -234,14 +262,14 @@ def test_expand_rejects_cycle(answerer: Model) -> None:
     "B", "target": "H", "link": {...the recorded arrow...}}`. The stored example
     already runs `H` to `C` to `B`, so that arrow closes the loop.
     """
-    arrows_before = len(HORMUZ.links)
+    arrows_before = len(THE_MAP_THE_RECORDINGS_WERE_MADE_AGAINST.links)
 
     outcome = ask(answerer, frontier="B")
 
     result = outcome.result  # type: ignore[union-attr]
     assert isinstance(result, Refused)
     assert [one.code for one in result.violations] == ["cycle"]
-    assert len(HORMUZ.links) == arrows_before
+    assert len(THE_MAP_THE_RECORDINGS_WERE_MADE_AGAINST.links) == arrows_before
 
 
 @pytest.mark.vcr

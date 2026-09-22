@@ -22,8 +22,8 @@ Two parts, and the difference between them matters:
 
 Every line has three fields: the name, then what the product would show on screen
 for this fact, then the fact itself. A `—` in the middle field means the product
-does not render this fact at all — a move, a share of a band and how often the
-versions agreed are real quantities, and none of them is a likelihood.
+does not render this fact at all — a move and a rank are real quantities, and
+neither of them is a likelihood written the way a likelihood is written.
 
 Five decimal places is a choice about reading. The screen never shows more than
 two significant figures, and the rules layer will not call a claim *shifted*
@@ -39,8 +39,12 @@ about to eight decimal places can still round two ways, and neither is wrong.
 Each such number is checked at full precision on the line that owns it.
 
 A `—` in the printed column means the product has no way of writing that kind of
-number yet: a move, a share of a band, and how often the versions agreed are all
-real quantities, and none of them is a likelihood.
+number yet: a move and a rank are real quantities, and neither is a likelihood.
+
+**Every likelihood here is one number.** No number on this product carries a
+range (decision record 0028, 2026-09-22): one likelihood per claim, computed
+once. This file used to print three figures in the right-hand column of every
+reading and every prior, and a low-to-high pair beside the number in the middle one.
 
 --- INPUTS: typed by a person, in backend/src/katalyst/fixtures/hormuz.py ---
 
@@ -48,37 +52,52 @@ How the example is run. A world is replayable from a map, a branch and a seed.
 
 run · day zero                                —                     2026-10-01
 run · seed                                    —                     20261001
-run · versions of the map                     —                     2,000
-run · worlds per version                      —                     8
+run · slices                                  —                     24
+run · worlds in the sample                    —                     50,000
 
 What each claim was given before anything pushed on it.
 
 B · kind                                      —                     event
-B · prior                                     .28 (.15–.42)         0.28000 0.15000 0.42000
+B · persistence                               —                     event
+B · prior                                     .28                   0.28000
 B · resolve by                                —                     2026-10-15 · day 14
 C · kind                                      —                     event
-C · prior                                     .30 (.18–.45)         0.30000 0.18000 0.45000
+C · persistence                               —                     state
+C · prior                                     .30                   0.30000
 C · resolve by                                —                     2026-10-31 · day 30
-H · base rate                                 —                     7 of 9
 H · kind                                      —                     hypothesis
-H · prior                                     .35 (.22–.50)         0.35000 0.22000 0.50000
+H · persistence                               —                     event
+H · prior                                     .20                   0.20000
 H · resolve by                                —                     2026-11-01 · day 31
-H · what the user thinks                      .55 (.40–.70)         0.55000 0.40000 0.70000
+H · what the user thinks                      .55                   0.55000
 M1 · kind                                     —                     market
-M1 · prior                                    .40 (.28–.55)         0.40000 0.28000 0.55000
+M1 · persistence                              —                     event
+M1 · prior                                    .40                   0.40000
 M1 · resolve by                               —                     2026-10-31 · day 30
-M1 · what the market prices                   .48 (.45–.52)         0.48000 0.45000 0.52000
+M1 · what the market prices                   .48                   0.48000
 M2 · kind                                     —                     market
-M2 · prior                                    .35 (.22–.50)         0.35000 0.22000 0.50000
+M2 · persistence                              —                     event
+M2 · prior                                    .35                   0.35000
 M2 · resolve by                               —                     2026-11-15 · day 45
+M3 · kind                                     —                     market
+M3 · persistence                              —                     event
+M3 · prior                                    .20                   0.20000
+M3 · resolve by                               —                     2026-11-01 · day 31
 N1 · kind                                     —                     not_tradeable
-N1 · prior                                    .22 (.12–.36)         0.22000 0.12000 0.36000
+N1 · persistence                              —                     event
+N1 · prior                                    .22                   0.22000
 N1 · resolve by                               —                     2026-11-30 · day 60
+O · kind                                      —                     event
+O · persistence                               —                     state
+O · prior                                     .12                   0.12000
+O · resolve by                                —                     2026-11-01 · day 31
 R · kind                                      —                     event
-R · prior                                     .18 (.080–.32)        0.18000 0.08000 0.32000
+R · persistence                               —                     event
+R · prior                                     .18                   0.18000
 R · resolve by                                —                     2026-11-30 · day 60
 S · kind                                      —                     event
-S · prior                                     .060 (.020–.14)       0.06000 0.02000 0.14000
+S · persistence                               —                     event
+S · prior                                     .060                  0.06000
 S · resolve by                                —                     2026-10-02 · day 1
 
 What each arrow was given. A strength's sign says which way the arrow pushes
@@ -89,12 +108,14 @@ B->M2 · arrow                                 —                     B → M2 
 B->R · arrow                                  —                     B → R · trigger · ramp · strength +0.6 · delay 14 days · half-life — · argued · reflexive
 C->B · arrow                                  —                     C → B · sustain · step · strength +0.7 · delay 7 days · half-life — · argued
 H->B · arrow                                  —                     H → B · trigger · impulse · strength +1.6 · delay 2 days · half-life 30 days · argued
-H->C · arrow                                  —                     H → C · sustain · step · strength +1.1 · delay 0 days · half-life — · argued
+H->M3 · arrow                                 —                     H → M3 · trigger · step · strength +4.0 · delay 0 days · half-life — · argued
 H->N1 · arrow                                 —                     H → N1 · trigger · ramp · strength +0.7 · delay 10 days · half-life — · asserted
-R->B · arrow                                  —                     R → B · trigger · step · strength -1.2 · delay 5 days · half-life — · argued
-S->B · arrow                                  —                     S → B · trigger · impulse · strength -2.4 · delay 0 days · half-life 10 days · argued
-S->C · arrow                                  —                     S → C · sustain · step · strength -2.0 · delay 1 day · half-life — · argued
-S->H · arrow                                  —                     S → H · sustain · step · strength -1.9 · delay 3 days · half-life — · argued
+H->O · arrow                                  —                     H → O · trigger · step · strength +2.2 · delay 0 days · half-life — · argued
+O->C · arrow                                  —                     O → C · sustain · step · strength +1.1 · delay 0 days · half-life — · argued
+R->B · arrow                                  —                     R → B · trigger · step · strength -1.2 · delay 1 day · half-life — · argued
+S->B · arrow                                  —                     S → B · trigger · step · strength -2.4 · delay 0 days · half-life — · argued
+S->C · arrow                                  —                     S → C · trigger · step · strength -2.0 · delay 1 day · half-life — · argued
+S->O · arrow                                  —                     S → O · trigger · step · strength -3.2 · delay 3 days · half-life — · argued
 
 The branches, and the edits each makes, in the order they are made. The
 strike branch ships with the example; the two observations are written in
@@ -102,7 +123,7 @@ the program that wrote this file, because the book argues about them and no
 button offers them.
 
 br_hormuz_then_strike · edit 1                —                     suppose H true · from 2026-10-01
-br_hormuz_then_strike · edit 2                —                     insert S · with arrows S->B, S->C, S->H
+br_hormuz_then_strike · edit 2                —                     insert S · with arrows S->B, S->C, S->O
 br_hormuz_then_strike · edit 3                —                     suppose S true · from 2026-10-02
 br_hormuz_then_strike · what it is called     —                     Hormuz opens, then Iran is struck
 obs_b · edit 1                                —                     observe B true
@@ -115,146 +136,133 @@ obs_c · what it is called                     —                     the war-r
 What each claim reads, in each world, on the day that claim is judged. A
 claim a branch supposed true reads the word, never the 1 behind it.
 
-B · base · reading                            .40 (.24–.56)         0.39522 0.24242 0.55639
-B · observed B · reading                      >.99 (>.99–>.99)      1.00000 1.00000 1.00000
-B · observed C · reading                      .52 (.30–.73)         0.51986 0.29966 0.73190
-B · strike · reading                          .31 (.16–.48)         0.30771 0.15565 0.47537
-C · base · reading                            .40 (.25–.56)         0.39678 0.24607 0.55807
-C · observed B · reading                      .40 (.22–.59)         0.39799 0.22321 0.58585
-C · observed C · reading                      >.99 (>.99–>.99)      1.00000 1.00000 1.00000
-C · strike · reading                          .074 (.029–.13)       0.07372 0.02917 0.13252
-H · base · reading                            .36 (.22–.50)         0.35577 0.21990 0.49982
-H · observed B · reading                      .36 (.23–.50)         0.35558 0.22557 0.49943
-H · observed C · reading                      .36 (.23–.51)         0.36456 0.22636 0.50899
-H · strike · reading                          .086 (.034–.15)       0.08582 0.03439 0.15023
-M1 · base · reading                           .46 (.32–.60)         0.45572 0.31781 0.60251
-M1 · observed B · reading                     .52 (.37–.67)         0.51839 0.36726 0.66786
-M1 · observed C · reading                     .46 (.31–.61)         0.46128 0.31462 0.61363
-M1 · strike · reading                         .41 (.28–.55)         0.41373 0.28371 0.55464
-M2 · base · reading                           .43 (.28–.59)         0.43068 0.28193 0.58502
-M2 · observed B · reading                     .54 (.34–.73)         0.53625 0.34022 0.72895
-M2 · observed C · reading                     .44 (.27–.61)         0.44039 0.27318 0.61192
-M2 · strike · reading                         .36 (.23–.51)         0.36344 0.22848 0.50662
-N1 · base · reading                           .28 (.15–.44)         0.28336 0.14867 0.43608
-N1 · observed B · reading                     .28 (.14–.46)         0.28457 0.14323 0.45706
-N1 · observed C · reading                     .30 (.15–.49)         0.30421 0.15421 0.48725
-N1 · strike · reading                         .38 (.17–.61)         0.37620 0.16968 0.61017
-R · base · reading                            .19 (.080–.32)        0.19135 0.07997 0.31986
-R · observed B · reading                      .19 (.082–.32)        0.19025 0.08168 0.31986
-R · observed C · reading                      .19 (.080–.32)        0.19135 0.07997 0.31986
-R · strike · reading                          .19 (.080–.32)        0.19135 0.07997 0.31986
+B · base · reading                            .30                   0.30099
+B · observed B · reading                      >.99                  1.00000
+B · observed C · reading                      .32                   0.31602
+B · strike · reading                          .10                   0.10275
+C · base · reading                            .32                   0.32188
+C · observed B · reading                      .34                   0.33926
+C · observed C · reading                      >.99                  1.00000
+C · strike · reading                          .15                   0.15176
+H · base · reading                            .20                   0.20000
+H · observed B · reading                      .25                   0.24750
+H · observed C · reading                      .21                   0.21292
+H · strike · reading                          supposed              —
+M1 · base · reading                           .46                   0.45615
+M1 · observed B · reading                     .59                   0.58747
+M1 · observed C · reading                     .46                   0.45834
+M1 · strike · reading                         .42                   0.41877
+M2 · base · reading                           .40                   0.40073
+M2 · observed B · reading                     .52                   0.51797
+M2 · observed C · reading                     .40                   0.40312
+M2 · strike · reading                         .37                   0.36702
+M3 · base · reading                           .30                   0.30302
+M3 · observed B · reading                     .34                   0.33883
+M3 · observed C · reading                     .31                   0.31256
+M3 · strike · reading                         .93                   0.92815
+N1 · base · reading                           .24                   0.24121
+N1 · observed B · reading                     .25                   0.24853
+N1 · observed C · reading                     .24                   0.24296
+N1 · strike · reading                         .36                   0.36073
+O · base · reading                            .17                   0.16958
+O · observed B · reading                      .19                   0.19140
+O · observed C · reading                      .23                   0.22767
+O · strike · reading                          .13                   0.12917
+R · base · reading                            .18                   0.18000
+R · observed B · reading                      .17                   0.16973
+R · observed C · reading                      .18                   0.18000
+R · strike · reading                          .18                   0.18000
 S · strike · reading                          supposed              —
 
 What each edit did to each claim, against the untouched map.
 
-B · observed B · move                         —                     0.60478
-B · observed B · moved only by reweighting    —                     no
-B · observed B · same direction               —                     1.00000
-B · observed B · was → is                     .40 → >.99            0.39522 → 1.00000
+B · observed B · move                         —                     0.69901
+B · observed B · was → is                     .30 → >.99            0.30099 → 1.00000
 B · observed B · what happened                —                     shifted
-B · observed C · move                         —                     0.12465
-B · observed C · moved only by reweighting    —                     no
-B · observed C · same direction               —                     0.91518
-B · observed C · was → is                     .40 → .52             0.39522 → 0.51986
+B · observed C · move                         —                     0.01503
+B · observed C · was → is                     .30 → .32             0.30099 → 0.31602
 B · observed C · what happened                —                     shifted
-B · strike · move                             —                     -0.08751
-B · strike · moved only by reweighting        —                     no
-B · strike · same direction                   —                     0.85050
-B · strike · was → is                         .40 → .31             0.39522 → 0.30771
-B · strike · what happened                    —                     unchanged
-C · observed B · move                         —                     0.00121
-C · observed B · moved only by reweighting    —                     no
-C · observed B · same direction               —                     0.41250
-C · observed B · was → is                     .40 → .40             0.39678 → 0.39799
-C · observed B · what happened                —                     unchanged
-C · observed C · move                         —                     0.60322
-C · observed C · moved only by reweighting    —                     no
-C · observed C · same direction               —                     1.00000
-C · observed C · was → is                     .40 → >.99            0.39678 → 1.00000
+B · strike · move                             —                     -0.19824
+B · strike · was → is                         .30 → .10             0.30099 → 0.10275
+B · strike · what happened                    —                     shifted
+C · observed B · move                         —                     0.01738
+C · observed B · was → is                     .32 → .34             0.32188 → 0.33926
+C · observed B · what happened                —                     shifted
+C · observed C · move                         —                     0.67812
+C · observed C · was → is                     .32 → >.99            0.32188 → 1.00000
 C · observed C · what happened                —                     shifted
-C · strike · move                             —                     -0.32307
-C · strike · moved only by reweighting        —                     no
-C · strike · same direction                   —                     1.00000
-C · strike · was → is                         .40 → .074            0.39678 → 0.07372
+C · strike · move                             —                     -0.17012
+C · strike · was → is                         .32 → .15             0.32188 → 0.15176
 C · strike · what happened                    —                     shifted
-H · observed B · move                         —                     -0.00019
-H · observed B · moved only by reweighting    —                     no
-H · observed B · same direction               —                     0.00000
-H · observed B · was → is                     .36 → .36             0.35577 → 0.35558
-H · observed B · what happened                —                     unchanged
-H · observed C · move                         —                     0.00879
-H · observed C · moved only by reweighting    —                     yes
-H · observed C · same direction               —                     0.00000
-H · observed C · was → is                     .36 → .36             0.35577 → 0.36456
-H · observed C · what happened                —                     unchanged
-H · strike · move                             —                     -0.26995
-H · strike · moved only by reweighting        —                     no
-H · strike · same direction                   —                     1.00000
-H · strike · was → is                         .36 → .086            0.35577 → 0.08582
+H · observed B · move                         —                     0.04750
+H · observed B · was → is                     .20 → .25             0.20000 → 0.24750
+H · observed B · what happened                —                     shifted
+H · observed C · move                         —                     0.01292
+H · observed C · was → is                     .20 → .21             0.20000 → 0.21292
+H · observed C · what happened                —                     shifted
+H · strike · move                             —                     0.80000
+H · strike · was → is                         .20 → supposed        0.20000 → —
 H · strike · what happened                    —                     shifted
-M1 · observed B · move                        —                     0.06267
-M1 · observed B · moved only by reweighting   —                     no
-M1 · observed B · same direction              —                     0.97160
-M1 · observed B · was → is                    .46 → .52             0.45572 → 0.51839
+M1 · observed B · move                        —                     0.13133
+M1 · observed B · was → is                    .46 → .59             0.45615 → 0.58747
 M1 · observed B · what happened               —                     shifted
-M1 · observed C · move                        —                     0.00556
-M1 · observed C · moved only by reweighting   —                     no
-M1 · observed C · same direction              —                     0.52695
-M1 · observed C · was → is                    .46 → .46             0.45572 → 0.46128
+M1 · observed C · move                        —                     0.00219
+M1 · observed C · was → is                    .46 → .46             0.45615 → 0.45834
 M1 · observed C · what happened               —                     unchanged
-M1 · strike · move                            —                     -0.04199
-M1 · strike · moved only by reweighting       —                     no
-M1 · strike · same direction                  —                     0.95350
-M1 · strike · was → is                        .46 → .41             0.45572 → 0.41373
+M1 · observed C · why unchanged               —                     under_the_floor
+M1 · strike · move                            —                     -0.03737
+M1 · strike · was → is                        .46 → .42             0.45615 → 0.41877
 M1 · strike · what happened                   —                     shifted
-M2 · observed B · move                        —                     0.10557
-M2 · observed B · moved only by reweighting   —                     no
-M2 · observed B · same direction              —                     0.95730
-M2 · observed B · was → is                    .43 → .54             0.43068 → 0.53625
+M2 · observed B · move                        —                     0.11724
+M2 · observed B · was → is                    .40 → .52             0.40073 → 0.51797
 M2 · observed B · what happened               —                     shifted
-M2 · observed C · move                        —                     0.00971
-M2 · observed C · moved only by reweighting   —                     no
-M2 · observed C · same direction              —                     0.53125
-M2 · observed C · was → is                    .43 → .44             0.43068 → 0.44039
+M2 · observed C · move                        —                     0.00238
+M2 · observed C · was → is                    .40 → .40             0.40073 → 0.40312
 M2 · observed C · what happened               —                     unchanged
-M2 · strike · move                            —                     -0.06724
-M2 · strike · moved only by reweighting       —                     no
-M2 · strike · same direction                  —                     0.93100
-M2 · strike · was → is                        .43 → .36             0.43068 → 0.36344
+M2 · observed C · why unchanged               —                     under_the_floor
+M2 · strike · move                            —                     -0.03372
+M2 · strike · was → is                        .40 → .37             0.40073 → 0.36702
 M2 · strike · what happened                   —                     shifted
-N1 · observed B · move                        —                     0.00121
-N1 · observed B · moved only by reweighting   —                     no
-N1 · observed B · same direction              —                     0.41889
-N1 · observed B · was → is                    .28 → .28             0.28336 → 0.28457
-N1 · observed B · what happened               —                     unchanged
-N1 · observed C · move                        —                     0.02085
-N1 · observed C · moved only by reweighting   —                     no
-N1 · observed C · same direction              —                     0.61480
-N1 · observed C · was → is                    .28 → .30             0.28336 → 0.30421
+M3 · observed B · move                        —                     0.03581
+M3 · observed B · was → is                    .30 → .34             0.30302 → 0.33883
+M3 · observed B · what happened               —                     shifted
+M3 · observed C · move                        —                     0.00954
+M3 · observed C · was → is                    .30 → .31             0.30302 → 0.31256
+M3 · observed C · what happened               —                     shifted
+M3 · strike · move                            —                     0.62513
+M3 · strike · was → is                        .30 → .93             0.30302 → 0.92815
+M3 · strike · what happened                   —                     shifted
+N1 · observed B · move                        —                     0.00732
+N1 · observed B · was → is                    .24 → .25             0.24121 → 0.24853
+N1 · observed B · what happened               —                     shifted
+N1 · observed C · move                        —                     0.00175
+N1 · observed C · was → is                    .24 → .24             0.24121 → 0.24296
 N1 · observed C · what happened               —                     unchanged
-N1 · strike · move                            —                     0.09284
-N1 · strike · moved only by reweighting       —                     no
-N1 · strike · same direction                  —                     0.87700
-N1 · strike · was → is                        .28 → .38             0.28336 → 0.37620
-N1 · strike · what happened                   —                     unchanged
-R · observed B · move                         —                     -0.00110
-R · observed B · moved only by reweighting    —                     no
-R · observed B · same direction               —                     0.00000
-R · observed B · was → is                     .19 → .19             0.19135 → 0.19025
-R · observed B · what happened                —                     unchanged
+N1 · observed C · why unchanged               —                     under_the_floor
+N1 · strike · move                            —                     0.11951
+N1 · strike · was → is                        .24 → .36             0.24121 → 0.36073
+N1 · strike · what happened                   —                     shifted
+O · observed B · move                         —                     0.02182
+O · observed B · was → is                     .17 → .19             0.16958 → 0.19140
+O · observed B · what happened                —                     shifted
+O · observed C · move                         —                     0.05809
+O · observed C · was → is                     .17 → .23             0.16958 → 0.22767
+O · observed C · what happened                —                     shifted
+O · strike · move                             —                     -0.04041
+O · strike · was → is                         .17 → .13             0.16958 → 0.12917
+O · strike · what happened                    —                     shifted
+R · observed B · move                         —                     -0.01027
+R · observed B · was → is                     .18 → .17             0.18000 → 0.16973
+R · observed B · what happened                —                     shifted
 R · observed C · move                         —                     0.00000
-R · observed C · moved only by reweighting    —                     no
-R · observed C · same direction               —                     1.00000
-R · observed C · was → is                     .19 → .19             0.19135 → 0.19135
+R · observed C · was → is                     .18 → .18             0.18000 → 0.18000
 R · observed C · what happened                —                     unchanged
+R · observed C · why unchanged                —                     under_the_floor
 R · strike · move                             —                     0.00000
-R · strike · moved only by reweighting        —                     no
-R · strike · same direction                   —                     1.00000
-R · strike · was → is                         .19 → .19             0.19135 → 0.19135
+R · strike · was → is                         .18 → .18             0.18000 → 0.18000
 R · strike · what happened                    —                     unchanged
+R · strike · why unchanged                    —                     under_the_floor
 S · strike · move                             —                     —
-S · strike · moved only by reweighting        —                     no
-S · strike · same direction                   —                     —
 S · strike · was → is                         — → supposed          — → —
 S · strike · what happened                    —                     added
 
@@ -262,122 +270,79 @@ The endings each edit reached, ranked the way the product ranks them. The
 place is part of the name, so a ranking that moves shows up as a number
 rather than as a block of lines shuffling.
 
-M1 · observed B · change list band width      —                     0.34398
-M1 · observed B · change list biggest move    —                     0.20816
-M1 · observed B · change list day             —                     2026-10-02 · day 1
+M1 · observed B · change list biggest move    —                     0.13133
+M1 · observed B · change list day             —                     2026-10-31 · day 30
 M1 · observed B · change list place           —                     1
-M1 · observed B · change list rank            —                     0.12489
-M1 · observed B · change list same direction  —                     0.98811
-M1 · observed B · change list was → is        .41 → .62             0.40903 → 0.61719
-M1 · strike · change list band width          —                     0.27319
-M1 · strike · change list biggest move        —                     -0.07654
-M1 · strike · change list day                 —                     2026-10-04 · day 3
-M1 · strike · change list place               —                     1
-M1 · strike · change list rank                —                     0.04592
-M1 · strike · change list same direction      —                     0.95350
-M1 · strike · change list was → is            .49 → .42             0.49412 → 0.41758
-M2 · observed B · change list band width      —                     0.38873
-M2 · observed B · change list biggest move    —                     0.15597
-M2 · observed B · change list day             —                     2026-10-04 · day 3
+M1 · observed B · change list rank            —                     0.07880
+M1 · observed B · change list was → is        .46 → .59             0.45615 → 0.58747
+M1 · strike · change list biggest move        —                     -0.03737
+M1 · strike · change list day                 —                     2026-10-31 · day 30
+M1 · strike · change list place               —                     3
+M1 · strike · change list rank                —                     0.02242
+M1 · strike · change list was → is            .46 → .42             0.45615 → 0.41877
+M2 · observed B · change list biggest move    —                     0.11724
+M2 · observed B · change list day             —                     2026-11-15 · day 45
 M2 · observed B · change list place           —                     2
-M2 · observed B · change list rank            —                     0.09358
-M2 · observed B · change list same direction  —                     0.97381
-M2 · observed B · change list was → is        .38 → .54             0.38028 → 0.53625
-M2 · strike · change list band width          —                     0.27814
-M2 · strike · change list biggest move        —                     -0.06724
-M2 · strike · change list day                 —                     2026-10-06 · day 5
-M2 · strike · change list place               —                     2
-M2 · strike · change list rank                —                     0.04034
-M2 · strike · change list same direction      —                     0.93100
-M2 · strike · change list was → is            .43 → .36             0.43068 → 0.36344
+M2 · observed B · change list rank            —                     0.07034
+M2 · observed B · change list was → is        .40 → .52             0.40073 → 0.51797
+M2 · strike · change list biggest move        —                     -0.03372
+M2 · strike · change list day                 —                     2026-11-15 · day 45
+M2 · strike · change list place               —                     4
+M2 · strike · change list rank                —                     0.02023
+M2 · strike · change list was → is            .40 → .37             0.40073 → 0.36702
+M3 · observed B · change list biggest move    —                     0.03581
+M3 · observed B · change list day             —                     2026-11-01 · day 31
+M3 · observed B · change list place           —                     3
+M3 · observed B · change list rank            —                     0.02149
+M3 · observed B · change list was → is        .30 → .34             0.30302 → 0.33883
+M3 · observed C · change list biggest move    —                     0.00954
+M3 · observed C · change list day             —                     2026-11-01 · day 31
+M3 · observed C · change list place           —                     1
+M3 · observed C · change list rank            —                     0.00572
+M3 · observed C · change list was → is        .30 → .31             0.30302 → 0.31256
+M3 · strike · change list biggest move        —                     0.63497
+M3 · strike · change list day                 —                     2026-10-27 · day 26
+M3 · strike · change list place               —                     1
+M3 · strike · change list rank                —                     0.38098
+M3 · strike · change list was → is            .25 → .89             0.25417 → 0.88914
+N1 · observed B · change list biggest move    —                     0.00732
+N1 · observed B · change list day             —                     2026-11-30 · day 60
+N1 · observed B · change list place           —                     4
+N1 · observed B · change list rank            —                     0.00220
+N1 · observed B · change list was → is        .24 → .25             0.24121 → 0.24853
+N1 · strike · change list biggest move        —                     0.11951
+N1 · strike · change list day                 —                     2026-11-30 · day 60
+N1 · strike · change list place               —                     2
+N1 · strike · change list rank                —                     0.03585
+N1 · strike · change list was → is            .24 → .36             0.24121 → 0.36073
 
 The one sentence the product writes beside each list.
 
-observed B · claims the edit left unchanged   —                     4
-observed B · the sentence beside the list     "Brent settled below $68" moves A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES from .41 to .62 by 2026-10-02 and leaves 4 claims untouched.  —
+base · warnings                               —                     none
+observed B · claims the edit left unchanged   —                     0
+observed B · the sentence beside the list     "Brent settled below $68" moves A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES from .46 to .59 by 2026-10-31 and leaves 0 claims untouched.  —
 observed B · warnings                         —                     none
-observed C · claims the edit left unchanged   —                     5
-observed C · the sentence beside the list     "the war-risk premium printed below 0.4%" moves no ending and leaves 5 claims untouched.  —
+observed C · claims the edit left unchanged   —                     4
+observed C · the sentence beside the list     "the war-risk premium printed below 0.4%" moves A Polymarket contract "Strait of Hormuz traffic returns to normal by October 31?" resolves YES from .30 to .31 by 2026-11-01 and leaves 4 claims untouched.  —
 observed C · warnings                         —                     none
-strike · claims the edit left unchanged       —                     3
-strike · the sentence beside the list         "Hormuz opens, then Iran is struck" moves A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES from .49 to .42 by 2026-10-04 and leaves 3 claims untouched.  —
+strike · claims the edit left unchanged       —                     1
+strike · the sentence beside the list         "Hormuz opens, then Iran is struck" moves A Polymarket contract "Strait of Hormuz traffic returns to normal by October 31?" resolves YES from .25 to .89 by 2026-10-27 and leaves 1 claim untouched.  —
 strike · warnings                             —                     none
-
-Suppositions a later edit undermined: the day the cause became true, never
-that day plus the arrow's delay.
-
-H · strike · supposition ended                —                     2026-10-02 · by S · along S->H · edit 2
-observed B · suppositions that ended          —                     0
-observed C · suppositions that ended          —                     0
-strike · suppositions that ended              —                     1
 
 The number on each arrow: its target, with its source supposed true — never
 how often the two show up together. Each arrow appears once, on the world
 where it exists.
 
-B->M1 · base · conditional                    .52 (.36–.67)         0.51773 0.36377 0.67135
-B->M2 · base · conditional                    .54 (.34–.73)         0.53955 0.34198 0.72895
-B->R · base · conditional                     .19 (.080–.32)        0.19135 0.07997 0.31986
-C->B · base · conditional                     .48 (.29–.68)         0.48089 0.29047 0.67517
-H->B · base · conditional                     .58 (.38–.76)         0.58088 0.38097 0.76122
-H->C · base · conditional                     .56 (.35–.75)         0.55586 0.35485 0.74723
-H->N1 · base · conditional                    .38 (.17–.61)         0.37620 0.16968 0.61017
-R->B · base · conditional                     .23 (.099–.38)        0.22631 0.09931 0.38063
-S->B · strike · conditional                   .20 (.10–.31)         0.19916 0.10084 0.31441
-S->C · strike · conditional                   .074 (.029–.13)       0.07372 0.02917 0.13252
-S->H · strike · conditional                   .086 (.034–.15)       0.08582 0.03439 0.15023
-
-Where each claim's band comes from, on the untouched map: the share of it
-owed to not being sure of each claim's own stated prior. A claim's shares
-do not add up to one, and are not meant to — they are the engine's own
-quantity, and it reports them near one rather than at it.
-
-B · base · band from B                        —                     0.57480
-B · base · band from C                        —                     0.03787
-B · base · band from H                        —                     0.04997
-B · base · band from M1                       —                     0.00933
-B · base · band from M2                       —                     0.00713
-B · base · band from N1                       —                     0.00722
-B · base · band from R                        —                     0.03262
-C · base · band from B                        —                     0.01139
-C · base · band from C                        —                     0.75860
-C · base · band from H                        —                     0.06484
-C · base · band from M1                       —                     0.00557
-C · base · band from M2                       —                     0.00935
-C · base · band from N1                       —                     0.00890
-C · base · band from R                        —                     0.01162
-H · base · band from B                        —                     0.01154
-H · base · band from C                        —                     0.00589
-H · base · band from H                        —                     0.98690
-H · base · band from M1                       —                     0.00928
-H · base · band from M2                       —                     0.00863
-H · base · band from N1                       —                     0.01095
-H · base · band from R                        —                     0.01189
-M1 · base · band from B                       —                     0.02156
-M1 · base · band from C                       —                     0.00541
-M1 · base · band from H                       —                     0.00779
-M1 · base · band from M1                      —                     0.89968
-M1 · base · band from M2                      —                     0.00561
-M1 · base · band from N1                      —                     0.01658
-M1 · base · band from R                       —                     0.00999
-M2 · base · band from B                       —                     0.03490
-M2 · base · band from C                       —                     0.00837
-M2 · base · band from H                       —                     0.01454
-M2 · base · band from M1                      —                     0.00945
-M2 · base · band from M2                      —                     0.78240
-M2 · base · band from N1                      —                     0.00758
-M2 · base · band from R                       —                     0.01801
-N1 · base · band from B                       —                     0.00757
-N1 · base · band from C                       —                     0.01050
-N1 · base · band from H                       —                     0.04017
-N1 · base · band from M1                      —                     0.00941
-N1 · base · band from M2                      —                     0.00981
-N1 · base · band from N1                      —                     0.73275
-N1 · base · band from R                       —                     0.01032
-R · base · band from B                        —                     0.01109
-R · base · band from C                        —                     0.00577
-R · base · band from H                        —                     0.00763
-R · base · band from M1                       —                     0.01241
-R · base · band from M2                       —                     0.01286
-R · base · band from N1                       —                     0.00413
-R · base · band from R                        —                     0.97988
+B->M1 · base · conditional                    .62                   0.61977
+B->M2 · base · conditional                    .54                   0.54402
+B->R · base · conditional                     .18                   0.18000
+C->B · base · conditional                     .43                   0.43389
+H->B · base · conditional                     .64                   0.64162
+H->M3 · base · conditional                    .93                   0.92815
+H->N1 · base · conditional                    .36                   0.36073
+H->O · base · conditional                     .55                   0.54536
+O->C · base · conditional                     .56                   0.55853
+R->B · base · conditional                     .13                   0.13331
+S->B · strike · conditional                   .10                   0.10275
+S->C · strike · conditional                   .15                   0.15176
+S->O · strike · conditional                   .13                   0.12917

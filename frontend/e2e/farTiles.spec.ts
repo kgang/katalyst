@@ -49,7 +49,7 @@ test("test_a_tile_seen_from_far_away_prints_every_belief_line_whole", async ({ p
     .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
-  await waitForTheLayout(page, 7);
+  await waitForTheLayout(page, 9);
 
   await zoomOutUntilTheTilesAreFarAway(page);
   // The tile takes its far-away form in one frame and the height reserved for
@@ -70,7 +70,7 @@ test("test_a_tile_seen_from_far_away_prints_every_belief_line_whole", async ({ p
     .getByRole("button", { name: new RegExp(THE_STRIKE_BRANCH) })
     .first()
     .click();
-  await waitForTheBranch(page, THE_STRIKE_BRANCH, 8);
+  await waitForTheBranch(page, THE_STRIKE_BRANCH, 10);
 
   await zoomOutUntilTheTilesAreFarAway(page);
   await expect(async () => {

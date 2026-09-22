@@ -30,6 +30,18 @@
  * repository already holds, `backend/recordings/hormuz.jsonl`, is an Explore run
  * with no destination and no backwards arrow, so on it the defect is invisible.
  *
+ * **One word in it was written by hand, and only one** *(2026-09-22)*. Every
+ * claim now says which kind of truth it is — `persistence`, either `event` for
+ * something that happens once and stays happened or `state` for something that
+ * holds for a while and can stop (decision record 0017). The field did not exist
+ * on the day this run was made, so the model never said one and the run carries
+ * none. All six of these claims are things that happen once — a strait reopening,
+ * a price settling, a report published, a quota approved, a fund closing above a
+ * level — so all six are written `event`. Nothing in the test that reads this file
+ * looks at the word; it is here because the type requires it. The one paid
+ * re-recording after the engine's flip (Kent's row R5) replaces this run with one
+ * whose every claim says its own word, and this note goes with it.
+ *
  * See `README.md` beside this file.
  */
 
@@ -52,6 +64,7 @@ export const A_LIVE_VERIFY_RUN: readonly StreamEvent[] = [
       claim:
         "The Strait of Hormuz reopens to commercial shipping traffic during the week of 28 September to 4 October 2026.",
       kind: "hypothesis",
+      persistence: "event",
       resolution: {
         criteria:
           "IMF PortWatch's Strait of Hormuz vessel-transit count (published in the IMF PortWatch Global Transport Tracker, the dataset cited throughout the current crisis by Reuters, gCaptain and the Straits Daily Brief) records an average of at least 40 vessel transits per day \\u2014 roughly half of the approximately 85-per-day pre-crisis baseline \\u2014 sustained over at least three separate days falling between 21 September 2026 and 4 October 2026 inclusive.",
@@ -100,6 +113,7 @@ export const A_LIVE_VERIFY_RUN: readonly StreamEvent[] = [
       claim:
         "Brent crude oil settles below $68.00 per barrel for five consecutive trading sessions",
       kind: "event",
+      persistence: "event",
       resolution: {
         criteria:
           "The daily settlement price of the ICE Brent Crude futures front-month contract closes below $68.00 per barrel on five consecutive trading sessions, on or before the by-date",
@@ -150,6 +164,7 @@ export const A_LIVE_VERIFY_RUN: readonly StreamEvent[] = [
       claim:
         "Crude oil tanker transits through the Strait of Hormuz return to at least 80 percent of their average daily volume recorded in January 2026, the last full month before the closure that began in late February 2026.",
       kind: "event",
+      persistence: "event",
       resolution: {
         criteria:
           "The average daily number of crude oil tanker transits through the Strait of Hormuz, as tracked in Kpler or Lloyd's List Intelligence ship-tracking data, over any consecutive seven-day period reaches at least 80 percent of the average daily transit count recorded in January 2026.",
@@ -270,6 +285,7 @@ export const A_LIVE_VERIFY_RUN: readonly StreamEvent[] = [
       claim:
         "The International Energy Agency's monthly Oil Market Report shows the global crude oil supply-demand balance back in a surplus of at least 1.0 million barrels per day.",
       kind: "event",
+      persistence: "event",
       resolution: {
         criteria:
           "In the first Oil Market Report edition covering a month that falls after the Strait of Hormuz tanker-transit recovery is confirmed, the IEA states that global oil supply exceeds global oil demand by at least 1.0 million barrels per day, moving the market back toward the roughly 3.7 mb/d surplus it was running before the war-related closure began in late February 2026.",
@@ -429,6 +445,7 @@ export const A_LIVE_VERIFY_RUN: readonly StreamEvent[] = [
       claim:
         "OPEC+ approves a further increase to its collective crude oil production quotas at a ministerial or Joint Ministerial Monitoring Committee meeting, marking at least a sixth consecutive monthly output increase since the Strait of Hormuz closure began in February 2026.",
       kind: "event",
+      persistence: "event",
       resolution: {
         criteria:
           "OPEC's own press release or statement following a ministerial or JMMC meeting announces an increase (not a cut, pause, or rollover) in collective output quotas for the following month, continuing the unbroken monthly-increase streak that began in April 2026.",
@@ -567,6 +584,7 @@ export const A_LIVE_VERIFY_RUN: readonly StreamEvent[] = [
       claim:
         "The U.S. Global Jets ETF (JETS) closes at least 8 percent above its price on the trading day immediately before Brent's five-session close under $68.00, at some point within the following 20 trading days.",
       kind: "market",
+      persistence: "event",
       resolution: {
         criteria:
           "JETS ETF's daily closing net asset value, as reported on NYSE Arca, reaches a level at least 8 percent above its closing price on the trading day immediately preceding the first of the five consecutive sessions in which Brent settles below $68.00, on any close within the following 20 trading sessions.",

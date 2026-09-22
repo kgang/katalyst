@@ -903,26 +903,23 @@ export interface components {
          *     already refers to. So a claim's state is about the number the reader is
          *     looking at, and not about some other day.
          *
-         *     `agreement` is carried on every claim both worlds hold, not only the ones
-         *     that moved, so a reader — or a test — can check the rule that decided the
-         *     state without recomputing anything. It is read with the same weights the two
-         *     numbers above were read with, so a version that counted for nothing in them
-         *     does not vote on which way they moved.
-         *
          *     A claim still supposed on its own resolve-by day carries the stored 1 (or 0,
          *     where it was supposed false) so that the arithmetic stays ordinary. **No
          *     surface prints that number**: every reader looks at the world's `states`
          *     first and writes the word *Supposed* where the number would go.
          *
-         *     `unchanged_because` says which half of the moved-at-all test an `unchanged`
-         *     claim failed. It is here because the floor and the bar are constants inside
-         *     this file and appear on no wire, so a reader who is only told *unchanged*
-         *     cannot tell "it barely moved" from "nobody agrees which way it went" — and
-         *     working it out at the other end would mean a second copy of both constants,
-         *     disagreeing with these ones. Where `moved_only_by_reweighting` is also true
-         *     it is the fuller answer and is the one to show: such a claim always says
-         *     `versions_disagree`, because every version that counts moved by exactly
-         *     nothing, and *nothing agreed with the direction* is a thin way to put that.
+         *     `unchanged_because` says why an `unchanged` claim is unchanged. It is here
+         *     because the floor is a constant inside this file and appears on no wire, so a
+         *     reader who is only told *unchanged* cannot tell "it barely moved" from
+         *     anything else — and working it out at the other end would mean a second copy
+         *     of the floor, disagreeing with this one.
+         *
+         *     **Two fields on this shape are now always the same value**, and both say so
+         *     in their own description: `agreement` is always nothing at all, and
+         *     `moved_only_by_reweighting` is always false. Both were about the two thousand
+         *     versions of the map, which were cut on 2026-09-22 (decision records 0028 and
+         *     0016). They stay on the wire until one follow-up after the browser round,
+         *     because their readers are that round's files.
          */
         ClaimDiff: {
             /**
@@ -953,17 +950,17 @@ export interface components {
             delta: number | null;
             /**
              * Agreement
-             * @description The share of versions of the map that moved the same way as the move above, each version counted by as much as it counted for the two numbers. Nothing at all when there is no direction to report: when only one of the two worlds holds the claim, and when no version of the map counted in both numbers. On screen this column is headed 'same direction'.
+             * @description Always nothing at all. It was the share of the versions of the map that moved the same way as the move above, and there is one version (decision record 0028). Kept on the wire, always absent, until the browser round closes.
              */
             agreement: number | null;
             /**
              * Moved Only By Reweighting
-             * @description True when the move above came from nothing but the observation changing how much each version counts: the claim is in both worlds, it moved by at least 0.005, and not one version that counts moved at all. Only an observation can produce it, and the Inspector says so in one sentence.
+             * @description Always false. It was true when a claim's whole move came from an observation changing how much each version of the map counted, and no version counts for anything any more (decision record 0016: there is no inner loop for a world to survive). Kept on the wire, always false, until the browser round closes.
              */
             moved_only_by_reweighting: boolean;
             /**
              * Unchanged Because
-             * @description Which half of the moved-at-all test this claim failed, in one word: 'under_the_floor' when the move is smaller than the floor, 'versions_disagree' when it cleared the floor and too few versions of the map moved that way. The floor is read first, so a claim that fails both says 'under_the_floor'. Nothing at all unless the claim is 'unchanged', and nothing when there is no test to fail: a claim only one world holds, and a claim no version counted in both numbers, whose absent 'agreement' already says there was no direction to read.
+             * @description Why this claim is unchanged, in one word: 'under_the_floor', because the move is smaller than the floor, which is the only answer this engine gives. The other word, 'versions_disagree', is never written — it was about the two thousand versions of the map, and there is one. Nothing at all unless the claim is 'unchanged', and nothing where there is no move to measure: a claim only one of the two worlds holds.
              */
             unchanged_because: ("under_the_floor" | "versions_disagree") | null;
         };
@@ -996,13 +993,13 @@ export interface components {
             link_id: string;
             /**
              * Versions
-             * @description The outer loop. Match the world this number is shown beside.
+             * @description **Accepted and ignored** — see `WorldRequest.versions`. Decision record 0028.
              * @default 2000
              */
             versions: number;
             /**
              * Worlds
-             * @description The inner loop, for the same reason.
+             * @description **Accepted and ignored** — see `WorldRequest.worlds`. Decision record 0016.
              * @default 8
              */
             worlds: number;
@@ -1091,11 +1088,11 @@ export interface components {
          *     example reading a row on its distant resolve-by day shows about two thirds of
          *     the move and calls it the answer.
          *
-         *     `range_width` and `agreement` are **columns, never factors**. They answer two
-         *     different questions — how unsure are we of this number, and how sure are we of
-         *     its direction — and a trader weighs them separately from how big the move is.
-         *     Multiplying either into the rank would bury exactly the wide claims that are
-         *     worth researching, and would hide which of the three facts is talking.
+         *     **`range_width` and `agreement` are both always nought**, and each says so in
+         *     its own description. They were the width of a range and a share of the two
+         *     thousand versions of the map, and Kent cut both on 2026-09-22 (decision record
+         *     0028). They stay on the wire until one follow-up after the browser round,
+         *     because their readers are that round's files.
          */
         DeltaRow: {
             /**
@@ -1126,12 +1123,12 @@ export interface components {
             at_day: string;
             /**
              * Range Width
-             * @description How wide the second world's own range on this claim is on that day — the same width its tile shows, so the list and the tile can never disagree about how firm a number is. On screen this column is headed 'how firm'.
+             * @description Always nought, and truthfully so: no number on this product carries a range any more, so every range is nought wide (decision record 0028). Kept on the wire until the browser round closes.
              */
             range_width: number;
             /**
              * Agreement
-             * @description The share of versions of the map that moved the same way on that day, each version counted by as much as it counted for the two numbers. A column, never a factor. On screen it is headed 'same direction'.
+             * @description Always nought. It was the share of the versions of the map that moved the same way on that day; there is one version, so there is no share of them to report, and nought is what a field that counts nothing carries. Kept on the wire until the browser round closes (decision record 0028).
              */
             agreement: number;
             /**
@@ -1172,12 +1169,12 @@ export interface components {
             seed: number;
             /**
              * Versions
-             * @description The outer loop both worlds ran: versions of the map.
+             * @description How many versions of the map both worlds worked out. Always 1 (decision record 0028). Kept on the wire until the browser round closes.
              */
             versions: number;
             /**
              * Worlds
-             * @description The inner loop both worlds ran: worlds per version.
+             * @description How many worlds ran inside each version. Always 0 — there is no inner loop (decision record 0016). Kept on the wire until the browser round closes.
              */
             worlds: number;
             /**
@@ -1230,13 +1227,13 @@ export interface components {
             seed: number;
             /**
              * Versions
-             * @description The outer loop both worlds run.
+             * @description **Accepted and ignored** — see `WorldRequest.versions`. Decision record 0028.
              * @default 2000
              */
             versions: number;
             /**
              * Worlds
-             * @description The inner loop both worlds run.
+             * @description **Accepted and ignored** — see `WorldRequest.worlds`. Decision record 0016.
              * @default 8
              */
             worlds: number;
@@ -1787,7 +1784,7 @@ export interface components {
             target: string;
             /**
              * Mode
-             * @description How the push behaves when the cause goes away. 'trigger': a one-time shove — once the cause becomes true the effect is pushed and stays pushed, fading on its own; undoing the cause later does not undo it (a toppled domino). 'sustain': a continuous hold — the push exists only while the cause holds, and vanishes the moment it stops (an apple on a desk).
+             * @description Which of the cause's two times this arrow reads. 'trigger' reads the day the cause came on and nothing else: once the cause has happened the effect is pushed and stays pushed, fading on its own if its shape fades, and whatever becomes of the cause afterwards makes no difference (a toppled domino). 'sustain' reads the cause's whole stretch — the day it came on and the day it stopped — so the push is dead the moment the cause stops holding (an apple on a desk). Only a claim that can stop has a stretch to read, so a 'sustain' arrow may leave only a claim whose persistence is 'state'; out of an event the two behave identically.
              * @enum {string}
              */
             mode: "trigger" | "sustain";
@@ -2206,6 +2203,12 @@ export interface components {
              * @enum {string}
              */
             kind: "hypothesis" | "event" | "market" | "not_tradeable";
+            /**
+             * Persistence
+             * @description Which kind of truth this claim is: `event` for something that happens once and stays happened, `state` for something that holds over a stretch of time and can stop holding. Required on every claim — a map that omits it is refused rather than given a kind we guessed.
+             * @enum {string}
+             */
+            persistence: "event" | "state";
             /** @description How and when this claim gets settled, and by whom. */
             resolution: components["schemas"]["Resolution"];
             /** @description The model's likelihood for this claim before its causes are taken into account. Always owned by `model`. */
@@ -2471,47 +2474,6 @@ export interface components {
              * @description The date by which the test has been applied. After this date the claim is true or false — never still open.
              */
             by: string;
-        };
-        /**
-         * Retraction
-         * @description The end of a supposition: which claim, which day, and what undermined it.
-         *
-         *     A claim the user supposed true, and which a later edit has pushed back down,
-         *     is never drawn as plainly true. This is what the tile's *Retracted · date · by
-         *     "…"* badge is written from.
-         *
-         *     It records the day the **cause** became true, never that day plus the arrow's
-         *     delay. Tying the end of a supposition to the arrival of the push would tie
-         *     "do I still take your word for this" to a delay parameter — change a lag from
-         *     three days to thirty and the supposition would silently outlive the news.
-         */
-        Retraction: {
-            /**
-             * Target
-             * @description The claim whose supposition ended.
-             */
-            target: string;
-            /**
-             * At
-             * Format: date
-             * @description The day it ended: the day the opposing arrow's source was settled, never that day plus the arrow's delay.
-             */
-            at: string;
-            /**
-             * By Link
-             * @description The arrow that undermined the supposition.
-             */
-            by_link: string;
-            /**
-             * By Claim
-             * @description That arrow's source — the claim the tile names in its badge.
-             */
-            by_claim: string;
-            /**
-             * By
-             * @description Which edit introduced the arrow, as its position in the branch, counting from 0. Always known, and that is a theorem rather than a convention: supposing a claim cuts every arrow pointing at it at that moment, so any arrow that later pushes against it was added afterwards, by an edit.
-             */
-            by: number;
         };
         /**
          * Retune
@@ -3062,10 +3024,10 @@ export interface components {
         Violation: {
             /**
              * Code
-             * @description Which rule was broken. One of twenty stable strings.
+             * @description Which rule was broken. One of twenty-one stable strings.
              * @enum {string}
              */
-            code: "missing_resolution" | "missing_rationale" | "documented_without_source" | "cycle" | "reflexive_without_lag" | "half_life_without_impulse" | "impulse_without_half_life" | "belief_out_of_range" | "no_terminal" | "no_hypothesis" | "multiple_hypotheses" | "dangling_link" | "duplicate_link" | "market_without_payoff" | "not_tradeable_without_reason" | "unknown_target" | "unknown_link" | "duplicate_id" | "edit_not_applicable" | "worlds_not_comparable";
+            code: "missing_resolution" | "claim_without_persistence" | "missing_rationale" | "documented_without_source" | "cycle" | "reflexive_without_lag" | "half_life_without_impulse" | "impulse_without_half_life" | "belief_out_of_range" | "no_terminal" | "no_hypothesis" | "multiple_hypotheses" | "dangling_link" | "duplicate_link" | "market_without_payoff" | "not_tradeable_without_reason" | "unknown_target" | "unknown_link" | "duplicate_id" | "edit_not_applicable" | "worlds_not_comparable";
             /**
              * Subject
              * @description The identifier of the thing at fault: a proposition id, a link id, the graph's own id for faults about the map as a whole — including two worlds that cannot be compared, which names the map they should both have come from — or a branch id when a chain of branches cannot be put in order. Never shown to the user.
@@ -3277,17 +3239,16 @@ export interface components {
          *
          *     Every likelihood in `beliefs` is owned by the model and is read on that claim's
          *     own resolve-by day, which is the day the claim is judged and the date its tile
-         *     already shows. `series` carries one likelihood per day so the spike and the
-         *     fade are visible rather than hidden, and `states` says, for each of those days,
-         *     whether the number is the ordinary sampled one, a supposition holding, a
-         *     supposition withdrawn with no push yet, or a push that has landed.
+         *     already shows. `series` carries one likelihood per day so the way the chance
+         *     arrives is visible rather than hidden, and `states` says, for each of those
+         *     days, whether the number is the ordinary computed one or a supposition holding.
          *
-         *     **A claim whose supposition is holding reads 1 — exactly 1, range and all, or
-         *     0 when it was supposed false.** That number is there so that a chain of claims
-         *     multiplied together has a factor for it, and for nothing else: **no surface may
-         *     print it.** Every reader looks at `states` first and prints the word *Supposed*
-         *     where the number would go, because "suppose this is true" answered with a
-         *     likelihood is a tool arguing with the person using it.
+         *     **A claim whose supposition is holding reads 1 — exactly 1, or 0 where it was
+         *     supposed false.** That number is there so that a chain of claims multiplied
+         *     together has a factor for it, and for nothing else: **no surface may print
+         *     it.** Every reader looks at `states` first and prints the word *Supposed* where
+         *     the number would go, because "suppose this is true" answered with a likelihood
+         *     is a tool arguing with the person using it.
          */
         World: {
             /**
@@ -3307,12 +3268,12 @@ export interface components {
             seed: number;
             /**
              * Versions
-             * @description The outer loop: how many versions of the map were tried — how sure we are of the numbers we put in.
+             * @description How many versions of the map were worked out. Always 1: one likelihood per claim, computed once. Kept on the wire, always the same number, until the browser round closes (decision record 0028; dated 2026-09-22).
              */
             versions: number;
             /**
              * Worlds
-             * @description The inner loop: how many worlds were run under each version — how the dice fall.
+             * @description How many worlds ran inside each version. Always 0, meaning there is no inner loop at all. Kept on the wire, always the same number, until the browser round closes (decision record 0016; dated 2026-09-22).
              */
             worlds: number;
             /**
@@ -3335,12 +3296,12 @@ export interface components {
             assignments: components["schemas"]["Assignment"][];
             /**
              * Retractions
-             * @description Every supposition that a later edit undermined, and what undermined it.
+             * @description Always empty. Nothing on this product undermines a supposition any more (decision record 0017): a claim that happened stays happened, and what a later event pushes back on is a state. Kept on the wire, always empty, until the browser round closes (dated 2026-09-22).
              */
-            retractions: components["schemas"]["Retraction"][];
+            retractions: string[];
             /**
              * Beliefs
-             * @description The model's likelihood for each claim, read on that claim's own resolve-by day, with the range that says how sure we are of it.
+             * @description The model's likelihood for each claim, read on that claim's own resolve-by day. One number: `lo`, `p` and `hi` are all the same.
              */
             beliefs: {
                 [key: string]: components["schemas"]["Belief"];
@@ -3362,7 +3323,7 @@ export interface components {
              * @description One named state per day, the same length as the series.
              */
             states: {
-                [key: string]: ("sampled" | "supposed" | "withdrawn" | "pushed")[];
+                [key: string]: ("sampled" | "supposed")[];
             };
             /**
              * Conditionals
@@ -3373,7 +3334,7 @@ export interface components {
             };
             /**
              * Range Shares
-             * @description How much of each claim's band comes from not being sure of each claim's prior: range_shares[target][source]. These do not add up to the whole band, and are not meant to: a version draws every arrow's push as well, and what the pushes explain is in no entry here. Nothing on screen reads it yet; it is carried because the sample it comes from is thrown away otherwise.
+             * @description Always empty. It said how much of each claim's range came from not being sure of each claim's own stated number, and there is no range (decision record 0028). Kept on the wire, always empty, until the browser round closes (dated 2026-09-22).
              */
             range_shares?: {
                 [key: string]: {
@@ -3410,13 +3371,13 @@ export interface components {
             seed: number;
             /**
              * Versions
-             * @description How many versions of the map to try: how sure we are of the numbers put in. Each version is one coherent set of numbers this model would have stood behind, and the range on every answer is the spread across them. Bounded at both ends: a request above the ceiling is refused, never quietly made smaller, because a caller who asks for one run and gets another is reading numbers that answer a question nobody asked.
+             * @description **Accepted and ignored.** The engine works out one version of the map and reports one likelihood per claim (decision record 0028, 2026-09-22), so this number reaches no arithmetic. It is still accepted, and still bounded at both ends, so that nothing written against the old shape has to change today; the field goes in one follow-up when the browser round closes.
              * @default 2000
              */
             versions: number;
             /**
              * Worlds
-             * @description How many worlds to run under each version: how the dice fall. At least two, or there is no spread inside a version to subtract from the range; and no more than the ceiling, which is measured rather than chosen.
+             * @description **Accepted and ignored.** There is no inner loop at all (decision record 0016). The same dated note as `versions` above.
              * @default 8
              */
             worlds: number;

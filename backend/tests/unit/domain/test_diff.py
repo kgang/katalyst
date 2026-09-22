@@ -36,7 +36,6 @@ from decimal import Decimal
 from itertools import pairwise
 
 import networkx
-import numpy
 import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
@@ -63,26 +62,17 @@ from katalyst.domain import (
     World,
     apply,
     diff,
-    introduced_by,
     propagate,
     sensitivity,
-    versions_of,
 )
 from katalyst.domain.belief import two_figures
 from katalyst.domain.diff import (
-    AGREEING_AT_LEAST,
     MOVED_AT_LEAST,
     NO_ARROW_TO_WEAKEN,
     PROVENANCE_WEIGHT,
-    SWEEP_VERSIONS,
-    SWEEP_WORLDS,
-    _agreement_on,
-    _counting_for,
     _ordinary_arrows,
-    _read_on,
     best_backed_routes,
 )
-from katalyst.domain.propagation import Numbers, Versions
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
 from tests.comparisons import every_version_answered_the_same
 from tests.strategies import branches, graphs
@@ -95,19 +85,6 @@ diff_module = importlib.import_module("katalyst.domain.diff")
 
 many = settings(max_examples=20, deadline=None)
 a_few = settings(max_examples=8, deadline=None)
-
-SMALL = {"versions": 16, "worlds": 4}
-"""The budget the tests over generated maps run at, and why it is not the shipped one.
-
-Sixteen versions of the map and four worlds under each is sixty-four draws rather
-than sixteen thousand, and a difference costs four runs of the engine. Every rule
-these tests check — which word a claim gets, which endings are listed and in what
-order, what the sentence says — is true at any budget; only how steady the
-numbers are depends on it.
-"""
-
-FULL = {"versions": 2_000, "worlds": 8}
-"""The shipped budget, for the handful of tests that are about a measured number."""
 
 DAY_ZERO = date(2026, 1, 1)
 """Day zero for the generated maps, which carry resolve-by dates from 2026 onwards."""
@@ -154,6 +131,7 @@ def _claim(
         id=identifier,
         claim=f"The claim written down under the name {identifier}.",
         kind=kind,  # type: ignore[arg-type]
+        persistence="event",
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",
@@ -199,7 +177,7 @@ def _branch(*edits: Intervention, identifier: str = "branch-under-test") -> Bran
     return Branch(id=identifier, label="A branch a test wrote", interventions=edits)
 
 
-def _world(graph: Graph, branch: Branch, **budget: int) -> World:
+def _world(graph: Graph, branch: Branch) -> World:
     """Fold a branch onto a map, work the numbers through, and say which branch it was."""
     folded = apply(graph, branch)
     if isinstance(folded, list):
@@ -209,38 +187,24 @@ def _world(graph: Graph, branch: Branch, **budget: int) -> World:
         assume(False)
     assert not isinstance(folded, list)
     left_behind, fixed = folded
-    world = propagate(
-        left_behind,
-        fixed,
-        as_of=DAY_ZERO,
-        seed=SEED,
-        introduced_by=introduced_by(branch),
-        **(budget or SMALL),
-    )
+    world = propagate(left_behind, fixed, as_of=DAY_ZERO, seed=SEED)
     return world.model_copy(update={"branch_id": branch.id})
 
 
-def _hormuz_world(branch: Branch | None, **budget: int) -> World:
+def _hormuz_world(branch: Branch | None) -> World:
     """The same, on the shipped worked example and its own day zero."""
     folded = apply(HORMUZ, branch or _branch())
     assert not isinstance(folded, list), folded
     left_behind, fixed = folded
-    world = propagate(
-        left_behind,
-        fixed,
-        as_of=FIXTURE_DATE,
-        seed=SEED,
-        introduced_by=introduced_by(branch or _branch()),
-        **(budget or FULL),
-    )
+    world = propagate(left_behind, fixed, as_of=FIXTURE_DATE, seed=SEED)
     return world.model_copy(update={"branch_id": branch.id if branch is not None else None})
 
 
-def _compared(graph: Graph, first: Branch, second: Branch, **budget: int) -> Diff:
+def _compared(graph: Graph, first: Branch, second: Branch) -> Diff:
     """Two worlds from one map and one seed, and the difference between them."""
     answer = diff(
-        _world(graph, first, **budget),
-        _world(graph, second, **budget),
+        _world(graph, first),
+        _world(graph, second),
         edit_in_words=second.label,
     )
     assert not isinstance(answer, list), answer
@@ -295,30 +259,6 @@ def _may_move(graph: Graph, branch: Branch) -> set[str] | None:
         here, _ = folded
         reached |= _affected_from_the_shape(here, edit)
     return reached
-
-
-def _weights_the_number_was_read_with(behind: Versions, claim_id: str) -> Numbers:
-    """How much each version counted when this world read this claim's own number.
-
-    Written out from the chapter rather than taken from the code, so the two agree
-    by arithmetic and not by sharing a line. Every version counts the same, unless
-    what was observed is evidence about this claim — then each version counts by
-    the share of its worlds that survived what was observed.
-    """
-    if claim_id in behind.reweighted:
-        return behind.weights[claim_id]
-    return numpy.ones_like(behind.weights[claim_id])
-
-
-def _one_number(per_version: Numbers, counting: Numbers) -> float:
-    """Average one claim's version-by-version answers the way a world reads its number."""
-    return float(numpy.clip((per_version * counting).sum() / counting.sum(), 0.0, 1.0))
-
-
-def _count_every_version_the_same(behind_a: Versions, behind_b: Versions, claim_id: str) -> Numbers:
-    """Stand in for the weights so that every version counts 1, whatever was observed."""
-    del behind_b
-    return numpy.ones_like(behind_a.weights[claim_id])
 
 
 def _weakest_on_the_best_route(graph: Graph, subjects: set[str], target: str) -> float:
@@ -417,51 +357,27 @@ def test_diff_replays_from_base_branches_seed(data: st.DataObject) -> None:
 # --- What puts a claim in each of the four states --------------------------
 
 
-def test_shifted_needs_agreement() -> None:
-    """Two ranges can overlap across half their width while every version moves the same way.
-
-    This is the single most likely way to get a difference wrong, and it is
-    measured here on the shipped example rather than argued. Supposing the strait
-    opens moves Brent-below-$68 on its own resolve-by day, and the two ranges
-    overlap heavily — because each one is wide for its own reason, which is that
-    we are unsure what number to give you. The *difference* between them is tight
-    and all one way, because both worlds were worked out from the same numbers.
-    An engine that compared the two ranges would report no change about the
-    clearest change on the map.
-    """
-    base = _hormuz_world(None)
-    supposed = _hormuz_world(_branch(Do(target="H", value=True, at=FIXTURE_DATE)))
-    answer = diff(base, supposed, edit_in_words="Hormuz opens")
-    assert not isinstance(answer, list), answer
-
-    before, after = base.beliefs["B"], supposed.beliefs["B"]
-    overlap = min(before.hi, after.hi) - max(before.lo, after.lo)
-    narrower = min(before.hi - before.lo, after.hi - after.lo)
-    assert overlap > 0.3 * narrower, "the two ranges were expected to overlap heavily"
-
-    moved = answer.claims["B"]
-    assert moved.state == "shifted"
-    assert moved.agreement is not None and moved.agreement > 0.9
-    assert moved.delta is not None and moved.delta > 0.0
-
-
 @given(st.data())
 @many
-def test_shifted_is_exactly_the_two_halves(data: st.DataObject) -> None:
-    """A claim is `shifted` exactly when it moved far enough **and** the versions agreed.
+def test_shifted_is_the_floor_alone(data: st.DataObject) -> None:
+    """A claim is `shifted` exactly when it moved by the floor or more, and on nothing else.
 
-    Both numbers are carried on every claim both worlds hold, so the rule that
-    decided the word can be read straight off the answer without recomputing
-    anything — which is the whole reason they are carried.
+    Decision record 0028 names this test. The word used to need a second thing —
+    that at least nine versions of the map in ten moved the same way — and that
+    went with the versions: there is one reading of the map, so a share of them is
+    a share of one thing. The move is carried on every claim both worlds hold, so
+    the rule that decided the word can be read straight off the answer without
+    recomputing anything, which is the whole reason it is carried.
     """
     graph = data.draw(graphs())
     answer = _compared(graph, data.draw(branches(graph)), data.draw(branches(graph)))
 
     for one in answer.claims.values():
-        if one.state in {"added", "killed"} or one.delta is None or one.agreement is None:
+        assert one.agreement is None, one
+        assert one.moved_only_by_reweighting is False, one
+        if one.state in {"added", "killed"} or one.delta is None:
             continue
-        both_halves = abs(one.delta) >= 0.005 and one.agreement >= 0.90
-        assert (one.state == "shifted") == both_halves, one
+        assert (one.state == "shifted") == (abs(one.delta) >= MOVED_AT_LEAST), one
 
 
 def test_killed_means_forced_false() -> None:
@@ -469,20 +385,23 @@ def test_killed_means_forced_false() -> None:
 
     Stretching the word to cover "the likelihood got low" would tell the user
     their argument was cut when it was merely losing. On the strike branch the
-    strait's own claim falls from about a third to under a tenth and is `shifted`;
-    add one edit forcing the premium claim false and that one, and only that one,
-    is `killed`.
+    state everything downstream rests on — *the strait stays open to commercial
+    transit through 1 November* — falls a long way and is `shifted`, and nothing on
+    that branch is `killed` at all: the strike is an insert and a supposition, and
+    neither forces anything false. Add one edit forcing the premium claim false and
+    that one, and only that one, is `killed`.
     """
-    base = _hormuz_world(None, **SMALL)
-    strike = _hormuz_world(HORMUZ_THEN_STRIKE, **SMALL)
+    base = _hormuz_world(None)
+    strike = _hormuz_world(HORMUZ_THEN_STRIKE)
     falling = diff(base, strike, edit_in_words=HORMUZ_THEN_STRIKE.label)
     assert not isinstance(falling, list), falling
 
-    assert falling.claims["H"].state == "shifted"
-    assert falling.claims["H"].after is not None and falling.claims["H"].after < 0.2
+    fell = falling.claims["O"]
+    assert fell.state == "shifted"
+    assert fell.before is not None and fell.after is not None and fell.after < fell.before
     assert all(one.state != "killed" for one in falling.claims.values())
 
-    cut = _hormuz_world(_branch(Do(target="C", value=False, at=FIXTURE_DATE)), **SMALL)
+    cut = _hormuz_world(_branch(Do(target="C", value=False, at=FIXTURE_DATE)))
     forced = diff(base, cut, edit_in_words="The premium never falls")
     assert not isinstance(forced, list), forced
 
@@ -530,8 +449,8 @@ def test_a_claim_only_the_first_world_holds_reads_as_untouched() -> None:
 def test_a_claim_the_second_world_adds_reads_as_added() -> None:
     """A claim the second branch put on the map is `added`, and carries the number it has there."""
     strike = diff(
-        _hormuz_world(None, **SMALL),
-        _hormuz_world(HORMUZ_THEN_STRIKE, **SMALL),
+        _hormuz_world(None),
+        _hormuz_world(HORMUZ_THEN_STRIKE),
         edit_in_words=HORMUZ_THEN_STRIKE.label,
     )
     assert not isinstance(strike, list), strike
@@ -659,7 +578,9 @@ def test_an_observation_carries_a_change_upstream_and_the_route_climbs_with_it()
     )
 
     answer = _compared(
-        graph, _branch(identifier="base"), _branch(Observe(target="seen", value=True)), **FULL
+        graph,
+        _branch(identifier="base"),
+        _branch(Observe(target="seen", value=True)),
     )
 
     listed = {one.target: one for one in answer.rows}
@@ -700,13 +621,14 @@ def _observing(target: str) -> Branch:
 def test_an_observation_puts_a_row_on_the_rail() -> None:
     """Saying Brent settled below $68 puts the two tradeable endings on the change list.
 
-    This is the button that used to look as if it did nothing. An observation is
-    made by throwing away the worlds it did not happen in, and on the worked
-    example some versions of the map lose every one of their eight worlds. Such a
-    version weighs nothing in the number, so it must weigh nothing in the
-    direction; counting it anyway dragged both endings a hair under the 90% bar and
-    emptied the rail. Read the direction with the weights the number was read with
-    and both endings are on the rail, rising, with the fixed sentence beside them.
+    This is the button that used to look as if it did nothing. It looked that way
+    for a reason that no longer exists: an observation was made by throwing away
+    the worlds it did not happen in, some versions of the map lost every one of
+    their eight worlds, and counting those empty versions in the direction dragged
+    both endings a hair under the ninety-per-cent bar and emptied the rail. There
+    are no versions and no bar now — a change-list row needs a move of `.005` and
+    nothing else (decision record 0028) — and both endings are on the rail, rising,
+    with the fixed sentence beside them.
 
     Directions and orderings only. The example map is a curated one whose
     illustrative inputs may be tuned, so nothing here pins a value.
@@ -716,279 +638,15 @@ def test_an_observation_puts_a_row_on_the_rail() -> None:
     answer = diff(base, learned, edit_in_words="Brent settled below $68")
     assert not isinstance(answer, list), answer
 
-    behind = versions_of(learned)
-    assert bool((behind.weights["M1"] == 0.0).any()), "this observation empties some versions"
-
-    assert [one.target for one in answer.rows] == ["M1", "M2"]
-    for row in answer.rows:
-        assert answer.claims[row.target].state == "shifted"
-        assert row.peak_delta > 0.0, "cheap Brent is evidence for both market claims"
-        assert row.agreement >= AGREEING_AT_LEAST
+    listed = {one.target: one for one in answer.rows}
+    assert {"M1", "M2"} <= set(listed), listed
+    for target in ("M1", "M2"):
+        assert answer.claims[target].state == "shifted"
+        assert listed[target].peak_delta > 0.0, "cheap Brent is evidence for both market claims"
     assert FIRST_SENTENCE.match(answer.summary), answer.summary
 
 
-def test_a_dead_version_does_not_vote() -> None:
-    """A version left with no surviving world weighs nothing, so it says nothing about direction.
-
-    Such a version reports no number at all, and its weight is zero, so letting it
-    argue about which way the number moved would let a version that contributed
-    nothing to either answer outvote the ones that did. The test hands every dead
-    version the loudest opinion it could have — each one made to point the opposite
-    way — and the answer does not move by a bit.
-    """
-    base = _hormuz_world(None)
-    learned = _hormuz_world(_observing("B"))
-    behind_a, behind_b = versions_of(base), versions_of(learned)
-    dead = behind_b.weights["M1"] == 0.0
-    assert bool(dead.any()), "this observation empties some versions"
-
-    for claim in learned.graph.propositions:
-        before = behind_a.likelihood[claim.id][:, _read_on(base, claim)]
-        after = behind_b.likelihood[claim.id][:, _read_on(learned, claim)]
-        move = learned.beliefs[claim.id].p - base.beliefs[claim.id].p
-        counting = _counting_for(behind_a, behind_b, claim.id)
-        assert bool((counting[dead] == 0.0).all()), claim.id
-
-        shouting = after.copy()
-        shouting[dead] = before[dead] - move
-        assert _agreement_on(before, shouting, move, counting) == _agreement_on(
-            before, after, move, counting
-        ), claim.id
-
-    # And the corner where nothing at all survived anywhere: every version counts
-    # the same again, which is exactly what the band does in the same corner, so
-    # the number and its direction stay read the same way and nothing is divided
-    # by nothing. The world already carries a loud warning about it.
-    impossible = _map(
-        (
-            _claim("top", kind="hypothesis", prior=(0.0, 0.0, 0.0)),
-            _claim("ending", kind="market"),
-        ),
-        (_arrow("top", "ending"),),
-    )
-    gone = _compared(impossible, _branch(identifier="base"), _observing("top"))
-    assert all(
-        one.agreement is None or 0.0 <= one.agreement <= 1.0 for one in gone.claims.values()
-    ), gone.claims
-
-
-def test_direction_is_read_with_the_numbers_own_weights() -> None:
-    """One rule: the direction is read with the same weights the number was read with.
-
-    The test finds out from the engine which weights each number was read with,
-    rather than being told: it rebuilds each world's own likelihood for each claim
-    from that world's version-by-version answers — every version counting the same
-    for a claim the observation is not evidence about, each version counting by the
-    share of its worlds that survived for a claim it is — and checks the world's own
-    number comes back. Then it checks the same-direction share is counted with those
-    very weights, a version counting for the move by as much as it counted in both
-    numbers. The last line is the teeth: on this observation at least one claim has
-    to read differently when every version is counted the same, or the rule would
-    be about nothing.
-    """
-    base = _hormuz_world(None)
-    learned = _hormuz_world(_observing("B"))
-    answer = diff(base, learned, edit_in_words="Brent settled below $68")
-    assert not isinstance(answer, list), answer
-    behind_a, behind_b = versions_of(base), versions_of(learned)
-
-    read_another_way = 0
-    for claim in learned.graph.propositions:
-        before = behind_a.likelihood[claim.id][:, _read_on(base, claim)]
-        after = behind_b.likelihood[claim.id][:, _read_on(learned, claim)]
-        in_a = _weights_the_number_was_read_with(behind_a, claim.id)
-        in_b = _weights_the_number_was_read_with(behind_b, claim.id)
-        assert _one_number(before, in_a) == pytest.approx(base.beliefs[claim.id].p), claim.id
-        assert _one_number(after, in_b) == pytest.approx(learned.beliefs[claim.id].p), claim.id
-
-        counting = _counting_for(behind_a, behind_b, claim.id)
-        assert bool((counting == numpy.minimum(in_a, in_b)).all()), claim.id
-
-        move = learned.beliefs[claim.id].p - base.beliefs[claim.id].p
-        assert answer.claims[claim.id].agreement == _agreement_on(before, after, move, counting)
-        evenly = _agreement_on(before, after, move, numpy.ones_like(counting))
-        read_another_way += evenly != answer.claims[claim.id].agreement
-
-    assert read_another_way, "counting every version the same has to give a different answer here"
-
-
-def test_an_edit_that_is_not_an_observation_is_unchanged_by_the_weights(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Five of the six edits weight nothing, so the difference is the same read either way.
-
-    Only an observation makes a version count for less than another, so under every
-    other edit reading the direction with the weights has to be the very same
-    arithmetic as reading it without them — not close, the same bytes. Nothing here
-    is compared against a number somebody typed: the whole difference is computed
-    twice, once as the code does it and once with every version forced to count the
-    same, and the two are asked to serialize identically.
-    """
-    base = _hormuz_world(None)
-    for branch in (HORMUZ_THEN_STRIKE, _branch(Do(target="H", value=True, at=FIXTURE_DATE))):
-        second = _hormuz_world(branch)
-        behind = versions_of(second)
-        assert not behind.reweighted, "nothing on this branch was observed"
-        assert all(bool((one == 1.0).all()) for one in behind.weights.values())
-
-        as_built = diff(base, second, edit_in_words=branch.label)
-        assert not isinstance(as_built, list), as_built
-
-        with monkeypatch.context() as forced:
-            forced.setattr(diff_module, "_counting_for", _count_every_version_the_same)
-            evenly = diff(base, second, edit_in_words=branch.label)
-        assert not isinstance(evenly, list), evenly
-        assert evenly.model_dump_json() == as_built.model_dump_json(), branch.label
-
-
-def test_a_claim_moved_only_by_reweighting_says_so() -> None:
-    """A claim with no causes moves under an observation only by how much each version counts.
-
-    Learning that the insurance premium fell moves the strait's own claim — the
-    hypothesis, which nothing on this map causes. Inside one version that claim is
-    its own prior in every world, so throwing worlds away cannot change what the
-    version says about it, and every version that counts gives exactly the same
-    number in both worlds. The whole move is the reweighting; the same-direction
-    share is zero by construction, not by disagreement. The four states are left
-    alone and the difference says so in one field of its own, which the Inspector
-    turns into one sentence.
-    """
-    base = _hormuz_world(None)
-    learned = _hormuz_world(_observing("C"))
-    answer = diff(base, learned, edit_in_words="the premium fell")
-    assert not isinstance(answer, list), answer
-
-    strait = answer.claims["H"]
-    assert strait.moved_only_by_reweighting
-    assert strait.state == "unchanged", "the four states are untouched"
-    assert strait.delta is not None and abs(strait.delta) >= MOVED_AT_LEAST
-    assert strait.agreement == 0.0, "no version that counts moved at all, either way"
-
-    # It is a claim with no causes, read off the map rather than asserted, and it
-    # is the only claim on this map in that position.
-    into_it = [one for one in learned.graph.links if one.target == "H" and not one.reflexive]
-    assert not into_it, "the strait's own claim has no causes on this map"
-    assert [one for one in answer.claims.values() if one.moved_only_by_reweighting] == [strait]
-
-    # No edit that is not an observation can ever set it: with every version
-    # counting the same, identical version-by-version answers give identical
-    # numbers, so the move is exactly nothing and lands below the floor.
-    struck = diff(base, _hormuz_world(HORMUZ_THEN_STRIKE), edit_in_words=HORMUZ_THEN_STRIKE.label)
-    assert not isinstance(struck, list), struck
-    assert not any(one.moved_only_by_reweighting for one in struck.claims.values())
-
-
 # --- Two corners where the weights run out ---------------------------------
-
-
-def test_a_world_that_kept_nothing_does_not_erase_the_other_worlds_weights() -> None:
-    """Each world falls back on its own, and only then are the two counted together.
-
-    A world in which nothing at all survived what was observed reads every version
-    the same, because there is no surviving share left to weigh anything by. That
-    fallback belongs to **that world**. Take the smaller of the two worlds' weights
-    before letting either of them fall back, and the one that did keep survivors
-    has its weights thrown away too — every version counts the same, which is what
-    *neither* of the two numbers was read with, and the one sentence this whole
-    rule rests on is broken in a corner.
-
-    Reachable only branch against branch, which is why it went unseen: with a base
-    world on one side that world is unweighted anyway, so the two readings happen
-    to agree. Here one branch observes something that keeps some worlds and the
-    other observes something that can keep none.
-    """
-    graph = _map(
-        (
-            _claim("top", kind="hypothesis", prior=(0.5, 0.25, 0.75)),
-            _claim("seen", kind="market", prior=(0.4, 0.2, 0.6)),
-            _claim("impossible", kind="market", prior=(0.0, 0.0, 0.0)),
-        ),
-        (_arrow("top", "seen"), _arrow("top", "impossible")),
-    )
-    kept_some = _world(graph, _branch(Observe(target="seen", value=True), identifier="kept-some"))
-    kept_none = _world(
-        graph, _branch(Observe(target="impossible", value=True), identifier="kept-none")
-    )
-    behind_a, behind_b = versions_of(kept_some), versions_of(kept_none)
-
-    # The corner is only the corner if one world really kept nothing, the other
-    # really is weighted, and the claim is one both observations are evidence about.
-    assert behind_b.weights["top"].sum() == 0.0, "this observation was meant to keep nothing"
-    assert behind_a.weights["top"].sum() > 0.0
-    assert not bool((behind_a.weights["top"] == 1.0).all()), "this observation was meant to weigh"
-    assert "top" in behind_a.reweighted and "top" in behind_b.reweighted
-
-    # The starved world counts every version the same — on its own, which is what
-    # its own number was read with — and never hands back nothing at all.
-    assert bool((behind_b.counting_for("top") == 1.0).all())
-    assert behind_a.counting_for("top").sum() > 0.0
-
-    # So the direction keeps the surviving world's own weights instead of losing
-    # them, which is what taking the smaller of the two first would have done.
-    counting = _counting_for(behind_a, behind_b, "top")
-    assert bool((counting == behind_a.counting_for("top")).all())
-    assert not bool((counting == 1.0).all()), "the weights of the world that kept some survived"
-
-    answer = diff(kept_some, kept_none, edit_in_words="what cannot have happened")
-    assert not isinstance(answer, list), answer
-    assert answer.claims["top"].agreement is not None
-
-
-def test_no_direction_at_all_when_no_version_counted_in_both_numbers() -> None:
-    """Two branches can keep disjoint versions alive, and then there is no direction.
-
-    Every version counted in one of the two numbers or the other and in neither
-    pair, so the paired difference this whole file is built on has no pair left.
-    Counting every version equally instead would report a direction read off
-    versions that contributed to neither reading — a number nobody computed, which
-    is the one state this product refuses to show. So the share comes back as
-    nothing at all and no claim can be `shifted`. Reject, never repair.
-
-    The map is built for it rather than waited for: one claim whose stated range
-    spans nearly the whole scale, so that at two versions of two worlds each
-    version draws a prior near one end or the other and comes out the same way in
-    both of its worlds. Observing it true then keeps one version and observing it
-    false keeps the other. Nothing here is typed in but the shape of the map; which
-    version survives which observation is the engine's own answer, and the test
-    asserts the disjointness it found rather than a number.
-    """
-    graph = _map(
-        (
-            _claim("either-way", kind="hypothesis", prior=(0.5, 1e-9, 1.0 - 1e-9)),
-            _claim("ending", kind="market", prior=(0.5, 0.25, 0.75)),
-        ),
-        (_arrow("either-way", "ending", strength=0.5),),
-    )
-    two_of_two = {"versions": 2, "worlds": 2}
-    said_true = _world(
-        graph, _branch(Observe(target="either-way", value=True), identifier="yes"), **two_of_two
-    )
-    said_false = _world(
-        graph, _branch(Observe(target="either-way", value=False), identifier="no"), **two_of_two
-    )
-    behind_a, behind_b = versions_of(said_true), versions_of(said_false)
-
-    # Each world kept something of its own, and between them they kept nothing in
-    # common. Without all three of those this is not the corner being tested.
-    assert behind_a.counting_for("either-way").sum() > 0.0
-    assert behind_b.counting_for("either-way").sum() > 0.0
-    assert _counting_for(behind_a, behind_b, "either-way").sum() == 0.0
-
-    answer = diff(said_true, said_false, edit_in_words="the other way round")
-    assert not isinstance(answer, list), answer
-    for claim_id, one in answer.claims.items():
-        assert one.agreement is None, claim_id
-        assert one.state != "shifted", claim_id
-        assert not one.moved_only_by_reweighting, claim_id
-    assert answer.rows == (), "no ending can be listed as moved when no direction can be read"
-    assert SECOND_SENTENCE.match(answer.summary), answer.summary
-    for claim_id, one in answer.claims.items():
-        # No direction was readable, so the second half of the test never ran and
-        # there is no honest way to say it failed. Where the move is under the
-        # floor the first half did run, and that answer stands on its own.
-        assert one.unchanged_because in {None, "under_the_floor"}, claim_id
-        if one.unchanged_because is None:
-            assert one.delta is None or abs(one.delta) >= 0.005, claim_id
 
 
 # --- Which half of the test an unchanged claim failed ----------------------
@@ -996,32 +654,28 @@ def test_no_direction_at_all_when_no_version_counted_in_both_numbers() -> None:
 
 @given(st.data())
 @many
-def test_an_unchanged_claim_says_which_half_it_failed(data: st.DataObject) -> None:
-    """The word on the row is the rule applied to the two numbers beside it.
+def test_an_unchanged_claim_says_why(data: st.DataObject) -> None:
+    """The word on the row is the rule applied to the number beside it.
 
-    Both constants live in the engine and reach no reader, so *unchanged* on its
-    own cannot tell "it barely moved" from "nobody agrees which way it went".
-    The word says which. Nothing here is typed in: the expected answer is worked
-    out from the row's own `delta` and `agreement`, so the row has to be
-    self-consistent for every map a generator can produce.
+    The floor lives in the engine and reaches no reader, so *unchanged* on its own
+    cannot say that the claim moved at all. There is one reason left —
+    `under_the_floor` — because the other was about the two thousand versions of
+    the map (decision record 0028), and this says so: no row ever carries the
+    other word.
     """
     graph = data.draw(graphs())
     answer = _compared(graph, data.draw(branches(graph)), data.draw(branches(graph)))
 
     for claim_id, one in answer.claims.items():
+        assert one.unchanged_because != "versions_disagree", claim_id
         if one.state != "unchanged" or one.delta is None:
             assert one.unchanged_because is None, claim_id
-            continue
-        if abs(one.delta) < 0.005:
-            assert one.unchanged_because == "under_the_floor", claim_id
-        elif one.agreement is not None and one.agreement < 0.90:
-            assert one.unchanged_because == "versions_disagree", claim_id
         else:
-            assert one.unchanged_because is None, claim_id
+            assert one.unchanged_because == "under_the_floor", claim_id
 
 
-def test_only_an_unchanged_claim_says_which_half_it_failed() -> None:
-    """Every other word means the test did not fail, so there is no half to name.
+def test_only_an_unchanged_claim_says_why() -> None:
+    """Every other word means the claim moved, so there is nothing to explain.
 
     On the worked example's strike branch: claims that moved, the claim the
     branch added, and a claim forced false all carry nothing at all, and the
@@ -1038,58 +692,11 @@ def test_only_an_unchanged_claim_says_which_half_it_failed() -> None:
     assert all(one.unchanged_because is not None for one in held_still), held_still
     assert all(one.unchanged_because is None for one in moved), moved
 
-    cut = _hormuz_world(_branch(Do(target="C", value=False, at=FIXTURE_DATE)), **SMALL)
-    forced = diff(_hormuz_world(None, **SMALL), cut, edit_in_words="The premium never falls")
+    cut = _hormuz_world(_branch(Do(target="C", value=False, at=FIXTURE_DATE)))
+    forced = diff(_hormuz_world(None), cut, edit_in_words="The premium never falls")
     assert not isinstance(forced, list), forced
     assert forced.claims["C"].state == "killed"
     assert forced.claims["C"].unchanged_because is None
-
-
-def test_the_floor_is_read_first_when_a_claim_fails_both_halves() -> None:
-    """A claim that barely moved and disagreed about it says it barely moved.
-
-    Two true answers, and something has to choose; the floor is the cheaper fact
-    to act on, because a move nobody would notice needs no second sentence about
-    its direction. The claim is the one an observation moves through the version
-    weights alone — its move is tiny and its same-direction share is zero — and
-    the test finds it by those two facts rather than by name.
-    """
-    base = _hormuz_world(None)
-    observed = _hormuz_world(_branch(Observe(target="B", value=True)))
-    answer = diff(base, observed, edit_in_words="Brent settled below $68")
-    assert not isinstance(answer, list), answer
-
-    failing_both = [
-        one
-        for one in answer.claims.values()
-        if one.state == "unchanged"
-        and one.delta is not None
-        and abs(one.delta) < 0.005
-        and one.agreement is not None
-        and one.agreement < 0.90
-    ]
-    assert failing_both, "the observation was expected to leave a claim failing both halves"
-    assert all(one.unchanged_because == "under_the_floor" for one in failing_both), failing_both
-
-
-def test_a_claim_moved_only_by_reweighting_keeps_both_fields() -> None:
-    """The reweighting field is the fuller answer, and neither field replaces the other.
-
-    Such a claim moved far enough and every version that counts moved by exactly
-    nothing, so the half it failed is the same-direction half — and the reason it
-    failed is the one `moved_only_by_reweighting` states. Both are true, both are
-    carried, and the Inspector shows the fuller one.
-    """
-    base = _hormuz_world(None)
-    observed = _hormuz_world(_branch(Observe(target="C", value=True)))
-    answer = diff(base, observed, edit_in_words="the premium printed below 0.4%")
-    assert not isinstance(answer, list), answer
-
-    reweighted = [one for one in answer.claims.values() if one.moved_only_by_reweighting]
-    assert reweighted, "the worked example was expected to show one"
-    for one in reweighted:
-        assert one.state == "unchanged"
-        assert one.unchanged_because == "versions_disagree"
 
 
 # --- Locality, seen from the difference ------------------------------------
@@ -1198,15 +805,6 @@ def test_a_longer_window_moves_nothing_it_cannot_reach() -> None:
 
     # `ending` is in the other piece; nothing the edit did can reach it.
     every_version_answered_the_same(base, stretched, ["cause", "effect", "ending"])
-    behind_base, behind_stretched = versions_of(base), versions_of(stretched)
-    where = {day: index for index, day in enumerate(behind_base.days)}
-    for index, day in enumerate(behind_stretched.days):
-        if day not in where:
-            continue
-        assert numpy.array_equal(
-            behind_stretched.likelihood["ending"][:, index],
-            behind_base.likelihood["ending"][:, where[day]],
-        ), day
 
 
 # --- How a likelihood is written ------------------------------------------
@@ -1392,73 +990,46 @@ def test_a_warning_either_world_carried_is_said_once() -> None:
 def test_the_hormuz_rail_reads_the_way_the_story_reads() -> None:
     """The shipped example's change list, pinned by its directions and its order.
 
-    Five sentences a person can check, and not one number among them. Both
-    tradeable endings fall. The claim nobody quotes moves further than either of
-    them and does **not** make the list at all, because the only arrow into it is
-    the one arrow on the map that nobody could back, so its push is drawn widest
-    and the versions do not agree which way it went — *we cannot vouch for this
-    one* is the honest reading, and the change list is for changes a reader can
-    act on. The claim reached only through a feedback arrow is identical to the
-    byte, and the strike itself is a claim the base map has never heard of.
+    Four sentences a person can check, and not one number among them. The rail is
+    exactly the endings that shifted, in rank order. Both endings that hang off the
+    Brent claim fall, because the strike ends the state the whole chain rests on.
+    The claim reached only through a feedback arrow is identical to the byte, and
+    the strike itself is a claim the base map has never heard of.
 
-    Values are deliberately absent. The example is a curated one whose illustrative
-    inputs may be tuned, so a test that pinned numbers would break every time
-    somebody made the example read better — which is exactly what tuning is for.
+    Values are deliberately absent, and so are counts of rows. The example is a
+    curated one whose illustrative inputs may be tuned, so a test that pinned
+    numbers — or pinned how many endings the branch happens to reach — would break
+    every time somebody made the example read better, which is exactly what tuning
+    is for.
     """
     base = _hormuz_world(None)
     strike = _hormuz_world(HORMUZ_THEN_STRIKE)
     answer = diff(base, strike, edit_in_words=HORMUZ_THEN_STRIKE.label)
     assert not isinstance(answer, list), answer
 
-    assert [one.target for one in answer.rows] == ["M1", "M2"]
+    endings = {one.id for one in HORMUZ.propositions if one.kind in {"market", "not_tradeable"}}
+    listed = [one.target for one in answer.rows]
+    assert set(listed) <= endings, listed
+    assert set(listed) == {one for one in endings if answer.claims[one].state == "shifted"}, listed
+    assert listed == sorted(
+        listed, key=lambda one: -next(row.rank for row in answer.rows if row.target == one)
+    ), "the rail is not in rank order"
+
     by_name = {one.target: one for one in answer.rows}
     assert by_name["M1"].peak_delta < 0.0
     assert by_name["M2"].peak_delta < 0.0
-
-    talks = answer.claims["N1"]
-    assert talks.delta is not None and talks.agreement is not None
-    assert talks.delta > 0.0
-    assert abs(talks.delta) > max(abs(one.peak_delta) for one in answer.rows)
-    assert talks.state == "unchanged"
-    assert talks.agreement < AGREEING_AT_LEAST
-    only_arrow = next(one for one in HORMUZ.links if one.target == "N1")
-    assert only_arrow.provenance == "asserted"
 
     assert answer.claims["R"].state == "unchanged"
     assert base.series["R"] == strike.series["R"]
     assert base.beliefs["R"] == strike.beliefs["R"]
     assert answer.claims["S"].state == "added"
 
-    contract = next(one for one in HORMUZ.propositions if one.id == "M1")
-    assert contract.claim.rstrip(".") in answer.summary
+    top = next(one for one in HORMUZ.propositions if one.id == answer.rows[0].target)
+    assert top.claim.rstrip(".") in answer.summary
     assert HORMUZ_THEN_STRIKE.label in answer.summary
-    assert "leaves 3 claims untouched" in answer.summary
 
 
 # --- One claim at a time ---------------------------------------------------
-
-
-def test_sensitivity_rows_name_their_budget() -> None:
-    """A sweep gives one row per claim, every ending on every row, and says what it ran at.
-
-    A sweep is one whole run of the engine per claim, so it runs at a quarter of
-    the versions the shipped budget uses — and every row carries that budget, so
-    nobody lays a swept number beside a full-budget one without noticing. The rows
-    come back unranked on purpose: which direction hurts depends on the trade, and
-    this has no idea which trade is being run.
-    """
-    world = _hormuz_world(None)
-
-    swept = sensitivity(world)
-
-    assert [one.flipped for one in swept] == [one.id for one in HORMUZ.propositions]
-    endings = {one.id for one in HORMUZ.propositions if one.kind in {"market", "not_tradeable"}}
-    for row in swept:
-        assert (row.versions, row.worlds) == (SWEEP_VERSIONS, SWEEP_WORLDS)
-        assert (row.versions, row.worlds) == (250, 8)
-        assert set(row.deltas) == endings
-        assert row.to is (world.beliefs[row.flipped].p < 0.5)
-    assert any(abs(value) > 0.01 for row in swept for value in row.deltas.values())
 
 
 @given(st.data())
@@ -1466,21 +1037,19 @@ def test_sensitivity_rows_name_their_budget() -> None:
 def test_a_sweep_covers_every_claim_of_any_map(data: st.DataObject) -> None:
     """One row per claim, every ending on every row, over maps nobody wrote by hand.
 
-    Run at a reduced budget, like every other test over generated maps here: a
-    sweep is a run of the engine per claim, and the statement being checked is
-    which rows exist rather than how steady their numbers are.
+    A sweep is one whole run of the engine per claim, and the statement being
+    checked is which rows exist rather than what their numbers are.
     """
     graph = data.draw(graphs())
     world = _world(graph, data.draw(branches(graph)))
 
-    swept = sensitivity(world, **SMALL)
+    swept = sensitivity(world)
 
     assert [one.flipped for one in swept] == [one.id for one in world.graph.propositions]
     endings = {
         one.id for one in world.graph.propositions if one.kind in {"market", "not_tradeable"}
     }
     for row in swept:
-        assert (row.versions, row.worlds) == (SMALL["versions"], SMALL["worlds"])
         assert set(row.deltas) == endings
         assert row.to is (world.beliefs[row.flipped].p < 0.5)
         assert all(-1.0 <= value <= 1.0 for value in row.deltas.values())
@@ -1488,26 +1057,27 @@ def test_a_sweep_covers_every_claim_of_any_map(data: st.DataObject) -> None:
 
 def test_a_sweep_leaves_the_world_it_was_given_alone() -> None:
     """Sweeping a world changes nothing about it: every map here is frozen."""
-    world = _hormuz_world(None, **SMALL)
+    world = _hormuz_world(None)
     before = world.model_dump_json()
 
-    sensitivity(world, **SMALL)
+    sensitivity(world)
 
     assert world.model_dump_json() == before
 
 
 def test_a_sweep_works_from_a_world_that_already_holds_a_branch() -> None:
-    """A world with a supposition already undermined can still be swept.
+    """A world a branch was folded onto can still be swept, one claim at a time.
 
-    The sweep works the same map through again, and a supposition that something
-    undermined has to be able to name the edit responsible. The world already
-    knows: it carries one record per supposition that ended, and each names both
-    the arrow and the edit.
+    The sweep works from what the branch left behind — the map, the values its
+    edits fixed, day zero and the seed — and a world carries all four. It needs
+    nothing else: there is no record of a supposition something undermined to hand
+    back, because nothing undermines a supposition (decision record 0017).
     """
-    world = _hormuz_world(HORMUZ_THEN_STRIKE, **SMALL)
-    assert world.retractions, "the strike branch is the one that undermines a supposition"
+    world = _hormuz_world(HORMUZ_THEN_STRIKE)
+    assert world.branch_id == HORMUZ_THEN_STRIKE.id
+    assert world.retractions == ()
 
-    swept = sensitivity(world, **SMALL)
+    swept = sensitivity(world)
 
     assert [one.flipped for one in swept] == [one.id for one in world.graph.propositions]
 
@@ -1527,6 +1097,7 @@ def a_route_map(arrows: list[tuple[str, str, str]]) -> Graph:
             id=name,
             claim=f"Claim {name}.",
             kind="hypothesis" if index == 0 else ("market" if name == "T" else "event"),
+            persistence="event",
             resolution=Resolution(
                 criteria="A test two people reading it would agree on.",
                 source="A named judge.",

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A bare number on a box is a claim from nowhere. A **belief** is a likelihood that says whose it is: a value between 0 and 1 and an **owner** — the model, the user, or a market. Every claim on the map carries up to three of them side by side, and they are never combined into one. That is the whole product in one design choice: the model's `.61`, the market's `.48` and your own `.30` on the same claim are not three attempts at one true number to be averaged away, they are the disagreement you are about to trade. What a user can do that they could not before: see, on any step of an argument, where their own view differs from a model's and from a live price — and put their own number on the map without the model overwriting it.
+A bare number on a box is a claim from nowhere. A **belief** is a likelihood that says whose it is: a value between 0 and 1 and an **owner** — the model, the user, or a market. Every claim on the map carries up to three of them side by side, and they are never combined into one. That is the whole product in one design choice: the model's number, the market's and your own on the same claim are not three attempts at one true number to be averaged away, they are the disagreement you are about to trade. What a user can do that they could not before: see, on any step of an argument, where their own view differs from a model's and from a live price — and put their own number on the map without the model overwriting it.
 
 ---
 
@@ -115,7 +115,7 @@ There is still a violation code `belief_out_of_range` — rule 11 in [`validity.
 
 ### Why the three owners are never merged
 
-Averaging them destroys the only thing the map is for. If the model says `.61`, the market says `.48` and you say `.30`, the average `.46` is a number nobody holds, describing nobody's view, and it deletes the two gaps that are the actual output: **model minus market is the edge you might trade; user minus model is the argument you are having with the tool.** This is invariant INV-11, and it is enforced by a test that inspects our own source code rather than by good intentions — see INV-graph.13 below.
+Averaging them destroys the only thing the map is for. If the model says one number, the market says a lower one and you say a lower one still, the average of the three is a number nobody holds, describing nobody's view, and it deletes the two gaps that are the actual output: **model minus market is the edge you might trade; user minus model is the argument you are having with the tool.** This is invariant INV-11, and it is enforced by a test that inspects our own source code rather than by good intentions — see INV-graph.13 below.
 
 **The first of those two gaps has a condition on it** *(added 2026-09-21, decision record 0018)*. A venue's price is the chance of the claim in the world as it stands. So the model's side of that subtraction must be read from the world with **no supposition in force** — never from a world where *Suppose this is true* has pinned something — or the difference is between two different questions. The rule is carried by the signature of the one function that builds an edge, which takes the unsupposed world and the world on screen as two separate, required arguments; where the two numbers cannot honestly be compared it returns a named refusal and a break-even instead of a difference. The thesis part of the spec spells it out.
 
@@ -165,15 +165,15 @@ That is a rendering rule, and the rendering lives in the workbench spec. What be
 
 ### B1 — Three numbers, side by side, on one claim
 
-The Hormuz map reaches terminal M1, *a Polymarket contract "Brent below $70 on 2026-10-31" resolves YES*. Its tile shows three chips, each one number. The numbers below are an **illustration of the form**, taken from research report 02 §3 before there was an engine; what the shipped engine computes is the line named `M1 · base · reading`, and until a world has been computed the stored example shows the claim's own stated number, `M1 · prior`.
+The Hormuz map reaches terminal M1, *a Polymarket contract "Brent below $70 on 2026-10-31" resolves YES*. Its tile shows three chips, each one number, and none of them carries a range *(amended 2026-09-22; decision record 0028)*.
 
-| Owner | Shown | Where it came from |
-|-------|-------|--------------------|
-| model | `.61` | Propagated: its own stated chance, plus the push from *Brent crude settles below $68 for five sessions* |
-| market | `.48` | The contract's mid-price, read minutes ago from Polymarket, `market_implied` |
-| user | `.30` | What you typed on the slider |
+| Owner | Where it came from | Where its number is written down |
+|-------|--------------------|----------------------------------|
+| model | Worked through the map: its own stated chance, plus the push from *Brent crude settles below $68 for five sessions* | the line named `M1 · base · reading`, and `M1 · prior` before any world is computed |
+| market | The contract's mid-price, read from Polymarket, `market_implied` | the line named `M1 · what the market prices` |
+| user | What you typed on the slider | nowhere in the stored example: nobody has typed one |
 
-Nothing on this tile is an average. The thesis card later reports `model − market = +.13` as an **edge**, computed outside the domain and labelled a difference. The gap is the point of the screen.
+Nothing on this tile is an average. The thesis card later reports `model − market` as an **edge**, computed outside the domain and labelled a difference. The gap is the point of the screen.
 
 ### B2 — "I think that is less likely than that"
 
@@ -195,23 +195,21 @@ The empty `user` slot renders as a dash inviting you to say what you think. The 
 
 ### B4 — A number that can say why
 
-Click the model chip on *"Brent crude settles below $68 for five sessions"* and the Inspector unrolls it (illustrative):
+Click the model chip on *"Brent crude settles below $68 for five sessions"* and the Inspector unrolls it. The **shape** of that list, with each line's own number named rather than typed:
 
 ```
-prior                            .20             base rate: 4 of 19 months since 2022 in which
-                                                 Brent crude settled below $68 for five sessions
-+ H, the strait opens (trigger)  +1.6 push       "the war-risk premium in the price unwinds"
-+ C, the Lloyd's war-risk
-  premium for Gulf transits
-  falls below 0.4% (sustain)     +0.7 push       "cheaper insurance lowers delivered cost"
-= model                          .71
+its own stated chance             B · prior        a base rate where the claim has an honest
+                                                   reference class, and nothing where it does not
++ one line per incoming arrow     <arrow> · arrow  the push, its shape and its delay, with the
+                                                   sentence the arrow gives for why
+= what the model says             B · base · reading
 ```
 
 A *push* is decision record 0005's link strength: a signed amount on an arrow, which under decision record 0016 bends the **rate** at which a claim comes about rather than a likelihood read on one day. The propagation chapter of the multiverse part spells out the arithmetic. The rule this chapter enforces is narrower: no line of that list may be a number whose owner cannot be named.
 
 ### B5 — Two significant figures, always, and only at the last moment
 
-`p = 0.6134` is what the domain stores, sends over the wire, and replays. `.61` is what the chip shows, and it is the whole of what the chip shows. A chip is never permitted to show `.6134`; the rendering test in the frontend checks exactly that.
+A number such as `0.6134` is what the domain stores, sends over the wire, and replays. `.61` is what the chip shows, and it is the whole of what the chip shows — one number, with no range beside it *(amended 2026-09-22; decision record 0028)*. A chip is never permitted to show `.6134`; the rendering test in the frontend checks exactly that.
 
 **Where the two guards begin** *(Kent, 2026-09-20 — the decision recorded as G10)*. The whole rule in one sentence: **round to two significant figures, then use a guard word exactly when it is true of the rounded number.** `<.01` when the rounded number is below a hundredth, `>.99` when it is above ninety-nine hundredths, and the two figures themselves otherwise.
 

@@ -8,29 +8,35 @@
  * twice — once the instant the branch opens, from the branch alone, and again
  * when the engine's answer lands, with the counts it worked out.
  *
- * **Every count comes from somewhere nameable.** What arrived and what was taken
- * back are read off the world; how many claims moved is read off the engine's
- * own difference, one word per claim, and never by the browser comparing two
- * numbers. While the engine is still being asked the line says so, because a
- * reader who cannot see the screen has no other way to know that the
- * likelihoods are on their way rather than missing.
+ * **Every count comes from somewhere nameable.** What arrived and what an edit
+ * supposed false are read off the world; how many claims moved is read off the
+ * engine's own difference, one word per claim, and never by the browser comparing
+ * two numbers. While the engine is still being asked the line says so, because a
+ * reader who cannot see the screen has no other way to know that the likelihoods
+ * are on their way rather than missing.
  *
  * On the stored example's strike branch the first line is, word for word:
  *
- * > Branch created. One claim added, six claims your edit can reach, one
- * > supposition retracted. The numbers are on their way from the engine.
+ * > Branch created. One claim added, N claims your edit can reach. The numbers
+ * > are on their way from the engine.
  *
- * Every count in it is a fact about the branch and about which arrows lead
- * where, so it reads the same on every machine and on every day. The second
- * line swaps the middle clause for the engine's own count of the claims it
- * called shifted:
+ * Every count in it is a fact about the branch and about which arrows lead where,
+ * so it reads the same on every machine and on every day. The second line swaps
+ * the last clause for the engine's own count of the claims it called shifted:
  *
- * > Branch created. One claim added, N claims moved, one supposition retracted.
+ * > Branch created. One claim added, N claims moved.
  *
- * **N is not written down here, because nobody here worked it out.** It is how
- * many of the `· strike · what happened` lines in `docs/worked-numbers.txt` read
- * `shifted`, and it moves on the day the arithmetic does — as it did when every
- * arrow's push was first drawn as wide as its backing says.
+ * **Neither N is written down here, because nobody here worked either out.** The
+ * second is how many of the `· strike · what happened` lines in
+ * `docs/worked-numbers.txt` read `shifted`, and it moves on the day the arithmetic
+ * does — as it did at the engine's flip.
+ *
+ * **A third clause used to sit at the end and is gone** *(2026-09-22; decision
+ * record 0017)*. It counted the suppositions the engine had taken back — *one
+ * supposition retracted* — because a later edit could undermine the cause of an
+ * earlier one. Nothing takes a supposition back any more: a supposition holds
+ * until the reader lifts it, so the count was always nought and the clause could
+ * never be said.
  */
 
 import type { DiffView, WorldView } from "../world";
@@ -55,9 +61,6 @@ export function branchAnnouncement(world: WorldView, change?: DiffView): string 
   }
   const added = world.claims.filter((claim) => claim.diff === "added").length;
   const supposedFalse = world.claims.filter((claim) => claim.diff === "killed").length;
-  const retracted = world.claims.filter((claim) =>
-    (claim.badges ?? []).some((badge) => badge.overrides === true),
-  ).length;
   // How many claims moved is the engine's own word, one per claim, read off its
   // difference. The browser never counts it by comparing two numbers: that would
   // be a second answer to a question the engine has already answered.
@@ -83,11 +86,6 @@ export function branchAnnouncement(world: WorldView, change?: DiffView): string 
       ? `${inWords(reachable)} ${reachable === 1 ? "claim" : "claims"} your edit can reach`
       : `${inWords(moved)} ${moved === 1 ? "claim" : "claims"} moved`,
   );
-  if (retracted > 0) {
-    parts.push(
-      `${inWords(retracted)} ${retracted === 1 ? "supposition" : "suppositions"} retracted`,
-    );
-  }
 
   const line = `Branch created. ${asSentence(parts.join(", "))}.`;
   return moved === null ? `${line} The numbers are on their way from the engine.` : line;

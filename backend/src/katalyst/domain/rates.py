@@ -27,10 +27,13 @@ on and nothing else on. Compare it with the claim's own no-cause chance:
 
 The conventions every array in the new engine obeys
 ---------------------------------------------------
-* **The version axis comes first.** A version is one coherent set of the numbers a
-  person stated. Every array is shaped `(versions, …)`. A version enters the
-  arithmetic as a single number multiplying arrays that were built once, which is
-  why two thousand versions cost one pass rather than two thousand passes.
+* **The version axis comes first, and it runs at length one.** A version is one
+  coherent set of the numbers a person stated, and this product works out exactly
+  one of them: the numbers as stated, with no range around them (decision record
+  0028). Every array is shaped `(versions, …)` all the same, because a version
+  enters the arithmetic as a single number multiplying arrays built once — so the
+  axis costs nothing at length one and the shapes below say what each number is
+  about rather than being flattened away.
 * **Then the cause axes**, in the order the arrows appear on the claim — the map's
   arrows sorted by target and then by the arrow's own identifier — and **the
   claim's own axis last**.
@@ -57,7 +60,7 @@ from numpy.typing import NDArray
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import LinkId, PropositionId
 from katalyst.domain.link import Link
-from katalyst.domain.proposition import Proposition
+from katalyst.domain.proposition import Persistence, Proposition
 
 SLICES: Final = 24
 """How many equal pieces a claim's window is cut into.
@@ -74,17 +77,6 @@ Eight is what every measurement in record 0016 was taken with. Thirty-two would 
 more accurate and nobody has costed it, so it is not built.
 """
 
-Persistence = Literal["event", "state"]
-"""Which kind of truth a claim is.
-
-`event` — it happens once and stays happened, such as *the strait reopens*.
-`state` — it holds over a stretch of time and can stop, such as *the strait stays
-open to commercial transit through 1 November*.
-
-Written here as a plain pair of words rather than read off a claim, because the
-field that carries it on a claim arrives with the flip (decision record 0017,
-`persistence` required on every claim) and this file lands before that.
-"""
 
 _LIKELIHOOD_FLOOR: Final = 1e-9
 """How close to nought or to one a stated chance is allowed to get.

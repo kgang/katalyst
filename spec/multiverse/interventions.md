@@ -239,7 +239,7 @@ In the Hormuz branch, `do(S, true)` makes the strike true on 2026-10-02, and thr
 
 ## Behaviour
 
-Worked on the Strait of Hormuz map. Its claims, in the wording the fixture uses: **H** *Strait of Hormuz open to unrestricted commercial transit for 14 consecutive days* (the hypothesis) · **C** *Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%* · **B** *Brent crude settles below $68 for five sessions* · **R** *OPEC+ announces output restraint* · **M1** a Polymarket contract on Brent resolving YES · **M2** the energy fund XLE underperforming the S&P 500 fund SPY by more than 3% over 20 days. The map's "today" is 2026-10-01.
+Worked on the Strait of Hormuz map. Its claims, in the wording the fixture uses: **H** *the Strait of Hormuz reopens to normal commercial traffic* (the hypothesis) · **O** *the Strait of Hormuz stays open to commercial transit through 1 November*, a **state** · **C** *Lloyd's war-risk insurance premium for Gulf transits is under 0.4%*, also a state · **B** *Brent crude settles below $68 for five sessions* · **R** *OPEC+ announces a new output cut* · **M1** a Polymarket contract on Brent resolving YES · **M2** the energy fund XLE underperforming the S&P 500 fund SPY by more than 3% over 20 days · **M3** the Polymarket contract on the strait's own traffic. Day zero is 2026-10-01.
 
 ### B1 — "Suppose Hormuz opens"
 
@@ -261,25 +261,27 @@ This is the branch `hormuz-then-strike`, three edits in this order.
 
 **Step 2 — `Insert(...)`.** A new claim **S**: *a confirmed military strike on Iranian territory, reported by at least two of AP, Reuters and AFP*, with its own resolution criteria and date like every other claim. It arrives with three arrows:
 
-| Arrow | Mode | Strength | Why |
-|---|---|---|---|
-| S → B | trigger, a spike that fades | −2.4 | A strike restores the war-risk premium in the oil price faster than transit data removes it |
-| S → C | sustain, a step | −2.0 | Underwriters reprice on the threat, not on transit counts |
-| S → H | sustain, a step | −1.9 | A reopening is sustained by the *absence* of hostilities, not by the opening event |
+| Arrow | Mode and shape | Why |
+|---|---|---|
+| S → B | trigger, a step | A strike restores the war-risk premium in the oil price faster than transit data removes it |
+| S → C | trigger, a step | Underwriters reprice on the threat, not on transit counts — and what they reprice is a level that can stop holding, so C is a state and this arrow **ends** it |
+| S → O | trigger, a step | A reopening is *sustained* by the absence of hostilities, so what a strike ends is the state **O** — *the strait stays open through 1 November* — and never the event H, which has already happened |
 
-*(The three arrows and their numbers are the fixture as it stands. The flip adds the state claim the strike ends and re-points the arrows that need to leave it, because a `sustain` arrow may leave only a state — so the middle column and the two sustain rows move with the fixture, and the story each row tells does not.)* <!-- VERIFY AT FLIP: the three arrows' sources, targets and modes once the fixture carries its state claim; S->H as written is a sustain arrow out of an event, which the shape freeze refuses by name. -->
+Each arrow's source, target, mode, shape, strength, delay and provenance are the lines named `S->B · arrow`, `S->C · arrow` and `S->O · arrow` in the numbers file, so nothing here is a figure somebody typed twice.
 
-**Read the signs.** Strength is signed, on a log-odds scale — the scale on which separate pushes add together instead of multiplying — and the sign always says which way the arrow pushes the claim at its head *toward coming out true*. All three are negative, and each against a different claim: the strike pushes against "Brent settles below $68", against "the premium falls below 0.4%", and against "the strait is open". The numbers are illustrative, carried over from `docs/research/02-causal-modeling-formalisms.md` §3, and the fixture marks them `argued`, not `documented`.
+**The third row is the whole of decision record 0017 in one line.** It used to read `S → H`, a `sustain` arrow out of H — and once something that happened can never un-happen, a `sustain` arrow out of an event is identical to a `trigger`, so the strike was pushing against a claim that could not fall. The map now carries the state the strike really ends, and the arrow points at it *(changed 2026-09-22 at the flip)*.
 
-The precondition holds: S is not already on the map, each arrow has S at one end and an existing claim at the other, and none of them closes a loop. Note what `insert` did *not* do: it did not touch a single field of H, B or C. It only added.
+**Read the signs.** Strength is signed, on a log-odds scale — the scale on which separate pushes add together instead of multiplying — and the sign always says which way the arrow pushes the claim at its head *toward coming out true*. All three are negative, and each against a different claim: the strike pushes against "Brent settles below $68", against "the premium is under 0.4%", and against "the strait stays open". The numbers are illustrative, carried over from `docs/research/02-causal-modeling-formalisms.md` §3, and the fixture marks them `argued`, not `documented`.
+
+The precondition holds: S is not already on the map, each arrow has S at one end and an existing claim at the other, and none of them closes a loop. Note what `insert` did *not* do: it did not touch a single field of H, O, B or C. It only added.
 
 **Step 3 — `Do(target="S", value=True, at=2026-10-02)`.** The strike is supposed true, one day later.
 
-**The showcase — S → H.** `do(H)` in step 1 cut the arrows that were coming into H *at that moment*. S → H did not exist yet; it was inserted afterwards, so it is live. This is the ordering rule in one sentence: *`do` cuts the arrows that exist when it is applied; an arrow inserted later is live.* It is why the branch lists `do(H)` first.
+**The showcase — S → O.** `do(H)` in step 1 cut the arrows that were coming into H *at that moment*, and the arrows into O were never cut at all, because nothing was supposed about O. `S → O` did not exist yet either; it was inserted afterwards, so it is live. This is the ordering rule in one sentence: *`do` cuts the arrows that exist when it is applied; an arrow inserted later is live.* It is why the branch lists `do(H)` first, and `test_an_arrow_inserted_after_a_supposition_is_live` is what pins it — supposing O before the insert cuts the very same arrow, and the branch then demonstrates nothing.
 
 **What the live arrow does, and what it does not** *(rewritten 2026-09-22; decision record 0017, which reverses decision A of record 0014)*. It does **not** end the supposition. **Nothing ends a supposition but another edit** — no calendar, no opposing arrow, nothing that un-trues a claim the reader typed. H stands supposed on every day of the branch, and so does S.
 
-What S → H does is end the **state** the reopening was holding up: *the strait stays open to commercial transit through 1 November*, a claim that holds over a stretch of time and can stop. A state's stopping rate starts at zero and is the sum of its ending causes, so with nothing on the map that can end it, it does not end; the strike is such a cause, and the state falls. Everything that state sustains falls with it — C most of all, which S → C also holds down on its own account.
+What `S → O` does is end the **state** the reopening was holding up: *the Strait of Hormuz stays open to commercial transit through 1 November*, a claim that holds over a stretch of time and can stop. A state's stopping rate starts at zero and is the sum of its ending causes, so with nothing on the map that can end it, it does not end; the strike is such a cause, and the state falls. Everything that state sustains falls with it — C most of all, which S → C also holds down on its own account.
 
 **Why the old rule went.** Record 0014 had the supposition itself end, on the day its undermining cause became true, and the tile carried both readings in order. Three faults killed it, and the third is the plain one: **the product was deleting something the reader had typed.** A claim inserted at a stated chance of `.001`, with a weak arrow, could put a supposed claim on a schedule to stop — a calendar consulted about a thing the user had asserted. Under the rule above that cannot happen: a *Suppose* pins the claim's time and cuts its incoming arrows, so there is no calendar to get wrong. `test_a_supposition_is_not_ended_by_a_cause_nobody_believes` pins it.
 

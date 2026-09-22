@@ -27,8 +27,6 @@ moves once, at the flip, and a test carrying one would have to move with it.
 
 from datetime import date, timedelta
 
-import pytest
-
 from katalyst.domain import (
     Belief,
     Beliefs,
@@ -43,7 +41,6 @@ from katalyst.domain import (
     Resolution,
     World,
     apply,
-    introduced_by,
     propagate,
 )
 
@@ -84,6 +81,7 @@ def _claim(
         id=identifier,
         claim=f"The claim written down under the name {identifier}.",
         kind=kind,  # type: ignore[arg-type]
+        persistence="event",
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",
@@ -132,35 +130,16 @@ def _folded(graph: Graph, *edits: object) -> World:
     result = apply(graph, branch)
     assert not isinstance(result, list), result
     left_behind, fixed = result
-    return propagate(
-        left_behind,
-        fixed,
-        as_of=DAY_ZERO,
-        seed=SEED,
-        introduced_by=introduced_by(branch),
-        # THE ONE LINE THE FLIP TOUCHES IN THIS FILE. `propagate` already takes
-        # an `engine` argument and it already defaults to `"today"`; these tests
-        # take that default on purpose and name no engine at all, so they pass
-        # unchanged the day the default becomes `"by_deadline"` and the three
-        # `xfail` marks come off in that same pull request. To run them against
-        # the new core before then, add `engine="by_deadline"` here and nowhere
-        # else in this file.
-        **BUDGET,
-    )
+    # These tests name no engine and no budget, which is what made the flip a
+    # one-word change: they took `propagate`'s own default before it and they take
+    # it after. The three `xfail(strict)` marks came off in the pull request that
+    # flipped it, which is the whole point of writing them first.
+    return propagate(left_behind, fixed, as_of=DAY_ZERO, seed=SEED)
 
 
 # --- Record 0016, defect 1 --------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Record 0016, defect 1: telling the map something happened never reaches what "
-        "caused it. Each claim's worked-out likelihood is kept and the coin flip thrown "
-        "away, so for a claim whose versions all agree, discarding worlds cannot move it "
-        "— and *Suppose this is true* and *This happened* come out as one behaviour."
-    ),
-)
 def test_this_happened_moves_what_caused_it() -> None:
     """Learning that an effect happened has to raise the odds on its cause.
 
@@ -202,15 +181,6 @@ def test_this_happened_moves_what_caused_it() -> None:
 # --- Record 0016, defect 2 --------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Record 0016, defect 2: the tradeable endings are deaf to half their causes. An "
-        "arrow reads its source on the day that source's EARLIEST incoming arrow lands — "
-        "one integer doing two jobs — so a cause whose push arrives later moves the "
-        "middle of the chain and moves the ending by exactly nothing."
-    ),
-)
 def test_an_ending_moves_when_a_cause_of_it_is_supposed() -> None:
     """Supposing a cause true has to move the ending it leads to, whatever the delays.
 
@@ -259,15 +229,6 @@ def test_an_ending_moves_when_a_cause_of_it_is_supposed() -> None:
 # --- Record 0016, defect 3 --------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Record 0016, defect 3: a claim nobody believes deletes the reader's own "
-        "assertion. A supposition ends on a calendar read off the map's shape, and the "
-        "test for which arrows oppose it reads only the sign of the push — so neither "
-        "the opposing claim's likelihood nor the size of its push ever enters."
-    ),
-)
 def test_a_supposition_survives_a_claim_nobody_believes() -> None:
     """Supposing a claim true has to survive a claim the map gives no credence to.
 

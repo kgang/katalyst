@@ -21,9 +21,14 @@ and the venue's no outcome is a separate contract that pays out in exactly that
 case. So a no-side ending is priced on *one minus* the claim's number, with its
 range turned over with it — the low end of *false* is one minus the high end of
 *true*. One function works that out, `what_this_side_pays_on`, and everything
-downstream reads its answer: both edges, the break-even, the band and the rule
-about the model's own range. Four places each remembering to turn a number over
-is four places one of them can forget.
+downstream reads its answer: both edges, the break-even and the band. Four places
+each remembering to turn a number over is four places one of them can forget.
+
+*(Amended 2026-09-22; decision record 0028, "one likelihood per claim, computed
+once; no range anywhere". A fourth reader stood in that list — the rule that
+refused to lead with an edge smaller than the model's own stated range. There is
+no range any more: every number this engine computes has the same value at both
+ends, so the rule can never fire and `inside_the_model_range` is always false.)*
 
 **Which price.** A venue shows a best bid, what somebody will pay you, and a best
 offer, what somebody will sell to you for. **You buy at the offer and sell at the
@@ -277,7 +282,9 @@ class Edge(BaseModel):
             "True when an edge is worth taking at one end of the model's own stated range "
             "and not at the other — the gap is smaller than how unsure the model is of its "
             "own number. Such an edge is shown with its reason, and neither headlined nor "
-            "ranked."
+            "ranked. **Always false since 2026-09-22** (decision record 0028): no number "
+            "on this product carries a range any more, both ends of every one are the same "
+            "value, and nothing this program computes can set this."
         )
     )
     base_branch: BranchId | None = Field(
@@ -518,7 +525,18 @@ def priced(
         buying=pays_on.p - quote.offer - paid,
         selling=quote.bid - pays_on.p - paid,
         break_even=break_even,
-        inside_the_model_range=_sign_changes_across_the_range(pays_on, quote, paid),
+        # **Always false, and it cannot be anything else today** *(2026-09-22;
+        # decision record 0028, "one likelihood per claim, computed once; no range
+        # anywhere")*. This used to say whether an edge was worth taking at one end
+        # of the model's stated range and not at the other. That question needs a
+        # range with width, and every number this engine computes now sets its low
+        # end, its likelihood and its high end to the same value, so no sign can
+        # change between two ends that are the same number. The field stays on the
+        # shape, and every reader of it goes on refusing to headline or rank such
+        # an edge, so the rule is still written down for the day a range with width
+        # comes back from somewhere — a reader's own stated uncertainty was the
+        # obvious candidate. Nothing this program computes will set it.
+        inside_the_model_range=False,
         base_branch=base.branch_id,
         tick=quote.tick,
         mixture=_mixture_of(base, shown, claim, otherwise),
@@ -559,44 +577,13 @@ def _the_quote_is_for_this_ending(payoff: ContractPayoff, quote: Quote) -> None:
         )
 
 
-def _sign_changes_across_the_range(pays_on: Belief, quote: Quote, fee: float) -> bool:
-    """Say whether an edge is worth taking at one end of the model's own range and not the other.
-
-    Every claim carries the range the model stated — how unsure it is of its own
-    number. Work the two edges out at the bottom of that range and again at the
-    top: if either of them is worth taking at one end and not at the other, the gap
-    being called an edge is smaller than the model's own uncertainty about the
-    number it is made from. A product that policed a one-cent tick and ignored a
-    twenty-point band would be policing what was easy.
-
-    **Worth taking means strictly better than nothing**, so an edge of exactly
-    nothing at one end and something at the other is marked. A gap you would not
-    cross the spread for is not one to lead with.
-
-    Args:
-        pays_on: The likelihood this side of the trade pays on, with its range —
-            already turned over on a no-side ending, so this reads one rule.
-        quote: The venue's two prices.
-        fee: What the venue charges on a filled trade, in the same units as a
-            price, with an unknown fee already read as nothing.
-
-    Returns:
-        True when buying, or selling, is worth it at one end of the range and not
-        at the other.
-    """
-    buying = (pays_on.lo - quote.offer - fee, pays_on.hi - quote.offer - fee)
-    selling = (quote.bid - pays_on.lo - fee, quote.bid - pays_on.hi - fee)
-    return _changes_sign(buying) or _changes_sign(selling)
-
-
-def _changes_sign(ends: tuple[float, float]) -> bool:
-    """Say whether one of two edges is worth taking and the other is not.
-
-    Worth taking is **strictly** more than nothing: an edge of exactly nothing pays
-    for nothing, so an end that reads nought sits with the ends that are not worth
-    crossing the spread for rather than with the ones that are.
-    """
-    return (ends[0] > 0.0) != (ends[1] > 0.0)
+# Two helpers stood here until 2026-09-22 and went with the range they read:
+# `_sign_changes_across_the_range`, which worked an edge out at the bottom of the
+# model's stated range and again at the top, and `_changes_sign`, which said
+# whether one of those two was worth taking and the other was not. Decision record
+# 0028 removed the range from this product altogether, so both ends of every range
+# are now the same number and neither helper could ever answer anything but no.
+# `git log` holds them if a range with width ever comes back.
 
 
 def _mixture_of(

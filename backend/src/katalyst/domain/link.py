@@ -117,11 +117,14 @@ class Link(BaseModel):
 
     mode: Literal["trigger", "sustain"] = Field(
         description=(
-            "How the push behaves when the cause goes away. 'trigger': a one-time shove — once the "
-            "cause becomes true the effect is pushed and stays pushed, fading on its own; undoing "
-            "the cause later does not undo it (a toppled domino). 'sustain': a continuous hold — "
-            "the push exists only while the cause holds, and vanishes the moment it stops (an "
-            "apple on a desk)."
+            "Which of the cause's two times this arrow reads. 'trigger' reads the day the cause "
+            "came on and nothing else: once the cause has happened the effect is pushed and stays "
+            "pushed, fading on its own if its shape fades, and whatever becomes of the cause "
+            "afterwards makes no difference (a toppled domino). 'sustain' reads the cause's whole "
+            "stretch — the day it came on and the day it stopped — so the push is dead the moment "
+            "the cause stops holding (an apple on a desk). Only a claim that can stop has a "
+            "stretch to read, so a 'sustain' arrow may leave only a claim whose persistence is "
+            "'state'; out of an event the two behave identically."
         )
     )
     # Open question 6 in spec/graph/link.md: strength has no sanity ceiling, so a

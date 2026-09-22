@@ -10,11 +10,13 @@
  * it's possible to zoom out a lot more?"*
  *
  * **It plays the recording rather than the stored example**, because the stored
- * example is seven claims and fits at a readable zoom already. Eighteen is the
- * map that does not: at the zoom a full tile needs it is about 1 600 by 1 700
- * pixels on the glass against a stage of about 1 264 by 860, so most of it is
- * off the screen and the reader has to pan to find out what shape their own
- * argument came out.
+ * example is nine claims in five columns and is only a little too wide for the
+ * stage — about 1 590 pixels of map in 1 574 of glass with the panel folded
+ * away, which is two tiles past the edge. Eighteen is the map that is nowhere
+ * near fitting: at the zoom a full tile needs it is about 1 600 by 1 700 pixels
+ * on the glass against a stage of about 1 264 by 860, so most of it is off the
+ * screen and the reader has to pan to find out what shape their own argument
+ * came out.
  *
  * **Nothing below is a number typed into this file.** Every figure is read off
  * the screen — where the stage is, where the tiles are, what the panel says —

@@ -250,6 +250,7 @@ def a_claim(identifier: str) -> Proposition:
         id=identifier,
         claim="The strait stays open to commercial transit through 1 November.",
         kind="hypothesis" if identifier == "claim-a" else "event",
+        persistence="event",
         resolution=Resolution(
             criteria="A seven-day moving average of transits at or above sixty.",
             source="IMF PortWatch",

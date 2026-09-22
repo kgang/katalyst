@@ -1,15 +1,22 @@
-"""A belief: a likelihood with an honest range and a name on it.
+"""A belief: a likelihood with a name on it.
 
 A bare number on a box is a claim from nowhere. A belief is a likelihood that
-says whose it is and how sure it is: a value between 0 and 1, a range around it,
-and an owner — the model, the user, or a market. Every claim on the map carries
-up to three of them side by side, and they are never combined into one.
+says whose it is: a value between 0 and 1 and an owner — the model, the user, or
+a market. Every claim on the map carries up to three of them side by side, and
+they are never combined into one.
 
-That is the product in one design choice. The model's .61, the market's .48 and
-your own .30 on the same claim are not three attempts at one true number to be
-averaged away. They are the disagreement you are about to trade: model minus
-market is the edge, user minus model is the argument you are having with the
-tool.
+That is the product in one design choice. What the model says, what the market
+prices and what you think about one claim are not three attempts at one true
+number to be averaged away. They are the disagreement you are about to trade:
+model minus market is the edge, user minus model is the argument you are having
+with the tool.
+
+**No number here carries a range** (decision record 0028, Kent's row R48,
+2026-09-22). `lo` and `hi` are still on the shape, and every number this product
+computes sets all three to the same value; they leave the wire in one follow-up
+after the browser round. A stated range is still elicited from the model, because
+what the model is asked for moves the prompt fingerprint and every recording with
+it, and nothing in version one reads it.
 
 Both classes here are frozen — once built, an instance cannot be changed. A
 change is a new instance, recorded as an intervention on a branch.

@@ -75,7 +75,7 @@ A branch that does not fit the map comes back as `422` with **every** reason at 
 |---------|--------|-----------|
 | [`interventions.md`](interventions.md) | The six operations, their preconditions, and what each may touch | stack 02 — written, models built |
 | [`branches-and-worlds.md`](branches-and-worlds.md) | Patch algebra, replay, seeds, naming, parent branches | stack 02 — written, models built |
-| [`propagation.md`](propagation.md) | What a claim's number means — the chance it comes out true by its own deadline; how an arrow bends a rate and how two causes add; events and states; the exact solve and the weighted sample; where the range comes from | stack 05 — rewritten whole, engine built |
+| [`propagation.md`](propagation.md) | What a claim's number means — the chance it comes out true by its own deadline; how an arrow bends a rate and how two causes add; events and states; the exact solve and the weighted sample | stack 05 — rewritten whole, engine built and flipped |
 | [`diff.md`](diff.md) | Per-proposition states (unchanged / shifted / added / killed), ranked terminal deltas, the one-line summary, the sensitivity sweep | stack 03a — written, engine built; **amended in stack 05** where the new engine made it false |
 
 Decision records behind this part: ADR-0004 (branches are patches), ADR-0005 (propagation), ADR-0014 (how a change is ranked and dated), **ADR-0016** (a claim's number is the chance it happens by its deadline; *whether* is solved exactly, *when* is sampled), **ADR-0017** (a claim is an event or a state; nothing retracts itself, which reverses record 0014's decision A) and **ADR-0028** (one likelihood per claim, computed once; no range anywhere, which reverses what record 0014 said a range meant).

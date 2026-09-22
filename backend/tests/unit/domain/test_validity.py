@@ -43,6 +43,7 @@ a_great_many = settings(max_examples=120, deadline=None)
 
 RULE_ORDER: tuple[tuple[str, ...], ...] = (
     ("missing_resolution",),
+    ("claim_without_persistence",),
     ("no_hypothesis", "multiple_hypotheses"),
     ("no_terminal",),
     ("market_without_payoff",),
@@ -280,6 +281,29 @@ def test_validate_rejects_belief_out_of_range(graph: Graph) -> None:
     assert [fault.code for fault in faults] == ["belief_out_of_range"]
     assert faults[0].subject in {one.id for one in graph.propositions}
     assert "not a range around that number between 0 and 1" in faults[0].message
+
+
+@given(broken_graphs("claim_without_persistence"))
+@many
+def test_validate_rejects_a_claim_that_does_not_say_which_kind_of_truth_it_is(
+    graph: Graph,
+) -> None:
+    """A claim that does not say whether it happens once or holds for a while is refused.
+
+    **Always required, and a map without it is refused by name** (Kent, decisions
+    note row R48's neighbour R27; decision record 0017). The claim's own class
+    requires the field, so the broken claim has to be built with `model_construct`,
+    the one way of making a model without running its checks. That is the point of
+    the rule: it is the net under maps that arrive some other way than through our
+    own classes — a hand-written stored example, or a recording made before the
+    field existed. Reject, never repair: nothing guesses `event` on the reader's
+    behalf.
+    """
+    faults = validate(graph)
+
+    assert [fault.code for fault in faults] == ["claim_without_persistence"]
+    assert faults[0].subject in {one.id for one in graph.propositions}
+    assert "happens once and stays happened" in faults[0].message
 
 
 @given(graphs())

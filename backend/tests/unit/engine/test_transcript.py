@@ -23,6 +23,7 @@ def a_map(identifier: str) -> Graph:
         id=f"{identifier}-claim",
         claim="Something somebody expects.",
         kind="hypothesis",
+        persistence="event",
         resolution=Resolution(
             criteria="A test two people reading it would agree on.",
             source="A named judge.",

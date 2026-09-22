@@ -64,7 +64,7 @@ from katalyst.domain.propagation import (
     SAMPLED_WORLDS,
     Numbers,
     World,
-    _worked_out_by_deadline,
+    _worked_out,
     _WorkedOut,
 )
 from katalyst.domain.rates import SLICES
@@ -181,9 +181,9 @@ def verdict(
         graph: The finished map.
         destination: The claim the person asked whether the story reaches.
         world: The world the numbers are read against — for the map it was built
-            from, the values its edits fixed, its first day, its seed and how many
-            versions of the map it tried. Without it the route is graded
-            structurally and all three numbers are absent rather than invented.
+            from, the values its edits fixed, its first day and its seed. Without
+            it the route is graded structurally and all three numbers are absent
+            rather than invented.
         beliefs: **Read by nothing, and it goes when its one caller moves.** This
             door used to be handed every claim's likelihood so it could multiply
             them along the route; decision record 0022 deleted that multiplication.
@@ -450,12 +450,10 @@ def _pass_over(graph: Graph, fixed: tuple[Assignment, ...], world: World) -> _Wo
     tables the solve ran over — the joint is one more elimination across them — so
     it asks the assembly for its working rather than for its result.
 
-    **There is no engine to choose here.** This is the by-deadline core's own route
-    — decision record 0016's arithmetic, reached directly — so the word the flip
-    changes does not reach this file and there is nothing here for the flip to
-    change. Until the flip lands, these three numbers are worked out on the new core
-    while the tiles beside them are still worked out on the old one; after it, both
-    are the same arithmetic.
+    **There is one engine.** This is the by-deadline core's own route — decision
+    record 0016's arithmetic, reached directly — and since the flip it is the only
+    arithmetic there is, so these three numbers and the tiles beside them are worked
+    out the same way.
 
     Dated 2026-09-22: `katalyst.domain.propagation` belongs to another lane this
     week, so the name is reached as it stands. The one-line change that makes it a
@@ -464,38 +462,37 @@ def _pass_over(graph: Graph, fixed: tuple[Assignment, ...], world: World) -> _Wo
     Args:
         graph: The map to work through.
         fixed: Every value its edits fixed.
-        world: The world whose first day, seed and versions this matches.
+        world: The world whose first day and seed this matches.
 
     Returns:
-        The finished pass, the values it was given, and every claim's number, one
-        per version of the map.
+        The finished pass, the values it was given, and every claim's one number.
     """
-    return _worked_out_by_deadline(
+    return _worked_out(
         graph,
         fixed,
         as_of=world.day_zero,
         seed=world.seed,
-        versions=world.versions,
         slices=SLICES,
         sampled_worlds=SAMPLED_WORLDS,
     )
 
 
-def _one_number(across_versions: Numbers) -> float:
-    """Read one number off an answer that carries one per version of the map.
+def _one_number(answer: Numbers) -> float:
+    """Read the one number off a claim's answer.
 
-    Their plain average, which is exactly what a tile shows: a world's own
-    likelihood is the middle of its band, and the middle of a band is the average
-    across the versions when no version counts for more than another — which is
-    every version under the exact core, because nothing there is ever thrown away.
+    The engine works out one version of the map and one likelihood per claim
+    (decision record 0028), so an answer is an array of exactly one number and this
+    reads it. The average is taken rather than the first element because the array
+    is still shaped as an array; with one entry the two are the same number, and the
+    day the shape goes this function goes with it. Dated 2026-09-22.
 
     Args:
-        across_versions: One number per version of the map.
+        answer: A claim's solved likelihood, as the core carries it.
 
     Returns:
         The one number, held between nought and one.
     """
-    return float(numpy.clip(across_versions.mean(), 0.0, 1.0))
+    return float(numpy.clip(answer.mean(), 0.0, 1.0))
 
 
 # --- Where the story got to, when it did not get there ---------------------

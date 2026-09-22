@@ -25,11 +25,19 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
         resolutionCriteria: "At least 14 consecutive days of unrestricted commercial transit.",
         resolutionSource: "Lloyd's List transit counts.",
         resolvesBy: "2026-11-01",
+        // **A count this test made up, and it says so** *(2026-09-22)*. The panel
+        // has to be shown a count to be tested for how it prints one, and there is
+        // no longer a count anywhere on the curated map to borrow: the one that
+        // used to sit on this claim counted Hormuz *disruptions* against a claim
+        // about a *closure* — a different kind of event — and the fixture dropped
+        // it rather than replace it with a number nobody had counted. So this one
+        // belongs to the test, is about nothing in the world, and is never quoted
+        // anywhere else.
         baseRate: {
           reading: {
-            referenceClass: "Closure episodes since 1980 that ended within 90 days.",
-            k: 7,
-            n: 9,
+            referenceClass: "A class this test invented, standing for whatever a map might count.",
+            k: 4,
+            n: 11,
             sources: [],
           },
         },
@@ -173,12 +181,23 @@ describe("the panel, on a claim", () => {
 
   it("test_never_derives_a_displayed_number", () => {
     render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />);
-    // Seven of nine past cases came out true. The panel prints the count and
-    // never the rate: dividing one by the other would be this half of the
-    // product working out a number, and it would quietly claim that .78 is the
-    // answer — which is what the prior is for and what it is not.
-    expect(screen.getByText("7 of 9")).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain(".78");
+    // Four of eleven past cases came out true, by this test's own made-up count.
+    // The panel prints the count and never the rate: dividing one by the other
+    // would be this half of the product working out a number, and it would quietly
+    // claim that .36 is the answer — which is what the prior is for and what it is
+    // not.
+    expect(screen.getByText("4 of 11")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(".36");
+  });
+
+  it("test_a_claim_with_no_count_behind_it_says_so_in_words", () => {
+    // **The live path** *(2026-09-22)*. No claim on the curated map carries a
+    // count of past cases, so what the panel actually draws beside a claim is this
+    // absence — the words and the reason for them, never an empty slot and never a
+    // number invented to fill one.
+    render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "B" }} />);
+    expect(document.body.textContent).not.toMatch(/\d+ of \d+/);
+    expect(screen.getByText(/not said/i)).toBeInTheDocument();
   });
 
   it("test_every_rendered_number_resolves_to_a_subject", () => {

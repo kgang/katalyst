@@ -65,6 +65,7 @@ def an_ending(payoff: ContractPayoff | PricePayoff | None) -> Proposition:
         id=PropositionId("the-ending"),
         claim="Brent crude settles below sixty-eight dollars for five sessions",
         kind="market" if payoff is not None else "event",
+        persistence="event",
         resolution=Resolution(
             criteria="five consecutive settlements below sixty-eight dollars",
             source="ICE settlement prices",

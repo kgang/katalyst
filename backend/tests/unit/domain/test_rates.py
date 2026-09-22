@@ -50,6 +50,7 @@ def _claim(identifier: str, *, prior: float = 0.3, days: int = 60) -> Propositio
         id=identifier,
         claim=f"The claim written down under the name {identifier}.",
         kind="event",
+        persistence="event",
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",

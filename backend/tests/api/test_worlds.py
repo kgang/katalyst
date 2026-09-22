@@ -85,24 +85,36 @@ def test_the_strike_branch_answers_with_a_world_that_names_its_branch() -> None:
     world = World.model_validate(answer.json())
     assert world.branch_id == HORMUZ_THEN_STRIKE.id
     assert "S" in world.beliefs, "the branch adds a claim the base map has never heard of"
-    assert [one.target for one in world.retractions] == ["H"]
-    assert world.states["H"][0] == "supposed"
+    assert world.retractions == (), "nothing retracts itself any more (decision record 0017)"
+    assert set(world.states["H"]) == {"supposed"}
     assert len(world.series["H"]) == len(world.series_days)
 
 
-def test_a_world_is_built_at_the_shipped_budget_when_the_request_does_not_say() -> None:
-    """Leaving the budget out gives the shipped run: two thousand versions, eight worlds each.
+def test_the_budget_a_request_may_still_ask_for_reaches_no_arithmetic() -> None:
+    """Whatever a request asks for, a world says one version of the map and no inner loop.
 
-    The two numbers live in the engine that works the likelihoods through, and the
-    routes repeat them so a reader of the request shape can see what they are. This
-    is what fails if the two copies ever part company.
+    Both fields are **accepted and ignored** (decision records 0028 and 0016): the
+    engine works out one version and reports one likelihood per claim, and there is
+    no inner loop for a world to run inside. They stay on the wire, with their own
+    ceilings, until the browser round closes and the empty fields go together — so
+    this asks the route twice, once saying nothing and once asking for the largest
+    run the ceilings allow, and requires the same two constants back both times.
     """
     with TestClient(app) as client:
-        answer = client.post("/api/worlds", json={"base_id": "hormuz", "seed": SEED})
+        silent = client.post("/api/worlds", json={"base_id": "hormuz", "seed": SEED})
+        asked = client.post(
+            "/api/worlds",
+            json={
+                "base_id": "hormuz",
+                "seed": SEED,
+                "versions": engine.MOST_VERSIONS,
+                "worlds": engine.MOST_WORLDS,
+            },
+        )
 
-    world = World.model_validate(answer.json())
-    assert (world.versions, world.worlds) == (2_000, 8)
-    assert (world.versions, world.worlds) == (engine.VERSIONS, engine.WORLDS)
+    for answer in (silent, asked):
+        world = World.model_validate(answer.json())
+        assert (world.versions, world.worlds) == (1, 0)
 
 
 def test_the_diff_route_ranks_the_endings_and_says_so_in_a_sentence() -> None:
@@ -370,7 +382,7 @@ def test_a_branch_folded_onto_a_generated_map_moves_the_same_endings(
     # asserting about the numbers, and the reason no number is written down here.
     also = Diff.model_validate(on_the_stored_one.json())
     assert difference.claims == also.claims
-    assert [one.claim_id for one in difference.rows] == [one.claim_id for one in also.rows]
+    assert [one.target for one in difference.rows] == [one.target for one in also.rows]
     assert difference.summary == also.summary
 
 

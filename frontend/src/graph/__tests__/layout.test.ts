@@ -787,4 +787,55 @@ describe("the union of two worlds", () => {
     // frame's own gap, which would be a test of nothing.
     expect(frame.x).toBeGreaterThan(PAST_THE_ZOOM_BUTTONS);
   });
+
+  it("test_folding_the_panel_shows_more_of_a_map_that_does_not_fit", () => {
+    // **The arithmetic behind a browser test that cannot ask for everything to
+    // fit** *(2026-09-22)*. The stored example became five columns wide when the
+    // map gained the claim that the strait stays open, and the end-to-end suite
+    // folds the panel away and then counts the tiles past the right edge. What
+    // it may ask for is what the framing rule promises, and this is that rule in
+    // pixels, worked out where a browser is not needed to work it out.
+    //
+    // Five columns of tiles, with the gap the layout is told to leave between
+    // one column and the next. Taken from the setting rather than typed, because
+    // a number typed here and a number the layout uses are two numbers waiting
+    // to disagree.
+    const between = Number(LAYOUT_OPTIONS["elk.layered.spacing.nodeNodeBetweenLayers"]);
+    const fiveColumns = 5 * TILE_WIDTH + 4 * between;
+
+    // The window every browser test runs in, the panel's own width, and the tab
+    // it leaves behind when it folds — `app.css` sets the last two.
+    const across = 1600;
+    const panel = 336;
+    const tab = 26;
+    const beside = { width: across - panel, height: 850 };
+    const folded = { width: across - tab, height: 850 };
+
+    // **It does not fit either way**, which is the thing the browser test may not
+    // assume: at the readable zoom this map is wider than the stage even with the
+    // whole panel given back to it.
+    expect(fiveColumns * SUMMARY_BELOW_ZOOM).toBeGreaterThan(folded.width);
+
+    const open = firstFrame({ x: 0, y: 0, width: fiveColumns, height: 800 }, beside);
+    const wide = firstFrame({ x: 0, y: 0, width: fiveColumns, height: 800 }, folded);
+
+    // So both framings keep the readable zoom and both start the map at its
+    // beginning, past the zoom buttons. Folding the panel moves the map not at
+    // all — there is nowhere to move it to — and what the reader gains is glass:
+    // exactly the width the panel gave back, and so one more column of it.
+    expect(open.zoom).toBe(SUMMARY_BELOW_ZOOM);
+    expect(wide.zoom).toBe(open.zoom);
+    expect(wide.x).toBe(open.x);
+    // How much of the map is on the glass: the stage's width less the gap the
+    // map starts after.
+    const seen = (start: number, room: { width: number }) => room.width - start;
+    expect(seen(wide.x, folded) - seen(open.x, beside)).toBe(panel - tab);
+    // And the width given back is more than a tile is wide at that zoom, so what
+    // the reader gains is a column and not a sliver of one.
+    expect(panel - tab).toBeGreaterThan(TILE_WIDTH * SUMMARY_BELOW_ZOOM);
+
+    // And there is still map beyond the right edge afterwards, which is why the
+    // browser test asks the stage to say so rather than asking it to fit.
+    expect(wide.x + fiveColumns * wide.zoom).toBeGreaterThan(folded.width);
+  });
 });

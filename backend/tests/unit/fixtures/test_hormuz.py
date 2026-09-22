@@ -1,12 +1,16 @@
 """The Hormuz example is valid, complete, and says what it is.
 
-This example is not decoration. Stack 03a measures its arithmetic against it and
-stack 03b draws it, so anything that silently changed in it would change answers
-elsewhere with nothing to say why. These tests pin down the things later stacks
-rely on: that the map is valid, that it still exercises every shape the model
-layer defines, that every number is a range rather than a point, that no arrow
-claims evidence it does not cite, and that the two arrows making up the
-trigger-versus-sustain showcase are still the way round they are supposed to be.
+This example is not decoration. The engine measures its arithmetic against it
+and the canvas draws it, so anything that silently changed in it would change
+answers elsewhere with nothing to say why. These tests pin down the things the
+rest of the product relies on: that the map is valid, that it still exercises
+every shape the model layer defines, that no likelihood on it carries a range,
+that no arrow claims evidence it does not cite, and that the arrows making up
+the showcase — a state that stops, against a push that has already landed and
+does not care — are still the way round they are supposed to be.
+
+What the example *does*, run through the engine, is in `test_hormuz_story.py`.
+This file is about the map as a written object.
 """
 
 import json
@@ -159,9 +163,11 @@ def test_the_two_endings_use_the_two_payoff_shapes() -> None:
     assert isinstance(price, PricePayoff)
     assert price.kind == "price"
     assert price.direction == "short"
-    # A fraction of the instrument's own price: three per cent, read straight
-    # off the claim, not a return on a position whose entry nobody wrote down.
-    assert price.move == pytest.approx(0.03)
+    # A fraction of the instrument's own price, and it is the **average** gap
+    # when the claim is true, not the threshold at which the claim starts being
+    # true. Three per cent is where the claim begins; the arithmetic beside the
+    # field in the fixture puts the average gap past it at a little over six.
+    assert price.move > 0.03
 
 
 def test_the_ending_that_cannot_be_traded_says_why() -> None:
@@ -200,15 +206,25 @@ def test_no_arrow_claims_evidence_it_does_not_cite() -> None:
         )
 
 
-def test_every_likelihood_is_a_range_and_never_a_point() -> None:
-    """No number in the example pretends to a precision nobody has.
+def test_no_likelihood_carries_a_range() -> None:
+    """Every number in the example is a point: low, likelihood and high all equal.
 
-    A belief whose low and high are the same number is a point estimate wearing a
-    range's clothes, which is the dishonesty this shape exists to prevent.
+    This reverses what this test used to assert. Every belief here used to carry
+    a range, meaning *how sure we are of the number we put in* — never *how much
+    the world can move*. Kent tried the built product on 2026-09-22 and cut it:
+    a second number per claim cost a reader attention on every tile and gave back
+    a caveat, and a range that needs a paragraph of hover copy to stop a trader
+    reading it as volatility is not a number anyone can use. Decision record 0028.
+
+    The two extra fields have not been deleted yet, because the wire and the
+    browser still carry them. So the rule while they are here is that they carry
+    nothing: a field that is always equal to another field is a field somebody
+    will eventually believe, and this check is what stops one creeping back.
     """
     for claim_id, belief in every_belief():
-        assert belief.lo < belief.hi, f"the {belief.owner} number on {claim_id} is a point"
-        assert belief.lo <= belief.p <= belief.hi
+        assert belief.lo == belief.p == belief.hi, (
+            f"the {belief.owner} number on {claim_id} carries a range"
+        )
 
 
 def test_the_starting_claim_carries_the_users_own_number() -> None:
@@ -222,25 +238,53 @@ def test_the_starting_claim_carries_the_users_own_number() -> None:
     assert hypothesis.beliefs.user.p != hypothesis.beliefs.model.p
 
 
-def test_the_quoted_contract_carries_a_market_number() -> None:
-    """The Polymarket terminal holds a market belief beside the model's, unmerged."""
-    contract = next(one for one in HORMUZ.propositions if one.id == "M1")
+def test_the_map_shows_three_voices_and_never_merges_them() -> None:
+    """One ending holds a market number beside the model's, and the two disagree.
 
-    assert contract.beliefs.market is not None
-    assert contract.beliefs.market.owner == "market"
-    assert contract.beliefs.model.owner == "model"
-    assert contract.beliefs.market.p != contract.beliefs.model.p
+    M1 is the stand-in contract: a read of the venue on 2026-09-21 found nothing
+    quoting Brent crude at all, so there is no identifier to name and no price to
+    record. What it keeps is the shape — an ending with a market voice on it, so
+    the map still shows what a priced ending looks like and what a disagreement
+    looks like. M3 is the ending with a real, live, recorded price, and it types
+    no number at all: its market voice is built from the committed quote file.
+    """
+    stand_in = next(one for one in HORMUZ.propositions if one.id == "M1")
+    really_quoted = next(one for one in HORMUZ.propositions if one.id == "M3")
+
+    assert stand_in.beliefs.market is not None
+    assert stand_in.beliefs.market.owner == "market"
+    assert stand_in.beliefs.model.owner == "model"
+    # Never merged, and allowed to disagree: the gap is what somebody would be
+    # trading, and an average of the two is a number nobody holds.
+    assert stand_in.beliefs.market.p != stand_in.beliefs.model.p
+
+    assert really_quoted.beliefs.market is None
 
 
-def test_the_starting_claim_is_anchored_on_a_reference_class() -> None:
-    """The hypothesis says how often this kind of thing has happened before: 7 of 9."""
+def test_no_claim_counts_a_reference_class_nobody_has_counted() -> None:
+    """The example carries no base rate, and that is the honest answer here.
+
+    The hypothesis used to carry one: *of the Hormuz disruption episodes since
+    1980, 7 of 9 ended within 90 days*, taken from a research report that cites
+    nothing for it. The class was the wrong population — the Strait has never
+    been closed, and a disruption is a different kind of event from a closure —
+    so a count over the one said nothing about the other. It is the single number
+    on this map a finance reader would have caught first.
+
+    `base_rate` is optional for exactly this case. Nobody has counted an honest
+    class for any claim here, so none of them claims one. An absent count is a
+    true statement; an invented one is not, and a wrong class is worse than both
+    because it looks like homework.
+
+    What the hypothesis does still carry is evidence, one item each way.
+    """
+    for proposition in HORMUZ.propositions:
+        assert proposition.base_rate is None, (
+            f"{proposition.id} counts a reference class; say who counted it or drop it"
+        )
+
     hypothesis = next(one for one in HORMUZ.propositions if one.id == "H")
 
-    assert hypothesis.base_rate is not None
-    assert (hypothesis.base_rate.k, hypothesis.base_rate.n) == (7, 9)
-    # Nothing has checked that count, and the empty source list is how the
-    # example says so rather than implying a document that does not exist.
-    assert hypothesis.base_rate.sources == ()
     assert len(hypothesis.evidence) >= 2
     assert {item.direction for item in hypothesis.evidence} == {1, -1}
 
@@ -281,6 +325,19 @@ def test_the_example_exercises_every_shape_the_model_layer_defines() -> None:
         "market",
         "not_tradeable",
     }
+    # Both kinds of truth: something that happens once and stays happened, and
+    # something that holds for a while and can stop. A map with no state on it
+    # would let a whole half of the arithmetic go unexercised.
+    assert {one.persistence for one in propositions} == {"event", "state"}
+    # And a `sustain` arrow only makes sense out of a claim that can stop, so
+    # every one of them here leaves a state. The rules layer starts refusing the
+    # alternative at the one pass where everything the model is asked changes.
+    kinds_of_truth = {one.id: one.persistence for one in propositions}
+    for link in every_link():
+        if link.mode == "sustain":
+            assert kinds_of_truth[link.source] == "state", (
+                f"the sustain arrow {link.id} leaves a claim that cannot stop"
+            )
     assert {link.mode for link in every_link()} == {"trigger", "sustain"}
     assert {link.shape for link in every_link()} == {"impulse", "step", "ramp"}
     assert {owner for _, belief in every_belief() for owner in [belief.owner]} == {
@@ -318,13 +375,17 @@ def test_every_resolve_by_date_falls_after_the_day_the_example_is_set_on() -> No
         assert proposition.resolution.source.strip()
 
 
-def test_the_strike_branch_is_three_edits_in_the_order_that_makes_it_work() -> None:
-    """Suppose the strait opens, add the strike, then suppose the strike lands.
+def test_the_strike_branch_is_three_edits_in_the_order_the_reader_made_them() -> None:
+    """Suppose the traffic comes back, add the strike, then suppose the strike lands.
 
-    The order is load-bearing. Supposing a claim cuts the arrows that exist at
-    that moment, so the arrow from the strike back onto the strait has to be
-    added *after* the strait was supposed open — otherwise it would be cut and
-    the showcase would not happen.
+    The order used to be load-bearing for a reason that has gone: the strike's
+    arrow pointed at the claim the reader had supposed, and supposing a claim
+    cuts the arrows into it that exist at that moment, so putting the insert
+    first would have cut the arrow and the branch would have shown nothing. That
+    arrow now points at the state instead, which nobody supposed, so the order is
+    simply the order the reader made their edits in — and it is still recorded,
+    because a branch that quietly reordered a reader's edits would be answering a
+    question they did not ask.
     """
     edits = HORMUZ_THEN_STRIKE.interventions
 
@@ -340,26 +401,55 @@ def test_the_strike_branch_is_three_edits_in_the_order_that_makes_it_work() -> N
     assert HORMUZ_THEN_STRIKE.label.strip()
 
 
-def test_the_showcase_is_a_sustain_arrow_pulling_against_a_trigger_that_already_fired() -> None:
-    """S → H is a sustain and H → B is a trigger. Both, together, are the whole idea.
+def test_the_showcase_is_a_state_that_ends_against_a_push_that_has_already_landed() -> None:
+    """Three arrows, together, are the whole idea; each one has to stay the way it is.
 
-    The strike withdraws what was holding the strait open, so the openness
-    retracts even though the user asserted it — a sustain arrow, the apple and
-    the desk. The push into the oil price already fired and does not un-fire — a
-    trigger arrow, the toppled domino. If either of these two ever flips, the
-    example stops demonstrating the thing it exists to demonstrate.
+    `S → O` ends the state. Its number sits below the state's own number, which
+    is what makes it an ending arrow rather than a helping one — no field says
+    so, the sign does. It points at *the strait stays open*, never at the claim
+    the user supposed: nothing on this map retracts what a reader typed.
+
+    `O → C` is the sustain out of that state. The moment the lane stops being
+    open, the thing holding the insurance rate down is gone, with nothing else
+    needing to happen — the apple and the desk.
+
+    `H → B` is the trigger out of the event. It fired when the traffic test was
+    met, the risk premium came out of the price, and that domino stays fallen
+    whatever happens next — which is why it has a half-life to fade on and the
+    other two do not.
+
+    If any of the three flips, the example stops demonstrating the thing it
+    exists to demonstrate.
     """
-    strike_to_hormuz = next(link for link in inserted_links() if link.id == "S->H")
-    hormuz_to_brent = next(link for link in HORMUZ.links if link.id == "H->B")
+    by_id = {link.id: link for link in every_link()}
+    claims = {one.id: one for one in HORMUZ.propositions}
 
-    assert strike_to_hormuz.mode == "sustain"
-    assert strike_to_hormuz.strength < 0
-    assert hormuz_to_brent.mode == "trigger"
-    assert hormuz_to_brent.strength > 0
-    # A trigger that fades needs to say how fast it fades, or there is nothing
-    # left for it to keep doing after its cause is retracted.
-    assert hormuz_to_brent.shape == "impulse"
-    assert hormuz_to_brent.half_life is not None
+    ends_the_state = by_id["S->O"]
+    assert ends_the_state.target == "O"
+    assert claims["O"].persistence == "state"
+    assert ends_the_state.mode == "trigger"
+    assert ends_the_state.strength < 0
+    # An ending arrow is one whose number sits below the claim's own, and that is
+    # what the sign is saying here: a negative push on a claim at a likelihood
+    # under a half is a number below it.
+    assert claims["O"].prior.p < 0.5
+
+    # Nothing points at the claim the user supposed.
+    assert "S->H" not in by_id
+    assert not [link for link in inserted_links() if link.target == HORMUZ.hypothesis_id]
+
+    held_up_by_the_state = by_id["O->C"]
+    assert held_up_by_the_state.mode == "sustain"
+    assert held_up_by_the_state.source == "O"
+    assert held_up_by_the_state.strength > 0
+
+    already_landed = by_id["H->B"]
+    assert already_landed.mode == "trigger"
+    assert already_landed.strength > 0
+    # A push that outlives its cause needs to say how fast it fades, or there is
+    # nothing left for it to keep doing once the world has moved on.
+    assert already_landed.shape == "impulse"
+    assert already_landed.half_life is not None
 
 
 def test_the_signs_on_the_map_read_the_way_the_claims_are_written() -> None:
@@ -373,12 +463,13 @@ def test_the_signs_on_the_map_read_the_way_the_claims_are_written() -> None:
     by_id = {link.id: link for link in every_link()}
 
     assert by_id["H->B"].strength == pytest.approx(1.6)
-    assert by_id["H->C"].strength == pytest.approx(1.1)
+    assert by_id["H->O"].strength == pytest.approx(2.2)
+    assert by_id["O->C"].strength == pytest.approx(1.1)
     assert by_id["C->B"].strength == pytest.approx(0.7)
     assert by_id["R->B"].strength == pytest.approx(-1.2)
     assert by_id["S->B"].strength == pytest.approx(-2.4)
     assert by_id["S->C"].strength == pytest.approx(-2.0)
-    assert by_id["S->H"].strength == pytest.approx(-1.9)
+    assert by_id["S->O"].strength == pytest.approx(-3.2)
 
 
 def test_the_branch_lands_on_a_map_that_is_still_valid() -> None:

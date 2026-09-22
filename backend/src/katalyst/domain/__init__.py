@@ -56,11 +56,10 @@ claim happens in one pass; `solving.py` answers **whether**, exactly; `sampling.
 draws weighted worlds where something was reported to have happened, and hands the
 days a later stack reads.
 
-`propagate` takes an `engine` argument naming which arithmetic to use, and **it
-still defaults to the one this layer has always run**. The two stand side by side
-while the second is checked against the first; which one every world on this server
-uses is that default, `DEFAULT_ENGINE` in `propagation.py`, so a caller that says
-nothing cannot be left behind when the flip changes it.
+**There is one engine.** The two nested loops this layer ran from stack 03a — two
+thousand versions of the map on the outside, eight worlds of dice on the inside —
+are deleted, along with the range they produced (decision records 0016 and 0028).
+`propagate` names no arithmetic to choose between, because there is only one.
 """
 
 from katalyst.domain.belief import Belief, Beliefs, two_figures
@@ -96,21 +95,18 @@ from katalyst.domain.patch import (
     introduced_by,
 )
 from katalyst.domain.propagation import (
-    DEFAULT_ENGINE,
+    ONE_VERSION,
     SAMPLED_WORLDS,
-    Engine,
-    Retraction,
     SeriesState,
-    Versions,
     World,
     propagate,
-    versions_of,
 )
 from katalyst.domain.proposition import (
     BaseRate,
     ContractPayoff,
     Evidence,
     Payoff,
+    Persistence,
     PricePayoff,
     Proposition,
     Resolution,
@@ -122,7 +118,6 @@ from katalyst.domain.rates import (
     ClaimShapes,
     Clamp,
     Drawn,
-    Persistence,
     Pin,
     Rates,
     Spread,
@@ -154,8 +149,8 @@ from katalyst.domain.states import (
 from katalyst.domain.validity import Violation, ViolationCode, validate
 
 __all__ = [
-    "DEFAULT_ENGINE",
     "NEVER",
+    "ONE_VERSION",
     "POINTS_IN_A_SLICE",
     "SAMPLED_WORLDS",
     "SLICES",
@@ -178,7 +173,6 @@ __all__ = [
     "Diff",
     "Do",
     "Drawn",
-    "Engine",
     "Evidence",
     "Forward",
     "Graph",
@@ -199,7 +193,6 @@ __all__ = [
     "Ready",
     "Refine",
     "Resolution",
-    "Retraction",
     "Retune",
     "Sample",
     "SensitivityRow",
@@ -208,7 +201,6 @@ __all__ = [
     "Spread",
     "Times",
     "UnchangedBecause",
-    "Versions",
     "Violation",
     "ViolationCode",
     "Window",
@@ -238,6 +230,5 @@ __all__ = [
     "stated_chance_with",
     "two_figures",
     "validate",
-    "versions_of",
     "window_of",
 ]

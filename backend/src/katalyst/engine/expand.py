@@ -204,6 +204,15 @@ def _starting_claim(drafted: StartingClaim, is_the_hypothesis: bool) -> Proposit
         id=mint_id(),
         claim=drafted.claim,
         kind="hypothesis" if is_the_hypothesis else "event",
+        # **Every claim a generation mints is an event, said out loud rather than
+        # defaulted.** Dated 2026-09-22: the one shape freeze asks the model which
+        # kind of truth each claim is (decision record 0017), and this line becomes
+        # `drafted.persistence` the day it does. Until then an event is the honest
+        # answer for a claim nobody was asked about — a `sustain` arrow out of an
+        # event behaves exactly as a `trigger` does, so the recorded map is
+        # unharmed, and the one state on this product is the one the stored example
+        # carries by hand.
+        persistence="event",
         resolution=drafted.resolution,
         prior=stated,
         beliefs=Beliefs(model=stated),
@@ -321,6 +330,9 @@ def _claim(proposal: ClaimProposal, found: tuple[Source, ...]) -> tuple[Proposit
         id=mint_id(),
         claim=proposal.claim,
         kind=proposal.claim_kind,
+        # An event, said out loud. The same dated note as `_starting_claim` above:
+        # the shape freeze asks the model, and this line reads the answer then.
+        persistence="event",
         resolution=proposal.resolution,
         prior=stated,
         beliefs=Beliefs(model=stated),

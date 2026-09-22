@@ -69,6 +69,7 @@ def a_claim(
         id=PropositionId(name),
         claim=f"The claim written down under the name {name}.",
         kind="market" if payoff is not None else "event",
+        persistence="event",
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",

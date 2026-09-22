@@ -19,20 +19,31 @@ from katalyst.domain.belief import Belief, Beliefs
 from katalyst.domain.forward import forward_pass
 from katalyst.domain.graph import Graph
 from katalyst.domain.link import Link
-from katalyst.domain.proposition import Proposition, Resolution
+from katalyst.domain.proposition import Persistence, Proposition, Resolution
 from katalyst.domain.rates import Drawn, Pin, window_of
 from katalyst.domain.states import Times, as_joint, is_true_on_its_deadline
 
 DAY_ZERO = date(2026, 10, 1)
 
 
-def _claim(identifier: str, *, prior: float = 0.3, days: int = 60) -> Proposition:
-    """One plain claim, with the chance it comes true on its own and the day it is judged."""
+def _claim(
+    identifier: str,
+    *,
+    prior: float = 0.3,
+    days: int = 60,
+    persistence: Persistence = "event",
+) -> Proposition:
+    """One plain claim, with the chance it comes true on its own and the day it is judged.
+
+    Which kind of truth it is rides on the claim itself (decision record 0017), so
+    a test that wants a state says so here rather than beside the pass.
+    """
     belief = Belief(p=prior, lo=max(0.0, prior - 0.1), hi=min(1.0, prior + 0.1), owner="model")
     return Proposition(
         id=identifier,
         claim=f"The claim written down under the name {identifier}.",
         kind="event",
+        persistence=persistence,
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",
@@ -339,15 +350,14 @@ def test_this_happened_is_not_honoured_by_the_pass() -> None:
 
 
 def test_a_state_nothing_can_end_comes_out_exactly_as_an_event() -> None:
-    graph = _map(
-        [_claim("cause"), _claim("holds")],
-        [_arrow("cause", "holds", strength=1.3)],
-    )
+    arrows = [_arrow("cause", "holds", strength=1.3)]
+    graph = _map([_claim("cause"), _claim("holds")], arrows)
+    held = _map([_claim("cause"), _claim("holds", persistence="state")], arrows)
     window = window_of(graph, DAY_ZERO, slices=5)
     drawn = _drawn(graph)
 
     as_event = forward_pass(graph, window, drawn)
-    as_state = forward_pass(graph, window, drawn, persistence={"holds": "state"})
+    as_state = forward_pass(held, window, drawn)
 
     assert as_state.times["holds"].persistence == "state"
     assert numpy.array_equal(as_event.table["holds"], as_state.table["holds"])
@@ -355,7 +365,11 @@ def test_a_state_nothing_can_end_comes_out_exactly_as_an_event() -> None:
 
 def test_a_state_something_can_end_is_read_as_still_holding_on_its_deadline() -> None:
     graph = _map(
-        [_claim("opens", prior=0.5), _claim("strike"), _claim("ending", prior=0.3)],
+        [
+            _claim("opens", prior=0.5, persistence="state"),
+            _claim("strike"),
+            _claim("ending", prior=0.3),
+        ],
         [
             _arrow("strike", "opens", strength=-2.0),
             _arrow("opens", "ending", strength=1.2, mode="sustain"),
@@ -363,7 +377,7 @@ def test_a_state_something_can_end_is_read_as_still_holding_on_its_deadline() ->
     )
     window = window_of(graph, DAY_ZERO, slices=5)
     drawn = _drawn(graph, with_cause={"strike->opens": [0.1], "opens->ending": [0.7]})
-    forward = forward_pass(graph, window, drawn, persistence={"opens": "state"})
+    forward = forward_pass(graph, window, drawn)
 
     times = forward.times["opens"]
     assert times.persistence == "state"
@@ -381,19 +395,19 @@ def test_a_state_something_can_end_is_read_as_still_holding_on_its_deadline() ->
     )
     # The strike ends it, so the state is worth less than the same claim with nothing
     # that can end it.
-    without = forward_pass(
-        _map([_claim("opens", prior=0.5)]),
-        window_of(_map([_claim("opens", prior=0.5)]), DAY_ZERO, slices=5),
-        _drawn(_map([_claim("opens", prior=0.5)])),
-        persistence={"opens": "state"},
-    )
+    alone = _map([_claim("opens", prior=0.5, persistence="state")])
+    without = forward_pass(alone, window_of(alone, DAY_ZERO, slices=5), _drawn(alone))
     assert float(is_true_on_its_deadline(times)[0]) < float(
         is_true_on_its_deadline(without.times["opens"])[0]
     )
 
 
 def test_a_sustain_arrow_out_of_a_state_stops_pushing_and_a_trigger_keeps_going() -> None:
-    claims = [_claim("opens", prior=0.5), _claim("strike"), _claim("ending", prior=0.3)]
+    claims = [
+        _claim("opens", prior=0.5, persistence="state"),
+        _claim("strike"),
+        _claim("ending", prior=0.3),
+    ]
     ends_it = _arrow("strike", "opens", strength=-2.0)
     drawn_values = {"strike->opens": [0.1], "opens->ending": [0.7]}
 
@@ -401,9 +415,7 @@ def test_a_sustain_arrow_out_of_a_state_stops_pushing_and_a_trigger_keeps_going(
     for mode in ("trigger", "sustain"):
         graph = _map(claims, [ends_it, _arrow("opens", "ending", strength=1.2, mode=mode)])
         window = window_of(graph, DAY_ZERO, slices=5)
-        forward = forward_pass(
-            graph, window, _drawn(graph, with_cause=drawn_values), persistence={"opens": "state"}
-        )
+        forward = forward_pass(graph, window, _drawn(graph, with_cause=drawn_values))
         answers[mode] = float(is_true_on_its_deadline(forward.times["ending"])[0])
 
     # A trigger arrow is a toppled domino: once the state came on it keeps pushing
@@ -414,7 +426,11 @@ def test_a_sustain_arrow_out_of_a_state_stops_pushing_and_a_trigger_keeps_going(
 
 def test_supposing_a_state_holds_it_on_from_the_start_and_never_off() -> None:
     graph = _map(
-        [_claim("opens", prior=0.5), _claim("strike"), _claim("ending", prior=0.3)],
+        [
+            _claim("opens", prior=0.5, persistence="state"),
+            _claim("strike"),
+            _claim("ending", prior=0.3),
+        ],
         [
             _arrow("strike", "opens", strength=-2.0),
             _arrow("opens", "ending", strength=1.2, mode="sustain"),
@@ -427,7 +443,6 @@ def test_supposing_a_state_holds_it_on_from_the_start_and_never_off() -> None:
         window,
         drawn,
         pinned={"opens": Pin(value=True, kind="do")},
-        persistence={"opens": "state"},
     )
 
     square = as_joint(supposed.times["opens"])
@@ -436,7 +451,7 @@ def test_supposing_a_state_holds_it_on_from_the_start_and_never_off() -> None:
     assert numpy.array_equal(supposed.table["opens"], numpy.array([[0.0, 1.0]]))
     # A cause the map says nothing can end is worth more to its effect than one the
     # strike might stop.
-    plain = forward_pass(graph, window, drawn, persistence={"opens": "state"})
+    plain = forward_pass(graph, window, drawn)
     assert float(is_true_on_its_deadline(supposed.times["ending"])[0]) > float(
         is_true_on_its_deadline(plain.times["ending"])[0]
     )
@@ -455,7 +470,7 @@ def test_the_square_of_still_holding_chances_is_built_once_a_state(monkeypatch) 
         [
             _claim("shock", prior=0.4),
             _claim("strike", prior=0.35),
-            _claim("opens", prior=0.5),
+            _claim("opens", prior=0.5, persistence="state"),
             _claim("ending", prior=0.3),
         ],
         [
@@ -478,7 +493,7 @@ def test_the_square_of_still_holding_chances_is_built_once_a_state(monkeypatch) 
         return real(*arguments, **keywords)
 
     monkeypatch.setattr(states, "_still_on_at_each_slice", watched)
-    forward = forward_pass(graph, window, drawn, persistence={"opens": "state"})
+    forward = forward_pass(graph, window, drawn)
 
     assert forward.table["opens"].shape == (1, 2, 2, 2)
     assert len(built) == 1

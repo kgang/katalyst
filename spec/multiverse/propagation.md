@@ -68,14 +68,14 @@ Several fields are on the wire and carry nothing, each with a dated comment sayi
 
 | Field | What it carries now |
 |---|---|
-| `retractions` | always empty — nothing retracts itself (record 0017) |
+| `retractions` | always an empty tuple — nothing retracts itself (record 0017). Its entries were a `Retraction` record naming the claim, the day and the arrow; the record itself is deleted, so the field carries plain text and carries none |
 | `worlds` | always `0` — there is no inner loop (record 0016) |
 | `versions` | always `1` — there is one reading, computed once (record 0028) |
 | `Belief.lo`, `Belief.hi` | always equal to `p` — there is no range (record 0028) |
 | `range_shares` | always empty — it answered whose stated number explained whose range (record 0028) |
 | `ClaimDiff.moved_only_by_reweighting`, `agreement`, `DeltaRow.range_width` | see [`diff.md`](diff.md) |
 
-**A field that is always equal to another field is a field somebody will eventually believe**, which is why they leave together and soon rather than one at a time. <!-- VERIFY AT FLIP: that every row of this table is present and empty rather than deleted, and that each carries its dated comment; and which of them the flip can delete outright because no browser reader is left. -->
+**A field that is always equal to another field is a field somebody will eventually believe**, which is why they leave together and soon rather than one at a time. Every row above is present on the wire and carries a dated comment in the code saying what it holds and why; none is deleted, because the readers that would break are the browser round's files and that round is open. They go in one follow-up, `fix/05-the-three-empty-fields`, when it closes.
 
 **`conditionals` means *supposed*, not *observed*, and it is empty on a freshly built world.** The number on a wire's midpoint chip is the target's likelihood **with that arrow's source supposed true** — the interventional number. It is never "how often do these two show up together", which is the correlational quantity [`../graph/link.md`](../graph/link.md)'s anti-pattern 3 refuses; putting that on a wire claiming a mechanism would be the worst kind of quiet lie. Computing it costs an extra solve per arrow, for a number most users never open, so it is fetched **lazily**, one arrow at a time, through `POST /api/worlds/conditional`. Laziness costs nothing in honesty: the number is a pure function of the same three inputs plus the arrow, so a lazily fetched number is byte-identical to an eagerly computed one.
 
@@ -100,7 +100,9 @@ def propagate(graph, assignments, *, as_of, seed,
               slices=24, sampled_worlds=50_000) -> World
 ```
 
-`as_of` is day zero, passed in by `engine/worlds.py` from the stored example's own date; this layer reads no clock. `worlds`, `versions` and `introduced_by` are the arguments nothing reads any more, kept until their callers move. **The version axis runs at length one**: every array inside keeps the shape it had, and one reading is computed rather than two thousand. <!-- VERIFY AT FLIP: the exact signature — whether `introduced_by` survives the deletion of retraction, and whether the `engine=` flag that stood the two cores side by side is deleted here or kept with its default changed. -->
+`as_of` is day zero, passed in by `engine/worlds.py` from the stored example's own date; this layer reads no clock. `worlds`, `versions` and `introduced_by` are accepted and ignored, each with a dated comment, and they leave with the empty fields above when their callers move. **The version axis runs at length one**: every array inside keeps the shape it had, and one reading is computed rather than two thousand.
+
+**There is no `engine=` argument, because there is one engine.** It stood there while the two cores were checked against each other, as `propagate`'s own default — the one place every caller already reads, so that the flip was one word changed once. The word is now gone rather than pointed the other way, and `test_there_is_one_engine_and_nothing_names_a_second` parses every file the server ships and fails if either name is written down anywhere.
 
 ---
 
@@ -110,17 +112,18 @@ Worked on the Strait of Hormuz map. Its claims and their stated chances are the 
 
 | | The claim | Kind of truth |
 |---|---|---|
-| **H** | *The Strait of Hormuz reopens to unrestricted commercial transit.* — the hypothesis | event |
-| **O** | *The strait stays open to commercial transit through 1 November.* | **state** |
-| **C** | *Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.* | event |
+| **H** | *The Strait of Hormuz reopens to normal commercial traffic.* — the hypothesis | event |
+| **O** | *The Strait of Hormuz stays open to commercial transit through 1 November.* | **state** |
+| **C** | *Lloyd's war-risk insurance premium for Gulf transits is under 0.4%.* | **state** |
 | **B** | *Brent crude settles below $68 for five sessions.* | event |
-| **R** | *OPEC+ announces output restraint.* — the tail | event |
+| **R** | *OPEC+ announces a new output cut.* — the tail | event |
 | **M1** | *A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.* — tradeable | event |
 | **M2** | *The energy fund XLE underperforms the S&P 500 fund SPY by more than 3% over 20 trading days.* — tradeable | event |
+| **M3** | *A Polymarket contract "Strait of Hormuz traffic returns to normal by October 31?" resolves YES.* — tradeable, and the venue's own test of H | event |
 | **N1** | *Omani-mediated United States-Iran talks resume publicly.* — real, and no venue prices it | event |
 | **S** | *A confirmed military strike on Iranian territory.* — on the branch only | event |
 
-<!-- VERIFY AT FLIP: the state claim O's identifier, its exact wording, its deadline and its arrows, all of which the fixture gains in the flip; and H's own wording, which the flip rewrites to the venue's own test (Kent, R30). Every line name below of the form `O · … ` depends on the first. -->
+Each claim's own word for which kind of truth it is is the line named `… · persistence` in the numbers file, so the right-hand column above is checkable rather than typed. **Two claims are states**: O, which the strike ends, and C, the war-risk premium, which is a level that can stop holding rather than a thing that happens once.
 
 Every number fed into that map is **illustrative**, exactly as the fixture says of its own, and the flip may tune it to make the example richer — each tuned value carrying a comment saying what it was, what it is and why. So the tests that guard this example assert **directions and orderings**, never values.
 
@@ -128,7 +131,7 @@ Every number fed into that map is **illustrative**, exactly as the fixture says 
 
 The window runs from day zero to the latest resolve-by day on the map, in whole days. Every date becomes an integer day index at the edge of `propagate` and stays an integer inside it.
 
-**The window is cut into 24 equal slices**, and inside each slice the rate is read at 8 evenly spaced days. One window is cut per map; claims differ only in where their own deadline falls inside it, and a slice past a claim's deadline counts zero days of that claim's window. Both counts are constants in `domain/rates.py`, and both were chosen by measurement (record 0016):
+**Every claim's window is cut into 24 equal slices from its own resolve-by day**, and inside each slice the rate is read at 8 evenly spaced days. The slice count is the line named `run · slices` in the numbers file; both counts are constants in `domain/rates.py`, and both were chosen by measurement (record 0016):
 
 * **Twelve slices halves the cost and is not built.** Its grid error alone puts 2.50% of *This happened* numbers further than `.005` from a fine reference, where 24 slices with the middle-of-slice convention below puts 0.00% — both measured over the same adversarially generated four-claim maps under the additive rate.
 * **An arrival inside a slice is taken at the slice's middle, never its end.** At 24 slices, against the same fine reference, that one line moves the worst gap from `.0290` to `.0027`. The last-day convention at 60 slices is worse than the middle-day one at 12.
@@ -137,7 +140,7 @@ The window runs from day zero to the latest resolve-by day on the map, in whole 
 
 **The settled day stops doing two jobs.** The old engine read *when a cause arrived* off the grid it drew the series on, which tied the timing of a push to how long the window happened to be — so a claim added at one end of the map could re-time a claim at the other end that nothing connected it to. That reading is gone: **when a cause arrived now comes out of the forward pass in B2**, as a chance spread over the slices, and the drawn grid is only where a line is drawn. Past 180 days the series handed to a reader is sampled down to 180 points, with every claim's own resolve-by day kept among them and a sentence in `warnings` saying so; `series_days` says which day each point sits on, because evenly spacing unevenly spaced points would misplace every date on the axis.
 
-**The slice edges are still a property of the whole map**, and that is the one place this hazard can come back: stretching the window by inserting a claim judged far out makes every slice wider, and a short-deadline claim is then worked out on a coarser grid. `test_a_longer_window_moves_nothing_it_cannot_reach` is what says whether that moves a number it cannot reach, and INV-4 below is the sharper form. <!-- VERIFY AT FLIP: whether a map-wide slice grid keeps `test_a_longer_window_moves_nothing_it_cannot_reach` and INV-4's byte-identity green; if it does not, this passage states the remedy instead of the hazard. -->
+**Every claim is cut into slices from its own resolve-by day**, and that is what closes this hazard rather than merely watching it. A map-wide grid would have kept it open: stretching the window by inserting a claim judged far out would make every slice wider, and a short-deadline claim would then be worked out on a coarser grid than before, without anything having reached it. Because each claim's window is its own, inserting a claim a year out leaves every other claim's slices exactly where they were. `test_a_longer_window_moves_nothing_it_cannot_reach` is what says so, and INV-4 below is the sharper form.
 
 ### B2 — What a number means, and how an arrow bends a rate
 
@@ -192,9 +195,9 @@ A holding-back arrow does not add a rate. It **scales the claim's own rate down*
 
 That is a hard floor, and it has a consequence the reader is told about rather than left to discover. **An arrow whose shape covers only part of the claim's window cannot hold the claim back as far as its number asks.** A spike with a half-life of ten days into a fortnight-long window is on for a fraction of that window; even suppressing the rate entirely while it is on leaves the rest of the window running, and the claim comes out **above** the number stated for it.
 
-**Where that happens, the arrow says so.** `propagate` puts a sentence on `World.warnings` naming the arrow in the map's own words, the chance it asked for and the chance the engine could deliver — the same shape as the loud-push warning in B2. Nothing is silently repaired and nothing is refused: the map is legal, the number is honest, and the reader can see which arrow is asking for more than its shape can give. On the shipped fixture this fires on the strike branch; the line named `strike · warnings` in the numbers file carries the sentences word for word, and `base · warnings` carries the base world's. Across the adversarially generated maps record 0016 measured, 30.0% of holding-back arrows fall short this way.
+**Where that happens, the arrow says so.** `propagate` puts a sentence on `World.warnings` naming the arrow in the map's own words, the chance it asked for and the chance the engine could deliver — the same shape as the loud-push warning in B2. Nothing is silently repaired and nothing is refused: the map is legal, the number is honest, and the reader can see which arrow is asking for more than its shape can give. Across the adversarially generated maps record 0016 measured, 30.0% of holding-back arrows fall short this way.
 
-<!-- VERIFY AT FLIP: which arrows on the shipped fixture clamp, and whether the numbers file names them on `strike · warnings` and `base · warnings` or on new lines of their own. The plan expects `S->B` and `R->B`; the flip re-examines `S->B`'s shape and number, so it may no longer. -->
+**On the shipped fixture, no arrow does.** The lines named `base · warnings`, `strike · warnings`, `observed B · warnings` and `observed C · warnings` in the numbers file all read *none*. That is a fact about this example rather than about the engine: the fixture was re-examined at the flip, and the two arrows that fell short under the old shapes — a spike into a fortnight-long window — were given shapes their numbers can deliver over the window they run on. The warning is still the net, and the sentence it writes is still checked by its own test on a map built to make it fire.
 
 ### B5 — Events and states
 
@@ -246,7 +249,7 @@ The exact solve above answers *whether*. It is built from timing worked out **be
 
 Fifty thousand worlds, seeded, and **one sample serves both its readers** — the numbers on screen, and the arrival days stack 06 reads to walk a position through time. Its correction is a single number per claim, added to the exact answer.
 
-**What it hands stack 06**, as a fixed contract: the day the window starts and how many days it runs; the claims in a fixed order; for each drawn world and each claim, the day it came on and the day it went off, with markers for *never* and *still holding*; and a weight per drawn world. Three things a consumer must know: the days are **slice middles rounded to whole days**, so on a sixty-day window at 24 slices every arrival lands on one of twenty-four days about two and a half apart; the weights are **real**, not all ones, so every count is weighted and any floor counts *effective* draws rather than rows; and an event's off day is always *still holding*, where a state's may not be.
+How many worlds are drawn is the line named `run · worlds in the sample`. **What it hands stack 06**, as a fixed contract: the day the window starts and how many days it runs; the claims in a fixed order; for each drawn world and each claim, the day it came on and the day it went off, with markers for *never* and *still holding*; and a weight per drawn world. Three things a consumer must know: the days are **slice middles rounded to whole days**, so on a sixty-day window at 24 slices every arrival lands on one of twenty-four days about two and a half apart; the weights are **real**, not all ones, so every count is weighted and any floor counts *effective* draws rather than rows; and an event's off day is always *still holding*, where a state's may not be.
 
 **How accurate that makes *This happened*** (Kent, R25): on the four-claim maps the enumerator can check, no number was further than `.005` from it. That is what the Inspector is allowed to say, and it must not be widened to *on maps this size* — the accuracy was measured on four-claim maps and the cost on twenty-claim ones, and the two sets never meet.
 
@@ -290,13 +293,13 @@ Everything comes from the one `seed` argument, through random generators built f
 * **N1 goes up** on the branch that makes everything else worse. `H → N1` is a `trigger`: the reopening was supposed true, the arrow fired, and a `trigger` keeps pushing whatever its cause does afterwards. What already rose stays risen.
 * **The map's one `asserted` arrow is still the weakest thing on it**, and it is the only way into N1. Nothing on screen widens to say so any more; what reads it is [`diff.md`](diff.md)'s provenance **weight**, which ranks a route by its worst-backed arrow.
 
-<!-- VERIFY AT FLIP: the first two bullets are orderings rather than values, but both are engine results on a fixture the flip rebuilds — that R stays byte-identical and that N1 still rises on the strike branch. Read them off the regenerated numbers file before this lands. -->
+Both bullets were read off the regenerated numbers file the day this landed: `R · base · reading` and `R · strike · reading` are the same figure to five places, and `N1 · strike · reading` stands above `N1 · base · reading`.
 
 ### What it costs, and the target it is read against
 
 **Recalculating a branch has a target proportional to the size of the map, not a fixed number, and it is a target rather than a gate** (Kent, R24, superseding the fixed 600 ms of R19). The reference point was 600 ms for one world **with its range** on a twenty-claim map at 2 000 versions — 30 ms a claim by plain division — and what it protects is that an edit feels responsive. **No test gates on the clock.** *(Every timing in this section was measured with the two thousand versions record 0028 has since cut. One reading is a small fraction of that work, so the engine is far inside the target and the target has stopped being the interesting number; the model calls are what a reader waits for.)*
 
-Where the design stood against that when record 0016 was written, on one benchmark — twenty claims, up to three causes each, **2 000 versions**, 24 slices — the prototype measured 538–568 ms with three arrows holding claims back, and **644 ms with five states feeding `sustain` arrows**, which was over the target and the record says so. That was the hard case for a design that no longer exists. The engine's own measured figures are recorded beside the old engine's in `ARCHITECTURE.md` §10 and in `docs/measurements.md`; the old engine's figures are not overwritten, because they were measured. <!-- VERIFY AT FLIP: the shipped engine's own benchmark, which the core pull request records; these are the prototype's. -->
+Where the design stood against that when record 0016 was written, on one benchmark — twenty claims, up to three causes each, **2 000 versions**, 24 slices — the prototype measured 538–568 ms with three arrows holding claims back, and **644 ms with five states feeding `sustain` arrows**, which was over the target and the record says so. That was the hard case for a design that no longer exists. The engine's own measured figures are recorded beside the old engine's in `ARCHITECTURE.md` §10 and in `docs/measurements.md`; the old engine's figures are not overwritten, because they were measured. **Every figure in this paragraph is the prototype's**, taken at the two thousand versions record 0028 has since cut; the shipped engine's own benchmark is the one the core pull request recorded.
 
 **One arrangement that is deliberately not built.** One tree built once and passed over twice would replace twenty elimination passes rather than the solve itself — about a tenth of the cost of a hard map, and nothing now asks for twenty passes in one request. The seam for it is the signature of `all_marginals` and nothing else.
 
@@ -340,7 +343,7 @@ This chapter uses the local numbers `INV-multiverse.9` through `.17`; `.12` is r
 
 Assertion 5 is a comparison **between branches on one day**, where the old golden test compared one branch's series across two days and asked it to rise. Under *the chance it has happened by day t* an event's series can only rise, so that assertion could no longer fail and had to be restated. Directions and orderings, never values.
 
-<!-- VERIFY AT FLIP: the five test names record 0017 lists, and that assertion 2's claim O exists on the fixture with the arrows the story needs. -->
+The five are `test_both_events_stand_through_the_strike`, `test_the_state_is_what_falls`, `test_a_supposition_is_not_ended_by_a_cause_nobody_believes`, `test_a_state_with_nothing_to_end_it_is_an_event` and `test_a_claim_says_which_kind_of_truth_it_is`, in `backend/tests/unit/fixtures/test_hormuz_story.py`. Claim O is on the fixture, it is a state, and the arrow `S → O` is what ends it.
 
 ---
 
