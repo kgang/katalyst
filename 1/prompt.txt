@@ -2291,3 +2291,86 @@ Logs: `plans/logs/04c/carry/check.log`, `plans/logs/04c/carry/server.log`. No ba
 <status>completed</status>
 <summary>Background command "Abort the stuck rebase, replay only #56's two server commits onto main, push, and land after the checks" completed (exit code 0)</summary>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>af4fca91a86e39bf2</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b0c894cc-4ecb-4c15-9930-d321fce0a448/tasks/af4fca91a86e39bf2.output</output-file>
+<status>completed</status>
+<summary>Agent "Carry list for the batch" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done — three commits on `feat/04c-the-first-ten-minutes`, worktree clean.
+
+## 1. `spec/workbench/streaming-growth.md` (1792 → 1940 lines)
+
+Merged by hand from the true three-way base (`38177b8` = `git merge-base origin/main feat/04c-carry`), with `git merge-file --diff3` doing the mechanical part. **Two conflicts**, both resolved below; everything else auto-merged and was then audited line by line against both sides.
+
+**Base is main's text.** Diffing merged-vs-batch, every line the merge *drops* from the batch is a #51 rewrite — the *nothing already placed moves* passages replaced by INV-workbench.64's new wording, B3's honest-wart paragraph, anti-pattern 7, both open questions. Nothing of #51 is lost: B3, .64 with the nearest-free-row exception, .78/.79 dated clauses, new .80/.81, B10's reduced-motion clause, anti-patterns 7/8/12/13, B9's first-screen pointer, the dock's *Run details* row, the invariant block widened to *60 – 79, and from 2026-09-21 80 onward*, and `theRunStrip.test.tsx` in the short-name list.
+
+**From the batch:** the `start` field on `GenerateRequest`; `Ranged` → `Likelihood` and every other R48 no-range wording (the chip no longer switching what it says about itself, `VR4`'s rewritten rule, the one-handle likelihood control); the `Growth` block with `activity`; and two whole sections. The `Growth` block is the batch's verbatim — `theChapterAndTheCode.test.ts` passes (5/5).
+
+**Renumbering, in the order a reader meets them:** B11 = the foot strip (main), **B12** = what the model is doing (mine — it puts two more lines on that same strip), **B13** = a finished generation (batch). I verified both moved bodies are byte-identical to the batch's, ignoring blank padding. Citations moved: the `Growth` block comment and open question 1 keep **B12**; `diff-view.md:40` and `inspector.md:113` go to **B13**; `inspector.md:505` stays **B11** (it is about the strip) — which is why I read them rather than swept.
+
+**Two of #51's sentences amended rather than kept or dropped,** because the chapter is a book kept true and a record written on the 21st was overtaken on the 22nd:
+- B11's *"No server change, and no ninth event. … See Open question 1, now answered"* now reads *"…and no ninth event — for this strip"* and names the ninth line that arrived the next day, pointing at B12.
+- Open question 1 opens with **both** answers — record 0023's *not in version one* (2026-09-21) and record 0027's (2026-09-22, the one that stands) — keeps what 0023 settled and still holds (the strip needs no ninth event; a ninth event carrying a **count** is still refused), then gives the 0027 answer. The coordinator said drop main's; I kept it named as superseded rather than deleted, so a reader is not left wondering whether it was ever asked. Main's question 2 (the 0024 re-answer) is kept whole.
+
+## 2. `ARCHITECTURE.md` (370 → 385 lines)
+
+One conflict (§10's bullet list). Resolved: **dropped** main's two `[planned]` bullets for the strip and the settle (both built; §3 carries them as `[built]` and dated, with 0027 beside them), **dropped** the batch's *a path's multiplied-out likelihood* bullet — record 0022/#62 retired it and §5's own INV-8 row says *there is no multiplication to move*; it came back through an earlier merge — and **kept** the batch's recording bullet, which names the first screen's recording row that is now built.
+
+§1 lost two `[planned]` paragraphs: #51's *the foot … and when a tile may move are decided and not built*, and *`grounding/` is an empty package*, which the paragraph four lines above it contradicts and which repeats the storage sentence two lines above it word for word.
+
+**Restored one thing the placeholder had dropped from main:** #51's clause that the stack cap became two on 2026-09-21 (second amendment to record 0009).
+
+Kept from the batch where it is newer: the eleven-routes paragraph with the `start` field, *Eight events, and one line that is never recorded*, the ADR-0012 row with its 2026-09-21 amendment, the de-duplicated INV-7/INV-8 rows, *fourteen-line* checklist ×2.
+
+**§9's decisions table gains ADR-0023, ADR-0024, ADR-0027.** (0025 is reserved and 0026 does not exist yet, so there is no gap to explain.)
+
+## 3. Record 0023's amendment — applied
+
+`git apply` of the prepared patch; one dated paragraph under the *No ninth event* bullet, nothing rewritten. I also gave it its index row clause and set `superseded-by: 0027, in part`.
+
+## 4. `INV-generation.22` → `.33`
+
+The activity invariant moves to **`.33`**, the next free number after `evaluation.md`'s `.32`. `replay.md` and `evaluation.md` are untouched — renumbering four chapters to keep one block contiguous would have moved eighteen citations to spare one. Both the chapter and the landing page say in one sentence why `streaming.md`'s block is not one run, and name `.34` as next free. Record 0027 carries a **dated correction** at the head of *More Information*, naming the new number and leaving every original sentence as written.
+
+## 5. `layout-and-zoom.md` B8
+
+Heading → *"You cannot move a tile, and the interface says so"*, with a dated note saying what it used to read and why that stopped being true. I also caught the last copy of the old words in the product: `Canvas.tsx`'s comment beside `nodesDraggable={false}`.
+
+## `git diff --stat HEAD~3`
+
+```
+ ARCHITECTURE.md                                   |   6 +-
+ docs/adr/0023-what-the-run-says-while-it-waits.md |   4 +-
+ docs/adr/0027-a-live-run-says-what-it-is-doing.md |   2 +
+ docs/adr/README.md                                |   2 +-
+ frontend/src/graph/Canvas.tsx                     |   2 +-
+ spec/generation/README.md                         |   4 +-
+ spec/generation/streaming.md                      |   4 +-
+ spec/workbench/diff-view.md                       |   2 +-
+ spec/workbench/inspector.md                       |   2 +-
+ spec/workbench/layout-and-zoom.md                 |   4 +-
+ spec/workbench/streaming-growth.md                | 482 +++++++++++++++++-----
+ 11 files changed, 407 insertions(+), 107 deletions(-)
+```
+
+## Verification
+
+```
+npm run typecheck                                  clean
+npm run lint            Checked 190 files.  No fixes applied.
+npx vitest run src/stream src/components src/graph  39 files, 388 tests passed
+carry-integration: npm run check      exit=0  7s    51 files, 465 tests passed
+carry-integration: whole server suite exit=0  250s  1153 passed, 4 xfailed, coverage 100%
+```
+Logs: `plans/logs/04c/carry/int-check.log`, `int-server.log`; the three-way material is kept in `plans/logs/04c/carry/merge/` (`.base`, `.main`, `.batch`, `.merged` for both documents) if you want to re-derive any decision. The typecheck/lint/vitest run above was repeated after the B13 citation commit.
+
+## One thing for you, not fixed by me
+
+`docs/adr/README.md`'s row for **0012** still ends *"a third amendment is **proposed** 2026-09-21"*. #55 accepted it — the record's own body carries the amendment and its status is `accepted`. That row is main's own text and it is inside the resolution you took (`docs/adr/README.md`: main's rows), so I left it; if #56 does not correct it, it wants one word.</result>
+<usage><subagent_tokens>385126</subagent_tokens><tool_uses>69</tool_uses><duration_ms>757565</duration_ms></usage>
+</task-notification>
