@@ -28,7 +28,7 @@ A map of causes is not a trade. This part turns it into one, and is careful abou
 |----|-----------|
 | INV-14 | **A watchlist you can see.** A claim shown under *what to watch* resolves before the ending it is watched for and is publicly observable; a claim that is adverse but resolves too late, or cannot be observed, is listed as *unhedgeable*. No claim is ever presented as a stop |
 
-*(INV-14 as amended by decision record 0019; the wording in `PRODUCT_REQUIREMENTS.md` §9 follows in the pull request that lands the amendment.)* Local invariants `INV-thesis.1`–`INV-thesis.16` are stated in the chapters, each naming the test that checks it.
+*(INV-14 as amended by decision record 0019; the wording in `PRODUCT_REQUIREMENTS.md` §9 follows in the pull request that lands the amendment.)* Local invariants `INV-thesis.1`–`INV-thesis.17` are stated in the chapters, each naming the test that checks it.
 
 ---
 
@@ -40,7 +40,7 @@ A map of causes is not a trade. This part turns it into one, and is careful abou
 | [`quotes.md`](quotes.md) | Recorded first, fetched second, reader-entered always; what a quote carries; a market belief is a point; an economic level is an observation | stack 06 |
 | [`position.md`](position.md) | The reader's position and exit; the one contract with the engine; daily paths that apply only the surprise; first touch; the greyed ceiling; what is refused | stack 06 |
 | [`what-takes-you-out.md`](what-takes-you-out.md) | Lift over the worlds where the stop went first; the two-way sweep and the watchlist | stack 06 |
-| [`card-and-export.md`](card-and-export.md) | The card's sections and who owns each number; **tails and reader-placed shocks**; ranked endings; the export that carries its own refusals | stack 06 |
+| [`card-and-export.md`](card-and-export.md) | The card's sections and who owns each number; **tails and reader-placed shocks**; ranked endings; the export that carries its own refusals; and the three routes that serve them — `POST /api/thesis/card`, `/api/thesis/export` and `/api/thesis/export/markdown` | stack 06 |
 
 ---
 
