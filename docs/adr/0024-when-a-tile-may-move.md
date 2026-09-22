@@ -1,7 +1,8 @@
 ---
 # ADR-0024: A tile moves only when an arrow would otherwise point backwards, and once when the run stops
-status: proposed
+status: accepted
 date: 2026-09-21
+accepted: 2026-09-22 — Kent, by merging the round (decisions note, row R43)
 decision-makers: Kent Gang
 consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/notes/2026-09-21-kent-m4-feedback.md`); analyst UB's measurement of three real streams through the app's own layout code (`plans/ux-round/B-layout.md`, scripts under `plans/analysis/scripts/ux-round/B/`); the red team's re-run of those measurements (`plans/ux-round/RT-red-team.md`, items 1 and 2 of *what must change*, and its question 4 to Kent); ADR-0007 (the canvas and its layered layout)
 informed: agents working in `frontend/src/graph/` — `layoutRunner.ts`, `elkGraph.ts`, `layers.ts`, `Canvas.tsx`, `geometry.ts` — and in `frontend/e2e/`

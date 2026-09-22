@@ -1,7 +1,8 @@
 ---
 # ADR-0023: What the run says while it waits — one sentence at the foot of the map, and a count of seconds
-status: proposed
+status: accepted
 date: 2026-09-21
+accepted: 2026-09-22 — Kent, by merging the round (decisions note, row R43)
 decision-makers: Kent Gang
 consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/notes/2026-09-21-kent-m4-feedback.md`); analyst UA's read-only pass over the generating screen, the same day (`plans/ux-round/A-live-status.md`); the red team's re-run of it (`plans/ux-round/RT-red-team.md`: its verdict on this plan, and items 5 and 7 of *what must change*); ADR-0012 (a replay is the real stream played back); ADR-0008 (how much browser testing a change needs)
 informed: agents working in `frontend/src/stream/`, `frontend/src/components/`, `frontend/src/a11y/` and `frontend/e2e/`; the stack-06-4 dock lane, which owned the *Run details* move until this record pulled it forward
