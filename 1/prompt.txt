@@ -1424,3 +1424,71 @@ Two one-line changes remain owed outside my files (`api/generate.py:526` → `wo
 <status>completed</status>
 <summary>Background command "Wait for checks and squash-merge the verdict PR #62" completed (exit code 0)</summary>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a532035361372c9d4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a532035361372c9d4.output</output-file>
+<status>completed</status>
+<summary>Agent "Flip F1: engine default and diff" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The flip is built. Here is my report.
+
+**Run, in order:** `cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src &amp;&amp; uv run mypy --strict src/katalyst/domain src/katalyst/grounding src/katalyst/thesis` · `uv run pytest tests/unit tests/oracles tests/api -q` (721 pass, 100% statement **and** branch on `domain/propagation.py`, `diff.py`, `validity.py`) · `make numbers-check` (green) · then read **`plans/analysis/2026-09-22-flip-numbers-diff.md`** and give it to Kent.
+
+## What landed
+- **`persistence`** required on `Proposition` (R27); `validity.py` rule 2 `claim_without_persistence` (reject, never repair, reachable only via `model_construct` — the same net as `belief_out_of_range`); `forward_pass` reads the claim's own field, `EVERY_CLAIM_IS_AN_EVENT` gone; `expand.py` mints `persistence="event"` twice with dated comments.
+- **One engine.** `propagation.py` 2 837 → 865 lines; `diff.py` 1 450 → 1 169. `Engine`, `DEFAULT_ENGINE`, `engine=`, `engine_that_built`, `Versions`, `versions_of`, `Retraction`, `_retractions`, `_opposing`, `_spells_on`, `_band`, `_range_shares`, the version draws and the whole `_prepare`/`_draw`/`_one_pass` path all deleted. **Decision: `Engine` goes** — one rule, and `test_there_is_one_engine_and_nothing_names_a_second` fails if either name is written in any shipped file.
+- **R48.** Version axis length 1, `Belief.lo == p == hi`, `range_shares={}`, `World.worlds=0`, `versions=1`, `retractions=()` (element type had to become `str` — `Retraction` had to leave `src`), `ClaimDiff.agreement=None`, `moved_only_by_reweighting=False`, `DeltaRow.range_width=agreement=0.0`; all with dated comments. `versions`/`worlds`/`introduced_by` stay accepted-and-ignored on `propagate` and on the four request fields.
+- **`diff.py`** keeps `unchanged_because` · `killed` · `added`; `versions_of` **does not survive** — nothing read it once the paired-difference machinery went, and keeping a rebuild nothing reads is 0028's own objection. `sensitivity` loses its budget and the retraction rebuild.
+
+## Tests
+**30 deleted outright** (18 in `test_propagation.py`, 10 in `test_diff.py`, 2 in `test_by_deadline.py`) — every one about versions, the range, retraction, the version weights, or the map-wide day grid, which no longer exists (each claim is cut from its own window). **18 rewritten or renamed.** Three new: `test_a_computed_belief_has_no_range`, `test_nothing_draws_a_version`, `test_the_engine_carries_no_retraction` (source checks naming symbols). All eight tests 0028 lists as deleted are gone; all three it names as confirmation exist. The three `xfail(strict)` marks came off and pass; `test_an_observation_moves_a_cause_even_when_no_arrow_pushes` deleted, its reversal unmarked. `test_band_is_not_sampling_noise` → replaced by `test_a_computed_belief_has_no_range` (zero width, exactly).
+
+**Two honest softenings, measured, not guessed.** Locality is byte-identical for *evidence* (`test_a_claim_cut_off_from_the_evidence_is_bit_for_bit`, untouched), but an edit that changes the map's *shape* changes the elimination order, so `tests/comparisons.py` and the state machine now ask for the last bit (`1e-12`): measured `8.311121790768778e-10` vs `…79e-10`, and `5.2e-26` on `2.4e-10`. And two observations in disjoint pieces share one 50 000-world sample, so one moves the other by ≤ `2.7e-4` (floor is `.005`) — scripts in `plans/analysis/scripts/stack-05-flip/`.
+
+## VERIFY marks: all 12 cleared
+Notable corrections: **three of four endings now peak on their judged day** (only M3 does not) — `diff.md` B5 says so rather than pretending; **no arrow clamps on the shipped fixture** (all four `warnings` lines read *none*); the rail is four rows, **N1 is on it, second**; `S → H` became `S → O`; C is a state too.
+
+## Deviation you must sign off
+**I migrated `backend/recordings/hormuz.jsonl`** (19 claims gained `"persistence": "event"`, script + rationale in `plans/analysis/scripts/stack-05-flip/persistence_into_the_recording.py`). Without it the file is unreadable, killing replay, `make eval` and the browser. Proved identical once the field is removed. No model call, no cost. Not a re-recording.
+
+## Still red (13, none mine)
+- **8 `tests/boundary/test_expand_cassettes.py`** — F2's fixture rewrote H, C, R and added O and M3, so the prompt body no longer matches the cassettes (`match_on` includes `body`). Fix: `make record-cassettes` (~$1), or it rides the freeze. **Your call.**
+- **5 `tests/thesis/test_{edge,card}.py`** — `inside_the_model_range` rests on a range with width; with `lo==p==hi`, `_sign_changes_across_the_range` is always false and the tests fail on their own guard. `thesis/` is the trade lane's. Suggested: field always `False` with a dated comment, a dated line on record 0018, and the five tests deleted with that reason.
+
+## Browser, broken by me (frontend is the third writer's; `make types` was run, `schema.ts` regenerated)
+`tsc -b` gives exactly 6 errors: `src/world/apiSource.ts:150,151` (×5 — `world.retractions` is now `string[]`; the mapper returns `[]`) and `src/stream/__tests__/aStream.ts:59` (needs `persistence: "event"`). Also red at runtime: `e2e/hormuz.spec.ts:491, 664-666, 686, 867, 935, 1107-1140`; `src/graph/diff/noChange.ts:67,102,108-113`; `src/a11y/announcement.ts:28`; plus F2's `:698-699, :897` counts and `fromTheServer.ts:148`.
+
+## Owed outside my files
+`PRODUCT_REQUIREMENTS.md` **NFR-1** (0028 gives the words), **FR-16** (drop the 90% bar, the agreement column and the width column), **FR-21** (cites `B · base · band from B`, a line name that no longer exists — 0028's line applies). `spec/vocabulary.md` **Agreement** (:49), **Diff** (:45) and **Delta rail** (:116) still describe both side columns as live.
+
+## Commits (4)
+1. `feat(domain): a claim says which kind of truth it is` — `proposition.py`, `rates.py`, `states.py`, `forward.py`, `validity.py`, `link.py`, `engine/expand.py`, `recordings/hormuz.jsonl`, `tests/strategies.py`, `tests/oracles_adapter.py`, `tests/unit/domain/test_validity.py`, the one-line `persistence="event"` test builders, `frontend/src/api/schema.ts`.
+2. `feat(domain): the by-deadline engine becomes the only engine` — `propagation.py`, `domain/__init__.py`, `engine/worlds.py`, `api/worlds.py`, `tests/comparisons.py`, `test_propagation.py`, `test_by_deadline.py`, `test_the_engine_is_right.py`, `test_patches.py`, `tests/api/test_worlds.py`.
+3. `feat(domain): the change list loses the versions and the range` — `diff.py`, `belief.py`, `test_diff.py`.
+4. `docs: the chapters, the architecture and the numbers file catch up with the flip` — `spec/multiverse/**`, `spec/graph/belief.md`, `ARCHITECTURE.md`, `engine/worked_numbers.py`, `docs/worked-numbers.txt`.
+
+**Not checked:** any browser run (forbidden), `make eval`, the benchmark, and whether hypothesis finds a worse map than the three degenerate shapes I ruled out of `test_observe_may_update_ancestors` (day-zero windows, pushes of `2.2e-16`, causes judged after their effects — each named in its docstring).</result>
+<usage><subagent_tokens>694611</subagent_tokens><tool_uses>258</tool_uses><duration_ms>3506522</duration_ms></usage>
+</task-notification>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
+UX-round coordinator: please hold the flip's BROWSER share until my batch lands, and branch it from the batch's tip — the four files it owns are exactly the ones my R48 screen half just rewrote, so a parallel start would be a rebase of every line for one of us. Specifically, on `feat/04-no-range-on-screen` (verified, in my integration branch): `src/world/apiSource.ts` — the origin sentence is now ONE function `theSentenceUnderTheMap(world, whereTheMapCameFrom, branchLabel)` shared by the stored and the generated map source, and the "over 2 000 versions of the map with 8 worlds under each" tail is already gone; `retractions` is still mapped (yours to empty). `src/world/fromTheServer.ts` — drops `lo`/`hi`/agreement/`moved_only_by_reweighting` at the wire with dated comments naming your follow-up. `src/graph/diff/noChange.ts` — a `versions_disagree` quiet row now prints *the engine could not settle which way it moves* (R4: every quiet row says why); when your flip removes that reason, delete the branch and the note together. `e2e/hormuz.spec.ts` — edited by four of my lanes (panel tabs, fold, first-screen row names, range assertions inverted); your strike-branch counts and the retraction-badge deletion will apply cleanly on top, but not under. The engine half and `spec/05-sound-numbers` do not collide with anything of mine — go ahead there. On (1): I cannot add `persistence: "event"` to `aStream.ts:59` before your regenerated `schema.ts` lands — it is an excess property against my current types and fails `tsc` — so add it in the flip; it is one line and I will keep both sides. Timing: the batch is one lane from complete (the frame's fix round); Kent has not yet given the word to land. I will message you the moment it is on `main`.
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>a450d5d8345332124</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a450d5d8345332124.output</output-file>
+<status>killed</status>
+<summary>Agent "Flip F4: browser share" was stopped by Claude</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I'll start by reading the briefs and getting oriented in the worktree.</result>
+</task-notification>
