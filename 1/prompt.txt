@@ -2070,3 +2070,20 @@ Files: `e2e/{hormuz,farTiles,zoomedOut}.spec.ts`, `src/graph/{geometry.ts,__test
 <status>completed</status>
 <summary>Background command "Commit the browser fixes and run one cold browser run on the flip through the queue" completed (exit code 0)</summary>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ab63d5581a75cd3cc</task-id>
+<tool-use-id>toolu_01E6SAp1HpbWZR1pEwHYwUcr</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ab63d5581a75cd3cc.output</output-file>
+<status>completed</status>
+<summary>Agent "Flip F7: five browser failures" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Fixed — `npm run check` green (lint, typecheck, 467 unit tests).**
+
+**Verdict: the test's identity, not a product regression.** The rule (`Canvas.tsx` `frameAgainWhen`, `MapScreen.tsx`, record 0024) is *framed again for the stage it is now in, once, as a cut* — framing, not restoring. `framedOpen` was read after the keyboard walk, which had panned the map to `-512` to bring a claim onto the glass; the unfold correctly discards that pan and lands on the map's own frame (`55.8462`). That identity only held when the walk happened not to pan.
+
+**Fix** (`e2e/hormuz.spec.ts`): capture `framedOnOpening` when the map first comes to rest; both the fold and the unfold now assert the map lands on that frame. The no-browser twin already proves the two stage widths give the same frame (`layout.test.ts`), which is why fold and unfold agree.</result>
+<usage><subagent_tokens>202118</subagent_tokens><tool_uses>15</tool_uses><duration_ms>190202</duration_ms></usage>
+</task-notification>
