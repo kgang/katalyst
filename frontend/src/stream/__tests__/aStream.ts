@@ -61,6 +61,11 @@ function claim(
     id,
     claim: words,
     kind,
+    // Which kind of truth this claim is (decision record 0017): `event` for
+    // something that happens once and stays happened, `state` for something that
+    // holds for a while and can stop. Every claim on this stream happens once, and
+    // a test that needs a state passes one in through `over`.
+    persistence: "event",
     resolution: {
       criteria: `Whether ${words.replace(/\.$/, "")}, judged as the source below judges it.`,
       source: "Lloyd's List",
