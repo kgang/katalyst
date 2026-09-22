@@ -96,28 +96,28 @@ describe("the ? key, screen by screen", () => {
     // also prints *Press ? for every key* under the map.
     expect(screen.getByRole("button", { name: /Every key/ })).toBeInTheDocument();
     pressTheQuestionMark();
-    expect(screen.getByText(/Tiles do not move/)).toBeInTheDocument();
+    expect(screen.getByText(/You cannot move a tile/)).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "Escape" });
-    expect(screen.queryByText(/Tiles do not move/)).toBeNull();
+    expect(screen.queryByText(/You cannot move a tile/)).toBeNull();
   });
 
   it("the generation screen: the top-bar control opens the same sheet", () => {
     render(theGenerationScreen());
     fireEvent.click(screen.getByRole("button", { name: /Every key/ }));
-    expect(screen.getByText(/Tiles do not move/)).toBeInTheDocument();
+    expect(screen.getByText(/You cannot move a tile/)).toBeInTheDocument();
   });
 
   it("the stored map: ? opens it — the control that proves the press lands", () => {
     render(theStoredMap());
     pressTheQuestionMark();
-    expect(screen.getByText(/Tiles do not move/)).toBeInTheDocument();
+    expect(screen.getByText(/You cannot move a tile/)).toBeInTheDocument();
   });
 
   it("the first screen: ? opens it, and Escape closes it", () => {
     render(<App listExamples={() => Promise.resolve([])} />);
     pressTheQuestionMark();
-    expect(screen.getByText(/Tiles do not move/)).toBeInTheDocument();
+    expect(screen.getByText(/You cannot move a tile/)).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "Escape" });
-    expect(screen.queryByText(/Tiles do not move/)).toBeNull();
+    expect(screen.queryByText(/You cannot move a tile/)).toBeNull();
   });
 });

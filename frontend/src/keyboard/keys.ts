@@ -63,7 +63,15 @@ export const SHORTCUTS: readonly Shortcut[] = [
 /**
  * The one line the sheet carries about dragging, said out loud rather than left
  * for a reader to discover by failing.
+ *
+ * **It stopped saying *tiles do not move* on 2026-09-22** *(decision record
+ * 0024)*. That was true of a finished map and false of one being written: while
+ * a map builds itself a tile changes column rather than let a later arrow point
+ * backwards, and the whole map takes its final places once at the moment the run
+ * stops. What was always true, and is what a reader needs from this line, is
+ * that they cannot move a tile themselves.
  */
 export const NO_DRAGGING =
-  "Tiles do not move. The layout is automatic, left to right. Drag the background to pan, " +
+  "You cannot move a tile: the layout is automatic, left to right, and a tile moves only when an " +
+  "arrow would otherwise point backwards, or once when a run stops. Drag the background to pan, " +
   "scroll to zoom. Pinning, grouping and annotating arrive as buttons, not as dragging.";

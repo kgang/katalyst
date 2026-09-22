@@ -221,7 +221,7 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   const sheet = page.locator(".sheet");
   await page.keyboard.press("?");
   await expect(sheet).toBeVisible();
-  await expect(sheet).toContainText("Tiles do not move");
+  await expect(sheet).toContainText("You cannot move a tile");
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
 

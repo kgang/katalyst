@@ -122,7 +122,9 @@ When there is no wire in that direction, focus does not move and the status line
 - **`N`** steps to the next panel beside the map *(Kent, 2026-09-22)*. Which panels a screen has is `inspector.md`; what this key adds is that they are one press apart from wherever the reader is standing, including on the map. The names at the head of the panel are also a row of labels in their own right: Tab reaches the row once, and the left and right arrow keys walk it, which is the pattern a screen reader announces as a set of panels. Both of them, and a click, are the same act — and they are the only acts other than selecting a claim or an arrow that change which panel is on the glass.
 - **`?`** opens the shortcuts sheet, which lists every key above and carries the line about dragging:
 
-  > **Tiles do not move.** The layout is automatic, left to right. Drag the background to pan, scroll to zoom. Pinning, grouping and annotating arrive as buttons, not as dragging.
+  > **You cannot move a tile:** the layout is automatic, left to right, and a tile moves only when an arrow would otherwise point backwards, or once when a run stops. Drag the background to pan, scroll to zoom. Pinning, grouping and annotating arrive as buttons, not as dragging.
+
+  *(Reworded 2026-09-22. It read **Tiles do not move. The layout is automatic, left to right.** — true of a finished map and false of one being written, from decision record 0024 onwards: while a map builds itself a tile changes column rather than let a later arrow point backwards, and the whole map takes its final places once at the moment the run stops. What the line is for is unchanged, and it is the half that never stopped being true: a reader cannot move a tile.)*
 
 ### B4 — What "no pop-ups" honestly means for a command palette
 

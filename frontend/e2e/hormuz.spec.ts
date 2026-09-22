@@ -803,12 +803,12 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     )
     .toBe(280);
 
-  // Every key, on one sheet — and it says out loud that tiles do not move.
+  // Every key, on one sheet — and it says out loud that you cannot move a tile.
   await page.keyboard.press("?");
-  await expect(page.getByText(/Tiles do not move/)).toBeVisible();
+  await expect(page.getByText(/You cannot move a tile/)).toBeVisible();
   // Escape closes it, and nothing was left half-done.
   await page.keyboard.press("Escape");
-  await expect(page.getByText(/Tiles do not move/)).toBeHidden();
+  await expect(page.getByText(/You cannot move a tile/)).toBeHidden();
 
   // Walking the wires. Tab onto the map, step forward along a wire out of the
   // hypothesis, and the line under the map names the wire that was taken.
