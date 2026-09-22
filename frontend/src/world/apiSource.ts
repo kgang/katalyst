@@ -358,8 +358,19 @@ function movement(row: ClaimDiff): Movement | undefined {
   };
 }
 
-/** Turn the engine's difference into what the rail and the tiles read. */
-function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
+/**
+ * Turn the engine's difference into what the rail and the tiles read.
+ *
+ * **Exported because a generated map goes through this one too.** A map somebody
+ * watched build itself is read from the same three routes, and two functions
+ * turning one difference into rows would drift into two answers about the same
+ * edit.
+ *
+ * @param difference The engine's own comparison of two worlds.
+ * @param claims Every claim either world holds, so a row can name an ending in
+ *   its own words rather than by its identifier.
+ */
+export function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
   const byId = new Map(claims.map((claim) => [claim.id, claim]));
 
   const changed = new Map<string, ClaimChange>();
@@ -413,10 +424,14 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
  * the part of this product that drafts a whole claim — its wording, how it is
  * judged, by whom, by when — and that is not connected.
  *
+ * **Exported for the same reason the difference reader above is**: a branch on a
+ * generated map is the same branch, and one rule about what can be sent beats
+ * two.
+ *
  * @param branch The branch the screen is showing.
  * @throws Error With one plain sentence, when the branch cannot be sent.
  */
-function sendable(branch: BranchView): WireBranch {
+export function sendable(branch: BranchView): WireBranch {
   if (branch.wire === undefined) {
     throw new Error(
       `The branch "${branch.label}" has an edit this build cannot hand to the engine, so no ` +

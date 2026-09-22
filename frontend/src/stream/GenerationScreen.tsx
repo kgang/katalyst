@@ -21,7 +21,7 @@ import { outlineOf } from "../a11y/sentences";
 import { AddAClaim } from "../components/AddAClaim";
 import { type Command, CommandPalette } from "../components/CommandPalette";
 import { DoneLine } from "../components/DoneLine";
-import { Inspector } from "../components/Inspector";
+import { type GenerationDetail, Inspector } from "../components/Inspector";
 import { MapFrame } from "../components/MapFrame";
 import { Outline } from "../components/Outline";
 import { type PanelChoice, PanelSwitch, theLabelFor } from "../components/PanelSwitch";
@@ -123,10 +123,28 @@ export interface GenerationScreenProps {
   readonly onRunAgain: () => void;
   /** Let go of this run and go back. A press, and the only way off this screen. */
   readonly onLeave: () => void;
+  /**
+   * Take up *Change this claim* on the finished map, on whatever the reader is
+   * pointing at.
+   *
+   * **A finished generation is a map like any other**, and the screen a map is
+   * edited on already exists. So the six things a reader can do to a claim are
+   * not built again here: this hands the finished map over to that screen, with
+   * the claim they pressed it about, and that screen opens on it.
+   *
+   * Absent means there is nowhere to hand it to, and then nothing offers it.
+   */
+  readonly onChangeAClaim?: (selection: Selection, run: GenerationDetail) => void;
 }
 
 /** A map building itself, and the panel beside it. */
-export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: GenerationScreenProps) {
+export function GenerationScreen({
+  run,
+  replaying,
+  onRunAgain,
+  onLeave,
+  onChangeAClaim,
+}: GenerationScreenProps) {
   const { growth, saying } = useTheRun(run);
   const [selection, setSelection] = useState<Selection>(null);
   const [focused, setFocused] = useState<string | null>(null);
@@ -285,8 +303,64 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
     setDock(selection.kind === "generation" ? "run" : "subject");
   }, [selection]);
 
-  // Nothing on this screen is bound to the map's own six operations yet, so the
-  // keys that open them say so rather than doing nothing.
+  /**
+   * Whether this run has left a map somebody can edit.
+   *
+   * Two things have to be true, and they are two different facts. The run has
+   * **stopped** — however it stopped, a cap or its own ending, because either
+   * way nothing more is coming. And the map has a **name of its own**, which is
+   * the engine's `base_id` arriving with the likelihoods: a run that broke or
+   * whose stream was dropped never gets one, and there is nothing for the
+   * engine to fold a branch onto.
+   *
+   * It is the same pair *Add a claim* waits for, and for the same reasons.
+   */
+  const aMapToEdit = finished && growth.world.baseId !== "";
+
+  /**
+   * Everything the panel says about the run that is building this map.
+   *
+   * It is held in one place because it is read in two: this screen's own panel,
+   * and — when the reader takes the finished map away to edit it — the panel on
+   * the screen it goes to. One object, so the two can never say different things
+   * about one run.
+   */
+  const theRun: GenerationDetail = useMemo(
+    () => ({
+      generationId,
+      seed: growth.seed,
+      promptFingerprint: growth.receipt?.prompt_hash ?? null,
+      working,
+      unknown: growth.unknown,
+      openAt,
+    }),
+    [generationId, growth.seed, growth.receipt, working, growth.unknown, openAt],
+  );
+
+  /**
+   * Take up *Change this claim* on whatever the reader is pointing at.
+   *
+   * It hands the finished map to the screen maps are edited on, rather than
+   * building the six things here. What comes back if nothing can be handed over
+   * is a sentence saying which of the two reasons it was, in the one line under
+   * the map that already says what the last press did.
+   */
+  const changeThis = useCallback(() => {
+    if (!aMapToEdit) {
+      setStatus(
+        finished
+          ? "this run left no map to edit — the engine never named one"
+          : "the map is still being built · the six edits open when it is finished",
+      );
+      return;
+    }
+    if (selection === null || selection.kind === "generation") {
+      setStatus("choose a claim or an arrow on the map first, then E opens the six edits");
+      return;
+    }
+    onChangeAClaim?.(selection, theRun);
+  }, [aMapToEdit, finished, selection, onChangeAClaim, theRun]);
+
   /**
    * Every command this screen has, by name.
    *
@@ -335,6 +409,18 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
               },
             },
           ]),
+      // **Only once the run has left a map.** Before that there is nothing to
+      // change, and a command that explains why it cannot run is a command that
+      // should not be on the list.
+      ...(aMapToEdit
+        ? [
+            {
+              name: "Change this claim",
+              does: "The six things you can do to it. The same as pressing E on the map.",
+              run: changeThis,
+            },
+          ]
+        : []),
       {
         name: "Every key",
         does: "The sheet of every key on this map. The same as pressing ?.",
@@ -346,13 +432,20 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
         run: onLeave,
       },
     ],
-    [generationId, finished, onLeave],
+    [generationId, finished, onLeave, aMapToEdit, changeThis],
   );
 
   const keys: MapKeys = useMemo(
     () => ({
-      intervene: () => setStatus("a generated map takes edits through Add a claim, beside the map"),
-      branch: () => setStatus("a branch is started on a stored map; this one is still being built"),
+      // The same key, on the same map, doing the same thing it does everywhere
+      // else — once there is a finished map for it to do it to.
+      intervene: changeThis,
+      branch: () =>
+        setStatus(
+          aMapToEdit
+            ? "press E to change a claim; a branch is started on the screen that opens"
+            : "a branch is started on a finished map; this one is still being built",
+        ),
       flipWorlds: () => setStatus("there is nothing to flip to — no branch is open"),
       outline: () =>
         setDock((was) => {
@@ -363,7 +456,7 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
       panel: () => setStatus("the panel is beside the map · press N for the next one"),
       palette: () => setOverlay("palette"),
     }),
-    [],
+    [changeThis, aMapToEdit],
   );
 
   /**
@@ -503,8 +596,19 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
              **This is the fix.** The panel used to be one column with the run's
              own sections stacked above this one, so a click on a tile filled the
              bottom of a box nothing scrolled — the answer arrived and the click
-             looked dead. The run is a panel of its own now, one name away. */
-          <Inspector world={growth.world} selection={selection} />
+             looked dead. The run is a panel of its own now, one name away.
+
+             **And once the run has stopped, the way in to the six things you
+             can do to this claim** — the same control, in the same place, with
+             the same words as on a stored map. What is behind it is the same
+             screen too: pressing it hands this map over to it. Kent read the
+             map he had just watched build itself and found no verb on it
+             (2026-09-22). */
+          <Inspector
+            world={growth.world}
+            selection={selection}
+            {...(aMapToEdit ? { onChangeThis: changeThis } : {})}
+          />
         ) : (
           <>
             {/* The Verify door's answer, at the top, when a destination was named. */}
@@ -594,14 +698,7 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
               world={growth.world}
               about="the run"
               selection={selection?.kind === "generation" ? selection : null}
-              generation={{
-                generationId,
-                seed: growth.seed,
-                promptFingerprint: growth.receipt?.prompt_hash ?? null,
-                working,
-                unknown: growth.unknown,
-                openAt,
-              }}
+              generation={theRun}
             />
           </>
         )
