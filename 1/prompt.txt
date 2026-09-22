@@ -1296,3 +1296,31 @@ INV-generation.22 — *an activity line is live, and nothing keeps it*: no file 
 No progress bar, no percentage, no time remaining, no count of calls in flight — the caps to divide by are the server's and are not on the wire. Nothing spins: `noSpinner.test.ts` and `motionBudget.test.ts` are untouched. No heartbeat: a run with nothing to say sends nothing. No change to `grow.py` or `following.py`, to the recorder, to the cassettes, to any recording, or to what the model is asked. No browser file but the generated `schema.ts`. And no line kept anywhere — the strip reads it and the server lets it go.</result>
 <usage><subagent_tokens>390981</subagent_tokens><tool_uses>198</tool_uses><duration_ms>2293362</duration_ms></usage>
 </task-notification>
+
+---
+
+Testing it out without my anthropic key, there is still the issue that the probabilities in the card spill out of the card. I think it's because the cards are calibrated to just the model probabilities being displayed that when there is a market one it's too much.
+
+When adding the anthoripc key, I still see nothing happening immediately after clicking the right hand column card "The Strait of Hormuz is going to open next week." I expected it to communicate in real time what's happening. I see that it begins populating slowly. The 2,000 runs thing is confusing. Can we cut that from the scope of this project completely for the sake of defending its design and also potentially to make the speed of the real time map construction a lot snappier and quicker?
+
+---
+
+Testing it out without my anthropic key, there is still the issue that the probabilities in the card spill out of the card. 
+[Image #5]
+I think it's because the cards are calibrated to just the model probabilities being displayed that when there is a market one it's too much.
+
+When adding the anthoripc key, I still see nothing happening immediately after clicking the right hand column card "The Strait of Hormuz is going to open next week." I expected it to communicate in real time what's happening. I see that it begins populating slowly. The 2,000 runs thing is confusing. Can we cut that from the scope of this project completely for the sake of defending its design and also potentially to make the speed of the real time map construction a lot snappier and quicker?
+
+---
+
+Testing it out without my anthropic key, there is still the issue that the probabilities in the card spill out of the card. 
+[Image #5]
+I think it's because the cards are calibrated to just the model probabilities being displayed that when there is a market one it's too much.
+
+When adding the anthoripc key, I still see nothing happening immediately after clicking the right hand column card "The Strait of Hormuz is going to open next week." I expected it to communicate in real time what's happening. I see that it begins populating slowly. The 2,000 runs thing is confusing. Can we cut that from the scope of this project completely for the sake of defending its design and also potentially to make the speed of the real time map construction a lot snappier and quicker? I would also like it that the replay is viewable from the base screen. Unify the screens for when the anthropic key is or is not available as much as possible. If the anthropic key is not available, than the real, live run options on the page can be greyed out or disabled, however, all the features built should always be available
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/78976.sock" from-name="katalyst-9d" from-mode="bypass">
+05/06 coordinator: R48's engine half is taken; no collision with what I have in flight. Plan, so both sides agree: (1) the core pull request (`feat/05-exact-core`, behind a flag, default unchanged) lands as built — its version axis simply runs at length one from the flip on, so nothing there is rewritten now. (2) The FLIP absorbs R48: one likelihood per claim, computed once; the range, `versions_disagree`, the agreement share and `range_shares` go from the engine; record 0028 (mine) is the dated amendment reversing 0005/0014's range and the PRD's interval, and it rides the flip's docs bottom (`spec/05-sound-numbers`, which also rewrites `spec/multiverse/*` and `belief.md`). (3) Wire fields: ONE rule for all of them — `Belief.lo`/`hi` (set equal to `p`), `ClaimDiff.agreement`/whatever carries the share, `moved_only_by_reweighting`, `World.retractions`, `World.worlds` all STAY on the wire, constant, with dated comments, through the flip; they are removed together in one follow-up after your round closes, at which point I message you and you regenerate `schema.ts` and `railRows`. So your browser may ignore `lo/hi` now and nothing breaks in between. I will message before that follow-up opens, and before any agent of mine opens `Tile.tsx`/`Inspector.tsx`.
+</cross-session-message>
