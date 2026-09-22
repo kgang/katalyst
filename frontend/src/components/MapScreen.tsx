@@ -44,7 +44,7 @@ import {
 } from "../world";
 import { absence } from "../world/absence";
 import { asOneSentence } from "../world/failures";
-import { BranchPanel, InterventionPanel } from "./BranchPanel";
+import { asTheMapWas, BranchPanel, InterventionPanel, theUneditedMap } from "./BranchPanel";
 import { type Command, CommandPalette } from "./CommandPalette";
 import { DeltaRail } from "./DeltaRail";
 import { type GenerationDetail, Inspector } from "./Inspector";
@@ -217,6 +217,14 @@ export function MapScreen({
    */
   readonly generation?: GenerationDetail;
 }) {
+  /**
+   * Did the reader watch this map get built, or is it one from the store?
+   *
+   * It is `generation` and nothing else, because `generation` is the run that
+   * built this map and it is absent on a stored example — so the flag cannot
+   * drift from the fact. It changes one word in three places and no behaviour.
+   */
+  const built = generation !== undefined;
   const [shop, setShop] = useState(() => workshopOf(branches));
   const [showing, setShowing] = useState<"now" | "before">("now");
   // Whatever the reader already asked about, so a press made on another screen
@@ -555,7 +563,7 @@ export function MapScreen({
           setStatus(
             next === "now"
               ? "the map with your edits"
-              : "the map as it was written, with what your branch adds drawn faint",
+              : `the map ${asTheMapWas(built)}, with what your branch adds drawn faint`,
           );
           return next;
         });
@@ -580,7 +588,9 @@ export function MapScreen({
         }),
       palette: () => setOverlay("palette"),
     }),
-    [paintings],
+    // `built` is here because the line the flip says names the map, and what the
+    // map with nothing done to it is called depends on where it came from.
+    [paintings, built],
   );
 
   // ⌘K, ? and Escape work wherever you are on the screen, not only on the map,
@@ -604,7 +614,7 @@ export function MapScreen({
   const commands: Command[] = useMemo(() => {
     const made: Command[] = [
       {
-        name: "The map as it was written",
+        name: theUneditedMap(built),
         does: "Close the branch. Also the first row of the branch panel.",
         run: () => setShop((was) => openBranch(was, null)),
       },
@@ -680,7 +690,7 @@ export function MapScreen({
       },
     ];
     return made;
-  }, [shop.branches, keys, onLeave, theRunsName]);
+  }, [shop.branches, keys, onLeave, theRunsName, built]);
 
   const pick = useCallback((id: string) => {
     setFocused(id);
@@ -812,6 +822,7 @@ export function MapScreen({
           <BranchPanel
             branches={shop.branches}
             openId={shop.openId}
+            built={built}
             world={world}
             onOpen={(id) => setShop((was) => openBranch(was, id))}
             onFork={(label) => setShop((was) => forkBranch(was, label))}
@@ -838,7 +849,7 @@ export function MapScreen({
       onEveryKey={() => setOverlay("sheet")}
       where={
         open === undefined ? (
-          <p className="map-bar__where">The map as it was written</p>
+          <p className="map-bar__where">{theUneditedMap(built)}</p>
         ) : (
           <p className="map-bar__where">
             {/* A branch's hue rides on its name chip and its lane and nowhere
@@ -847,7 +858,7 @@ export function MapScreen({
             <span className="map-bar__chip" data-hue={open.hue} aria-hidden="true" />
             {open.label}
             <span className="map-bar__side">
-              {showing === "now" ? "with your edits" : "as it was written"}
+              {showing === "now" ? "with your edits" : asTheMapWas(built)}
             </span>
           </p>
         )

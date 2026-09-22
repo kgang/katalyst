@@ -12,7 +12,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
 import type { BranchView, Edit } from "../../world";
-import { BranchPanel, InterventionPanel } from "../BranchPanel";
+import { asTheMapWas, BranchPanel, InterventionPanel, theUneditedMap } from "../BranchPanel";
 
 /**
  * The words the vocabulary settles, and the only words these buttons may use.
@@ -73,6 +73,7 @@ describe("the branch panel", () => {
       <BranchPanel
         branches={[STRIKE]}
         openId={STRIKE.id}
+        built={false}
         world={WORLD}
         onOpen={vi.fn()}
         onFork={vi.fn()}
@@ -92,6 +93,7 @@ describe("the branch panel", () => {
       <BranchPanel
         branches={[STRIKE]}
         openId={STRIKE.id}
+        built={false}
         world={WORLD}
         onOpen={vi.fn()}
         onFork={vi.fn()}
@@ -112,6 +114,7 @@ describe("the branch panel", () => {
       <BranchPanel
         branches={[STRIKE]}
         openId={null}
+        built={false}
         world={{ ...WORLD, workedOut: true }}
         onOpen={vi.fn()}
         onFork={vi.fn()}
@@ -127,6 +130,7 @@ describe("the branch panel", () => {
       <BranchPanel
         branches={[STRIKE]}
         openId={null}
+        built={false}
         world={WORLD}
         onOpen={vi.fn()}
         onFork={vi.fn()}
@@ -142,6 +146,7 @@ describe("the branch panel", () => {
       <BranchPanel
         branches={[]}
         openId={null}
+        built={false}
         world={WORLD}
         onOpen={vi.fn()}
         onFork={vi.fn()}
@@ -152,12 +157,53 @@ describe("the branch panel", () => {
     expect(screen.getByText(/Nothing has been edited/)).toBeInTheDocument();
   });
 
+  it("test_a_stored_map_is_the_map_as_it_was_written_and_a_generated_one_as_it_was_built", () => {
+    // **Two maps, two true sentences.** A stored example was written — by hand,
+    // into a file. A generated map was built, in front of the reader, out of
+    // proposals the rules accepted. The first row of this panel is where the
+    // difference is said, and saying the wrong one tells a reader who just
+    // watched a map build itself that somebody typed it out.
+    const stored = render(
+      <BranchPanel
+        branches={[]}
+        openId={null}
+        built={false}
+        world={WORLD}
+        onOpen={vi.fn()}
+        onFork={vi.fn()}
+        naming={false}
+        onNaming={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(theUneditedMap(false))).toBeInTheDocument();
+    expect(stored.container.textContent).toContain(asTheMapWas(false));
+    expect(stored.container.textContent).not.toContain(asTheMapWas(true));
+    stored.unmount();
+
+    const generated = render(
+      <BranchPanel
+        branches={[]}
+        openId={null}
+        built={true}
+        world={WORLD}
+        onOpen={vi.fn()}
+        onFork={vi.fn()}
+        naming={false}
+        onNaming={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(theUneditedMap(true))).toBeInTheDocument();
+    expect(generated.container.textContent).toContain(asTheMapWas(true));
+    expect(generated.container.textContent).not.toContain(asTheMapWas(false));
+  });
+
   it("test_naming_a_branch_happens_in_the_panel", () => {
     const onFork = vi.fn();
     render(
       <BranchPanel
         branches={[]}
         openId={null}
+        built={false}
         world={WORLD}
         onOpen={vi.fn()}
         onFork={onFork}

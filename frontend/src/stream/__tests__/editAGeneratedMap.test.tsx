@@ -25,6 +25,7 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { theUneditedMap } from "../../components/BranchPanel";
 import { MapScreen } from "../../components/MapScreen";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
 import type { Selection, WorldSource, WorldView } from "../../world";
@@ -253,6 +254,46 @@ describe("the screen a map is edited on takes a generated map", () => {
     );
 
     expect(theSixEdits()).toEqual(onAGeneratedClaim);
+  });
+
+  it("test_the_bar_says_built_on_a_map_the_reader_generated_and_written_on_a_stored_one", () => {
+    // **The one word this screen must not get wrong.** The bar and the first row
+    // of the branch panel both name the map with nothing done to it, and a map
+    // the reader watched build itself was not *written* — nobody typed it out,
+    // which is the whole of what this product is showing. The flag is
+    // `generation`, which is the run that built the map and is absent on a
+    // stored example, so it cannot drift from the fact.
+    const generated = theFinishedMap();
+    const built = render(
+      <MapScreen
+        base={generated}
+        branches={[]}
+        source={aSourceThatAnswers(generated).source}
+        insteadOfTheEngine={null}
+        generation={{
+          generationId: "gen_a_run_the_reader_watched",
+          seed: "4803646386380448080",
+          promptFingerprint: null,
+          working: { state: "reading" },
+          unknown: new Map(),
+          openAt: null,
+        }}
+        onLeave={() => {}}
+      />,
+    );
+    expect(document.querySelector(".map-bar__where")?.textContent).toBe(theUneditedMap(true));
+    built.unmount();
+
+    render(
+      <MapScreen
+        base={generated}
+        branches={[]}
+        source={aSourceThatAnswers(generated).source}
+        insteadOfTheEngine={null}
+        onLeave={() => {}}
+      />,
+    );
+    expect(document.querySelector(".map-bar__where")?.textContent).toBe(theUneditedMap(false));
   });
 
   it("test_a_supposition_on_a_generated_map_paints_two_worlds_and_lists_the_change", async () => {

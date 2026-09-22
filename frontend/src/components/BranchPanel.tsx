@@ -129,15 +129,44 @@ function editLine(edit: Edit, world: WorldView): { button: string; about: string
   }
 }
 
+/**
+ * What the unedited map is called, which depends on where it came from.
+ *
+ * *(2026-09-22.)* A **stored example** was written: by hand, into a file, every
+ * number beside the reason for it. A **generated map** was built, in front of
+ * the reader, out of proposals the rules accepted one at a time. Calling the
+ * second one *as it was written* tells a reader who just watched it build that
+ * somebody typed it out — which is the one thing this product must never say
+ * about a generated map, because the whole of what it is showing is that nobody
+ * did.
+ *
+ * Both screens say it, so both ask here, and there is one answer.
+ *
+ * @param built True when this map came from a run rather than from the store.
+ */
+export function theUneditedMap(built: boolean): string {
+  return built ? "The map as it was built" : "The map as it was written";
+}
+
+/** The same fact in the half-sentence the bar prints beside an open branch. */
+export function asTheMapWas(built: boolean): string {
+  return built ? "as it was built" : "as it was written";
+}
+
 /** What the branch panel needs. */
 export interface BranchPanelProps {
   /** Every branch on this map, in the order they arrived. */
   readonly branches: readonly BranchView[];
-  /** Which branch is open, or `null` for the map as it was written. */
+  /** Which branch is open, or `null` for the map with nothing done to it. */
   readonly openId: string | null;
+  /**
+   * True when the map under these branches came from a run the reader watched,
+   * false when it is a stored example. It changes one word and no behaviour.
+   */
+  readonly built: boolean;
   /** The world on screen, so an edit can be read back in the claim's own words. */
   readonly world: WorldView;
-  /** Open a branch, or go back to the map as it was written. */
+  /** Open a branch, or go back to the map with nothing done to it. */
   readonly onOpen: (id: string | null) => void;
   /** Start a new branch with this name. */
   readonly onFork: (label: string) => void;
@@ -151,6 +180,7 @@ export interface BranchPanelProps {
 export function BranchPanel({
   branches,
   openId,
+  built,
   world,
   onOpen,
   onFork,
@@ -173,7 +203,7 @@ export function BranchPanel({
             onClick={() => onOpen(null)}
           >
             <span className="branch-panel__chip" data-hue="base" aria-hidden="true" />
-            <span className="branch-panel__name">The map as it was written</span>
+            <span className="branch-panel__name">{theUneditedMap(built)}</span>
           </button>
         </li>
         {branches.map((branch) => (
@@ -251,9 +281,9 @@ export function BranchPanel({
         // sentence over both would be making the weaker one silently.
         <p className="branch-panel__none">
           {world.workedOut === true
-            ? "Nothing has been edited. The map above is exactly as it was written, and every " +
+            ? `Nothing has been edited. The map above is exactly ${asTheMapWas(built)}, and every ` +
               "number on it was worked out by the engine from that map with nothing done to it."
-            : "Nothing has been edited. The map above is exactly as it was written, and every " +
+            : `Nothing has been edited. The map above is exactly ${asTheMapWas(built)}, and every ` +
               "number on it is the one the stored example carries — nothing has worked one out."}
         </p>
       ) : (
