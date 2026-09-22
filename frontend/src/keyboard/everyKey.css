@@ -1,0 +1,20 @@
+/*
+ * Where the sheet of every key hangs on a screen that has no map.
+ *
+ * The sheet places itself at the bottom right of whatever box it sits in, and
+ * on the two map screens that box is the map's own stage. The first screen has
+ * no stage, so it hangs the sheet in this: a pane the size of the window that
+ * catches nothing — presses go straight through it to the page — while the
+ * sheet inside it takes its own.
+ */
+
+.every-key-anchor {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.every-key-anchor > * {
+  pointer-events: auto;
+}

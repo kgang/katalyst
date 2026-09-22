@@ -137,6 +137,18 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   const firstTile = page.locator(".react-flow__node.react-flow__node-claim").first();
   const wasAt = await whereTheTileSits(firstTile);
 
+  // **`?` while the map is still arriving** — the one press no browser test had
+  // ever made. This screen prints *Press ? for every key* under the map, and the
+  // key was bound on the stored map alone, so every press in the suite was made
+  // on a map that had finished. The sheet opens over the map, and Escape puts it
+  // away and leaves the run running.
+  const sheet = page.locator(".sheet");
+  await page.keyboard.press("?");
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toContainText("Tiles do not move");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+
   // Every proposal the rules refused is on screen, in the validator's own words
   // — and a run that refused nothing says that, rather than leaving an empty
   // space a reader has to interpret. Which of the two this recording shows is
