@@ -25,8 +25,8 @@ import type {
   ClaimView,
   EvidenceClipping,
   Known,
+  Likelihood,
   LinkView,
-  Ranged,
   SourceView,
 } from "./types";
 
@@ -48,7 +48,8 @@ type Link = components["schemas"]["Link"];
  * the engine the same question and get the same answer.
  *
  * A seed is an input, not a reading. Nothing on screen is a number this
- * produced; it decides which of two thousand versions of the map get tried.
+ * produced; it is what every random draw behind the engine's likelihoods starts
+ * from, and it is what makes one run reproducible.
  *
  * @param bundle The stored example in full.
  * @returns The map's own date with its dashes taken out, as a whole number.
@@ -58,13 +59,19 @@ export function seedFor(bundle: FixtureBundle): number {
 }
 
 /**
- * Turn a likelihood from the server into a filled slot, unchanged.
+ * Turn a likelihood from the server into a filled slot.
  *
- * The three numbers are copied across at full precision. Rounding is a display
- * decision and is made once, in the chip that prints them.
+ * The number is copied across at full precision. Rounding is a display decision
+ * and is made once, in the chip that prints it.
+ *
+ * **The server sends three numbers and this keeps one** *(2026-09-22, R48)*. A
+ * `lo` and a `hi` still arrive beside every `p`, because the engine that works
+ * them out is another stack's to rewrite; there is nowhere on this side of the
+ * wire to put them and nothing on screen that would print them, so they stop
+ * here.
  */
-export function filled(belief: Belief): Known<Ranged> {
-  return { reading: { p: belief.p, lo: belief.lo, hi: belief.hi } };
+export function filled(belief: Belief): Known<Likelihood> {
+  return { reading: { p: belief.p } };
 }
 
 /**
@@ -74,7 +81,7 @@ export function filled(belief: Belief): Known<Ranged> {
  * holds the vocabulary's five, so that *"change them here first"* is a thing a
  * person can actually do. The kind decides the words; the caller says why.
  */
-export function missing(kind: AbsenceKind, reason: string): Known<Ranged> {
+export function missing(kind: AbsenceKind, reason: string): Known<Likelihood> {
   return { absence: absence(kind, reason) };
 }
 
@@ -188,7 +195,7 @@ const NO_MARKET_REASON: Record<"market" | "event" | "hypothesis", string> = {
 };
 
 /** Why this claim has no market number. */
-function marketAbsence(proposition: Proposition): Known<Ranged> {
+function marketAbsence(proposition: Proposition): Known<Likelihood> {
   if (proposition.kind === "not_tradeable") {
     // A dead end says why it is a dead end, in the map's own words. This is the
     // one reason a tile prints for itself, because it is an answer rather than
@@ -230,7 +237,7 @@ export function toClaim(proposition: Proposition): ClaimView {
     resolvesBy: proposition.resolution.by,
     resolutionSource: proposition.resolution.source,
     resolutionCriteria: proposition.resolution.criteria,
-    prior: { p: proposition.prior.p, lo: proposition.prior.lo, hi: proposition.prior.hi },
+    prior: { p: proposition.prior.p },
     baseRate: baseRate(proposition),
     beliefs: {
       model: filled(beliefs.model),

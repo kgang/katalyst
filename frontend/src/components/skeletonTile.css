@@ -56,3 +56,28 @@
   line-clamp: 4;
   overflow: hidden;
 }
+
+/* ---- Out where the map draws no words ---------------------------------- *
+ * Past the zoom at which even the largest type size would land under eleven
+ * pixels, every tile on the map is down to its shape alone. A rectangle held
+ * open follows, for the same reason: its two lines are thirteen-pixel type,
+ * which out there lands at about two pixels on the glass, and the eleven-pixel
+ * promise holds everywhere or it is not a promise.
+ *
+ * **The dashed outline stays, and is drawn to be seen from there.** The dash is
+ * the whole of what this box says — *this is not here yet* — and one pixel of
+ * it is a sixth of a pixel at the furthest the map goes. Six pixels in the
+ * map's own coordinates is about one on the glass there, and three at the
+ * nearest of this form; the same six the tile's own outline takes.
+ *
+ * The canvas says which form the map is in, because this box is not a tile and
+ * carries nothing of its own. *(2026-09-22)* */
+
+.canvas[data-detail="silhouette"] .skeleton-tile {
+  border-width: 6px;
+}
+
+.canvas[data-detail="silhouette"] .skeleton-tile__mark,
+.canvas[data-detail="silhouette"] .skeleton-tile__words {
+  display: none;
+}

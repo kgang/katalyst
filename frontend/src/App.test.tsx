@@ -9,7 +9,7 @@
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { aClaim, aWire, aWorld } from "./test/aMap";
 import type { FixtureBundle, WorldSource, WorldView } from "./world";
 
@@ -68,6 +68,16 @@ import { readAbout, readHealth, readReadiness } from "./api/client";
 import { STARTING_SENTENCES } from "./components/Launchpad";
 import { absence } from "./world/absence";
 
+/**
+ * The row that opens the stored map, named by what pressing it does.
+ *
+ * Not by the words *Strait of Hormuz*, which are on three rows of the first
+ * screen now: the stored map, the recording of a sentence about it, and the live
+ * run of that same sentence. Naming the row by its own action is what tells the
+ * three apart, and it is what a reader does too.
+ */
+const THE_STORED_MAP = /Open the map/;
+
 /** Set the three stand-ins to answer the way a healthy server with no key would. */
 function serverAnswersNormally() {
   vi.mocked(readHealth).mockResolvedValue({ status: "ok" });
@@ -102,7 +112,7 @@ const WORLD: WorldView = aWorld({
       claim: "The Strait of Hormuz reopens to unrestricted commercial transit.",
       kind: "hypothesis",
       beliefs: {
-        model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
+        model: { reading: { p: 0.35 } },
         user: { absence: absence("not_said", "You have not said.") },
         market: {
           absence: absence("no_market", "No venue quotes this claim."),
@@ -115,7 +125,7 @@ const WORLD: WorldView = aWorld({
       resolvesBy: "2026-11-15",
       resolutionSource: "ICE Brent front-month settlement prices.",
       beliefs: {
-        model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
+        model: { reading: { p: 0.46 } },
         user: { absence: absence("not_said", "You have not said.") },
         market: {
           absence: absence("no_market", "No venue quotes this claim."),
@@ -168,6 +178,20 @@ function sourceThatCannot(reason: string): WorldSource {
   };
 }
 
+/**
+ * Turn the panel beside the map to one of the panels its head names.
+ *
+ * The panel used to be one column holding everything at once; it is a few
+ * panels with their names at the head of it now, and a reader reaches one by
+ * name. A test that wants the branches has to ask for them the way a reader
+ * does.
+ *
+ * @param label The name at the head of the panel, as it is written there.
+ */
+function turnThePanelTo(label: string): void {
+  fireEvent.click(screen.getByRole("tab", { name: new RegExp(label) }));
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
 });
@@ -184,24 +208,28 @@ describe("the launchpad", () => {
       screen.getByText("If the Strait of Hormuz reopens, what happens to crude?"),
     ).toBeInTheDocument();
 
-    // **This server has no key and nothing recorded, so there is nothing the
-    // four sentences could honestly show and none of them is drawn as a card.**
-    // They used to be four rows reading *not yet live* — four things a reader
-    // counted and could not take up, under a heading offering to build them a
-    // map. One sentence says it instead, and points at the thing that does work
-    // with neither a key nor a recording.
-    expect(
-      await screen.findByText(/No model key configured, and nothing recorded/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/No model key configured, and nothing recorded/).textContent).toContain(
-      "The map above is already drawn and needs neither.",
+    // **This server has no key and nothing recorded, and the four ways are
+    // still all four.** What changes is what is enabled and the reason printed
+    // beside what is not: the two that call a model are drawn, disabled, and
+    // say why, while the two free ones are untouched.
+    // Twice: once under the live rows and once under the form, because they are
+    // two controls a reader is looking at and each is owed the reason in place.
+    expect(await screen.findAllByText(/No model key is configured/)).toHaveLength(2);
+    expect(document.querySelectorAll(".way__head")).toHaveLength(4);
+    expect(document.querySelectorAll("button.example:disabled")).toHaveLength(
+      STARTING_SENTENCES.length,
     );
-    expect(screen.queryByText("Photonic chips get adopted faster than expected.")).toBeNull();
+    // Nothing is badged a replay, because there is no recording to play.
     expect(document.querySelectorAll(".example__badge")).toHaveLength(0);
+    expect(document.body.textContent).toContain("no recording of any of these sentences");
 
-    // Both doors are named and explained.
-    expect(screen.getByText("Explore")).toBeInTheDocument();
-    expect(screen.getByText("Verify")).toBeInTheDocument();
+    // The four ways are named, in order, in their own words.
+    expect([...document.querySelectorAll(".way__name")].map((one) => one.textContent)).toEqual([
+      "Open the map",
+      "Watch the recording",
+      "Run it live",
+      "Build the map",
+    ]);
 
     // Nothing spins and nothing pops up.
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -221,12 +249,13 @@ describe("the launchpad", () => {
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
 
     expect(await screen.findAllByText(/Nothing answered at \/api\/readyz/)).not.toHaveLength(0);
-    // One row for each starting sentence, counted off the list itself.
-    expect(document.querySelectorAll('[data-state="no-answer"]')).toHaveLength(
+    // Every way that needs an answer is drawn and cannot be taken — one row for
+    // each starting sentence, counted off the list itself.
+    expect(document.querySelectorAll("button.example:disabled")).toHaveLength(
       STARTING_SENTENCES.length,
     );
     expect(document.body.textContent).not.toContain("Asking the server");
-    expect(document.body.textContent).not.toContain("No model key configured");
+    expect(document.body.textContent).not.toContain("No model key is configured");
     // And nothing pops up about it: a failure is printed in the page.
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -238,7 +267,7 @@ describe("opening a map", () => {
     const source = sourceThatAnswers();
     render(<App source={source} listExamples={async () => EXAMPLES} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
 
     expect(await screen.findByTestId("the-map")).toHaveTextContent("2 claims, 1 arrows");
     expect(source.readWorld).toHaveBeenCalledWith({ baseId: "hormuz" });
@@ -253,7 +282,7 @@ describe("opening a map", () => {
     serverAnswersNormally();
     const source = sourceThatAnswers();
     render(<App source={source} listExamples={async () => EXAMPLES} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
     await screen.findByTestId("the-map");
 
     // Nothing is asked for until somebody asks about an arrow: the number costs
@@ -261,7 +290,7 @@ describe("opening a map", () => {
     expect(source.readConditional).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
-    await screen.findByText(".58 (.42–.73)");
+    await screen.findByText(".58");
     expect(source.readConditional).toHaveBeenCalledTimes(1);
     expect(source.readConditional).toHaveBeenCalledWith({
       baseId: "hormuz",
@@ -273,7 +302,7 @@ describe("opening a map", () => {
     // and the same seed, is the same question — so it is answered from what was
     // kept rather than asked again.
     fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
-    await screen.findByText(".58 (.42–.73)");
+    await screen.findByText(".58");
     expect(source.readConditional).toHaveBeenCalledTimes(1);
   });
 
@@ -281,17 +310,19 @@ describe("opening a map", () => {
     serverAnswersNormally();
     const source = sourceThatAnswers();
     render(<App source={source} listExamples={async () => EXAMPLES} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
     await screen.findByTestId("the-map");
 
-    // A branch of the reader's own, and one arrow asked about.
+    // A branch of the reader's own, and one arrow asked about. The branches are
+    // a panel of their own now, reached by the name at the head of the panel.
+    turnThePanelTo("Branches");
     fireEvent.click(screen.getByRole("button", { name: "Start a branch" }));
     fireEvent.change(screen.getByLabelText(/What is this branch called/), {
       target: { value: "Your own branch" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Start this branch" }));
     fireEvent.click(await screen.findByRole("button", { name: "select H->B" }));
-    await screen.findByText(".58 (.42–.73)");
+    await screen.findByText(".58");
     expect(source.readConditional).toHaveBeenCalledTimes(1);
 
     // Now an edit. The branch is append-only, so this is a different branch
@@ -318,7 +349,7 @@ describe("opening a map", () => {
     // which by then is a new element in the same place.
     serverAnswersNormally();
     render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
     await screen.findByTestId("the-map");
 
     fireEvent.click(screen.getByRole("button", { name: "select claim B" }));
@@ -347,7 +378,7 @@ describe("opening a map", () => {
       new Error("The server did not answer."),
     );
     render(<App source={source} listExamples={async () => EXAMPLES} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
     await screen.findByTestId("the-map");
 
     // The first ask does not come back. What the panel says is what happened —
@@ -361,16 +392,17 @@ describe("opening a map", () => {
     // work out cannot be worked out.
     fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
     await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(".58 (.42\u2013.73)")).toBeInTheDocument();
+    expect(await screen.findByText(".58")).toBeInTheDocument();
   });
 
   it("test_a_wires_number_belongs_to_the_map_that_is_showing", async () => {
     serverAnswersNormally();
     const source = sourceThatAnswers();
     render(<App source={source} listExamples={async () => EXAMPLES} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
     await screen.findByTestId("the-map");
 
+    turnThePanelTo("Branches");
     fireEvent.click(screen.getByRole("button", { name: "Start a branch" }));
     fireEvent.change(screen.getByLabelText(/What is this branch called/), {
       target: { value: "Your own branch" },
@@ -399,7 +431,7 @@ describe("opening a map", () => {
     const stored = sourceThatAnswers();
 
     render(<App source={engine} fallback={stored} listExamples={async () => EXAMPLES} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
 
     // A map you can still read beats a blank screen: the stored example draws.
     expect(await screen.findByTestId("the-map")).toHaveTextContent("2 claims, 1 arrows");
@@ -423,7 +455,7 @@ describe("opening a map", () => {
     const gone = sourceThatCannot("Nothing answered at /api/fixtures/hormuz.");
     render(<App source={gone} fallback={gone} listExamples={async () => EXAMPLES} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /Strait of Hormuz/ }));
+    fireEvent.click(await screen.findByRole("button", { name: THE_STORED_MAP }));
 
     expect(
       await screen.findByText("Nothing answered at /api/fixtures/hormuz."),
@@ -456,5 +488,100 @@ describe("the strip at the foot of the launchpad", () => {
       "Build 0.1.0, reported by Katalyst.",
     );
     expect(document.querySelector(".status-value")?.textContent).toBe("absent");
+  });
+});
+
+describe("how a run is asked for", () => {
+  /**
+   * Catch every request body the browser posts, and answer with a stream that
+   * ends at once.
+   *
+   * The run itself is not the subject here — what is said when the press goes
+   * out is. Nothing reaches a network: the global fetch is replaced, and it is
+   * put back after every case.
+   */
+  function catchingWhatIsAsked(): string[] {
+    const bodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_address: string, options?: RequestInit) => {
+        bodies.push(String(options?.body ?? ""));
+        return Promise.resolve(
+          new Response(
+            'event: done\ndata: {"reason":"reached_terminal","claims":0,"links":0,"rejected":0}\n\n',
+            { status: 200, headers: { "content-type": "text/event-stream" } },
+          ),
+        );
+      }),
+    );
+    return bodies;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("test_the_press_says_how_the_run_starts_rather_than_leaving_it_to_the_key", async () => {
+    // **The route used to read the key and decide; now the reader does.** This
+    // is the press on *Run it live*, and what goes out says so — the key is a
+    // reason beside a disabled control and nothing else.
+    serverAnswersNormally();
+    vi.mocked(readReadiness).mockResolvedValue({
+      status: "ready",
+      model_key_present: true,
+      replayable: [],
+      unreadable: [],
+    });
+    const bodies = catchingWhatIsAsked();
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: /Run it live/ }))[0] as Element);
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((JSON.parse(bodies[0] ?? "{}") as Record<string, unknown>).start).toBe("live");
+  });
+
+  it("test_a_key_and_a_recording_still_lets_the_reader_ask_for_the_recording", async () => {
+    // **The case that could not happen before this screen.** A copy with a key
+    // presses *Watch the recording* and the request asks for a recording — which
+    // is how somebody holding a key reaches the half of the product that needs
+    // none. Nothing about the key is read on the way out.
+    serverAnswersNormally();
+    vi.mocked(readReadiness).mockResolvedValue({
+      status: "ready",
+      model_key_present: true,
+      replayable: [{ example: "hormuz", recording_date: "2026-09-21" }],
+      unreadable: [],
+    });
+    const bodies = catchingWhatIsAsked();
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Watch the recording/ }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    const sent = JSON.parse(bodies[0] ?? "{}") as Record<string, unknown>;
+    expect(sent.start).toBe("replay");
+    // And the sentence went out exactly as a reader would type it, which is what
+    // makes the recorded path and the live path one path.
+    expect(sent.hypothesis).toBe(STARTING_SENTENCES[0]?.sentence);
+  });
+
+  it("test_a_copy_with_no_key_asks_for_the_recording_by_name", async () => {
+    // The keyless path is unchanged in what it gets and changed in how it says
+    // so: the recording is now asked for rather than fallen into.
+    serverAnswersNormally();
+    vi.mocked(readReadiness).mockResolvedValue({
+      status: "ready",
+      model_key_present: false,
+      replayable: [{ example: "hormuz", recording_date: "2026-09-21" }],
+      unreadable: [],
+    });
+    const bodies = catchingWhatIsAsked();
+    render(<App source={sourceThatAnswers()} listExamples={async () => EXAMPLES} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Watch the recording/ }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((JSON.parse(bodies[0] ?? "{}") as Record<string, unknown>).start).toBe("replay");
   });
 });

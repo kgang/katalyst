@@ -20,9 +20,21 @@
  * built, and the outline beside them grows in the same order.
  *
  * Nothing here composes a sentence about a refusal: a refused proposal is read
- * out in the words the rule itself wrote. And nothing here counts anything the
- * stream did not count — the claim and arrow counts at the end are the fields the
- * closing event carried.
+ * out in the model's own words and then in the words the rule itself wrote. And
+ * nothing here counts anything the stream did not count — the claim and arrow
+ * counts at the end are the fields the closing event carried.
+ *
+ * **And nothing here says a word about what the model is doing right now.** The
+ * strip prints those two lines, and they change every few seconds; a polite
+ * region that said them would be reading a stopwatch over the top of the map
+ * being built. They are printed, reachable and never announced.
+ *
+ * **And each line about a growing map ends by naming what is still open**, from
+ * the frontier both growth events carry (added 2026-09-21). These lines are now
+ * printed as well as spoken, in the strip at the foot of the map, and they are
+ * what a reader looks at during the fifty to a hundred and ten seconds between
+ * two events of a live run: *what has arrived* is half the answer, and *what is
+ * being worked on* is the other half.
  */
 
 import { THE_STREAM_ENDED_EARLY, WHY_IT_STOPPED } from "../components/DoneLine";
@@ -56,18 +68,36 @@ export function theOpeningLine(growth: Growth): string {
  *   rather than falling silent.
  */
 export function whatChanged(was: Growth, now: Growth): string {
-  // A refusal, in the rule's own sentences, said once and never said again.
-  // Accepted and refused are two different events, so only one of the two
-  // branches below can be the reason for any one change.
+  // A refusal: **what the model proposed, in its own words**, and then the
+  // rule's own sentences. Said once and never said again. Accepted and refused
+  // are two different events, so only one of the two branches below can be the
+  // reason for any one change.
+  //
+  // **The model's words were added on 2026-09-22**, because of what Kent asked
+  // for: *"if we could see the different things that the llm is proposing even
+  // if the events are rejected, that'd be helpful."* Every refusal was already
+  // listed in full in the panel, and this line already carried the rule's
+  // sentence — but at the moment a refusal arrives a reader is looking at the
+  // foot of the screen, and what the foot said was *a proposal* rather than
+  // which one. A rule's sentence with nothing to attach it to is half a fact.
+  //
+  // It is shortened the same way a claim arriving is, and for the same reason:
+  // enough to know which proposal it was, on one line. The whole of it, with
+  // every rule it broke, is in the panel.
   if (now.refusals.length > was.refusals.length) {
     const last = now.refusals[now.refusals.length - 1];
-    return last === undefined ? "" : `A proposal was refused. ${last.reasons.join(" ")}`;
+    return last === undefined
+      ? ""
+      : (
+          `A proposal was refused: "${inFewWords(last.claimInWords)}". ` +
+          `${last.reasons.join(" ")} ${whatIsOpen(now, null)}`
+        ).trim();
   }
 
   // The likelihoods landing: one event, one world, every number. It is the
-  // engine's own world arriving that says so — a growing map has no count of
-  // versions on it, because nothing has been run through it yet.
-  if (was.world.versions === undefined && now.world.versions !== undefined) {
+  // engine's own world arriving that says so — a growing map is not marked as
+  // worked out, because nothing has been worked through it yet.
+  if (was.world.workedOut !== true && now.world.workedOut === true) {
     return (
       "Every likelihood has been worked out, through the whole finished map, at once. Every " +
       "claim on the map now carries a number."
@@ -76,11 +106,12 @@ export function whatChanged(was: Growth, now: Growth): string {
 
   if (now.world.claims.length > was.world.claims.length) {
     const arrived = now.world.claims[now.world.claims.length - 1];
+    const many = now.world.claims.length;
     return (
       `A claim arrived: "${inFewWords(arrived?.claim ?? "")}". ` +
-      `${asClaims(now.world.claims.length)} so far, ` +
-      `${asRectangles(now.skeletons.length)} still to come.`
-    );
+      `${asCount(many)} ${many === 1 ? "claim" : "claims"} so far. ` +
+      `${whatIsOpen(now, arrived?.id ?? null)}`
+    ).trim();
   }
 
   if (now.verdict !== null && was.verdict === null) {
@@ -94,6 +125,54 @@ export function whatChanged(was: Growth, now: Growth): string {
   }
 
   return "";
+}
+
+/**
+ * What the run is working on now, named rather than counted.
+ *
+ * **It is read off the frontier, which the stream states on both growth
+ * events** — the claims still open to expand, in the engine's own order. The
+ * reserved rectangles on the canvas are that same frontier drawn, so the
+ * sentence and the picture cannot disagree.
+ *
+ * **It names one and counts the rest.** A sentence listing five claims in full
+ * is a sentence nobody finishes, and a sentence that only counts them — *three
+ * places held open* — says how many without saying what, which is the thing a
+ * reader waiting a minute actually wants to know.
+ *
+ * **It counts places, never calls.** How many calls are in flight is the
+ * server's business and is not on the wire; the browser can count what it was
+ * sent and nothing else.
+ *
+ * **And it says *it* rather than repeating a claim just quoted.** The claim that
+ * has this moment arrived is usually the first thing still open, and a sentence
+ * that names it twice in twelve words reads as a stutter.
+ *
+ * @param now Everything known after the event.
+ * @param justArrived The claim this event brought, when it brought one, so the
+ *   sentence can point back at it instead of quoting it again.
+ * @returns The sentence, or the one that says nothing is open — which is what a
+ *   map has just before the likelihoods land.
+ */
+function whatIsOpen(now: Growth, justArrived: string | null): string {
+  const open = now.skeletons;
+  const first = open[0];
+  if (first === undefined) {
+    return "No place is left open.";
+  }
+  const others = open.length - 1;
+  const rest = others === 0 ? "" : ` and ${inWords(others)} ${others === 1 ? "other" : "others"}`;
+  if (first.after !== null && first.after === justArrived) {
+    return `Working on what follows from it${rest}.`;
+  }
+  // The rectangle carries the claim it hangs off; the claim's own words are on
+  // the map. The first rectangle of all hangs off nothing and carries the
+  // reader's own sentence, which is the right thing to name then.
+  const words =
+    first.after === null
+      ? first.words
+      : (now.world.claims.find((claim) => claim.id === first.after)?.claim ?? first.words);
+  return `Working on what follows from "${inFewWords(words)}"${rest}.`;
 }
 
 /** What a run that has stopped says, in one line, whichever way it stopped. */
@@ -134,9 +213,4 @@ function asClaims(count: number): string {
 /** How many arrows, in words. */
 function asArrows(count: number): string {
   return `${inWords(count)} ${count === 1 ? "arrow" : "arrows"}`;
-}
-
-/** How many rectangles are being held open, in words. */
-function asRectangles(count: number): string {
-  return count === 1 ? "one place held open" : `${inWords(count)} places held open`;
 }

@@ -38,7 +38,6 @@ import type { ClaimDiff, Diff, World } from "../api/client";
 import { readConditional, readDiff, readExample, readWorld } from "../api/client";
 import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
-import { noReadingAtAll } from "./absence";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
 import { NOT_ON_THIS_MAP } from "./naming";
 import type { FixtureBundle, WorldSource } from "./source";
@@ -52,8 +51,8 @@ import type {
   DiffRequest,
   DiffView,
   Known,
+  Likelihood,
   Movement,
-  Ranged,
   Standing,
   WireBranch,
   WorldRequest,
@@ -202,8 +201,8 @@ function standingFromTheWorld(
     standing.set(claim.id, {
       words: said?.words ?? word,
       reason:
-        `${said?.reason ?? "An edit fixed this claim's value."} It is settled in every version ` +
-        `of the map, so there is no likelihood to show.`,
+        `${said?.reason ?? "An edit fixed this claim's value."} It is settled wherever the ` +
+        `engine looks, so there is no likelihood to show.`,
     });
   }
   return standing;
@@ -216,18 +215,49 @@ function standingFromTheWorld(
  * It names both halves — the address the map was read from and the address its
  * likelihoods were worked out at — and the three things anyone would need to
  * rebuild the same answer: the map, the branch, and the seed.
+ *
+ * **It used to end with how the engine got there** *(until 2026-09-22, R48)*:
+ * *"over 2 000 versions of the map with 8 worlds under each"*. Those two
+ * numbers only meant something while a claim carried a range, and there is no
+ * range. The seed stays, because a run is still reproducible from it.
+ *
+ * **Both kinds of map say it in these words.** A stored example and one
+ * somebody watched build itself differ in exactly one clause — where the claims
+ * and arrows came from — so that clause is the argument and the rest is written
+ * once. Two sentences would drift the next time one of them was improved, and
+ * then the same map read two ways would explain itself two ways.
+ *
+ * @param world The world as the engine built it, for its seed.
+ * @param whereTheMapCameFrom The one clause that differs, with no punctuation
+ *   at the end of it: the rest of the sentence is joined onto it.
+ * @param branchLabel The name of the branch folded on, or nothing on the base
+ *   world.
  */
-function originOf(world: World, bundle: FixtureBundle, branchLabel: string | null): string {
+export function theSentenceUnderTheMap(
+  world: World,
+  whereTheMapCameFrom: string,
+  branchLabel: string | null,
+): string {
   const which =
     branchLabel === null
       ? "with nothing done to it"
       : `with the branch "${branchLabel}" folded onto it`;
   return (
-    `Every claim, arrow and date came from /api/fixtures/${bundle.id}; every likelihood was ` +
-    `worked out by /api/worlds from that map ${which}, at seed ${world.seed}, over ` +
-    `${world.versions.toLocaleString("en-GB").replace(/,/g, " ")} versions of the map with ` +
-    `${world.worlds} worlds under each. Nothing here was typed in: the same map, branch and ` +
-    `seed give the same answer every time.`
+    `${whereTheMapCameFrom}; every likelihood was worked out by /api/worlds from that map ` +
+    `${which}, at seed ${world.seed}. Nothing here was typed in: the same map, branch and seed ` +
+    `give the same answer every time.`
+  );
+}
+
+/**
+ * The same sentence for a stored example, which says where the map itself was
+ * read from.
+ */
+function originOf(world: World, bundle: FixtureBundle, branchLabel: string | null): string {
+  return theSentenceUnderTheMap(
+    world,
+    `Every claim, arrow and date came from /api/fixtures/${bundle.id}`,
+    branchLabel,
   );
 }
 
@@ -301,8 +331,12 @@ export function toWorldView(world: World, from: WorldSummary, branch?: BranchVie
       };
     }),
     links: world.graph.links.map(toLink),
-    versions: world.versions,
-    worldsPerVersion: world.worlds,
+    // The engine answered, so these numbers are its own rather than the stored
+    // example's. **How** it got there — how many versions of the map it tried
+    // and how many worlds under each — is not carried onto the screen's own view
+    // of the world any more (2026-09-22, R48): the only thing any surface asked
+    // it was whether a range had been computed, and there is no range.
+    workedOut: true,
     seed: world.seed,
     warnings: world.warnings,
     origin: from.origin,
@@ -312,15 +346,28 @@ export function toWorldView(world: World, from: WorldSummary, branch?: BranchVie
 /**
  * How far one claim moved, as the engine read it.
  *
- * Every part of it is the engine's own: the two readings, the sign that says
- * which way it went, the share of versions that agreed, and whether the move
- * came from nothing but the observation changing how much each version counts.
- * Nothing here subtracts, compares two numbers, or works anything out.
+ * Every part of it is the engine's own: the two readings and the sign that says
+ * which way it went. Nothing here subtracts, compares two numbers, or works
+ * anything out.
+ *
+ * **Two fields the engine still sends are dropped here** *(2026-09-22, R48)*.
+ * `agreement` is the share of two thousand versions of the map that moved the
+ * same way, and `moved_only_by_reweighting` says a claim moved only because an
+ * observation made some of those versions count for more. Both are facts about
+ * running the map many times, which is the thing Kent cut, so neither may reach
+ * a screen. They are still on the wire because the engine that computes them is
+ * another stack's to rewrite; **they die with it**, and until then this is the
+ * one place they stop.
+ *
+ * **The engine's word for why a claim is unchanged is not one of them.** It is
+ * carried across as it came, both of its spellings, because R4 requires every
+ * quiet row on the change list to say why in words — `graph/diff/noChange.ts`
+ * turns `versions_disagree` into a phrase with no versions in it.
  *
  * @param row The claim's own row of the engine's difference.
  */
 function movement(row: ClaimDiff): Movement | undefined {
-  const { before, after, delta, agreement } = row;
+  const { before, after, delta } = row;
   if (before === null || after === null || delta === null) {
     return undefined;
   }
@@ -332,34 +379,30 @@ function movement(row: ClaimDiff): Movement | undefined {
     // out how far anything moved.
     way: delta < 0 ? "down" : "up",
     by: delta,
-    sameDirection:
-      agreement === null
-        ? {
-            absence: noReadingAtAll(
-              "Only one of the two worlds holds this claim, so there is no direction for the " +
-                "versions of the map to have agreed or disagreed about.",
-            ),
-          }
-        : { reading: agreement },
-    // A claim with no causes of its own can move under **This happened** without
-    // anything pushing on it: the observation makes the versions of the map in
-    // which it was likely count for more, and the average shifts. The engine
-    // says when that is the whole story, and the panel prints one sentence when
-    // it does. **The browser never works this out for itself** — it is a fact
-    // about how the engine read the numbers, and only the engine knows it.
-    onlyReweighted: row.moved_only_by_reweighting,
-    // And which half of its test a claim the engine called unchanged failed:
-    // the move was too small, or the versions of the map disagreed which way.
-    // Carried across as the word it came as. The floor and the bar that decide
-    // it are constants inside the engine and are on no wire, so this is the
-    // only way the browser can know — which is what stops a second engine
-    // growing here and disagreeing with the first.
+    // Why the engine would not call the difference a move, carried across as the
+    // word it came as. The floor and the bar that decide it are constants inside
+    // the engine and are on no wire, so this is the only way the browser can
+    // know — which is what stops a second engine growing here and disagreeing
+    // with the first. Neither spelling is ever printed; `graph/diff/noChange.ts`
+    // picks the words, and words the second of them without the versions of the
+    // map it names (2026-09-22, R48).
     unchangedBecause: row.unchanged_because ?? undefined,
   };
 }
 
-/** Turn the engine's difference into what the rail and the tiles read. */
-function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
+/**
+ * Turn the engine's difference into what the rail and the tiles read.
+ *
+ * **Exported because a generated map goes through this one too.** A map somebody
+ * watched build itself is read from the same three routes, and two functions
+ * turning one difference into rows would drift into two answers about the same
+ * edit.
+ *
+ * @param difference The engine's own comparison of two worlds.
+ * @param claims Every claim either world holds, so a row can name an ending in
+ *   its own words rather than by its identifier.
+ */
+export function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
   const byId = new Map(claims.map((claim) => [claim.id, claim]));
 
   const changed = new Map<string, ClaimChange>();
@@ -387,8 +430,12 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
           by: row.peak_delta,
         },
       },
-      rangeWidth: { reading: row.range_width },
-      agreement: { reading: row.agreement },
+      // **`range_width` and `agreement` arrive on this row and are dropped**
+      // *(2026-09-22, R48)*. One is the width of the range around the new
+      // number and the other the share of the versions of the map that moved
+      // the same way; they were the change list's *how firm* and *same
+      // direction* columns, and a row is now the claim, its number before and
+      // after, and the direction.
     };
   });
 
@@ -413,10 +460,14 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
  * the part of this product that drafts a whole claim — its wording, how it is
  * judged, by whom, by when — and that is not connected.
  *
+ * **Exported for the same reason the difference reader above is**: a branch on a
+ * generated map is the same branch, and one rule about what can be sent beats
+ * two.
+ *
  * @param branch The branch the screen is showing.
  * @throws Error With one plain sentence, when the branch cannot be sent.
  */
-function sendable(branch: BranchView): WireBranch {
+export function sendable(branch: BranchView): WireBranch {
   if (branch.wire === undefined) {
     throw new Error(
       `The branch "${branch.label}" has an edit this build cannot hand to the engine, so no ` +
@@ -506,7 +557,7 @@ export class ApiWorldSource implements WorldSource {
    *
    * @param request Which map, which branch, and which arrow.
    */
-  async readConditional(request: ConditionalRequest): Promise<Known<Ranged>> {
+  async readConditional(request: ConditionalRequest): Promise<Known<Likelihood>> {
     const bundle = await this.readBundle(request.baseId);
     const answer = await readConditional(
       request.baseId,

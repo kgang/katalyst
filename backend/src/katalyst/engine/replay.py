@@ -36,6 +36,11 @@ What this file must never do
   exact after trimming: playing the Hormuz map back at somebody who asked about
   photonic chips is worse than saying no, and afterwards indistinguishable from
   the product working.
+- Never play, invent or accept an `activity` line. Activity is what a live model
+  call is doing this second: it belongs to a run that is happening, it is no part
+  of what a generation decided, and there is nothing of it to play back. A file
+  holding one is refused by name, and a replay makes none — a replayed run says
+  what it is showing and never pretends to be working (record 0027, 2026-09-22).
 - Never let the pacing change an event, an order or a number. It is cosmetic.
 - Never honour a seed from the request. The header's is the one the recorded run
   had, and the numbers are recomputed from it.
@@ -138,12 +143,45 @@ class RecordingHeader(BaseModel):
 
 
 class RecordingSummary(BaseModel):
-    """One recording the first screen can offer, and when it was made."""
+    """One recording the first screen can offer, when it was made, and what making it cost.
+
+    The three figures are the **recorded run's own**, read off the receipt line
+    inside the file and never worked out here. They are the only measured price
+    and the only measured duration this product owns, so they are what the first
+    screen prints beside a live run before anybody presses it — with the day they
+    were measured, which is `recording_date`.
+
+    They are absent together when the file holds no receipt this engine can read,
+    and the screen then prints no figure at all rather than a guess.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     example: str = Field(description="The short name of the example, matching its file name.")
     recording_date: date = Field(description="The day `make record-demo` wrote it.")
+    calls: int | None = Field(
+        default=None,
+        description=(
+            "How many times the recorded run called a model. Absent when the file "
+            "holds no receipt this engine can read."
+        ),
+    )
+    seconds: float | None = Field(
+        default=None,
+        description=(
+            "How long the recorded run took, wall clock, in seconds — the "
+            "receipt's own field and its own unit, so nothing converts it on the "
+            "way here. Absent when the file holds no readable receipt."
+        ),
+    )
+    dollars: float | None = Field(
+        default=None,
+        description=(
+            "What the recorded run cost, in United States dollars — the receipt's "
+            "own field and its own unit. Absent when the file holds no readable "
+            "receipt."
+        ),
+    )
 
 
 class Recording(BaseModel):
@@ -226,6 +264,26 @@ def read(path: Path) -> Recording:
     return Recording(example=path.stem, header=header, lines=tuple(lines))
 
 
+def was_never_recorded(example: str) -> str:
+    """Say why a file holding an `activity` line is not a recording, in one sentence.
+
+    One sentence, written once and given wherever the refusal is made, so the
+    reader of a readiness route, of a replay that stopped and of the build's own
+    check all read the same words.
+
+    Args:
+        example: The short name of the file.
+
+    Returns:
+        The sentence.
+    """
+    return (
+        f"{example} holds an {events.ACTIVITY} line. Activity is what a live run is "
+        "doing this second — it is never written down, never played back and never "
+        "invented — so this file was not written by this program. Record it again."
+    )
+
+
 def why_it_cannot_be_played(recording: Recording) -> str | None:
     """Say, in one sentence, why this recording would not play through. Or nothing.
 
@@ -242,6 +300,8 @@ def why_it_cannot_be_played(recording: Recording) -> str | None:
         One plain sentence, or nothing at all when every event in it would play.
     """
     for name, payload in recording.lines:
+        if name == events.ACTIVITY:
+            return was_never_recorded(recording.example)
         if name == events.NAMES[Receipt]:
             continue
         shape = events.BY_NAME.get(name)
@@ -334,13 +394,71 @@ def every_recording(folder: Path | None = None) -> tuple[Recording, ...]:
     return tuple(found)
 
 
+def summary_of(recording: Recording) -> RecordingSummary:
+    """Describe one recording the way the first screen needs it described.
+
+    **One builder, used by everything that lists recordings**, because two of
+    them would be two answers to "what does this example cost to run", and the
+    difference would show up as a number on somebody's first screen.
+
+    Args:
+        recording: A recording that read.
+
+    Returns:
+        Its name, the day it was made, and what making it cost.
+    """
+    calls, seconds, dollars = _what_the_recorded_run_cost(recording)
+    return RecordingSummary(
+        example=recording.example,
+        recording_date=recording.header.recording_date,
+        calls=calls,
+        seconds=seconds,
+        dollars=dollars,
+    )
+
+
+def _what_the_recorded_run_cost(
+    recording: Recording,
+) -> tuple[int | None, float | None, float | None]:
+    """Read the recorded run's own receipt: how many calls, how long, how much.
+
+    **Read off the file, never worked out here.** These are the figures of the
+    paid run this recording was made from, in the receipt's own fields and the
+    receipt's own units, so a screen printing them is quoting a measurement
+    rather than repeating a number somebody typed.
+
+    The receipt is the one event `why_it_cannot_be_played` deliberately does not
+    check, because a replay rebuilds it rather than emitting it — so a file that
+    plays perfectly well can still carry a receipt this engine cannot read. That
+    is an absence, not a fault: the three come back empty together and the screen
+    says it was not told.
+
+    Args:
+        recording: The recording to read.
+
+    Returns:
+        The calls, the seconds and the dollars, or three absences.
+    """
+    for name, payload in reversed(recording.lines):
+        if name != events.NAMES[Receipt]:
+            continue
+        try:
+            said = Receipt.model_validate(payload)
+        except ValidationError:
+            return None, None, None
+        return said.calls, said.seconds, said.dollars
+    return None, None, None
+
+
 def summaries(folder: Path | None = None) -> tuple[RecordingSummary, ...]:
     """List what this copy of the program can play back, and when each was made.
 
     Read by the first screen before anything runs, which is how the sentence
     record 0012 requires — *"No model key configured — these run from recordings
     made on <date>"* — can name a date at all: the date lives on the receipt, and
-    the receipt arrives last.
+    the receipt arrives last. The same reason carries the three figures beside it:
+    what a live run of this example costs and how long it takes has to be on
+    screen **before** the press, and a receipt arrives long after.
 
     Args:
         folder: Where the recordings live. The committed folder when not said.
@@ -349,10 +467,7 @@ def summaries(folder: Path | None = None) -> tuple[RecordingSummary, ...]:
         One summary per recording, by file name.
     """
     good, _ = readable(folder)
-    return tuple(
-        RecordingSummary(example=one.example, recording_date=one.header.recording_date)
-        for one in good
-    )
+    return tuple(summary_of(one) for one in good)
 
 
 def find(hypothesis: str, folder: Path | None = None) -> Recording | None:
@@ -393,6 +508,11 @@ def play(recording: Recording) -> Iterator[Event]:
         The events, in the order the file holds them.
     """
     for name, payload in recording.lines:
+        if name == events.ACTIVITY:
+            # **A replay invents no activity and plays none back.** There is
+            # nothing happening to report: the calls this file records were made
+            # once, on a day in the past, by somebody who paid for them.
+            raise CannotBeRead(was_never_recorded(recording.example))
         if name == events.NAMES[Receipt]:
             yield _rebuilt(payload, recording)
             continue
@@ -603,7 +723,9 @@ def faults_in(recording: Recording, *, current_prompt_hash: str) -> list[str]:
     found: list[str] = []
     names = [name for name, _ in recording.lines]
 
-    unknown = sorted({one for one in names if one not in events.BY_NAME})
+    if events.ACTIVITY in names:
+        found.append(was_never_recorded(recording.example))
+    unknown = sorted({one for one in names if one not in events.BY_NAME and one != events.ACTIVITY})
     if unknown:
         found.append(f"{recording.example} holds events nobody knows: {', '.join(unknown)}.")
     for name, payload in recording.lines:

@@ -66,8 +66,9 @@ body {
 }
 
 /* ---- The map screen ----------------------------------------------------- *
- * A bar across the top, the map filling everything under it, and one line at
- * the foot saying where every number on it came from. No padding around the
+ * A bar across the top, the map filling everything under it, the panel beside
+ * it, and one band at the foot saying what is happening to the map, what the
+ * last key did and where every number on it came from. No padding around the
  * map: the map is the screen. */
 
 .page--map {
@@ -125,10 +126,10 @@ body {
   min-height: 0;
 }
 
-/* The map and the line under it that says what the last keystroke did. Both are
- * the stage; the panel is beside them. The stage is the thing the two overlays —
- * the command palette and the shortcuts sheet — are positioned against, so that
- * neither can ever cover the panel and neither needs a scrim to sit above. */
+/* The map, and nothing else. The panel is beside it and the band is under it.
+ * The stage is the thing the two overlays — the command palette and the
+ * shortcuts sheet — are positioned against, so that neither can ever cover the
+ * panel and neither needs a scrim to sit above. */
 .map-stage {
   position: relative;
   flex: 1 1 auto;
@@ -138,22 +139,63 @@ body {
   min-height: 0;
 }
 
-/* One line under the map naming what the last keystroke did: which wire it took
- * and how long that wire's delay is, or that there was no wire that way. A
- * movement you cannot account for is the same failure as a number you cannot
- * account for, in a smaller place. */
-.map-status {
-  flex: none;
+/* ---- One band at the foot, never three ---------------------------------- *
+ *
+ * **What it replaced** *(2026-09-22)*. The foot was three boxes stacked on one
+ * another, each with its own hairline and its own raised surface: what the last
+ * keystroke did, what the run was doing, and where every number on the map came
+ * from. Kent, after a live run: *"the triple nested bottom bar … somewhat
+ * garish"*. Three rules across the bottom of a screen say that three unrelated
+ * things are competing, and nothing says which one to read.
+ *
+ * It is one band now, with one rule above it and one raised surface, and at most
+ * two rows in every state: the run's own row, and under it either what the model
+ * is doing this second or the quiet grey row. Never both — see `MapFrame.tsx`.
+ *
+ * It is never squashed. Between them these rows say whether the tool is alive,
+ * what the last key did, and where the numbers came from. */
+.map-foot {
+  flex: 0 0 auto;
   display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-  margin: 0;
-  padding: var(--space-hair) var(--space-2);
+  flex-direction: column;
+  gap: var(--space-hair);
+  padding: var(--space-1) var(--space-3);
   border-top: 1px solid var(--hairline);
   background: var(--surface-raised);
   font-size: var(--text-sm);
+}
+
+/* The quiet row: the last key pressed, and where this map came from. Two things
+ * a reader glances at rather than reads, side by side on one row, separated by
+ * the same hairline every other separation in this product uses. */
+.map-foot__quiet {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
   color: var(--text-muted);
-  min-height: 1.8em;
+}
+
+/* What the last keystroke did: which wire it took and how long that wire's delay
+ * is, or that there was no wire that way. A movement you cannot account for is
+ * the same failure as a number you cannot account for, in a smaller place.
+ *
+ * It takes the room its own words need and no more, so the provenance beside it
+ * gets the rest of the row. */
+.map-status {
+  /* **It takes what it needs and never gives way.** Left to shrink beside the
+     provenance it was cut after thirty characters at 1600: the provenance's
+     natural width is a sentence of three hundred, so shrinking the two in
+     proportion hands it nearly everything. The cap is on the sentence below
+     rather than here, so that it is a count of characters the reader gets and
+     not of characters minus the width of a label. */
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  color: var(--text-muted);
 }
 
 /* The label on the line under the map. A word rather than a glyph: a picture of
@@ -168,22 +210,38 @@ body {
   color: var(--text-muted);
 }
 
-/* What a branch did, said out loud. It is a visible line as well as a spoken
- * one: a reader looking at the picture should be told the same thing a reader
- * hearing it is told, and the counts are the ones the diff worked out rather
- * than any number nobody computed. */
+/* What the key did, on one line, cut at the end when it runs past its share.
+ *
+ * **One line rather than as many as it wants.** Left to wrap, a long account of
+ * one keystroke — *your edit added this claim · A confirmed military strike on
+ * Iranian territory* — takes four lines of a narrow column beside a provenance
+ * that takes three, and the quiet row becomes the tallest thing at the foot for
+ * the most transient thing on it. The words that matter are the first ones. */
+.map-status__said {
+  /* Forty-six characters, which is the longest thing this line says whole —
+     *the panel is away · press P to bring it back*. Past that it is cut, because
+     past that the words are detail and the provenance beside it is a sentence
+     three hundred characters long that has to fit on the same row. */
+  max-width: 46ch;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The one polite line, said out loud and printed.
+ *
+ * **It is a visible line as well as a spoken one, on every screen** — a reader
+ * looking at the picture is told the same thing a reader hearing it is told, and
+ * it is one element rather than two so the two can never drift apart. It lives
+ * inside the strip at the foot of the map (`components/runStrip.css`), which is
+ * where its box, its hairline and its background now come from; what is left
+ * here is how the words read. */
 .map-live {
   margin: 0;
-  padding: var(--space-1) var(--space-3);
-  border-top: 1px solid var(--hairline);
-  background: var(--surface-raised);
   font-size: var(--text-sm);
   color: var(--text);
   text-wrap: pretty;
-}
-
-.map-live:empty {
-  display: none;
 }
 
 /* The panel beside the map: the six things you can do, your branches, where the
@@ -217,6 +275,68 @@ body {
    appear on a gesture, because *there is more below* is the whole of what a
    reader needs to know and a bar that is only there while you scroll says it
    only to somebody who already knew. */
+/* **The panel and the names at its head, as one column.**
+ *
+ * The width lives here rather than on the scrolling box below, so the row of
+ * names is exactly as wide as the panel it names and neither can drift from the
+ * other. The names take the room they need; the scrolling box takes the rest,
+ * which is what keeps the head of the panel on the glass however long the panel
+ * gets. */
+.dock-column {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: 336px;
+  min-height: 0;
+}
+
+/* **What the panel leaves behind when it is folded away** *(2026-09-22, Kent:
+ * "can you introduce a button to be able to collapse and open the side bar")*.
+ *
+ * `P` has always put the panel away and always brought it back, and a reader who
+ * has not read the sheet of every key has no way of knowing that — so a reader
+ * who found `P` by accident lost the panel with nothing on screen to get it
+ * back. This is that something: a tab the width of a word, at the edge the panel
+ * went behind, carrying the panel's own word and a chevron pointing the way it
+ * will come from.
+ *
+ * **It is beside the map and never over it.** It takes its own width out of the
+ * row, exactly as the panel does, so the stage is 310 pixels wider with the
+ * panel folded and nothing is drawn on top of anything.
+ *
+ * The word is set sideways because the tab is a column: turning the reader's
+ * head is a smaller ask than a column of single letters, which is what a
+ * horizontal word in 26 pixels would be. It is set in the middle of the edge
+ * rather than at the top of it, because a reader who has just folded the panel
+ * is looking at the map and a word at the top of a thousand-pixel edge is a word
+ * outside where anybody is looking. */
+.dock-tab {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 26px;
+  padding: var(--space-1) 0;
+  border: none;
+  border-left: 1px solid var(--hairline);
+  background: var(--surface-raised);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.dock-tab:hover {
+  color: var(--text);
+}
+
+.dock-tab__word {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.02em;
+}
+
 .dock {
   flex: 0 0 auto;
   display: flex;
@@ -227,7 +347,8 @@ body {
      scrolling thing does — and without a line there the cut half and the next
      section's first line read as one word printed over another. */
   gap: 1px;
-  width: 336px;
+  /* The whole of the column it is in, whose width is the panel's own 336. */
+  width: 100%;
   min-width: 0;
   overflow-y: auto;
   border-left: 1px solid var(--hairline);
@@ -261,7 +382,9 @@ body {
    shadow is a veto condition. */
 .dock-frame {
   position: relative;
-  flex: 0 0 auto;
+  /* It takes whatever height the names at the head of the column leave, so the
+     panel that scrolls is the only thing that ever has to give. */
+  flex: 1 1 auto;
   display: flex;
   align-items: stretch;
   min-height: 0;
@@ -403,33 +526,38 @@ body {
   color: var(--text);
 }
 
-/* Where every number on the map came from, under the map — and whatever is
- * still on its way. A map whose numbers cannot say where they came from is the
- * state this product refuses to show, so the sentence is part of the map rather
- * than a footnote somebody might have left off.
+/* Where every number on the map came from — and whatever is still on its way. A
+ * map whose numbers cannot say where they came from is the state this product
+ * refuses to show, so the sentence is part of the map rather than a footnote
+ * somebody might have left off.
  *
- * One line each, stacked, in a strip of a fixed smallest height, so a line
- * arriving or going does not move the map above it. There is no spinner in this
- * strip and there is none anywhere: a line that says what was asked and at which
- * address says the same thing and says it usefully. */
+ * **It is no longer a strip of its own** *(2026-09-22)*. It is the right-hand
+ * half of the band's quiet row, behind a hairline, which is what turned three
+ * bars at the foot into one. One line each, stacked, so a line arriving or going
+ * changes this row's height and nothing else's. There is no spinner in it and
+ * there is none anywhere: a line that says what was asked and at which address
+ * says the same thing and says it usefully. */
 .map-origin {
-  /* Never squashed. It is the line that says where every number on this screen
-     came from, and half of it is worth nothing at all. */
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   display: grid;
   row-gap: var(--space-hair);
-  min-height: 2.6em;
+  min-width: 0;
   margin: 0;
-  padding: var(--space-1) var(--space-3);
-  border-top: 1px solid var(--hairline);
-  background: var(--surface-raised);
-  font-size: var(--text-sm);
+  padding-inline-start: var(--space-2);
+  border-inline-start: 1px solid var(--hairline);
   color: var(--text-muted);
   text-wrap: pretty;
 }
 
 .map-origin__line {
   margin: 0;
+}
+
+/* A generated map keeps nothing here until it has something to say — where it
+ * came from is read in the panel now. A hairline with nothing after it would be
+ * the row claiming a provenance it has not got. */
+.map-origin:empty {
+  display: none;
 }
 
 /* What the screen says while the map is on its way, or when it could not be

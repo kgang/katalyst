@@ -22,16 +22,8 @@ refusals, labelled as a replay everywhere a reader looks.
 
 This chapter owns the eight stream events as the browser types them, the `growth` reducer that folds
 them into a world, the skeleton tile, the refusal strip, the receipt strip, the Verify door's two
-cards, the input bar, the strip at the foot of the map, and the replay badge. It owns no arithmetic:
-every number on every one of those surfaces is a field on an event.
-
-**Two things in this chapter are decided and not yet built** *(2026-09-21, the usual cadence — the
-record and the chapter first, then the code)*. The strip at the foot of the map that says what the
-run is doing, with *Run details* moving into the panel, is **B11** and **decision record 0023**;
-today that sentence exists and is clipped to a one-pixel box. When a tile may move is **B3** and
-**INV-workbench.64**, rewritten by **decision record 0024**; today a tile's column is frozen the
-moment it is first drawn. Both records are `proposed`, and nothing is implemented against a proposed
-record.
+cards, the input bar, and the replay badge. It owns no arithmetic: every number on every one of
+those surfaces is a field on an event.
 
 ---
 
@@ -260,9 +252,16 @@ export interface GenerateRequest {
   /** The Verify door's destination, in the reader's words. Absent is the Explore door. */
   readonly target?: string;
   /** The reader's own likelihood on the hypothesis. Absent when they chose "I don't know". */
-  readonly user_belief?: Ranged;
+  readonly user_belief?: Likelihood;
   /** Only when reproducing a run we were given a seed for. See below. */
   readonly seed?: number;
+  /**
+   * How the run starts: `live` calls a model, `replay` plays the committed
+   * recording of this sentence back. The caller says which and the server never
+   * chooses; left out, the route plays a recording. See
+   * [`first-screen.md`](first-screen.md).
+   */
+  readonly start?: "replay" | "live";
 }
 
 // The route takes `versions` and `worlds` too, both upper-bounded on it, and the
@@ -292,9 +291,11 @@ caller does: it sends its sentence. Nothing in the browser holds a table of file
 numbers the cards, and the live path and the replayed path send byte-identical requests — which is
 what makes the reviewer's replay evidence about the live route rather than about a second one.
 
-`Ranged` — a likelihood with its two range ends, at full precision — is
-`frontend/src/world/types.ts`'s, the same shape a belief chip takes
-([`tiles-ports-wires.md`](tiles-ports-wires.md)).
+`Likelihood` — one likelihood, at full precision — is `frontend/src/world/types.ts`'s, the same
+shape a belief chip takes ([`tiles-ports-wires.md`](tiles-ports-wires.md)). *(It was called `Ranged`
+and carried two range ends beside the number until 2026-09-22, Kent's R48. The route's `Belief` still
+takes a `lo` and a `hi`; the browser sends the reader's own number in all three places — a range of
+nothing — and both fields go when the engine half of the cut lands.)*
 
 ### The `growth` reducer
 
@@ -372,6 +373,12 @@ export interface Growth {
   readonly waitingWires: readonly Link[];
   /** Event names this build does not know, and how many of each arrived. */
   readonly unknown: ReadonlyMap<string, number>;
+  /**
+   * What the model is doing right now — at most two lines, latest only — and
+   * the one thing an `activity` line changes. Empty on every replay, because a
+   * recording holds no such line. B12.
+   */
+  readonly activity: WhatTheModelIsDoing;
 }
 ```
 
@@ -404,17 +411,15 @@ that nothing minted an identifier, but nowhere for one to be minted.
 Nothing new is added to the page. The screen is the one
 [`layout-and-zoom.md`](layout-and-zoom.md) and [`diff-view.md`](diff-view.md) already describe: the
 canvas, and the **dock** beside it that holds the branch panel, the delta rail and the Inspector.
-A generation puts four sections into that same dock, above the Inspector, in this order — three of
-them until 2026-09-21, when *Run details* became the fourth:
+A generation puts three sections into that same dock, above the Inspector, in this order:
 
 | Section | When it is there | What it holds |
 |---|---|---|
 | **The verdict card** | Only when the reader used the Verify door | The graded path, or the honest *no path reaches this* (B7) |
 | **The refusal strip** | From the first refusal, for the rest of the run | One row per refused proposal, in the validator's own words (B5) |
 | **The receipt strip** | From the `receipt` event onward | What the run cost, and the mode it ran in (B6) |
-| **Run details** | From `generation_started` onward *(added 2026-09-21, decision record 0023)* | Where every claim on the map came from: the route, the generation's identifier and the seed. It is a section of the panel and **never a dialog**. It used to be a line of prose at the foot of the map, where it asserted arrivals on a map with nothing on it yet (B11) |
 
-The delta rail and these four are never on screen together: a generation is running or a difference
+The delta rail and these three are never on screen together: a generation is running or a difference
 is being read, never both. When the run is over, the refusals do not vanish — they move into the
 Inspector's own **this generation** section with the whole transcript, which is where
 [`inspector.md`](inspector.md) open question 2 is answered.
@@ -503,14 +508,6 @@ which is the honest reading of what UX-8 promises anyway. **NFR-7 now reads that
 shape of the thing being waited for: a reserved rectangle where a claim will go, an absence with its
 reason where a number will go. Checklist `VR2` is the standing check and
 `test_there_is_no_spinner_anywhere` is the automated one.
-
-**And the foot of the screen says, in words, what is being waited for** *(added 2026-09-21, decision
-record 0023)*. A rectangle says *where* the next claim goes; it does not say that anything is
-happening, and on a live run the first proposal takes about twenty-three seconds to come back and
-later ones fifty to a hundred and ten seconds apart. So from the press onward one strip at the foot
-of the map carries the run's own sentence, and beside it the count of seconds since the last event.
-That strip is **B11**, and it is the whole of what this chapter says about waiting: no spinner, no
-bar, no estimate, and nothing that moves except a number that changed because time passed.
 
 ### B2 — What a skeleton is, and what it never becomes
 
@@ -621,36 +618,13 @@ one [`layout-and-zoom.md`](layout-and-zoom.md) owns: a claim sits in a column to
 everything that causes it. N1 arrives third and lands in column 1; B arrives fourth and lands in
 column 2. The picture reads causality, and arrival order leaves no trace in it.
 
-**A tile keeps its row, and only its row** *(rewritten 2026-09-21, decision record 0024; this said
-"nothing that is already on screen moves")*. A tile's **vertical** place — where it sits, and its
-order within its column — is pinned from the moment it is first drawn and is never taken from it
-while the map grows. That is INV-workbench.23, and it is the half of the pin that does the work of
-keeping the reader's place. A tile's **column** is not pinned: it is re-read from the arrows on every
-pass, so when a later arrow proves a claim belongs further right, the claim goes there on that
-arrival rather than staying put and being drawn with an arrow doubling back into it.
-
-**Why the column had to be freed, measured.** Until 2026-09-21 the pin held x as well as y —
-`readPositions` in `frontend/src/graph/elkGraph.ts` says it in its own words, *a tile that had a
-position keeps that position, to the pixel* — and the pins were never dropped, because they are
-dropped only when a box changes height and a tile reserves its belief rail from the first frame
-(`BELIEF_RAIL` in `frontend/src/graph/geometry.ts`), so the likelihoods landing changes no height.
-Measured on three real streams through the app's own layout code (analyst UB, 2026-09-21,
-`plans/ux-round/B-layout.md`): **zero pin drops in 25, 14 and 12 layout passes.** On the Explore run
-this chapter walks, nothing points backwards and the freeze costs nothing. On the **Verify** door it
-is acute: the destination claim arrives second with no incoming arrows at all, lands in column 0
-beside the hypothesis, is pinned there, and ends the run in column 3 with four arrows into it — three
-of nine arrows on one kept live run pointing right to left, two of five on another. The feedback rule
-is not involved: `reflexive` is false on every arrow in all three, and a proposal has no `reflexive`
-field to set.
-
-**Every claim the engine sends is still strictly downstream of the map so far** — a `ClaimProposal`
-brings one claim and the one arrow into it, so that arrow's source is always a claim that already
-exists — which is exactly the precondition INV-workbench.22 names, and INV-workbench.22 is unchanged.
-What moves a column is not a claim arriving downstream; it is an **arrows-only** proposal, or a
-destination that spent the early part of the run with nothing pointing at it. A late arrival still
-finds a gap, and nothing above it or beside it shifts.
-
-**And the map settles once, when the run stops** — see the end of this section.
+**Nothing that is already on screen moves.** This is not new machinery and growth adds none. The
+rule already lives in `readPositions` in `frontend/src/graph/elkGraph.ts`, in those words: *a tile
+that had a position keeps that position, to the pixel, and only a tile that had none takes a new
+one.* Growth is the case that rule was written for. Every claim the engine sends is strictly
+downstream of the map so far — a `ClaimProposal` brings one claim and the one arrow into it, so that
+arrow's source is always a claim that already exists — which is exactly the precondition
+INV-workbench.22 names. A late arrival finds a gap; nothing above it, beside it or before it shifts.
 
 **The layout answers later, and a box waits for its place rather than borrowing one** *(added
 2026-09-21)*. The layout runs on a background thread, so between a claim arriving on the stream and
@@ -675,12 +649,9 @@ until 2026-09-21, and on a machine where the first answer lost its race to the f
 box was the claim. Two promises broke at once. The growing edge went quiet, which is what continuous
 integration read. And the claim was drawn at the origin, which is not where the layout puts the first
 box of a map — the layout leaves a margin of its own around what it lays out, so the tile then moved
-by that margin, and **a box drawn anywhere but where the layout put it** is the thing this part
-refuses outright (INV-workbench.79, anti-pattern 12). How far it moved was read off the page by the
-end-to-end test itself, which is what caught it: it holds the first tile's place and compares it with
-itself later in the run. **That reading is now taken before the run stops** *(2026-09-21, decision
-record 0024)*, because the settle moves every tile on purpose and a reading taken after it would fail
-by design. What the reading proves is unchanged: a box the layout has not placed is never drawn.
+by that margin, and *nothing already drawn moves* is the loudest promise this part makes. How far it
+moved was read off the page by the end-to-end test itself, which is what caught it: it holds the
+first tile's place and compares it with itself at the end of the run.
 
 **A wire draws only after both of its ends exist.** In practice the engine makes this true by
 construction, twice over: a `ClaimProposal` brings the claim and the arrow into it in one event, and
@@ -697,31 +668,15 @@ its column 60 milliseconds (`--duration-stagger`) after the column before. It is
 column. Growth switches it on per arrival instead of once per map, and adds no fourth animation to
 the budget of three.
 
-**The wart this used to have, and the rule that removed it** *(rewritten 2026-09-21, decision record
-0024)*. An arrows-only proposal — step 4 above — joins two tiles that are already placed. While the
-pin was absolute the wire was drawn where they sat rather than the map being re-laid out to suit it,
-so an arrows-only proposal whose source happened to sit *right* of its target was drawn pointing
-backwards: honest about where the tiles were and misleading about the argument. On this run it costs
-nothing either way — H is in column 0 and B in column 2, so `H → B` points rightwards like every
-other wire. On a Verify run it was three arrows in nine. Now the column is re-read on every pass, so
-the tile moves and the arrow points the way the argument runs. What it costs is stated plainly: on
-the two live Verify runs measured, **five tile-moves across three arrivals** and **three across
-two**; on the committed Hormuz recording, an eighteen-claim Explore run and not the six-claim one
-walked above, forty-four across fourteen. A tile that
-moves keeps its row, so nothing changes height on the page and the reader's vertical scan survives.
-
-**Then the map settles once, at the moment the run stops.** Whatever takes the run past *growing* —
-the likelihoods landing, a break, a stream that ends early — clears every pin and lays the map out
-once, whole. It is **the same moment the canvas already re-frames at**, so the settle and the
-re-frame cannot come apart: every tile takes its new place in the same frame the chips fill, and then
-nothing moves again. It is a **cut**, not an animation — the opacity change already budgeted and
-nothing more — so the budget of three is untouched and under reduced motion it is already a hard cut.
-`setCenter` on the focused tile runs on every layout after the first (INV-workbench.25), which is
-what makes one moment where every tile moves bearable: the tile the reader is on does not go anywhere
-on the glass. Measured: at the settle the wire length falls **11 264 → 5 567 px** on the recording,
-**5 729 → 2 973** and **2 930 → 1 773** on the two live Verify runs, and no arrow points backwards
-and none returns into its own column. On the recording that one moment moves 18 tiles of 18, the
-furthest by 1 968 pixels. This was Open question 2, **answered below**.
+**The honest wart, and the one event that could cause it.** An arrows-only proposal — step 4 above —
+joins two tiles that are already placed, and because the pin is absolute the wire is drawn where they
+sit rather than re-laying out the map to suit it. On this run that costs nothing: H is in column 0
+and B in column 2, so `H → B` points rightwards like every other wire and no column would have moved
+anyway. But an arrows-only proposal whose source happens to sit *right* of its target would be drawn
+pointing backwards, which is honest about where the tiles are and misleading about the argument. The
+trade is the one [`layout-and-zoom.md`](layout-and-zoom.md) anti-pattern 7 makes: the map should be
+still while you read it, and losing your place is the worse failure. Whether the map re-lays out once
+when the run finishes is Open question 2, **answered below**.
 
 **A stream that simply stops** *(added 2026-09-21)*. Every stream a reader stayed for ends in exactly
 one `done` or one `failed`. A body that ends with neither is a dropped connection —
@@ -758,10 +713,10 @@ this part already ships: real claims, real arrows, real provenance marks, and an
 reason in every likelihood slot.
 
 **When `beliefs_propagated` arrives, they all fill at once.** One event, one world, every number.
-The chip's own sentence switches from the *stated* pair to record 0014's *computed* pair with no
-change to the component, because `WorldView.versions` arrives on the same world and that is the one
-field the chip reads to choose (Kent, K3; `tiles-ports-wires.md`, *What the model chip says about its
-own range*).
+*(The chip used to switch what it said about itself at this moment — from the *stated* pair to record
+0014's *computed* pair — picked by a count of versions on the world. A chip says nothing about itself
+any more: 2026-09-22, Kent's R48. What the world still carries is one flag, `workedOut`, and the only
+words it changes are the last line of the decomposition and the sentence in the branch list.)*
 
 **Never per tile, and never twice.** A likelihood that changed four times as its causes arrived would
 be four numbers nobody computed: the first three would each be the answer to a question about a map
@@ -877,11 +832,10 @@ Four things about it.
   billed apart from tokens: without that row, `dollars` is a number a reader could check against the
   token counts and find wrong.
 * **Checklist `VR4` is about likelihoods.** *"No number shows more than two significant figures, and
-  none is missing its range"* is the rule that stops a fake-precise `.347` reaching the screen
-  (NFR-1). A token count, a call count, a duration and a dollar figure are counts and measurements:
-  they are printed whole, in `--font-mono` with fixed-width digits, and they have no range because
-  nothing sampled them. The same reading already lets a lag chip say *14 days* and a tile be 280
-  pixels wide.
+  no range appears anywhere on the screen"* *(as rewritten 2026-09-22, R48)* is the rule that stops a
+  fake-precise `.347` reaching the screen. A token count, a call count, a duration and a dollar
+  figure are counts and measurements: they are printed whole, in `--font-mono` with fixed-width
+  digits. The same reading already lets a lag chip say *14 days* and a tile be 280 pixels wide.
 * **In replay the mode reads `replay`**, the recording's date sits beside it, and `cost` reads what
   the rebuilt receipt carries, which is zero. That zero is a computed zero — the recording was played,
   nothing was called, so nothing was spent — not an empty slot, and it is printed rather than hidden.
@@ -987,11 +941,11 @@ whose run broke after twenty claims keeps the twenty claims.
 
 1. **The sentence.** One line, the hypothesis, in the reader's own words.
 2. **Where it ends**, optional. The Verify door. One field, hinted with what it is for.
-3. **Your own likelihood.** A range with an explicit **I don't know** state (FR-2). Three handles on
-   one track — the number and the two ends of its range — spelled beside the track in exactly the
-   one-line form the chip uses, `.55 (.40–.70)`, under the same two-significant-figure rule and the
-   same certainty guard ([`keyboard-and-access.md`](keyboard-and-access.md) B6), so the control
-   cannot post a `1.0`.
+3. **Your own likelihood.** One number with an explicit **I don't know** state (FR-2). **One handle
+   on one track** *(amended 2026-09-22, Kent's R48; it was three — the number and the two ends of
+   its range)* — spelled beside the track the way the chip spells it, `.55`, under the same
+   two-significant-figure rule and the same certainty guard
+   ([`keyboard-and-access.md`](keyboard-and-access.md) B6), so the control cannot post a `1.0`.
 
 **The button is `Build the map`**, word for word, and it is the same button on both doors. Not
 *Generate*, which is the pipeline's word rather than the reader's, and not *Explore* or *Verify*,
@@ -1068,15 +1022,6 @@ the engine's pure core, which is why a reader with no key still gets the whole m
 fidelity.
 
 ### B9 — With no key: the replay badge, and the cards
-
-**The first screen itself is moving into its own chapter** *(2026-09-21)*. What this chapter owns
-here is the **replay badge** — the mark on the canvas saying a run is a recording and naming the day
-— and what a generation looks like when it is played back rather than run. The screen a reader meets
-before any of that, and the question of what it offers with a key and without one, belongs to
-`spec/workbench/first-screen.md`, which arrives in this same round with decision record 0012's dated
-amendment: *a reader choosing a recording is not a fallback; the server never chooses and never
-substitutes.* Until that chapter is on `main` the cards are described below; when it is, this section
-keeps the badge and that chapter keeps the cards, and neither says the other's half twice.
 
 **With a key, all four cards run live.** With no key, a card runs from a recording — through the same
 route, the same eight events, the same canvas, at a fixed pacing that is cosmetic and never changes
@@ -1212,95 +1157,124 @@ And the outline view grows too. Each accepted claim gets its item at the moment 
 same causal order — a reader who never sees the canvas hears the map being built, not a silence
 followed by a finished list.
 
-**Two things still change under reduced motion, and both are information rather than decoration**
-*(added 2026-09-21)*. At the foot of the map, the count of seconds since the last event goes on
-counting, because it is a measurement and not a tween — a reader who has asked for less motion has
-not asked to be told less. And on the map, at the settle (B3), every tile takes its new place in one
-frame, which is what it does anyway: the settle is a cut in both settings, and there is nothing to
-take out of it.
+### B11 — A finished generation is a map like any other
 
-### B11 — The foot of the map says what the run is doing
+**When the run has stopped and the engine has named the map, the reader can change any claim on it,
+exactly as on the stored example** *(Kent, 2026-09-22: "for completed maps, can we include the
+ability to make changes on the cards? I see that the change this claim button and flow is available
+for the prebuilt map but doesn't exist for the map that's generated live")*.
 
-*(Added 2026-09-21, decision record 0023.)*
+Nothing new was built for it, and that is the point. A generated map has claims, arrows, dates and
+sources; a branch folds onto it; the engine works every likelihood through it from a seed. The
+server already answers about one — a finished generation is held in memory under **the map's own
+identifier**, for the life of the process, and `/api/worlds`, `/api/worlds/diff` and
+`/api/worlds/conditional` take that identifier wherever they take a stored example's name. So the
+six operations, a branch, the two worlds painted together and the change list are the ones
+[`diff-view.md`](diff-view.md) already describes, on the screen that already draws them.
 
-**One strip at the foot of both map screens says what the run is doing.** Before this the foot
-carried three stacked strips of prose — the last key pressed, a live region clipped to one pixel, and
-a line naming the route, the generation and the seed — and **none of the three was about the run**.
-Now there are two: the keyboard's own last-key line, which is unchanged and belongs to
-[`keyboard-and-access.md`](keyboard-and-access.md), and this one. This one carries the state as a
-single word in the mono mark box the foot already uses, then **one human sentence**, then — whenever
-the screen is waiting on the server — the count of seconds since the last event. **Waiting on the
-server** is a live run, and it is also a stored map whose world is being worked out; it is never a
-replay, whose pace we set ourselves. The table below says which is which, row by row.
+**Two conditions, and they are two different facts.** The run has *stopped* — however it stopped,
+its own ending or a cap, because either way nothing more is coming. And the map has a *name of its
+own*, which is the `base_id` arriving with the likelihoods: a run that broke, or whose stream was
+dropped, never gets one, and there is nothing for the engine to fold a branch onto. They are the
+same pair **Add a claim** waits for, for the same reasons.
+
+**The way across is a press, never a stop.** A run that ends does not throw the reader onto another
+screen — they watched it build, and the moment it stops is the moment they start reading it. What
+they press is *Change this claim*, in the same place and with the same words as on a stored map:
+the panel that reads out whatever they are pointing at. The map itself is handed over exactly as it
+is on screen, so nothing is fetched again and no number changes as the screens swap.
+
+**Where the map came from travels with it.** *Run details* — the route, the run's own name and its
+seed — is on the panel beside the claim, and the whole working of the run, every refusal in the
+rules' own words among it, is one command away. What stays behind on the run's own screen is what
+is about the *run* rather than about the map: the verdict card, the receipt strip, the replay badge
+and **Add a claim**.
+
+**And the map says how long it will answer.** A generated map is held in memory and written to no
+disk, so a restarted server has forgotten it. The sentence under a branch world on one says so, and
+a reader who comes back to a restarted server and finds it gone has been told rather than left
+hunting for a name they think they mistyped.
+
+**A replayed recording is a generated map too**, and it is the case that matters most: it needs no
+model key, so a reviewer who has configured nothing gets the whole multiverse on a map they watched
+build themselves. Five of the six operations call no model at all.
+
+### B12 — What the model is doing, while a call takes a minute
+
+*(Added 2026-09-22, decision record 0027, Kent's R44 and R47.)*
+
+**The wait is the model's, and it is long.** Measured over the five kept runs under
+`backend/.runs/`, the **first** model call took 7, 67, 135, 152 and 223 seconds, and 61 to 80 per
+cent of everything the model wrote was thinking nobody could see. The eight events are the map's
+decisions, and between two of them the server has nothing new to report — so the strip could say
+*something is happening* and could not say **what**.
+
+**So a live call is streamed, and one line travels that is not a decision.** `activity` is the
+ninth name on the wire: `{about, kind, text}`, where `kind` is `searching`, `found` or `thinking`
+and `text` is somebody else's words, verbatim — the model's own search query, the title of one page
+the search returned, or the model's own summarised thinking. `spec/generation/streaming.md` owns the
+line and its six clauses; what this chapter owns is what the browser does with it.
+
+**It changes one field and nothing else.** `Growth` gains `activity`, and folding an `activity` line
+touches neither the map, the reserved rectangles, the counts, the frontier, the refusals, the
+receipt nor the phase. That is not taste: the line is never written to a recording, so anything it
+could move would be something a replay of the same run could not reproduce, and a recording is the
+real stream line for line. A line reaching a run that has already stopped changes nothing at all.
+
+**Two lines, latest only, never a list.** `WhatTheModelIsDoing` holds one slot for the latest
+`searching`-or-`found` line — *found* answers *searching*, so they share a slot — and one for the
+latest `thinking` line. The server sends at most about one a second per call and the newest wins, so
+a browser that kept them all would grow a log at the foot of the screen that nobody could read and
+that would push the map up the page every second. Two slots rather than one because they are two
+different things: a search is about the world and is checkable; a thought is about the model's own
+mind, and the line about the mind says whose mind it is every time it is drawn.
+
+**The words are fixed, and they are the whole of what the browser adds:**
 
 ```
-┌ map ─────────────────────────────────────────────┬ panel ───────┐
-│           ┌ HELD OPEN ─────────┐                 │ Run details ▸│
-│           │ The Strait of      │                 │ Nothing      │
-│           │ Hormuz …           │                 │ selected     │
-│           └────────────────────┘                 │              │
-├──────────────────────────────────────────────────┴──────────────┤
-│ last key  Press ? for every key. j and k walk a column…         │
-│ ┌live┐ One place is held open where the first claim will go.    │
-│ └────┘                              nothing new for 23 s        │
-└─────────────────────────────────────────────────────────────────┘
+searching the web: "<query>"
+found: <title> · <host>
+the model, in its own words: <text>
 ```
 
-**The sentence, in each state. Every one of these strings exists already; the strip is where they
-land.**
+Everything after the colon is the model's or the search tool's, verbatim. A line longer than 160
+characters — the length the server already cuts its own thinking to — is cut at a word and closed
+with an ellipsis, never through the middle of one.
 
-| State | The word | The one sentence | Seconds |
-|---|---|---|---|
-| stored map | `stored` | the map's own origin — *this map was built earlier and is drawn as it was written* | no |
-| stored map, the engine asked | `asking` | the reason the map screen already prints while a world is being worked out | yes |
-| replay | `replay` | the replay sentence, and how much has arrived so far | **no** |
-| live, waiting | `live` | the opening line, or the last thing that changed — **and what is being worked on**, named from the `frontier` both growth events already carry | yes |
-| live, arriving | `live` | what just changed, in its own words | yes |
-| finished | `finished` | why it stopped, with the run's own counts | no |
-| failed | `stopped` | the one plain sentence the run left | no |
-| ended early | `ended early` | the stream ended before the run said it had finished, and how many claims arrived first | no |
+**A line stops being true when its call comes back, and the browser stops saying it.** An accepted
+proposal clears the lines about the calls it answers — a call works on one open claim, and an
+accepted proposal names that claim as the source of the arrows it brought, while a proposal hanging
+off nothing at all is the opening call returning. A **refusal** clears both lines, because a refusal
+carries no claim it hangs off: the honest answer to *which of these is still true* is *we no longer
+know*, and a line that is still true is back within about a second. `done`, `failed` and a stream
+that simply stops clear them too — nothing is out, so nothing is being done.
 
-**While a live run waits, the sentence names what is open.** The two growth events each carry
-`frontier` — which claims are still open — which is the same field the reserved rectangles are drawn
-from (B2), so saying it in words costs nothing and invents nothing. What it may **not** say is how
-many model calls are in flight: three calls may be out against one open claim, and the browser has no
-way to know. It counts proposals, and it says *proposals*.
+**Where they sit, and what they never do.** In the run strip only (`components/RunStrip.tsx`),
+under the run's own row, never on the map and never in the panel. **Both are outside the polite live
+region**, for the same reason the seconds counter is and more so: they change every few seconds, and
+a region that announced them would be reading a stopwatch over the top of the map being built. The
+room for two lines is held open on every live run whether or not either has anything in it, so a
+line arriving or clearing changes the words and never the height. **Nothing spins**: a line of text
+replaced by another line of text is a reading, not a motion.
 
-**The printed sentence is the spoken sentence.** The live region goes on saying what *changed*
-(INV-workbench.78) and the strip prints the same words. There is no state in which the only account
-of what the run is doing is spoken — which is what it was until this was written: the sentence was
-passed to the frame as *spoken only* and a stylesheet clipped it to a one-pixel box, and a browser
-test asserted the clipping, which is why nothing in the suite could catch it.
+**And they leave the seconds counter alone.** The reading at the foot of the map says *nothing new
+on the map for N s* and starts again on every arrival. An `activity` line is not an arrival in that
+sense, so `onlyTheStripChanged` in `growth.ts` asks whether the last event moved anything but this
+field, and the counter ignores it. A counter that restarted on every line would read *nothing new
+for 1 s* for three solid minutes while nothing whatever reached the map — which is exactly the
+screen that looks busy while nothing happens.
 
-**The seconds are a measurement of silence, never an estimate of what is left.** The reading is *how
-long since the last event*, taken from the browser's own clock and reset by any arrival. It sits
-**beside** the live region, never inside it — a number that ticked inside a polite region would be
-announced once a second — and it is plain text a screen reader can reach, never hidden. There is no
-percentage, no bar, no *about a minute left*, and no count of calls in flight: the browser can count
-proposals and cannot count calls (B2), and anti-pattern 8 forbids the rest.
+**A replay shows none, and nothing on screen says so.** A recording holds no `activity` line, so
+there is nothing to play back and nothing is invented; the screen passes the strip nothing on a
+replay, which is the same difference the seconds counter already makes. The fold is never told which
+it is folding and does not need to be — the screen knows.
 
-**A replay shows no seconds.** A replay is paced by the server, at six tenths of a second an event in
-the shipped product and four tenths under the browser suite, so the number would reset twice a second
-and would be measuring our own pacing rather than any wait. This is the one visible difference
-between a replay and a live run in this chapter, and the reason is that the thing being measured does
-not exist in a replay.
-
-**Why it is worth a strip at all.** Measured on a keyed run of the Hormuz example on 2026-09-21: the
-first **proposal** arrives about **twenty-three seconds** after the press and later ones **fifty to a
-hundred and ten seconds** apart, and one model call was measured at 51.98 seconds at `medium` effort
-and 109.65 at the effort the recordings were made at. Between two events the screen holds one dashed
-rectangle and nothing else. A reader who presses the button and is shown nothing for half a minute
-concludes the tool is broken, and the only honest cure is words.
-
-**Where the provenance line went: *Run details*, in the panel.** The line naming the route, the
-generation identifier and the seed leaves the always-on foot for a **Run details** section of the
-panel beside the map — never a dialog, and one press away. That is decision R16, pulled forward from
-a later stack on 2026-09-21 because it is what makes showing the run's own sentence safe: with the
-provenance line gone, nothing else at the foot repeats it. It was also, where it stood, saying
-*"Every claim and arrow on this map arrived from …"* over a map with nothing on it yet.
-
-**No server change, and no ninth event.** Everything the strip says is already on the eight events or
-on the browser's own clock. See Open question 1, now answered.
+**Checked by** `frontend/src/stream/__tests__/theRunStrip.test.tsx`, which holds one test per rule
+above: the search line's words, the thinking line saying whose words they are, the cut at a word,
+both lines outside the live region, a claim arriving clearing the lines that were about it, a replay
+showing none even when one is fed to it, and a stopped run saying nothing. The fold itself is
+**growth**'s: `test_an_activity_line_changes_what_the_strip_may_say_and_nothing_else`.
+`noSpinner.test.ts` and `motionBudget.test.ts` are unchanged, which is the point.
 
 ---
 
@@ -1313,13 +1287,9 @@ checklist line is a checkable thing; it is checked by a person. Frontend test na
 names below: **growth** is `frontend/src/stream/__tests__/growth.test.ts`, **reader**
 `frontend/src/stream/__tests__/generate.test.ts`, **noSpinner**
 `frontend/src/stream/__tests__/noSpinner.test.ts`, **strip**
-`frontend/src/stream/__tests__/strips.test.tsx`, **theRunStrip**
-`frontend/src/stream/__tests__/theRunStrip.test.tsx` *(added 2026-09-21; the foot strip's own tests,
-with fake timers, because no browser test in this suite can see a live wait)*.
+`frontend/src/stream/__tests__/strips.test.tsx`.
 
-Local numbers in this part are `INV-workbench.<n>`. This chapter holds **60 – 79**, and from
-2026-09-21 **80 onward**, because the six blocks named next are closed and 80 was the next free
-number;
+Local numbers in this part are `INV-workbench.<n>`. This chapter holds **60 – 79**;
 [`tiles-ports-wires.md`](tiles-ports-wires.md) holds 1 – 12,
 [`color-motion-type.md`](color-motion-type.md) 13 – 19, [`layout-and-zoom.md`](layout-and-zoom.md)
 20 – 30, [`keyboard-and-access.md`](keyboard-and-access.md) 31 – 39,
@@ -1355,50 +1325,15 @@ empty from `failed` onward, and from the moment a body ends with no terminator a
 `test_every_skeleton_goes_when_the_beliefs_arrive`, `test_every_skeleton_goes_when_a_run_breaks`; the
 run › `test_a_stream_that_just_stops_takes_the_rectangles_down`.
 
-**INV-workbench.64 — a tile moves only when an arrow would otherwise point backwards, and once when
-the run stops** *(rewritten 2026-09-21, decision record 0024; it read "nothing already placed
-moves")*. For every stream and every event in it, three things hold together.
-
-1. **The row is kept, while the map grows.** For every event up to and not including the one that
-   stops the run, every tile that had a vertical position before the event has the identical
-   vertical position after it, and its order within its column is unchanged — **unless that
-   event moved its column and the row it held is taken there, and then it has the nearest free
-   row in its new column**: its own row when that row is free, otherwise the closest free row up
-   or down, a tie going down. Measured 2026-09-22 on both streams through the app's own layout
-   code: once on the live Verify run, by 48 pixels; never on the committed recording. The
-   exception is the price of the promise, not a softening of it: with the row held regardless,
-   the recording draws one claim 140 pixels on top of another, which INV-workbench.79 and the
-   visual checklist both forbid. A reserved rectangle is a box for this purpose, never room to
-   be drawn over. The rule without its exception is
-   [`layout-and-zoom.md`](layout-and-zoom.md)'s INV-workbench.23, unchanged and now load-bearing.
-   **The scope is the whole of the promise**: at the settle, clause 3, every pin goes and rows move
-   with the columns — on the eighteen-claim recording the map's own height falls from 2 640 to 2 010
-   pixels, which cannot happen with every row held.
-2. **The column is the arrows'.** Every tile's column is the one the layering gives it for the map as
-   it stands after that event, so **no arrow points backwards at any moment** — no arrow's target
-   sits strictly left of its source — except a reflexive arrow, which is set aside before columns are
-   assigned and is meant to point backwards.
-3. **The settle is the only moment a tile may change row, and the only moment every tile may move.**
-   While the run is still growing, a tile's horizontal place changes only under clause 2 and its
-   vertical place does not change at all. At the moment the run stops — the likelihoods landing, a
-   break, or a stream ending early — every pin is cleared, the map is laid out once, whole, in the
-   same frame the canvas re-frames in, and after it nothing moves again.
-
-**What this stopped promising, and why.** It promised that no tile ever moved, and the promise was
-kept by pinning x as well as y and never dropping the pin: measured at **zero pin drops in 25, 14 and
-12 passes** over three real runs (analyst UB, 2026-09-21). The note this invariant carried — *every
-tile gains a chip on `beliefs_propagated` and so every tile can change height*, and a box whose height
-changed drops its pin — is **measured false**: a tile reserves its belief rail from the first frame,
-so the likelihoods landing changes no height and drops no pin. That is why the settle has to be asked
-for by name rather than inherited from a height change that never happens. *Tests:* layout ›
-`test_no_arrow_points_backwards_at_any_moment` and
-`test_no_arrow_points_backwards_once_the_run_has_stopped` — the two that carry clauses 2 and 3, run
-with no browser over a live Verify stream and the committed recording, through the app's own
-`assignLayers`, `toElkGraph` and `readPositions`; growth ›
-`test_a_tile_keeps_its_row_while_the_map_grows`,
-`test_a_tile_sent_into_a_taken_row_takes_the_nearest_free_row`,
-`test_a_tie_between_two_free_rows_goes_down`,
-`test_nothing_moves_except_a_column_until_the_run_stops`; layout ›
+**INV-workbench.64 — nothing already placed moves.** For every stream and every event in it, every
+tile that had a position before the event has the identical position after it. That the layout
+machinery guarantees this is [`layout-and-zoom.md`](layout-and-zoom.md)'s INV-workbench.22; this is
+the same promise stated over a stream rather than over one added claim. **`beliefs_propagated` is an
+event in it** *(2026-09-21)*: it replaces the world wholesale, every claim comes back carrying its
+likelihood, every tile gains a chip and so every tile can change height — and a box whose height
+changed drops its pin. It is the one event that could move a tile a reader is already looking at, and
+it was the one event the walks stopped short of. *Tests:* growth ›
+`test_a_tile_keeps_its_place_when_a_later_tile_arrives`; layout ›
 `test_no_two_tiles_in_a_column_collide`; `frontend/e2e/generate.spec.ts`. **Also: visual review
 checklist `VR13`.**
 
@@ -1532,13 +1467,9 @@ into a generation, the polite line a screen reader speaks is about **that event*
 a proposal was refused with the rule's own sentence, the likelihoods landed, this is why it stopped —
 said once, at the moment it became true, and never repeated on a later event. A region that re-reads
 the whole run announces every refusal again on every arrival, so a listener hears the thing that just
-happened last, after a minute of things they already knew. **And the same sentence is printed at the
-foot of the screen** *(added 2026-09-21, decision record 0023)*: there is no state in which the only
-account of what the run is doing is spoken, and no stylesheet rule anywhere clips this region to a
-box a pixel wide. *Tests:* `frontend/src/a11y/__tests__/growth.test.ts` ›
-`test_a_refusal_is_read_out_once_and_not_again`,
-`test_every_claim_that_arrives_is_announced_by_its_own_words`; theRunStrip ›
-`test_the_visible_strip_says_what_the_run_is_waiting_for`.
+happened last, after a minute of things they already knew. *Tests:*
+`frontend/src/a11y/__tests__/growth.test.ts` › `test_a_refusal_is_read_out_once_and_not_again`,
+`test_every_claim_that_arrives_is_announced_by_its_own_words`.
 
 **INV-workbench.79 — a box waits for its place, and a rectangle waits for its claim** *(added
 2026-09-21)*. For every stream and every moment in it, including the moments between an event
@@ -1548,11 +1479,7 @@ is still waiting for a place, every reserved rectangle that was standing goes on
 stood; and once no box is waiting, the rectangles are exactly the ones the frontier asks for — so a
 map that is still growing always has one, and a map that is finished, broken or ended early has none.
 The one box the map places itself is the rectangle held open for the reader's own sentence, at the
-origin, before the layout has answered anything at all; it is never a claim. **A tile that changes
-column, or takes a new place at the settle, is still a box drawn where the layout put it**
-*(2026-09-21, decision record 0024)*: a new place the layout gave is not a place the map invented,
-so this invariant is unchanged in substance and anti-pattern 12 stands. When a tile may take a new
-place at all is INV-workbench.64. *Test:*
+origin, before the layout has answered anything at all; it is never a claim. *Test:*
 `frontend/src/graph/__tests__/onTheGlass.test.ts` ›
 `test_a_rectangle_stands_at_every_moment_the_map_is_still_growing`,
 `test_no_rectangle_stands_once_nothing_more_is_coming`,
@@ -1574,36 +1501,6 @@ the stream (FR-5), tested on the server's own clock by
 `backend/tests/api/test_the_stream_is_not_buffered.py` ›
 `test_the_events_of_a_replay_are_let_go_of_one_at_a_time`. *(Written down 2026-09-21, after the
 browser test asked for the stronger thing for a while and was quietly held up by the replay's pace.)*
-
-**INV-workbench.80 — the foot of the map says what the run is doing, in ink** *(added 2026-09-21,
-decision record 0023)*. For every state of a map screen there is one visible strip at the foot
-carrying a state word and one sentence about the run, and that sentence is word for word the one the
-polite live region speaks. For every state in which the screen is **waiting on the server** — a live
-run that has not stopped, or a stored map whose world is being worked out — the strip also carries
-the time since the last event, a measurement taken from the browser's own clock, reset by every
-event, drawn beside the live region and never inside it, and never hidden from a screen reader. For
-every **replay**, and for every state that is not waiting on anything, no such reading is drawn at
-all. No strip anywhere renders a share of work done, a time remaining, a cost so
-far, or a count of model calls. *Tests:* theRunStrip ›
-`test_the_visible_strip_says_what_the_run_is_waiting_for`, `test_an_arrival_resets_the_count`,
-`test_a_replay_shows_no_seconds`; `frontend/e2e/generate.spec.ts`, whose assertion that this region
-is clipped is deleted and inverted; and one end-to-end test with the replay pace set long, the
-suite's only meeting with a real silence. **Also: visual review checklist `VR2`.**
-
-**INV-workbench.81 — the only thing that changes on a timer is a measured reading** *(added
-2026-09-21, decision record 0023)*. For every module under `frontend/src/`, every repeating or
-delayed timer in product code is on a named allowlist, and every one on that list redraws a
-**measurement** — a value the screen would print anyway — beside a sentence that is complete without
-it. Nothing loops, spins, pulses or sweeps; a repeat is motion with no measurement behind it. Under
-reduced motion the measurement still updates, because it is information and not a tween. This adds
-nothing to the animation budget and takes nothing from INV-workbench.60, .18 or .73, which stand as
-written. **This invariant is an addition, not an amendment, and it is flagged for Kent**: R35 says
-*"no rule or architectural test changes"*, and nothing here weakens one — but the check it names is a
-new walk over the browser's own source, needed because this is the first timer in product code that
-redraws anything. If he reads R35 as forbidding even the addition, the line is held by review instead
-and this invariant goes. *Test:* noSpinner ›
-`test_the_only_thing_that_changes_on_a_timer_is_a_measured_reading`, a walk over the browser's own
-source in the manner `colourLaw.test.ts` uses.
 
 ---
 
@@ -1640,21 +1537,15 @@ source in the manner `colourLaw.test.ts` uses.
    fabrication in the exact place the honesty bar exists to prevent one (FR-7). **Instead:** the
    engine's sentence, the nearest claim named, and nothing drawn between them.
 
-7. **Do not move a tile to make the picture tidier** *(rewritten 2026-09-21, decision record 0024; it
-   read "do not re-layout the map while it grows")*. *Because* a map that rearranges itself under the
-   reader's eye costs them the tile they were reading, which is the failure the whole layout chapter
-   exists to prevent. **Instead:** pin the row absolutely and let a late arrival find a gap. A tile
-   moves for one reason only — an arrow into it would otherwise point backwards, which is a picture
-   of the argument running the wrong way — and once more when the run stops, at the moment the map is
-   already re-framed, because the picture a pin leaves behind is not the picture the argument makes
-   (B3). *Tidier* is not a reason. *Backwards* is.
+7. **Do not re-layout the map while it grows to make the picture tidier.** *Because* a map that
+   rearranges itself under the reader's eye costs them the tile they were reading, which is the
+   failure the whole layout chapter exists to prevent. **Instead:** pin absolutely, let a late arrival
+   find a gap, and say out loud what that costs (B3).
 
 8. **Do not estimate the cost, the progress or the remaining claims while a run is going.** *Because*
    a percentage nobody computed is a number nobody computed wearing a progress bar, and the caps that
    would have to be divided by are the server's and are not on the stream. **Instead:** show what has
-   arrived, and the receipt when the receipt arrives. **How long it has been since the last event is
-   a measurement, not an estimate, and is allowed; how much longer it will take is an estimate, and
-   is not** *(added 2026-09-21, decision record 0023)*.
+   arrived, and the receipt when the receipt arrives.
 
 9. **Do not throw on an event name the build does not know, and do not swallow it either.** *Because*
    a browser that crashes on a new event makes the server unable to add one, and a browser that
@@ -1675,16 +1566,8 @@ source in the manner `colourLaw.test.ts` uses.
     *Because* the only place available to give is the map's origin, which either belongs to a box
     already standing there or is about to belong to this one at coordinates the layout chose — so the
     box lands where it does not belong and then moves, on the one screen whose whole promise is that
-    a box is only ever drawn where the layout put it. **Instead:** draw nothing that has no place, and
-    let the rectangle already standing go on saying where the claim is going until the claim itself
-    is drawn.
-
-13. **Do not put a spinner beside the sentence either** *(added 2026-09-21, decision record 0023)*.
-    *Because* the ask that produced the strip in B11 was, in the reader's own words, for
-    *"spinners/animations to show what it's doing"* — and what answers it is the sentence, not a mark
-    going round. A spinner beside a sentence is still the veto's own example with a caption on it.
-    **Instead:** say what is being waited for, count the seconds it has been, and let nothing else
-    move.
+    nothing already drawn moves. **Instead:** draw nothing that has no place, and let the rectangle
+    already standing go on saying where the claim is going until the claim itself is drawn.
 
 ---
 
@@ -1692,51 +1575,32 @@ source in the manner `colourLaw.test.ts` uses.
 
 *Raised 2026-09-17.*
 
-1. **Should the stream say when a call goes out?** **Answered 2026-09-21 by decision record 0023: not
-   in version one.**
+1. **Should the stream say when a call goes out?** **Answered 2026-09-22 by decision record 0027 —
+   and the answer is not the question.**
 
-   The eight events say what came back, so the browser can draw the frontier but cannot honestly say
-   how many proposals are in flight — three calls against one open claim show one rectangle (B2).
-   Everything the foot strip says (B11) is already on those eight events or on the browser's own
-   clock, so nothing in this chapter needs a ninth.
+   The count is still not on the wire and is not wanted. The eight events say what came back, so the
+   browser can draw the frontier but cannot honestly say how many proposals are in flight — three
+   calls against one open claim show one rectangle (B2) — and a number the browser guessed at would
+   be a number nobody computed.
 
-   A ninth event would be the first to carry **activity rather than a decision**, which is a
-   different kind of thing to put on a stream; and **no committed recording holds it**, so a replay
-   would be visibly less alive than a live run — which is the one thing decision record 0012 cannot
-   allow, since *the same events, the same canvas, the same refusals* is the sentence it rests on. If
-   the count on screen is ever wanted, it rides the one shape freeze, where all four recordings are
-   made together. **Owner:** `spec/generation/streaming.md`, at that freeze and not before.
+   What ships instead is a different thing altogether: the stream does not say **that** a call went
+   out, it says **what the call is doing**, on a line that is never recorded. `activity` carries the
+   model's own search query, the title of one page that search returned, or the model's own
+   summarised thinking — somebody else's words, verbatim, with nothing counted and nothing estimated.
+   It is sent on a live run only; no recording holds one, no replay invents one, and it is never
+   billed and never counted by the transcript counter. So a replay is not less alive than a live run
+   for want of a count it never had: it shows no activity for the same reason it shows no seconds,
+   which is that the thing being reported does not exist in a replay, and decision record 0012 —
+   *a recording is the real stream, line for line* — is left whole, because a recording is the real
+   stream of **decisions** and activity is not one.
 
-2. **Does the map re-lay out once when the run finishes?** **Answered 2026-09-21: no. Reopened the
-   same day on three real maps rather than one, and answered again: yes — once, at the moment the run
-   stops, and never at any other.** Decision record 0024.
+   What the browser does with it is B12. **Owner:** closed; the line and its six clauses are
+   `spec/generation/streaming.md`'s.
 
-   **Why it was reopened.** The first answer was measured on a ten-claim **Explore** run, where no
-   arrow points backwards, so the thing a re-layout would have tidied did not happen. The Verify door
-   has no end-to-end test and every end-to-end test plays the committed recording, which is an
-   Explore run. On a **Verify** run the destination claim arrives second with no causes, is pinned in
-   column 0 beside the hypothesis, and gains four arrows into it, three of them from claims placed to
-   its right: three of nine arrows on that run then point right to left, two of five on another. The first
-   answer was true of the map it was measured on and false of the map a reader types.
+2. **Does the map re-lay out once when the run finishes?** **Answered 2026-09-21: no — and the real
+   question turned out to be a different one.**
 
-   **What the three maps measure** (analyst UB, 2026-09-21, feeding three real streams through the
-   app's own `layers.ts`, `elkGraph.ts` and `geometry.ts`; re-run by the red team the same day). The
-   pin is dropped only when a box changes height, and a tile reserves its belief rail from the first
-   frame, so the likelihoods landing drops no pin: **zero pin drops in 25, 14 and 12 passes.** Laying
-   each map out once, whole, at the end: **no arrow backwards, none returning into its own column**,
-   and the wire length **11 264 → 5 567 px** on the recording, **5 729 → 2 973** and **2 930 → 1 773**
-   on the two Verify runs. It costs one moment in which 18 tiles of 18 move, the furthest by 1 968
-   pixels. Freeing each claim's column on every pass as well — which is what keeps the map legible
-   *during* the run — costs **5 tile-moves across 3 arrivals** and **3 across 2** on the two Verify
-   runs, and 44 across 14 on the eighteen-claim Explore recording.
-
-   **The answer, in one line: both.** A tile changes column when a later arrow proves it belongs
-   further right and keeps its row, and the map settles once when the run stops. That is
-   INV-workbench.64 and B3. **Owner:** closed by decision record 0024.
-
-   **What the first answer got right stands unchanged**, and it is the more important half of it: a
-   map cut by the window with nothing saying so is read as a map that ends there. The measurement,
-   taken on the coordinator's ten-claim run at 1600 × 1000, the size the whole
+   The measurement, taken on the coordinator's ten-claim run at 1600 × 1000, the size the whole
    interface is designed against: the stage is **1264 × 801**, the map is framed at **0.85** — the
    floor below which a tile would have to become a summary — and at that framing **six of the ten
    tiles are whole on the glass, four are wholly below it and none is cut**. No arrow points
@@ -1746,22 +1610,16 @@ source in the manner `colourLaw.test.ts` uses.
    read as a map that ends there, and for a causal map that is the worst thing it can be read as: the
    reader concludes the argument stops where the window does.
 
-   So one half of the answer costs the reader nothing and is unchanged: **the stage says where it is
-   cut.** A two-pixel rule in `--text-muted` sits at whichever edge has map beyond it and at no edge
-   that has not — the same rule, the same weight and the same colour the panel beside it already uses
-   for the same fact, drawn as the four sides of one box so a corner reads as a corner. The stage
-   measures it about itself, because the two boxes are measured differently: a panel is scrolled and
-   a stage is panned. **Laying the map out once at the end does not replace that and never could**:
-   there is no zoom that fits ten tiles in 1264 × 801 and keeps them readable, which is exactly why
-   the zoom floor exists, so a settled map is still a map with tiles below the glass and the edge
-   rules still have to say so.
+   So the answer is the one that costs the reader nothing: **the map is never re-laid out, and the
+   stage says where it is cut.** A two-pixel rule in `--text-muted` sits at whichever edge has map
+   beyond it and at no edge that has not — the same rule, the same weight and the same colour the
+   panel beside it already uses for the same fact, drawn as the four sides of one box so a corner
+   reads as a corner. The stage measures it about itself, because the two boxes are measured
+   differently: a panel is scrolled and a stage is panned.
 
-   **What the second answer accepts, having weighed it once more** *(2026-09-21)*: laying the map out
-   at the end does move every tile once, at the moment the reader starts reading. That was the
-   objection the first answer rested on, and it is a real cost — 18 tiles of 18 on the recording, the
-   furthest by 1 968 pixels. It is paid because the alternative is a finished map whose arrows point
-   the wrong way, and because `setCenter` on the focused tile runs on every layout after the first
-   (INV-workbench.25), so the tile the reader is on does not move on the glass.
+   Re-laying out would still move every tile once at the moment the reader starts reading, and it
+   would still not put the four tiles on the glass — there is no zoom that fits ten tiles in 1264 ×
+   801 and keeps them readable, which is exactly why the zoom floor exists. **Owner:** closed.
 
 3. **What does an `insert` cost, and where does that show?** **Answered 2026-09-20 by
    [`spec/generation/streaming.md`](../generation/streaming.md), drawn 2026-09-21, and nothing is

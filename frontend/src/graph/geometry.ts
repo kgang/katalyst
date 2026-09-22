@@ -64,11 +64,29 @@ const HEADER = 21;
 const CLAIM_LINE = 20.25;
 
 /**
- * The three belief chips: owner, number and range, with the rule above them.
+ * The belief chips: owner and number, with the rule above them.
  *
- * Measured at 69 in the browser, which is two pixels more than the 67 written
- * here before the chips grew their brightness bars. A row that is two pixels
- * short takes them off the bottom of the tile.
+ * **It is still 69, and the range line is not why** *(re-measured 2026-09-22,
+ * after R48 took the range off the chip)*. The rail has to hold the tallest chip
+ * a tile can ever draw, because the height is reserved before anything is drawn
+ * and the layout cannot know what a chip will end up reading. That tallest chip
+ * is not a number: it is a reading that is **words** in a narrow column, wrapping
+ * to the two lines the stylesheet allows it.
+ *
+ * Measured in the browser on the stored example, at 1600 × 1000, with the real
+ * stylesheet:
+ *
+ * | What the row holds | What it comes to |
+ * |---|---|
+ * | one chip, a number | 52 |
+ * | three chips, all numbers | 52 |
+ * | two chips, one reading *Supposed · Oct 1* | **69** |
+ * | three chips, one reading *the ask did not come back* | **69** |
+ *
+ * So the constant stays where it was, and a tile whose chips all read one line
+ * carries seventeen pixels it does not use. Shrinking it to 52 would take the
+ * second line off a supposed claim on the stored example's own strike branch —
+ * the one tile the diff view is there to show.
  */
 const BELIEF_RAIL = 69;
 
@@ -273,32 +291,114 @@ const LARGEST_TEXT = 22;
  * nothing is ever drawn below eleven. Eleven over thirteen is the exact zoom at
  * which thirteen-pixel type lands at eleven pixels, so a full tile is only ever
  * shown at or above it, and below it the summary takes over — which sets every
- * word in the largest size and so clears the floor all the way down.
+ * word in the largest size and so clears the floor down to the zoom at which
+ * even that size would fall under it, `SILHOUETTE_BELOW_ZOOM`.
  */
 export const SUMMARY_BELOW_ZOOM = SMALLEST_READABLE_TEXT / SMALLEST_TEXT;
 
 /**
- * How far out the map may be zoomed.
+ * Below this zoom a tile stops showing words at all and shows its shape.
  *
  * The summary sets every word it draws in the largest of the three type sizes,
- * so the floor is the one zoom at which that size arrives at eleven pixels:
- * eleven over twenty-two, which is a half.
+ * so this is the one zoom at which that size arrives at eleven pixels: eleven
+ * over twenty-two, which is a half. Below it there is no size left to fall back
+ * to — the largest one has run out — so the answer is the same answer the tile
+ * gave at the first threshold, taken one step further: draw less rather than
+ * draw it smaller, and what is left when the last word goes is the shape.
+ *
+ * **This was the floor until 2026-09-22.** Kent asked whether the map could
+ * zoom out a lot more; it can, because below this line the eleven-pixel rule
+ * has nothing left to say about a tile that prints nothing. The number has not
+ * moved and is derived exactly as it was — it has stopped being the end of the
+ * zoom and become the last of the three forms.
  */
-export const SMALLEST_ZOOM = SMALLEST_READABLE_TEXT / LARGEST_TEXT;
+export const SILHOUETTE_BELOW_ZOOM = SMALLEST_READABLE_TEXT / LARGEST_TEXT;
+
+/**
+ * The smallest a thing the reader points at may be drawn, in pixels.
+ *
+ * Twenty-four by twenty-four, from the Web Content Accessibility Guidelines
+ * 2.2, success criterion 2.5.8 *Target Size (Minimum)*, at level AA. It is the
+ * published floor for anything a pointer has to land on, and it is what the
+ * zoom floor below is worked out from — the same way the text floor above
+ * works out the other two zoom numbers.
+ */
+const SMALLEST_TARGET = 24;
+
+/**
+ * How far out the map may be zoomed.
+ *
+ * **It is derived, not chosen** *(2026-09-22, Kent: "Can we make it so it's
+ * possible to zoom out a lot more?")*. Below the silhouette threshold there is
+ * no word left on a tile to keep above eleven pixels, so the eleven-pixel rule
+ * has stopped being the thing that decides. The next question down is the one
+ * that decides instead: **how small may a tile's box get and still be something
+ * a reader can point at, and tell apart from a wire?**
+ *
+ * The shortest box this map ever draws is `TILE_MIN_HEIGHT` — a hundred and
+ * fifty-two pixels, the floor of a tile's clamped height, and the exact height
+ * of a reserved rectangle and of a "+n more" tile as well. So the floor is the
+ * zoom at which that shortest side lands on the smallest target anything may be
+ * drawn at: twenty-four over a hundred and fifty-two, about 0.158.
+ *
+ * **The other side of the box comes out of it for free, and is worth writing
+ * down.** At that zoom a tile's two hundred and eighty pixels of width land at
+ * 44.2 — clear of the forty-four by forty-four of the same guidelines' stricter
+ * rule, success criterion 2.5.5 *Target Size* at level AAA, which Apple's
+ * interface guidelines name as well. So the smallest box on the map is
+ * forty-four across and twenty-four down: a target in both directions, and
+ * nothing like the one-pixel stroke of a wire.
+ *
+ * The old floor, eleven over twenty-two, is `SILHOUETTE_BELOW_ZOOM` above.
+ */
+export const SMALLEST_ZOOM = SMALLEST_TARGET / TILE_MIN_HEIGHT;
 
 /** How far in the map may be zoomed. Past this a tile is merely large. */
 export const LARGEST_ZOOM = 1.4;
 
 /**
- * The smallest type size a tile draws at this zoom, in pixels, before the map's
- * own scaling is applied.
+ * Which of the three forms a tile takes, from nearest to furthest.
  *
- * Multiply it by the zoom and you have what lands on the reader's screen, which
- * is what `layout.test.ts` checks never falls below eleven.
+ * - **full** — everything: the heading, the claim, the chips, the foot.
+ * - **summary** — the claim and the chips, set in the largest type size.
+ * - **silhouette** — the shape and its kind's colour, and no words at all.
+ */
+export type TileDetail = "full" | "summary" | "silhouette";
+
+/**
+ * Which form a tile takes at this zoom.
+ *
+ * Written once, here, beside the two thresholds it reads, because three things
+ * have to agree on it: the tile itself, the plate in the middle of a wire —
+ * which is words, and goes when the words go — and the reserved rectangles at a
+ * growing map's edge.
  *
  * @param zoom How far the map is zoomed in, where 1 is life size.
  */
-export function smallestTextAt(zoom: number): number {
+export function detailAt(zoom: number): TileDetail {
+  if (zoom < SILHOUETTE_BELOW_ZOOM) {
+    return "silhouette";
+  }
+  return zoom < SUMMARY_BELOW_ZOOM ? "summary" : "full";
+}
+
+/**
+ * The smallest type size a tile draws at this zoom, in pixels, before the map's
+ * own scaling is applied — or nothing at all, where the tile draws no words.
+ *
+ * Multiply it by the zoom and you have what lands on the reader's screen, which
+ * is what `layout.test.ts` checks never falls below eleven. Below the
+ * silhouette threshold the answer is `null` rather than a number, because there
+ * is no smallest word where there is no word: a size returned there would be a
+ * size nothing is set in, and the eleven-pixel check would be checking a
+ * fiction.
+ *
+ * @param zoom How far the map is zoomed in, where 1 is life size.
+ */
+export function smallestTextAt(zoom: number): number | null {
+  if (zoom < SILHOUETTE_BELOW_ZOOM) {
+    return null;
+  }
   return zoom < SUMMARY_BELOW_ZOOM ? LARGEST_TEXT : SMALLEST_TEXT;
 }
 
@@ -328,12 +428,64 @@ export interface Frame {
 /** The breathing room left around the map when it is framed, as a share of its size. */
 const FIRST_FRAME_MARGIN = 0.04;
 
-/** The gap left at the edge when the map is too big to fit and has to be panned. */
-const EDGE_GAP = 16;
+/**
+ * How far the zoom buttons float in from the corner of the canvas: `--space-2`,
+ * which is the margin `canvas.css` gives `.react-flow__controls`.
+ */
+const CONTROLS_INSET = 16;
+
+/**
+ * How wide the column of zoom buttons is: `--space-4` for the button itself and
+ * the hairline drawn around the stack of them. Measured on the page at two
+ * window sizes on 2026-09-22: they stand from 16 to 50 pixels in from the left
+ * edge of the canvas.
+ */
+const CONTROLS_WIDE = 34;
+
+/**
+ * How far in from the left edge of the canvas the zoom buttons reach.
+ *
+ * Exported so that the promise *the map never starts under a control* can be
+ * checked against the buttons' own geometry rather than against the frame's own
+ * constant, which would be a test of nothing.
+ */
+export const PAST_THE_ZOOM_BUTTONS = CONTROLS_INSET + CONTROLS_WIDE;
+
+/**
+ * The clear space the frame leaves at the edge of the canvas.
+ *
+ * **It is the room the zoom buttons take, and that is the whole point**
+ * *(2026-09-22)*. The buttons float over the bottom-left corner of the canvas,
+ * and this gap used to be `--space-2` — the same sixteen pixels the buttons
+ * themselves are inset by — so a map that did not fit was started at exactly the
+ * place they sit, and its bottom-left tile was drawn underneath them. Measured
+ * on the stored example at 1280 × 800: the hypothesis, the one tile a reader
+ * looks at first, with the zoom buttons over its corner.
+ *
+ * So the map starts on the far side of them, with the same gap again between the
+ * two, and nothing a reader has to read is ever behind a control.
+ */
+const EDGE_GAP = PAST_THE_ZOOM_BUTTONS + CONTROLS_INSET;
+
+/**
+ * The same gap at the top, where nothing floats over the map.
+ *
+ * The left edge has to clear the zoom buttons; the top has only to not touch, so
+ * it keeps the plain `--space-2` it always had. One constant each, rather than
+ * one constant doing two jobs and pushing fifty pixels of map off the bottom of
+ * the window to make room for buttons that are not up there.
+ */
+const TOP_GAP = CONTROLS_INSET;
 
 /**
  * How the map is framed the first time it is drawn — and the one promise that
  * framing makes: **the first frame never shows summary tiles.**
+ *
+ * **And so it never shows silhouettes either** *(2026-09-22)*. The frame is
+ * held at or above the zoom at which a full tile would have to become a
+ * summary, and the third form begins further out still — so the promise covers
+ * both without being widened. The map now zooms out a great deal further than
+ * it did; the reader goes there by asking, and never by opening a map.
  *
  * The obvious rule is "fit the whole map". On a wide screen with the panel beside
  * it that lands at about 0.8 zoom on the stored example, which is under the zoom
@@ -348,6 +500,21 @@ const EDGE_GAP = 16;
  * rest. A tile changes representation rather than shrinking; the same principle,
  * applied to the frame rather than to the tile.
  *
+ * **And when it does not fit, it starts on the far side of the zoom buttons**
+ * *(2026-09-22)*. This gap was `--space-2`, the very sixteen pixels the buttons
+ * themselves are inset by, so a map that did not fit began exactly where they
+ * float — and at 1280 × 800 on the stored example the hypothesis, the first
+ * tile anybody reads, was drawn underneath them. See `EDGE_GAP`.
+ *
+ * **What this does not fix, measured the same day.** At 1600 × 1000 the stored
+ * map *does* fit, and it is centred with six pixels to spare on each side, so
+ * its last column sits all but touching the panel beside the map. That is not a
+ * margin that was forgotten: at the readable zoom the map is 1252 pixels wide in
+ * a stage 1264 pixels wide, so there are twelve pixels in the whole stage to
+ * share out. Leaving a proper gap would make the map stop fitting and be cut
+ * instead, which is worse. The fix for that one is a narrower panel or a lower
+ * floor on the zoom, and it is neither of them here.
+ *
  * @param map Everything the frame has to hold, in the map's own coordinates.
  * @param canvas How much room there is for it, in screen pixels.
  */
@@ -359,14 +526,16 @@ export function firstFrame(map: Box, canvas: { width: number; height: number }):
   // Never blown up past life size, however small the map; never shrunk past the
   // point where a full tile would have to become a summary.
   const zoom = Math.max(SUMMARY_BELOW_ZOOM, Math.min(1, fits));
-  const place = (room: number, start: number, size: number): number => {
+  const place = (room: number, gap: number, start: number, size: number): number => {
     const shown = size * zoom;
-    return shown <= room ? (room - shown) / 2 - start * zoom : EDGE_GAP - start * zoom;
+    return shown <= room ? (room - shown) / 2 - start * zoom : gap - start * zoom;
   };
   return {
     zoom,
-    x: place(canvas.width, map.x, map.width),
-    y: place(canvas.height, map.y, map.height),
+    // The left edge is the one the zoom buttons float over, so a map that has to
+    // start there starts past them. The top has nothing over it.
+    x: place(canvas.width, EDGE_GAP, map.x, map.width),
+    y: place(canvas.height, TOP_GAP, map.y, map.height),
   };
 }
 

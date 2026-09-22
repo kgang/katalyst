@@ -18,6 +18,7 @@ import { BELIEFS, REFUSED, THE_GROWTH, THE_SENTENCE } from "../../stream/__tests
 import type { StreamEvent } from "../../stream/events";
 import type { Growth } from "../../stream/growth";
 import { fold, theStreamEnded, waitingFor } from "../../stream/growth";
+import { inFewWords } from "../../world/naming";
 import { theOpeningLine, whatChanged } from "../growth";
 
 /** Every line the region would speak, walking a whole stream in order. */
@@ -45,7 +46,13 @@ describe("the live region says what changed", () => {
     // again on any later arrival.
     const times = said.filter((line) => line.includes(sentence));
     expect(times).toHaveLength(1);
-    expect(times[0]).toContain("A proposal was refused.");
+    expect(times[0]).toContain("A proposal was refused");
+    // **And it names which proposal, in the model's own words.** A rule's
+    // sentence with nothing to attach it to is half a fact, and this line is
+    // what a reader is looking at when a refusal lands (Kent, 2026-09-22:
+    // *"if we could see the different things that the llm is proposing even if
+    // the events are rejected, that'd be helpful"*).
+    expect(times[0]).toContain(inFewWords(REFUSED.claim_in_words));
   });
 
   it("test_every_claim_that_arrives_is_announced_by_its_own_words", () => {

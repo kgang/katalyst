@@ -21,7 +21,7 @@ FAKE_KEY = "not-a-real-key"
 @pytest.fixture(autouse=True)
 def a_recordings_folder_with_nothing_in_it(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
-) -> None:
+) -> Iterator[None]:
     """Point every test here at an empty recordings folder of its own.
 
     These tests ask one question: does the program know whether it has a model
@@ -33,8 +33,18 @@ def a_recordings_folder_with_nothing_in_it(
 
     What readiness says when a recording IS there is pinned where recordings are
     tested, by `test_readyz_says_what_can_be_replayed_before_anything_runs`.
+
+    **The settings are read once and remembered**, so setting the variable is not
+    enough on its own: a module that ran earlier may already have asked, and its
+    answer would be the one this test got. Clearing on the way in and on the way
+    out is what makes the folder a fact about this test rather than about the
+    order the suite happened to run in — these two files together went red
+    exactly that way (2026-09-21).
     """
     monkeypatch.setenv("KATALYST_RECORDINGS", str(tmp_path_factory.mktemp("no-recordings")))
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture

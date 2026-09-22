@@ -3,9 +3,9 @@
  *
  * It is a fact about the **session**, not a badge on a claim, and it is on screen
  * from the moment the run starts — long before the receipt that also says so
- * arrives. That is the whole reason it exists twice: the browser knows there is
- * no model key before the stream has said anything, and a reader should not watch
- * a map build itself for a minute before being told where it came from.
+ * arrives. That is the whole reason it exists twice: the browser knows the reader
+ * asked for the recording before the stream has said anything, and a reader should
+ * not watch a map build itself for a minute before being told where it came from.
  *
  * **It is a badge, and it sits beside the title.** It used to be a paragraph
  * floating over the canvas, which was wrong twice: nothing in this product may
@@ -14,9 +14,12 @@
  * explains it goes in the line under the map where every other sentence about
  * where this map came from already lives.
  *
- * **Two sources, and they are never merged.** The badge is set from whether a
- * key is configured — the browser knows that before the stream says anything,
- * which is the whole reason the badge can be on screen from the first frame.
+ * **Two sources, and they are never merged.** The badge is set from what the
+ * reader asked for — *Watch the recording* — and never from whether a key is
+ * configured (record 0012, amended 2026-09-21: a recording is reachable with a
+ * key, so a key says nothing about this). The browser knows what was asked
+ * before the stream says anything, which is the whole reason the badge can be on
+ * screen from the first frame.
  * The receipt, when it lands, carries the mode and the day the recording was
  * made, and it names the day here, because a day is a fact only the receipt
  * has.
@@ -67,8 +70,8 @@ function theyDisagree(receiptMode: ReplayBadgeProps["receiptMode"]): boolean {
 export function replaySentence({ recordingDate, receiptMode }: ReplayBadgeProps): string {
   if (theyDisagree(receiptMode)) {
     return (
-      "This session has no model key, so it played a recording — but the receipt says the run " +
-      "was live. The receipt is the authority, and the two disagreeing is itself worth seeing."
+      "A recording was asked for — but the receipt says the run was live. The receipt is the " +
+      "authority, and the two disagreeing is itself worth seeing."
     );
   }
   const from =
@@ -76,8 +79,8 @@ export function replaySentence({ recordingDate, receiptMode }: ReplayBadgeProps)
       ? "The receipt will name the day it was made."
       : `It was made on ${recordingDate}.`;
   return (
-    "No model key is configured, so this map is a recording being played back through the same " +
-    `route, the same events and the same canvas. ${from}`
+    "You asked to watch the recording, so this map is a recording being played back through the " +
+    `same route, the same events and the same canvas. No model was called and nothing was spent. ${from}`
   );
 }
 

@@ -145,17 +145,12 @@
   border-radius: 2px;
 }
 
-/* A tile whose belief chip has opened its shelf has to be drawn over the tile
- * below it, or the shelf would slide out behind its neighbour. The drawing
- * library writes each tile's stacking order straight onto the element, and a
- * value written onto an element beats any rule written in a stylesheet — so
- * this one rule has to insist, and it is the only one in the product that does. */
-.canvas .react-flow__node:has(.belief-chip:hover),
-.canvas .react-flow__node:has(.belief-chip:focus-within),
-.canvas .react-flow__node:has(.belief-chip__note[data-pinned="yes"]) {
-  /* biome-ignore lint/complexity/noImportantStyles: the drawing library writes this tile's stacking order onto the element itself, and nothing in a stylesheet can otherwise reach past it. */
-  z-index: 20 !important;
-}
+/* **One rule used to live here and no longer does** *(2026-09-22, R48)*. A
+ * belief chip opened a shelf out of the bottom edge of its tile explaining the
+ * range under its number, and the tile had to be lifted over its neighbour or
+ * the shelf slid out behind it — the one `!important` in the product, because
+ * the drawing library writes each tile's stacking order onto the element
+ * itself. There is no range and no shelf, so nothing has to be lifted. */
 
 /* ---- The library's own furniture ---------------------------------------- *
  * Two pieces survive with the bare stylesheet: the zoom buttons and the
@@ -252,4 +247,34 @@
   outline: 1px solid var(--accent);
   outline-offset: 4px;
   border-radius: 2px;
+}
+
+/* ---- Both rings, out where a tile is a shape and nothing else ----------- *
+ * A ring is drawn in the map's own coordinates, so the zoom shrinks it with
+ * everything else — and out at the floor the map is about a sixth of life size,
+ * which puts a one-pixel ring at a sixth of a pixel and a four-pixel gap at
+ * two thirds of one. Neither is there. That matters more out here than
+ * anywhere, not less: a silhouette says what **kind** of claim it is and
+ * nothing about which one, so the ring is the only thing on the glass saying
+ * which shape the panel beside the map is reading.
+ *
+ * So both rings are drawn wider and further out, by about the six the floor
+ * divides by: two pixels becomes eight and one becomes six, and the gap goes
+ * from four to sixteen. On the glass that is roughly the ring each was drawn to
+ * be at the furthest the map goes, and about four times it at the nearest of
+ * this form — heavier than near to, and right to be: at this size the reader is
+ * picking a shape out of a field of shapes rather than reading one.
+ *
+ * Neither ring changes colour, and neither is drawn any nearer the tile's own
+ * outline, so the shape that says what kind of claim this is is still whole.
+ * *(2026-09-22)* */
+
+.canvas[data-detail="silhouette"] .react-flow__node:focus-visible {
+  outline-width: 8px;
+  outline-offset: 16px;
+}
+
+.canvas[data-detail="silhouette"] .react-flow__node.selected {
+  outline-width: 6px;
+  outline-offset: 16px;
 }

@@ -10,6 +10,7 @@ export { ApiWorldSource } from "./apiSource";
 export { appendEdit, forkBranch, openBranch, type Workshop, workshopOf } from "./branchReducer";
 export { branchesOf, FixtureWorldSource } from "./fixtureSource";
 export { monogramFor, seedFor } from "./fromTheServer";
+export { GeneratedMapSource, type TheGeneratedMap } from "./generatedSource";
 export type { FixtureBundle, WorldSource } from "./source";
 export type {
   Absence,
@@ -32,12 +33,12 @@ export type {
   Edit,
   EvidenceClipping,
   Known,
+  Likelihood,
   LinkMode,
   LinkShape,
   LinkView,
   Movement,
   Provenance,
-  Ranged,
   Reason,
   Selection,
   SourceView,

@@ -140,6 +140,7 @@ describe("the receipt", () => {
         world={theFinishedRun().world}
         selection={{ kind: "generation", id: "gen_worked_run" }}
         generation={{
+          generationId: "gen_worked_run",
           seed: "4803646386380448080",
           promptFingerprint: RECEIPT.prompt_hash,
           working: { state: "reading" },
@@ -163,6 +164,7 @@ describe("the receipt", () => {
         world={theFinishedRun().world}
         selection={{ kind: "generation", id: "gen_worked_run" }}
         generation={{
+          generationId: "gen_worked_run",
           seed: "4803646386380448080",
           promptFingerprint: RECEIPT.prompt_hash,
           working: { state: "reading" },
@@ -189,6 +191,7 @@ describe("the receipt", () => {
         world={theFinishedRun().world}
         selection={{ kind: "generation", id: "gen_worked_run" }}
         generation={{
+          generationId: null,
           seed: null,
           promptFingerprint: null,
           working: { state: "reading" },
@@ -508,6 +511,7 @@ describe("a generated map never prints an identifier", () => {
           world={grown.world}
           selection={{ kind: "generation", id: grown.generationId ?? "" }}
           generation={{
+            generationId: grown.generationId,
             seed: grown.seed,
             promptFingerprint: grown.receipt?.prompt_hash ?? null,
             working: { state: "reading" },

@@ -3,9 +3,15 @@
  *
  * An **ending** is where an argument turns into a position — a claim that names
  * something you could trade, or one that names why there is nothing to trade.
- * The rail lists the ones this edit can reach and, beside each, three things:
- * how far its number moved, **how firm** that number is, and whether it went the
- * **same direction** whatever numbers the map started from.
+ * The rail lists the ones this edit can reach and, beside each, how far its
+ * number moved and which way.
+ *
+ * **A row used to carry two more columns and no longer does** *(Kent,
+ * 2026-09-22, R48)*. *How firm* was the width of the range around the new
+ * number; *same direction* was the share of the two thousand versions of the map
+ * that moved the same way. Both were readings of a range and of the versions
+ * that produced one, and Kent cut both from this product. A row is the ending,
+ * its number before and after, and the direction.
  *
  * **The rail ranks nothing.** When the engine has ordered these rows — largest
  * move along the best-backed route first — the rail draws them in that order and
@@ -19,24 +25,15 @@
  * missing from that ranking could mean it held still, or that it is not on this
  * map, or that you forced it false a moment ago, and a reader cannot tell those
  * apart by looking at a list something was left out of. So every other ending
- * the edit reaches follows the ranked ones, never mixed in among them. On the
- * stored example's strike branch the row worth reading is the talks: they make
- * the biggest move on the map, the one arrow into them is the map's one bare
- * assertion, and the versions of the map end up disagreeing which way the talks
- * went — so the engine will not call it a move, and the row says so rather than
- * disappearing.
+ * the edit reaches follows the ranked ones, never mixed in among them.
  *
  * **There is one kind of quieter row and it carries its reason in words.** Every
  * row has a half-line under the ending's own words: which way it went and the
- * day the two maps were furthest apart where it moved, and where it did not,
- * the engine's own word for why — *barely moved*, *the versions disagreed which
- * way*, *it was supposed false*, *it arrived with the edit*. Being a shade
- * quieter than the rows above is not a reading: it says nothing once the screen
- * is read in grey, and nothing at all read out loud.
- *
- * The two columns are never folded into any ordering. They answer different
- * questions and a trader weighs them separately; folding the width into a rank
- * would sink exactly the claims that most deserve a second look.
+ * day the two maps were furthest apart where it moved, and where it did not, the
+ * engine's own word for why — *barely moved*, *it was supposed false*, *it
+ * arrived with the edit*. Being a shade quieter than the rows above is not a
+ * reading: it says nothing once the screen is read in grey, and nothing at all
+ * read out loud.
  *
  * **The rows are the first thing in it.** The heading is followed by the table
  * and nothing else; the note saying whose order this is reads as a caption and
@@ -48,7 +45,7 @@
 import { useId, useState } from "react";
 import { toDay } from "../graph/diff/days";
 import type { DeltaRow, Known } from "../world";
-import { toMovement, toShare, toSize } from "./BeliefChip";
+import { toMovement } from "./BeliefChip";
 import "./deltaRail.css";
 
 /** What the rail needs to draw itself. */
@@ -125,27 +122,6 @@ function changeOf(row: DeltaRow): Known<string> {
 }
 
 /**
- * How firm the new number is: the width of its own range.
- *
- * A width is a **size**, not a likelihood: it is how far apart the two ends of a
- * band sit. So it takes no certainty guard — a band four thousandths wide is a
- * remarkably firm number and the reader wants to see it, where `<.01` would say
- * only that it is small.
- */
-function firmnessOf(row: DeltaRow): Known<string> {
-  return row.rangeWidth.reading === undefined
-    ? { absence: row.rangeWidth.absence }
-    : { reading: toSize(row.rangeWidth.reading) };
-}
-
-/** The share of versions of the map that moved the same way, as a whole percentage. */
-function sameDirectionOf(row: DeltaRow): Known<string> {
-  return row.agreement.reading === undefined
-    ? { absence: row.agreement.absence }
-    : { reading: toShare(row.agreement.reading) };
-}
-
-/**
  * The half-line under an ending's own words — **one rule for every row, not one
  * rule per kind of row.**
  *
@@ -153,8 +129,7 @@ function sameDirectionOf(row: DeltaRow): Known<string> {
  * furthest apart, because a row is read on that day rather than on the claim's
  * own judging day and a number whose day is not said is a number nobody can
  * check. A row the engine ranked no move on says why, in the engine's own word:
- * it barely moved, the versions of the map disagreed which way, you supposed it
- * false, or it arrived with the edit.
+ * it barely moved, you supposed it false, or it arrived with the edit.
  *
  * **This is what makes a quieter row readable in grey.** Such a row is a shade
  * quieter than the ones above it, and a shade is not a reading: convert the
@@ -225,8 +200,6 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
           <div className="delta-rail__table">
             <div className="delta-rail__labels" aria-hidden="true">
               <span>change</span>
-              <span>how firm</span>
-              <span>same direction</span>
             </div>
             <ul className="delta-rail__rows">
               {rows.map((row, place) => {
@@ -256,8 +229,6 @@ export function DeltaRail({ rows, ranked, summary }: DeltaRailProps) {
                     </p>
                     <div className="delta-rail__values">
                       <Cell value={changeOf(row)} onReason={setReason} />
-                      <Cell value={firmnessOf(row)} onReason={setReason} />
-                      <Cell value={sameDirectionOf(row)} onReason={setReason} />
                     </div>
                   </li>
                 );

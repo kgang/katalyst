@@ -46,20 +46,22 @@ import {
   pushInWords,
   shapeInWords,
 } from "../graph/wires/encodings";
+import { GENERATE_ADDRESS } from "../stream/generate";
 import type { UnreadLine } from "../stream/growth";
+import { NO_LIKELIHOOD_YET, NOTHING_HERE_WAS_TYPED_IN } from "../stream/growth";
 import type { Working } from "../stream/transcript";
 import type {
   BeliefOwner,
   ClaimKind,
   ClaimView,
   Known,
+  Likelihood,
   LinkView,
-  Ranged,
   Selection,
   WorldView,
 } from "../world";
 import { inFewWords, NOT_ON_THIS_MAP } from "../world/naming";
-import { toMovement, toReading, toShare, toTwoFigures } from "./BeliefChip";
+import { toMovement, toTwoFigures } from "./BeliefChip";
 import { OriginMark } from "./OriginMark";
 import { PathBar } from "./PathBar";
 import { TheWorking } from "./TheWorking";
@@ -117,10 +119,32 @@ export interface InspectorProps {
    * every proposal it made.
    */
   readonly generation?: GenerationDetail;
+  /**
+   * What this drawing of the panel is for, when a screen has more than one of
+   * them and shows one at a time.
+   *
+   * The screen a map builds itself on now offers two panels that are both this
+   * component: one reading out whatever the reader selected, one reading out
+   * the run that built the map. **"Nothing selected" is an answer the first of
+   * those owes and the second does not** — a panel about the run telling a
+   * reader to choose a claim would be answering a question nobody asked, in the
+   * one place they came to read something else. Left out, the panel is the only
+   * one on its screen and says both.
+   */
+  readonly about?: "whatever is selected" | "the run";
 }
 
 /** Everything the panel knows about the run that produced this map. */
 export interface GenerationDetail {
+  /**
+   * The engine's own name for this run, as its twenty-six characters.
+   *
+   * The one identifier in this product that is printed on screen, and it is
+   * deliberate: it is how somebody asks for this answer again — the map, the
+   * seed and the working — and the working is asked for by it. Null until the
+   * run's first event has arrived.
+   */
+  readonly generationId: string | null;
   /**
    * The seed every likelihood in this run was worked out from, as its digits.
    *
@@ -215,15 +239,19 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * One belief, on one line: the owner, the reading, and a bounded bar behind the
  * number painted from the five-step brightness ramp.
  *
- * The bar is a glance and never a reading. The number and its range are printed
- * beside it every time, in the text colour, so nobody is ever asked to tell one
- * step of the ramp from the next by eye — and the number always clears four and
- * a half to one while the bar only has to clear three.
+ * The bar is a glance and never a reading. The number is printed beside it every
+ * time, in the text colour, so nobody is ever asked to tell one step of the ramp
+ * from the next by eye — and the number always clears four and a half to one
+ * while the bar only has to clear three.
  *
- * The panel writes a belief on one line; the tile stacks it over three. Same
+ * The panel writes a belief on one line; the tile stacks it over two. Same
  * number, same rounding, same guard against printing a certainty; two shapes.
+ *
+ * **The range beside the number is gone** *(Kent, 2026-09-22, R48)*, here as on
+ * the tile, and so are the words *interval* and *uncalibrated* that explained
+ * it. One claim, one likelihood.
  */
-function BeliefRow({ owner, slot }: { owner: BeliefOwner; slot: Known<Ranged> }) {
+function BeliefRow({ owner, slot }: { owner: BeliefOwner; slot: Known<Likelihood> }) {
   const reading = slot.reading;
   if (reading === undefined) {
     return (
@@ -243,81 +271,21 @@ function BeliefRow({ owner, slot }: { owner: BeliefOwner; slot: Known<Ranged> })
             length would be a second channel carrying the meaning brightness
             already carries, and the number beside it is the reading anyway. */}
         <span className="inspector__bar" data-step={likelihoodStep(reading.p)} aria-hidden="true" />
-        <span className="inspector__reading">{toReading(reading.p, reading.lo, reading.hi)}</span>
+        <span className="inspector__reading">{toTwoFigures(reading.p)}</span>
       </span>
     </div>
   );
 }
 
-/**
- * What the model's range is, and which of two sentences says so.
- *
- * The range means *how sure we are of the number*, not how much the world can
- * move — the second is already inside the likelihood, and a reader who confuses
- * them reads a wide band as a volatile event.
- *
- * Which sentence sits here is decided by one field and nothing else: whether the
- * world says how many versions of the map were run. **Present**, something
- * computed this number and the range is the spread across those versions.
- * **Absent** — as here, and everywhere in this build — nothing computed it, and
- * the range is what whoever wrote the number down said about how sure they were.
- * Printing "uncalibrated" over a stated range would claim an arithmetic that
- * never ran.
- *
- * The two sentences are the belief chip's, word for word, so the tile and the
- * panel cannot drift apart.
- */
-function RangeNote({ world, claim }: { world: WorldView; claim: ClaimView }) {
-  const model = claim.beliefs.model.reading;
-  if (model === undefined) {
-    return null;
-  }
-  if (world.versions === undefined) {
-    return (
-      <>
-        <p className="inspector__label">stated range · not computed</p>
-        <p className="inspector__reason">
-          This range is stated, not computed — it says how sure the elicitation was. Nothing has
-          worked this number through the map yet.
-        </p>
-      </>
-    );
-  }
-  return (
-    <>
-      <p className="inspector__label">
-        {`model interval, uncalibrated · how sure we are of ${toTwoFigures(model.p)} — not how much the world can move`}
-      </p>
-      <p className="inspector__reason">
-        {`Across ${world.versions.toLocaleString("en-GB").replace(/,/g, " ")} versions of this map — each one a set of numbers this model would have stood behind — the answer landed between ${toTwoFigures(model.lo)} and ${toTwoFigures(model.hi)} eight times in ten. Nobody has checked whether that 8-in-10 holds up; no claim on this map has resolved yet.`}
-      </p>
-
-      {/* ---- The reserved band slot: "why is this band wide?" -------------
-          Drawn only where the range above is a *computed* one, which is what
-          the test just above asks. What goes in it is one sentence naming the
-          claim whose own prior explains most of the band — on the stored
-          example, the Brent claim's band is mostly the Brent claim's own stated
-          prior — and it is worked out from `range_shares` on the world, which
-          the engine gets out of the same two thousand versions of the map it
-          already runs, at no extra cost.
-
-          **No figure is written in this comment.** The two that used to be here
-          were the engine's answer copied by hand, and they were wrong within a
-          stack: the share is the `B · base · band from B` line of
-          `docs/worked-numbers.txt`, and the width is that line's claim read off
-          `B · base · reading`. One generated file owns them both, so there is
-          one place to look on the day they move again.
-
-          **It ships in stack 06 and nothing draws it here.** Not a placeholder
-          sentence, not a greyed-out example: a sentence naming a percentage
-          nobody computed is a number nobody computed wearing words. The slot is
-          left in place so the layout does not jump the day the sentence
-          arrives, and this comment is where the next person finds out why it is
-          empty. */}
-      <div className="inspector__band-slot" />
-    </>
-  );
-}
+/* **The range note used to stand here and is gone** *(Kent, 2026-09-22, R48).*
+ * It was a label and a sentence under the model's row in *Beliefs*, saying that
+ * the range around the number was a *model interval, uncalibrated*, that it said
+ * how sure we were of the number rather than how much the world could move, and
+ * that it came out of the answer landing somewhere across 2 000 versions of this
+ * map eight times in ten. There is no range, so there is nothing for any of it
+ * to be about. The reserved slot under it — one sentence naming the claim whose
+ * own prior explained most of the band — went with it: it was a width, and a
+ * width is a reading of a range. */
 
 /**
  * The whole decomposition: what this claim started from, everything that pushes
@@ -352,35 +320,17 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
 
   return (
     <Section title="Why this number">
-      {/* A claim that moved only because some versions started counting more
-          says so here, as the first line of this section and above the
-          decomposition — because it is a fact about the *reading* of the number,
-          and the decomposition is the reading.
-          
-          Observing one claim reweights the versions of the map: a version under
-          which the observation was likely counts for more than one under which
-          it was a fluke. A claim with no causes can move by that alone, because
-          inside every single version its answer is its own prior in both worlds
-          and the paired difference is exactly zero. Without a word about it the
-          reader opens the claim and finds a number that moved, a prior, and
-          nothing in between to explain it.
-          
-          It is rendered exactly when the engine's own difference says so, and by
-          no other route: no comparison of a share against zero, no check for
-          whether a claim has incoming arrows, no inference from an empty
-          decomposition. */}
-      {claim.moved?.onlyReweighted === true ? (
-        <p className="inspector__reweighted">
-          this claim moved only because the observation made some versions count more.
-        </p>
-      ) : null}
-
+      {/* **One line used to stand here and is gone** *(Kent, 2026-09-22, R48).*
+          It read *this claim moved only because the observation made some
+          versions count more*, and it was drawn exactly when the engine's own
+          difference said so. The engine still says it; there are no versions of
+          the map on this screen for it to be about, so it is not drawn.
+          `world/apiSource.ts` is where it stops, and it dies with the engine
+          half. */}
       <dl className="inspector__decomposition">
         <dt className="inspector__step-label">it started at</dt>
         <dd className="inspector__step">
-          <span className="inspector__mono">
-            {toReading(claim.prior.p, claim.prior.lo, claim.prior.hi)}
-          </span>
+          <span className="inspector__mono">{toTwoFigures(claim.prior.p)}</span>
           <span className="inspector__reason">
             the model's likelihood before anything on this map pushes on it
           </span>
@@ -393,7 +343,6 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
               <span className="inspector__words">—</span>
               <span className="inspector__reason">
                 nothing on this map points at this claim, so its answer is its own starting number
-                in every version of the map
               </span>
             </dd>
           </>
@@ -421,10 +370,8 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
                     arrive. */}
                 {wire.conditional.reading === undefined ? null : (
                   <span className="inspector__reason">
-                    {`with that cause supposed true this claim reads ${toReading(
+                    {`with that cause supposed true this claim reads ${toTwoFigures(
                       wire.conditional.reading.p,
-                      wire.conditional.reading.lo,
-                      wire.conditional.reading.hi,
                     )}`}
                   </span>
                 )}
@@ -465,13 +412,11 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
             </>
           ) : (
             <>
-              <span className="inspector__mono">
-                {toReading(result.reading.p, result.reading.lo, result.reading.hi)}
-              </span>
+              <span className="inspector__mono">{toTwoFigures(result.reading.p)}</span>
               <span className="inspector__reason">
-                {world.versions === undefined
-                  ? "the likelihood the map was written with, read on the day this claim is judged"
-                  : "the engine's own answer for this claim, read on the day this claim is judged"}
+                {world.workedOut === true
+                  ? "the engine's own answer for this claim, read on the day this claim is judged"
+                  : "the likelihood the map was written with, read on the day this claim is judged"}
               </span>
             </>
           )}
@@ -493,28 +438,26 @@ function WhyThisNumber({ world, claim }: { world: WorldView; claim: ClaimView })
  * anything.
  *
  * Both readings are the engine's, and which way it went is the engine's word:
- * this panel prints them and subtracts nothing. Beside them goes the share of
- * the versions of the map that moved the same way, headed in the reader's own
- * words rather than by the field's name.
+ * this panel prints them and subtracts nothing.
+ *
+ * **A column used to stand beside them and is gone** *(Kent, 2026-09-22, R48)*:
+ * *same direction*, the share of the two thousand versions of the map that moved
+ * the same way, with a sentence under it explaining what a version of the map
+ * was. There are no versions of the map on this screen. What is left is the two
+ * numbers, the direction, and — where the engine would not call it a move — its
+ * own reason.
  */
 function WhatYourEditDid({ claim }: { claim: ClaimView }) {
   const moved = claim.moved;
   // A claim whose value an edit fixed has no move to report: it is true — or
-  // false — in every version of the map, and the badge that says so is the
-  // whole of what happened to it.
+  // false — in every world the engine works through, and the badge that says so
+  // is the whole of what happened to it.
   if (moved === undefined || claim.standing !== undefined) {
     return null;
   }
-  const agreed = moved.sameDirection.reading;
   // The engine's verdict on the claim, which is not the same thing as the two
   // numbers: a claim can move a hair and still come out unchanged.
   const counted = claim.diff === "shifted";
-  // A claim that moved only by reweighting is a third case, and the two
-  // sentences below would both be false of it: the versions did not disagree
-  // about a direction, because not one version that counts moved at all. The
-  // sentence that *is* true of it is printed at the head of the decomposition,
-  // where the chapter puts it.
-  const reweighted = moved.onlyReweighted === true;
 
   return (
     <Section title="What your edit did">
@@ -527,31 +470,8 @@ function WhatYourEditDid({ claim }: { claim: ClaimView }) {
       {/* Why the engine says it did not move. The sentence is not written here:
           the tile's line and the rail's greyed row say the same thing, and one
           verdict said three ways is three chances to name a cause the engine
-          never gave. A claim that moved only by reweighting is the exception —
-          its sentence is at the head of the decomposition, where the chapter
-          puts it, and saying it twice on one screen is noise. */}
-      {counted || reweighted ? null : <p className="inspector__reason">{noChangeReason(moved)}</p>}
-      {reweighted ? null : (
-        <>
-          <dl className="inspector__pairs">
-            <dt>same direction</dt>
-            <dd>
-              {agreed === undefined ? (
-                moved.sameDirection.absence.words
-              ) : (
-                <span className="inspector__mono">{toShare(agreed)}</span>
-              )}
-            </dd>
-          </dl>
-          <p className="inspector__reason">
-            {agreed === undefined
-              ? moved.sameDirection.absence.reason
-              : "The share of the versions of the map — each one a set of numbers this model " +
-                "would have stood behind — in which this claim moved the same way. It is a " +
-                "column beside the move and never multiplied into it."}
-          </p>
-        </>
-      )}
+          never gave. */}
+      {counted ? null : <p className="inspector__reason">{noChangeReason(moved)}</p>}
     </Section>
   );
 }
@@ -626,7 +546,7 @@ function ClaimDetail({
           voice. */}
       <Section title="Prior">
         <p className="inspector__mono inspector__prior">
-          {toReading(claim.prior.p, claim.prior.lo, claim.prior.hi)}
+          {toTwoFigures(claim.prior.p)}
           <span className="inspector__owner"> model</span>
         </p>
       </Section>
@@ -636,7 +556,6 @@ function ClaimDetail({
           number nobody holds. */}
       <Section title="Beliefs">
         <BeliefRow owner="model" slot={claim.beliefs.model} />
-        <RangeNote world={world} claim={claim} />
         <BeliefRow owner="user" slot={claim.beliefs.user} />
         <BeliefRow owner="market" slot={claim.beliefs.market} />
       </Section>
@@ -753,11 +672,7 @@ function WireDetail({
         ) : (
           <>
             <p className="inspector__mono inspector__prior">
-              {toReading(
-                wire.conditional.reading.p,
-                wire.conditional.reading.lo,
-                wire.conditional.reading.hi,
-              )}
+              {toTwoFigures(wire.conditional.reading.p)}
               <span className="inspector__owner"> model</span>
             </p>
             <p className="inspector__reason">
@@ -964,11 +879,72 @@ function GenerationDetailPanel({ detail }: { detail: GenerationDetail }) {
   );
 }
 
+/**
+ * Where this map is coming from: the route, the run's own name, and the seed.
+ *
+ * **It moved here from the foot of the screen** (decision R16, brought forward
+ * on 2026-09-21). Where it stood it was an always-on strip of prose reading
+ * *"Every claim and arrow on this map arrived from /api/generate, in generation
+ * …, at seed …"* — written from the run's first event onward, which is to say
+ * **over a map with nothing on it yet**. It asserted arrivals that had not
+ * happened, it repeated what the strip now says in words, and it was the third
+ * of three stacked strips at the foot of a screen whose reader could not tell
+ * whether anything was happening at all.
+ *
+ * **What it says here is true from the first frame.** Nothing on this map is
+ * typed in — that is a fact about how the map is built, not about how much of it
+ * has arrived — and the three readings beside it are the three things a reader
+ * needs to ask for the same answer again.
+ *
+ * **A plain section that is always here.** Not a dialog, not a disclosure, not
+ * something that opens over the map. Folding the panel's sections behind their
+ * summaries is a later stack's work and this is written to be folded.
+ */
+function RunDetails({
+  detail,
+  theMapsOwn,
+}: {
+  detail: GenerationDetail;
+  theMapsOwn: string | null;
+}) {
+  const { generationId, seed } = detail;
+  return (
+    <Section title="Run details">
+      <dl className="inspector__pairs inspector__pairs--facts">
+        <dt>route</dt>
+        <dd className="inspector__mono">{GENERATE_ADDRESS}</dd>
+        <dt>generation</dt>
+        <dd className="inspector__mono">{generationId ?? NOT_YET}</dd>
+        <dt>seed</dt>
+        {/* The digits that came off the wire, never a parsed number: a seed can
+            be nineteen digits and a browser holds a whole number exactly only up
+            to sixteen. */}
+        <dd className="inspector__mono">{seed ?? NOT_YET}</dd>
+      </dl>
+      {/* While the map is being built these two are the whole of what is true
+          about where it came from. The moment the engine hands its own world
+          over it also hands over its own origin sentence — which says the same
+          thing and more, at the seed it really used — so that one is printed
+          instead. It is never printed at the foot of the screen as well: one
+          account, in one place. */}
+      {theMapsOwn === null ? (
+        <>
+          <p className="inspector__reason">{NOTHING_HERE_WAS_TYPED_IN}</p>
+          <p className="inspector__reason">{NO_LIKELIHOOD_YET}</p>
+        </>
+      ) : (
+        <p className="inspector__reason">{theMapsOwn}</p>
+      )}
+    </Section>
+  );
+}
+
 /** The panel beside the map. */
 export function Inspector({
   world,
   selection,
   generation,
+  about,
   onChangeThis,
   changeRef,
 }: InspectorProps) {
@@ -980,6 +956,15 @@ export function Inspector({
 
   return (
     <aside className="inspector" aria-label="Why this number is what it is">
+      {/* Where this map is coming from, always in the panel while there is a
+          run — except while the panel is already reading that run out, which
+          says the same three things at more length. */}
+      {generation === undefined || run !== undefined ? null : (
+        <RunDetails
+          detail={generation}
+          theMapsOwn={world.workedOut === true ? world.origin : null}
+        />
+      )}
       {run !== undefined ? (
         <GenerationDetailPanel detail={run} />
       ) : claim !== undefined ? (
@@ -991,7 +976,7 @@ export function Inspector({
         />
       ) : wire !== undefined ? (
         <WireDetail world={world} wire={wire} onChangeThis={onChangeThis} changeRef={changeRef} />
-      ) : (
+      ) : about === "the run" ? null : (
         <div className="inspector__empty">
           <h2 className="inspector__empty-heading">Nothing selected</h2>
           <p className="inspector__body">

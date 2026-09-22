@@ -46,6 +46,17 @@ import {
   whatItSaw,
 } from "./watching.js";
 
+/**
+ * The row on the first screen that plays the committed recording of the one
+ * sentence this file watches.
+ *
+ * **Two rows carry that sentence now**, since the first screen offers four ways
+ * to start: *Watch the recording* plays it back for nothing, and *Run it live*
+ * calls a model. So a row is named by its sentence **and** by what pressing it
+ * does, which is how a reader tells the two apart as well.
+ */
+const THE_RECORDING_ROW = new RegExp(`${THE_SENTENCE}[\\s\\S]*Watch the recording`);
+
 test.describe.configure({ timeout: A_WHOLE_RUN + 60_000 });
 
 // **Every test here watches a map arrive, and a map arriving drops frames.**
@@ -146,11 +157,13 @@ test("test_the_growing_edge_holds_when_the_layout_thread_starts_late", async ({ 
   );
 
   await startWatching(page);
-  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
 
-  // Where the first tile came to rest. Read before the run is over, so that
-  // "nothing already placed moved" is a statement about a map that went on
-  // growing underneath it.
+  // Where the first tile came to rest. Read while the map is still growing,
+  // which is the only reading worth taking: the map settles once at the moment
+  // the run stops — every pin dropped, the whole thing laid out as one thing —
+  // so a place read after that is a different question (decision record 0024,
+  // 2026-09-21).
   const firstTile = page.locator(".react-flow__node.react-flow__node-claim").first();
   const wasAt = await whereTheTileSits(firstTile);
 
@@ -213,7 +226,10 @@ test("test_the_growing_edge_holds_when_the_layout_thread_starts_late", async ({ 
   expect(saw.everStacked).toBe(false);
   expect(await boxesRunningIntoEachOther(page)).toEqual([]);
 
-  // And the tile that was placed first is exactly where it was, with every other
-  // claim on the map having arrived since.
-  expect(await whereTheTileSits(firstTile)).toBe(wasAt);
+  // **And the map settled when it stopped**, even with the layout thread held
+  // back all the way through: every tile takes the place the whole map's own
+  // layout gives it, so the first tile is no longer at the place it was read at
+  // while the map was still growing. This used to assert the opposite, and the
+  // settle is what changed it (decision record 0024, 2026-09-21).
+  expect(await whereTheTileSits(firstTile)).not.toBe(wasAt);
 });

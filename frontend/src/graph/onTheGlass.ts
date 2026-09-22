@@ -49,8 +49,10 @@ function isRectangle(box: MapNode): boolean {
  * **A box is drawn where the layout put it, and nowhere else.** A box the layout
  * has not placed has no place, and drawing it at the map's origin gives it one
  * the layout never agreed to — so it appears at the origin and then hops to
- * wherever the layout actually wanted it, on the one screen whose whole promise
- * is that nothing already drawn ever moves (INV-workbench.64).
+ * wherever the layout actually wanted it. A tile does move on this screen, but
+ * only when an arrow would otherwise point backwards, and once when the run
+ * stops (INV-workbench.64, decision record 0024) — a hop from a place nobody
+ * worked out is not one of those, and is what this file exists to prevent.
  *
  * **A reserved rectangle stands until the claim it was holding a place for is on
  * the glass** — not until the event carrying that claim arrived. Those are

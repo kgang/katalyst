@@ -1,4 +1,4 @@
-"""The eight things that travel down a generation, and how they are framed on the wire.
+"""The eight things a generation is made of, one that is only ever live, and their framing.
 
 One request builds a whole map, and this is what comes back along it while that
 happens. **The stream is the loading state**: a generation takes minutes and
@@ -6,10 +6,13 @@ returns one whole proposal every few seconds, so there is no honest way to show
 it as a single answer that arrives at the end — and a spinner followed by a
 finished map is a veto condition rather than a design choice.
 
-Eight names, and no ninth
--------------------------
+Eight names that are written down
+---------------------------------
 The map starts · a proposal landed · a proposal was refused · the likelihoods ·
 whether the destination was reached · what it cost · why it stopped · what broke.
+
+**These eight are the generation.** Each one is a decision somebody took — the
+model, the rules, the walk — and a recording is exactly these, line for line.
 
 Two things that close a claim make **no event of their own**: the model saying
 this part of the story is finished, and a claim's third failure in a row. Neither
@@ -18,6 +21,18 @@ next growth event's `frontier`, which no longer names that claim, and on
 `beliefs_propagated` every skeleton goes at once because the frontier is empty by
 definition. An event whose only job is to say that nothing happened is an event
 somebody will one day draw.
+
+And one that never is
+---------------------
+`activity` says what a model call is doing **right now** — the search it just
+issued, one thing that search returned, the sentence it is thinking. It is not a
+decision and it changes nothing, so it is not part of the generation: it is sent
+on a live run and **never written to a recording, a transcript or a kept run,
+never replayed, never invented by a replay, never billed and never counted by
+`at`**. That is why it is not in `NAMES` and not in `Event` — the eight are what
+a recording holds, and the ninth is what a live run additionally says out loud
+(record 0027, Kent's R44 and R47, 2026-09-22; it amends record 0023's *no ninth
+event*).
 
 Four of these shapes are not defined here, on purpose
 ------------------------------------------------------
@@ -29,15 +44,18 @@ draws is what `domain/` computed.
 
 What this file must never do
 ----------------------------
-- Never gain a ninth event for something a client can already read off the eight.
+- Never gain another event for something a client can already read off the eight.
 - Never carry a fact that is already on another event. `no_path` lives on the
   verdict; the mode, the recording's date and the prompt's fingerprint live on
   the receipt. Two places to read one fact eventually disagree.
 - Never write a stack trace, an exception's name or an identifier into `Failed`.
   It is interface text.
+- Never put `activity` in `NAMES`, in `BY_NAME` or in `Event`. Those three are
+  what a recording is read and written through, and the moment `activity` is in
+  one of them a recording can hold one.
 - Never emit a heartbeat, a comment line or anything else that is not one of the
-  eight. A recording is this stream line for line, and a line carrying no event
-  is a line somebody eventually parses as one.
+  eight or `activity`. A recording is the eight line for line, and a line
+  carrying no event is a line somebody eventually parses as one.
 """
 
 import json
@@ -251,6 +269,65 @@ class Failed(BaseModel):
     )
 
 
+class Activity(BaseModel):
+    """What one model call is doing this second. Live only, and never written down.
+
+    The one thing on the wire that is **not** a decision. Nothing on the map
+    changes because of it, nothing is spent because of it, and a run that never
+    sent one is the same run. It exists because a model call takes minutes and a
+    person watching an empty screen has no way to tell a working program from a
+    stopped one (Kent, 2026-09-22).
+
+    Every word in `text` is the model's own or the search tool's own, verbatim.
+    Nothing here is composed by us, and nothing here is an estimate of progress:
+    there is no percentage, no count of what is left and no guess at how long.
+
+    What it must never do
+    ---------------------
+    - Never be written to a recording, a transcript or a kept run.
+    - Never be sent by a replay, and never be invented by one.
+    - Never be billed, and never counted by the `at` counter.
+    - Never be folded into the map, and never drawn on it.
+    - Never be the reason a run fails. Whatever goes wrong raising one is
+      swallowed and logged, and the run carries on.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    about: PropositionId | None = Field(
+        default=None,
+        description=(
+            "The open claim this call is working on — one of the identifiers the "
+            "latest `frontier` names — or nothing at all when the call is not "
+            "about one claim, which is what the opening call is."
+        ),
+    )
+    kind: Literal["searching", "found", "thinking"] = Field(
+        description=(
+            "Which of the three this is. `searching`: the model just issued a web "
+            "search. `found`: one thing that search returned. `thinking`: the "
+            "model's own summarised thinking."
+        )
+    )
+    text: str = Field(
+        description=(
+            "The words themselves, never paraphrased by us. For `searching`, the "
+            "query the model wrote. For `found`, the title of one page the search "
+            "returned, followed by ` · <host>` when a host is known. For "
+            "`thinking`, the most recent whole sentence of the model's own "
+            "summarised thinking."
+        )
+    )
+
+
+ACTIVITY = "activity"
+"""The name the ninth travels under.
+
+**Deliberately not in `NAMES`.** That table is the eight a recording is written
+and read through, and a name in it is a name a recording may hold.
+"""
+
+
 Event = (
     GenerationStarted
     | ProposalAccepted
@@ -261,7 +338,14 @@ Event = (
     | Done
     | Failed
 )
-"""Any one of the eight. The wire's `event:` line carries the name; `data:` carries the payload."""
+"""Any one of the eight. The wire's `event:` line carries the name; `data:` carries the payload.
+
+`Activity` is **not** one of them, on purpose: this is the type a recording, a
+transcript and a replay are written in terms of.
+"""
+
+OnTheWire = Event | Activity
+"""Anything a live stream may write out: the eight, plus the one that is never recorded."""
 
 NAMES: dict[type[Event], str] = {
     GenerationStarted: "generation_started",
@@ -284,7 +368,7 @@ BY_NAME: dict[str, type[Event]] = {said: shape for shape, said in NAMES.items()}
 """The same table read the other way, for whatever reads a stream back."""
 
 
-def framed(event: Event) -> str:
+def framed(event: OnTheWire) -> str:
     """Write one event the way it goes on the wire: two lines and a blank one.
 
     The payload is **one line of JSON** — never pretty-printed, never wrapped — so
@@ -292,7 +376,7 @@ def framed(event: Event) -> str:
     be one event per line.
 
     Args:
-        event: The event to write.
+        event: The event to write. One of the eight, or the live-only ninth.
 
     Returns:
         The `event:` line, the `data:` line and the blank line that ends them.
@@ -300,12 +384,14 @@ def framed(event: Event) -> str:
     return f"event: {name_of(event)}\ndata: {payload_of(event)}\n\n"
 
 
-def name_of(event: Event) -> str:
-    """Say which of the eight names this event travels under."""
+def name_of(event: OnTheWire) -> str:
+    """Say which name this event travels under: one of the eight, or `activity`."""
+    if isinstance(event, Activity):
+        return ACTIVITY
     return NAMES[type(event)]
 
 
-def payload_of(event: Event) -> str:
+def payload_of(event: OnTheWire) -> str:
     """Write one event's payload as the single line of JSON the wire carries.
 
     Sorted and tightly spaced, so the same event is always the same bytes and a

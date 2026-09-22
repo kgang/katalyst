@@ -74,14 +74,6 @@
   padding-right: var(--space-3);
 }
 
-/* The claim the reader started from is the one thing on the map that did not
- * come from the model, so its outline is drawn in the accent rather than in the
- * hairline. The shape already says it is the hypothesis; this only makes the
- * eye land there first. */
-.tile[data-hypothesis="yes"] .tile__outline path {
-  stroke: var(--accent);
-}
-
 /* ---- The header: what kind of claim, and when it settles ---------------- */
 
 .tile__header {
@@ -104,6 +96,66 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* ---- What kind of claim this is, said a third time, in colour ----------- *
+ * The two ends of a map are the two tiles a reader is hunting for: the
+ * hypothesis they started from, and a tradeable outcome they could act on.
+ * Both already say what they are twice — the outline's shape, and the word in
+ * the heading — so colour here is a third saying of the same thing and never
+ * the only one. Convert the screen to grey and nothing is lost, which is `VR3`
+ * of the visual review checklist.
+ *
+ * The steps in between keep the hairline, and so does a dead end: if every kind
+ * were coloured, none of them would stand out, which is the whole point.
+ *
+ * **Neither hue goes anywhere near a number.** Hue on a number means which way
+ * the money moves, and what kind of claim this is is a different thing
+ * entirely — so nothing below touches a belief chip, a badge, a wire or a port.
+ *
+ * What an edit did to a claim is drawn further down this file and wins over
+ * both, by coming after them: a claim your edit just added is drawn as added,
+ * whatever kind it is, because that is the more urgent thing to know. */
+
+/* The hypothesis: the teal accent it already borrowed, now said three times —
+ * the outline, the word in the heading, and a wash of the same accent behind
+ * the whole tile.
+ *
+ * The wash is the accent mixed into the tile's own surface rather than a colour
+ * of its own, so there is no fourth teal and nothing new to keep in step. Eight
+ * parts in a hundred: 1.1 to 1 against the plain surface — a tint you notice
+ * only beside an ordinary tile — and every word drawn on it still clears 4.5 to
+ * 1 in both themes (measured: the claim at 13.1 dark and 16.6 light, the accent
+ * itself at 8.6 and 4.9). */
+.tile[data-kind="hypothesis"] .tile__outline path {
+  stroke: var(--accent);
+  fill: color-mix(in oklab, var(--accent) 8%, var(--surface-raised));
+}
+
+.tile[data-kind="hypothesis"] .tile__kind {
+  color: var(--accent);
+}
+
+/* A tradeable outcome: the one new hue in the product, in exactly three places
+ * — the outline, the corner that outline cuts away, and the word *market*. No
+ * wash, on purpose: the two ends of the map are then told apart by more than a
+ * hue, so neither depends on a reader telling teal from orchid. */
+.tile[data-kind="market"] .tile__outline path {
+  stroke: var(--kind-market);
+}
+
+/* The cut corner, drawn a second time over the outline at twice the width. It
+ * is the outline's own diagonal and nothing else — no new mark, nothing a grey
+ * print would lose — and it is what makes the ticket-stub corner read from
+ * across the map instead of from a foot away. */
+.tile[data-kind="market"] .tile__outline .tile__cut {
+  fill: none;
+  stroke: var(--kind-market);
+  stroke-width: 2;
+}
+
+.tile[data-kind="market"] .tile__kind {
+  color: var(--kind-market);
 }
 
 /* ---- The claim ---------------------------------------------------------- *
@@ -410,6 +462,22 @@
   text-wrap: pretty;
 }
 
+/* Out where the map draws no words, this box draws none either — the same rule
+ * the tiles obey, for the same reason: its count is set at twenty-two pixels
+ * and its line at thirteen, and out there they land at three and two. What is
+ * left is the dashed rectangle, drawn six pixels wide in the map's own
+ * coordinates so that it is about one on the glass. The canvas says which form
+ * the map is in; this box is not a claim and carries nothing of its own.
+ * *(2026-09-22)* */
+.canvas[data-detail="silhouette"] .tile--overflow .tile__outline rect {
+  stroke-width: 6;
+}
+
+.canvas[data-detail="silhouette"] .tile__overflow-count,
+.canvas[data-detail="silhouette"] .tile__overflow-line {
+  display: none;
+}
+
 /* ---- Far out: the summary ---------------------------------------------- *
  * Zoomed out past the threshold a tile changes what it draws rather than
  * shrinking what it draws. It keeps the claim and the three readings and drops
@@ -465,27 +533,21 @@
   border-left: none;
 }
 
-/* One belief, said the way it would be read out loud: the owner, the number,
- * the range. **One wrapping line, not three columns and not two rows** — the
- * range stays beside its number wherever it fits and drops under it where it
- * does not. Nothing counts anything; the browser wraps when the words run out
- * of room.
+/* One belief, said the way it would be read out loud: the owner, then the
+ * number. **One wrapping line, not two columns and not two rows.** Nothing
+ * counts anything; the browser wraps when the words run out of room.
  *
- * **Why it has to be allowed to wrap.** Every word out here is set at
- * twenty-two pixels and may not be set smaller: half zoom is as far out as the
- * map goes, and twenty-two pixels there is the eleven the product promises. The
- * longest line the engine can print — the owner *market*, a three-figure
- * likelihood and a three-figure range, which the stored example's strike branch
- * really does print — comes to 281 pixels against the 256 a belief row has, and
- * 244 on the two tiles whose outline cuts into one side. It cannot be made to
- * fit on one line, and a range is never dropped and never cut off. So it is
- * given a line. (Measured at the furthest zoom on 2026-09-22: on that branch
- * the hypothesis lost 23 pixels of its range off the right of its row and
- * Lloyd's lost 11.)
+ * **The range used to live on this line and is gone** *(2026-09-22, R48)*. It
+ * was the reason the line had to be allowed to wrap at all: the owner *market*,
+ * a three-figure likelihood and a three-figure range came to 281 pixels against
+ * the 256 a belief row has, so the range dropped under its number. An owner and
+ * a number fit on one line on every tile now, and the wrap is left in place for
+ * the other thing that can overrun it — a reading that is words, such as *the
+ * ask did not come back*.
  *
- * **The wrapped range lines up with the number, not with the owner**, so it
- * reads as the rest of that belief rather than as a belief of its own. That is
- * the padding below, with the same distance taken back off the owner: the owner
+ * **A wrapped line lines up with the number, not with the owner**, so it reads
+ * as the rest of that belief rather than as a belief of its own. That is the
+ * padding below, with the same distance taken back off the owner: the owner
  * hangs out into it on the first line, and every line after the first starts
  * where the number starts. */
 .tile[data-detail="summary"] .belief-chip__face {
@@ -507,8 +569,9 @@
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: var(--space-1);
-  /* The two lines of one belief are held together by their line height alone;
-   * the gap that separates one belief from the next is on the row above. */
+  /* Where one belief does run to two lines, they are held together by their
+   * line height alone; the gap that separates one belief from the next is on
+   * the row above. */
   row-gap: 0;
   width: 100%;
   padding-left: calc(var(--far-owner) + var(--space-1));
@@ -538,24 +601,19 @@
  * it.** The bar carries no text, so the browser had nothing to take a baseline
  * from and used the bar's bottom edge — and a four-pixel bar centred in a
  * twenty-two-pixel line sits about five pixels above where the words sit, so
- * the owner, the number and the range were lined up on the bar and the whole
- * line was pushed five pixels down the tile for nothing. Saying that the number
- * is the thing with a baseline puts those five pixels back, a line, and leaves
- * the bar where it was drawn. */
+ * the owner and the number were lined up on the bar and the whole line was
+ * pushed five pixels down the tile for nothing. Saying that the number is the
+ * thing with a baseline puts those five pixels back, a line, and leaves the bar
+ * where it was drawn. */
 .tile[data-detail="summary"] .belief-chip__figure {
   align-self: baseline;
 }
 
-.tile[data-detail="summary"] .belief-chip__under {
-  flex: none;
-}
-
 .tile[data-detail="summary"] .belief-chip__owner,
-.tile[data-detail="summary"] .belief-chip__reading,
-.tile[data-detail="summary"] .belief-chip__under {
+.tile[data-detail="summary"] .belief-chip__reading {
   font-size: var(--text-lg);
   /* Tighter than the 1.25 the near form sets. The tile's box was reserved from
-   * the near form and never grows, so the room a wrapped range needs has to
+   * the near form and never grows, so the room a wrapped reading needs has to
    * come from somewhere inside it: this is two and a half pixels a line of it,
    * and the step above the row is the rest. */
   line-height: 1.15;
@@ -564,12 +622,61 @@
 
 /* A reading that is words rather than a number — *no engine yet*, *Supposed ·
  * Oct 2* — takes the rest of the line and wraps inside it, instead of starting
- * a line of its own. It costs nothing: a chip showing words has no range under
- * it, so the line it would have taken is free. Last of these rules, because it
- * is the narrowest: a rule that names more than the one before it and is
- * written above it may never get its turn. */
+ * a line of its own. Last of these rules, because it is the narrowest: a rule
+ * that names more than the one before it and is written above it may never get
+ * its turn. */
 .tile[data-detail="summary"] .belief-chip[data-reading="words"] .belief-chip__reading {
   flex: 1 1 0;
+}
+
+/* ---- Further out still: the silhouette --------------------------------- *
+ * Past the zoom at which the largest of the three type sizes would itself land
+ * under eleven pixels, there is no size left to fall back to — so the tile
+ * stops printing words rather than printing them smaller, which is the same
+ * answer it gave at the first threshold taken one step further. `Tile.tsx`
+ * draws nothing but the outline out here; what is below is only how that
+ * outline has to change to be seen from where the reader now is.
+ *
+ * **Nothing here sets a type size**, and that is not an omission: a rule that
+ * set one would be a rule about words that are not drawn.
+ *
+ * Kent, 2026-09-22: *"Can we make it so it's possible to zoom out a lot more?"* */
+
+/* The outline is now the whole tile, so it is drawn to be seen at a sixth of
+ * life size. Two changes, and both are forced by the arithmetic rather than
+ * chosen: the stroke is six pixels in the map's own coordinates, which is about
+ * one pixel on the glass at the furthest the map zooms out and three at the
+ * nearest of this form; and the two kinds that keep the hairline step up to the
+ * muted text colour, because a tenth of the text colour is a separator between
+ * things a reader is reading and out here the outline is the only thing on the
+ * screen. The hue rule is untouched — the two kinds that take a hue still take
+ * it, below, and the other two still do not. */
+.tile[data-detail="silhouette"] .tile__outline path {
+  stroke: var(--text-muted);
+  stroke-width: 6;
+}
+
+.tile[data-kind="hypothesis"][data-detail="silhouette"] .tile__outline path {
+  stroke: var(--accent);
+}
+
+.tile[data-kind="market"][data-detail="silhouette"] .tile__outline path {
+  stroke: var(--kind-market);
+}
+
+/* The one corner a kind draws twice, at the same doubling it has near to: the
+ * ticket-stub cut is what tells a tradeable outcome from an ordinary step when
+ * neither is printing the word. */
+.tile[data-detail="silhouette"] .tile__outline .tile__cut {
+  stroke-width: 12;
+}
+
+/* The ports go with the words. A port is a two-pixel bar saying which socket a
+ * wire lands in, and at this zoom it is a third of a pixel — a smudge on the
+ * edge of the shape rather than a reading. The sockets themselves stay where
+ * they are, because the wires are drawn to them; only the ink goes. */
+.tile[data-detail="silhouette"] .tile__port {
+  background: none;
 }
 
 /* ---- The ports ---------------------------------------------------------- *

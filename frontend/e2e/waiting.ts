@@ -171,8 +171,8 @@ export async function standOn(page: Page, claim: string): Promise<void> {
  * things into a tile's style — its stacking order, whether the pointer may reach
  * it, and whether it is visible at all, which it turns off and on again as it
  * measures boxes — and only one of them is where the tile is. Comparing the
- * whole style across a change compares those too, and then "nothing already
- * placed moved" fails on a tile that was merely being re-measured. For the same
+ * whole style across a change compares those too, and then "the tile kept its
+ * place" fails on a tile that was merely being re-measured. For the same
  * reason this waits for the tile to have a **place** rather than for it to be
  * visible: where it sits is a fact about the layout, and whether it is painted
  * this instant is not.
