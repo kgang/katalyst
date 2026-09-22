@@ -46,15 +46,18 @@ A map of causes is not a trade. This part turns it into one, and is careful abou
 
 ## Routes
 
-Five routes carry this part to the browser, all under the `/api/` prefix. One is built.
+Six routes carry this part to the browser, all under the `/api/` prefix. Four are built.
 
 | Route | What it answers | |
 |---|---|---|
 | `POST /api/thesis/position` | The reader's exit, how often each end of it is reached first, the rail of *what takes you out*, and the greyed ceiling | **built** — [`position.md`](position.md) §B6 |
+| `POST /api/thesis/card` | The whole thesis a reader carries away, in nine sections | **built** — [`card-and-export.md`](card-and-export.md) §B7 |
+| `POST /api/thesis/export` | That card as a document a program can read | **built** — [`card-and-export.md`](card-and-export.md) §B7 |
+| `POST /api/thesis/export/markdown` | That document as a page a person reads | **built** — [`card-and-export.md`](card-and-export.md) §B7 |
 | `POST /api/thesis/quote` | A venue's two prices for a contract, recorded first and fetched second | planned |
 | `POST /api/thesis/quote/refresh` | The same prices, read again on request | planned |
-| `POST /api/thesis/card` | The whole thesis a reader carries away, in six sections | planned |
-| `GET /api/thesis/export` | That card as a document a program can read | planned |
+
+All four built routes answer a refusal the same way and check a request the same way, because the vocabulary, the envelope and the four checks are written once in `backend/src/katalyst/api/thesis.py` and imported by the card's file beside it.
 
 ---
 
