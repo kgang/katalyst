@@ -382,7 +382,7 @@ def test_a_branch_folded_onto_a_generated_map_moves_the_same_endings(
     # asserting about the numbers, and the reason no number is written down here.
     also = Diff.model_validate(on_the_stored_one.json())
     assert difference.claims == also.claims
-    assert [one.claim_id for one in difference.rows] == [one.claim_id for one in also.rows]
+    assert [one.target for one in difference.rows] == [one.target for one in also.rows]
     assert difference.summary == also.summary
 
 

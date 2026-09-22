@@ -120,6 +120,9 @@ def a_claim(
         id=PropositionId(name),
         claim=f"The claim written down under the name {name}.",
         kind="market" if payoff is not None else "event",
+        # Every claim on this map is something that happens once and stays happened,
+        # which is what `event` says. Decision record 0017 made the word required.
+        persistence="event",
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",
