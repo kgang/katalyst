@@ -357,7 +357,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/thesis/position": {
+    "/api/thesis/card": {
         parameters: {
             query?: never;
             header?: never;
@@ -367,38 +367,111 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Take A Position
-         * @description Say how often each end of the reader's exit is reached first, and what takes them out.
+         * Build Card
+         * @description Build one thesis card on one ending of a map.
          *
-         *     Six steps, and every one of them can be read off the answer afterwards. The
-         *     branch is folded onto the map and the ending's payoff says what is traded and
-         *     which way. The reader's four numbers are checked, all faults at once. Worlds are
-         *     drawn forward from the same map, branch and seed, carrying the day each claim
-         *     came on. A daily price path is walked through every one of them, applying only
-         *     what the market has not already priced. The two first-touch shares are read to
-         *     the reader's own horizon and no further. And the claims over-represented in the
-         *     worlds where the stop went first are ranked beside them.
+         *     What the route fetches and what it hands to the card:
          *
-         *     **The greyed ceiling is read from the map with nothing fixed by an edit**, never
-         *     from the branch the reader is looking at: a world in which something has been
-         *     supposed or recorded answers a different question from a venue's price, so an
-         *     edge read off it would be an edge against a question nobody asked.
+         *     | Part of the card | Where it comes from |
+         *     |---|---|
+         *     | The trade | the ending's own payoff |
+         *     | What is priced in | `thesis/edge.py`, against the **recorded** quote |
+         *     | What carries it | the Verify door's weakest arrow and its share of the shift |
+         *     | What takes you out | `thesis/lift.py`, over the drawn worlds |
+         *     | Your exit | what the reader typed, with `thesis/ceiling.py` beside it |
+         *     | What else can I trade | `thesis/card.py`, ranked by two rules kept apart |
+         *     | What this does not know | the fixed refusals, carried as data |
          *
          *     Args:
-         *         request: Which map, which branch, which seed, which ending, and the
-         *             reader's own entry, exit and risk budget.
+         *         request: Which example, which branch, which seed, which ending, and the
+         *             exit the reader typed.
          *
          *     Returns:
-         *         The trade, the exit with its two first-touch shares and its greyed ceiling,
-         *         the rail of what takes the reader out, and what the path applied.
+         *         One card, stamped with the map, the branch and the seed it came from.
          *
          *     Raises:
          *         HTTPException: With status 404 and a sentence naming the examples that do
          *             exist, when nothing is stored under that name. With status 422 and
-         *             every reason at once, when the branch does not fit the map or the form
-         *             has faults.
+         *             every reason at once, when the branch does not fit the map, when the
+         *             ending is not a tradeable claim on it, or when the exit the reader
+         *             typed is not one a position can be taken on.
          */
-        post: operations["take_a_position_api_thesis_position_post"];
+        post: operations["build_card_api_thesis_card_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/thesis/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Card
+         * @description Write the same card out as the declarative document a program reads.
+         *
+         *     **Legs and conditions, never an order.** A venue's combination-leg structure is
+         *     an order format, and a document shaped like one implies it could be submitted
+         *     somewhere; this product is not an execution layer.
+         *
+         *     The document is checked against the committed description of itself before it
+         *     leaves: the description is generated from these very shapes and committed
+         *     beside them, so the check is that the committed file still says what the code
+         *     says, and that the document answers it.
+         *
+         *     Args:
+         *         request: The same five things a card takes.
+         *
+         *     Returns:
+         *         The document: the stamp, the leg, the conditions, the exit, the ranked
+         *         endings, and the limits as fields.
+         *
+         *     Raises:
+         *         HTTPException: With status 404 or 422 exactly as the card route, or 500
+         *             when the committed description of the document has drifted from the
+         *             shapes — which is a fault in this repository rather than in the
+         *             request, and is said out loud rather than served.
+         */
+        post: operations["export_card_api_thesis_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/thesis/export/markdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Page
+         * @description Write the same card out as the page a person reads.
+         *
+         *     One place writes a number out, and it cannot write one without its owner and
+         *     without the rule its kind names — so a page showing a number nobody owns, or a
+         *     likelihood at six figures, cannot be produced here.
+         *
+         *     Args:
+         *         request: The same five things a card takes.
+         *
+         *     Returns:
+         *         The page as `text/markdown`, in the same order as the panel.
+         *
+         *     Raises:
+         *         HTTPException: With status 404 or 422 exactly as the card route.
+         */
+        post: operations["export_page_api_thesis_export_markdown_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -611,6 +684,133 @@ export interface components {
             interventions: (components["schemas"]["Do"] | components["schemas"]["Observe"] | components["schemas"]["Insert"] | components["schemas"]["Retune"] | components["schemas"]["Refine"] | components["schemas"]["Believe"])[];
         };
         /**
+         * Card
+         * @description The whole thesis the reader carries away, stamped with what produced it.
+         *
+         *     A card is a **state of the panel, never a dialog**, and it can always be thrown
+         *     away and rebuilt: the map it came from, the branch and the seed are on it, and
+         *     the same three produce the same card.
+         */
+        Card: {
+            /**
+             * Base Id
+             * @description The map this card was built from.
+             */
+            base_id: string;
+            /**
+             * Branch Id
+             * @description The branch folded on, or nothing at all for the untouched map.
+             */
+            branch_id: string | null;
+            /**
+             * Seed
+             * @description The one number every random draw behind this card came from.
+             */
+            seed: number;
+            /**
+             * As Of
+             * Format: date
+             * @description The first day of the window the numbers were worked out over.
+             */
+            as_of: string;
+            /**
+             * Hypothesis
+             * @description The claim the map starts from.
+             */
+            hypothesis: string;
+            /**
+             * Hypothesis Says
+             * @description That claim, in one sentence.
+             */
+            hypothesis_says: string;
+            the_trade: components["schemas"]["TheTrade"];
+            /**
+             * Carried By
+             * @description The claims whose arrows carry most of the hypothesis's effect on this ending.
+             */
+            carried_by: components["schemas"]["WhatCarriesIt"][];
+            /**
+             * Priced In
+             * @description The edge against a venue's two prices, or the named refusal and the break-even.
+             */
+            priced_in: components["schemas"]["PricedIn"] | components["schemas"]["NotPriced"];
+            /** @description The claims over-represented where the stop went first. */
+            takes_you_out: components["schemas"]["WhatTakesYouOutShown"];
+            /**
+             * Watch
+             * @description What is adverse, resolves in time, and can be seen.
+             */
+            watch: components["schemas"]["WhatToWatch"][];
+            /**
+             * Unhedgeable
+             * @description What is adverse and cannot be watched for, with the reason.
+             */
+            unhedgeable: components["schemas"]["UnhedgeableShown"][];
+            /** @description What the reader typed, and how often each end is hit. */
+            your_exit: components["schemas"]["YourExit"];
+            /**
+             * Tails
+             * @description Claims that are unlikely and would hurt, ranked by harm, never averaged.
+             */
+            tails: components["schemas"]["TailRow"][];
+            /**
+             * Shocks
+             * @description Suppositions the reader placed, with no probability attached.
+             */
+            shocks: components["schemas"]["ShockRow"][];
+            /** @description Every tradeable ending on the map, ranked by two rules kept apart. */
+            what_else: components["schemas"]["WhatElseCanITrade"];
+            /** @description The refusals, the not-advice line and the one execution sentence. */
+            does_not_know: components["schemas"]["WhatThisDoesNotKnow"];
+        };
+        /**
+         * CardRequest
+         * @description What it takes to build one card: a map, a branch, a seed, an ending, and an exit.
+         *
+         *     The same five give a byte-identical card on any machine and at any time, which
+         *     is what makes a card somebody read three days ago reproducible from what is
+         *     stamped on it.
+         */
+        CardRequest: {
+            /**
+             * Base Id
+             * @description The short name of the stored example, such as "hormuz".
+             */
+            base_id: string;
+            /** @description The edits in force, sent whole because there is nowhere to keep one yet. Leave it out for the map with nothing done to it. **The edge is always read from the map as it stands**, never from the edited world, so an edit cannot quietly improve what a venue is charging. */
+            branch?: components["schemas"]["Branch"] | null;
+            /**
+             * Seed
+             * @description The one number every random draw behind this card comes from. Bounded by what a browser can hold exactly.
+             */
+            seed: number;
+            /**
+             * Ending
+             * @description The ending the card leads with — the one the reader has taken a position on. Every other tradeable ending on the map is ranked beside it.
+             */
+            ending: string;
+            /** @description The stop, the target, the horizon and the risk budget. */
+            exit: components["schemas"]["ExitAsked"];
+            /**
+             * Shocks
+             * @description Suppositions the reader placed on top of the branch above, each named in their own words. The card reports what each did to the position and **no probability**: supposing something is not a forecast.
+             * @default []
+             */
+            shocks: components["schemas"]["Branch"][];
+            /**
+             * Versions
+             * @description The outer loop: how many versions of the map to try.
+             * @default 2000
+             */
+            versions: number;
+            /**
+             * Worlds
+             * @description The inner loop: how many worlds to run under each version.
+             * @default 8
+             */
+            worlds: number;
+        };
+        /**
          * CeilingShown
          * @description The greyed quartered-Kelly ceiling, and the words it is always shown under.
          *
@@ -752,6 +952,43 @@ export interface components {
              * @default 8
              */
             worlds: number;
+        };
+        /**
+         * Conditions
+         * @description The computed lists, each row carrying what it rests on.
+         *
+         *     These are the conditions the legs above hold under: what carries them, what
+         *     takes the reader out, what to watch and by when, what cannot be watched for,
+         *     the tails, and any shock the reader placed.
+         */
+        Conditions: {
+            /**
+             * Carried By
+             * @description The claims whose arrows carry most of the hypothesis's effect on the ending.
+             */
+            carried_by: components["schemas"]["WhatCarriesIt"][];
+            /** @description The claims over-represented in the worlds where the stop went first. */
+            takes_you_out: components["schemas"]["WhatTakesYouOutShown"];
+            /**
+             * Watch
+             * @description What is adverse, resolves before the ending, and can be seen by anybody.
+             */
+            watch: components["schemas"]["WhatToWatch"][];
+            /**
+             * Unhedgeable
+             * @description What is adverse and cannot be watched for, each with its reason.
+             */
+            unhedgeable: components["schemas"]["UnhedgeableShown"][];
+            /**
+             * Tails
+             * @description Claims that are unlikely and would hurt, ranked by harm and never averaged.
+             */
+            tails: components["schemas"]["TailRow"][];
+            /**
+             * Shocks
+             * @description Suppositions the reader placed, each with no probability.
+             */
+            shocks: components["schemas"]["ShockExported"][];
         };
         /**
          * ContractPayoff
@@ -1044,6 +1281,88 @@ export interface components {
             weight: number;
         };
         /**
+         * ExitAsked
+         * @description What the reader types about getting out. Every number here is theirs.
+         *
+         *     A stop is a price the reader owns and this product never derives one (decision
+         *     record 0019). What it derives beside these numbers is what takes them out and
+         *     what to watch.
+         */
+        ExitAsked: {
+            /**
+             * Entry
+             * @description The price they entered at, in the instrument's own units.
+             */
+            entry: number;
+            /**
+             * Stop
+             * @description The price at which they get out for a loss. Theirs.
+             */
+            stop: number;
+            /**
+             * Target
+             * @description The price at which they get out for a gain. Theirs.
+             */
+            target: number;
+            /**
+             * Horizon
+             * Format: date
+             * @description The day by which they expect to be out. The two first-touch shares are read to this day and no further: shares over a window nobody named are two numbers nobody can check.
+             */
+            horizon: string;
+            /**
+             * Risk Budget
+             * @description The share of their capital they are prepared to lose here. The size it implies is worked out from it and the distance to their stop, and is never a recommendation.
+             */
+            risk_budget: number;
+            /**
+             * Daily Move
+             * @description How far the instrument moves in a day, in price units — one standard deviation of a day's change. The reader's own number today.
+             */
+            daily_move: number;
+        };
+        /**
+         * Export
+         * @description The whole document: legs, conditions, the exit, and the limits carried as data.
+         */
+        Export: {
+            /**
+             * Schema
+             * @description What this document calls itself, so a program knows what it has.
+             * @constant
+             */
+            schema: "katalyst.thesis/1";
+            /** @description The map, the branch, the seed and the day, so it replays. */
+            map: components["schemas"]["Stamp"];
+            hypothesis: components["schemas"]["Hypothesis"];
+            /**
+             * Legs
+             * @description One position, complete on its own.
+             */
+            legs: components["schemas"]["Leg"][];
+            /** @description The computed lists the legs hold under. */
+            conditions: components["schemas"]["Conditions"];
+            /** @description What the reader typed about getting out. */
+            risk_exit: components["schemas"]["RiskExit"];
+            /** @description Every tradeable ending on the map, ranked by two rules kept apart. */
+            what_else: components["schemas"]["WhatElseCanITrade"];
+            /**
+             * Refuses
+             * @description What this document does not know, in full sentences, carried as data. Never empty: a document with no limits is a claim nobody on this map may make.
+             */
+            refuses: string[];
+            /**
+             * Not Advice
+             * @description What this document is not, in one line.
+             */
+            not_advice: string;
+            /**
+             * Execution
+             * @description The one thing this product says about getting out, and nothing else.
+             */
+            execution: string;
+        };
+        /**
          * Figure
          * @description One number on the card, with who it belongs to and where it came from.
          *
@@ -1240,6 +1559,22 @@ export interface components {
             status: "ok";
         };
         /**
+         * Hypothesis
+         * @description The claim the map starts from.
+         */
+        Hypothesis: {
+            /**
+             * Id
+             * @description Its identifier on the map.
+             */
+            id: string;
+            /**
+             * Claim
+             * @description The claim, in one sentence.
+             */
+            claim: string;
+        };
+        /**
          * Insert
          * @description Add a new claim to the map, together with the arrows that connect it.
          *
@@ -1278,6 +1613,89 @@ export interface components {
              * @description What the person typed: "…but Iran is struck the next day".
              */
             claim_in_words: string;
+        };
+        /**
+         * Leg
+         * @description One position, with everything a reader of this document needs about it.
+         *
+         *     A leg is complete on its own: what is traded, which way, what the model says,
+         *     what a venue charges, the two edges or the named refusal, the break-even, the
+         *     size the reader's own risk budget implies, and the greyed ceiling with its
+         *     label attached. A program that reads a leg should not have to look anywhere
+         *     else to know what it may and may not do with the numbers in it.
+         *
+         *     One leg is what this version builds, because one position is what the reader
+         *     holds. The field is a list so that two positions are two legs rather than a
+         *     different document.
+         */
+        Leg: {
+            /**
+             * Ending
+             * @description The ending this leg is on.
+             */
+            ending: string;
+            /**
+             * Claim
+             * @description That ending's claim, in one sentence.
+             */
+            claim: string;
+            /**
+             * Trades
+             * @description Whether it names something traded whose price moves, or a contract.
+             * @enum {string}
+             */
+            trades: "instrument" | "contract";
+            /**
+             * Instrument
+             * @description What is bought or sold, named the way its venue names it.
+             */
+            instrument: string;
+            /**
+             * Side
+             * @description Which way the trade is pointed.
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /**
+             * Venue
+             * @description The venue, where the ending names a contract.
+             */
+            venue: string | null;
+            /**
+             * Contract Id
+             * @description The venue's own identifier for that contract.
+             */
+            contract_id: string | null;
+            /**
+             * Contract Side
+             * @description Which outcome of the contract the ending takes.
+             */
+            contract_side: ("yes" | "no") | null;
+            /**
+             * Resolves
+             * Format: date
+             * @description The day the ending's own claim is judged.
+             */
+            resolves: string;
+            /**
+             * Resolution Test
+             * @description The test that settles it, word for word.
+             */
+            resolution_test: string;
+            /**
+             * Resolved By
+             * @description Who applies that test.
+             */
+            resolved_by: string;
+            /**
+             * Priced In
+             * @description The model's number, a venue's two prices and the two edges — or the named refusal and the break-even that stands where no edge could be built.
+             */
+            priced_in: components["schemas"]["PricedIn"] | components["schemas"]["NotPriced"];
+            /** @description The share of capital the reader's own risk budget implies. Their rule's arithmetic, and never a recommendation. */
+            size: components["schemas"]["Figure"];
+            /** @description The greyed quartered-Kelly ceiling, carried as a value with its label attached, so a program that reads the number reads *never size to this* with it. */
+            ceiling: components["schemas"]["CeilingShown"];
         };
         /**
          * Link
@@ -1365,6 +1783,119 @@ export interface components {
             reflexive: boolean;
         };
         /**
+         * MixtureShown
+         * @description How a supposed reading relates to the unsupposed one — an explanation, never a sum.
+         *
+         *     After *Suppose this is true* the reader sees the ending's number re-worked in a
+         *     world where the supposition holds, beside an edge computed from the world where
+         *     nothing was supposed. These are the terms relating the two: the map's own
+         *     chance of the supposition times the reading where it holds, plus one minus that
+         *     chance times the reading where it does not.
+         *
+         *     **The two terms do not add up to the unsupposed number and nothing here claims
+         *     they do.** A cause of the supposed claim may reach the ending another way, and
+         *     supposing something pins a **date** as well as a truth while the unsupposed
+         *     world averages over the days it might have happened. So these are four numbers
+         *     shown term by term, and nothing computes an edge from them.
+         */
+        MixtureShown: {
+            /**
+             * Supposed
+             * @description The claim the reader supposed.
+             */
+            supposed: string;
+            /** @description The map's own chance of that claim coming out the way they supposed it. */
+            weight_supposed: components["schemas"]["Figure"];
+            /** @description One minus it. The two always sum to one. */
+            weight_otherwise: components["schemas"]["Figure"];
+            /** @description The ending's likelihood in the world the reader is looking at. */
+            reading_supposed: components["schemas"]["Figure"];
+            /** @description The ending's likelihood where that same claim goes the other way. */
+            reading_otherwise: components["schemas"]["Figure"];
+            /**
+             * Says
+             * @description What these terms are, and what they are not.
+             */
+            says: string;
+        };
+        /**
+         * NotPriced
+         * @description What is priced in, where an edge could not be built — a named refusal and a break-even.
+         *
+         *     A refusal is a value and never a blank. Where the ending names a contract, the
+         *     break-even comes with it, because it needs no quote and is the honest answer
+         *     when there is none. Where the ending names an instrument, the break-even is a
+         *     **price** rather than a likelihood, and the reader's own entry price is what
+         *     makes it computable.
+         */
+        NotPriced: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "not_priced";
+            /**
+             * Because
+             * @description Which of the four refusals this is.
+             * @enum {string}
+             */
+            because: "conditional_world" | "no_contract" | "no_quote" | "settled_market";
+            /**
+             * Sentence
+             * @description What the card prints, in plain words a reader can act on.
+             */
+            sentence: string;
+            /** @description The venue's fee, where anybody has read it. Nothing at all where nobody has. */
+            fee: components["schemas"]["Figure"] | null;
+            /**
+             * Fee Is Unknown
+             * @description Said out loud where nobody has read the fee schedule; nothing otherwise.
+             */
+            fee_is_unknown: string | null;
+            /** @description Worth buying below this, where the ending names a contract. */
+            buy_below: components["schemas"]["Figure"] | null;
+            /** @description Worth selling above this, where the ending names a contract. */
+            sell_above: components["schemas"]["Figure"] | null;
+            /** @description The price at which a position in an instrument is worth nothing: the reader's own entry price moved by what it costs to get in and out. Nothing at all where the ending names a contract, which has a break-even in likelihoods instead. */
+            price_break_even: components["schemas"]["Figure"] | null;
+            /**
+             * Costs Are Unknown
+             * @description Said out loud where nobody has stated what it costs to get in and out of the instrument, so the price above is the entry price itself.
+             */
+            costs_are_unknown: string | null;
+        };
+        /**
+         * NotRanked
+         * @description One tradeable ending the ranking leaves out, and why.
+         *
+         *     Said out loud rather than quietly missing, because *this ending is not ranked*
+         *     and *this ending was never considered* are different facts and a reader can act
+         *     on only one of them.
+         */
+        NotRanked: {
+            /**
+             * Ending
+             * @description The ending left out.
+             */
+            ending: string;
+            /**
+             * Says
+             * @description Its claim, in one sentence.
+             */
+            says: string;
+            /**
+             * Because
+             * @description Which of the three reasons it was.
+             * @enum {string}
+             */
+            because: "inside_the_model_range" | "no_edge" | "no_shift";
+            /**
+             * Sentence
+             * @description What the card prints beside it.
+             */
+            sentence: string;
+        };
+        /**
          * Observe
          * @description Record that a claim actually came true (or false) — this is news, not a lever.
          *
@@ -1389,155 +1920,6 @@ export interface components {
              * @description True if the claim came out true; False if it came out false.
              */
             value: boolean;
-        };
-        /**
-         * PositionAnswer
-         * @description The reader's exit, how often each end of it is reached first, and what takes them out.
-         *
-         *     A state of the panel that can always be thrown away and rebuilt: the map, the
-         *     branch, the seed and the number of worlds drawn are all on it, and the same
-         *     four produce the same answer.
-         */
-        PositionAnswer: {
-            /**
-             * Base Id
-             * @description The map this position was worked out on.
-             */
-            base_id: string;
-            /**
-             * Branch Id
-             * @description The branch in force, or nothing at all for the untouched map.
-             */
-            branch_id: string | null;
-            /**
-             * Seed
-             * @description The one number every random draw behind this answer came from.
-             */
-            seed: number;
-            /**
-             * As Of
-             * Format: date
-             * @description The first day of the window the numbers were worked out over.
-             */
-            as_of: string;
-            /** @description How many worlds the event days were read off. */
-            drawn_worlds: components["schemas"]["Figure"];
-            /** @description How many equally-weighted worlds those worlds' weights are worth, which is what every floor in this answer is measured against. */
-            effective_draws: components["schemas"]["Figure"];
-            the_trade: components["schemas"]["TheTrade"];
-            /** @description What you typed, what your own risk budget implies, how often each end is reached first, and the greyed ceiling that is never a size. */
-            your_exit: components["schemas"]["YourExit"];
-            /** @description The claims over-represented in the worlds where your stop went first, ranked. Nothing at all where there was no first touch to rank them over, which is a contract ending — the reason is on the exit above. */
-            takes_you_out: components["schemas"]["WhatTakesYouOutShown"] | null;
-            /**
-             * Path Applied
-             * @description What each claim did to the price on the walk, and what the market had already priced of it. Empty where no claim on this map moves this instrument.
-             */
-            path_applied: components["schemas"]["WhatThePathApplied"][];
-        };
-        /**
-         * PositionRefused
-         * @description One thing this route will not do, the field at fault, and what it says.
-         *
-         *     A refusal is never a blank: it names a stable code a screen can switch on, the
-         *     field the reader should look at, and one plain sentence. Nothing is silently
-         *     repaired, and every fault the request has comes back together — a form that
-         *     reveals one mistake at a time is a form nobody finishes.
-         */
-        PositionRefused: {
-            /**
-             * Code
-             * @description Which rule this is, from the closed list of ten.
-             */
-            code: ("stop_on_the_wrong_side" | "target_not_beyond_entry" | "horizon_after_the_claim" | "risk_budget_out_of_range" | "price_outside_the_contract" | "first_touch_on_a_contract") | ("unknown_ending" | "the_ending_names_no_trade" | "horizon_outside_the_window" | "nothing_agrees_with_what_happened");
-            /**
-             * Field
-             * @description The field at fault, named as the reader sees it.
-             */
-            field: string;
-            /**
-             * Sentence
-             * @description What the screen prints.
-             */
-            sentence: string;
-        };
-        /**
-         * PositionRequest
-         * @description What it takes to work out a position: a map, a branch, a seed, an ending, and an exit.
-         *
-         *     The first three are what every computed answer in this program is built from,
-         *     and the same three give the same answer on any machine and at any time. The
-         *     ending says which trade. The rest is the reader's own, and none of it is
-         *     derived from anything: a map of claims cannot say where somebody should get
-         *     out.
-         */
-        PositionRequest: {
-            /**
-             * Base Id
-             * @description The short name of the stored example, such as "hormuz".
-             */
-            base_id: string;
-            /** @description The branch in force, sent whole because there is nowhere to keep one yet. Leave it out for the map with nothing done to it. A position is **not** an edit: it appears on no branch and moves nothing on the map. */
-            branch?: components["schemas"]["Branch"] | null;
-            /**
-             * Seed
-             * @description The one number every random draw in the answer comes from — the drawn worlds and the price paths alike. Bounded by what a browser can hold exactly, so a browser can always send back a seed the server used.
-             */
-            seed: number;
-            /**
-             * Ending
-             * @description The ending being traded. What it names and which way is read off its payoff.
-             */
-            ending: string;
-            /**
-             * Entry
-             * @description The price you entered at, in the instrument's own units. Yours.
-             */
-            entry: number;
-            /**
-             * Stop
-             * @description The price at which you get out for a loss. Yours, and never derived.
-             */
-            stop: number;
-            /**
-             * Target
-             * @description The price at which you get out for a gain. Yours, and never derived.
-             */
-            target: number;
-            /**
-             * Horizon
-             * Format: date
-             * @description The day you expect to be out. The two first-touch shares are read to this day and no further, because reading to the end of whatever window the drawn worlds carry answers a question nobody asked.
-             */
-            horizon: string;
-            /**
-             * Risk Budget
-             * @description The share of your capital you are prepared to lose on this trade. What it implies about size is arithmetic on it and your stop, and is never a recommendation. Bounded by the position form rather than here, so that a reader who types a hundred instead of a hundredth is told what a risk budget is in the form's own words, beside every other fault at once.
-             */
-            risk_budget: number;
-            /**
-             * Daily Move
-             * @description How far the instrument moves in a day, in price units — one standard deviation of a day's change. Yours today: nothing in this program measures it.
-             */
-            daily_move: number;
-            /**
-             * Versions
-             * @description The outer loop the worlds beside this position are built at.
-             * @default 2000
-             */
-            versions: number;
-            /**
-             * Worlds
-             * @description The inner loop those worlds run.
-             * @default 8
-             */
-            worlds: number;
-            /**
-             * Drawn Worlds
-             * @description How many worlds to draw the event days from. A request above the ceiling is refused rather than quietly made smaller; the ceiling is the count the engine draws for itself, so the days a trade reads and the days a claim's own number was corrected by are one sample and not two.
-             * @default 50000
-             */
-            drawn_worlds: number;
         };
         /**
          * PricePayoff
@@ -1569,6 +1951,55 @@ export interface components {
              * @description How far the instrument's price is expected to move if the claim comes out true, as a fraction of that price: 0.03 means three per cent. The side is carried by `direction`, so this number is never negative.
              */
             move: number;
+        };
+        /**
+         * PricedIn
+         * @description What is priced in, where a venue quotes this claim and an edge could be built.
+         *
+         *     The card shows whichever side is worth taking. When neither is, that is a
+         *     complete answer rather than a gap: the number this side pays on sits inside the
+         *     venue's own bid and offer with fees paid.
+         */
+        PricedIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "priced";
+            /** @description The claim's own likelihood — the chance it comes true — read from the map with nothing fixed by an edit. */
+            model: components["schemas"]["Figure"];
+            /** @description The likelihood this side of the contract actually pays on. The same number on a yes side; one minus it, range turned over, on a no side. */
+            pays_on: components["schemas"]["Figure"];
+            /** @description The venue's two prices and the day they were read. */
+            quote: components["schemas"]["QuotedPrices"];
+            /** @description What the venue charges on one filled trade, in the same units as a price. Nothing at all means nobody has read the venue's schedule, which is not the same as a fee of nothing. */
+            fee: components["schemas"]["Figure"] | null;
+            /**
+             * Fee Is Unknown
+             * @description Said out loud where nobody has read the fee schedule; nothing otherwise.
+             */
+            fee_is_unknown: string | null;
+            /** @description What buying is worth, at the offer, after the fee. */
+            buying: components["schemas"]["Figure"];
+            /** @description What selling is worth, at the bid, after the fee. */
+            selling: components["schemas"]["Figure"];
+            /**
+             * Headline
+             * @description Which side the card leads with, or that neither is worth taking.
+             * @enum {string}
+             */
+            headline: "buying" | "selling" | "no_edge_at_this_price";
+            /**
+             * Not Headlined Because
+             * @description Why a positive edge is not led with: the gap is narrower than the venue's smallest price step, or it is inside the model's own stated range.
+             */
+            not_headlined_because: string | null;
+            /** @description Worth buying at any offer below this. */
+            buy_below: components["schemas"]["Figure"];
+            /** @description Worth selling at any bid above this. */
+            sell_above: components["schemas"]["Figure"];
+            /** @description The terms relating a supposed reading to this one, where the reader supposed something and the other world was worked out. An explanation that never computes the edge. Nothing at all otherwise. */
+            mixture: components["schemas"]["MixtureShown"] | null;
         };
         /**
          * Proposition
@@ -1622,6 +2053,90 @@ export interface components {
              * @description Why this chain ends without an instrument, in one plain sentence. Required when `kind` is `not_tradeable` — again by the validity rules.
              */
             not_tradeable_reason?: string | null;
+        };
+        /**
+         * QuotedPrices
+         * @description What a venue is showing, and when it was read.
+         *
+         *     A price the reader typed is **theirs**, not a venue's: it is their report of a
+         *     price they believe they could deal at, and it never fills the market's slot. So
+         *     the three figures below are owned by a venue on a quote a venue gave and by the
+         *     reader on one they typed, and the card says which on the same line as the
+         *     number.
+         */
+        QuotedPrices: {
+            /** @description The best bid: the price you would sell at. */
+            bid: components["schemas"]["Figure"];
+            /** @description The best offer: the price you would buy at. */
+            offer: components["schemas"]["Figure"];
+            /** @description Halfway between the two, shown because a reader recognises it and never traded at. */
+            midpoint: components["schemas"]["Figure"];
+            /**
+             * Venue
+             * @description Which venue published it, or that the reader entered it.
+             */
+            venue: string;
+            /**
+             * Read On
+             * Format: date
+             * @description The day it was read.
+             */
+            read_on: string;
+            /**
+             * How
+             * @description How it reached us: read now, read from a committed file, or typed.
+             */
+            how: string;
+        };
+        /**
+         * RankedEnding
+         * @description One tradeable ending in the ranking, and which rule put it there.
+         */
+        RankedEnding: {
+            /**
+             * Ending
+             * @description The ending.
+             */
+            ending: string;
+            /**
+             * Says
+             * @description Its claim, in one sentence.
+             */
+            says: string;
+            /**
+             * Trades
+             * @description Whether it names something traded or a contract.
+             * @enum {string}
+             */
+            trades: "instrument" | "contract";
+            /**
+             * Instrument
+             * @description What would be bought or sold, or the contract's identifier.
+             */
+            instrument: string;
+            /**
+             * Ranked By
+             * @description Which of the two rules ranked this row. Never a blend of the two.
+             * @enum {string}
+             */
+            ranked_by: "the_size_of_its_edge" | "the_shift_times_the_move";
+            /** @description The number that rule ranked it on. */
+            key: components["schemas"]["Figure"];
+            /**
+             * Made Of
+             * @description The numbers the key is made of, so it can say why it is what it is.
+             */
+            made_of: components["schemas"]["Figure"][];
+            /**
+             * Headline
+             * @description Whether this row may be led with, or only listed.
+             */
+            headline: boolean;
+            /**
+             * Not Headlined Because
+             * @description Why it may not be led with. Nothing where it may.
+             */
+            not_headlined_because: string | null;
         };
         /**
          * Readiness
@@ -1728,6 +2243,44 @@ export interface components {
             reconcile: "marginalize";
         };
         /**
+         * Refused
+         * @description One reason a card could not be built: a stable code, the thing at fault, a sentence.
+         *
+         *     Two different kinds of fault arrive here and both are shaped the same way, so a
+         *     screen has one thing to read. A **branch that does not fit the map** names the
+         *     claim or arrow at fault. A **form the reader filled in** names the field they
+         *     should look at. Neither is ever repaired silently and neither arrives one at a
+         *     time: every reason comes back together.
+         */
+        Refused: {
+            /**
+             * Code
+             * @description Which rule this is, as a stable string a screen can switch on.
+             */
+            code: string;
+            /**
+             * Subject
+             * @description What is at fault: the identifier of a claim or an arrow for a branch that does not fit, or the name of a form field as the reader sees it.
+             */
+            subject: string;
+            /**
+             * Message
+             * @description One plain sentence the person reads.
+             */
+            message: string;
+        };
+        /**
+         * RefusedCard
+         * @description Every reason a card was refused, in a settled order, never just the first.
+         */
+        RefusedCard: {
+            /**
+             * Detail
+             * @description Every reason the card could not be built, in a settled order.
+             */
+            detail: components["schemas"]["Refused"][];
+        };
+        /**
          * RefusedEdit
          * @description Why a branch could not be folded onto a map: every reason at once, never just the first.
          *
@@ -1743,17 +2296,6 @@ export interface components {
              * @description Every reason the branch was refused, in a settled order.
              */
             detail: components["schemas"]["Violation"][];
-        };
-        /**
-         * RefusedPosition
-         * @description Every reason a position could not be worked out, in a settled order.
-         */
-        RefusedPosition: {
-            /**
-             * Detail
-             * @description Every reason at once, never just the first one found.
-             */
-            detail: components["schemas"]["PositionRefused"][];
         };
         /**
          * Resolution
@@ -1848,6 +2390,110 @@ export interface components {
             strength: number;
         };
         /**
+         * RiskExit
+         * @description What the reader typed about getting out, and how often each end is reached first.
+         *
+         *     The size their risk budget implies and the greyed ceiling are **not** here:
+         *     they are on the leg, because a leg has to be complete on its own.
+         */
+        RiskExit: {
+            /** @description The price they entered at. */
+            entry: components["schemas"]["Figure"];
+            /** @description The price at which they get out for a loss. Never derived. */
+            stop: components["schemas"]["Figure"];
+            /** @description The price at which they get out for a gain. Never derived. */
+            target: components["schemas"]["Figure"];
+            /**
+             * Horizon
+             * Format: date
+             * @description The day by which they expect to be out.
+             */
+            horizon: string;
+            /** @description The share of capital they are prepared to lose here. */
+            risk_budget: components["schemas"]["Figure"];
+            /** @description How often the stop is touched before the target, over the drawn worlds. */
+            stop_first: components["schemas"]["Figure"] | null;
+            /** @description How often the target is touched first. */
+            target_first: components["schemas"]["Figure"] | null;
+            /** @description How often the window closes with neither touched. The three sum to one. */
+            neither: components["schemas"]["Figure"] | null;
+            /** @description The level actually checked for the stop, after the barrier shift. */
+            stop_at: components["schemas"]["Figure"] | null;
+            /** @description The same, for the target. */
+            target_at: components["schemas"]["Figure"] | null;
+            /** @description How many days of the window the shares were read to: the reader's own horizon, counted from the day the window opened. Shares over a window nobody named are numbers nobody can check. */
+            through: components["schemas"]["Figure"] | null;
+            /**
+             * First Touch Refused
+             * @description Why there is no first touch here. Nothing where the shares were worked out.
+             */
+            first_touch_refused: string | null;
+            /**
+             * Method
+             * @description How the shares were arrived at.
+             */
+            method: string | null;
+        };
+        /**
+         * ShockExported
+         * @description A shock the reader placed, with its probability written down as nothing at all.
+         *
+         *     The field exists and is fixed at nothing. An absent field reads as an
+         *     oversight; a field that says *null* says that nobody claims to know, which is
+         *     the truth: the reader supposed this, and supposing something is not a statement
+         *     about how likely it is.
+         */
+        ShockExported: {
+            /**
+             * Name
+             * @description What they supposed, in their own words.
+             */
+            name: string;
+            /**
+             * Placed By
+             * @description Who placed it. Always the reader.
+             * @constant
+             */
+            placed_by: "reader";
+            /**
+             * Probability
+             * @description Always nothing at all. A shock is supposed, not forecast, and this document will not carry a number here.
+             */
+            probability: null;
+            /** @description What the position is worth on that branch less what it is worth without it. */
+            change_to_the_position: components["schemas"]["Figure"];
+            /**
+             * Says
+             * @description Why there is no probability here.
+             */
+            says: string;
+        };
+        /**
+         * ShockRow
+         * @description A supposition the reader placed, and what it did to the position — with no probability.
+         */
+        ShockRow: {
+            /**
+             * Name
+             * @description What they supposed, in their own words.
+             */
+            name: string;
+            /**
+             * Placed By
+             * @description Who placed it. Always the reader: nothing else places a shock.
+             * @default reader
+             * @constant
+             */
+            placed_by: "reader";
+            /** @description What the position is worth on that branch less what it is worth without it. */
+            change_to_the_position: components["schemas"]["Figure"];
+            /**
+             * Says
+             * @description Why there is no probability here, in the reader's own terms.
+             */
+            says: string;
+        };
+        /**
          * Source
          * @description Something a reader can open to check what we are claiming.
          *
@@ -1871,6 +2517,62 @@ export interface components {
              * @description The day our retrieval step fetched it. None when a person supplied the source by hand.
              */
             retrieved?: string | null;
+        };
+        /**
+         * Stamp
+         * @description The three things a card can be rebuilt from, plus the day it was worked out for.
+         *
+         *     A world is a computed result and never a source of truth: it can always be
+         *     thrown away and rebuilt from the base map, the branch and the seed. Stamping
+         *     them here is what makes the document replayable rather than merely readable.
+         */
+        Stamp: {
+            /**
+             * Base Id
+             * @description The map this was built from.
+             */
+            base_id: string;
+            /**
+             * Branch Id
+             * @description The branch folded on, or nothing at all for the untouched map.
+             */
+            branch_id: string | null;
+            /**
+             * Seed
+             * @description The one number every random draw behind this came from.
+             */
+            seed: number;
+            /**
+             * As Of
+             * Format: date
+             * @description The first day of the window the numbers were worked out over.
+             */
+            as_of: string;
+        };
+        /**
+         * TailRow
+         * @description One tail: unlikely, and enough to hurt. Never averaged into anything.
+         */
+        TailRow: {
+            /**
+             * Claim
+             * @description The unlikely claim.
+             */
+            claim: string;
+            /**
+             * Says
+             * @description Its claim, in one sentence.
+             */
+            says: string;
+            /** @description The model's own chance of it, range and all. */
+            likelihood: components["schemas"]["Figure"];
+            /** @description What it would do to the position, as a loss. */
+            harm: components["schemas"]["Figure"];
+            /**
+             * What Could Be Done
+             * @description What a reader could do about it, or why nothing can.
+             */
+            what_could_be_done: string;
         };
         /**
          * TakesYouOutRow
@@ -2126,6 +2828,38 @@ export interface components {
              */
             seconds: number;
         };
+        /**
+         * UnhedgeableShown
+         * @description One adverse turn nothing can warn the reader about, with the reason.
+         */
+        UnhedgeableShown: {
+            /**
+             * Claim
+             * @description The claim.
+             */
+            claim: string;
+            /**
+             * Says
+             * @description Its claim, in one sentence.
+             */
+            says: string;
+            /**
+             * Why
+             * @description Why it cannot be watched for.
+             */
+            why: string;
+            /**
+             * Resolves
+             * Format: date
+             * @description The day it is judged.
+             */
+            resolves: string;
+            /**
+             * Can Be Seen
+             * @description Whether anybody publishes the answer at all.
+             */
+            can_be_seen: boolean;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -2168,6 +2902,57 @@ export interface components {
             message: string;
         };
         /**
+         * WhatCarriesIt
+         * @description One row of *what carries it*: a claim, and how much of the effect its arrows carry.
+         */
+        WhatCarriesIt: {
+            /**
+             * Claim
+             * @description The claim.
+             */
+            claim: string;
+            /**
+             * Says
+             * @description Its claim, in one sentence.
+             */
+            says: string;
+            /** @description How much of the shift this claim accounts for. */
+            points: components["schemas"]["Figure"];
+            /** @description What part of the whole shift that is. */
+            share: components["schemas"]["Figure"];
+        };
+        /**
+         * WhatElseCanITrade
+         * @description Every tradeable ending on the map, ranked — by two rules, kept apart.
+         *
+         *     Two lists rather than one because an edge in cents and a move in per cent are
+         *     not the same quantity and there is no honest exchange rate between them. Each
+         *     list is ordered within itself; no row is ever ordered against a row in the
+         *     other.
+         */
+        WhatElseCanITrade: {
+            /**
+             * By The Size Of Its Edge
+             * @description Endings a venue quotes, best edge first, whichever side it favours.
+             */
+            by_the_size_of_its_edge: components["schemas"]["RankedEnding"][];
+            /**
+             * By The Shift Times The Move
+             * @description Endings naming an instrument, largest shift times move first.
+             */
+            by_the_shift_times_the_move: components["schemas"]["RankedEnding"][];
+            /**
+             * Not Ranked
+             * @description Tradeable endings neither rule could rank, each with its reason.
+             */
+            not_ranked: components["schemas"]["NotRanked"][];
+            /**
+             * Two Rules
+             * @description Why there are two lists, said on the card itself.
+             */
+            two_rules: string;
+        };
+        /**
          * WhatTakesYouOutShown
          * @description The rail: the rows, what was left off it, and what the numbers rest on.
          */
@@ -2200,21 +2985,38 @@ export interface components {
             sample_says: string;
         };
         /**
-         * WhatThePathApplied
-         * @description What one claim did to the price on the walk, and what the market had already priced.
+         * WhatThisDoesNotKnow
+         * @description The limits, carried as data rather than as a footer.
          *
-         *     A price path that applied a claim's **whole** stated move on top of today's
-         *     price would count that move twice, because today's price already reflects the
-         *     market's own chance of the claim. So the path applies the **surprise** — the
-         *     move scaled by one minus that chance — and gives the priced-in part back day by
-         *     day while the claim has not happened. Which chance was used, where it came from,
-         *     and what shape the giving back followed are all here, because every one of them
-         *     moves the first-touch shares.
+         *     A footer is dropped by whatever reads the document next; a field has to be
+         *     read. So the refusals are a list of full sentences, the not-advice line is a
+         *     field, and the one thing this product says about getting out is a field too.
          */
-        WhatThePathApplied: {
+        WhatThisDoesNotKnow: {
+            /**
+             * Refuses
+             * @description Every limit, in full sentences.
+             */
+            refuses: string[];
+            /**
+             * Not Advice
+             * @description What this document is not, in one line.
+             */
+            not_advice: string;
+            /**
+             * Execution
+             * @description The one thing said about getting out, and nothing else.
+             */
+            execution: string;
+        };
+        /**
+         * WhatToWatch
+         * @description One adverse turn to keep an eye on — and never a stop.
+         */
+        WhatToWatch: {
             /**
              * Claim
-             * @description The claim whose coming true moves the price.
+             * @description The claim to watch.
              */
             claim: string;
             /**
@@ -2222,34 +3024,19 @@ export interface components {
              * @description Its claim, in one sentence.
              */
             says: string;
-            /** @description The market's own chance of the claim, which is what the path did not apply. */
-            market_chance: components["schemas"]["Figure"];
             /**
-             * Came From
-             * @description Which of the four sources that chance came from, as a stable word.
-             * @enum {string}
+             * Resolves
+             * Format: date
+             * @description The day it is judged, which is before the ending's own.
              */
-            came_from: "venue_quote" | "sample_share" | "base_world" | "reader";
-            /** @description How far the instrument moves if the claim comes true, as the model stated it. */
-            stated_move: components["schemas"]["Figure"];
-            /** @description That same move in the instrument's own price units, which is what a path takes. */
-            level_gap: components["schemas"]["Figure"];
+            resolves: string;
             /**
-             * Converted
-             * @description What turning a share of the price into price units costs, in plain words.
+             * Observed By
+             * @description Who publishes the answer.
              */
-            converted: string;
-            /**
-             * Decay Shape
-             * @description Which shape the giving back followed, as a stable word.
-             * @enum {string}
-             */
-            decay_shape: "arrival_days" | "straight_line" | "nothing_given_back";
-            /**
-             * Decay Says
-             * @description What that shape is, in plain words.
-             */
-            decay_says: string;
+            observed_by: string;
+            /** @description How far it moves the ending against the reader's side. */
+            hurts_by: components["schemas"]["Figure"];
         };
         /**
          * World
@@ -2915,7 +3702,7 @@ export interface operations {
             };
         };
     };
-    take_a_position_api_thesis_position_post: {
+    build_card_api_thesis_card_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2924,7 +3711,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PositionRequest"];
+                "application/json": components["schemas"]["CardRequest"];
             };
         };
         responses: {
@@ -2934,23 +3721,83 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PositionAnswer"];
+                    "application/json": components["schemas"]["Card"];
                 };
             };
-            /** @description No example is stored under that name. The answer is one sentence naming the examples this program does ship with. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A position the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. A body the server cannot read at all is also a 422, and says so in its own words. */
+            /** @description The request cannot be carried out as written — either the branch does not fit the map, or the exit the reader typed is not one a position can be taken on. The answer lists every reason at once, each with a stable code a screen can switch on, the thing at fault, and one plain sentence. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedPosition"];
+                    "application/json": components["schemas"]["RefusedCard"];
+                };
+            };
+        };
+    };
+    export_card_api_thesis_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Export"];
+                };
+            };
+            /** @description The request cannot be carried out as written — either the branch does not fit the map, or the exit the reader typed is not one a position can be taken on. The answer lists every reason at once, each with a stable code a screen can switch on, the thing at fault, and one plain sentence. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusedCard"];
+                };
+            };
+        };
+    };
+    export_page_api_thesis_export_markdown_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardRequest"];
+            };
+        };
+        responses: {
+            /** @description The same document as a page of text, in the panel's own order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/markdown": string;
+                };
+            };
+            /** @description The request cannot be carried out as written — either the branch does not fit the map, or the exit the reader typed is not one a position can be taken on. The answer lists every reason at once, each with a stable code a screen can switch on, the thing at fault, and one plain sentence. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusedCard"];
                 };
             };
         };
