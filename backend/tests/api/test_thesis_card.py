@@ -33,7 +33,19 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from katalyst.api.main import app
-from katalyst.api.thesis_card import NO_PATH_TO_RANK, _every_answer
+from katalyst.api.thesis_card import (
+    NO_PATH_TO_RANK,
+    REFUSES,
+    CardRequest,
+    ExitAsked,
+    _built,
+    _drawn_worlds,
+    _every_answer,
+    _the_ending,
+    _the_position,
+    _what_moves_the_price,
+    _worth_of,
+)
 from katalyst.domain import (
     Belief,
     Beliefs,
@@ -45,6 +57,7 @@ from katalyst.domain import (
     PricePayoff,
     Proposition,
     Resolution,
+    Retune,
     Source,
     World,
 )
@@ -56,8 +69,11 @@ from katalyst.thesis import (
     Card,
     Export,
     NotComparable,
+    Refusal,
     as_json,
+    first_touch,
     schema_json,
+    walk,
 )
 from katalyst.thesis.edge import A_VALUE_IS_FIXED, NO_PRICE_READ
 from katalyst.thesis.export import EXPORT_SCHEMA_FILE
@@ -549,8 +565,8 @@ def test_a_form_that_cannot_be_accepted_comes_back_naming_every_field_at_fault()
         "target_not_beyond_entry",
         "horizon_after_the_claim",
     ]
-    assert [one["subject"] for one in reasons] == ["stop", "target", "horizon"]
-    assert [one["message"] for one in reasons] == [
+    assert [one["field"] for one in reasons] == ["stop", "target", "horizon"]
+    assert [one["sentence"] for one in reasons] == [
         REFUSALS["stop_on_the_wrong_side"],
         REFUSALS["target_not_beyond_entry"],
         REFUSALS["horizon_after_the_claim"],
@@ -563,7 +579,9 @@ def test_an_ending_the_map_does_not_carry_is_refused_by_name() -> None:
         answer = client.post("/api/thesis/card", json=asked(ending="NOT-ON-THIS-MAP"))
 
     assert answer.status_code == 422
-    assert [one["code"] for one in answer.json()["detail"]] == ["unknown_ending"]
+    reasons = answer.json()["detail"]
+    assert [one["code"] for one in reasons] == ["unknown_ending"]
+    assert reasons[0]["field"] == "ending"
 
 
 def test_a_claim_that_names_no_trade_is_refused_by_name() -> None:
@@ -573,8 +591,9 @@ def test_a_claim_that_names_no_trade_is_refused_by_name() -> None:
 
     assert answer.status_code == 422
     reasons = answer.json()["detail"]
-    assert [one["code"] for one in reasons] == ["ending_names_no_trade"]
-    assert reasons[0]["subject"] == "H"
+    assert [one["code"] for one in reasons] == ["the_ending_names_no_trade"]
+    assert reasons[0]["field"] == "ending"
+    assert reasons[0]["sentence"] == REFUSES["the_ending_names_no_trade"]
 
 
 def test_a_contract_price_outside_its_own_range_is_refused_on_the_field_at_fault() -> None:
@@ -596,7 +615,7 @@ def test_a_contract_price_outside_its_own_range_is_refused_on_the_field_at_fault
     assert answer.status_code == 422
     reasons = answer.json()["detail"]
     assert {one["code"] for one in reasons} == {"price_outside_the_contract"}
-    assert [one["subject"] for one in reasons] == ["entry", "target"]
+    assert [one["field"] for one in reasons] == ["entry", "target"]
 
 
 # --- The world an edge is read from ------------------------------------------
@@ -646,6 +665,14 @@ def test_a_world_that_already_fixes_a_value_prices_nothing_at_all() -> None:
     reads its edges from the map as it stands, so this is the seam rather than the
     whole route: handed a world that already carries a fixed value, it prices
     nothing and says why for every ending at once.
+
+    **The refusal is unreachable through the route, and deliberately so**, which is
+    why this test reaches the route's own pricing helper with a world built here.
+    A base map can only come from a stored example or from a map this process
+    generated, and neither carries a fixed value: an assignment exists only where
+    a branch has been folded. The guard inside `priced` is defence in depth
+    against a future caller handing the world on screen in twice — which is the
+    one mutation this test is here to catch.
     """
     supposing = Branch(
         id="br_supposing",
@@ -665,3 +692,212 @@ def test_a_world_that_already_fixes_a_value_prices_nothing_at_all() -> None:
         assert isinstance(one, NotComparable)
         assert one.reason == "conditional_world"
         assert one.sentence == A_VALUE_IS_FIXED
+
+
+# --- The two faults the assembly review found --------------------------------
+
+
+def test_a_horizon_outside_the_window_the_map_covers_is_refused_by_name() -> None:
+    """The day the reader expects to be out has to leave at least one day to walk.
+
+    The form cannot ask this: its own rule compares the horizon with the day the
+    *claim* is judged, which is a different question. A horizon on the day the
+    window opens leaves no days at all, and a date picker defaulting to today is
+    the obvious way a reader reaches it — so without a guard here the paths are
+    walked, `first_touch` raises, and the reader is shown a 500.
+    """
+    on_the_first_day = an_exit(horizon=DAY_ZERO.isoformat())
+    with TestClient(app) as client:
+        for route in ("card", "export", "export/markdown"):
+            answer = client.post(f"/api/thesis/{route}", json=asked(exit=on_the_first_day))
+
+            assert answer.status_code == 422, route
+            reasons = answer.json()["detail"]
+            assert [one["code"] for one in reasons] == ["horizon_outside_the_window"]
+            assert reasons[0]["field"] == "horizon"
+            assert reasons[0]["sentence"] == REFUSES["horizon_outside_the_window"]
+
+
+def a_retuned_branch() -> Branch:
+    """A branch that only changes how hard the step pushes the ending it is traded on.
+
+    A retune fixes no value, so nothing on the map is cut loose — which is what
+    makes it the right branch for the test below: a shock supposing the step true
+    cannot wash it out, so a shocked world that has lost it is a different world
+    and says so.
+    """
+    return Branch(
+        id="br_tuned",
+        label="Suppose Brent pushes the fund pair harder",
+        interventions=(Retune(kind="retune", link="B->M2", strength=3.0),),
+    )
+
+
+def a_shock() -> Branch:
+    """A supposition the reader places with the mouse: Brent falls."""
+    return Branch(
+        id="br_shock",
+        label="but suppose Brent falls",
+        interventions=(Do(kind="do", target="B", value=True, at=DAY_ZERO),),
+    )
+
+
+def _the_worth(branch: Branch | None) -> float:
+    """What the position is worth on one branch, recomputed here from the pure functions.
+
+    Nothing is read off the answer under test: the world, the drawn worlds, the
+    paths and the first-touch shares are all worked out again here, so the number
+    this file compares against is one it computed rather than one it was handed.
+    """
+    request = CardRequest(
+        base_id="hormuz",
+        seed=SEED,
+        ending=HORMUZ_PAIR,
+        branch=branch,
+        exit=ExitAsked.model_validate(an_exit()),
+        **SMALL,
+    )
+    world = _built("hormuz", branch, request)
+    ending = _the_ending(world, HORMUZ_PAIR)
+    position = _the_position(ending, request.exit)
+    paths = walk(
+        _drawn_worlds(world),
+        _what_moves_the_price(ending, position),
+        entry=position.entry,
+        daily_move=position.daily_move,
+        seed=SEED,
+    )
+    touch = first_touch(paths, position)
+    assert not isinstance(touch, Refusal)
+    return _worth_of(touch, paths, position)
+
+
+def test_a_shock_is_placed_on_top_of_the_branch_in_force() -> None:
+    """A shock supposes something *as well as* the branch, never instead of it.
+
+    Two things follow and both are checked. The change it reports is the
+    position's worth with the branch **and** the shock, less its worth with the
+    branch alone — recomputed here from a branch written out with both sets of
+    edits in it, so the comparison rests on nothing the route did. And a shock
+    that names the branch in force as its parent is accepted rather than refused,
+    because that branch is its parent by construction: it gives the same number to
+    the last digit.
+    """
+    branch, shock = a_retuned_branch(), a_shock()
+    together = Branch(
+        id="br_together",
+        label="Both, written out by hand",
+        interventions=(*branch.interventions, *shock.interventions),
+    )
+    expected = _the_worth(together) - _the_worth(branch)
+
+    body = asked(branch=branch.model_dump(mode="json"), shocks=[shock.model_dump(mode="json")])
+    parented = asked(
+        branch=branch.model_dump(mode="json"),
+        shocks=[shock.model_copy(update={"parent": branch.id}).model_dump(mode="json")],
+    )
+    with TestClient(app) as client:
+        answer = client.post("/api/thesis/card", json=body)
+        named = client.post("/api/thesis/card", json=parented)
+
+    assert answer.status_code == 200, answer.text
+    assert named.status_code == 200, named.text
+    row = answer.json()["shocks"][0]
+    assert row["name"] == shock.label
+    assert row["change_to_the_position"]["value"] == expected
+    assert named.json()["shocks"][0] == row
+
+
+# --- The three holes the mutation run found ----------------------------------
+
+
+def test_the_drawn_worlds_come_from_the_map_the_reader_is_looking_at() -> None:
+    """Same seed, same map, same **branch** as the world shown — the sample's one rule.
+
+    An edit changes which worlds are drawn and when each claim comes on in them,
+    so it changes how often the reader's stop is reached first. A sample drawn on
+    the map with the reader's edits stripped out would answer a question nobody
+    asked, and would do it silently: every other number on the card would still
+    move.
+    """
+    supposing = Branch(
+        id="br_supposing_brent",
+        label="Suppose Brent falls",
+        interventions=(Do(kind="do", target="B", value=True, at=DAY_ZERO),),
+    )
+    with TestClient(app) as client:
+        plain = a_card(client)
+        edited = a_card(client, branch=supposing.model_dump(mode="json"))
+
+    assert plain.your_exit.stop_first is not None
+    assert edited.your_exit.stop_first is not None
+    assert plain.your_exit.stop_first.value != edited.your_exit.stop_first.value
+
+
+def test_the_fee_is_unknown_and_never_quietly_nothing() -> None:
+    """Nobody has read this venue's schedule, so the card says so rather than netting to zero.
+
+    An edge quietly netted against a fee of nothing prints a number that looks net
+    and is not, which is worse than no number at all.
+    """
+    with TestClient(app) as client:
+        card = on_the_built_map(client, "quoted", **A_CONTRACTS_PRICES)
+
+    priced_in = card.priced_in
+    assert priced_in.kind == "priced"
+    assert priced_in.fee is None
+    assert priced_in.fee_is_unknown, "an unknown fee is said in words, beside the two edges"
+
+
+def test_the_level_gap_carries_the_payoff_s_own_direction() -> None:
+    """A claim pushes the instrument the way its payoff says, and the sign is the whole point.
+
+    The level gap is the move the map states, converted against the price the
+    reader entered at, signed by which side of the instrument pays when the claim
+    comes true. Drop the sign and a short ending is walked as a long one: the stop
+    and the target swap. Both numbers here are worked out in this test from the
+    map's own stated move and the reader's own entry price.
+    """
+    hold(four_endings())
+    # A short ending's stop sits above the entry price and its target below;
+    # a long ending's the other way about. Both are the reader's own numbers.
+    shorting = an_exit()
+    going_long = an_exit(stop=67.0, target=76.0)
+
+    for name, direction, typed in (("pair", -1.0, shorting), ("future", 1.0, going_long)):
+        request = CardRequest(
+            base_id=FOUR_ENDINGS,
+            seed=SEED,
+            ending=name,
+            exit=ExitAsked.model_validate(typed),
+            **SMALL,
+        )
+        ending = _the_ending(_built(FOUR_ENDINGS, None, request), name)
+        payoff = ending.payoff
+        assert isinstance(payoff, PricePayoff)
+        position = _the_position(ending, request.exit)
+        (move,) = _what_moves_the_price(ending, position)
+
+        assert position.side == ("short" if direction < 0 else "long")
+
+        assert move.claim == name
+        assert move.move == direction * position.entry * payoff.move
+        assert move.market_chance is None, "the walk reads the market's chance for itself"
+        assert move.market_chance_from == "sample_share"
+
+
+def test_a_risk_budget_outside_its_own_range_is_refused_in_the_form_s_own_words() -> None:
+    """A reader who types a hundred instead of a hundredth is told what a risk budget is.
+
+    The bound lives in the position form rather than on the request shape, so the
+    answer is the form's own sentence beside every other fault at once, and never
+    a validation error naming a field path.
+    """
+    with TestClient(app) as client:
+        answer = client.post("/api/thesis/card", json=asked(exit=an_exit(risk_budget=100.0)))
+
+    assert answer.status_code == 422
+    reasons = answer.json()["detail"]
+    assert [one["code"] for one in reasons] == ["risk_budget_out_of_range"]
+    assert reasons[0]["field"] == "risk budget"
+    assert reasons[0]["sentence"] == REFUSALS["risk_budget_out_of_range"]
