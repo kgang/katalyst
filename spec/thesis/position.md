@@ -83,6 +83,26 @@ Refusals read like the map's own validity rules: a stable code, the field at fau
 
 Given a risk budget and the distance from entry to stop, the size that loses exactly that budget is arithmetic on two numbers the reader typed — the share of capital to put in is the budget times the entry price, over the distance to the stop. The card shows it as what their own rule implies, **never as a recommendation**, and it is **not capped**: a stop nearer the entry than the budget is to the whole implies more than all their capital, and saying so is more useful than quietly clipping it. Beside it sits the greyed **quartered-Kelly ceiling** of `ceiling.py`, labelled *never size to this*. On getting out the card says one thing and no more: *a stop order's trigger is not its fill price.*
 
+### B6 — Asking for one over the wire
+
+One route, in `backend/src/katalyst/api/thesis.py`, under the `/api/` prefix like everything else the browser calls.
+
+| Route | Body | Answer |
+|---|---|---|
+| `POST /api/thesis/position` | `{base_id, branch?, seed, ending, entry, stop, target, horizon, risk_budget, daily_move, versions?, worlds?, drawn_worlds?}` — the branch is sent whole, as it is to the world routes, because there is nowhere to keep one yet | The trade, the exit with its two first-touch shares and its greyed ceiling, the rail of *what takes you out*, and what the price path applied to each claim |
+
+**The three prices the reader owns are declared on the request and never set** — written as annotations with no value beside them, exactly as they are on the card's own exit, so that the check which reads our own source can tell a field a reader fills in from a number somebody worked out. A test points that check at the routes as well as at this layer.
+
+**Four things come back, and each says who owns every number on it.** *The trade* — the ending, what is bought or sold, which way, and the test that settles it, all read off the map's own payoff. *Your exit* — the reader's four numbers, what their own risk budget implies, the two first-touch shares with the day they were read to, and the greyed ceiling. *What takes you out* — the rail, ranked, with the effective-draw floor said out loud. *What the path applied* — for each claim that moves the price, the market's chance with the source it came from, the map's stated share, the level gap in price units it was converted to, and which shape the giving back followed.
+
+**The days come from the engine's own weighted forward sample**, asked for from the same map, branch and seed a world is built from, through `sample_of` in `engine/worlds.py`. `drawn_worlds` says how many; its default and its ceiling are the same number the engine draws for itself, so the days a trade reads and the days a claim's own number was corrected by are one sample and not two. A request above the ceiling is refused rather than quietly made smaller.
+
+**The greyed ceiling's edge is read from the world with nothing fixed by an edit**, never from the branch on screen — record 0018, and Kent's decision R20: any fixed value in that world returns *conditional world* and no edge. The route therefore builds two worlds, and a branch that supposes something still gets this ending's own refusal rather than that one.
+
+**What it refuses, and how.** A name matching no stored example is a `404` naming the examples that do exist. A branch that does not fit the map is a `422` carrying the world routes' own violations. Everything else a reader can fix is a `422` carrying every fault at once, each with a stable code, the field at fault and one plain sentence: the six the form owns, plus four the route owns — `unknown_ending`, `the_ending_names_no_trade`, `horizon_outside_the_window`, and `nothing_agrees_with_what_happened`, which is what the engine raises when nothing a map can produce agrees with what *This happened* recorded. **Two things that are not mistakes come back inside a perfectly good answer:** a contract ending's first touch is refused by name, and the rail is absent with it because there is nothing to rank over; and where no edge could be built the ceiling is absent carrying that refusal's own sentence.
+
+The four routes `README.md` still promises — the two quote routes, the card and the export — are not built.
+
 ---
 
 ## INVARIANTS
@@ -121,7 +141,7 @@ Written *for all inputs drawn from generator S, statement P holds*. `positions()
 
 1. **Is a claim's stated move a level gap or a reaction?** The surprise rule needs the first — the level where the claim is true against the level where it is false — and the model answers with the second unless asked precisely. One sentence in the one shape freeze; until it lands the rule can discount twice. The map states a move as a **share of the price** today, and this layer takes one in **price units**, so whatever adapts the two converts; a percentage move compounds and the additive arithmetic puts free drift back above about a twenty per cent move.
 2. **How much of the giveback's shape is noise?** The engine's arrivals land on about two dozen days, so the histogram behind the schedule has at most that many bars. How few arrivals it takes before that shape is noise is unmeasured.
-3. **Which number is the market's chance, exactly?** The neutral assumption is the model's own, and there are two candidates: the base world's likelihood for the claim, read on its own resolve-by day, and the share of the **drawn worlds** in which it comes on inside the trade's window. They agree only where the window is the claim's own horizon. The path has no drift at all under the second — that is what makes the invariant above an identity — so a supplier handing in the first should expect a little drift and say so.
+3. ~~**Which number is the market's chance, exactly?**~~ **Answered 2026-09-21 by row R41** of the decisions note, written up as a dated amendment at the foot of decision record 0019 and stated in *Where `q` comes from, in order* above: the share of the **drawn worlds** in which the claim comes on inside the trade's window, worked out by `the_sample_s_own_chance` rather than handed in. It is the only reading under which the path carries no drift at all. The claim's printed likelihood, read on its own resolve-by day, stays as the fallback where the sample carries no arrivals inside the window, and a screen using it owes the reader that sentence — which is why the source of the chance is a closed list of four rather than three, and why `POST /api/thesis/position` names it beside the number.
 4. **How many drawn worlds, and where does the instrument's day-to-day variability come from?** The first is a measurement to be made; the second is the reader's own number today, and measuring it needs a third data source. The walk also steps at one fixed variability for the whole window, where a real instrument's moves most around the event.
 5. **Does a position survive a branch change?** It is not an edit, so it lives on no branch — but a reader who supposes something new and comes back expects their numbers to still be there.
 
