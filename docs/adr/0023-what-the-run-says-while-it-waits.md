@@ -7,7 +7,7 @@ decision-makers: Kent Gang
 consulted: Kent's own walk of the app with his model key, 2026-09-21 (`plans/notes/2026-09-21-kent-m4-feedback.md`); analyst UA's read-only pass over the generating screen, the same day (`plans/ux-round/A-live-status.md`); the red team's re-run of it (`plans/ux-round/RT-red-team.md`: its verdict on this plan, and items 5 and 7 of *what must change*); ADR-0012 (a replay is the real stream played back); ADR-0008 (how much browser testing a change needs)
 informed: agents working in `frontend/src/stream/`, `frontend/src/components/`, `frontend/src/a11y/` and `frontend/e2e/`; the stack-06-4 dock lane, which owned the *Run details* move until this record pulled it forward
 supersedes: none
-superseded-by: none
+superseded-by: 0027, in part — its *no ninth event* only; the dated amendment is in the body
 spec-impact: spec/workbench/streaming-growth.md (B1, the dock's fourth section, a new B11, B10, INV-workbench.78, two new invariants .80 and .81, anti-pattern 8 and a new 13, open question 1 answered — and INV-workbench.60, .18 and .73 explicitly unchanged); spec/workbench/README.md visual review checklist VR2 and VR13; PRODUCT_REQUIREMENTS.md UX-8 and §10 anti-pattern 9; ARCHITECTURE.md §1 and §10
 ---
 
@@ -100,6 +100,8 @@ One check is **added**, because this decision creates the first timer in product
 ### What this does not build
 
 * **No ninth event.** Open question 1 of `spec/workbench/streaming-growth.md` is answered: not in version one. Everything the strip says is already on the eight events or on the browser's own clock. A ninth event would be the first to carry *activity* rather than a *decision*, and no committed recording holds it — so a replay would be visibly less alive than a live run, which is the one thing ADR-0012 cannot allow. If it is ever wanted it rides the one shape freeze, where all four recordings are made together.
+
+  **Amended 2026-09-22 — superseded in part by ADR-0027 (Kent, R44 and R47).** The reasoning above holds for an event carrying a **decision**, which a recording must hold; it does not hold for a line carrying **activity**, which a recording must not. `activity` — what a model call is doing this second, in the model's own words — is sent on a live run only and is never recorded, never transcribed, never replayed, never billed and never counted by the transcript counter. So a replay is not less alive for want of it: **a replay shows no activity for the same reason it shows no seconds**, which is that the thing being reported does not exist in a replay, and ADR-0012 — *a recording is the real stream, line for line* — is left whole, because a recording is the real stream of decisions. Everything else in this record stands: no progress bar, no percentage, no time remaining, no count of calls in flight, no faster replay, and nothing spins.
 * **No progress bar, no percentage, no time remaining.**
 * **No count of calls in flight.** The browser can count proposals; it cannot count calls; it should say *proposals*.
 * **No faster replay.** A replay that races teaches a reviewer the product is faster than it is.

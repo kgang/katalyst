@@ -30,9 +30,11 @@ Proposal · Rejection · Generation receipt · Grounding · Streaming · Transcr
 |---|---|
 | `proposals.md` | `INV-generation.1` – `.8` |
 | `grounding.md` | `.9` – `.15` |
-| `streaming.md` | `.16` – `.22` |
+| `streaming.md` | `.16` – `.21`, and `.33` |
 | `replay.md` | `.22` – `.27` |
 | `evaluation.md` | `.28` – `.32` |
+
+**`streaming.md`'s block is not one run**, and that is the pool working rather than failing: a chapter that gains an invariant after the blocks were handed out takes the next free number rather than the next one in its own block. `.33` was written as `.22` on 2026-09-22, which was already `replay.md`'s, and was corrected the same day. The next free number is `.34`.
 
 ## Chapters
 

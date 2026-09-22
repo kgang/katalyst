@@ -905,7 +905,7 @@ function MapSurface({
         edges={edges}
         nodeTypes={TILE_TYPES}
         edgeTypes={WIRE_TYPES}
-        // Tiles do not move. Automatic layout decides where a claim sits, and a
+        // You cannot move a tile. Automatic layout decides where a claim sits, and a
         // tile you can drag half of the time — snapping back whenever the map is
         // laid out again — reads as broken. Pinning, grouping and annotating
         // arrive later as things you ask for, not as free dragging.

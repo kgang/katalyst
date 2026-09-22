@@ -201,9 +201,11 @@ One rule makes it land well: **creating a claim moves focus to it.** So the mome
 
 A claim present in both worlds has exactly one coordinate. That is the property that makes a ghost overlay readable at all: if the two worlds were laid out separately, every tile would appear to have moved and nothing would stand out.
 
-### B8 — Tiles do not move, and the interface says so
+### B8 — You cannot move a tile, and the interface says so
 
 No tile is draggable. Not "mostly", not "except the ones you pinned" — none, anywhere, in this stack.
+
+*(This section was headed **Tiles do not move** until 2026-09-22. That stopped being true of a map being written when decision record 0024 landed — a tile changes column rather than let a later arrow point backwards, and the whole map settles once when the run stops — and it was never what this section was about. What it is about, and what has never changed, is that the reader cannot move one: the layout decides, every time.)*
 
 Half-supported dragging looks broken (anti-pattern 13 in the research). Pinning, grouping and annotating arrive later as **explicit buttons**, not as free drag.
 
