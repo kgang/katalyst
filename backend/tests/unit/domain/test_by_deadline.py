@@ -93,6 +93,19 @@ Decision record 0016 calls the solve exact, and this is what exact means when tw
 programs add the same numbers up in a different order.
 """
 
+NUMBERS_COMPARED = {"no edit": 62, "suppose": 484, "this happened": 484}
+"""How many numbers the oracle comparison really sets side by side, per verb.
+
+One number per claim per question, over the sixteen seeded maps
+`tests/oracles/maps.py` hands out. **Asserted, not described.** The review of
+2026-09-22 found the test's own sentence saying nine hundred and ninety where it
+compared a thousand and thirty (must-fix 4), which is the sort of drift a count
+nobody checks always ends in: the maps grew and the sentence did not. Adding a map
+fails this, and the failure names both numbers, so the count is corrected
+deliberately rather than by somebody re-reading the loop.
+"""
+
+
 # --- Small maps these tests build by hand -----------------------------------
 
 
@@ -178,6 +191,19 @@ def _worked_through(graph: Graph, pinned: dict[str, Pin], states=None) -> dict[s
     `propagate(engine="by_deadline")` does, called a layer down so that a map
     carrying states can be worked through before the field that says so exists on a
     claim.
+
+    **One difference from the assembly, and it goes the safe way.** `propagate`
+    adds the correction only to the claims the news actually moved — it solves the
+    map a second time with the report set aside and leaves any claim whose two
+    answers agree exactly alone, which is what makes a claim cut off from the
+    evidence come out bit for bit as it would have with no news at all. This adds
+    it to **every** claim. So every number the oracle comparison judges has had the
+    sample's correction applied to it, including the ones the assembly would have
+    left untouched, and the distance it measures is the **larger** of the two. A
+    figure taken here is therefore never flattering to what ships. Measured both
+    ways on the same maps and the same seed: `docs/measurements.md`, the entry for
+    2026-09-22, *The oracles*, with `E/agreement.log` and
+    `E/agreement-correction-always.log` beside each other.
     """
     window = window_of(graph, DAY_ZERO)
     forward = forward_pass(graph, window, _stated(graph), pinned=pinned, persistence=states or {})
@@ -239,9 +265,17 @@ def test_the_tables_agree_with_integrating_over_time() -> None:
     both ways on every claim. The set is asserted below to carry a decaying impulse,
     a diamond and states, so it is adversarial by check rather than by claim.
 
-    Nine hundred and ninety numbers in all, and at least ninety-nine in every
-    hundred must sit within five thousandths of the enumerator, **per verb**. Any
-    that does not is named.
+    **What is counted.** One number per claim per question, so a four-claim map
+    asked seventeen questions contributes sixty-eight. Over the sixteen maps that
+    comes to `NUMBERS_COMPARED` below — **62 with no edit, 484 under *Suppose this
+    is true*, 484 under *This happened*** — and the test asserts those three counts
+    rather than describing them, so the sentence cannot go stale while the maps
+    change underneath it. **Nothing is skipped**: the enumerator refuses a question
+    no world can satisfy, and on this set it refuses none, which is asserted too —
+    a comparison that quietly stopped comparing would otherwise still pass.
+
+    At least ninety-nine in every hundred must sit within five thousandths of the
+    enumerator, **per verb**. Any that does not is named.
     """
     drawn = maps.a_few_of_each()
     assert any(maps.has_an_impulse(one) for _name, one in drawn), (
@@ -256,6 +290,7 @@ def test_the_tables_agree_with_integrating_over_time() -> None:
 
     missed: dict[str, list[str]] = {"no edit": [], "suppose": [], "this happened": []}
     counted = dict.fromkeys(missed, 0)
+    skipped = 0
     for name, oracle_map in drawn:
         graph, states = a_graph_the_engine_reads(name, oracle_map, DAY_ZERO)
         judged_map = a_map_the_oracle_reads(graph, DAY_ZERO, states)
@@ -266,6 +301,7 @@ def test_the_tables_agree_with_integrating_over_time() -> None:
                 judged_map, maps.GRID, supposed=supposed, observed=observed, ready=ready
             )
             if judged is None:
+                skipped += 1
                 continue
             pinned = {one: Pin(value=value, kind="do") for one, value in supposed.items()}
             pinned |= {one: Pin(value=value, kind="observe") for one, value in observed.items()}
@@ -274,6 +310,15 @@ def test_the_tables_agree_with_integrating_over_time() -> None:
                 counted[verb] += 1
                 if abs(answer - judged[who]) > WITHIN:
                     missed[verb].append(f"{name} / {asked} / {who} by {answer - judged[who]:+.4f}")
+
+    assert counted == NUMBERS_COMPARED, (
+        f"this test compares {counted}, and the sentence above it says {NUMBERS_COMPARED}. "
+        "One of the two is out of date; neither may be guessed at"
+    )
+    assert skipped == 0, (
+        f"{skipped} questions were passed over because the enumerator could not answer them, "
+        "so the count above is not what was really compared"
+    )
 
     for verb, wrong in missed.items():
         within = 1.0 - len(wrong) / counted[verb]
