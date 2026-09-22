@@ -150,3 +150,13 @@ It keeps the arrow's fields and changes what they bend. `strength`, `lag`, `shap
 With it: the consequence bullet beginning *"Good, because `trigger` versus `sustain` makes the Hormuz-then-strike branch behave correctly"* — the pair still works, and what it works on is a state rather than a retraction; and the two confirmation tests `test_trigger_persists_after_parent_reset` and `test_sustain_retracts_when_parent_removed`, which are replaced by record 0017's own named tests.
 
 **This record's judgement stands.** Trigger versus sustain was called *"the best idea in the brainstorm"* and it survives — as a distinction about what kind of claim an arrow may leave, rather than one about what happens when a parent is taken away.
+
+---
+
+## Amendment, 2026-09-22 — the interval on the canvas goes, by decision record 0028
+
+**In force from 2026-09-22** (Kent, decisions note row R48). Appended rather than written into the body, so what this record decided on 2026-09-16 still reads as it was decided.
+
+**One clause moves.** Under *Untouched* in the 2026-09-21 amendment above, and in this record's own rendering sentence: **"two significant figures and the interval on the canvas"** becomes **two significant figures and nothing else**. There is no interval, because there is no range: the engine computes one likelihood per claim, once, and record 0028 says why. The two guards stay — a likelihood below `.01` prints `<.01` and one above `.99` prints `>.99` — and so does the rule that a *move* keeps two significant figures however small.
+
+**Nothing else here moves.** One number and one sentence per arrow; the arrows add on a scale where independent pushes add rather than multiply; `strength`, `lag`, `shape`, `half_life` and `reflexive` bending a rate under record 0016; and every option this record rejected. The seeded forward simulation of the title was already replaced by record 0016's forward pass and exact solve; what record 0028 removes is the **outer** loop over versions of the map, which this record never named.

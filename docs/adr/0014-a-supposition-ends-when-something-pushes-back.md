@@ -308,3 +308,20 @@ One more bullet is restated rather than removed: *"the mean sits a hair above th
 ### What is untouched
 
 Decision **D** (how a change counts as shifted, and *agreement*), decision **E** (the rank, and which day a number is read on — a tile's headline is still read on the claim's own resolve-by day, which under record 0016 is the only day it could be read on), and decision **G** (the provenance-derived spread, landing in stack 04; and *"there are no `strength_lo` / `strength_hi` fields, ever"*). The *Pros and Cons* of all nine options, and the four formalisms set aside, stand as written: they were the reasons for a decision whose meaning this amendment preserves.
+
+---
+
+## Third amendment, 2026-09-22 — the range itself is cut, by decision record 0028
+
+**In force from 2026-09-22** (Kent, decisions note row R48). Appended, like the two amendments above, so the record still reads as it was decided.
+
+**The second amendment kept this record's meaning and replaced its machinery.** This one removes the meaning as well. **Decision B — what a range on a computed number means — is reversed.** There is no range on any number this product shows: not on a tile, not in the panel, not on the change list, not in a footer sentence and not in a hover note. `lo` and `hi` cease to be percentiles of anything; they stay on the wire equal to `p` until one follow-up pull request takes them out. Kent's reason, in his own words, is quoted in record 0028.
+
+**What goes with decision B:**
+
+* **The two thousand versions of the map**, and everything that made them differ — a claim's likelihood drawn from its stated range, the split fitting of `{p, lo, hi}` on the log-odds scale, and the even spreading of the draws.
+* **Decision C, the variance shares** — whose stated number explains whose width. There is no width. FR-21 is not built in version one.
+* **Decision G's provenance-derived spread** — *how well-backed an arrow is becomes how wide it is drawn*. It existed only to make versions differ. **The other half of G stands and is now permanent: there are no `strength_lo` / `strength_hi` fields, ever.**
+* **The second half of decision D.** A claim counted as `shifted` when it moved by `.005` **and** at least 90% of versions moved the same way. The second half was a share **of versions** and goes with them; the `.005` floor is now the whole test, and an `unchanged` claim has one reason where it had two.
+
+**What stands.** Decision A's surviving half — a supposition is a hard fact in every reading while it holds, and the tile shows **Supposed · date**, never a number (its other half was reversed by record 0017). Decision E in full: the ranking is the size of the move times the weakest backing on the best-backed route, and a tile's headline is read on the claim's own resolve-by day. **Two significant figures and both guards.** And this record's own closing rule, untouched: *every number shown in a demo comes from the engine itself or from a recording of the engine, never typed by hand.*
