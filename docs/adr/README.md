@@ -2,7 +2,7 @@
 
 Format: [MADR 4.x](https://adr.github.io/madr/) with three project-local front-matter fields — `supersedes`, `superseded-by`, `spec-impact` — see [`template.md`](template.md). No tooling: copy the template, take the next number, add a row here.
 
-Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes a lower-numbered one on the same question; an ADR is `proposed` until Kent accepts it, and nothing is implemented against a `proposed` ADR.
+Rules (from `AGENTS.md`): numbered in order; a higher-numbered record supersedes a lower-numbered one on the same question; an ADR is `accepted` until Kent accepts it, and nothing is implemented against a `proposed` ADR.
 
 | # | Title | Status | Date |
 |---|-------|--------|------|

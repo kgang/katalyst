@@ -121,7 +121,7 @@ The `instant` flag named in *Decision Outcome* above is now one setting, `KATALY
 
 ## Amendment (2026-09-21, later the same day) — the request names what it wants, and the server never substitutes
 
-**Status: `proposed`.** Kent accepts before the first screen that depends on it is built. Everything above stands unless this section says otherwise.
+**Status: `accepted` — 2026-09-22, Kent, by merging the round (decisions note, row R43).** It was written `proposed` on 2026-09-21; the first screen that depends on it landed in the same batch. Everything above stands unless this section says otherwise.
 
 ### What changes
 
