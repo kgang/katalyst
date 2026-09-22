@@ -41,6 +41,7 @@ from collections.abc import Mapping
 
 from katalyst.domain import (
     DEFAULT_ENGINE,
+    SLICES,
     Assignment,
     Belief,
     Branch,
@@ -50,6 +51,7 @@ from katalyst.domain import (
     Intervention,
     Link,
     LinkId,
+    Sample,
     Violation,
     World,
     apply,
@@ -57,7 +59,18 @@ from katalyst.domain import (
     flatten,
     introduced_by,
     propagate,
+    sample_forward,
 )
+
+# The by-deadline core's own assembly, reached rather than copied: a second one
+# here would be a second chance for the drawn worlds and the world shown beside
+# them to disagree about the same map. `engine/verify.py` reaches it the same way
+# and for the same reason.
+#
+# the flip: `katalyst.domain.propagation` belongs to another lane this week, so
+# the name is reached as it stands. The flip makes this a public seam and the
+# leading underscore goes; when it does, this import and the call below lose it.
+from katalyst.domain.propagation import SAMPLED_WORLDS, _worked_out_by_deadline
 from katalyst.engine.transcript import held
 from katalyst.fixtures import EXAMPLES, StoredExample, find
 
@@ -73,6 +86,16 @@ WORLDS = 8
 """How many worlds run under each version when a request does not say.
 
 The inner loop: how the dice fall. The same number `propagate` defaults to.
+"""
+
+DRAWN_WORLDS = SAMPLED_WORLDS
+"""How many worlds a set of drawn worlds holds when a request does not say.
+
+The same number the engine draws for itself when something has been reported, so
+the days a trade reads and the days a claim's own number was corrected by are one
+sample and not two. It is also the most a request may ask for: more is memory
+nobody has measured, and a daily path through fifty thousand worlds over a
+two-month window is already three million prices.
 """
 
 MOST_VERSIONS = 2_400
@@ -319,6 +342,82 @@ def conditional(
         with_the_cause, also_fixed, example, branch, seed, told, versions, worlds
     )
     return world.beliefs[arrow.target]
+
+
+def sample_of(
+    base_id: str,
+    branch: Branch | None,
+    seed: int,
+    *,
+    versions: int = VERSIONS,
+    drawn: int = DRAWN_WORLDS,
+) -> Sample | list[Violation] | None:
+    """Draw worlds forward on a stored example, carrying the day every claim came on.
+
+    **One sampler, two readers.** The same draw the engine makes to correct an
+    answer after *This happened* is the one the trade layer reads for the day each
+    claim arrived. Nothing here is a second sampler and nothing here is a second
+    set of days.
+
+    A world says what each claim's chance is; it does not carry the worlds it was
+    read off, because fifty thousand worlds by twenty claims is a million numbers
+    and no browser should ever be sent them. So a caller that needs the days asks
+    for them here, from the same map, branch and seed a world is built from.
+
+    the flip: until the flip lands, the world a route shows beside these draws is
+    still worked out by the day-by-day engine while these days come from the
+    by-deadline core. Afterwards both are the same arithmetic. `engine/verify.py`
+    carries the same note for the same reason.
+
+    Args:
+        base_id: The short name of the stored example, such as `hormuz`.
+        branch: The branch to fold first, sent whole. Nothing at all means the map
+            with nothing done to it.
+        seed: The one number every draw comes from. The same seed gives the same
+            days and the same weights.
+        versions: How many versions of the map to work out. The draw itself is made
+            at the first of them; this is what the exact answers it corrects are
+            worked out across.
+        drawn: How many worlds to draw.
+
+    Returns:
+        The drawn worlds, or the list of reasons the branch could not be folded, or
+        nothing at all when no example is stored under that name.
+
+    Raises:
+        ImpossibleObservation: If nothing this map can produce agrees with what a
+            *This happened* edit reported, so there is no weighted world to read.
+            The caller turns it into a refusal the reader can see.
+    """
+    example = example_named(base_id)
+    if example is None:
+        return None
+    folded = _fold(example, branch)
+    if isinstance(folded, list):
+        return folded
+    graph, fixed, _ = folded
+    worked = _worked_out_by_deadline(
+        graph,
+        fixed,
+        as_of=example.fixture_date,
+        seed=seed,
+        versions=versions,
+        slices=SLICES,
+        # The correction inside the exact answers is drawn at the engine's own
+        # count, never at the one this request asked for: those answers are the
+        # world's numbers and must not change because somebody wanted fewer worlds
+        # to read days off.
+        sampled_worlds=SAMPLED_WORLDS,
+    )
+    return sample_forward(
+        worked.forward,
+        worked.pinned,
+        window=worked.window,
+        version=0,
+        seed=seed,
+        worlds=drawn,
+        exact=worked.answers,
+    )
 
 
 # --- Putting a branch in order and folding it ------------------------------
