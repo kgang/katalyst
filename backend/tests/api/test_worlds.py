@@ -12,8 +12,10 @@ difference costs four runs of the engine. Nothing about what the routes answer
 changes with the budget, only how steady the numbers are.
 """
 
+from collections.abc import Iterator
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -21,7 +23,8 @@ from hypothesis import strategies as st
 from katalyst.api.main import app
 from katalyst.domain import Belief, Diff, World, diff
 from katalyst.engine import worlds as engine
-from katalyst.fixtures import HORMUZ_THEN_STRIKE
+from katalyst.engine.transcript import Transcript, held
+from katalyst.fixtures import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
 from tests.strategies import branches, graphs
 
 SEED = 20261001
@@ -260,6 +263,134 @@ def test_asking_for_an_example_that_does_not_exist_answers_in_words() -> None:
         assert "photonics" in message
         assert "hormuz" in message
         assert len(message.split()) >= 8
+
+
+A_GENERATED_MAP = "01JGENERATEDMAP0000000000"
+"""A map identifier of the shape the engine mints, so nothing here reads as a stored name."""
+
+
+@pytest.fixture
+def a_generation_this_process_is_holding() -> Iterator[str]:
+    """Fold one stand-in generation into this process and give back its map's own name.
+
+    A finished generation is kept in memory, under the identifier of the map it
+    built, for the life of the process — which is what lets a reviewer who has just
+    watched a map draw itself suppose something on it. Nothing here calls a model:
+    what stands in for the generated map is the stored one under a minted name,
+    which is exactly what a generated map is to every route below — a map that
+    answers to no stored name.
+
+    Yields:
+        The map's own identifier, which is what a request sends as its `base_id`.
+    """
+    held.forget_everything()
+    held.remember(
+        Transcript(
+            generation_id="01JGENERATIONTHATBUILTIT0",
+            hypothesis="The Strait of Hormuz is going to open next week.",
+            seed=SEED,
+            # The day the run happened, which is its map's day zero. The stored
+            # example's own date is used so that the two worlds below differ by
+            # the name of the map and by nothing else.
+            on=FIXTURE_DATE,
+            mode="replay",
+        ),
+        HORMUZ.model_copy(update={"id": A_GENERATED_MAP}),
+        in_flight=False,
+    )
+    yield A_GENERATED_MAP
+    held.forget_everything()
+
+
+def test_a_world_is_built_on_a_generated_map_held_by_its_id(
+    a_generation_this_process_is_holding: str,
+) -> None:
+    """A map this process generated answers here under its own name, like any stored one.
+
+    This is the whole of what lets a reader edit a map they have just watched
+    build itself: the six edits, a branch, the two worlds and the change list all
+    go through these routes with the generated map's identifier as the base, and
+    nothing about them knows or cares where the map came from.
+
+    The proof is the comparison rather than any number written down here: the same
+    map under a minted name gives the same world, to the byte, apart from the name
+    itself.
+    """
+    generated = a_generation_this_process_is_holding
+    with TestClient(app) as client:
+        answer = _asked(client, "worlds", base_id=generated)
+        stored = _asked(client, "worlds")
+
+    assert answer.status_code == 200, answer.text
+    world = World.model_validate(answer.json())
+    assert world.base_id == generated
+    assert world.branch_id is None
+    assert {one.id for one in world.graph.propositions} == set(world.beliefs)
+    for claim_id, belief in world.beliefs.items():
+        assert 0.0 <= belief.lo <= belief.p <= belief.hi <= 1.0, claim_id
+        assert belief.owner == "model"
+
+    from_the_stored_one = World.model_validate(stored.json())
+    assert world.beliefs == from_the_stored_one.beliefs
+    assert world.series == from_the_stored_one.series
+    assert world.model_dump(mode="json", exclude={"base_id", "graph"}) == (
+        from_the_stored_one.model_dump(mode="json", exclude={"base_id", "graph"})
+    )
+
+
+def test_a_branch_folded_onto_a_generated_map_moves_the_same_endings(
+    a_generation_this_process_is_holding: str,
+) -> None:
+    """Supposing something on a generated map gives two worlds and a ranked change list.
+
+    The browser's *Change this claim* is this pair of requests and nothing else: a
+    world with the branch folded on, and the difference between that world and the
+    one before it. Both have to answer on a generated base, or the panel beside a
+    map somebody just watched build itself has nothing to draw.
+    """
+    generated = a_generation_this_process_is_holding
+    with TestClient(app) as client:
+        after = _asked(client, "worlds", base_id=generated, branch=STRIKE)
+        change = _asked(client, "worlds/diff", base_id=generated, branch_b=STRIKE)
+        on_the_stored_one = _asked(client, "worlds/diff", branch_b=STRIKE)
+
+    assert after.status_code == 200, after.text
+    assert World.model_validate(after.json()).branch_id == HORMUZ_THEN_STRIKE.id
+
+    assert change.status_code == 200, change.text
+    difference = Diff.model_validate(change.json())
+    assert difference.base_id == generated
+    assert difference.branch_b == HORMUZ_THEN_STRIKE.id
+    assert difference.claims["S"].state == "added"
+    assert [one.rank for one in difference.rows] == sorted(
+        (one.rank for one in difference.rows), reverse=True
+    )
+    # The same edit on the same map under its stored name says the same thing
+    # about every claim, in the same words — which is the one thing worth
+    # asserting about the numbers, and the reason no number is written down here.
+    also = Diff.model_validate(on_the_stored_one.json())
+    assert difference.claims == also.claims
+    assert [one.claim_id for one in difference.rows] == [one.claim_id for one in also.rows]
+    assert difference.summary == also.summary
+
+
+def test_a_generation_this_process_no_longer_holds_says_so() -> None:
+    """A generated map is held for the life of the process, and the refusal says that.
+
+    A restarted server has forgotten every map it generated, and a reader who
+    refreshes on one then asks for a world under an identifier nothing answers to.
+    Naming the stored examples alone would leave them thinking they had mistyped a
+    name; what is true is that the map was real and this process no longer has it.
+    """
+    with TestClient(app) as client:
+        answer = _asked(client, "worlds", base_id="01JGENERATEDMAPLONGGONE00")
+
+    assert answer.status_code == 404
+    message = answer.json()["detail"]
+    assert "01JGENERATEDMAPLONGGONE00" in message
+    assert "hormuz" in message
+    assert "life of the process" in message
+    assert len(message.split()) >= 8
 
 
 def test_a_world_needs_no_key_of_any_kind() -> None:
