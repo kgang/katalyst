@@ -9,22 +9,35 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { type PinnedTile, type Position, pinsFor, readPositions } from "../../graph/elkGraph";
+import {
+  COLUMN_GAP,
+  type PinnedTile,
+  type Position,
+  pinsFor,
+  readPositions,
+} from "../../graph/elkGraph";
+import { TILE_WIDTH } from "../../graph/geometry";
 import { toFlow } from "../../graph/toFlow";
 import { inFewWords } from "../../world/naming";
 import type { ProposalAccepted, StreamEvent } from "../events";
 import type { Growth } from "../growth";
-import { fold, foldAll, waitingFor } from "../growth";
+import { fold, foldAll, onlyTheStripChanged, theStreamEnded, waitingFor } from "../growth";
 import { A_REAL_RUN } from "./aRealRun";
 import {
+  activity,
   B,
   BELIEFS,
+  DONE,
   EVERY_ARROW,
   EVERY_CLAIM,
+  FOUND,
   H,
+  REFUSED,
+  SEARCHING,
   STARTED,
   THE_GROWTH,
   THE_SENTENCE,
+  THINKING,
   theWorld,
 } from "./aStream";
 
@@ -132,11 +145,35 @@ describe("the rectangles are the frontier, drawn", () => {
   });
 });
 
-describe("nothing already placed moves", () => {
-  it("test_a_tile_keeps_its_place_when_a_later_tile_arrives", () => {
-    // The real machinery, over the real run: at every step the map is laid out
-    // again, and the rule the layout obeys — a tile that had a position keeps it,
-    // to the pixel — is checked against what came out.
+describe("a tile keeps its row until the run stops", () => {
+  /**
+   * An answer of the kind the layout engine gives, for one pass.
+   *
+   * Every box gets a column of its own and a row nobody asked for, and both
+   * change from pass to pass as boxes come and go. That is the point: the rule
+   * being checked is what **we** do with the engine's answer, and an answer that
+   * agreed with the pins would prove nothing. Columns are a whole tile and a
+   * gap apart, so no box in this answer is in another's column and nothing has
+   * to find room.
+   */
+  function anAnswer(tiles: readonly { id: string }[]) {
+    return {
+      id: "map",
+      children: tiles.map((tile, place) => ({
+        id: tile.id,
+        x: place * (TILE_WIDTH + COLUMN_GAP),
+        y: place * (TILE_WIDTH + COLUMN_GAP),
+      })),
+    };
+  }
+
+  it("test_nothing_moves_except_a_column_until_the_run_stops", () => {
+    // The real machinery, over the chapter's own run: at every step the map is
+    // laid out again, and what we do with the answer is checked against what
+    // came out. **The rule, rewritten 2026-09-21 by decision record 0024:** a
+    // tile that had a place keeps its **row**, to the pixel, and takes its
+    // **column** from this pass's answer — because which column a claim belongs
+    // in is decided by the arrows into it, and arrows keep arriving.
     //
     // **The whole run, `beliefs_propagated` included.** It used to stop at the
     // last growth event, which left out the one event that replaces the world
@@ -147,6 +184,7 @@ describe("nothing already placed moves", () => {
     // was the one moment the walk did not reach.
     let placed = new Map<string, PinnedTile>();
     let seen = new Map<string, Position>();
+    let columnsWereReRead = false;
 
     for (const state of everyStateOf([...THE_GROWTH, BELIEFS])) {
       const drawing = toFlow(state.world, undefined, state.skeletons);
@@ -160,21 +198,21 @@ describe("nothing already placed moves", () => {
         }
       }
 
-      // The layout engine is asked again and answers with somewhere new for
-      // everything. What comes back keeps every pinned tile exactly where it was.
-      const laidOut = {
-        id: "map",
-        children: drawing.tiles.map((tile, place) => ({
-          id: tile.id,
-          x: 1000 + place * 7,
-          y: 2000 + place * 11,
-        })),
-      };
-      const positions = readPositions(laidOut, pins);
+      const answer = anAnswer(drawing.tiles);
+      const saidColumn = new Map(answer.children.map((child) => [child.id, child.x]));
+      const positions = readPositions(answer, pins);
 
       for (const [id, was] of seen) {
-        if (positions.has(id)) {
-          expect(positions.get(id)).toEqual(was);
+        const now = positions.get(id);
+        if (now === undefined) {
+          continue;
+        }
+        // Its row is the row it had. Nothing takes that away while the map grows.
+        expect(now.y, id).toBe(was.y);
+        // Its column is this pass's, never the one it is remembered at.
+        expect(now.x, id).toBe(saidColumn.get(id));
+        if (now.x !== was.x) {
+          columnsWereReRead = true;
         }
       }
 
@@ -186,8 +224,44 @@ describe("nothing already placed moves", () => {
     }
 
     // And the claims really did arrive one after another rather than all at once,
-    // or the walk above would have proved nothing.
+    // or the walk above would have proved nothing — and a column really was read
+    // afresh at least once, or the second assertion is true by accident.
     expect(seen.size).toBeGreaterThan(1);
+    expect(columnsWereReRead).toBe(true);
+  });
+
+  it("test_every_pin_goes_when_the_run_stops", () => {
+    // The settle. Nothing about it is a new event or a new frame: it is the one
+    // moment every pin is dropped, so the whole map is laid out as one thing and
+    // takes the places the argument asks for, rows included. On the page it is
+    // the same flag that re-frames the view, handed to the layout as well.
+    let placed = new Map<string, PinnedTile>();
+    let drawing = toFlow(waitingFor(THE_SENTENCE, null).world);
+
+    for (const state of everyStateOf([...THE_GROWTH, BELIEFS])) {
+      drawing = toFlow(state.world, undefined, state.skeletons);
+      const positions = readPositions(anAnswer(drawing.tiles), pinsFor(placed, drawing.tiles));
+      const heights = new Map(drawing.tiles.map((tile) => [tile.id, tile.height]));
+      placed = new Map(
+        [...positions].map(([id, at]) => [id, { at, height: heights.get(id) ?? 0 }]),
+      );
+    }
+
+    // While the run was going, the map remembered where everything was.
+    expect(pinsFor(placed, drawing.tiles).size).toBe(placed.size);
+    expect(placed.size).toBeGreaterThan(1);
+
+    // On the one pass where it has just stopped, it remembers nothing — so every
+    // box takes the place this layout gives it, and no pin can hold a tile in a
+    // column the arrows have moved on from.
+    const atTheSettle = pinsFor(placed, drawing.tiles, true);
+    expect(atTheSettle.size).toBe(0);
+    const settled = readPositions(anAnswer(drawing.tiles), atTheSettle);
+    const said = new Map(anAnswer(drawing.tiles).children.map((one) => [one.id, one]));
+    for (const [id, at] of settled) {
+      expect(at.y, id).toBe(said.get(id)?.y);
+      expect(at.x, id).toBe(said.get(id)?.x);
+    }
   });
 });
 
@@ -308,6 +382,97 @@ describe("an event this build does not know", () => {
     // Everything else is exactly as it was.
     expect({ ...after, unknown: grown.unknown }).toEqual(grown);
   });
+
+  it("test_a_tenth_name_is_still_ignored_without_error_now_that_there_are_nine", () => {
+    // The browser learned a ninth name on 2026-09-22. The rule that made a
+    // ninth possible at all is the one that must still hold for a tenth: a
+    // browser that throws on a name it does not know makes the server unable to
+    // add one, and a browser that swallows one makes a missing feature look
+    // like a working one.
+    const grown = foldAll(fresh(), THE_GROWTH);
+    const after = foldAll(grown, [{ event: "unknown", name: "a_tenth_kind_of_line" }]);
+
+    expect(after.unknown.get("a_tenth_kind_of_line")).toEqual({ howMany: 1, unreadable: false });
+    // It touched nothing — not the map, and not what the strip may say either.
+    expect({ ...after, unknown: grown.unknown }).toEqual(grown);
+  });
+});
+
+describe("what the model is doing right now", () => {
+  it("test_an_activity_line_changes_what_the_strip_may_say_and_nothing_else", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+    const after = foldAll(grown, [SEARCHING, THINKING]);
+
+    // The latest of each kind, kept as it arrived, with nothing composed here.
+    expect(after.activity.searching).toEqual({
+      about: SEARCHING.about,
+      kind: SEARCHING.kind,
+      text: SEARCHING.text,
+    });
+    expect(after.activity.thinking?.text).toBe(THINKING.text);
+
+    // **And nothing else moved at all.** Not the map, not the rectangles, not
+    // the refusals, not the receipt, not the phase, not the counts. The line is
+    // never written to a recording, so anything it could move would be
+    // something a replay of this run could not reproduce.
+    expect({ ...after, activity: grown.activity }).toEqual(grown);
+  });
+
+  it("test_the_latest_of_each_kind_wins_and_no_list_is_kept", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+    const later = activity("searching", "a second query, issued a second later", "C");
+    const after = foldAll(grown, [SEARCHING, FOUND, later]);
+
+    // One slot for the search, one for the thought. What came back answers the
+    // query, and the next query answers that: latest only, never a log.
+    expect(after.activity.searching?.text).toBe(later.text);
+    expect(after.activity.thinking).toBeNull();
+  });
+
+  it("test_a_proposal_clears_the_lines_the_call_it_answers_was_saying", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+    const aboutTheStrait = activity("searching", "an open-ended search about the strait", "H");
+    const saying = foldAll(grown, [aboutTheStrait, THINKING]);
+
+    // The proposal that hangs off the war-risk premium — the claim the thinking
+    // line is about — arrives.
+    const answers = THE_GROWTH[4] as StreamEvent;
+    const after = fold(saying, answers);
+
+    expect(after.activity.thinking).toBeNull();
+    // The other call is still out, and still says what it is doing.
+    expect(after.activity.searching?.text).toBe(aboutTheStrait.text);
+  });
+
+  it("test_a_refusal_and_a_stop_clear_everything", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+    const saying = foldAll(grown, [SEARCHING, THINKING]);
+
+    // A refusal carries no claim it hangs off, so the browser cannot say which
+    // call came back. It stops asserting either.
+    const refused = fold(saying, REFUSED);
+    expect(refused.activity).toEqual({ searching: null, thinking: null });
+
+    // And when the run stops, nothing is out, so nothing is being done.
+    const stopped = fold(saying, DONE);
+    expect(stopped.activity).toEqual({ searching: null, thinking: null });
+    // Even a line that arrives after the end changes nothing.
+    expect(fold(stopped, SEARCHING)).toBe(stopped);
+    // A stream that simply stopped being delivered is the same answer.
+    expect(theStreamEnded(saying).activity).toEqual({ searching: null, thinking: null });
+  });
+
+  it("test_only_the_strip_changed_is_what_the_seconds_counter_asks", () => {
+    const grown = foldAll(fresh(), THE_GROWTH.slice(0, 3));
+
+    // The counter at the foot reads *nothing new on the map for N s*, and it
+    // starts again on an arrival. An activity line is not one: it is the model
+    // saying what it is doing inside a call that has not come back.
+    expect(onlyTheStripChanged(grown, fold(grown, SEARCHING))).toBe(true);
+    expect(onlyTheStripChanged(grown, fold(grown, THE_GROWTH[4] as StreamEvent))).toBe(false);
+    // Before anything at all, there is nothing to have changed only part of.
+    expect(onlyTheStripChanged(null, grown)).toBe(false);
+  });
 });
 
 describe("the reader's own number", () => {
@@ -320,7 +485,7 @@ describe("the reader's own number", () => {
     // It is checked against the number handed in, never against one written
     // here: what is being asked is whether the screen carries the reader's own
     // figure through, not what that figure is.
-    const mine = { p: 0.72, lo: 0.6, hi: 0.85, owner: "user" as const };
+    const mine = { p: 0.72, lo: 0.72, hi: 0.72, owner: "user" as const };
     const withMine = EVERY_CLAIM.map((one) =>
       one.id === "H" ? { ...one, beliefs: { ...one.beliefs, user: mine } } : one,
     );
@@ -330,7 +495,9 @@ describe("the reader's own number", () => {
     ]);
 
     const hypothesis = finished.world.claims.find((claim) => claim.id === "H");
-    expect(hypothesis?.beliefs.user.reading).toEqual({ p: mine.p, lo: mine.lo, hi: mine.hi });
+    // The likelihood, and only the likelihood: the bottom and the top the wire
+    // still carries are dropped at the boundary (2026-09-22, R48).
+    expect(hypothesis?.beliefs.user.reading).toEqual({ p: mine.p });
     // And nobody else's slot was filled in from it: two slots that are never
     // merged stay two slots.
     for (const claim of finished.world.claims) {

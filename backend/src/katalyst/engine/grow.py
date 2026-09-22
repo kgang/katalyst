@@ -7,10 +7,21 @@ reason a person can read.
 
 Four things worth knowing before reading it
 -------------------------------------------
-**The order is fixed even though three lines are asked about at once.** A round
-takes the first few open claims in frontier order and asks about them at the
-same time; their answers are folded in that same order, whichever came back
-first. The map depends on the answers and never on the weather.
+**Three lines are asked about at once, and each answer is folded the moment its
+own call comes back** — not in the order the questions went out (Kent,
+2026-09-22). On the run he kept, one round's calls took 131, 44 and 65 seconds
+and all three claims appeared at 131: folding in ask order holds a fast answer
+behind a slow earlier one, and that is a dead screen for 87 seconds after the
+answer already existed. **The price, said plainly:** when two answers of one
+round both change the map, which lands first now depends on which call returned
+first — so the order of a run's events, the order of the frontier, and therefore
+which claims the next round asks about, depend on timing as well as on the
+answers. It is paid on purpose, because nothing that must be exact rests on it:
+every answer is judged again at the fold against the map as it then stands, so
+whichever order they land in the map that comes out is one the rules accept;
+identifiers are minted inside the call rather than at the fold, so they do not
+move; and a recording keeps whatever order actually happened, so a replay of one
+is exact either way.
 
 **An answer is judged twice: when it comes back, and where the map changes.** A
 round hands one snapshot of the map to all its calls, so two answers can each be
@@ -23,10 +34,13 @@ repaired.
 frontier as it stands once it was folded in, and a claim leaving that list is
 how a reader learns it has closed.
 
-**Nothing a run paid for is ever lost.** A round's calls are all made and billed
-before the first of them is folded, so a reader who goes away, a cap that trips
-mid-round and a question that fails all leave every answer folded — into the map
-where it belongs, and onto the bill always.
+**Nothing a run paid for is ever lost.** Each call is billed the moment it comes
+back, before it is folded, so a fold that throws can never take it off the
+receipt. And whatever the round still has in flight when a fold throws or the
+reader goes away is waited for, billed and folded too — into the map where it
+belongs, and into the working where nobody will see it — so a reader who goes
+away, a cap that trips mid-round and a question that fails all leave every
+answer on the bill.
 
 What this file must never do
 ----------------------------
@@ -40,7 +54,7 @@ What this file must never do
 
 import logging
 from collections.abc import Callable, Generator, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Literal, cast
 
@@ -137,6 +151,14 @@ def grow(
     one `Finished`, always last. Nothing is buffered: a caller can draw the map as
     it arrives.
 
+    **Within a round the order is the order the calls came back in, not the
+    order the questions went out** (Kent, 2026-09-22). Three lines are asked
+    about at once and the answers arrive minutes apart; holding the first answer
+    behind a slower earlier one is a dead screen for the difference. What that
+    costs is written out at the top of this file: which answer of a round lands
+    first now depends on timing, and so therefore does the frontier the next
+    round reads. Nothing that has to be exact rests on it.
+
     The first round asks about one claim — the one the map started from — which is
     also what lets the standing half of the request be written into the service's
     cache before anything is asked in parallel. Calls sent at the same moment
@@ -156,9 +178,9 @@ def grow(
             nothing: "I don't know" is an answer, and it is not a likelihood of
             one half.
         never_seen: Told about an answer that was paid for and that nobody will
-            ever be handed, because the reader went away while its round was in
-            flight. The money was spent and the working is still owed
-            (2026-09-20).
+            ever be handed — because the reader went away while its round was in
+            flight, or because a fold of ours threw part way through the round.
+            The money was spent and the working is still owed (2026-09-20).
 
     Yields:
         Each call's outcome in the order it was folded, then one `Finished`.
@@ -242,7 +264,7 @@ def grow(
             room = caps.claims - len(graph.propositions)
             asking = list(walk.frontier[: min(caps.at_once, room)])
             walk.watch(answerer)
-            answers = _ask_about_each(
+            in_flight = _ask_about_each(
                 pool,
                 graph,
                 asking,
@@ -251,27 +273,32 @@ def grow(
                 on=on,
                 searches_left=caps.searches - walk.receipt.searches,
             )
-            # **Every answer of the round is on the bill before any of them is
-            # folded.** They were all asked and all billed together, so an
-            # exception inside one fold used to take the rest off the receipt
-            # (Kent, 2026-09-21).
-            walk.bill(answers)
-            waiting = list(zip(asking, answers, strict=True))
-            while waiting:
-                claim_id, answer = waiting.pop(0)
-                graph, outcome = walk.fold(graph, claim_id, answer)
-                try:
+            # **Each call is billed the moment it comes back, before it is
+            # folded** — which is how Kent's rule of 2026-09-21, that no paid
+            # call ever falls off the receipt, survives handing each answer over
+            # as its own call returns rather than billing the whole round first
+            # (Kent, 2026-09-22). `not_folded` is the one answer that has been
+            # billed and not yet folded, so that a fold which throws can still
+            # hand it to the working.
+            not_folded: Outcome | None = None
+            try:
+                for call in as_completed(list(in_flight)):
+                    claim_id = in_flight.pop(call)
+                    answer = _what_came_back(call)
+                    walk.bill(answer)
+                    not_folded = answer
+                    graph, outcome = walk.fold(graph, claim_id, answer)
+                    not_folded = None
                     yield outcome.model_copy(update={"frontier": tuple(walk.frontier)})
-                except GeneratorExit:
-                    # The reader went away mid-round. Every call of this round was
-                    # made and billed before the first of them was folded, so the
-                    # rest are folded here — nobody will see them, and they are
-                    # still owed to the working and to the bill (2026-09-20).
-                    for left_over, its_answer in waiting:
-                        graph, its_outcome = walk.fold(graph, left_over, its_answer)
-                        if never_seen is not None:
-                            never_seen(its_outcome)
-                    raise
+            except BaseException:
+                # The reader went away mid-round, or a fold of ours threw. Either
+                # way every call of this round was asked, so every one of them is
+                # waited for, billed and folded here — nobody will see them, and
+                # they are still owed to the working and to the bill (2026-09-20).
+                graph = _folded_where_nobody_sees(
+                    in_flight, walk, graph, never_seen, not_folded=not_folded
+                )
+                raise
 
         # One last call per open line, asking only for an ending. A cap that
         # stopped the walk is exactly when this is wanted; only the money running
@@ -327,20 +354,21 @@ class _Walk:
         self.last_refusal: str | None = None
         self._billed: list[Outcome] = []
 
-    def bill(self, answers: Sequence[Outcome]) -> None:
-        """Put a whole round on the bill before any of it is folded.
+    def bill(self, answer: Outcome) -> None:
+        """Put one answer on the bill the moment its call comes back, before it is folded.
 
-        A round's calls are all made and billed together, so the money is a fact
-        about the round and not about whether each answer folds cleanly. An
-        exception part way through the folding used to take the rest of the
-        round off the receipt (Kent, 2026-09-21).
+        The money is a fact about the call, not about whether the answer folds
+        cleanly, so it is put on the receipt first and the fold happens after. An
+        exception inside a fold used to take the rest of the round off the
+        receipt; billing the whole round up front fixed that, and billing each
+        call as it returns fixes it the same way while letting each answer reach
+        the reader as soon as it exists (Kent, 2026-09-21 and 2026-09-22).
 
         Args:
-            answers: Every answer of the round, in the order it will be folded.
+            answer: What one call came back with.
         """
-        for one in answers:
-            self.receipt = fold(self.receipt, one)
-            self._billed.append(one)
+        self.receipt = fold(self.receipt, answer)
+        self._billed.append(answer)
 
     def watch(self, answerer: Answerer) -> None:
         """Say what has been spent and what may be, before a question is put.
@@ -649,14 +677,14 @@ def _ask_about_each(
     answerer: Answerer,
     on: date,
     searches_left: int,
-) -> list[Outcome]:
-    """Ask about several claims at the same time, and hand the answers back in order.
+) -> dict[Future[Outcome], PropositionId]:
+    """Ask about several claims at the same time, and hand back the calls, unwaited for.
 
-    The answers are read out in the order the questions were asked, not in the
-    order they came back, which is what makes a run's shape depend on its answers
-    rather than on how fast each one arrived.
+    Nothing here blocks. The caller reads the calls as each of them comes back,
+    which is what lets one answer reach the reader while the round's other calls
+    are still out (Kent, 2026-09-22).
 
-    **The searches are handed out one call at a time, in that same order.** Every
+    **The searches are handed out one call at a time, in frontier order.** Every
     call in a round goes out before any of them comes back, so a round that read
     the budget once could carry a run a whole round's worth past it — twenty-five
     searches a call, three calls. Each call is allowed the tool only while the
@@ -673,7 +701,10 @@ def _ask_about_each(
         searches_left: How much of the run's budget of searches is unspent.
 
     Returns:
-        One outcome per claim, in the same order.
+        One call per claim, each remembering which claim it was about. In the
+        order the questions went out, which is the order the searches were
+        handed out in and the order a round is drained in when nobody is left to
+        watch it.
     """
     allowed: list[bool] = []
     left = searches_left
@@ -682,7 +713,7 @@ def _ask_about_each(
         allowed.append(may)
         if may:
             left -= SEARCHES_INSIDE_ONE_CALL
-    in_flight = [
+    return {
         pool.submit(
             expand,
             graph,
@@ -691,27 +722,80 @@ def _ask_about_each(
             answerer=answerer,
             on=on,
             may_search=may_search,
-        )
+        ): claim_id
         for claim_id, may_search in zip(asking, allowed, strict=True)
-    ]
-    # **Every result is collected before any failure is dealt with.** Reading
-    # them with a comprehension meant one exception the seam had not converted
-    # threw away the round's other answers, which were asked, answered and
-    # billed — the money spent on them would have been on no receipt and in no
-    # transcript (2026-09-20).
-    answers: list[Outcome] = []
-    went_wrong: BaseException | None = None
-    for one in in_flight:
-        try:
-            answers.append(one.result())
-        except BaseException as failed:
-            went_wrong = went_wrong or failed
-            answers.append(_never_answered(failed))
-    if went_wrong is not None:
+    }
+
+
+def _what_came_back(call: Future[Outcome]) -> Outcome:
+    """Wait for one call of a round and hand back what it came back with.
+
+    **A failure the seam did not convert is an answer too.** Reading a round's
+    calls with a comprehension meant one exception threw away the round's other
+    answers, which were asked, answered and paid for — money that would have
+    been on no receipt and in no transcript (2026-09-20). So whatever is raised
+    becomes a refusal here, goes to the log, and is billed and folded like any
+    other answer.
+
+    Args:
+        call: One question already on its way.
+
+    Returns:
+        What it answered, or a refusal standing in for a failure nobody wrote a
+        sentence for.
+    """
+    try:
+        return call.result()
+    except BaseException as failed:
         logging.getLogger(__name__).exception(
-            "a question failed in a way the seam did not convert", exc_info=went_wrong
+            "a question failed in a way the seam did not convert", exc_info=failed
         )
-    return answers
+        return _never_answered(failed)
+
+
+def _folded_where_nobody_sees(
+    in_flight: dict[Future[Outcome], PropositionId],
+    walk: _Walk,
+    graph: Graph,
+    never_seen: Callable[[Outcome], None] | None,
+    *,
+    not_folded: Outcome | None = None,
+) -> Graph:
+    """Wait for, bill and fold every call of a round that nobody will be handed.
+
+    Reached two ways: the reader went away while the round was in flight, and a
+    fold of ours threw. Both leave calls that were asked and will be paid for, so
+    both end here. Nothing is abandoned unbilled.
+
+    **Every call is billed before any of them is folded**, which is the one thing
+    that must not depend on anything else going right: a fold that throws in here
+    would otherwise take the calls behind it off the receipt, which is the exact
+    fault this whole rule exists to prevent (Kent, 2026-09-21).
+
+    Args:
+        in_flight: The round's calls that have not been read yet, each
+            remembering which claim it was about. Emptied.
+        walk: What this walk has spent and remembers. Changed as it goes.
+        graph: The map as it stands.
+        never_seen: Told about each answer nobody will be handed, or nothing at
+            all when the caller does not want to know.
+        not_folded: The one answer that was billed and whose fold threw. It was
+            paid for like the rest, so it is owed to the working too.
+
+    Returns:
+        The map with every one of those answers on it.
+    """
+    left = [(claim_id, _what_came_back(call)) for call, claim_id in in_flight.items()]
+    in_flight.clear()
+    for _, answer in left:
+        walk.bill(answer)
+    if not_folded is not None and never_seen is not None:
+        never_seen(not_folded)
+    for claim_id, answer in left:
+        graph, its_outcome = walk.fold(graph, claim_id, answer)
+        if never_seen is not None:
+            never_seen(its_outcome)
+    return graph
 
 
 def _never_answered(failed: BaseException) -> Outcome:
@@ -812,8 +896,18 @@ def _why_it_stopped(walk: _Walk, graph: Graph) -> StoppingReason:
     **The rule: the reason names what closed the last claim that was still
     open** — with the money and the map ending nowhere overriding it, in that
     order, because each stops the run wherever it happens to be. One rule, so two
-    readers cannot get two answers. Reaching the cap on searches can never
-    appear: it stops the searching and not the run.
+    readers of one run cannot get two answers. Reaching the cap on searches can
+    never appear: it stops the searching and not the run.
+
+    **"Last" means last as the reader watched it close**, which since Kent's
+    answer of 2026-09-22 is the order the calls came back in rather than the
+    order the questions went out. So a round whose answers close two lines at
+    once — one by a cap, one by a `Stop` — names whichever of them landed second,
+    and the very same answers arriving in the other order would name the other.
+    Both sentences are true of the run that happened, and each names the line
+    that closed last on the screen somebody was watching. Nothing in production
+    asks the same answers twice: they come from a model, and a replay plays a
+    recording back rather than walking again.
 
     Args:
         walk: What this walk remembers, including what closed the last claim.

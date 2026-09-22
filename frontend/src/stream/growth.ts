@@ -26,6 +26,15 @@
  * event — and this file does not rely on it. An arrow whose two ends are not both
  * on the map is held and drawn the moment the second one arrives. A wire with one
  * end nowhere is a picture of something that is not true.
+ *
+ * **And one event is folded into none of that** *(added 2026-09-22, Kent's R44
+ * and R47)*. `activity` — what the model is doing inside a call that has not
+ * come back — changes one field, `activity`, and nothing else: not the map, not
+ * the rectangles, not the counts, not the frontier, not the refusals, not the
+ * receipt and not the phase. It has to be that way round rather than as a matter
+ * of taste: the line is never written to a recording, so anything it could move
+ * would be something a replay of the same run could not reproduce, and a
+ * recording is the real stream line for line.
  */
 
 import { absence } from "../world/absence";
@@ -35,9 +44,12 @@ import { toClaim, toLink } from "../world/fromTheServer";
 import { inFewWords, NOT_ON_THIS_MAP } from "../world/naming";
 import type { Absence, ClaimView, LinkView, WorldView } from "../world/types";
 import type {
+  Activity,
+  ActivityKind,
   Done,
   GenerationStarted,
   Link,
+  ProposalAccepted,
   Proposition,
   PropositionId,
   ReadEvent,
@@ -70,6 +82,48 @@ export interface UnreadLine {
   /** True when the name was one of the eight and its payload could not be read. */
   readonly unreadable: boolean;
 }
+
+/**
+ * One line about what the model is doing inside a call that has not come back.
+ *
+ * It is the `activity` event's three fields, kept as they arrived. Nothing here
+ * is composed, shortened or translated: the strip does the shortening when it
+ * draws, and what is kept is what the model said.
+ */
+export interface ActivityLine {
+  /**
+   * The open claim the call is working on, or null when the call is about no one
+   * claim. It is what says which lines a proposal's arrival makes stale.
+   */
+  readonly about: PropositionId | null;
+  /** Which of the three things the model was doing. */
+  readonly kind: ActivityKind;
+  /** The model's own words, verbatim. */
+  readonly text: string;
+}
+
+/**
+ * The most the strip may say about what the model is doing right now: two lines.
+ *
+ * **Latest only, never a list.** The server sends at most about one of these a
+ * second per call and the newest wins, so a browser that kept them all would
+ * grow a log at the foot of the screen that nobody could read and that would
+ * push the map up the page every second.
+ *
+ * **Two, because they are two different things.** A search is about the world —
+ * a query issued, a page found — and is checkable. A thought is about the
+ * model's own mind. Neither replaces the other, and the one about the mind says
+ * whose mind it is, every time it is drawn.
+ */
+export interface WhatTheModelIsDoing {
+  /** The latest `searching` or `found` line. They are one slot: found answers searching. */
+  readonly searching: ActivityLine | null;
+  /** The latest `thinking` line. */
+  readonly thinking: ActivityLine | null;
+}
+
+/** Nothing is being said about what the model is doing. Where every run starts and ends. */
+export const SAYING_NOTHING: WhatTheModelIsDoing = { searching: null, thinking: null };
 
 /** One reserved rectangle at the growing edge of the map. Never a claim. */
 export interface Skeleton {
@@ -172,6 +226,24 @@ export interface Growth {
    * that line carried.
    */
   readonly unknown: ReadonlyMap<string, UnreadLine>;
+  /**
+   * What the model is doing right now, and the **only** thing an `activity`
+   * event changes.
+   *
+   * It touches nothing else here — not the map, not the rectangles, not the
+   * refusals, not the receipt, not the phase — because a line that is never
+   * recorded must never be able to move something a recording would have to
+   * reproduce. Everything above is folded from the eight events a recording
+   * holds, and folding the same recording twice gives the same map; this field
+   * is folded from the one event a recording never holds, and it is empty on
+   * every replay for that reason.
+   *
+   * **Who decides it is shown is the screen, not this.** A fold has not been
+   * told whether the run it is folding is live or a recording being played back,
+   * and it does not need to be: the screen knows, and it passes the strip
+   * nothing on a replay — the same difference the seconds counter already makes.
+   */
+  readonly activity: WhatTheModelIsDoing;
 }
 
 /**
@@ -188,16 +260,33 @@ export const WHILE_IT_GROWS: Absence = absence(
     "question about a map that will not exist in a second.",
 );
 
-/** The one sentence under a growing map saying where everything on it came from. */
-function originWhileGrowing(generationId: string | null, seed: string | null): string {
-  const named = generationId === null ? "a generation that has not started yet" : generationId;
-  const from = seed === null ? "a seed the engine has not named yet" : `seed ${seed}`;
-  return (
-    `Every claim and arrow on this map arrived from /api/generate, in generation ${named}, ` +
-    `at ${from}. Nothing here was typed in, and no likelihood has been worked out yet: the ` +
-    `engine works them through the whole map at once, when the map is finished.`
-  );
-}
+/**
+ * The one sentence *Run details* carries while a map is still being built.
+ *
+ * **It does not say that anything has arrived**, because for the first
+ * twenty-odd seconds of a run nothing has. The line this replaced read *"Every
+ * claim and arrow on this map arrived from /api/generate…"* and it was written
+ * from the run's first event onward — that is, over an empty map, asserting
+ * arrivals that had not happened. What is true from the first event is where
+ * the map is being built and how: nothing on it is typed in, and no likelihood
+ * has been worked out yet.
+ *
+ * The route, the run's own name and the seed are printed beside it as three
+ * readings rather than folded into the prose, so a reader can copy one.
+ */
+export const NOTHING_HERE_WAS_TYPED_IN =
+  "Nothing on this map is typed in: every claim and every arrow on it was proposed by the model " +
+  "and accepted by the map's own rules.";
+
+/**
+ * The second sentence *Run details* carries, and only until the numbers land.
+ *
+ * It is true while the map is being built and false the moment the engine's
+ * world arrives, so it is printed for exactly that long.
+ */
+export const NO_LIKELIHOOD_YET =
+  "No likelihood has been worked out yet: the engine works them through the whole map at once, " +
+  "when the map is finished.";
 
 /** An empty map, in the shape the canvas draws, with the reader's sentence as its title. */
 function nothingYet(hypothesis: string): WorldView {
@@ -213,7 +302,10 @@ function nothingYet(hypothesis: string): WorldView {
     hypothesisId: "",
     claims: [],
     links: [],
-    origin: originWhileGrowing(null, null),
+    // Where this map came from is read in *Run details*, in the panel, from the
+    // run's own name and seed. The map itself has no origin sentence of its own
+    // until the engine hands one over with the likelihoods.
+    origin: `${NOTHING_HERE_WAS_TYPED_IN} ${NO_LIKELIHOOD_YET}`,
   };
 }
 
@@ -240,6 +332,7 @@ export function waitingFor(hypothesis: string, target: string | null = null): Gr
     failure: null,
     waitingWires: [],
     unknown: new Map<string, UnreadLine>(),
+    activity: SAYING_NOTHING,
   };
 }
 
@@ -359,10 +452,61 @@ function started(was: Growth, event: GenerationStarted): Growth {
       // happens to be a string of the same shape — and it would do it on
       // exactly the two screens where the map is half-built.
       title: event.hypothesis,
-      origin: originWhileGrowing(event.generation_id, seedOf(event)),
     },
     skeletons: [{ id: FIRST_RECTANGLE, words: event.hypothesis, after: null }],
   };
+}
+
+/**
+ * The two lines once this one has arrived. Latest wins, and only in its own slot.
+ *
+ * @param lines What was being said before.
+ * @param event The line that just arrived.
+ */
+function theLatest(lines: WhatTheModelIsDoing, event: Activity): WhatTheModelIsDoing {
+  const line: ActivityLine = { about: event.about, kind: event.kind, text: event.text };
+  return event.kind === "thinking" ? { ...lines, thinking: line } : { ...lines, searching: line };
+}
+
+/**
+ * Which calls a proposal that has just arrived is the answer to.
+ *
+ * A call is working on one open claim — the claim the proposal hangs off — and
+ * an accepted proposal names that claim, as the source of the arrows it brought.
+ * A proposal that hangs off nothing at all is the **opening** call coming back:
+ * the one that turns the reader's own sentence into the first claim, and the one
+ * whose activity lines are about no claim.
+ *
+ * @param event The accepted proposal.
+ * @returns The claims whose calls this answers, with null standing for the
+ *   opening call.
+ */
+function theCallsAnsweredBy(event: ProposalAccepted): ReadonlySet<PropositionId | null> {
+  const answered = new Set<PropositionId | null>(event.links.map((link) => link.source));
+  if (event.links.length === 0) {
+    answered.add(null);
+  }
+  return answered;
+}
+
+/**
+ * The lines left once those calls have been answered.
+ *
+ * A line says what the model is doing *while a call is out*. When the call comes
+ * back, the line is no longer true, and a strip still saying *searching the web*
+ * under a sentence announcing what arrived is the browser asserting something
+ * that has stopped being the case.
+ *
+ * @param lines What was being said.
+ * @param answered The calls that have just come back.
+ */
+function withoutTheCalls(
+  lines: WhatTheModelIsDoing,
+  answered: ReadonlySet<PropositionId | null>,
+): WhatTheModelIsDoing {
+  const kept = (line: ActivityLine | null) =>
+    line === null || answered.has(line.about) ? null : line;
+  return { searching: kept(lines.searching), thinking: kept(lines.thinking) };
 }
 
 /**
@@ -371,10 +515,13 @@ function started(was: Growth, event: GenerationStarted): Growth {
  * @param was Everything known before this event.
  * @param event The event, with its name already joined onto its payload.
  * @returns Everything known after it, as a new object. Every one of the eight
- *   events changes something — even an unknown name, which changes the count of
- *   how many of it arrived — so there is no event this hands its argument back
- *   for, and a screen that compared the two to decide whether to redraw would be
- *   comparing two things that are never the same.
+ *   events changes something the map is made of — even an unknown name, which
+ *   changes the count of how many of it arrived. **The ninth is the exception,
+ *   and it is the exception on purpose:** an `activity` line changes only
+ *   `activity`, and one that reaches a run which has already stopped changes
+ *   nothing at all and hands the same object back. So a screen that wants to
+ *   know whether something *arrived* asks `onlyTheStripChanged`, below, rather
+ *   than comparing the two objects.
  */
 export function fold(was: Growth, event: ReadEvent): Growth {
   switch (event.event) {
@@ -402,6 +549,10 @@ export function fold(was: Growth, event: ReadEvent): Growth {
         },
         skeletons: rectanglesFor(event.frontier, claims),
         waitingWires: waiting,
+        // The call this proposal came from has come back, so whatever it was
+        // last seen doing is over. A call still out, on another claim, keeps
+        // saying what it is doing.
+        activity: withoutTheCalls(was.activity, theCallsAnsweredBy(event)),
       };
     }
 
@@ -409,6 +560,13 @@ export function fold(was: Growth, event: ReadEvent): Growth {
       return {
         ...was,
         phase: "growing",
+        // **A refusal clears both lines, where an acceptance clears only the
+        // ones it answers.** A refusal carries no claim it hangs off — what it
+        // carries is the model's words and the rules it broke — so the browser
+        // cannot say which call came back, and the honest answer to *which of
+        // these is still true* is *we no longer know*. A line that is still true
+        // is back within about a second; a line that is false stays false.
+        activity: SAYING_NOTHING,
         refusals: [
           ...was.refusals,
           {
@@ -432,11 +590,7 @@ export function fold(was: Growth, event: ReadEvent): Growth {
         day: event.world.day_zero,
         // The seed the run reported, not the one on the world: both are the
         // same seed, and only the first was read as its digits.
-        origin: originOfTheFinishedMap(
-          was,
-          was.seed ?? String(event.world.seed),
-          event.world.versions,
-        ),
+        origin: originOfTheFinishedMap(was, was.seed ?? String(event.world.seed)),
       };
       return {
         ...was,
@@ -462,6 +616,9 @@ export function fold(was: Growth, event: ReadEvent): Growth {
         ...was,
         done: event,
         phase: event.reason === "reached_terminal" ? "settled" : "stopped",
+        // Nothing is out, so nothing is being done. The lines go with the
+        // seconds, and for the same reason: both measure a wait that is over.
+        activity: SAYING_NOTHING,
       };
 
     case "failed":
@@ -475,7 +632,21 @@ export function fold(was: Growth, event: ReadEvent): Growth {
       // run is the case it does not name. The claims still open are in the
       // working either way, so nothing is lost by taking the boxes down — what
       // would be lost by leaving them is a reader waiting for a claim for ever.
-      return { ...was, phase: "failed", failure: event.message, skeletons: [] };
+      return {
+        ...was,
+        phase: "failed",
+        failure: event.message,
+        skeletons: [],
+        activity: SAYING_NOTHING,
+      };
+
+    case "activity":
+      // **The one event that changes only what the strip may say.** Not the
+      // map, not the rectangles, not the counts, not the frontier, not the
+      // receipt and not the phase — a run that has not started does not start
+      // because the model said something, and a run that has stopped stays
+      // stopped and says nothing more about what is being done.
+      return hasStopped(was.phase) ? was : { ...was, activity: theLatest(was.activity, event) };
 
     case "unknown": {
       const counted = new Map(was.unknown);
@@ -491,20 +662,59 @@ export function fold(was: Growth, event: ReadEvent): Growth {
   }
 }
 
-/** The one sentence under a finished map, saying where every number on it came from. */
-function originOfTheFinishedMap(was: Growth, seed: string, versions: number): string {
-  const spelled = versions.toLocaleString("en-GB").replace(/,/g, " ");
+/**
+ * The one sentence under a finished map, saying where every number on it came
+ * from.
+ *
+ * **It used to say how the engine got there** *(until 2026-09-22, R48)*: *"over
+ * 2 000 versions of the map"*. That count only meant something while a claim
+ * carried a range, and there is no range. The seed stays, because a run is still
+ * reproducible from it, and so does the run's own name.
+ */
+function originOfTheFinishedMap(was: Growth, seed: string): string {
   return (
     `Every claim and arrow on this map was proposed at /api/generate and accepted by the map's ` +
-    `own rules; every likelihood was worked out by the engine from that map, at seed ${seed}, ` +
-    `over ${spelled} versions of the map. The working is generation ` +
-    `${was.generationId ?? "this run"}, and the same sentence and seed give the same map again.`
+    `own rules; every likelihood was worked out by the engine from that map, at seed ${seed}. ` +
+    `The working is generation ${was.generationId ?? "this run"}, and the same sentence and ` +
+    `seed give the same map again.`
   );
 }
 
 /** Fold a whole stream, in order. What a test builds a finished map with. */
 export function foldAll(from: Growth, events: readonly ReadEvent[]): Growth {
   return events.reduce(fold, from);
+}
+
+/**
+ * Did the last event change only what the strip may say, and nothing else?
+ *
+ * **This is what keeps the seconds counter honest.** The reading at the foot of
+ * a map says *nothing new on the map for N s*, and it starts again every time
+ * something arrives. An `activity` line is not an arrival in that sense: it is
+ * the model saying what it is doing inside a call that has not come back, and a
+ * counter that started again on every one of them would read *nothing new on the
+ * map for 1 s* for three solid minutes while nothing whatever reached the map —
+ * which is exactly the screen that looks busy while nothing happens, the thing
+ * the counter was built to stop. So the counter measures arrivals on the map,
+ * its words say so, and the lines say the tool is alive in their own right, by
+ * changing in front of the reader every few seconds.
+ *
+ * It compares every other field by identity rather than by value, which is what
+ * `fold` gives it: every branch above hands back the same objects for the fields
+ * it did not touch.
+ *
+ * @param was What was known before the event, or null before anything at all.
+ * @param now What is known after it.
+ */
+export function onlyTheStripChanged(was: Growth | null, now: Growth): boolean {
+  if (was === null) {
+    return false;
+  }
+  const { activity: _wasSaying, ...before } = was;
+  const { activity: _nowSaying, ...after } = now;
+  return (Object.keys(before) as (keyof typeof before)[]).every(
+    (field) => before[field] === after[field],
+  );
 }
 
 /**
@@ -539,5 +749,7 @@ export function theStreamEnded(was: Growth): Growth {
   if (hasStopped(was.phase)) {
     return was;
   }
-  return { ...was, phase: "ended_early", skeletons: [] };
+  // And what the model was last seen doing goes with them, for the same reason:
+  // nothing is out, so nothing is being done.
+  return { ...was, phase: "ended_early", skeletons: [], activity: SAYING_NOTHING };
 }

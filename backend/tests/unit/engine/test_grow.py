@@ -48,6 +48,16 @@ def ending(steps: list[object]) -> Finished:
     return steps[-1]
 
 
+def arrows_between(graph: object) -> set[tuple[str, str]]:
+    """Every arrow on a map, written as the two claims' own words.
+
+    By the words rather than by the identifiers, because the identifiers are
+    minted while the run is happening and two runs of one story never share them.
+    """
+    words = {one.id: one.claim for one in graph.propositions}  # type: ignore[attr-defined]
+    return {(words[one.source], words[one.target]) for one in graph.links}  # type: ignore[attr-defined]
+
+
 def test_a_walk_hands_back_every_outcome_and_then_exactly_one_finished() -> None:
     """Nothing is buffered, so a caller can draw the map as it arrives."""
     steps = walk(Storyteller())
@@ -249,8 +259,22 @@ def test_a_run_stops_searching_at_its_search_cap() -> None:
     assert len(finished.graph.propositions) > 2
 
 
-def test_a_walk_gives_the_same_map_twice_from_the_same_answers() -> None:
-    """Three lines are asked about at once, and the fold order is the frontier's."""
+def test_a_walk_builds_the_same_map_twice_from_the_same_answers() -> None:
+    """Three lines are asked about at once, and each answer lands as its own call returns.
+
+    **What that keeps:** the same answers build the same map — the same claims and
+    the same arrows — because every answer of a round is folded whichever order
+    they come back in, and each is judged again at the fold against the map as it
+    then stands.
+
+    **What it gives up, on purpose** (Kent, 2026-09-22): the order the
+    answers land in is the order the calls came back in. This story's last round
+    closes two lines at once — one by the width cap, one by a `Stop` — so two
+    runs of it can name either as the reason the run stopped. Both sentences are
+    true, and each names the line the reader watched close last. The reason is
+    pinned where it is not ambiguous, in
+    `test_the_reason_names_what_closed_the_last_line_that_was_still_open`.
+    """
     story = {
         STARTED_AT: [
             an_answer(a_claim(A_STEP, cause=FROM_THE_QUESTION)),
@@ -264,10 +288,11 @@ def test_a_walk_gives_the_same_map_twice_from_the_same_answers() -> None:
     second = ending(walk(Storyteller({one: list(said) for one, said in story.items()})))
 
     assert first.graph is not None and second.graph is not None
-    assert [one.claim for one in first.graph.propositions] == [
+    assert {one.claim for one in first.graph.propositions} == {
         one.claim for one in second.graph.propositions
-    ]
-    assert first.reason == second.reason
+    }
+    assert len(first.graph.propositions) == len(second.graph.propositions)
+    assert arrows_between(first.graph) == arrows_between(second.graph)
 
 
 def test_a_run_that_never_gets_started_says_so_and_builds_no_map() -> None:

@@ -18,7 +18,8 @@
  * | `B` | Start a branch from here and name it |
  * | `Space` | Flip between the map as it was and the map with your edits |
  * | `O` | Read the map as a list |
- * | `P` | Show or hide the panel beside the map |
+ * | `P` | Put the panel beside the map away, and bring it back. On both map screens — the one a map is being built on and the one a stored map is read on — and the chevron at the head of the panel does the same |
+ * | `N` | The next panel beside the map. Bound in `components/PanelSwitch.tsx` rather than here, because it means nothing on a screen with no panels to step between; it is in this table because this table is the whole keyboard |
  * | `?` | Every key, on one sheet |
  * | `⌘K` | Every command, by name |
  * | `Escape` | Close whatever is open |

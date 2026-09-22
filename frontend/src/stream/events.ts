@@ -1,5 +1,13 @@
 /**
- * The eight things that travel down a generation, as the browser types them.
+ * The eight things that travel down a generation, as the browser types them —
+ * and, from 2026-09-22, one more that only a live run sends.
+ *
+ * **The grammar is split in two, and the split is load-bearing.** The eight are
+ * what a recording holds, line for line, and everything that reaches the map
+ * comes from them. The ninth, `activity`, says what the model is doing inside a
+ * call that has not come back yet; it is ephemeral by rule — never recorded,
+ * never transcribed, never replayed, never invented by a replay — and it reaches
+ * the run strip and nothing else (Kent, R44 and R47, 2026-09-22).
  *
  * Written by hand, exactly as `WorldView` was, because the server's description
  * of itself and this canvas are built at the same time. The server's own copy is
@@ -45,7 +53,7 @@
  */
 
 import type { components } from "../api/schema";
-import type { Ranged } from "../world/types";
+import type { Likelihood } from "../world/types";
 
 /** An identifier the engine minted for a claim. Nothing in the browser ever makes one. */
 export type PropositionId = string;
@@ -235,6 +243,64 @@ export const EVENT_NAMES: readonly StreamEvent["event"][] = [
   "failed",
 ];
 
+/** Which of the three things the model was doing when it said so. */
+export type ActivityKind = "searching" | "found" | "thinking";
+
+/**
+ * The ninth kind of line: what the model is doing **right now**.
+ *
+ * **It is not one of the eight, and the split is the whole point.** The eight
+ * above are what a recording holds, line for line, and a replay is those eight
+ * played back. This one is sent on a live run and is never written to a
+ * recording, never written to a transcript, never replayed, never invented by a
+ * replay, never counted by the `at` counter and never folded into the map. So a
+ * recording is still the real stream line for line, which is what made a ninth
+ * event possible at all: the thing it reports does not exist in a replay, the
+ * same way the seconds counter's wait does not (Kent, R44 and R47, 2026-09-22).
+ *
+ * **What it carries is the model's own words and nothing composed by us.** The
+ * search it just issued, verbatim; the title of one thing that search returned,
+ * verbatim, with the host after it when a host is known; its own summarised
+ * thinking, verbatim. There is no progress estimate here, no percentage and no
+ * time remaining — the caps those would be worked out from are the server's and
+ * are not on the wire.
+ *
+ * **Where it may be shown is the run strip and nowhere else.** Never on the map,
+ * never in the panel, and never inside the polite live region: these lines
+ * change every few seconds, and a region that read them out would be reading a
+ * stopwatch over the top of the map being built.
+ */
+export interface Activity {
+  readonly event: "activity";
+  /**
+   * The open claim the model call is working on — one of the identifiers in the
+   * latest `frontier` — or null when the call is about no one claim, which is
+   * the opening call that proposes the reader's own sentence as a claim.
+   */
+  readonly about: PropositionId | null;
+  /** Which of the three things it is doing. */
+  readonly kind: ActivityKind;
+  /** The model's own words, verbatim. Never paraphrased, never composed here. */
+  readonly text: string;
+}
+
+/** The ninth name. Live only, and a recording never holds it. */
+export const ACTIVITY_NAME = "activity";
+
+/**
+ * The nine names a **live** run may send: the eight a recording holds, and the
+ * ephemeral one.
+ *
+ * The reader matches on this list rather than on the eight, because a name that
+ * is not on it comes back as *a name this build does not know* and is counted
+ * on screen — which is the right answer for a server that has learned a tenth
+ * word and the wrong one for a word this build knows perfectly well.
+ */
+export const NAMES_A_LIVE_RUN_MAY_SEND: readonly (StreamEvent | Activity)["event"][] = [
+  ...EVENT_NAMES,
+  ACTIVITY_NAME,
+];
+
 /**
  * An event whose name this build does not know.
  *
@@ -262,8 +328,11 @@ export interface UnknownEvent {
   readonly unreadable?: boolean;
 }
 
-/** Everything the reader can hand back: one of the eight, or a name it does not know. */
-export type ReadEvent = StreamEvent | UnknownEvent;
+/**
+ * Everything the reader can hand back: one of the eight, the ephemeral ninth, or
+ * a name it does not know.
+ */
+export type ReadEvent = StreamEvent | Activity | UnknownEvent;
 
 /** What the browser asks for when it asks for a map. */
 export interface GenerateRequest {
@@ -275,7 +344,7 @@ export interface GenerateRequest {
   /** The Verify door's destination, in the reader's words. Absent is the Explore door. */
   readonly target?: string;
   /** The reader's own likelihood on the hypothesis. Absent when they chose "I don't know". */
-  readonly user_belief?: Ranged;
+  readonly user_belief?: Likelihood;
   /**
    * Only when reproducing a run we were handed a seed for.
    *

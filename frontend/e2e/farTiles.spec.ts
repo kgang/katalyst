@@ -3,23 +3,30 @@
  * printed over nothing.
  *
  * **Why this is a browser test.** Zoomed out, a tile stops being a row of
- * columns and becomes a few lines — the owner, the number, the range. Whether
- * two of those lines land on top of each other, or the end of a range runs off
- * the tile, is a fact about laid-out boxes, and the no-browser tests have no
- * layout: every one of them passed on 2026-09-22 while the one tile that holds a
- * venue's number printed its second line over its first, and while the two tiles
- * whose outline cuts into one side lost the end of their range.
+ * columns and becomes a few lines — the owner and the number. Whether two of
+ * those lines land on top of each other, or the end of one runs off the tile, is
+ * a fact about laid-out boxes, and the no-browser tests have no layout: every
+ * one of them passed on 2026-09-22 while the one tile that holds a venue's
+ * number printed its second line over its first, and while the two tiles whose
+ * outline cuts into one side lost the end of a line.
  *
- * **Why it reads the map twice.** The first version of this test read the base
- * map only, and the base map is the easy one: every likelihood on it has two
- * figures, and two figures just fit beside their owner and their range on one
- * line at this size. Open the stored branch and the engine prints three —
- * `.074  .029–.13` — and the line no longer fits. Nobody saw that, because
- * nothing read the far-away tiles with a branch open. So this opens the stored
+ * **There was a third thing on that line and it is gone** *(Kent, 2026-09-22,
+ * R48)*: the range. It was what made a line overrun in the first place — the
+ * owner *market*, a three-figure likelihood and a three-figure range came to 281
+ * pixels against the 256 a belief row has — and with it cut, a belief that
+ * prints a likelihood fits on one line on every tile. The four rules below are
+ * unchanged and still worth holding: a reading that is **words** — *no engine
+ * yet*, *Supposed · Oct 2* — still wraps, and that is what the second reading
+ * now looks at.
+ *
+ * **Why it reads the map twice.** The base map is the easy one. The stored
+ * branch draws a claim standing on the reader's own say-so, whose chip prints a
+ * word where a likelihood would go and takes two lines to do it; it also prints
+ * three-figure likelihoods the base map does not. So this opens the stored
  * branch, zooms out again (opening a branch re-frames the map to full zoom) and
  * reads every line a second time, and it ends by checking that the branch really
- * did print a belief the base map could not print on one line — otherwise the
- * second reading is the first one again.
+ * did draw a line the base map has not got — otherwise the second reading is the
+ * first one again.
  *
  * It runs on the stored example because that is the one map where a tile holds
  * two beliefs. It asserts places, never a number.
@@ -39,7 +46,7 @@ test("test_a_tile_seen_from_far_away_prints_every_belief_line_whole", async ({ p
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto("/");
   await page
-    .getByRole("button", { name: /Strait of Hormuz/ })
+    .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
   await waitForTheLayout(page, 7);
@@ -56,6 +63,9 @@ test("test_a_tile_seen_from_far_away_prints_every_belief_line_whole", async ({ p
   // The stored branch, opened the way a reader opens it: by pressing its name in
   // the panel. The map re-frames to full zoom when it opens, so it has to be
   // zoomed out again before there is anything far away to read.
+  // The list of branches is one of the panels beside the map, so the panel is
+  // turned to it first — nothing but the reader ever turns it (INV-workbench.84).
+  await page.getByRole("tab", { name: /Branches and changes/ }).click();
   await page
     .getByRole("button", { name: new RegExp(THE_STRIKE_BRANCH) })
     .first()
@@ -67,22 +77,28 @@ test("test_a_tile_seen_from_far_away_prints_every_belief_line_whole", async ({ p
     await everyLineIsWhole(page, "with the branch open");
   }).toPass({ timeout: 5_000 });
 
-  // **The premise of the second reading.** The fault this test was extended for
-  // only shows itself where a belief will not fit on one line and its range has
-  // to take one of its own. So the map with the branch open must hold such a
-  // belief: without one the second reading looked at nothing harder than the
-  // first, and proves nothing.
+  // **The premise of the second reading.** It has to be looking at something the
+  // base map has not got, or it is the first reading again. With the range cut
+  // (2026-09-22, R48) the line that still wraps is a reading that is words
+  // rather than a number, and the strike branch is where one is: the claim it
+  // adds stands on the reader's own say-so and its chip prints *Supposed · Oct
+  // 2* where a likelihood would go.
   expect(
-    await howManyBeliefsTookASecondLine(page),
-    "no belief with the branch open needed a second line, so reading it proved nothing",
+    await howManyBeliefsPrintWordsRatherThanANumber(page),
+    "no belief with the branch open printed words, so reading it proved nothing",
   ).toBeGreaterThan(0);
 });
 
 /**
  * Zoom out until the tiles change to their far-away form.
  *
- * The map does not zoom out past half, so this ends; if the form never comes,
- * that is a failure of this test's own premise and it says so.
+ * It stops on the **first** press that produces one, which is the summary — the
+ * middle of the tile's three forms, and the one this file is about. It is
+ * bounded as well, so a form that never comes is a failure of this test's own
+ * premise and says so rather than pressing for ever. *(The bound used to be
+ * carried by the zoom floor, which was half; since 2026-09-22 the map goes a
+ * good deal further out than that, and the tiles drop their words altogether
+ * below half — `layout-and-zoom.md` B6.)*
  *
  * @param page The page the map is on.
  */
@@ -116,9 +132,8 @@ interface FarTile {
  * Read every tile's belief lines off the glass.
  *
  * The ink of one belief line: every piece of text on the chip's face that is
- * really drawn. The note a chip opens when it is pointed at is not part of the
- * line, and words kept for a screen reader are clipped to a pixel and are not
- * ink.
+ * really drawn. Words kept for a screen reader are clipped to a pixel and are
+ * not ink.
  *
  * @param page The page the map is on.
  */
@@ -157,27 +172,20 @@ async function theBeliefLines(page: Page): Promise<FarTile[]> {
 }
 
 /**
- * How many beliefs on this map printed their range on a line of its own.
+ * How many beliefs on this map print words where a likelihood would go.
  *
- * No height is written down here. A belief that fits beside its number is the
- * short kind and a belief whose range took a second line is taller than that —
- * so the shortest line on the map is what one line is, and anything taller than
- * it has wrapped. Two measurements of the same thing, compared with each other.
- *
- * **Only the beliefs that print a likelihood are counted.** A belief that prints
- * words instead — *no engine yet*, *Supposed · Oct 2* — wraps to two lines of
- * its own accord and always did, so counting those would let the premise pass
- * for a reason that has nothing to do with a range.
+ * **This was `howManyBeliefsTookASecondLine`** *(until 2026-09-22, R48)*, and it
+ * counted the beliefs whose range had to drop under their number. There is no
+ * range, so no belief that prints a likelihood wraps any more, and what is left
+ * to look for is the line that still can: a reading that is words — *no engine
+ * yet*, *Supposed · Oct 2* — which is longer than any number and is the one
+ * thing on a far-away tile that can still run off the end of its row.
  *
  * @param page The page the map is on.
  */
-async function howManyBeliefsTookASecondLine(page: Page): Promise<number> {
+async function howManyBeliefsPrintWordsRatherThanANumber(page: Page): Promise<number> {
   const tiles = await theBeliefLines(page);
-  const heights = tiles.flatMap((tile) =>
-    tile.lines.filter((line) => line.reading === "number").map((line) => line.bottom - line.top),
-  );
-  const oneLine = Math.min(...heights);
-  return heights.filter((height) => height > oneLine + A_PIXEL).length;
+  return tiles.flatMap((tile) => tile.lines.filter((line) => line.reading === "words")).length;
 }
 
 /**
@@ -201,9 +209,9 @@ async function everyLineIsWhole(page: Page, where: string): Promise<void> {
 
   for (const tile of tiles) {
     for (const line of tile.lines) {
-      // Nothing on the line is shortened to make it fit: not the range, and not
-      // the owner, who is never abbreviated. A line that will not fit takes a
-      // second line; it never gives a word up.
+      // Nothing on the line is shortened to make it fit: not the reading, and
+      // not the owner, who is never abbreviated. A line that will not fit takes
+      // a second line; it never gives a word up.
       expect(
         line.cutOff,
         `${where}, "${tile.claim}": the ${line.owner} line has been cut short to make it fit`,

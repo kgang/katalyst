@@ -129,15 +129,44 @@ function editLine(edit: Edit, world: WorldView): { button: string; about: string
   }
 }
 
+/**
+ * What the unedited map is called, which depends on where it came from.
+ *
+ * *(2026-09-22.)* A **stored example** was written: by hand, into a file, every
+ * number beside the reason for it. A **generated map** was built, in front of
+ * the reader, out of proposals the rules accepted one at a time. Calling the
+ * second one *as it was written* tells a reader who just watched it build that
+ * somebody typed it out — which is the one thing this product must never say
+ * about a generated map, because the whole of what it is showing is that nobody
+ * did.
+ *
+ * Both screens say it, so both ask here, and there is one answer.
+ *
+ * @param built True when this map came from a run rather than from the store.
+ */
+export function theUneditedMap(built: boolean): string {
+  return built ? "The map as it was built" : "The map as it was written";
+}
+
+/** The same fact in the half-sentence the bar prints beside an open branch. */
+export function asTheMapWas(built: boolean): string {
+  return built ? "as it was built" : "as it was written";
+}
+
 /** What the branch panel needs. */
 export interface BranchPanelProps {
   /** Every branch on this map, in the order they arrived. */
   readonly branches: readonly BranchView[];
-  /** Which branch is open, or `null` for the map as it was written. */
+  /** Which branch is open, or `null` for the map with nothing done to it. */
   readonly openId: string | null;
+  /**
+   * True when the map under these branches came from a run the reader watched,
+   * false when it is a stored example. It changes one word and no behaviour.
+   */
+  readonly built: boolean;
   /** The world on screen, so an edit can be read back in the claim's own words. */
   readonly world: WorldView;
-  /** Open a branch, or go back to the map as it was written. */
+  /** Open a branch, or go back to the map with nothing done to it. */
   readonly onOpen: (id: string | null) => void;
   /** Start a new branch with this name. */
   readonly onFork: (label: string) => void;
@@ -151,6 +180,7 @@ export interface BranchPanelProps {
 export function BranchPanel({
   branches,
   openId,
+  built,
   world,
   onOpen,
   onFork,
@@ -173,7 +203,7 @@ export function BranchPanel({
             onClick={() => onOpen(null)}
           >
             <span className="branch-panel__chip" data-hue="base" aria-hidden="true" />
-            <span className="branch-panel__name">The map as it was written</span>
+            <span className="branch-panel__name">{theUneditedMap(built)}</span>
           </button>
         </li>
         {branches.map((branch) => (
@@ -246,16 +276,15 @@ export function BranchPanel({
       {open === undefined ? (
         // Where the numbers on the unedited map came from — and there are two
         // answers, told apart by the one thing that says whether anything was
-        // worked out: whether the world reports how many versions of the map
-        // were run. The engine's answer and the stored example's own numbers are
-        // different claims about the world, and a screen that said the same
+        // worked out. The engine's answer and the stored example's own numbers
+        // are different claims about the world, and a screen that said the same
         // sentence over both would be making the weaker one silently.
         <p className="branch-panel__none">
-          {world.versions === undefined
-            ? "Nothing has been edited. The map above is exactly as it was written, and every " +
-              "number on it is the one the stored example carries — nothing has worked one out."
-            : "Nothing has been edited. The map above is exactly as it was written, and every " +
-              "number on it was worked out by the engine from that map with nothing done to it."}
+          {world.workedOut === true
+            ? `Nothing has been edited. The map above is exactly ${asTheMapWas(built)}, and every ` +
+              "number on it was worked out by the engine from that map with nothing done to it."
+            : `Nothing has been edited. The map above is exactly ${asTheMapWas(built)}, and every ` +
+              "number on it is the one the stored example carries — nothing has worked one out."}
         </p>
       ) : (
         <ol className="branch-panel__edits">
@@ -323,7 +352,10 @@ export function InterventionPanel({
   onClose,
 }: InterventionPanelProps) {
   const [ownNumber, setOwnNumber] = useState(false);
-  const [reading, setReading] = useState({ p: "", lo: "", hi: "" });
+  // **One number, not three** *(Kent, 2026-09-22, R48)*. This form used to ask
+  // for a likelihood, a bottom and a top; the range is cut from this product, so
+  // it asks for the likelihood.
+  const [reading, setReading] = useState("");
   const [pushing, setPushing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [push, setPush] = useState("");
@@ -591,19 +623,14 @@ export function InterventionPanel({
           className="intervene__form"
           onSubmit={(event) => {
             event.preventDefault();
-            const p = Number(reading.p);
-            const lo = Number(reading.lo);
-            const hi = Number(reading.hi);
-            if (!(lo >= 0 && lo <= p && p <= hi && hi <= 1)) {
-              say(
-                "A likelihood runs from 0 to 1, and the range has to hold the number: the bottom " +
-                  "at or below it, the top at or above it.",
-              );
+            const p = Number(reading);
+            if (!(p >= 0 && p <= 1)) {
+              say("A likelihood runs from 0 to 1.");
               return;
             }
-            onEdit({ op: "believe", target: claim.id, belief: { p, lo, hi } });
+            onEdit({ op: "believe", target: claim.id, belief: { p } });
             setOwnNumber(false);
-            setReading({ p: "", lo: "", hi: "" });
+            setReading("");
             say(
               "Your number now sits beside the model's and the market's on that tile. It is never " +
                 "averaged with either of them, and it is not pushed through the map.",
@@ -611,34 +638,16 @@ export function InterventionPanel({
           }}
         >
           <label className="intervene__label" htmlFor="own-p">
-            Your likelihood, and the range that says how sure you are of it. Between 0 and 1.
+            Your likelihood for this claim. Between 0 and 1.
           </label>
-          <div className="intervene__three">
-            <input
-              className="intervene__field"
-              id="own-p"
-              inputMode="decimal"
-              placeholder="likelihood"
-              value={reading.p}
-              onChange={(event) => setReading((was) => ({ ...was, p: event.target.value }))}
-            />
-            <input
-              className="intervene__field"
-              aria-label="the bottom of your range"
-              inputMode="decimal"
-              placeholder="bottom"
-              value={reading.lo}
-              onChange={(event) => setReading((was) => ({ ...was, lo: event.target.value }))}
-            />
-            <input
-              className="intervene__field"
-              aria-label="the top of your range"
-              inputMode="decimal"
-              placeholder="top"
-              value={reading.hi}
-              onChange={(event) => setReading((was) => ({ ...was, hi: event.target.value }))}
-            />
-          </div>
+          <input
+            className="intervene__field"
+            id="own-p"
+            inputMode="decimal"
+            placeholder="likelihood"
+            value={reading}
+            onChange={(event) => setReading(event.target.value)}
+          />
           <button className="intervene__go" type="submit">
             Put this number on the claim
           </button>

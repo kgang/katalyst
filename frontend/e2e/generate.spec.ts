@@ -49,6 +49,17 @@ import {
   whatItSaw,
 } from "./watching.js";
 
+/**
+ * The row on the first screen that plays the committed recording of the one
+ * sentence this file watches.
+ *
+ * **Two rows carry that sentence now**, since the first screen offers four ways
+ * to start: *Watch the recording* plays it back for nothing, and *Run it live*
+ * calls a model. So a row is named by its sentence **and** by what pressing it
+ * does, which is how a reader tells the two apart as well.
+ */
+const THE_RECORDING_ROW = new RegExp(`${THE_SENTENCE}[\\s\\S]*Watch the recording`);
+
 // Every test here plays a recording from beginning to end, so each needs room
 // for one. It is set on the file rather than in the configuration because it is
 // a fact about these tests: the stored example's tests next door are right to
@@ -84,19 +95,33 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
     "This server has no committed recording to play, so there is no generation to watch.",
   );
 
-  // The first screen says what this copy is, and says only what is true. Record
-  // 0012's sentence — *these four run from recordings made on <day>* — is
-  // printed word for word when all four can be played and all four were made on
-  // one day; anything else says how many there really are, in the same voice.
-  // Either way it names a day from the server's own readiness answer, and either
-  // way the field for a sentence of your own is disabled with it, because a
-  // field that takes typing and then does nothing reads as a broken tool.
-  const keyless = page.locator(".launchpad__keyless").first();
-  await expect(keyless).toBeVisible();
-  await expect(keyless).toHaveText(/^No model key configured — .*\d{4}-\d{2}-\d{2}/);
-  const said = ((await keyless.textContent()) ?? "").trim();
-  expect(said.includes("these four run from recordings")).toBe(replayable.length === 4);
+  // **The four ways to start are all four, on a copy with no key.** Nothing has
+  // gone missing and nothing is silently inert: the two that call a model are
+  // drawn, cannot be pressed, and carry the reason beside them, while the two
+  // free ones are untouched. The field for a sentence of your own is disabled
+  // with the same sentence, because a field that takes typing and then does
+  // nothing reads as a broken tool.
+  await expect(page.locator(".way__name")).toHaveText([
+    "Open the map",
+    "Watch the recording",
+    "Run it live",
+    "Build the map",
+  ]);
+  const whyNotLive = page.locator(".way--live .launchpad__why");
+  await expect(whyNotLive).toBeVisible();
+  await expect(whyNotLive).toHaveText(
+    /^No model key is configured, so this copy cannot call a model\./,
+  );
+  await expect(page.locator(".way--live button.example").first()).toBeDisabled();
   await expect(page.getByLabel("An event you think will happen")).toBeDisabled();
+
+  // **And what a live run would cost is on screen before any press**, read from
+  // the recorded run's own receipt and dated — never a figure typed into the
+  // page. A recording with no receipt this engine can read prints none, so what
+  // is asserted here is the shape and the date, not a number.
+  await expect(page.locator(".way--live .way__measure-line").first()).toHaveText(
+    /^The recorded run of .+ made \d+ model calls?, took about \d+ (seconds?|minutes?) and cost (\$[\d.]+|<\$0\.01), on \d{4}-\d{2}-\d{2}\.$/,
+  );
 
   // From here the page watches itself, because what follows is a screen that is
   // moving and four of the claims made about it are about moments, not about the
@@ -107,7 +132,7 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // The card that has a recording. It sends its sentence, exactly as a reader
   // would type it — the same request a live run sends — and it is opened with
   // the keyboard, because every way into this product is usable without a mouse.
-  const card = page.getByRole("button", { name: new RegExp(THE_SENTENCE) });
+  const card = page.getByRole("button", { name: THE_RECORDING_ROW });
   await card.focus();
   await expect(card).toBeFocused();
   await page.keyboard.press("Enter");
@@ -118,6 +143,24 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // first rectangle are true of exactly one moment — after it is drawn and
   // before the first claim replaces it with the frontier's.
   await expect(page.locator(".skeleton-tile").first()).toBeVisible();
+
+  // **And the foot of the screen says, in words, what is being waited for.**
+  // Until 2026-09-21 this line asserted the opposite — that the sentence about
+  // the run carried `map-live--spoken`, the class that clipped it to a
+  // one-pixel box — which is why no test in this suite could catch the thing
+  // Kent saw with his own key: a screen that says nothing at all for
+  // twenty-three seconds. It is visible now, it is the same element a screen
+  // reader hears, and it names what is being held open.
+  const runStrip = page.locator(".run-strip");
+  await expect(runStrip).toBeVisible();
+  const runSentence = runStrip.locator(".map-live");
+  await expect(runSentence).toBeVisible();
+  await expect(runSentence).toHaveAttribute("aria-live", "polite");
+  await expect(runSentence).toContainText(/held open|Working on what follows from/);
+  // A replay counts no seconds: it is paced by us, so the number would reset
+  // twice a second and would be measuring our own pacing rather than a wait.
+  await expect(runStrip).toHaveAttribute("data-state", "replay");
+  await expect(page.locator(".run-strip__waited")).toHaveCount(0);
 
   // The badge says this session is a replay, from the first frame, before the
   // receipt that also says so has arrived — and it is beside the map's name
@@ -132,10 +175,43 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // likelihood will go.
   await expect(page.locator(".tile").first()).toBeVisible();
 
-  // Where the first tile came to rest, before any of the others arrive. Nothing
-  // already placed may move, and this is what that promise is checked against.
+  // Where the first tile came to rest, before any of the others arrive. A tile
+  // keeps its row while the map grows, and this is what that promise is checked
+  // against — **while it is still growing**, because the map settles once at the
+  // moment it stops and a reading taken after that would fail by design
+  // (decision record 0024, 2026-09-21).
   const firstTile = page.locator(".react-flow__node.react-flow__node-claim").first();
   const wasAt = await whereTheTileSits(firstTile);
+
+  // **A click on a tile while the recording is still arriving**, which is the
+  // press Kent made and watched do nothing. It did select the tile and it did
+  // fill the panel — at the bottom of a column that also held the refusals, the
+  // receipt and *Run details*, and nothing scrolled. The claim's own words are
+  // read off the tile rather than written down here, so this is a test of the
+  // panel and never of the recording's copy.
+  await page.locator(".react-flow__node.react-flow__node-claim").first().click();
+
+  // The panel on the glass is the one that reads that claim out, and it says so
+  // at its own head. **Which claim is read off the map's own ring** rather than
+  // off the tile this test pointed at: the map pans as claims arrive, so the
+  // honest question is whether the claim the map says is chosen is the claim the
+  // panel is showing.
+  const panel = page.locator(".dock");
+  await expect(page.getByRole("tab", { name: /This claim/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const chosen = page.locator(".react-flow__node.selected").first();
+  const itsWords = ((await chosen.locator(".tile__claim").textContent()) ?? "").trim();
+  expect(itsWords, "the map drew a ring round a tile with no claim on it").not.toBe("");
+  await expect(panel.locator(".inspector__claim")).toHaveText(itsWords);
+  // And nothing about the run is stacked in front of it.
+  await expect(panel).not.toContainText("Run details");
+
+  // Back to the run, which is where the rest of this test reads. One press of
+  // the name at the head of the panel, exactly as a reader does it.
+  await page.getByRole("tab", { name: /The run/ }).click();
+  await expect(panel).toContainText("Run details");
 
   // **`?` while the map is still arriving** — the one press no browser test had
   // ever made. This screen prints *Press ? for every key* under the map, and the
@@ -145,9 +221,16 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   const sheet = page.locator(".sheet");
   await page.keyboard.press("?");
   await expect(sheet).toBeVisible();
-  await expect(sheet).toContainText("Tiles do not move");
+  await expect(sheet).toContainText("You cannot move a tile");
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
+
+  // **And the first tile has not moved, with the map still growing under it.**
+  // Taken here, with more claims on the map than there were when the reading
+  // above was taken and more still on their way: that is what makes it a
+  // statement about a map that went on growing rather than about one frame.
+  await expect(page.locator(".tile").nth(1)).toBeVisible();
+  expect(await whereTheTileSits(firstTile)).toBe(wasAt);
 
   // Every proposal the rules refused is on screen, in the validator's own words
   // — and a run that refused nothing says that, rather than leaving an empty
@@ -199,53 +282,78 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   );
 
   // The likelihoods land once, at the end, all together: every claim on the map
-  // now reads a number at two significant figures with its range, and none of
-  // them reads an absence any more.
+  // now reads one number at two significant figures — and no range, which R48
+  // cut on 2026-09-22 — and none of them reads an absence any more.
   const claims = await page.locator(".tile").count();
   await expect(page.locator('.belief-chip[data-owner="model"][data-reading="number"]')).toHaveCount(
     claims,
   );
   await expect(page.locator(".tile").first()).not.toContainText("no engine yet");
+  // One reading a chip, and the line a range stood under it on is gone rather
+  // than standing empty (2026-09-22, R48).
+  await expect(page.locator(".belief-chip__under")).toHaveCount(0);
 
-  // The map is framed once more when it stops — the one moment nothing on it is
-  // moving — and then it stays still.
+  // The map is framed once more when it stops, and settles in the same moment —
+  // every pin dropped, the whole map laid out as one thing — and then it stays
+  // still.
   const atRest = await whereTheMapCameToRest(page);
   expect(atRest).not.toBe("");
 
-  // And the tile that was placed first is exactly where it was.
-  expect(await whereTheTileSits(firstTile)).toBe(wasAt);
+  // **And the settle really happened.** On this recording it moves every one of
+  // the eighteen tiles, the first among them, so the tile read while the map was
+  // growing is no longer where it was. If this ever reads the same place again,
+  // the map stopped settling and half of decision record 0024 is gone.
+  expect(await whereTheTileSits(firstTile)).not.toBe(wasAt);
 
   // No two boxes on the map overlap. A claim drawn on top of another is the one
   // failure a growing map makes that a finished one never does.
   expect(await boxesRunningIntoEachOther(page)).toEqual([]);
 
-  // And not one claim's or arrow's identifier reached the map or the panel
-  // beside it. On a generated map they are twenty-six characters of the engine's
-  // own bookkeeping, and a reader learns nothing from one.
-  //
-  // **The run's own name is the exception, and it is deliberate.** The line under
-  // the map exists so that somebody can ask for this answer again — the map, the
-  // seed, and the working — and the working is asked for by the generation's
-  // name. It is printed once, there, beside the seed, and nowhere else.
-  const onTheMap = (await page.locator(".map-body").textContent()) ?? "";
+  // And not one claim's or arrow's identifier reached the map. On a generated
+  // map they are twenty-six characters of the engine's own bookkeeping, and a
+  // reader learns nothing from one.
+  const onTheMap = (await page.locator(".map-stage").textContent()) ?? "";
   expect(onTheMap).not.toMatch(/\b01[0-9A-HJKMNP-TV-Z]{24}\b/);
 
-  // Why the run stopped, in the engine's words for that reason — **printed once**
-  // and said once. The live region is still a live region and still reads the
-  // whole line out; what it no longer does is print it, because the same sentence
-  // in two of three stacked strips of prose is the foot of the screen repeating
-  // itself.
-  const why = page.locator(".done-line__why");
+  // **The run's own name is the exception, and it is deliberate.** Somebody has
+  // to be able to ask for this answer again — the map, the seed and the working
+  // — and the working is asked for by the generation's name. So it is on the
+  // screen, in *Run details* in the panel beside the route and the seed, and it
+  // is **the only identifier anywhere on it**: every twenty-six-character name
+  // the page shows is that one name. It moved into the panel on 2026-09-21
+  // (R16), from a strip of prose at the foot that also claimed, over an empty
+  // map, that every claim on it had already arrived.
+  const names =
+    ((await page.locator(".map-body").textContent()) ?? "").match(
+      /\b01[0-9A-HJKMNP-TV-Z]{24}\b/g,
+    ) ?? [];
+  expect(names.length).toBeGreaterThan(0);
+  expect(new Set(names).size).toBe(1);
+  await expect(page.locator(".inspector")).toContainText("Run details");
+  await expect(page.locator(".inspector")).toContainText("/api/generate");
+
+  // Why the run stopped, in the engine's words for that reason — **printed once
+  // and said once, in one element.** The polite region is now the printed
+  // sentence rather than a one-pixel box beside a copy of it, which is the whole
+  // of what this branch changed: until 2026-09-21 this line asserted that the
+  // live region carried `map-live--spoken`, so the suite was holding the fault
+  // in place. What it holds now is that the sentence is visible and appears
+  // exactly once on the page.
+  const why = page.locator(".run-strip .map-live");
   await expect(why).toBeVisible();
+  await expect(why).toHaveAttribute("aria-live", "polite");
   const stopped = ((await why.textContent()) ?? "").trim();
   expect(stopped).not.toBe("");
-  await expect(page.locator(".map-live")).toHaveClass(/map-live--spoken/);
-  const howOften = await page.evaluate((sentence) => {
-    const times = (text: string): number => text.split(sentence).length - 1;
-    const spoken = document.querySelector(".map-live")?.textContent ?? "";
-    return times(document.body.textContent ?? "") - times(spoken);
-  }, stopped);
+  const howOften = await page.evaluate(
+    (sentence) => (document.body.textContent ?? "").split(sentence).length - 1,
+    stopped,
+  );
   expect(howOften).toBe(1);
+
+  // The state, in one word, in front of it — and a finished run counts no
+  // seconds, because nothing is being waited for.
+  await expect(page.locator(".run-strip")).toHaveAttribute("data-state", "finished");
+  await expect(page.locator(".run-strip__waited")).toHaveCount(0);
 
   // The map says where it is cut. A ten-claim map framed so its tiles stay
   // readable does not fit the stage, and a map that is cut with nothing saying
@@ -335,7 +443,7 @@ test("the edges of the stage and the panel stay true when the window changes", a
     "This server has no committed recording to play, so there is no map to resize around.",
   );
 
-  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
   await waitUntilItStops(page);
 
   /**
@@ -352,8 +460,13 @@ test("the edges of the stage and the panel stay true when the window changes", a
         one.getBoundingClientRect(),
       );
       const yes = (it: boolean) => (it ? "yes" : "no");
-      const frame = document.querySelector(".dock-frame") as HTMLElement;
-      const dock = document.querySelector(".dock") as HTMLElement;
+      // **The panel may not be there at all.** It folds away from 2026-09-22,
+      // and then the stage has the whole width — which is the one change to
+      // this screen's layout that nothing else on it causes, and so the one the
+      // stage's own edges are most likely to be wrong about.
+      const frame = document.querySelector(".dock-frame") as HTMLElement | null;
+      const dock = document.querySelector(".dock") as HTMLElement | null;
+      const folded = "the panel is folded away";
       return {
         stageSaid: {
           left: stage.dataset.moreLeft,
@@ -367,13 +480,42 @@ test("the edges of the stage and the panel stay true when the window changes", a
           above: yes(boxes.some((at) => at.top < room.top - 1)),
           below: yes(boxes.some((at) => at.bottom > room.bottom + 1)),
         },
-        panelSaid: { above: frame.dataset.moreAbove, below: frame.dataset.moreBelow },
-        panelTruly: {
-          above: yes(dock.scrollTop > 1),
-          below: yes(dock.scrollTop + dock.clientHeight < dock.scrollHeight - 1),
-        },
+        panelSaid:
+          frame === null
+            ? folded
+            : { above: frame.dataset.moreAbove, below: frame.dataset.moreBelow },
+        panelTruly:
+          dock === null
+            ? folded
+            : {
+                above: yes(dock.scrollTop > 1),
+                below: yes(dock.scrollTop + dock.clientHeight < dock.scrollHeight - 1),
+              },
       };
     });
+
+  /** Both boxes say what is beyond them, and both are right, at this window. */
+  const theEdgesComeTrue = async (where: string) => {
+    // **Waited for, not slept through, and the wait is the statement.** The
+    // edges are settled exactly when what the two boxes say is what is so; a
+    // fixed pause would be a guess about how long a resize takes on whatever
+    // machine this runs on.
+    await expect
+      .poll(
+        async () => {
+          const now = await bothReadings();
+          return (
+            JSON.stringify(now.stageSaid) === JSON.stringify(now.stageTruly) &&
+            JSON.stringify(now.panelSaid) === JSON.stringify(now.panelTruly)
+          );
+        },
+        {
+          timeout: 15_000,
+          message: `the edges never came true ${where}: ${JSON.stringify(await bothReadings())}`,
+        },
+      )
+      .toBe(true);
+  };
 
   // **Five windows, including the one everything was designed against.** The
   // rule is *at each edge that has content beyond it and at no edge that has
@@ -390,28 +532,29 @@ test("the edges of the stage and the panel stay true when the window changes", a
     { width: 1600, height: 1000 },
   ]) {
     await page.setViewportSize(size);
-    // **Waited for, not slept through, and the wait is the statement.** The
-    // edges are settled exactly when what the two boxes say is what is so; a
-    // fixed pause would be a guess about how long a resize takes on whatever
-    // machine this runs on.
-    await expect
-      .poll(
-        async () => {
-          const now = await bothReadings();
-          return (
-            JSON.stringify(now.stageSaid) === JSON.stringify(now.stageTruly) &&
-            JSON.stringify(now.panelSaid) === JSON.stringify(now.panelTruly)
-          );
-        },
-        {
-          timeout: 15_000,
-          message: `the edges never came true at ${size.width}x${size.height}: ${JSON.stringify(
-            await bothReadings(),
-          )}`,
-        },
-      )
-      .toBe(true);
+    await theEdgesComeTrue(`at ${size.width}x${size.height}`);
   }
+
+  // **And the same claim with the panel folded away** *(2026-09-22)*. Folding it
+  // gives the stage 310 more pixels without the window changing at all, which is
+  // a resize nothing outside this screen causes — so if the stage watched only
+  // the window, the rule at its right edge would go on claiming tiles that are
+  // now comfortably on the glass.
+  await page.getByRole("button", { name: "Hide the panel beside the map" }).click();
+  await expect(page.locator(".dock-column")).toHaveCount(0);
+  for (const size of [
+    { width: 1600, height: 1000 },
+    { width: 900, height: 620 },
+  ]) {
+    await page.setViewportSize(size);
+    await theEdgesComeTrue(`with the panel folded at ${size.width}x${size.height}`);
+  }
+
+  // And the panel comes back, with both boxes telling the truth again.
+  await page.getByRole("button", { name: "Show the panel beside the map" }).click();
+  await expect(page.locator(".dock-column")).toHaveCount(1);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await theEdgesComeTrue("with the panel back");
 });
 
 test("a run that was cut still offers its working", async ({ page }) => {
@@ -443,7 +586,7 @@ test("a run that was cut still offers its working", async ({ page }) => {
   });
 
   await page.reload();
-  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
 
   // It says the stream ended, and it offers to run it again with the price on
   // the control — this copy has no key, so playing it again spends nothing.
@@ -468,6 +611,70 @@ test("a run that was cut still offers its working", async ({ page }) => {
   expect(await boxesRunningIntoEachOther(page)).toEqual([]);
 });
 
+test("a finished generation takes the six edits, like any other map", async ({ page }) => {
+  await page.goto("/");
+
+  const replayable = await whatCanBeReplayed(page);
+  test.skip(
+    replayable.length === 0,
+    "This server has no committed recording to play, so there is no generated map to edit.",
+  );
+
+  // **A replayed recording is a generated map too**, and this is the case a
+  // keyless reviewer will try: no model key anywhere, and the whole of the six
+  // edits, a branch and the change list on a map nobody stored.
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
+  await waitUntilItStops(page);
+
+  // Choose a claim on the finished map, exactly as on a stored one. Which claim
+  // is read off the map's own ring rather than written down here.
+  await page.locator(".react-flow__node.react-flow__node-claim").first().click();
+  await expect(page.getByRole("tab", { name: /This claim/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
+  // The way in that was not here before Kent asked for it: *"the change this
+  // claim button and flow is available for the prebuilt map but doesn't exist
+  // for the map that's generated live"* (2026-09-22).
+  const wayIn = page.getByRole("button", { name: /Change this claim/ });
+  await expect(wayIn).toBeVisible();
+  await wayIn.click();
+
+  // The six edits are on the panel, on the claim that was chosen, and the map
+  // is still the map — same claims, nothing re-fetched, nothing re-drawn from
+  // somewhere else.
+  const sixEdits = page.locator(".intervene");
+  await expect(sixEdits).toBeVisible();
+  await expect(sixEdits.locator(".intervene__button").first()).toBeVisible();
+
+  // And where this map came from travelled with it: the run's own name, its
+  // seed and the route are read out in *Run details*, beside the claim.
+  await expect(page.locator(".dock")).toContainText("Run details");
+
+  // Suppose it true. This is the edit with no model in it at all — pure
+  // arithmetic in the rules layer — which is why a reviewer with no key gets
+  // the whole multiverse on a map they watched build itself.
+  await page.getByRole("button", { name: /Suppose this is true/ }).click();
+
+  // A branch exists and the screen says which of the two worlds is in front.
+  // The branch was forked by the edit itself, so its name and its hue are on
+  // the bar; the map as it was built is one press of Space away.
+  await expect(page.locator(".map-bar__chip")).toBeVisible();
+  await expect(page.locator(".map-bar__where")).toContainText("with your edits");
+
+  // And the change list is filled from the engine's own difference. One press
+  // of the name at the head of the panel, exactly as a reader reaches it.
+  await page.getByRole("tab", { name: /Branches and changes/ }).click();
+  const rows = page.locator(".delta-rail__row");
+  await expect(rows.first()).toBeVisible({ timeout: 30_000 });
+  expect(await rows.count()).toBeGreaterThan(0);
+
+  // Nothing about this opened over the map, and nothing spun.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
+});
+
 test("add a claim on a generated map declines in the server's own words", async ({ page }) => {
   await page.goto("/");
 
@@ -477,7 +684,7 @@ test("add a claim on a generated map declines in the server's own words", async 
     "This server has no committed recording to play, so there is no map to add a claim to.",
   );
 
-  await page.getByRole("button", { name: new RegExp(THE_SENTENCE) }).click();
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
   await waitUntilItStops(page);
 
   // A sentence no recording scripted. With no key there is nothing that could

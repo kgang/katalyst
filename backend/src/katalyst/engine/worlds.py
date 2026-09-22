@@ -186,18 +186,28 @@ def example_named(base_id: str) -> StoredExample | None:
 
 
 def no_such_example(base_id: str) -> str:
-    """Say, in one sentence, that no example is stored under this name, and name the ones that are.
+    """Say, in one sentence, that no map answers to this name — stored or generated.
+
+    **Two different things can be true of a name that matches nothing**, and a
+    reader told only the first will think they mistyped. The stored examples ship
+    with the program and are always here. A map this program generated is held in
+    memory under its own identifier for the life of the process that built it, so
+    a map somebody watched build itself really is gone after a restart — and
+    saying only "there is no stored example called this" would leave them hunting
+    for a typing mistake in a name that was real ten minutes ago.
 
     Args:
-        base_id: The short name that was asked for.
+        base_id: The name that was asked for.
 
     Returns:
         A sentence for the reader, never a code and never a stack trace.
     """
     offered = ", ".join(one.id for one in EXAMPLES)
     return (
-        f"There is no stored example called '{base_id}'. "
-        f"The ones this program ships with are: {offered}."
+        f"There is no map called '{base_id}' here. "
+        f"The examples this program ships with are: {offered}. "
+        "A map this program generated is held under its own identifier for the "
+        "life of the process that built it, so one built before a restart is gone."
     )
 
 

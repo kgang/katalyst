@@ -42,19 +42,22 @@ export type LinkMode = "trigger" | "sustain";
 export type BeliefOwner = "model" | "user" | "market";
 
 /**
- * A likelihood and the range around it, both at full precision.
+ * One likelihood, at full precision. **One number, and never a range**
+ * *(Kent, 2026-09-22, R48)*.
  *
- * The range says **how sure we are of the number** — not how much the world can
- * move. How much the world can move is already inside `p`. Rounding to two
- * significant figures happens once, at the moment of display, and never here.
+ * There used to be a bottom and a top beside it, and the pair said how sure we
+ * were of the number. They are gone from the screen and from this view model:
+ * one claim, one likelihood. The server still writes a `lo` and a `hi` beside
+ * every number it sends, because the engine that computes them is being rewritten
+ * in another stack; the reader at the wire drops them on the way in, and nothing
+ * on this side of the wire has anywhere to put them.
+ *
+ * Rounding to two significant figures happens once, at the moment of display,
+ * and never here.
  */
-export interface Ranged {
+export interface Likelihood {
   /** How likely the claim is to come out true, from 0 to 1. */
   readonly p: number;
-  /** The bottom of the range around `p`. Never above it. */
-  readonly lo: number;
-  /** The top of the range around `p`. Never below it. */
-  readonly hi: number;
 }
 
 /**
@@ -131,11 +134,11 @@ export type Known<T> =
 /** The three voices on one claim, each in its own slot, never merged. */
 export interface BeliefSlots {
   /** What the model thinks. */
-  readonly model: Known<Ranged>;
+  readonly model: Known<Likelihood>;
   /** What the reader thinks. Absent until they say. */
-  readonly user: Known<Ranged>;
+  readonly user: Known<Likelihood>;
   /** What a venue is pricing. Absent when no venue quotes this claim. */
-  readonly market: Known<Ranged>;
+  readonly market: Known<Likelihood>;
 }
 
 /**
@@ -248,7 +251,7 @@ export interface ClaimView {
    * be a fourth voice — and always drawn in the panel, where the decomposition
    * starts from it.
    */
-  readonly prior: Ranged;
+  readonly prior: Likelihood;
   /** How often this kind of thing has happened before, or the reason there is no such count. */
   readonly baseRate: { readonly reading: BaseRateView } | { readonly absence: Absence };
   /** The three likelihoods, side by side. */
@@ -271,7 +274,7 @@ export interface ClaimView {
    * Nothing in the browser multiplies anything to fill it in, and the slot holds
    * its absence until the engine can answer.
    */
-  readonly pathProduct: Known<Ranged>;
+  readonly pathProduct: Known<Likelihood>;
   /** A word shown instead of a likelihood, when the claim is standing on the reader's say-so. */
   readonly standing?: Standing;
   /**
@@ -330,37 +333,28 @@ export interface Movement {
    */
   readonly by: number;
   /**
-   * The share of versions of the map that moved the same way. On screen this is
-   * headed **same direction**; the word *agreement* is kept off the screen.
-   */
-  readonly sameDirection: Known<number>;
-  /**
-   * True when the engine says this claim moved **only** because an observation
-   * made some versions of the map count for more than others.
+   * Why the engine would not call this claim's difference a move, in its own
+   * word — **both of its words, and neither of them printed** *(2026-09-22,
+   * R48)*.
    *
-   * It comes from the engine's difference, on the claim's own row, and the
-   * browser must never work it out for itself — whether a claim moved for that
-   * reason is a fact about how the engine read the numbers, and only the engine
-   * knows it. The panel prints one sentence when it is set.
-   */
-  readonly onlyReweighted?: boolean;
-  /**
-   * Which half of its test a claim the engine called **unchanged** failed, in
-   * the engine's own word.
+   * `under_the_floor` says the move is smaller than the engine will report at
+   * all. `versions_disagree` says the move was far enough and the engine could
+   * not settle a direction for it — its own spelling names the two thousand
+   * versions of the map, which R48 cut from the screen, so `graph/diff/noChange.ts`
+   * words it without them. The word is carried rather than dropped because R4 is
+   * the older rule and the stronger one: every quiet row on the change list says
+   * why, in words, and a row with no reason is what R4 forbids.
    *
-   * The engine reports a move only when both halves pass: the move clears a
-   * floor, and the versions of the map agree on which way it went.
-   * `under_the_floor` means the move is smaller than the engine will report at
-   * all; `versions_disagree` means the move was far enough and the versions did
-   * not agree on its direction. The floor is read first, so a claim failing both
-   * says `under_the_floor`.
+   * **The second reason dies with the engine half**, which decides a claim's
+   * direction differently; until then this is the true thing to say. The
+   * engine's other two answers about versions — the agreement share and *moved
+   * only by reweighting* — reach no screen at all and stop at the wire in
+   * `world/apiSource.ts`.
    *
    * **Nothing in the browser decides this.** The floor and the bar are constants
    * inside the engine and are on no wire, so the browser can copy the word and
    * cannot re-run the test. Absent on every claim the engine did not call
-   * `unchanged`, and on an `unchanged` claim with no test to fail — one only one
-   * world holds, and one no version of the map counted in both numbers.
-   * `graph/diff/noChange.ts` turns it into the words on screen.
+   * `unchanged`, and on an `unchanged` claim the engine gave no word for.
    */
   readonly unchangedBecause?: "under_the_floor" | "versions_disagree";
 }
@@ -467,7 +461,7 @@ export interface LinkView {
    * does not exist yet — the slot holds its absence and the wire's chip reads
    * the push back in words instead. Never a guessed number.
    */
-  readonly conditional: Known<Ranged>;
+  readonly conditional: Known<Likelihood>;
   /**
    * True when this arrow is a market feeding back on the world. A feedback
    * arrow is the one arrow allowed to close a loop, and it is set aside when
@@ -536,22 +530,19 @@ export interface WorldView {
   /** Every arrow on the map. */
   readonly links: readonly LinkView[];
   /**
-   * How many versions of the map the engine ran to produce these numbers.
+   * True when the engine worked these likelihoods out from this map.
    *
-   * Absent when nothing was computed — which is every world in this build,
-   * because the engine's route does not exist yet. It is the one thing that
-   * tells a belief chip whether its range was *computed* across many versions
-   * of the map or merely *stated* by whoever wrote the number down, and the
-   * chip says a different sentence for each. Nothing else reads it.
-   */
-  readonly versions?: number;
-  /**
-   * How many worlds ran under each version of the map: how the dice fall.
+   * Absent on a map whose numbers are the stored example's own, written by hand
+   * to show the shape of an answer. It is the one thing that tells the two apart,
+   * and the panel, the branch list and the line read out to a screen reader each
+   * say a different, true sentence for each.
    *
-   * Absent for the same reason `versions` is. It is printed in the sentence
-   * under the map, beside the seed, so that a reader can rebuild this world.
+   * **It was a count of versions of the map** *(until 2026-09-22, R48)*. The
+   * count was carried here only so that a chip could say whether its range came
+   * out of running the map many times or was merely stated; there is no range
+   * any more, and the only question left is the one this answers.
    */
-  readonly worldsPerVersion?: number;
+  readonly workedOut?: true;
   /**
    * The one number every random draw behind these likelihoods came from.
    *
@@ -563,9 +554,9 @@ export interface WorldView {
   /**
    * Plain sentences the engine wanted the reader to see under the map.
    *
-   * The engine writes these itself — for instance when so few worlds survived an
-   * observation that the range around the answer stops meaning much. They are
-   * printed as they came and never summarised.
+   * The engine writes these itself — for instance when an observation leaves it
+   * too little to work an answer out from. They are printed as they came and
+   * never summarised.
    */
   readonly warnings?: readonly string[];
 
@@ -741,7 +732,7 @@ export type Edit =
   /** The finer claims add back up to the one they replace. Not built yet. */
   | { readonly op: "refine"; readonly target: string }
   /** The reader's own likelihood, beside the model's and the market's. */
-  | { readonly op: "believe"; readonly target: string; readonly belief: Ranged };
+  | { readonly op: "believe"; readonly target: string; readonly belief: Likelihood };
 
 /** The four hues a branch may take. Never amber: amber means "the money moves down". */
 export type BranchHue = "violet" | "teal" | "rose" | "slate";
@@ -804,10 +795,16 @@ export type WireEdit = components["schemas"]["Branch"]["interventions"][number];
 /**
  * One ending the edit can reach, as the rail beside the map lists it.
  *
- * Every number on a row is optional, and before the engine answers every one of
- * them is an absence with its reason. **The rail ranks nothing and computes
- * nothing**: when the engine has ordered these rows the browser draws them in
- * that order, and when it has not the browser says so on its own face.
+ * **A row is the ending, its number before and after, and the direction**
+ * *(Kent, 2026-09-22, R48)*. It used to carry two more columns — *how firm*, the
+ * width of the range around the new number, and *same direction*, the share of
+ * two thousand versions of the map that moved the same way. Both were readings
+ * of a range and of the versions that produced it, and both are gone.
+ *
+ * Every number on a row is optional, and before the engine answers it is an
+ * absence with its reason. **The rail ranks nothing and computes nothing**: when
+ * the engine has ordered these rows the browser draws them in that order, and
+ * when it has not the browser says so on its own face.
  */
 export interface DeltaRow {
   /** The ending's identifier on the map. */
@@ -825,10 +822,6 @@ export interface DeltaRow {
     /** How far it moved on that day, as the engine reported it. */
     readonly by: number;
   }>;
-  /** How firm: the width of this world's own range on the claim. */
-  readonly rangeWidth: Known<number>;
-  /** Same direction: the share of versions of the map that moved the same way. */
-  readonly agreement: Known<number>;
   /**
    * True when the engine gave this ending no row of its own.
    *
@@ -848,9 +841,8 @@ export interface DeltaRow {
    * It stands in the same slot a row that moved uses for *down · largest on Oct
    * 4*, so a quieter row carries its reason **in words** rather than only in
    * being paler than its neighbours — which says nothing in grey and nothing at
-   * all read aloud. A claim that barely moved, a claim whose versions of the map
-   * disagreed which way, and a claim you supposed false say different, true
-   * things.
+   * all read aloud. A claim that barely moved, a claim you supposed false and a
+   * claim that arrived with the edit say different, true things.
    *
    * **`graph/diff/noChange.ts` writes it and nothing else does**, from the
    * engine's own word for what happened to the claim. Absent where there is

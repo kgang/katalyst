@@ -32,6 +32,24 @@ export const BACKEND_PORT = Number(process.env.KATALYST_E2E_BACKEND_PORT ?? 8015
 export const FRONTEND_PORT = Number(process.env.KATALYST_E2E_FRONTEND_PORT ?? 5187);
 
 /**
+ * The second pair, for the one test that needs a replay played slowly.
+ *
+ * **Why a second pair at all.** How fast a recording plays back is one setting
+ * read from the environment, and the server refuses to take it as a field on the
+ * request on purpose — a client that could ask for an instant replay could skip
+ * the thing the recording exists to show. So the only honest way to give one
+ * test a long pace, without touching the server, is a server of its own with a
+ * different setting, and a browser app of its own pointed at it.
+ *
+ * They are checked for being free exactly like the first pair, and they move
+ * with variables of their own.
+ */
+export const SLOW_BACKEND_PORT = Number(process.env.KATALYST_E2E_SLOW_BACKEND_PORT ?? 8016);
+
+/** Where the browser app talking to the slow server is served. */
+export const SLOW_FRONTEND_PORT = Number(process.env.KATALYST_E2E_SLOW_FRONTEND_PORT ?? 5188);
+
+/**
  * Can this machine still open that port?
  *
  * By asking for it and letting it go, which is the only answer that is about
@@ -74,6 +92,8 @@ export function assertPortsAreFree(): void {
   for (const [port, half, variable] of [
     [BACKEND_PORT, "the server", "KATALYST_E2E_BACKEND_PORT"],
     [FRONTEND_PORT, "the browser app", "KATALYST_E2E_FRONTEND_PORT"],
+    [SLOW_BACKEND_PORT, "the slow-replay server", "KATALYST_E2E_SLOW_BACKEND_PORT"],
+    [SLOW_FRONTEND_PORT, "the slow-replay browser app", "KATALYST_E2E_SLOW_FRONTEND_PORT"],
   ] as const) {
     if (free(port)) {
       continue;

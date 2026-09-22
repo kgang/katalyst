@@ -21,8 +21,9 @@ is an honest sentence rather than a hole.
 **Every engine-computed figure quoted below is read from one generated file.** [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) is written by `make numbers` from the shipped engine on the Strait of Hormuz map, at that example's own seed and the shipped loop sizes, and the build fails when it goes stale. Every line in it starts with a name a passage can cite — `B · base · reading` — and the numbers a person typed into the example are kept in a part of their own, apart from the numbers the engine worked out. A figure is quoted here only where it teaches something; the file is where it is kept true, so the day the arithmetic changes, the diff of that one file is the whole list of what moved.
 
 [`keyboard-and-access.md`](keyboard-and-access.md) covers reaching and reading the panel without a
-mouse, and owns the rendering rule behind INV-7 — two significant figures, and the range never
-omitted.
+mouse, and owns the rendering rule behind INV-7 — two significant figures on the one number a
+belief shows. *(It said "and the range never omitted" until 2026-09-22; Kent's R48 cut the range
+from this product.)*
 
 ---
 
@@ -30,7 +31,7 @@ omitted.
 
 `ClaimDetail` and `LinkDetail` are **projections of `ClaimView` and `LinkView`**, the per-claim and
 per-arrow records on `WorldView`, all defined in [`diff-view.md`](diff-view.md). `BeliefView` — one
-likelihood with its range and a name on it — is defined in
+likelihood with a name on it *(and no range, 2026-09-22, R48)* — is defined in
 [`tiles-ports-wires.md`](tiles-ports-wires.md). This panel takes the fields it draws and adds
 nothing of its own:
 
@@ -61,7 +62,9 @@ interface ClaimDetail {
   // assembled from fields that are each read — `prior` here, `strength`/`mode`/`lag`/`provenance`
   // and the fetched `conditional` on each incoming arrow, `beliefs.model` as the result — and not
   // one line of it is arithmetic. See B2.
-  rangeShares?: Record<string, number>;// the reserved band slot; stack 06, nothing reads it here
+  // `rangeShares` stood here — the reserved band slot, for stack 06. It was each stated range's
+  // share of this claim's band, and a band is a range: it went on 2026-09-22 with everything else
+  // R48 cut, and nothing had ever read it.
   pathProduct: Known<PathProduct>;     // INV-8; arrives on the world, never multiplied here
 }
 ```
@@ -94,6 +97,29 @@ Worked on the Hormuz map (the cast is in [`README.md`](README.md)). This chapter
 crude settles below $68 for five sessions* — the busiest claim on the map, three arrows in (**H**,
 **C**, **R**) and three out (**M1**, **M2**, and back to R) — and the arrow **H → B**.
 
+### B0 — What is beside the map, and what is allowed to change it
+
+*Kent, 2026-09-22, of the replay: "could you have it so that clicking on a card will expand its details on the right hand side panel? In general, it's a little hard to find/navigate to/know what right hand side panels exist and how to navigate to them."*
+
+**What was wrong.** A click already selected the tile and the panel already read it out — at the bottom of one column that also held, above it, the Verify door's answer, every proposal the rules refused printed in full, the receipt, the way into the working and *Run details*. Nothing scrolled on its own, so the answer arrived off the screen and the click looked dead. The stored map stacked its own sections the same way.
+
+**The panel is a few panels now, and their names are at the head of it.** The names sit above the part that scrolls, so the way to the others can never scroll away, and they are the whole answer to *what is over there*.
+
+| Screen | The panels it has |
+|---|---|
+| A map building itself | **This claim** / **This arrow** — whatever the reader chose · **The run** — the verdict, every refusal, the receipt, *Run details*, and every call the run made · **Outline** — the map as a list |
+| A stored map | **This claim** / **This arrow** — whatever the reader chose, and the six things you can do to it · **Branches and changes** — your branches, the open one's edits, the engine's refusals, and the endings the edit reaches · **Outline** |
+
+**A panel a screen does not have is not offered.** A map still being built has no branches to open; nobody generated a stored map, so there is no run to read out. Three each, never seven. *(Amended 2026-09-22: a **finished** generation does have branches — taking up *Change this claim* on one hands it to the stored map's screen, which is the screen with the branch panel on it, and carries its **Run details** and its working across. See [`streaming-growth.md`](streaming-growth.md) B13.)* A panel that exists and is empty says so in a sentence, as everything else in this product does — *Nothing selected. Choose a claim or an arrow on the map…*
+
+**The name follows the subject.** *This claim* becomes *This arrow* when an arrow is what is selected, because the name is what says what the panel is about.
+
+**One rule about when the panel changes by itself, and it has one clause.** Choosing a tile or an arrow — by mouse, by Tab, or by walking the wires with `h`, `l`, `j` and `k` — turns to the panel that reads it out, at once, at the top, with nothing scrolled. **Nothing else ever does.** A refusal arriving, the verdict landing, the receipt coming back, the engine answering about a branch: each of those changes a panel the reader may not be looking at, and each says so on that panel's own name — a count in the product's own word, *refused 3*, read off state the screen already holds — and in the strip at the foot, which says the same thing in a sentence. Nothing pulses, nothing fades and nothing grows; the motion budget has three movements in it and a panel asking to be looked at is not one of them (`color-motion-type.md`).
+
+**Every name is a word.** Kent asked for *buttons or icons*; an icon with no word beside it is a thing a reader has to learn before they can use it, and this product has no icon set to learn from. Which name is chosen is said three ways — the word goes from the quiet colour to the text colour, a two-pixel rule of the accent runs under it, and `aria-selected` carries it for a reader who hears the screen. Two of the three survive greyscale, which is `VR3`.
+
+**The panel is one press away, and it never opens over the map** *(2026-09-22 — this replaces "this panel is always here")*. It is inside the frame beside the map, 336 pixels wide whichever panel is chosen, and the map's stage does not change width when the reader turns to another one. What it now also does is fold: a chevron at the head of its own names puts it away and gives the map those 336 pixels, `P` does the same from anywhere on either map screen, and while it is away a 26-pixel tab at the edge the panel went behind — a chevron and the word *panel* — brings it back. Kent asked for the control, 2026-09-22: *"can you introduce a button to be able to collapse and open the side bar."* The key already did it and nothing on screen said so, which is a panel a reader can lose. **Pointing at a claim or an arrow while it is folded brings it back**, because pointing at one is the reader asking to read something and the panel is where it is read. **Walking to one does not.** Reaching a claim with the keyboard and pointing at one both fill the panel — that rule is untouched — but they are not the same request: a panel that came back on every selection came back on the reader's first press of `l`, and a fold a reader cannot walk away from is a fold that does not work. So while the panel is folded the map keeps filling it quietly, and `P` or the tab is what puts it back on the glass. It opens on every screen and is not remembered between them. *Nothing in this product opens over the map* is untouched: the folded panel takes its width out of the row rather than sliding over the canvas, and the tab is beside the map, never on it.
+
 ### B1 — A claim, top to bottom
 
 Select B's tile. The panel fills, in this order, and nothing opens over the canvas:
@@ -111,13 +137,10 @@ BASE RATE
   —  no reference class recorded for this claim
 
 PRIOR
-  .28 (.15–.42)          model
+  .28          model
 
 BELIEFS
-  model    .28 (.15–.42)
-  stated range · not computed
-  This range is stated, not computed — it says how sure the elicitation
-  was. Nothing has worked this number through the map yet.
+  model    .28
   user     —
   market   no market · no venue quotes this claim
 
@@ -132,17 +155,17 @@ Five things to read off that:
 
 * **The resolution triple is never optional.** Criteria, the source that adjudicates, and the date —
   all three, on every claim (INV-1, *checkable*: a claim nobody can score is not a claim).
-* **Which sentence sits under the model row is decided by one field.** `WorldView.versions` — how
-  many versions of the map the engine ran — is present only when something was computed. **Absent**,
-  as here and everywhere in this stack, the row reads the **stated** pair above and **the reserved
-  band slot is not drawn at all**: there is no computed band for it to explain. **Present**, the row
-  reads record 0014's *model interval, uncalibrated · how sure we are of `.40` — not how much the
-  world can move*, and the slot appears beneath it. The two sentences are written once and shared
-  with the belief chip ([`tiles-ports-wires.md`](tiles-ports-wires.md)) so they cannot drift.
-* **The model row here is the prior's own numbers, and that is not a coincidence.** Every
-  `beliefs.model` in the fixture equals its `prior`, because nothing has been computed into it — so
-  the stated sentence describes exactly what the row holds. Run the engine over this map and B comes
-  out `.40 (.24–.56)`, which is the number the computed sentence above would be about.
+* **Nothing sits under the model row at all** *(amended 2026-09-22, Kent's R48)*. There were two
+  sentences here, and which one showed was decided by whether the world carried a count of versions
+  of the map: record 0014's *model interval, uncalibrated · how sure we are of `.40` — not how much
+  the world can move* over a computed number, and *stated range · not computed* over one nothing had
+  worked out. Both were about the range under the number, there is no range, and both are gone along
+  with the reserved band slot that sat under them. What the world still carries is one flag — whether
+  the engine worked these likelihoods out — and the only place it changes a word is the last line of
+  the decomposition and the sentence in the branch list.
+* **The model row here is the prior's own number, and that is not a coincidence.** Every
+  `beliefs.model` in the fixture equals its `prior`, because nothing has been computed into it. Run
+  the engine over this map and B comes out `.40`.
 * **Four things are genuinely absent on B, and each absence says which kind it is.** The **tile**
   shows `no market` and nothing else; **this panel is where the reason is read** — chosen by the
   claim's `kind` and written once in [`../vocabulary.md`](../vocabulary.md). B is an `event`, so it
@@ -151,21 +174,20 @@ Five things to read off that:
   tile too. The **user** slot is the one absence drawn as a bare dash: an invitation to type your own
   number, where a sentence would read as an error rather than an offer.
 * **Three beliefs, three owners, never merged** (INV-11). On B only the model has spoken; on **M1**
-  two do. Read from the fixture, as this stack reads it, that is `model .40 (.28–.55)` — the prior,
-  nothing computed — beside `market .48 (.45–.52)`, eight points apart, with `user —`. Run the
-  engine and the model side becomes `.46 (.32–.60)`, two points apart. **Say which source a number
-  came from before calling the gap an edge**: the gap is only worth trading once the engine has
-  written the model's half of it. No function anywhere may average the two. The panel writes a
-  belief on one line; the **tile** stacks it — owner, number, range beneath
-  ([`tiles-ports-wires.md`](tiles-ports-wires.md)).
+  two do. Read from the fixture, as this stack reads it, that is `model .40` — the prior, nothing
+  computed — beside `market .48`, eight points apart, with `user —`. Run the engine and the model
+  side becomes `.46`, two points apart. **Say which source a number came from before calling the gap
+  an edge**: the gap is only worth trading once the engine has written the model's half of it. No
+  function anywhere may average the two. The panel writes a belief on one line; the **tile** stacks
+  it — owner, then number ([`tiles-ports-wires.md`](tiles-ports-wires.md)).
 
 ### B2 — The decomposition: a number that can say why
 
 Under **WHY THIS NUMBER** the panel lays out the argument for the claim's number. The layout is the
 one [`../graph/belief.md`](../graph/belief.md) §B4 draws — prior, one line per incoming arrow with
 its push and its reason, then the result — and this panel copies it rather than inventing a second.
-§B4's numbers are its own illustration and are not B's: B's prior is `.28 (.15–.42)`, it has no base
-rate, and it has three incoming arrows, not two.
+§B4's numbers are its own illustration and are not B's: B's prior is `.28`, it has no base rate, and
+it has three incoming arrows, not two.
 
 **There is no `decomposition` field, and the block is not one thing the world hands over**
 *(corrected 2026-09-20, stack 04a, on building it)*. This chapter said the world carried the block
@@ -199,57 +221,30 @@ result line reads *"no engine yet"*, with its reason, rather than being left off
 its last line reads as a sum somebody forgot to finish, and the reader cannot tell that from a sum
 that went wrong; a last line that says why it is empty cannot be mistaken for either.
 
-**A claim that moved only because some versions started counting more says so, here.** Observing one
-claim reweights the versions of the map — a version under which the observation was likely counts
-for more than one under which it was a fluke (record 0014 §F) — and a claim with **no causes** can
-move by that reweighting alone, because inside every single version its answer is its own prior in
-both worlds and the paired difference is exactly zero. On Hormuz, observing **C** moves **H**, which
-nothing on the map causes. Without a word about it the reader opens H and finds a number that moved,
-a prior, and nothing in between to explain it.
+**Two passages stood here and both are gone** *(Kent, 2026-09-22, R48)*.
 
-So the panel prints one sentence, word for word:
+The first said that a claim which moved **only because some versions of the map started counting
+for more** said so, in one sentence, at the head of this section: *this claim moved only because the
+observation made some versions count more.* Observing one claim reweights the versions — a version
+under which the observation was likely counts for more than one under which it was a fluke — and a
+claim with no causes of its own can move by that alone. On Hormuz, observing **C** moves **H**, which
+nothing on the map causes, and without a word about it the reader opened H and found a number that
+moved, a prior, and nothing in between.
 
-> this claim moved only because the observation made some versions count more.
+The second was **B3, the reserved slot: "why is this band wide?"** — one sentence, for stack 06,
+naming the claim whose own prior explained most of a claim's band, worked out from `range_shares`
+across the same two thousand versions the engine already ran.
 
-**Where it sits:** under **WHY THIS NUMBER**, as the first line of that section, above the
-decomposition — because it is a fact about the reading of the number, and the decomposition is the
-reading (the same shape as which sentence sits under the model row, Kent's K4).
+Both were true, and both are about a thing this product no longer has. **The engine still writes
+both fields**; `frontend/src/world/apiSource.ts` drops them at the wire and says so in a comment, and
+they die when the engine half of R48 lands. What the panel has left for a claim the engine would not
+call moved is its two readings and the engine's own reason, where the engine has one this product can
+show — see `graph/diff/noChange.ts`, which owns those words.
 
-**When it shows:** only when the panel is open on a claim in a world being compared against another,
-and the engine's own diff row for that claim carries the field saying so — a field the engine writes
-in `domain/diff.py` and 04a's bottom pull request generates into `frontend/src/api/schema.ts`
-([`../multiverse/diff.md`](../multiverse/diff.md) names it). Never otherwise, and **never worked out
-here**: the browser does not compare a same-direction share against zero, does not check whether a
-claim has incoming arrows, and does not infer this from a decomposition with no lines in it. It reads
-the field or it says nothing.
-
-### B3 — The reserved slot: "why is this band wide?"
-
-Where the model row carries a *computed* band — that is, where `WorldView.versions` is present —
-there is a slot directly under it, and **in this stack nothing ever draws it**, because nothing is
-computed yet. What it will hold, in stack 06, is one sentence naming the claim whose own prior
-explains most of the band:
-
-> **`<share>` of this band is `<claim>`'s own prior; pin that down and the band goes from `<this
-> wide>` to `<that wide>`.**
-
-Every slot in it is the engine's. Today the share is the line named `B · base · band from B` in the
-generated numbers file and the band it is a share of is `B · base · reading`; **what the band
-narrows to is computed nowhere yet**, which is the one thing still owed before this sentence can be
-written, and it is why the example above is a shape rather than a sentence with figures in it.
-
-That sentence is computed from `World.range_shares` — each stated range's share of this claim's
-band, which the engine gets out of the same two thousand versions of the map it already runs, at no
-extra cost. It is the honest answer to *where should I spend the next hour of research*, and it
-replaces the older sensitivity-times-width ranking (FR-21, decision record 0014 §C — both amended
-2026-09-17 to say *prior* rather than *base rate*, because B has no base rate and what varies
-between versions is the prior).
-
-**It ships in stack 06, not here.** In this stack the panel leaves the slot in place, leaves a
-comment in the component naming `range_shares` and pointing at this paragraph, and **renders
-nothing** — not a placeholder sentence, not a spinner, not a greyed-out example. The slot is
-reserved so the layout does not jump when the sentence arrives, and so the reason it is missing sits
-where the next person will find it.
+**What a reader loses, said plainly.** A claim with no causes whose number moved under **This
+happened** now shows the move and a decomposition with nothing in the middle of it, and the panel
+does not explain the gap. That is the price of the cut, and it is the engine half's to answer: the
+explanation that fits a product with no versions of the map in it has not been written yet.
 
 ### B4 — An arrow, read back in words
 
@@ -456,8 +451,7 @@ of this chapter needs to know about a number they clicked through from.)*
   panel that is empty exactly while a reader is most likely to open it.
 * **The two-significant-figures rule is about likelihoods.** A token count, a call count, a duration
   and a dollar figure are counts and measurements: they are printed whole, in `--font-mono` with
-  fixed-width digits, and they carry no range because nothing sampled them. INV-workbench.36 is
-  phrased over beliefs for exactly this reason.
+  fixed-width digits. INV-workbench.36 is phrased over beliefs for exactly this reason.
 
 **Where it is read from, and how long it lasts.** `GET /api/generate/{generation_id}/transcript`, and
 the server holds it in memory for the life of the process. There is no storage in this stack, so a
@@ -470,6 +464,60 @@ section a reader would read as a transcript with nothing in it.
 Selecting the receipt strip opens it at the top. Both strips, and the shape of the stream behind
 them, are [`streaming-growth.md`](streaming-growth.md)'s; this chapter owns only what the panel does
 with them, and INV-workbench.72 there pins the receipt's own fields.
+
+**And one control, in the panel, that appears only once there is a working** *(2026-09-21)*. *Read
+the working of this run* used to be drawn from the run's first event. The working itself is read back
+from the server **when the run stops** — the server writes it from the same pass that writes the
+stream, and a half-read one would be a second, staler copy — so a reader who pressed it during the
+two minutes they were most likely to press it was left with *Reading the working of this run…* until
+the run ended. A control that cannot do what it says is worse than no control, so it is not drawn
+until the run has stopped, whichever way it stopped. A run whose stream was cut has a working and
+gets the control.
+
+### B8 — Run details: where this map is coming from
+
+*(Added 2026-09-21, decision record 0023, which brings decision R16 forward from a later stack.)*
+
+**A plain section, always in the panel while there is a run**, carrying three readings and one
+sentence: the route the map is arriving on, the run's own name, the seed every likelihood in it will
+be worked out from, and *nothing on this map is typed in*.
+
+```
+RUN DETAILS
+  route        /api/generate
+  generation   <GenerationStarted.generation_id>
+  seed         <GenerationStarted.seed, as its digits>
+
+  Nothing on this map is typed in: every claim and every arrow on it was proposed by
+  the model and accepted by the map's own rules.
+
+  No likelihood has been worked out yet: the engine works them through the whole map
+  at once, when the map is finished.          ← until the numbers land, and then it goes
+```
+
+**Where it came from, and why it moved.** It was an always-on strip of prose at the foot of the map,
+reading *"Every claim and arrow on this map arrived from /api/generate, in generation …, at seed
+…"*, and it was written from the run's **first** event — that is, **over a map with nothing on it
+yet**. It asserted arrivals that had not happened; it was the third of three stacked strips at the
+foot of a screen whose reader could not tell whether anything was happening at all; and Kent asked
+for it to be *"hidden, deprioritized in terms of importance"*. Moving it here is what made it safe to
+print the run's own sentence at the foot instead, because with this gone nothing down there repeats
+it ([`streaming-growth.md`](streaming-growth.md) B11).
+
+**What it says is true from the first frame.** *Nothing here was typed in* is a fact about how the
+map is built rather than about how much of it has arrived, so it is true of an empty map and of a
+finished one. The second sentence is true only until the numbers land, so it is printed only until
+then.
+
+**It is never a dialog.** Nothing in this product opens over the map. The whole panel folds away from
+2026-09-22 — a chevron at the head of its names, `P`, and a tab at the edge while it is gone — but
+*this section* does not fold behind a summary of itself: that is a later stack's work, and this
+section is written to be folded and is not folded yet.
+
+**The run's own name is the one identifier this product prints.** Every other identifier on a
+generated map — a claim's, an arrow's — is twenty-six characters of the engine's bookkeeping and a
+reader learns nothing from one, so none of them reaches the screen. This one is how somebody asks for
+the same answer again, and how the working is asked for, so it is printed here and nowhere else.
 
 ---
 
@@ -509,22 +557,26 @@ claim, every arrow and every generation, no number displayed is derived by arith
 each is a field on the world, on the map or on the `receipt` event. In particular every line of the
 decomposition is a field printed as it was read — the claim's prior, each arrow's push and its
 fetched conditional, the model's belief as the result — with no line computed here and none left off
-when its number is absent, and the receipt's counts are printed one by one and never added together. And for every claim
-in a world being compared, the sentence *"this claim moved only because the observation made some
-versions count more."* is rendered exactly when the engine's diff row for that claim carries the
-field saying so, and by no other route: no comparison of a same-direction share against zero, no
-check for whether a claim has incoming arrows, no inference from an empty decomposition. *Tests:*
+when its number is absent, and the receipt's counts are printed one by one and never added together.
+*(The clause about the reweighting sentence went with the sentence on 2026-09-22, R48.)* *Tests:*
 inspector › `test_never_derives_a_displayed_number`,
-`test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector`;
+`test_no_sentence_about_reweighting_reaches_the_panel`;
 `frontend/src/stream/__tests__/strips.test.tsx` ›
 `test_the_receipt_strip_prints_every_field_and_adds_nothing_up`, which covers this rendering and the
 strip's, because there is one rule and it should not be checked twice under two names.
 
-**INV-workbench.55 — which sentence, and the band slot.** For every claim, the sentence under the
-model row is the stated one when `WorldView.versions` is absent and record 0014's when it is
-present, and the "why is this band wide?" slot is drawn only in the second case. In this stack no
-component reads `range_shares` and the slot never renders. *Tests:* inspector ›
-`test_picks_the_sentence_from_versions`, `test_the_band_slot_is_never_drawn_without_versions`.
+**INV-workbench.55 — nothing in this panel says anything about a range or about versions of the map**
+*(rewritten 2026-09-22, R48)*. It said: for every claim the sentence under the model row is the
+stated one when `WorldView.versions` is absent and record 0014's when it is present, and the "why is
+this band wide?" slot is drawn only in the second case. There is no range, no band slot and no count
+of versions. What it requires now: for every claim and every arrow, no rendering in this panel
+contains a range, the words *interval*, *uncalibrated*, *version*, *versions*, *worlds* or *middle
+80*, nor a share of anything counted. *Tests:* inspector ›
+`test_the_panel_says_nothing_about_a_range_or_about_versions`,
+`test_no_sentence_about_reweighting_reaches_the_panel`,
+`test_a_moved_claim_shows_the_two_readings_and_the_direction`; and
+`frontend/src/graph/__tests__/noRange.test.tsx` › `test_no_panel_draws_a_range`,
+`test_nothing_on_screen_mentions_versions_or_worlds`.
 
 **INV-workbench.56 — the mark and the word come from one component.** For every one of the seven
 provenance values, the mark beside the word in this panel is produced by the same `OriginMark`
@@ -547,6 +599,18 @@ arrow, the panel renders the day our retrieval step fetched it, or the reason th
 source with no retrieval day is never rendered as though it had one. *Test:* inspector ›
 `test_renders_a_fetch_day_or_its_reason`.
 
+**INV-workbench.84 — the only thing that changes which panel is on the glass is the reader** *(2026-09-22; numbered 84 because 60 to 79 are `streaming-growth.md`'s — 60 is *there is no spinner* — 80 and 81 are its two of 2026-09-21, and 82 and 83 are `first-screen.md`'s; a number is never reused, so a citation can never quietly come to mean another statement)*. For every map screen, choosing a claim or an arrow — by pointer or by keyboard — puts that subject's panel on the glass, and no event arriving from the run or from the engine ever changes which panel is showing. What an arrival may do is add a count to a panel's own name. Every name offered is a panel that screen has, and every one of them is a word. *Tests:* `frontend/src/components/__tests__/panelSwitch.test.tsx` ›
+`test_a_click_on_a_tile_during_a_replay_shows_that_claim_in_the_panel`,
+`test_a_click_on_an_arrow_shows_that_arrow_in_the_panel`,
+`test_a_refusal_arriving_does_not_pull_the_reader_off_what_they_are_reading`,
+`test_the_switcher_offers_only_the_panels_this_context_has`,
+`test_the_stored_map_offers_its_own_panels_and_not_the_runs`,
+`test_every_panel_label_is_a_word`,
+`test_the_arrow_keys_move_between_the_labels`,
+`test_the_one_key_steps_to_the_next_panel_from_anywhere_on_the_screen`,
+`test_typing_is_never_a_shortcut`,
+`test_the_panel_is_named_by_the_label_that_chose_it`; **visual review checklist `VR1`** (it is not a row of tabs from a component kit) and `VR9`.
+
 ---
 
 ## ANTI-PATTERNS
@@ -562,11 +626,15 @@ source with no retrieval day is never rendered as though it had one. *Test:* ins
    nobody able to say which is right. **Instead:** print the prior, the pushes and the result as
    the fields they each are, and an absence with its reason wherever one of them is not there.
 
-3. **Do not put a plausible sentence in the reserved band slot to show what it will look like, and
-   do not print the uncalibrated label over a number nothing computed.** *Because* a sentence naming
-   a percentage nobody computed is a number nobody computed wearing words, and "uncalibrated" over a
-   stated range claims an arithmetic that never ran. **Instead:** the stated sentence and no slot
-   until `versions` says otherwise; a comment naming `range_shares`; stack 06 fills it.
+3. **Do not bring a range back, in any form, to explain a number** *(rewritten 2026-09-22, R48)*.
+   This anti-pattern was about not putting a plausible sentence in the reserved band slot and not
+   printing the uncalibrated label over a number nothing computed. Both are now impossible, because
+   both the slot and the label are gone. What is left to forbid is the thing that would bring them
+   back: a band, an interval, a spread, a confidence, or a share of versions of the map, printed
+   anywhere in this panel. *Because* Kent cut the whole idea rather than one wording of it, and a
+   second-hand version of it — *how sure we are*, in some other words — would be the same confusion
+   under a new name. **Instead:** one likelihood, and the decomposition that says where it came
+   from.
 
 4. **Do not average, blend or reconcile the three owners** — stated as an anti-pattern in
    [`tiles-ports-wires.md`](tiles-ports-wires.md), which owns the belief chip. Here it means three
@@ -585,6 +653,13 @@ source with no retrieval day is never rendered as though it had one. *Test:* ins
 7. **Do not truncate the claim's wording here.** *Because* the tile already ellipsizes to three
    lines and this is where the full text lives; a claim you cannot read in full cannot be argued
    with. **Instead:** the whole sentence, wrapping as far as it needs.
+
+8. **Do not let anything but the reader change which panel is on the glass, and do not draw a name
+   that only an icon says.** *Because* a panel that jumps when a refusal lands takes a reader off
+   the sentence they were halfway through, and a row of unlabelled pictures is a thing to learn
+   before it can be used — and a row of filled, rounded pills is the component-library look that is
+   a veto condition. **Instead:** the reader's own selection turns the panel, an arrival adds a
+   count to a name, and every name is a word.
 
 ---
 

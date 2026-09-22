@@ -2,9 +2,10 @@
  * What a belief chip must never do.
  *
  * This is the one test in the browser half that holds the honesty rule up: two
- * significant figures, the range always, an absence with a reason rather than a
- * blank, and the word rather than a number when the reader has supposed a claim
- * true. It is the test decision record 0005 promised by name —
+ * significant figures, **one number and never a range** (Kent, 2026-09-22,
+ * R48), an absence with a reason rather than a blank, and the word rather than a
+ * number when the reader has supposed a claim true. It is the test decision
+ * record 0005 promised by name —
  * `test_chip_never_shows_more_than_two_significant_figures` is the first one
  * below — and every other test in this directory could pass while the product
  * still lied, if this one did not.
@@ -12,17 +13,9 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Known, Ranged } from "../../world";
+import type { Known, Likelihood } from "../../world";
 import { absence } from "../../world/absence";
-import {
-  BeliefChip,
-  toMovement,
-  toRange,
-  toReading,
-  toShare,
-  toSize,
-  toTwoFigures,
-} from "../BeliefChip";
+import { BeliefChip, toMovement, toSize, toTwoFigures } from "../BeliefChip";
 
 /**
  * Count the significant figures in a printed number.
@@ -40,36 +33,22 @@ function readingOf(container: HTMLElement): string {
   return container.querySelector(".belief-chip__reading")?.textContent ?? "";
 }
 
-/** The line under the number: the range, or the invitation to add your own. */
-function underOf(container: HTMLElement): string {
-  return container.querySelector(".belief-chip__under")?.textContent ?? "";
-}
-
 /** A slot with a number in it. */
-function known(p: number, lo: number, hi: number): Known<Ranged> {
-  return { reading: { p, lo, hi } };
+function known(p: number): Known<Likelihood> {
+  return { reading: { p } };
 }
 
 describe("a belief chip", () => {
   // The test decision record 0005 promised by name.
   it("test_chip_never_shows_more_than_two_significant_figures", () => {
     // Deliberately awkward numbers: ones that round up into a shorter string,
-    // ones with a nought that has to be kept, one that rounds to a whole number,
-    // and the two ends of the range.
-    const awkward: [number, number, number][] = [
-      [0.3456789, 0.2222222, 0.4987654],
-      [0.06123456, 0.0198765, 0.1444444],
-      [0.999, 0.9512345, 0.99999],
-      [0.5, 0.125, 0.875],
-      [0.049999, 0.001234, 0.0987654],
-    ];
+    // ones with a nought that has to be kept, and one that rounds to a whole
+    // number.
+    const awkward = [0.3456789, 0.06123456, 0.999, 0.5, 0.049999];
 
-    for (const [p, lo, hi] of awkward) {
-      const { container, unmount } = render(<BeliefChip owner="model" slot={known(p, lo, hi)} />);
+    for (const p of awkward) {
+      const { container, unmount } = render(<BeliefChip owner="model" slot={known(p)} />);
       expect(significantFigures(readingOf(container))).toBeLessThanOrEqual(2);
-      for (const end of underOf(container).split("–")) {
-        expect(significantFigures(end)).toBeLessThanOrEqual(2);
-      }
       unmount();
     }
   });
@@ -81,15 +60,22 @@ describe("a belief chip", () => {
     expect(toTwoFigures(0.0498)).toBe(".050");
     expect(toTwoFigures(0.06123)).toBe(".061");
     expect(toTwoFigures(0.35)).toBe(".35");
-    expect(toReading(0.35, 0.22, 0.5)).toBe(".35 (.22–.50)");
   });
 
-  it("test_chip_never_omits_the_range", () => {
-    const { container } = render(<BeliefChip owner="model" slot={known(0.61, 0.45, 0.74)} />);
+  // **This test was `test_chip_never_omits_the_range`** and now asserts its
+  // absence: R48 cut the range from this product, so a chip is the owner, the
+  // mark and the number, and there is no fourth line for a range to stand on.
+  it("test_no_chip_draws_a_range", () => {
+    const { container } = render(<BeliefChip owner="model" slot={known(0.61)} />);
     expect(readingOf(container)).toBe(".61");
-    expect(underOf(container)).toBe(".45–.74");
-    // And the whole reading, the way it would be read out loud, carries both.
-    expect(screen.getByRole("button")).toHaveAttribute("aria-label", "model: .61 (.45–.74)");
+    // Nothing on the chip is a pair of numbers with a dash between them, and
+    // nothing under the number at all: the line that held one is gone, not
+    // merely empty.
+    expect(container.querySelector(".belief-chip__under")).toBeNull();
+    expect(container.textContent).not.toMatch(/[.\d]\s*[–-]\s*[.>]/);
+    // And what the chip is called is what it reads: the owner, then the number.
+    expect(container.textContent).toContain("model");
+    expect(container.textContent).toContain(".61");
   });
 
   it("test_an_absent_number_renders_its_reason_and_never_a_blank", () => {
@@ -114,7 +100,7 @@ describe("a belief chip", () => {
     ).toBeInTheDocument();
   });
 
-  it("test_your_own_empty_slot_invites_a_number", () => {
+  it("test_your_own_empty_slot_is_a_dash_with_a_reason", () => {
     const { container } = render(
       <BeliefChip
         owner="user"
@@ -124,17 +110,21 @@ describe("a belief chip", () => {
       />,
     );
     expect(readingOf(container)).toBe("—");
-    expect(underOf(container)).toBe("add yours");
+    // The invitation *add yours* stood on the line the range used to share, and
+    // that line went with the range (2026-09-22, R48). The tile no longer draws
+    // an empty column at all, so there was nothing left for it to invite.
+    expect(container.textContent).not.toContain("add yours");
+    expect(container.textContent).toContain("You have not put your own number on this yet.");
   });
 
   it("test_a_supposed_claim_renders_the_word_not_a_number", () => {
     const { container } = render(
       <BeliefChip
         owner="model"
-        slot={known(0.35, 0.22, 0.5)}
+        slot={known(0.35)}
         standing={{
           words: "Supposed · Oct 1",
-          reason: "You supposed this true on the 1st, so it holds in every simulated world.",
+          reason: "You supposed this true on the 1st, so it holds wherever the engine looks.",
         }}
       />,
     );
@@ -145,56 +135,15 @@ describe("a belief chip", () => {
     expect(container.textContent).not.toContain("1.0");
   });
 
-  it("test_a_computed_chip_says_it_is_uncalibrated", () => {
-    render(<BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} versions={2000} />);
-
-    // No claim on any map has resolved, so the eight-in-ten below has never
-    // been checked against anything. The label says that in one word rather
-    // than letting a range that came out of two thousand runs pass for a range
-    // somebody has tested.
-    expect(
-      screen.getByText(
-        "model interval, uncalibrated · how sure we are of .35 — not how much the world can move",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Across 2 000 versions of this map — each one a set of numbers this model would have " +
-          "stood behind — the answer landed between .20 and .49 eight times in ten. Nobody has " +
-          "checked whether that 8-in-10 holds up; no claim on this map has resolved yet.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  // The test the decisions of 2026-09-17 asked for by name.
-  it("test_model_chip_says_computed_only_when_a_world_computed_it", () => {
-    // Nothing has run this number through a map, so the chip says the range is
-    // the one whoever wrote the number down stated, and says nothing at all
-    // about versions of the map.
-    const stated = render(<BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} />);
-    expect(screen.getByText("stated range · not computed")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "This range is stated, not computed — it says how sure the elicitation was. " +
-          "Nothing has worked this number through the map yet.",
-      ),
-    ).toBeInTheDocument();
-    expect(stated.container.textContent).not.toContain("versions of this map");
-    expect(stated.container.textContent).not.toContain("uncalibrated");
-    stated.unmount();
-
-    // A world that ran two thousand versions may say so, and counts them out.
-    const computed = render(
-      <BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} versions={2000} />,
-    );
-    expect(computed.container.textContent).toContain("Across 2 000 versions of this map");
-    expect(computed.container.textContent).not.toContain("stated, not computed");
-
-    // And it counts out whatever number it was actually given, not a fixed one.
-    computed.unmount();
-    render(<BeliefChip owner="model" slot={known(0.35, 0.2, 0.49)} versions={16} />);
-    expect(screen.getByText(/Across 16 versions of this map/)).toBeInTheDocument();
-  });
+  // **Two tests stood here and are deleted** *(2026-09-22, R48)*:
+  // `test_a_computed_chip_says_it_is_uncalibrated` and
+  // `test_model_chip_says_computed_only_when_a_world_computed_it`. Both asserted
+  // the shelf behind a chip — *model interval, uncalibrated*, and *Across 2 000
+  // versions of this map…* against *stated range · not computed*. There is no
+  // range, no shelf and no count of versions, so there is nothing for either to
+  // be about. What replaces them is
+  // `test_nothing_on_a_tile_or_in_the_panel_mentions_versions_or_worlds` in
+  // `graph/__tests__/noRange.test.tsx`, which walks the whole rendered map.
 
   // The certainty guard the decisions of 2026-09-17 asked for by name.
   it("test_chip_never_prints_a_certainty", () => {
@@ -206,17 +155,13 @@ describe("a belief chip", () => {
     const awkward = [0.995, 0.9962, 0.999, 1, 0, 0.004, 0.0004];
 
     for (const value of awkward) {
-      const { container, unmount } = render(
-        <BeliefChip owner="model" slot={known(value, value, value)} />,
-      );
-      const printed = [readingOf(container), ...underOf(container).split("–")];
-      for (const one of printed) {
-        expect(one).not.toBe("1.0");
-        expect(one).not.toBe("1");
-        expect(one).not.toBe(".0");
-        expect(one).not.toBe("0.0");
-        expect(significantFigures(one)).toBeLessThanOrEqual(2);
-      }
+      const { container, unmount } = render(<BeliefChip owner="model" slot={known(value)} />);
+      const one = readingOf(container);
+      expect(one).not.toBe("1.0");
+      expect(one).not.toBe("1");
+      expect(one).not.toBe(".0");
+      expect(one).not.toBe("0.0");
+      expect(significantFigures(one)).toBeLessThanOrEqual(2);
       unmount();
     }
 
@@ -232,24 +177,12 @@ describe("a belief chip", () => {
     expect(toTwoFigures(0)).toBe("<.01");
     // Rounding that carries into the next place keeps two figures, not three.
     expect(toTwoFigures(0.0999)).toBe(".10");
-
-    // The guard applies to each end of the range on its own, unchanged: on one
-    // end here, on both in the second.
-    expect(toReading(0.9962, 0.988, 0.9995)).toBe(">.99 (.99–>.99)");
-    expect(toReading(0.9962, 0.9971, 0.9999)).toBe(">.99 (>.99–>.99)");
   });
 
-  it("test_a_share_is_a_whole_percentage_and_never_rounds_up_into_all_of_them", () => {
-    // A share of something counted is not a likelihood: a hundred per cent
-    // really can mean every one of them, so printing `>.99` over it would hide
-    // a fact the machine actually counted. The only guard is the one that stops
-    // rounding from inventing unanimity.
-    expect(toShare(0.9663)).toBe("97%");
-    expect(toShare(1)).toBe("100%");
-    expect(toShare(0.9995)).toBe(">99%");
-    expect(toShare(0)).toBe("0%");
-    expect(toShare(0.0004)).toBe("<1%");
-  });
+  // **`test_a_share_is_a_whole_percentage_and_never_rounds_up_into_all_of_them`
+  // is deleted** *(2026-09-22, R48)*. The only share this product ever printed
+  // was *same direction* — how many of the two thousand versions of the map
+  // moved the same way — and the printer that wrote it went with the column.
 
   it("test_the_lower_guard_begins_at_a_hundredth", () => {
     // Kent, 2026-09-20, G10. The guard is applied to the number **as it would
@@ -265,12 +198,6 @@ describe("a belief chip", () => {
     expect(toTwoFigures(0.00996)).toBe(".010");
     expect(toTwoFigures(0.0104)).toBe(".010");
     expect(toTwoFigures(0.011)).toBe(".011");
-
-    // A range end is a likelihood, so it takes the same guard — and a band
-    // whose bottom sits under a hundredth says so without being called
-    // impossible.
-    expect(toRange(0.004, 0.031)).toBe("<.01–.031");
-    expect(toReading(0.006, 0.0002, 0.03)).toBe("<.01 (<.01–.030)");
   });
 
   it("test_a_size_is_not_a_likelihood_and_takes_no_guard", () => {
@@ -315,16 +242,17 @@ describe("a belief chip", () => {
     expect(toMovement(0.19, 0.19, 0, "up")).toBe(".19");
   });
 
-  it("test_a_chip_is_reachable_by_keyboard_and_opens_no_dialog", () => {
-    render(<BeliefChip owner="model" slot={known(0.35, 0.22, 0.5)} />);
+  // **This test was `test_a_chip_is_reachable_by_keyboard_and_opens_no_dialog`**
+  // and now asserts the opposite of its first half: with the range gone there is
+  // nothing behind a chip to open, so the chip is not a control at all. A button
+  // that does nothing when it is pressed is worse than no button — it is a
+  // promise the product cannot keep, and a stop on every keyboard walk of the
+  // map for nothing.
+  it("test_a_chip_is_not_a_control_and_opens_nothing", () => {
+    const { container } = render(<BeliefChip owner="model" slot={known(0.35)} />);
 
-    const chip = screen.getByRole("button");
-    chip.focus();
-    expect(document.activeElement).toBe(chip);
-
-    // The note is described text on the chip, not a window over the page.
-    const described = chip.getAttribute("aria-describedby");
-    expect(described).not.toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(container.querySelector("button")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.querySelector("dialog")).toBeNull();
   });

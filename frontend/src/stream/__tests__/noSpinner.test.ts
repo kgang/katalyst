@@ -16,6 +16,14 @@
  *    part a screen reader reads as "progress" without a value to read.
  * 3. **Nothing calls itself a spinner, or a loader, or loading.** A word is a
  *    good proxy for an intention, and the intention is what this test is about.
+ * 4. **The only thing that changes on a timer is a measured reading** *(added
+ *    2026-09-21, decision record 0023)*. The three lines above walk stylesheets,
+ *    and a spinner written with `setInterval` in JavaScript would walk straight
+ *    past them. So every timer in product code is on a list here with what it is
+ *    for, and a new one is a deliberate entry rather than something nobody
+ *    noticed. The rule it holds: *motion may carry information; it may never
+ *    stand in for it* — a value the screen would print anyway may change because
+ *    time passed, and nothing else may.
  *
  * It is the same technique the colour law uses: read the files as text and walk
  * them, so that a rule added in a stylesheet nobody thought about is still found.
@@ -135,6 +143,58 @@ describe("there is no spinner anywhere", () => {
     }
 
     expect(wrong).toEqual([]);
+  });
+
+  it("test_the_only_thing_that_changes_on_a_timer_is_a_measured_reading", () => {
+    // **Why this check exists.** From 2026-09-21 the foot of a map prints how
+    // long it has been since anything arrived, and that number changes on a
+    // timer. It is legal — a measurement is information, and information may
+    // change because time passed — and it is also exactly the shape a spinner
+    // would take if somebody wrote one in JavaScript instead of in a stylesheet,
+    // where the three checks above would catch it.
+    //
+    // So the line is held by name: every timer in product code is listed here
+    // with what it is for, and a new one is a deliberate entry in this list
+    // rather than something nobody noticed. It is the technique `colourLaw.test`
+    // already uses on the five steps of the brightness ramp.
+    const MAY_SET_A_TIMER: Record<string, string> = {
+      // The reading itself: seconds since the last arrival, redrawn once a
+      // second while the screen is waiting on the server.
+      "/src/components/RunStrip.tsx": "the count of seconds since the last arrival",
+      // Turns the arrival animation off once, a fixed time after a map lands.
+      // It runs once and changes no value on screen.
+      "/src/components/MapScreen.tsx": "the wave of wires settling, once",
+      // A deadline on the layout thread: if the background thread has not
+      // answered by then, the map is drawn without it rather than waited for.
+      // Nothing is redrawn on a tick; it gives up waiting.
+      "/src/graph/layoutRunner.ts": "how long to wait for the layout thread",
+    };
+
+    const wrong: string[] = [];
+    const found: string[] = [];
+    for (const [path, whole] of Object.entries(COMPONENTS)) {
+      if (path.includes("__tests__")) {
+        continue;
+      }
+      // The words are looked for in the code, not in the prose around it: half
+      // this product's files explain in so many words why they set no timer.
+      const source = withoutComments(whole);
+      if (!/\bset(Interval|Timeout)\s*\(/.test(source)) {
+        continue;
+      }
+      found.push(path);
+      if (MAY_SET_A_TIMER[path] === undefined) {
+        wrong.push(
+          `${path} sets a timer and is not on the list in noSpinner.test.ts. ` +
+            "A thing on screen may change over time only when what changes is a measurement. " +
+            "If it is one, add it to the list saying what it measures.",
+        );
+      }
+    }
+
+    expect(wrong).toEqual([]);
+    // And the list has nothing stale on it, so it stays a list somebody reads.
+    expect(found.sort()).toEqual(Object.keys(MAY_SET_A_TIMER).sort());
   });
 
   it("test_the_files_being_walked_are_really_there", () => {

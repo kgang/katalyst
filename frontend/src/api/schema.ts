@@ -2831,7 +2831,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The eight events, in the order the grammar allows, one `event:` line and one `data:` line each. A refusal is one of them, never an error. */
+            /** @description The eight events, in the order the grammar allows, one `event:` line and one `data:` line each. A refusal is one of them, never an error. A live run may also send `activity` — what a model call is doing this second, in the model's own words — anywhere between the first event and the ending. It is never recorded, never replayed and never required, and a client that does not know it ignores it. */
             200: {
                 headers: {
                     [name: string]: unknown;

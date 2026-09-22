@@ -260,7 +260,7 @@ export interface GenerateRequest {
   /** The Verify door's destination, in the reader's words. Absent is the Explore door. */
   readonly target?: string;
   /** The reader's own likelihood on the hypothesis. Absent when they chose "I don't know". */
-  readonly user_belief?: Ranged;
+  readonly user_belief?: Likelihood;
   /** Only when reproducing a run we were given a seed for. See below. */
   readonly seed?: number;
   /**
@@ -299,9 +299,11 @@ caller does: it sends its sentence. Nothing in the browser holds a table of file
 numbers the cards, and the live path and the replayed path send byte-identical requests — which is
 what makes the reviewer's replay evidence about the live route rather than about a second one.
 
-`Ranged` — a likelihood with its two range ends, at full precision — is
-`frontend/src/world/types.ts`'s, the same shape a belief chip takes
-([`tiles-ports-wires.md`](tiles-ports-wires.md)).
+`Likelihood` — one likelihood, at full precision — is `frontend/src/world/types.ts`'s, the same
+shape a belief chip takes ([`tiles-ports-wires.md`](tiles-ports-wires.md)). *(It was called `Ranged`
+and carried two range ends beside the number until 2026-09-22, Kent's R48. The route's `Belief` still
+takes a `lo` and a `hi`; the browser sends the reader's own number in all three places — a range of
+nothing — and both fields go when the engine half of the cut lands.)*
 
 ### The `growth` reducer
 
@@ -379,6 +381,12 @@ export interface Growth {
   readonly waitingWires: readonly Link[];
   /** Event names this build does not know, and how many of each arrived. */
   readonly unknown: ReadonlyMap<string, number>;
+  /**
+   * What the model is doing right now — at most two lines, latest only — and
+   * the one thing an `activity` line changes. Empty on every replay, because a
+   * recording holds no such line. B12.
+   */
+  readonly activity: WhatTheModelIsDoing;
 }
 ```
 
@@ -765,10 +773,10 @@ this part already ships: real claims, real arrows, real provenance marks, and an
 reason in every likelihood slot.
 
 **When `beliefs_propagated` arrives, they all fill at once.** One event, one world, every number.
-The chip's own sentence switches from the *stated* pair to record 0014's *computed* pair with no
-change to the component, because `WorldView.versions` arrives on the same world and that is the one
-field the chip reads to choose (Kent, K3; `tiles-ports-wires.md`, *What the model chip says about its
-own range*).
+*(The chip used to switch what it said about itself at this moment — from the *stated* pair to record
+0014's *computed* pair — picked by a count of versions on the world. A chip says nothing about itself
+any more: 2026-09-22, Kent's R48. What the world still carries is one flag, `workedOut`, and the only
+words it changes are the last line of the decomposition and the sentence in the branch list.)*
 
 **Never per tile, and never twice.** A likelihood that changed four times as its causes arrived would
 be four numbers nobody computed: the first three would each be the answer to a question about a map
@@ -884,11 +892,10 @@ Four things about it.
   billed apart from tokens: without that row, `dollars` is a number a reader could check against the
   token counts and find wrong.
 * **Checklist `VR4` is about likelihoods.** *"No number shows more than two significant figures, and
-  none is missing its range"* is the rule that stops a fake-precise `.347` reaching the screen
-  (NFR-1). A token count, a call count, a duration and a dollar figure are counts and measurements:
-  they are printed whole, in `--font-mono` with fixed-width digits, and they have no range because
-  nothing sampled them. The same reading already lets a lag chip say *14 days* and a tile be 280
-  pixels wide.
+  no range appears anywhere on the screen"* *(as rewritten 2026-09-22, R48)* is the rule that stops a
+  fake-precise `.347` reaching the screen. A token count, a call count, a duration and a dollar
+  figure are counts and measurements: they are printed whole, in `--font-mono` with fixed-width
+  digits. The same reading already lets a lag chip say *14 days* and a tile be 280 pixels wide.
 * **In replay the mode reads `replay`**, the recording's date sits beside it, and `cost` reads what
   the rebuilt receipt carries, which is zero. That zero is a computed zero — the recording was played,
   nothing was called, so nothing was spent — not an empty slot, and it is printed rather than hidden.
@@ -994,11 +1001,11 @@ whose run broke after twenty claims keeps the twenty claims.
 
 1. **The sentence.** One line, the hypothesis, in the reader's own words.
 2. **Where it ends**, optional. The Verify door. One field, hinted with what it is for.
-3. **Your own likelihood.** A range with an explicit **I don't know** state (FR-2). Three handles on
-   one track — the number and the two ends of its range — spelled beside the track in exactly the
-   one-line form the chip uses, `.55 (.40–.70)`, under the same two-significant-figure rule and the
-   same certainty guard ([`keyboard-and-access.md`](keyboard-and-access.md) B6), so the control
-   cannot post a `1.0`.
+3. **Your own likelihood.** One number with an explicit **I don't know** state (FR-2). **One handle
+   on one track** *(amended 2026-09-22, Kent's R48; it was three — the number and the two ends of
+   its range)* — spelled beside the track the way the chip spells it, `.55`, under the same
+   two-significant-figure rule and the same certainty guard
+   ([`keyboard-and-access.md`](keyboard-and-access.md) B6), so the control cannot post a `1.0`.
 
 **The button is `Build the map`**, word for word, and it is the same button on both doors. Not
 *Generate*, which is the pipeline's word rather than the reader's, and not *Explore* or *Verify*,
@@ -1306,8 +1313,130 @@ a later stack on 2026-09-21 because it is what makes showing the run's own sente
 provenance line gone, nothing else at the foot repeats it. It was also, where it stood, saying
 *"Every claim and arrow on this map arrived from …"* over a map with nothing on it yet.
 
-**No server change, and no ninth event.** Everything the strip says is already on the eight events or
-on the browser's own clock. See Open question 1, now answered.
+**No server change, and no ninth event — for this strip.** Everything *this* strip says is already on
+the eight events or on the browser's own clock. **A ninth line arrived the next day all the same, and
+it is not one of the eight** *(2026-09-22, decision record 0027)*: `activity` says what a model call
+is doing while it is out, it is sent on a live run only and never recorded, and it puts two more lines
+under this one. That is B12, and Open question 1 is answered there.
+
+### B12 — What the model is doing, while a call takes a minute
+
+*(Added 2026-09-22, decision record 0027, Kent's R44 and R47.)*
+
+**The wait is the model's, and it is long.** Measured over the five kept runs under
+`backend/.runs/`, the **first** model call took 7, 67, 135, 152 and 223 seconds, and 61 to 80 per
+cent of everything the model wrote was thinking nobody could see. The eight events are the map's
+decisions, and between two of them the server has nothing new to report — so the strip could say
+*something is happening* and could not say **what**.
+
+**So a live call is streamed, and one line travels that is not a decision.** `activity` is the
+ninth name on the wire: `{about, kind, text}`, where `kind` is `searching`, `found` or `thinking`
+and `text` is somebody else's words, verbatim — the model's own search query, the title of one page
+the search returned, or the model's own summarised thinking. `spec/generation/streaming.md` owns the
+line and its six clauses; what this chapter owns is what the browser does with it.
+
+**It changes one field and nothing else.** `Growth` gains `activity`, and folding an `activity` line
+touches neither the map, the reserved rectangles, the counts, the frontier, the refusals, the
+receipt nor the phase. That is not taste: the line is never written to a recording, so anything it
+could move would be something a replay of the same run could not reproduce, and a recording is the
+real stream line for line. A line reaching a run that has already stopped changes nothing at all.
+
+**Two lines, latest only, never a list.** `WhatTheModelIsDoing` holds one slot for the latest
+`searching`-or-`found` line — *found* answers *searching*, so they share a slot — and one for the
+latest `thinking` line. The server sends at most about one a second per call and the newest wins, so
+a browser that kept them all would grow a log at the foot of the screen that nobody could read and
+that would push the map up the page every second. Two slots rather than one because they are two
+different things: a search is about the world and is checkable; a thought is about the model's own
+mind, and the line about the mind says whose mind it is every time it is drawn.
+
+**The words are fixed, and they are the whole of what the browser adds:**
+
+```
+searching the web: "<query>"
+found: <title> · <host>
+the model, in its own words: <text>
+```
+
+Everything after the colon is the model's or the search tool's, verbatim. A line longer than 160
+characters — the length the server already cuts its own thinking to — is cut at a word and closed
+with an ellipsis, never through the middle of one.
+
+**A line stops being true when its call comes back, and the browser stops saying it.** An accepted
+proposal clears the lines about the calls it answers — a call works on one open claim, and an
+accepted proposal names that claim as the source of the arrows it brought, while a proposal hanging
+off nothing at all is the opening call returning. A **refusal** clears both lines, because a refusal
+carries no claim it hangs off: the honest answer to *which of these is still true* is *we no longer
+know*, and a line that is still true is back within about a second. `done`, `failed` and a stream
+that simply stops clear them too — nothing is out, so nothing is being done.
+
+**Where they sit, and what they never do.** In the run strip only (`components/RunStrip.tsx`),
+under the run's own row, never on the map and never in the panel. **Both are outside the polite live
+region**, for the same reason the seconds counter is and more so: they change every few seconds, and
+a region that announced them would be reading a stopwatch over the top of the map being built. The
+room for two lines is held open on every live run whether or not either has anything in it, so a
+line arriving or clearing changes the words and never the height. **Nothing spins**: a line of text
+replaced by another line of text is a reading, not a motion.
+
+**And they leave the seconds counter alone.** The reading at the foot of the map says *nothing new
+on the map for N s* and starts again on every arrival. An `activity` line is not an arrival in that
+sense, so `onlyTheStripChanged` in `growth.ts` asks whether the last event moved anything but this
+field, and the counter ignores it. A counter that restarted on every line would read *nothing new
+for 1 s* for three solid minutes while nothing whatever reached the map — which is exactly the
+screen that looks busy while nothing happens.
+
+**A replay shows none, and nothing on screen says so.** A recording holds no `activity` line, so
+there is nothing to play back and nothing is invented; the screen passes the strip nothing on a
+replay, which is the same difference the seconds counter already makes. The fold is never told which
+it is folding and does not need to be — the screen knows.
+
+**Checked by** `frontend/src/stream/__tests__/theRunStrip.test.tsx`, which holds one test per rule
+above: the search line's words, the thinking line saying whose words they are, the cut at a word,
+both lines outside the live region, a claim arriving clearing the lines that were about it, a replay
+showing none even when one is fed to it, and a stopped run saying nothing. The fold itself is
+**growth**'s: `test_an_activity_line_changes_what_the_strip_may_say_and_nothing_else`.
+`noSpinner.test.ts` and `motionBudget.test.ts` are unchanged, which is the point.
+
+### B13 — A finished generation is a map like any other
+
+**When the run has stopped and the engine has named the map, the reader can change any claim on it,
+exactly as on the stored example** *(Kent, 2026-09-22: "for completed maps, can we include the
+ability to make changes on the cards? I see that the change this claim button and flow is available
+for the prebuilt map but doesn't exist for the map that's generated live")*.
+
+Nothing new was built for it, and that is the point. A generated map has claims, arrows, dates and
+sources; a branch folds onto it; the engine works every likelihood through it from a seed. The
+server already answers about one — a finished generation is held in memory under **the map's own
+identifier**, for the life of the process, and `/api/worlds`, `/api/worlds/diff` and
+`/api/worlds/conditional` take that identifier wherever they take a stored example's name. So the
+six operations, a branch, the two worlds painted together and the change list are the ones
+[`diff-view.md`](diff-view.md) already describes, on the screen that already draws them.
+
+**Two conditions, and they are two different facts.** The run has *stopped* — however it stopped,
+its own ending or a cap, because either way nothing more is coming. And the map has a *name of its
+own*, which is the `base_id` arriving with the likelihoods: a run that broke, or whose stream was
+dropped, never gets one, and there is nothing for the engine to fold a branch onto. They are the
+same pair **Add a claim** waits for, for the same reasons.
+
+**The way across is a press, never a stop.** A run that ends does not throw the reader onto another
+screen — they watched it build, and the moment it stops is the moment they start reading it. What
+they press is *Change this claim*, in the same place and with the same words as on a stored map:
+the panel that reads out whatever they are pointing at. The map itself is handed over exactly as it
+is on screen, so nothing is fetched again and no number changes as the screens swap.
+
+**Where the map came from travels with it.** *Run details* — the route, the run's own name and its
+seed — is on the panel beside the claim, and the whole working of the run, every refusal in the
+rules' own words among it, is one command away. What stays behind on the run's own screen is what
+is about the *run* rather than about the map: the verdict card, the receipt strip, the replay badge
+and **Add a claim**.
+
+**And the map says how long it will answer.** A generated map is held in memory and written to no
+disk, so a restarted server has forgotten it. The sentence under a branch world on one says so, and
+a reader who comes back to a restarted server and finds it gone has been told rather than left
+hunting for a name they think they mistyped.
+
+**A replayed recording is a generated map too**, and it is the case that matters most: it needs no
+model key, so a reviewer who has configured nothing gets the whole multiverse on a map they watched
+build themselves. Five of the six operations call no model at all.
 
 ---
 
@@ -1699,20 +1828,32 @@ source in the manner `colourLaw.test.ts` uses.
 
 *Raised 2026-09-17.*
 
-1. **Should the stream say when a call goes out?** **Answered 2026-09-21 by decision record 0023: not
-   in version one.**
+1. **Should the stream say when a call goes out?** **Answered 2026-09-21 by decision record 0023 —
+   *not in version one* — and answered again the next day by decision record 0027, which is the
+   answer that stands.**
 
-   The eight events say what came back, so the browser can draw the frontier but cannot honestly say
-   how many proposals are in flight — three calls against one open claim show one rectangle (B2).
-   Everything the foot strip says (B11) is already on those eight events or on the browser's own
-   clock, so nothing in this chapter needs a ninth.
+   **What 0023 settled, and it still holds:** everything the foot strip says (B11) is already on the
+   eight events or on the browser's own clock, so nothing this chapter draws needs a ninth event.
+   What it went on to refuse was a ninth event carrying a **count**, and that refusal stands too.
 
-   A ninth event would be the first to carry **activity rather than a decision**, which is a
-   different kind of thing to put on a stream; and **no committed recording holds it**, so a replay
-   would be visibly less alive than a live run — which is the one thing decision record 0012 cannot
-   allow, since *the same events, the same canvas, the same refusals* is the sentence it rests on. If
-   the count on screen is ever wanted, it rides the one shape freeze, where all four recordings are
-   made together. **Owner:** `spec/generation/streaming.md`, at that freeze and not before.
+   The count is still not on the wire and is not wanted. The eight events say what came back, so the
+   browser can draw the frontier but cannot honestly say how many proposals are in flight — three
+   calls against one open claim show one rectangle (B2) — and a number the browser guessed at would
+   be a number nobody computed.
+
+   What ships instead is a different thing altogether: the stream does not say **that** a call went
+   out, it says **what the call is doing**, on a line that is never recorded. `activity` carries the
+   model's own search query, the title of one page that search returned, or the model's own
+   summarised thinking — somebody else's words, verbatim, with nothing counted and nothing estimated.
+   It is sent on a live run only; no recording holds one, no replay invents one, and it is never
+   billed and never counted by the transcript counter. So a replay is not less alive than a live run
+   for want of a count it never had: it shows no activity for the same reason it shows no seconds,
+   which is that the thing being reported does not exist in a replay, and decision record 0012 —
+   *a recording is the real stream, line for line* — is left whole, because a recording is the real
+   stream of **decisions** and activity is not one.
+
+   What the browser does with it is B12. **Owner:** closed; the line and its six clauses are
+   `spec/generation/streaming.md`'s.
 
 2. **Does the map re-lay out once when the run finishes?** **Answered 2026-09-21: no. Reopened the
    same day on three real maps rather than one, and answered again: yes — once, at the moment the run

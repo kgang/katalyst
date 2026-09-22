@@ -37,6 +37,8 @@ export interface WorldSource {
 }
 ```
 
+*(Amended 2026-09-22: there is a third implementation, `GeneratedMapSource`, for a map somebody watched build itself. It asks the same three routes with the map's own identifier and the run's own seed, and has no bundle to read because a generated map is in no store — see [`streaming-growth.md`](streaming-growth.md) B13.)*
+
 Two implementations, and the screen cannot tell which it has. `FixtureWorldSource` reads
 `GET /api/fixtures/hormuz` and uses the fixture's stored `beliefs.model` for the **base** world —
 honest, because the fixture says in its own comments that those are illustrative. `ApiWorldSource`
@@ -83,9 +85,11 @@ export interface WorldView {
   links: LinkView[];
   terminals: DeltaRow[];        // what the delta rail draws
   headline: Known<string>;      // the one-line plain-English diff (FR-16)
-  /** How many versions of the map the engine ran to produce these numbers.
-      Absent when nothing was computed — which is what picks the chip's sentence. */
-  versions?: number;
+  /** True when the engine worked these likelihoods out from this map. Absent on a map
+      whose numbers are the stored example's own, written by hand. It was a count of
+      versions of the map until 2026-09-22 (R48); the count was carried only so a chip
+      could say whether its range was computed, and there is no range. */
+  workedOut?: true;
 }
 
 /** One claim as this stack reads it. `TileProps` and `ClaimDetail` are projections of it. */
@@ -103,7 +107,8 @@ export interface ClaimView {
   states: Known<readonly SeriesState[]>; // supposed → withdrawn → pushed, with dates
   decomposition: Known<Decomposition>;   // prior, a line per incoming arrow, the result
   pathProduct: Known<PathProduct>;       // INV-8; computed on the world, never here
-  rangeShares?: Record<string, number>;  // stack 06 — nothing reads it yet
+  // `rangeShares` stood here for stack 06 and nothing ever read it. It was each stated
+  // range's share of this claim's band: it went on 2026-09-22 with R48's cut.
 }
 
 /** One arrow as this stack reads it. `WireProps` and `LinkDetail` are projections of it. */
@@ -128,20 +133,23 @@ export interface ClaimDiffView {
   state: "unchanged" | "shifted" | "added" | "killed";
   before: Known<number>;
   after: Known<number>;
-  /** "Same direction": the share of versions that moved the same way. */
-  agreement: Known<number>;
-  /** True when the whole of the move is the observation changing how much each version
-      counts — the claim's own arithmetic did not move it at all. Written by the engine
-      (`spec/multiverse/diff.md`); the Inspector turns it into one sentence and nothing
-      in the browser ever works it out. */
-  movedOnlyByReweighting: boolean;
-  /** Which half of the `unchanged` test the claim failed, in the engine's own plain word:
-      `under_the_floor` (it barely moved) or `versions_disagree` (it moved, and the versions
-      of the map did not agree which way). The engine reads the floor first, so a claim that
-      failed both says `under_the_floor`. Null on any claim that is not `unchanged`, and on an
-      `unchanged` claim with no move to measure. The browser prints the sentence that goes with
-      the word and works nothing out: the floor and the bar are constants inside the engine and
-      are on no wire. The server's name is `unchanged_because`. */
+  // Two fields stood here and are dropped at the wire (2026-09-22, R48). `agreement` was
+  // the share of versions of the map that moved the same way — the rail's *same direction*
+  // column — and `movedOnlyByReweighting` said a claim moved only because an observation
+  // made some of those versions count for more. Both are facts about running the map two
+  // thousand times, which is the thing Kent cut, and neither was a reason a row owed a
+  // reader. The engine still sends them; `frontend/src/world/apiSource.ts` is where they
+  // stop, and they die with the engine half.
+  /** Why the engine would not call this claim's difference a move, in its own word:
+      `under_the_floor`, it barely moved, or `versions_disagree`, the move was far enough
+      and it could not settle a direction. **Both are carried and neither is printed**
+      (2026-09-22, R48): the second names the versions of the map, which are cut from the
+      screen, so `graph/diff/noChange.ts` words it without them — *the engine could not
+      settle which way it moves*. It is carried rather than dropped because R4 requires
+      every quiet row to say why in words. Null on any claim that is not `unchanged` and on
+      one with no move to measure. The browser prints the phrase that goes with the word and
+      works nothing out: the floor and the bar are constants inside the engine and are on no
+      wire. The server's name is `unchanged_because`. */
   unchangedBecause: "under_the_floor" | "versions_disagree" | null;
 }
 ```
@@ -157,13 +165,16 @@ field is renamed, and this one had: it described a `shifted` flag that the code 
 some time, and described it the wrong way round.
 
 A row names **one ending**: its identifier, its own words, and its **kind**, which is what says
-whether anything trades. Beside the name sit the three quantities the list is read across — **the
-move** (the two readings, which way it went, how far, and the day the two worlds are furthest apart),
-**how firm** (the width of this world's own range on that claim) and **same direction** (the share of
-versions of the map that moved the same way). All three are `Known<T>`, so a row with nothing to
-report says why rather than going blank. Two further fields carry the rule below: **whether the
-engine gave this ending a row of its own in its ranking**, and the half-line under the ending's own
-words that says what that ending did instead.
+whether anything trades. Beside the name sits **the move** — the two readings, which way it went, how
+far, and the day the two worlds are furthest apart — as a `Known<T>`, so a row with nothing to report
+says why rather than going blank. Two further fields carry the rule below: **whether the engine gave
+this ending a row of its own in its ranking**, and the half-line under the ending's own words that
+says what that ending did instead.
+
+**There were three quantities beside the name and there is one** *(amended 2026-09-22, Kent's R48)*.
+**How firm** was the width of this world's own range on the claim, and **same direction** the share
+of the two thousand versions of the map that moved the same way. Both read a range or the versions
+that made one, and the cut took both.
 
 **One rule, and the list obeys nothing else: every ending the edit can reach has a row, whatever the
 engine called it.** Ranked if the engine ranked it; otherwise quiet, saying in the engine's own word
@@ -172,8 +183,8 @@ change list — and the change list keeps it.
 
 | The engine's word | The row |
 |---|---|
-| **`shifted`** | Ranked: in the engine's order, above the rest, with its move, how firm and same direction |
-| **`unchanged`** | Quiet: *no change* where the move would be, **and which half of the engine's test it failed** — *barely moved* (`under_the_floor`) or *the versions disagreed which way* (`versions_disagree`) |
+| **`shifted`** | Ranked: in the engine's order, above the rest, with its move and nothing beside it |
+| **`unchanged`** | Quiet: *no change* where the move would be, **and the engine's own reason, in words** — *barely moved* (`under_the_floor`) or *the engine could not settle which way it moves* (`versions_disagree`). The second is the engine's word said without the versions of the map it names *(2026-09-22, R48: the versions leave the screen, the reason stays, because R4 is the older rule and every quiet row says why)* |
 | **`killed`** — an edit fixed its value to false | Quiet: **the word its tile shows**, never a likelihood. The engine stores a flat zero on such a claim, and a row reading `.46 ▼ <.01` would be that zero wearing the certainty guard's clothes |
 | **`added`** — it arrived with the edit | Quiet: *Added*. There is no earlier reading of it to put beside this world's, so there is no move to rank |
 
@@ -197,22 +208,18 @@ a `claims` map with every claim in either world exactly once and its state, and 
 The browser re-deciding it by comparing two numbers would be the browser re-running the shifted test
 with its own floor and its own bar, and two answers to that question is one too many.
 
-**`BeliefView`** — one likelihood with its range and a name on it — is defined once in
+**`BeliefView`** — one likelihood with a name on it, and no range (2026-09-22, R48) — is defined once in
 [`tiles-ports-wires.md`](tiles-ports-wires.md), because the belief chip is the only component that
 takes one. `TileProps` and `WireProps` there, and `ClaimDetail` and `LinkDetail` in
 [`inspector.md`](inspector.md), are projections of `ClaimView` and `LinkView` above.
 
-**One field, two spellings, said once here.** The server's wire name is `range_width`; the view
-model's is `rangeWidth`. Same number, and neither is ever shown — the rail's column is headed **how
-firm**. Likewise the field `agreement`, whose column reads **same direction**: the bare word
-*agreement* is left free on screen for a run-to-run number, if one is ever earned. Decision record
-0015 says not in stack 04 — the range a claim ships with is the one the model stated, labelled as
-stated, and no number anywhere says how far two generations agreed.
-
-**And one field with one spelling in all three places.** The engine's `ClaimDiff` carries
-`moved_only_by_reweighting`; the view model spells it `movedOnlyByReweighting`; the Inspector turns it
-into one fixed sentence. Nothing shortens it, nothing abbreviates it, and nothing in the browser
-decides it — [`inspector.md`](inspector.md) B2 has the sentence and the rule.
+**Two passages about field names stood here** *(removed 2026-09-22, R48)*. One said that the
+server's `range_width` is the view model's `rangeWidth` and that the column over it reads **how
+firm**; the other that `moved_only_by_reweighting` becomes `movedOnlyByReweighting` and then one
+fixed sentence in the panel. Neither field reaches the view model any more: they are read off the
+wire and dropped in `frontend/src/world/apiSource.ts`, which says so in a comment, and they die when
+the engine half of R48 lands. The bare word *agreement* was being kept free for a run-to-run number;
+it stays free, and there is nothing on screen it could be confused with.
 
 ### Component props
 
@@ -320,15 +327,15 @@ line each, in the order the engine gave them:
 M1  A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.
     tradeable
     down · largest on 2026-10-04
-    .49 ▼ .42        .27        95%
+    .49 ▼ .42
 ```
 
 The ending's own words and what kind of ending it is; then which way it went and
-the day the two worlds are furthest apart; then the three columns — the change,
-**how firm**, **same direction**. The chevron sits between the two readings
-rather than after them, so the row reads as one number becoming another, and the
-direction is a word as well as a glyph because a glyph read aloud is nothing at
-all.
+the day the two worlds are furthest apart; then **the change, and nothing beside
+it** *(amended 2026-09-22, R48: the *how firm* and *same direction* columns are
+cut)*. The chevron sits between the two readings rather than after them, so the
+row reads as one number becoming another, and the direction is a word as well as
+a glyph because a glyph read aloud is nothing at all.
 
 The engine writes every part of that row. On the Hormuz strike branch (seed 20261001) it gives
 **two** rows: the Polymarket Brent contract · `.49 → .42` ▼ · largest on Oct 4; and the energy-shares
@@ -336,25 +343,23 @@ claim · `.43 → .36` ▼ · largest on Oct 6. This stack draws neither number;
 
 **The third ending is the one worth reading.** N1, the talks that cannot be traded, makes the biggest
 move on the map — `.28 → .38` — and the engine still calls it `unchanged`, so it is **not** a ranked
-row. Its only incoming arrow is the map's one bare assertion, `H → N1`, and a bare assertion is drawn
-so wide that only 88 of every 100 versions of the map agree the talks go *up* at all — under the 90
-in 100 the engine needs before it will say a claim moved
-([`../multiverse/diff.md`](../multiverse/diff.md) owns that bar). A big move nobody can agree the
-direction of is exactly what the bar is for, and the rail still lists N1: greyed, beneath the two
-ranked rows, reading **no change**. That is the case B5's greyed row was written for, arriving.
+row. Its only incoming arrow is the map's one bare assertion, `H → N1`, and the engine will not put a
+direction on a move behind one. The rail lists N1: greyed, beneath the two ranked rows, reading **no
+change**, with *the engine could not settle which way it moves* under the ending's own words. That is
+the case B5's greyed row was written for, arriving. *(The engine's own word for it names the versions
+of the map; R48 cut the versions from the screen on 2026-09-22 and the row is worded without them.
+The reason itself dies with the engine half, which decides a direction differently.)*
 
 That order is the size of the move times the **weakest arrow on the best-backed route** from any of
 the branch's edits to that ending — the route whose weakest arrow is strongest. Two factors and no
-more; the engine computes it, the rail renders it in the order given, and beside it sit **two
-columns that are never folded into the rank**:
+more; the engine computes it, and the rail renders it in the order given.
 
-| Column on screen | The question it answers | Field |
-|---|---|---|
-| **how firm** | *How firm is this number?* The width of the new world's own range on that claim — the same quantity the tile shows, so the rail and the tile cannot disagree | `rangeWidth` |
-| **same direction** | *Did it point the same way whatever numbers we started from?* The share of the 2 000 versions of the map that moved in the same direction — **each version counted by as much as it counted for the two numbers**, so a version that contributed nothing to either number votes on neither | `agreement` |
-
-Different questions, weighed separately by a trader, which is why they are columns and not one
-score. Folding width into the rank would sink exactly the claims that most deserve attention.
+**Two columns sat beside the rank and are cut** *(2026-09-22, Kent's R48)*. **How firm** answered
+*how firm is this number?* with the width of the new world's own range on that claim; **same
+direction** answered *did it point the same way whatever numbers we started from?* with the share of
+the two thousand versions of the map that moved in the same direction. They were two good questions,
+they were never folded into the rank, and they are both readings of a thing this product no longer
+has. A row is the ending, its number before and after, and the direction.
 
 **Every ending the edit can reach is on the rail, and never a missing one** *(decided 2026-09-17,
 stack 04a, and widened 2026-09-21; this closes [`../multiverse/diff.md`](../multiverse/diff.md) open
@@ -378,30 +383,32 @@ numbers — that would be the browser re-running the shifted test, with its own 
 90% bar, and two answers to that question is one too many. The two numbers behind a greyed row are
 still one click away in the Inspector; the row itself says the thing that is true.
 
-**And a row that held still says which half of the test it failed.** *Barely moved* and *moved, but the
-versions disagreed which way* are two different findings, and a reader given only "no change" cannot
-tell them apart. The engine writes the word — `under_the_floor` or `versions_disagree` — on the
-claim's own row, and the browser picks the sentence that goes with it. It still works nothing out:
-the floor and the bar are constants inside the engine and are on no wire, so the browser could not
-re-run the test if it wanted to. On the Hormuz strike branch the two claims that moved and still came
-out `unchanged`, B and N1, read `versions_disagree`; R, which did not move at all, reads
-`under_the_floor`. Where a claim fails both halves the engine names the floor, because a move nobody
-would notice needs no second sentence about its direction —
-[`../multiverse/diff.md`](../multiverse/diff.md) owns that rule and the two constants.
+**And a row that held still says why** *(amended 2026-09-22, R48)*. The engine writes one of two
+words on the claim's own row — `under_the_floor`, it barely moved, or `versions_disagree`, the move
+was far enough and it could not settle a direction — and the browser picks the phrase that goes with
+it. **Neither spelling is ever printed**, and the second is said without the versions of the map it
+names: *the engine could not settle which way it moves*. The word is carried rather than dropped
+because **R4 is the older rule and the stronger one** — every ending the edit can reach has a row,
+and a quiet row carries its reason in words rather than in being a shade paler; a row with no reason
+is exactly what R4 forbids. On the Hormuz strike branch B and N1 read the second phrase, and R, which
+did not move at all, reads *barely moved*. The browser still works nothing out: the floor and the bar
+are constants inside the engine and are on no wire, so it could not re-run the test if it wanted to —
+[`../multiverse/diff.md`](../multiverse/diff.md) owns that rule and the constants. *(The second
+reason dies with the engine half, which decides a direction differently.)*
 
 **Before the engine — this stack — the rail does not rank and does not compute.** It lists the
 terminals the edit can reach, in **map order**, each with an absence and a reason where the number
 will go:
 
 ```
-                                                   change          how firm   same direction
-M1  Polymarket "Brent below $70 on 2026-10-31"     no engine yet   —          —
-M2  XLE underperforms SPY by more than 3%          no engine yet   —          —
-N1  Omani-mediated talks resume                    no engine yet   —          —
+                                                   change
+M1  Polymarket "Brent below $70 on 2026-10-31"     no engine yet
+M2  XLE underperforms SPY by more than 3%          no engine yet
+N1  Omani-mediated talks resume                    no engine yet
 ```
 
-Each dash carries the same reason as the change beside it: no engine yet. All three endings are
-reachable here, so all three are listed; R is not a terminal and never appears. **A rail that
+One column, since 2026-09-22 (R48). All three endings are reachable here, so all three are listed; R
+is not a terminal and never appears. **A rail that
 invented an ordering would be inventing the one thing the rail exists to tell you** — map order is
 visibly arbitrary and says so; a fabricated ranking looks like an answer.
 
@@ -575,9 +582,13 @@ false, `frontend/src/graph/__tests__/diffState.test.ts` ›
 `test_an_ending_you_forced_false_stays_on_the_list_and_is_not_no_change` and
 `test_a_forced_false_ending_is_on_the_list_even_with_no_word_to_show`.
 
-**INV-workbench.47 — how firm and same direction are never folded into the rank.** For every rail
-row the two are rendered as their own columns, and no ordering function reads either. *Test:*
-deltaRail › `test_how_firm_and_same_direction_are_columns_not_factors`.
+**INV-workbench.47 — a row is the ending, its two readings and the direction, and nothing beside
+them** *(rewritten 2026-09-22, R48)*. It required that *how firm* and *same direction* be rendered as
+their own columns and never folded into the rank. Both columns are cut, so what it requires now is
+that no rail row renders a width, a share, a percentage or a range at all, and that the list has one
+value column. *Tests:* deltaRail ›
+`test_the_change_list_has_no_how_firm_and_no_same_direction`,
+`test_renders_a_reason_for_every_absent_number`.
 
 **INV-workbench.48 — a claim whose value an edit fixed shows the word, and the retraction comes from
 the world.** For every claim under a live supposition and every claim reported as news, the tile

@@ -26,6 +26,18 @@ export type Health = components["schemas"]["Health"];
 /** What the server says when asked whether it can do its job yet. */
 export type Readiness = components["schemas"]["Readiness"];
 
+/**
+ * One recording this copy can play, the day it was made, and what making it
+ * cost.
+ *
+ * The three figures are the recorded run's own, read off the receipt line inside
+ * the file by the server. They are the only measured price and the only measured
+ * duration this product owns, which is why the first screen can say what a live
+ * run costs before anybody presses. They are absent together when the file holds
+ * no receipt this engine can read.
+ */
+export type RecordingSummary = components["schemas"]["RecordingSummary"];
+
 /** What the server calls itself, and which build is running. */
 export type About = components["schemas"]["About"];
 

@@ -64,6 +64,7 @@ describe("the tokens the law names", () => {
       "--branch-teal",
       "--branch-rose",
       "--branch-slate",
+      "--kind-market",
       "--dir-up",
       "--dir-down",
       "--tail",
@@ -73,12 +74,16 @@ describe("the tokens the law names", () => {
     for (const token of named) {
       expect(TOKENS).toContain(`${token}:`);
     }
-    // The ramp and the branch palette are defined for the light page as well as
-    // the dark one. A map that only works dark reads as a demo.
+    // The ramp, the branch palette and the kind hue are defined for the light
+    // page as well as the dark one. A map that only works dark reads as a demo.
     const light = TOKENS.slice(TOKENS.indexOf('[data-theme="light"]'));
-    for (const token of [...RAMP, "--branch-violet", "--branch-teal"]) {
+    for (const token of [...RAMP, "--branch-violet", "--branch-teal", "--kind-market"]) {
       expect(light).toContain(`${token}:`);
     }
+    // And for the reader who asks for no theme at all and whose machine asks
+    // for a light page — the third block, which is easy to forget.
+    const followed = TOKENS.slice(TOKENS.indexOf("@media (prefers-color-scheme: light)"));
+    expect(followed).toContain("--kind-market:");
   });
 
   it("test_every_new_colour_carries_its_measured_ratio", () => {
@@ -91,6 +96,7 @@ describe("the tokens the law names", () => {
       "--branch-teal",
       "--branch-rose",
       "--branch-slate",
+      "--kind-market",
     ]) {
       const at = TOKENS.indexOf(`${token}:`);
       const after = TOKENS.slice(at, at + 200);

@@ -1,0 +1,130 @@
+/*
+ * The row of names at the head of the panel beside the map.
+ *
+ * It is drawn the way the rest of this product draws a label on a line: a word
+ * in the quiet colour, a hairline between one and the next, and a mono box round
+ * a count — the same box the foot of the map puts `last key` in and the run
+ * strip puts its one state word in. There is no pill, no rounded chip, no filled
+ * button and no icon set: a template-looking interface is a veto condition, and
+ * a row of tabs from a component kit is the most recognisable piece of one
+ * there is.
+ *
+ * **Which one is showing is said twice over.** The word goes from the quiet
+ * colour to the text colour, and a two-pixel accent rule runs under it — the
+ * same two-pixel rule the panel and the map draw at an edge that has more beyond
+ * it. Either alone would read; both together survive greyscale and a reader who
+ * sees no colour at all (INV-12).
+ *
+ * **Nothing in here moves.** A label gains a count when what it names gains one,
+ * and that is the whole of what ever changes.
+ */
+
+/* It sits above the box that scrolls and never inside it, so the way back to
+ * the other panels cannot scroll away — and so the panel's own measuring of its
+ * edges is never a measurement of a thing it changed (`styles/app.css`). */
+.panel-switch {
+  flex: none;
+  display: flex;
+  /* One hairline between one name and the next, drawn by the row showing
+     through a one-pixel gap rather than by a border on each label. */
+  gap: 1px;
+  border-left: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--hairline);
+}
+
+/* The names themselves take whatever the fold control leaves, and they never
+ * wrap to a second line: the panel is 336 pixels whatever the window, so a row
+ * that wrapped here would wrap at every window and for every reader. */
+.panel-switch__names {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 1px;
+  min-width: 0;
+}
+
+.panel-switch__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-hair);
+  /* The accent rule under a chosen name takes two pixels off the padding
+     underneath it, so choosing one moves nothing. */
+  padding: var(--space-1) var(--space-1) calc(var(--space-1) - 2px);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: var(--surface-raised);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.panel-switch__label:hover {
+  color: var(--text);
+}
+
+/* **A name that no longer fits is cut, never drawn over the fold beside it.**
+ * Measured 2026-09-22 at 336 pixels: *This claim* 85, *Branches and changes*
+ * 163, *Outline* 66, the fold 18, three hairlines — 335 of 336. The row fits by
+ * one pixel, and the next panel to be renamed takes it. Cutting is the honest
+ * failure: a word with its end missing still says which panel it is, and a word
+ * printed over a control makes the control unreachable. */
+.panel-switch__word {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.panel-switch__label[data-showing="yes"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* How many of the thing this panel holds there are. The same box, the same
+ * hairline and the same mono face as the last-key mark under the map and the
+ * state word in the strip at the foot, because they are the same kind of thing:
+ * a label on a line, never a badge. */
+.panel-switch__mark {
+  padding: 1px var(--space-hair);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* The control that folds the panel away, at the end of the names.
+ *
+ * It takes the room a chevron needs and not one pixel more: the names beside it
+ * are what a reader is reading, and the panel is 336 pixels whatever the window.
+ * Drawn on the same raised surface as a name, with no border of its own, so the
+ * head of the panel is one strip rather than a strip with a button stuck on it. */
+.panel-switch__fold {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-hair);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.panel-switch__fold:hover {
+  color: var(--text);
+}
+
+/* The chevron itself, drawn rather than fetched. It is the mark that says which
+ * way the panel goes, and it is the only mark in this product that is not a
+ * word — see `PanelSwitch.tsx` for why it earns that. */
+.chevron {
+  display: block;
+  flex: none;
+}
