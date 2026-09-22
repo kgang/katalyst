@@ -8,7 +8,9 @@ The user supposes the strait reopens, then adds a strike the next day, and asks 
 
 This chapter owns the four per-claim states, how a change is decided, how the changes are ranked and dated, the one-line summary, the one-at-a-time sensitivity sweep, and the three routes that serve them. It rests on decision record **0014 (accepted 2026-09-17, amended in place the same day)**, which settles how a change is ranked and which day a number is read on. A **world**, a **version of the map**, the seed streams and the **range** on a computed likelihood are defined in [`propagation.md`](propagation.md); this chapter uses those words and does not redefine them.
 
-> **This chapter was amended, not rewritten** *(2026-09-22)*. Decision records **0016** and **0017** replaced the engine underneath it: a claim's number is now the chance it comes out true by its own deadline, the answer inside a version is solved exactly rather than sampled, and nothing retracts itself. Three things that made those records make this chapter **false** have been restated and are marked where they appear — the version weights under an observation, the field `moved_only_by_reweighting`, and what a `series` does over time. **Everything else stands as it was measured**, including every figure it quotes; those figures move when the engine does, and the generated numbers file is where that move is reviewed.
+> **This chapter was amended, not rewritten** *(2026-09-22)*. Three decision records replaced the engine underneath it. **0016 and 0017:** a claim's number is the chance it comes out true by its own deadline, solved exactly rather than sampled, and nothing retracts itself. **0028:** there is **one likelihood per claim, computed once, and no range anywhere** — so the two thousand versions of the map are gone, and with them the *same direction N%* share, which was a share **of** them.
+>
+> **What that leaves: a claim has moved when it moved by `.005` or more, and nothing else is asked.** Every passage the three records make false is restated and marked where it appears. **Everything else stands as it was measured**, including every figure it quotes; those figures move when the engine does, and the generated numbers file is where that move is reviewed.
 
 ---
 
@@ -29,8 +31,7 @@ def diff(world_a: World, world_b: World, *, edit_in_words: str) -> Diff | list[V
 ```python
 ClaimState = Literal["unchanged", "shifted", "added", "killed"]
 # unchanged — present in both worlds, and it fails either half of the shifted test
-# shifted   — present in both, moved by 0.005 or more, and moved the same way in
-#             at least 90% of the versions of the map
+# shifted   — present in both, and moved by 0.005 or more. One test, one half
 # added     — present in world B and not in world A
 # killed    — present in both, and assigned false in world B. Never "its number got
 #             small", and never "it lost its path from the hypothesis" (see B2)
@@ -42,20 +43,20 @@ class ClaimDiff(BaseModel):          # proposed here — the plan names the four
     before: float | None             # world A's likelihood on this claim's own resolve-by day; None when added
     after: float | None              # world B's likelihood on the same day
     delta: float | None              # signed, after minus before; None when added
-    agreement: float | None          # share of the versions that moved the same way;
-                                     # None when the claim is `added`
+    agreement: float | None          # always None since 2026-09-22: it was a share of
+                                     # versions of the map, and there are none. See B3
     moved_only_by_reweighting: bool  # always false since 2026-09-22; kept on the wire
                                      # until its three browser readers move. See B3
     unchanged_because: Literal["under_the_floor", "versions_disagree"] | None
-                                     # which half of the shifted test an `unchanged` claim
-                                     # failed; None on every other state. See B2
+                                     # `under_the_floor` on every unchanged claim that has
+                                     # a move to measure; the second value is unreachable
 ```
 
-`agreement` is carried on **every** claim present in both worlds, not only the shifted ones, so a reader — or a test — can check the rule that decided a claim's state without recomputing anything. It is `None` in exactly one case, meaning *there is no direction to report*: an `added` claim, which has no world A to be compared against. **Every version counts the same, under every edit** — B3 says why that changed.
+`agreement` is **always `None`** *(amended 2026-09-22; decision record 0028)*. It was the share of the two thousand versions of the map whose paired difference pointed the same way as the average — a real, computed number, and the second half of the test that decided whether a claim had moved. There are no versions, so there is no such share. It stays on the wire, always absent, until its readers move; **nothing may put a number in it again.** B3 keeps what it meant, as history.
 
 `moved_only_by_reweighting` is **always `false`** *(amended 2026-09-22; decision record 0016)*. It used to mark a claim whose number moved only because an observation made some versions count more than others. An observation no longer throws anything away, so no version is ever left weighing less than another, and nothing can be in that position. The field stays on the wire, always false and with a dated comment, until its three readers in the browser move in one pull request of their own; **nothing may make it true again.** B3 keeps what it meant, as history.
 
-`unchanged_because` says **which half of the `shifted` test an `unchanged` claim failed** *(added 2026-09-21)*, in one plain word: `under_the_floor` when the move is smaller than `0.005`, `versions_disagree` when it cleared the floor and fewer than 90% of the counted versions moved that way. **The floor is read first**, so a claim that fails both halves says `under_the_floor` — something has to choose between two true answers, and a move nobody would notice needs no second sentence about its direction. It is `None` on every other state, and `None` where there is no test to fail: a claim only one world holds, which has no move to measure. B2 says why the field exists at all.
+`unchanged_because` says **why an `unchanged` claim is unchanged** *(added 2026-09-21; narrowed 2026-09-22 by decision record 0028)*. There is now one reason and one word: `under_the_floor`, when the move is smaller than `0.005`. **The second value, `versions_disagree`, is unreachable** — it meant *it cleared the floor and fewer than 90% of the versions of the map moved that way*, and there are no versions. It stays in the type until the same follow-up takes `agreement` and the range fields out together. The field is `None` on every other state, and `None` where there is no move to measure: a claim only one world holds.
 
 `before` and `after` are read on **the claim's own resolve-by day** — the day the claim is judged, which every claim has (INV-1, the product rule that a claim without resolution criteria, a named judge and a date is not a claim). That is the number the claim's tile shows, so it is the number its state has to be about. When a claim is still `supposed` on its own resolve-by day, `before` and `after` carry the stored `1.0` (or `0.0` for a claim supposed false) so that `delta` stays ordinary arithmetic — but any surface showing that row reads `states` first and prints the word, *Supposed · date*, never `1.0` ([`propagation.md`](propagation.md)). *(Amended 2026-09-22: this used to name the path product as the one surface allowed to print the number behind the word. Decision record 0022 deleted that product, and the three quantities replacing it are worked out from the world rather than multiplied out of tile readings, so no surface reads the stored `1.0` for display at all.)*
 
@@ -69,15 +70,14 @@ class DeltaRow(BaseModel):
     peak_delta: float      # signed; the largest divergence over the days the series
                            # carries — not necessarily over every day (see B4's second wart)
     at_day: date           # the day that divergence is largest, among those days
-    range_width: float     # a column in the delta rail; never multiplied into rank
-    agreement: float       # share of the versions that count which moved the same way;
-                           # a column, never a factor
+    range_width: float     # always 0.0 since 2026-09-22: there is no range (record 0028)
+    agreement: float       # always 0.0 since 2026-09-22: there are no versions to agree
     rank: float            # |peak_delta| × weakest provenance weight on the path. Two factors
 ```
 
 One row per **terminal** — a claim of kind `market` (it names an instrument) or `not_tradeable` (it names the reason there is nothing to trade) — that came out `shifted`. Ordered by `rank`, largest first. The **delta rail** is the interface's name for this list beside a diff.
 
-`range_width` is **the width of world B's own 10-to-90 band on that claim at `at_day`** — `hi` minus `lo`, the same quantity the claim's tile shows (Kent, 2026-09-17). Taking it from the tile rather than from the difference is what keeps the rail and the tile from ever disagreeing about how firm a number is.
+`range_width` is **always zero** *(amended 2026-09-22; decision record 0028)*. It was the width of world B's own range on that claim, taken from the tile rather than from the difference so the rail and the tile could never disagree about how firm a number was. There is no range on a tile either, so the rail's two side columns — *how firm* and *same direction* — are both gone from the screen, and these two fields leave the wire with the rest.
 
 ### The whole difference
 
@@ -87,9 +87,8 @@ class Diff(BaseModel):                              # proposed here — the plan
     branch_a: BranchId | None                       # None means the base world, the empty branch
     branch_b: BranchId | None
     seed: int                                       # the one seed both worlds were built from
-    versions: int                                   # the versions of the map both worlds ran
-    worlds: int                                     # always 0 since 2026-09-22: there is no
-                                                    # inner loop. Kept while the browser reads it
+    versions: int                                   # always 1 since 2026-09-22: one reading
+    worlds: int                                     # always 0 since 2026-09-22: no inner loop
     claims: Mapping[PropositionId, ClaimDiff]       # every claim in either world, exactly once
     rows: tuple[DeltaRow, ...]                      # the terminals that shifted, ranked
     summary: str                                    # the fixed sentence of B6, filled in
@@ -103,8 +102,8 @@ class SensitivityRow(BaseModel):                    # proposed here — the plan
     flipped: PropositionId                          # the claim that was flipped
     to: bool                                        # the value it was flipped to: the opposite of how it more often comes out
     deltas: Mapping[PropositionId, float]           # signed change on each terminal
-    versions: int                                   # the reduced version count this row was produced at: 250
-    worlds: int                                     # always 0 since 2026-09-22: there is no inner loop
+    versions: int                                   # always 1 since 2026-09-22: one reading
+    worlds: int                                     # always 0 since 2026-09-22: no inner loop
 
 
 def sensitivity(world: World) -> tuple[SensitivityRow, ...]
@@ -132,11 +131,11 @@ Every arrow in the Hormuz example is `argued` (0.6) except `` `H->N1` ``, which 
 
 Worked on the Strait of Hormuz map and its strike branch. The claims, quoted from the fixture: **H** *"The Strait of Hormuz reopens to unrestricted commercial transit."* (the hypothesis, prior `.35`, judged by 2026-11-01) · **C** *"Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%."* (prior `.30`, by 2026-10-31) · **B** *"Brent crude settles below $68 for five sessions."* (prior `.28`, by 2026-10-15) · **R** *"OPEC+ announces output restraint."* (prior `.18`, by 2026-11-30) · **M1** *"A Polymarket contract 'Brent below $70 on 2026-10-31' resolves YES."* (a terminal, by 2026-10-31) · **M2** *"The energy fund XLE underperforms the S&P 500 fund SPY by more than 3% over 20 trading days."* (a terminal, by 2026-11-15) · **N1** *"Omani-mediated United States-Iran talks resume publicly."* (a terminal nobody quotes, by 2026-11-30). The branch `br_hormuz_then_strike`, labelled **"Hormuz opens, then Iran is struck"**, adds **S** *"A confirmed military strike on Iranian territory."* with three arrows and supposes it true on 2026-10-02. Day zero is 2026-10-01.
 
-**Every number below is the engine's own**, measured on the shipped fixture at seed `20261001` and 2 000 versions of the map. *(Amended 2026-09-22: this used to read "2 000 versions × 8 worlds". There is no inner loop; the answer inside a version is solved exactly. The figures themselves are the old engine's and move with it — the generated numbers file is where that move is reviewed.)* None of them is typed by hand. The example map is a curated one whose illustrative inputs may be tuned — B's resolve-by day and one half-life were, in this stack — so the golden test asserts **directions and orderings, never values**, and re-running the engine is what keeps this page honest rather than re-reading it.
+**Every number below is the engine's own**, measured on the shipped fixture at seed `20261001`. *(Amended 2026-09-22: this used to read "2 000 versions × 8 worlds". There is neither an inner loop nor a version any more — one reading, computed once. Every figure below is the old engine's and moves with it; the generated numbers file is where that move is reviewed, and no range, width or same-direction share survives it.)* None of them is typed by hand. The example map is a curated one whose illustrative inputs may be tuned — B's resolve-by day and one half-life were, in this stack — so the golden test asserts **directions and orderings, never values**, and re-running the engine is what keeps this page honest rather than re-reading it.
 
 ### B1 — Two worlds, one base, one seed
 
-`diff` compares the world of branch A with the world of branch B. Both are built by folding a branch onto the *same* untouched base map and working the likelihoods through with the *same* seed. The versions stream — the one that picks which 2 000 versions of the map to try — never depends on the branch, so version 7 of world A and version 7 of world B were built from the same underlying numbers and differ only by the edit. That is what makes the paired comparison in B3 possible.
+`diff` compares the world of branch A with the world of branch B. Both are built by folding a branch onto the *same* untouched base map and working the likelihoods through with the *same* seed. **Every number in both worlds comes from what the map states**, so the two worlds differ by the edit and by nothing else — by construction rather than by a rule. *(Amended 2026-09-22; decision record 0028. This used to rest on a rule: the stream that picked which two thousand versions of the map to try was forbidden to see the branch, so version 7 of each world was built from the same drawn numbers and the difference was the edit rather than a wash of elicitation noise. Nothing is drawn now, so there is nothing to hold fixed.)*
 
 Two worlds that disagree on `base_id`, `seed`, `versions` or `worlds` are refused with a violation naming the mismatch, under its own code, `worlds_not_comparable` — nothing here is anybody's edit, so it borrows none of the four codes a refused edit carries. There is no repair: a difference computed across two seeds is the user's change plus a wash of sampling noise, and a number nobody can trace to an edit is exactly the state this product refuses to show.
 
@@ -148,76 +147,58 @@ The checks run in this order, and the first that matches wins.
 
 1. **`added`** — the claim is in world B and not in world A. `S` is added: the base map has never heard of it.
 2. **`killed`** — the claim is in both, and in world B it is **assigned false** by a `do` or an `observe`. That is the whole rule (Kent, 2026-09-17). A claim whose likelihood fell to `.02` is a claim that moved a long way; it is `shifted`, and calling it `killed` would tell the user their argument was cut when it was merely losing.
-3. **`shifted`** — the claim is in both, it moved by 0.005 or more on its own resolve-by day, **and** it moved the same way in at least 90% of the versions of the map. Both halves, always. B3 says why.
-4. **`unchanged`** — the claim is in both and fails either half. **The row says which half**, in `unchanged_because`, and that is the whole of the field's job.
+3. **`shifted`** — the claim is in both, and it moved by `0.005` or more on its own resolve-by day. **That is the whole test** *(amended 2026-09-22; decision record 0028: the second half asked that at least 90% of the versions of the map move the same way, and there are no versions).*
+4. **`unchanged`** — the claim is in both and its move is under the floor. The row says so, in `unchanged_because`, which now has one word to say.
 
 A claim present in world A and missing from world B cannot happen: there is no delete operation, and "this is out of the picture" is expressed as `do(n, false)`, which forces the claim false ([`interventions.md`](interventions.md) anti-pattern 5).
 
-**Why `unchanged` has to say which half** *(added 2026-09-21)*. Both constants — the `0.005` floor and the 90% bar — live in `domain/diff.py` and appear on no wire, so a reader told only *unchanged* cannot tell *it barely moved* from *nobody agrees which way it went*. Those are two different pieces of advice: the first says stop looking, the second says this is exactly where more homework would pay. Working it out at the other end would mean a second copy of both constants in the browser, re-running the engine's own test against the engine's own answer, with nobody able to say which was right when they disagreed. So the engine says it, in one word, on the row. It is a fact about how the number was **read** rather than about what happened to the claim, and it never becomes a fifth state (anti-pattern 8).
+**Why `unchanged` still says why** *(added 2026-09-21; narrowed 2026-09-22)*. The `0.005` floor lives in `domain/diff.py` and appears on no wire, so a reader told only *unchanged* cannot tell *it barely moved* from *it did not move at all*. Working it out at the other end would mean a second copy of the constant in the browser, re-running the engine's own test against the engine's own answer, with nobody able to say which was right when they disagreed. So the engine says it, in one word, on the row (anti-pattern 10), and it never becomes a fifth state (anti-pattern 8).
 
-**And the reader is shown that word, not *no change*** *(added 2026-09-22; the first of the three wordings Kent has seen)*. On this fixture a tile prints `.31` against a base world's `.40` under a chip reading **no change** — a nine-point move labelled as none, because the claim failed the direction half of the test. **A chip must never contradict the number above it.** The two words an `unchanged` claim's chip takes, one per value of `unchanged_because`, are:
+**What the chip may read, now that there is one reason.** An `unchanged` claim's chip reads **no change**, and that is now true of it: under decision record 0028 a claim is `unchanged` exactly when its move is under the floor, so the number above the chip rounds to the same two figures in both worlds and the words and the figures agree. *(Until 2026-09-22 they could disagree badly — a tile printed `.31` against a base world's `.40` under a chip reading* no change, *because the claim had cleared the floor and failed the direction half of the test. That half is gone, and with it the second chip wording this chapter carried for one day.* `spec/workbench/diff-view.md` *owns where the chip is drawn.)*
 
-| `unchanged_because` | What the chip reads | What it means |
-|---|---|---|
-| `under_the_floor` | **no change** | the move is smaller than `0.005` — too small for anybody to act on, and the number above it will round to the same two figures |
-| `versions_disagree` | **no agreed direction** | it moved, and fewer than 90% of the versions of the map moved the same way. The move itself is still printed beside it |
+**On the Hormuz branch.** `S` is `added`, and every other claim the strike reaches is `shifted`: `H`, `C`, `B`, `M1`, `M2` and `N1`, each read on its own resolve-by day and each on the lines named `… · base · reading` and `… · strike · reading`. Every one of those moves clears the `0.005` floor with room to spare — which is what the tests pin, rather than a particular figure. *(Amended 2026-09-22; decision record 0028: there were four before, because `B` and `N1` failed a direction test that no longer exists.)*
 
-Both words come off the field the engine already carries; neither is worked out in the browser (anti-pattern 10). `spec/workbench/diff-view.md` owns where the chip is drawn.
+**One claim is `unchanged`, and the reason is the only one there is.** `R`'s move on its own resolve-by day is `0` exactly, so it is `under_the_floor`: its only incoming arrow is `B → R`, the feedback arrow from the market back onto the world, and *the map the engine works through is the map with feedback arrows set aside* — [`interventions.md`](interventions.md)'s named rule, which `test_a_feedback_arrow_never_carries_a_change` pins. R reads its own stated chance in both worlds, byte for byte, on the line named `R · base · reading`.
 
-**On the Hormuz branch.** `S` is `added`. Four claims are `shifted`, each read on its own resolve-by day, base world to strike world: `H` `.36` → `.086`, `C` `.40` → `.074`, `M1` `.46` → `.41` and `M2` `.43` → `.36`. Every one of those moves clears the 0.005 floor with room to spare and clears the 90% same-direction bar — which is what the golden test pins, rather than a particular share.
-
-**Three claims are `unchanged`, and each for a different reason** — which is why the word alone was never enough:
-
-| | Move on its own resolve-by day | Same direction | Says | Why |
-|---|---|---|---|---|
-| `R` | `0` exactly | 100% | `under_the_floor` | Its only incoming arrow is `B → R`, the feedback arrow from the market back onto the world, and *the map the engine works through is the map with feedback arrows set aside* — [`interventions.md`](interventions.md)'s named rule, which `test_a_feedback_arrow_never_carries_a_change` pins. R reads its own prior in both worlds, `.19 (.080–.32)`, byte for byte |
-| `B` | `−.088` | 85.1% | `versions_disagree` | Two large pushes nearly cancel: `S → B` shoves it down and `H → B`'s trigger shoves it back up, and once each version draws its own pushes ([`propagation.md`](propagation.md) B8) about one version in seven comes out the other way |
-| `N1` | `+.093` — **the biggest move of any ending on this map** | 87.7% | `versions_disagree` | The only arrow into it is `H → N1`, the one arrow on this map nobody could back, so its push is drawn widest of all and the versions do not agree which way it went. B4 works this through; it is the clearest thing the spread does on this fixture |
+**`B` and `N1` moved a long way and are `shifted`** *(changed 2026-09-22; decision record 0028)*. Until the versions were cut, both cleared the `.005` floor and failed the other half of the test — about one version in seven put `B` the other way, and `N1`'s only support is `H → N1`, the one arrow on this map nobody could back, which was drawn widest of all — so both read `unchanged` with `versions_disagree` beside them. **There is no second half now, so a claim that moved is a claim that moved.** What the map knows about `H → N1` has not changed and is not lost: it is `asserted`, and B4's ranking reads exactly that, which is why `N1` is still not on the rail.
 
 `N1` going **up** at all is not a slip: `H → N1` is a trigger, which reads the day its cause came on and keeps pushing whatever the cause does afterwards, so the push fired and stayed fired. Nothing on this branch is `killed`. *(Amended 2026-09-22: this used to say "after the strike withdraws H". Nothing withdraws anything — both events stand, and what the strike ends is the state they hold up, [`propagation.md`](propagation.md) B5.)*
 
-*(Amended 2026-09-21. Before the versions drew the arrows' pushes, six claims were `shifted` here and `R` was the only untouched one. `B` and `N1` moved just as far then; what changed is that the engine can now say it does not know which way, which is the honest answer for a claim whose only support is an arrow with no mechanism behind it.)*
+<!-- VERIFY AT FLIP: which claims come out `shifted` on this branch once the versions are gone and the fixture is rebuilt. The paragraph above asserts B and N1 do; read it off the regenerated numbers file. -->
 
 **`killed`, shown.** Add `Do(target="C", value=False)` to a branch and C is `killed` — forced false, its tile struck through, still on the map and still in the record.
 
 **Why `killed` is not also "cut off from the hypothesis".** That second half was tried and dropped (Kent, 2026-09-17), and the fixture shows why. `Do(target="B", value=True)` cuts B's incoming arrows, which removes `H → B`, so no path of arrows runs from the hypothesis H to M1, M2 or R any more — and under the dropped rule all three would have read *killed* while B, supposed true, was pushing M1 and M2 harder than anything else on the map. Two unrelated facts were wearing one word. Losing the last path is a fact about the **path**, not about the claim's value, so it is reported where paths are reported: the Inspector's path bar says *"no path from the hypothesis reaches this claim any more"* in those words (`spec/workbench/inspector.md`).
 
-### B3 — How `shifted` is decided: the paired difference, never band overlap
+### B3 — How `shifted` is decided: one move against one floor
 
-Subtract world A's version *k* from world B's version *k*, for all 2 000 versions. Because the versions stream does not depend on the branch, the elicitation noise cancels and what is left is the edit — this is *common random numbers*, the standard trick for comparing two runs of the same simulation. Two numbers come out of those 2 000 paired differences:
+Subtract world A's number for the claim from world B's. That difference is **the move**, and it is what `delta` and `peak_delta` report. **A claim is `shifted` when the move is at least `0.005` in size.** That is the whole test.
 
-* **the move** — the average paired difference, which is what `delta` and `peak_delta` report;
-* **agreement** — the share of versions whose paired difference has the same sign as that average, **every version counting the same** (the rule, and the rule it replaced, are just below). It is the vocabulary's word for a number the machine computes rather than one anything self-reports. Here it means the share of versions of the map that moved the same way; a run-to-run agreement across independent generations would be the other sense — decision record 0015 says stack 04 builds none — and the vocabulary asks us to say which.
+Both worlds are built from the same untouched base map with the same seed, and every number in each comes from what that map states, so the difference is the edit and nothing else. There is no noise to cancel and nothing to average.
 
-A claim is `shifted` when the move is at least `0.005` in size **and** agreement is at least `90%`.
+#### The second half of this test, and the two thousand versions behind it — history
 
-#### Every version counts the same — and the rule that used to sit here
+*(Amended 2026-09-22; decision record 0028, Kent's row R48. Kept rather than deleted, because a reader who knew the old rule must be told it is gone, and because what it was worth is worth knowing.)*
 
-*(Amended 2026-09-22; decision record 0016. The rule this heading replaces was Kent's decision G2 of 2026-09-17 and is kept below, because a reader who knew it must be told it is gone.)*
+The engine used to work the whole map out **two thousand times over**, each version drawing every stated number from the range around it. A difference was then read **version by version** — version 7 of world A against version 7 of world B, built from the same drawn numbers, so that the elicitation noise cancelled and what was left was the edit. That is *common random numbers*, the standard trick for comparing two runs of one simulation. It gave two numbers rather than one: the average paired difference, and **agreement** — the share of versions that moved the same way. A claim counted as `shifted` only if it cleared the floor **and** at least 90% of the versions agreed on the direction, and the rail showed that share in a column headed *same direction*, beside a column headed *how firm* that carried the width of world B's own range.
 
-**Every version counts the same, under every edit.** The paired difference is an ordinary average over all 2 000 of them, and `agreement` is an ordinary share. There is no weight anywhere in this chapter.
+**All of it goes with the versions.** There is one reading per claim, so there is nothing to take a share of; `agreement` is always absent and `range_width` always zero until both leave the wire. **The claim it was making is not replaced by anything**, and that is the honest way to put it: the product no longer says *we are unsure which way this went*. What it still says is **how well-backed the route behind a move is** — B4's second ranking factor, which reads each arrow's `provenance` and has never had anything to do with versions.
 
-**What it replaced.** *This happened* used to be answered by throwing away the draws in which the thing did not happen, so a version kept only some of its draws — and a version that kept none of them contributed nothing to the number, nothing to the range, and yet cast a full vote on the direction. The rule, in one sentence, was: *a version counts for the move by as much as it counted for the two numbers — the smaller of the two weights it carried — so a version with no surviving draw counts for nothing and does not vote.* Three corners hung off it: one world observing and the other not; both observing; and two branches whose surviving versions did not overlap at all, where there was no paired difference left and `agreement` came back as nothing.
-
-**Why it is gone rather than kept.** An exact solve **conditions** on what was seen instead of discarding what disagrees with it ([`propagation.md`](propagation.md) B6). Nothing is thrown away, so no version is ever left with less than another, so there is no second way of counting to choose between and no corner to get right. The three corners, the fallback, and the case with no direction at all go with it. **What it was worth is still worth knowing:** on this fixture, 209 of the 2 000 versions kept nothing at all under *Brent settled below $68*, and counting them as one vote each dragged both tradeable endings under the 90% bar and emptied the rail — *This happened* looked like a button that does nothing. That failure is now impossible by construction rather than repaired by a weight.
+*(An earlier rule under this heading, Kent's G2 of 2026-09-17, weighted each version by how much of it survived an observation, because *This happened* used to throw draws away and a version could be left with none. Decision record 0016 removed the discarding — an exact solve conditions rather than discards — and record 0028 has now removed the versions themselves. What it was worth: on this fixture 209 of the 2 000 versions kept nothing at all under *Brent settled below $68*, and counted as one vote each they dragged both tradeable endings under the 90% bar and emptied the rail, so **This happened** looked like a button that does nothing. Neither failure can recur.)*
 
 #### A claim moved only by reweighting — history
 
-*(Amended 2026-09-22; decision record 0016. Kent's decision G3 of 2026-09-17, kept for the same reason as the rule above.)*
+*(Kent's decision G3 of 2026-09-17, removed by decision record 0016 and kept for the same reason as the rule above.)*
 
-A claim with **no causes** — the hypothesis, usually — was its own stated chance in every draw of a version, so throwing draws away could not change what a version *said* about it. Its number still moved, because the versions were being counted differently; its same-direction share was zero by construction rather than by disagreement; and the row carried `moved_only_by_reweighting` so the Inspector could say *"this claim moved only because the observation made some versions count more."*
+A claim with **no causes** — the hypothesis, usually — was its own stated chance in every draw of a version, so throwing draws away could not change what a version *said* about it. Its number still moved, because the versions were being counted differently, and the row carried `moved_only_by_reweighting` so the Inspector could say *"this claim moved only because the observation made some versions count more."*
 
-**None of that can happen now.** An observation reaches a causeless claim through the solve itself — the evidence runs up the arrows into it — so when such a claim moves, the arithmetic moved it and the paired difference says which way. The field stays on the wire, always false; the Inspector's sentence goes; and **an observation that moves nothing an arrow can reach now moves nothing at all**, which is the test that used to assert the opposite and was reversed to assert invariance.
+**None of that can happen now.** An observation reaches a causeless claim through the solve itself — the evidence runs up the arrows into it — so when such a claim moves, the arithmetic moved it. The field stays on the wire, always false; the Inspector's sentence goes; and **an observation that moves nothing an arrow can reach now moves nothing at all**, which is the test that used to assert the opposite and was reversed to assert invariance.
 
-**The four states stay as they are**, which was the other half of the decision and is untouched: a fifth state would put two unrelated facts under one word, exactly as `killed` nearly did (B2). What a row still carries beside its state is `unchanged_because`, which says which half of the `shifted` test the claim failed.
+**The four states stay as they are**, which was the other half of that decision and is untouched: a fifth state would put two unrelated facts under one word, exactly as `killed` nearly did (B2). What a row still carries beside its state is `unchanged_because`, and it has one word to say.
 
-**On screen the rail heads this column *same direction*, and the range-width column beside it *how firm*** (Kent, 2026-09-17). The field names stay `agreement` and `range_width`; the headings say in the reader's words what each column answers, and keeping *agreement* off the screen here leaves the word free for a run-to-run number, if one is ever earned (decision record 0015 says not in stack 04).
+#### Why the rail's two side columns are gone
 
-**Why never band overlap, measured on this fixture.** Supposing the strait opens and reading B on its own resolve-by day, 2026-10-15: the base world says `.40 (.24–.56)` and the supposed world says `.58 (.38–.76)`. Those two bands **overlap by 56% of the narrower one** — `.175` of `.314` — and yet **99.9% of versions move the same way**: `+.19`, with a 10-to-90 band on the difference itself of `+.084` to `+.29`. Reading the overlap would report "no change" about the single clearest change on the map. The two bands overlap because each one is wide for its own reason — we are unsure what number to give you — while the *difference* between them is tight, because both were computed from the same numbers.
-
-A second measured warning from the same fixture, so nobody builds a demo on it: supposing the strait opens **widens** B's band, `.314` to `.380`, because the curve that turns log-odds into a likelihood is steeper near `.45`. A supposition collapses its own target's band and does not reliably narrow anything downstream. The honest thing to show is the **share** of B's band that H's own range explains, which goes from 5.0% to 0.6% — that is FR-21's "where to spend modeling budget" number, carried on the world and first read on screen in stack 06.
-
-*(Both paragraphs re-measured 2026-09-21. The bands are all a little wider than they were, because a version now draws every arrow's push as well as every prior; the overlap was 44% of a narrower band and the widening was `.296` to `.318`. The point each paragraph makes is untouched, and the overlap being **larger** sharpens the first one.)*
+*(2026-09-22.)* The rail used to head one column *same direction* — the share of versions — and the one beside it *how firm* — the width of the new number's range. Both are cut with the versions and the range. **The rail is now the move, the day it was largest, and the rank**, and the reason a reader is told about the quality of a change is the `provenance` on the arrows behind it, which is what the rank's second factor already reads.
 
 ### B4 — The ranked change list: two factors, and only two
 
@@ -228,7 +209,7 @@ rank = |peak_delta| × min(provenance weight of each arrow on the best-backed ro
 
 How big the move is, times what the weakest arrow behind it is worth. That is FR-16's "the size of the move × the weakest backing on the best-backed route", made arithmetic.
 
-**`range_width` and `agreement` are columns and never factors.** They answer two different questions — *how unsure are we of this number* and *how sure are we of its direction* — and a trader weighs them separately from *how big is it*. Blend any of the three into one score and the reader can no longer tell which one is talking. Worse, multiplying width in would push down exactly the claims FR-21 floats: a wide band is the signal that says *go and research this*, and a ranking that buries wide claims gives the opposite advice.
+**Two factors, and the rule that keeps it at two.** Never blend a third thing into this score — not how unsure we are of the number, not how firm it looks, not how many runs agreed. Each would answer a different question, and one blended score hides which one is talking. *(Until 2026-09-22 the rail carried two such numbers beside the rank, as columns and never as factors; decision record 0028 cut both. The rule outlives them, because the temptation does.)*
 
 **Which route the weakest arrow is read along** (Kent, 2026-09-17). Over every path from **any** differing edit's subject to the terminal — the subjects of the edits branch B has and branch A does not — take the one whose weakest arrow is strongest. That is the **widest bottleneck**: the route whose narrowest point is as wide as possible, the way a lorry driver picks the road with the highest low bridge rather than the shortest one. It is a ten-line variant of the usual shortest-path walk. Neither "shortest" nor "which subject" survives in the rule: a change that could have reached a terminal along a well-backed route is ranked by that route, whichever edit started it, because that route is the best case the reader is entitled to.
 
@@ -238,23 +219,23 @@ The route is read over **the same map the affected set is computed over** — *t
 
 The rail the engine actually produces, base world against the strike branch:
 
-| | Ending | `at_day` | before → after | `peak_delta` | same direction | weakest weight | `rank` |
-|---|---|---|---|---|---|---|---|
-| 1 | M1, the Polymarket contract | day 3, 2026-10-04 | `.49` → `.42` | `−.077` | 95.4% | 0.6 | `.046` |
-| 2 | M2, energy shares against the market | day 5, 2026-10-06 | `.43` → `.36` | `−.067` | 93.1% | 0.6 | `.040` |
+| | Ending | `at_day` | before → after | `peak_delta` | weakest weight | `rank` |
+|---|---|---|---|---|---|---|
+| 1 | M1, the Polymarket contract | day 3, 2026-10-04 | `.49` → `.42` | `−.077` | 0.6 | `.046` |
+| 2 | M2, energy shares against the market | day 5, 2026-10-06 | `.43` → `.36` | `−.067` | 0.6 | `.040` |
 
-**N1 has the biggest move of any ending on the map and is not on the rail at all**, and that is the second factor earning its place twice over. Its move on its own resolve-by day is `+.093`, larger than either market's, and the only way into N1 is `H → N1` — an arrow whose own rationale admits it cannot say which way the causality runs, since quiet talks may be what reopened the lane rather than the other way about. That is written on the arrow as `asserted`, and it is now read **twice**: once by the ranking, which would have discounted the row to `0.3`, and once by the engine itself, which draws that arrow's push widest of all ([`propagation.md`](propagation.md) B8), so that **87.7%** of the versions agree on the direction and the claim does not clear the 90% bar. It reads `unchanged`, with `versions_disagree` on its row, and the Inspector says so where the move would go.
+**N1 has the biggest move of any ending on the map and it ranks last**, which is the second factor earning its place. Its move on its own resolve-by day is `+.093`, larger than either market's, and the only way into N1 is `H → N1` — an arrow whose own rationale admits it cannot say which way the causality runs, since quiet talks may be what reopened the lane rather than the other way about. That is written on the arrow as `asserted`, worth `0.3` against the `0.6` behind either market, so the row is discounted to well under half of what its size alone would buy.
 
-**That is the right answer and it is worth saying why.** The change list is for changes a reader can act on. *This ending moved further than either of the ones you can trade, and we cannot vouch for which way* is not such a change, and putting it on the list under a small rank would have shown a number the map cannot support. The move is not hidden — it is on the claim's own row, with its size and its share — it is merely not ranked among things somebody can trade.
+**That is the right answer and it is worth saying why.** The change list is for changes a reader can act on, and *this moved further than anything you can trade, along the one arrow nobody could back* is a change to read last rather than first. The move is not hidden — it is on the claim's own row with its size — it is ranked where the quality of its evidence puts it.
 
-*(Amended 2026-09-21. This rail had three rows, N1 last at `rank .026` and `99.9%` same direction, while every arrow's push was a fixed number. Nothing about the ranking changed; what changed is that a push nobody could back is now drawn as wide as that admission deserves. B2's table has the other claim the same rule caught, `B`.)*
+*(Amended 2026-09-22; decision record 0028. Until the versions were cut, `asserted` was read **twice**: once by this ranking, and once by the engine itself, which drew that arrow's number widest of all so that fewer than 90% of the versions agreed on the direction and N1 fell off the rail entirely, reading `unchanged`. It is now read once, here. The conclusion a reader draws is the same and it is reached in one place instead of two.)* <!-- VERIFY AT FLIP: whether N1 appears on the rail at all once the direction half of the test is gone, and where it ranks. -->
 
 **And the rail under an observation**, base world against `observe(B, true)` — *Brent settled below $68* — which is what **This happened** produces on the same map. Both endings rise, because cheap Brent is evidence for both, and both peak within days of the news:
 
-| | Ending | `at_day` | before → after | `peak_delta` | same direction | weakest weight | `rank` |
-|---|---|---|---|---|---|---|---|
-| 1 | M1, the Polymarket contract | day 1, 2026-10-02 | `.41` → `.62` | `+.21` | 98.8% | 0.6 | `.12` |
-| 2 | M2, energy shares against the market | day 3, 2026-10-04 | `.38` → `.54` | `+.16` | 97.4% | 0.6 | `.094` |
+| | Ending | `at_day` | before → after | `peak_delta` | weakest weight | `rank` |
+|---|---|---|---|---|---|---|
+| 1 | M1, the Polymarket contract | day 1, 2026-10-02 | `.41` → `.62` | `+.21` | 0.6 | `.12` |
+| 2 | M2, energy shares against the market | day 3, 2026-10-04 | `.38` → `.54` | `+.16` | 0.6 | `.094` |
 
 N1 is reachable — the observation climbs from B to H and runs forward down `H → N1` — but it is absent, and for the ordinary reason: its move is `+.0012`, well under the `0.005` floor, and its same-direction share is `42%`, well under the bar. Its row says `under_the_floor`, because the floor is read first. Read both rows above with every version counted as one vote instead and they read `88.6%` and `87.4%`, each falls under the bar, and this table is empty — which was open question 7, and B3's one rule is the answer.
 
@@ -289,15 +270,12 @@ Nothing about the arithmetic moved: on every day the two windows share, every ve
 
 ```
 "<edit in the user's words> moves <terminal> from <before> to <after> by <date>,
- and leaves <n> claims unchanged — <m> of them moved, without the versions
- agreeing which way."                       (`claim`, singular, when <n> is 1;
-                                             the clause after the dash is dropped
-                                             when <m> is 0)
+ and leaves <n> claims unchanged."         (`claim`, singular, when <n> is 1)
 ```
 
-`<terminal>` is the top row of the rail, `<before>`, `<after>` and `<date>` are that row's `before`, `after` and `at_day`, `<n>` is the count of claims whose state is `unchanged`, and `<m>` is how many of those carry `versions_disagree`. Two significant figures, like every number this product shows.
+`<terminal>` is the top row of the rail, `<before>`, `<after>` and `<date>` are that row's `before`, `after` and `at_day`, and `<n>` is the count of claims whose state is `unchanged`. Two significant figures, like every number this product shows.
 
-**Why the sentence no longer says *untouched*** *(rewritten 2026-09-22; Kent has seen these three wordings)*. `unchanged` is the engine's word for *failed the `shifted` test*, and one of the two ways to fail it is to move a long way while the versions disagree about the direction. On this very fixture the sentence said *leaves 3 claims untouched* of three claims two of which had moved nine and ten points. **Untouched was a false word for a claim that moved**, and a reader who acts on the summary alone was being told the opposite of what the rail's own rows say. The replacement keeps the count — which is what makes the sentence short — and says in the same breath how many of those claims moved anyway, which is the thing worth looking at.
+**Why the sentence says *unchanged* and not *untouched*** *(rewritten 2026-09-22; Kent has seen these wordings)*. It used to end *leaves 3 claims untouched*, and on this fixture two of those three had moved nine and ten points — they had cleared the floor and failed the other half of a two-part test. **Untouched was a false word for a claim that moved.** Under decision record 0028 there is one half left, so an `unchanged` claim really is one whose move is under the floor and *unchanged* is true of it; the word is kept anyway, because it is the engine's own word for the state and the sentence should use the word the rail uses.
 
 **The two numbers in this sentence are likelihoods, so they carry the guards** *(Kent, 2026-09-20 — G10)*. The rule in one sentence: **round to two significant figures, then use a guard word exactly when it is true of the rounded number** — `<.01` below a hundredth, `>.99` above ninety-nine hundredths, the figures themselves otherwise. `.010` and `.99` print, because neither is below or above its own guard; `.0099` and `.995` do not. The reason the boundary sits exactly there is that **the guard's words have to mean what they say**: `<.01` beside a likelihood of `.0035` is true, and beside `.010` it would not be. [`../graph/belief.md`](../graph/belief.md) B5 owns the rule and works it; [`../workbench/keyboard-and-access.md`](../workbench/keyboard-and-access.md) B6 owns the table of awkward cases; `two_figures` in `domain/belief.py` — beside the class that holds a likelihood — writes this sentence and `toTwoFigures` in `BeliefChip.tsx` writes every chip, and the two are one rule that moves in one pull request.
 
@@ -316,8 +294,7 @@ Note which reading the two likelihoods are. They are M1's on the day the two wor
 **When no ending shifted, there is a second fixed sentence:**
 
 ```
-"<edit in the user's words> moves no ending and leaves <n> claims unchanged —
- <m> of them moved, without the versions agreeing which way."
+"<edit in the user's words> moves no ending and leaves <n> claims unchanged."
 ```
 
 It is used whenever the rail is empty — after a `believe`, because the user's own number is not pushed through the map in this version, or after a `retune` whose effect lands below the 0.005 floor. That is a real answer and not an error: *you changed something and nothing at the endings moved* is exactly what the user needs to hear, and an empty rail with no sentence beside it reads as a bug.
@@ -326,9 +303,9 @@ It is used whenever the rail is empty — after a `believe`, because the user's 
 
 ```
 "<edit in the user's words> forces <terminal> false and moves no other ending;
- it leaves <n> claims unchanged — <m> of them moved, without the versions
- agreeing which way."       (`<terminal>` is the killed ending; where an edit
-                             killed more than one, they are listed with `and`)
+ it leaves <n> claims unchanged."    (`<terminal>` is the killed ending; where
+                                      an edit killed more than one, they are
+                                      listed with `and`)
 ```
 
 Where an edit both kills one ending and shifts another, the first sentence is used and the killed ending is named in its own clause after the move: *…, and forces <terminal> false*. One sentence, filled from fields already on the `Diff`; nothing is written fresh (anti-pattern 5).
@@ -337,7 +314,7 @@ Nothing about either sentence is written by a language model, and the diff route
 
 ### B7 — The sensitivity sweep
 
-`sensitivity(world)` flips each claim in turn — a `do` to the opposite of whichever way it more often comes out in that world — re-propagates, and records the signed change on every terminal. One re-propagation per claim, so it runs at a **reduced budget of 250 versions** against the full 2 000, and **every row says which budget produced it** so nobody compares a swept number with a full-budget one without noticing. *(Amended 2026-09-22: a flip is now one exact solve rather than 250 versions of 8 sampled worlds, so the sweep is cheaper than it was and the budget is one number rather than two.)*
+`sensitivity(world)` flips each claim in turn — a `do` to the opposite of whichever way it more often comes out in that world — re-propagates, and records the signed change on every terminal. One re-propagation per claim, and **every row is worked out at the same budget as every other number on the map**, because there is only one: a flip is one exact solve. *(Amended 2026-09-22. The sweep used to run at a reduced 250 versions against the full 2 000, and each row said which budget produced it so nobody compared a swept number with a full-budget one without noticing. Decision records 0016 and 0028 leave one reading and no versions, so there is no reduced budget and nothing to warn about; the field stays on the row, always `1`, with the other emptied fields.)*
 
 **Which edit introduced a claim is read off the branch** *(amended 2026-09-22)*. The sweep needs to know which claims an edit added, so that a flip of a claim that was not there in the base world is reported as such. It used to reconstruct that from the world's record of what had been retracted; nothing retracts itself any more, and there is no such record, so it reads the branch directly — which is where the answer always was, every edit carrying its own position in the list.
 
@@ -357,7 +334,7 @@ All under the `/api/` prefix, in `backend/src/katalyst/api/worlds.py`.
 | `POST /api/worlds/diff` | `{base_id, branch_a, branch_b, seed, versions?, worlds?}` | One `Diff` |
 | `POST /api/worlds/conditional` | `{base_id, branch, seed, link_id}` | One `Belief`: the arrow's target with the arrow's source **supposed** true — a `do`, never an observation |
 
-**Both worlds of a diff are built with the same versions stream**, from the one seed in the body. That is not an optimisation; it is what makes the paired difference in B3 mean anything, and it is why the route takes one seed rather than two.
+**Both worlds of a diff are built from the one seed in the body.** The seed now reaches only the forward sample that answers *This happened* ([`propagation.md`](propagation.md) B9); everything else is worked out from what the map states. The route still takes one seed rather than two, so two worlds compared against each other were sampled alike.
 
 `engine/worlds.py` sits between the routes and the pure core: it finds the base map among the stored examples, walks the parent chain of a branch and concatenates the edits, reads day zero from the stored example's own fixture date, mints identifiers and passes the seed through. It is the only place any of that happens, because the pure core reads no clock and knows no store.
 
@@ -375,11 +352,11 @@ This chapter uses the local numbers `INV-multiverse.18` through `.34`. `.1`–`.
 
 **INV-multiverse.19 — every claim gets exactly one state.** For all such world pairs: every claim in either world appears exactly once in `claims`, its state is one of the four, and the four states partition the union of the two worlds' claims. Test: `test_every_claim_has_exactly_one_state`.
 
-**INV-multiverse.20 — `shifted` is exactly the two halves.** For all such world pairs and all claims present in both and not `killed`: the state is `shifted` if and only if `agreement` is a number at all **and** `delta` is at least `0.005` in size **and** `agreement` is at least `0.90`. A claim whose direction could not be read is never `shifted`, because nothing can be said about which way it went. Both numbers are carried on every such claim, so the rule can be read straight off the `Diff`. A pair whose bands overlap heavily but which moves the same way in every version comes out `shifted`; a pair that moved far but inconsistently in direction does not. Test: `test_shifted_needs_agreement`.
+**INV-multiverse.20 — `shifted` is exactly the floor** *(restated 2026-09-22; decision record 0028)*. For all such world pairs and all claims present in both and not `killed`: the state is `shifted` if and only if `delta` is at least `0.005` in size. One condition, carried on the row, so the rule reads straight off the `Diff`. Test: `test_shifted_is_the_floor_alone`, replacing `test_shifted_needs_agreement`, whose second condition was a share of versions of the map. *Catches:* a second condition creeping back in under another name.
 
 **INV-multiverse.21 — `killed` means forced false.** For all such world pairs: a claim's state is `killed` if and only if world B assigns it false, by a `do` or an `observe`. So, for any threshold, a claim whose `after` falls below it is never `killed` unless it was assigned false; and a claim that lost its last path from the hypothesis but was not assigned false is not `killed` either — that fact belongs to the path, not to the state. Test: `test_killed_means_forced_false`.
 
-**INV-multiverse.22 — the rank has two factors and no more.** For all such world pairs and all rows: `rank` equals the size of `peak_delta` times the weakest provenance weight on the **best-backed route** — over every path from any differing edit's subject to that row's claim, in the map with feedback arrows set aside, the route whose weakest arrow is strongest. No other route to that claim has a stronger weakest arrow. Rebuilding the same diff with every `range_width` and every `agreement` replaced by any other number leaves every `rank` and the whole ordering unchanged. Test: `test_rank_has_two_factors`.
+**INV-multiverse.22 — the rank has two factors and no more.** For all such world pairs and all rows: `rank` equals the size of `peak_delta` times the weakest provenance weight on the **best-backed route** — over every path from any differing edit's subject to that row's claim, in the map with feedback arrows set aside, the route whose weakest arrow is strongest. No other route to that claim has a stronger weakest arrow. Rebuilding the same diff with any third quantity multiplied in changes the ordering, and nothing in the code does so. Test: `test_rank_has_two_factors`. *(Until 2026-09-22 this was checked by replacing `range_width` and `agreement` with any other number and requiring the ordering to hold; both are always empty now — decision record 0028 — so the test builds its own third factor rather than borrowing a live field.)*
 
 **INV-multiverse.23 — the rail holds ranked terminals and nothing else.** For all such world pairs: `rows` contains exactly the claims of kind `market` or `not_tradeable` whose state is `shifted`, ordered by `rank` from largest to smallest. Test: `test_delta_rail_holds_ranked_terminals`.
 
@@ -389,29 +366,29 @@ This chapter uses the local numbers `INV-multiverse.18` through `.34`. `.1`–`.
 
 **INV-multiverse.26 — a difference replays.** For all maps `g`, all branch pairs `a`, `b` and all seeds `s`: two independently computed diffs from `(g, a, b, s)` serialize to identical bytes (INV-5 and NFR-2, the rules that a world is replayable from its base map, its branch and its seed). Test: `test_diff_replays_from_base_branches_seed`.
 
-**INV-multiverse.27 — the summary is one of two fixed sentences, filled in.** For all such world pairs: `summary` matches one of the two sentences in B6 exactly — the first when `rows` is not empty, the second when it is. Both take the branch's `label` (or, for a branch of one edit, that edit's words) and the count of `unchanged` claims, with *claim* written in the singular when that count is 1; the first also takes the top row's claim, `before`, `after` and `at_day`. Neither contains a number that is not already in the `Diff`. Test: `test_summary_matches_the_template`.
+**INV-multiverse.27 — the summary is one of three fixed sentences, filled in** *(a third added 2026-09-22)*. For all such world pairs: `summary` matches one of the three sentences in B6 exactly — the first when `rows` is not empty, the second when it is and no terminal was `killed`, and the third when a terminal was. All three take the branch's `label` (or, for a branch of one edit, that edit's words) and the count of `unchanged` claims, with *claim* written in the singular when that count is 1; the first also takes the top row's claim, `before`, `after` and `at_day`, and the third names the killed ending. None contains a number that is not already in the `Diff`. Test: `test_summary_matches_the_template`.
 
-**INV-multiverse.28 — a sensitivity row names its budget.** For all maps `g`, branches `b` and seeds `s`: `sensitivity` returns one row per claim in the world, each carrying the budget it was produced at — `versions` 250 and `worlds` 8 — and each row's `deltas` covers every terminal on the map. Test: `test_sensitivity_rows_name_their_budget`.
+**INV-multiverse.28 — a sensitivity row covers every ending.** For all maps `g`, branches `b` and seeds `s`: `sensitivity` returns one row per claim in the world, and each row's `deltas` covers every terminal on the map. Test: `test_sensitivity_rows_cover_every_ending`. *(It used to require each row to name the reduced budget it was produced at — 250 versions against the full 2 000 — so a swept number could not be mistaken for a full-budget one. Decision records 0016 and 0028 leave one budget, so there is nothing to tell apart; the two fields stay on the row, always `1` and `0`.)*
 
 **INV-multiverse.29 — a rejected edit is a 422 with violations.** For all maps `g` and all branches drawn from `branches(g2)` for an independently drawn map `g2`, so that subjects usually do not match: `POST /api/worlds` and `POST /api/worlds/diff` answer either with a body or with status 422 carrying the list of violations, each with its code, its subject and its plain sentence. Never a 500, never a silently repaired branch. Test: `test_worlds_routes_reject_with_422`, in `backend/tests/api/test_worlds.py`.
 
-**INV-multiverse.30 — the diff route builds both worlds from one versions stream.** For all maps `g`, branch pairs and seeds: the `Diff` returned by `POST /api/worlds/diff` is byte-identical to the one `diff` gives for the two worlds `POST /api/worlds` returns for the same base, branches and seed. Test: `test_diff_route_matches_two_world_calls`, in `backend/tests/api/test_worlds.py`.
+**INV-multiverse.30 — the diff route builds both worlds from one seed.** For all maps `g`, branch pairs and seeds: the `Diff` returned by `POST /api/worlds/diff` is byte-identical to the one `diff` gives for the two worlds `POST /api/worlds` returns for the same base, branches and seed. Test: `test_diff_route_matches_two_world_calls`, in `backend/tests/api/test_worlds.py`.
 
-**INV-multiverse.31 — every version counts the same, under every edit** *(restated 2026-09-22; decision record 0016)*. For all maps `g` from `graphs()`, all pairs of branches from `branches(g)` and all seeds `s`: the whole `Diff` the code produces serializes to exactly the bytes of the same `Diff` computed with every version forced to count the same — **including under an observation**, which is what changed. Nothing is compared against a number anybody typed: the difference is compared with itself. Test: `test_an_edit_that_is_not_an_observation_is_unchanged_by_the_weights`, which keeps its name and widens to every edit. *(This replaces three statements — `.31`, `.32` and `.32b` — about which versions voted, what happened when a world kept nothing alive, and what a direction read off no shared versions came back as. None of those situations can arise: an exact solve conditions rather than discards, so no version is ever left with nothing.)*
+**INV-multiverse.31 — no row carries a range, a width or a share of runs** *(restated 2026-09-22; decision records 0016 and 0028)*. For all maps `g` from `graphs()`, all pairs of branches from `branches(g)` and all seeds `s`: every `ClaimDiff` has `agreement` absent and `moved_only_by_reweighting` false; every `DeltaRow` has `range_width` exactly zero; and every belief either world carries satisfies `lo == p == hi`. Test: `test_no_row_carries_a_range_or_a_share`. *(This replaces three statements — `.31`, `.32` and `.32b` — about which versions voted, what happened when a world kept nothing alive, and what a direction read off no shared versions came back as. None of those situations can arise: an exact solve conditions rather than discards, and there are no versions to weigh or to disagree.)*
 
 **INV-multiverse.32 — an observation that nothing connects to a claim moves it not at all** *(restated 2026-09-22)*. For all maps `g`, all `Observe` edits and all claims with no path to the observed claim and no ancestor in common with it: the claim's row is `unchanged`, its `delta` is exactly zero, and both worlds' numbers for it are byte-identical. Test: `test_an_observation_moves_nothing_no_arrow_reaches`. *(This is the reversal of `test_an_observation_moves_a_cause_even_when_no_arrow_pushes`, which asserted the opposite and was right about the engine that existed when it was written: the version weights moved such a claim by a hair. The mechanism is gone, so the test asserts the invariance instead of the movement.)*
 
 **INV-multiverse.33 — `moved_only_by_reweighting` is false on every claim of every world** *(restated 2026-09-22)*. For all maps, branch pairs and seeds, including under an observation: not one claim carries it true. It is a field kept on the wire while its browser readers move, and a source check names the symbol so nothing sets it again. Test: `test_nothing_moves_only_by_reweighting`. *(It used to be true of exactly one claim on this fixture — the hypothesis under `observe(C, true)` — and the Inspector had a sentence for it, which goes with the field's meaning.)*
 
-**INV-multiverse.34 — an `unchanged` claim says which half of the test it failed, and nothing else does** *(added 2026-09-21)*. For all maps `g` from `graphs()`, all pairs of branches from `branches(g)` and all seeds `s`: a claim whose state is not `unchanged`, and a claim `unchanged` with no `delta` to measure, carries nothing at all in `unchanged_because`. Every other `unchanged` claim carries `under_the_floor` when its own `delta` is smaller than `0.005`; otherwise `versions_disagree` when its own `agreement` is a number below `0.90`; otherwise nothing at all, which is the claim with no move to measure. **The floor is read first**, so a claim failing both halves says `under_the_floor`. Nothing is compared against a typed-in word: the expected answer is worked out from the row's own two numbers, so the row has to be self-consistent. Tests: `test_an_unchanged_claim_says_which_half_it_failed`, `test_only_an_unchanged_claim_says_which_half_it_failed`, `test_the_floor_is_read_first_when_a_claim_fails_both_halves`. *Catches:* a browser re-deciding the engine's own test with its own copy of the two constants.
+**INV-multiverse.34 — an `unchanged` claim says why, and nothing else does** *(added 2026-09-21; narrowed 2026-09-22 by decision record 0028)*. For all maps `g` from `graphs()`, all pairs of branches from `branches(g)` and all seeds `s`: a claim whose state is not `unchanged`, and a claim `unchanged` with no `delta` to measure, carries nothing at all in `unchanged_because`. Every other `unchanged` claim carries `under_the_floor`, and **no claim ever carries `versions_disagree`**. Nothing is compared against a typed-in word: the expected answer is worked out from the row's own `delta`, so the row has to be self-consistent. Tests: `test_an_unchanged_claim_says_why`, `test_only_an_unchanged_claim_says_why`, `test_no_claim_says_versions_disagree`. *Catches:* a browser re-deciding the engine's own test with its own copy of the floor.
 
 ---
 
 ## ANTI-PATTERNS
 
-**1. Do not decide `shifted` by whether the two ranges overlap.** *Because* each range says how sure we are of that world's own number, and two wide ranges can overlap while the difference between them is tight and one-directional — measured on this fixture, B's two ranges overlap by 56% of the narrower one while 99.9% of versions move the same way. Overlap would report no change about the clearest change on the map. **Do** subtract version by version and read the move and the agreement off the paired differences.
+**1. Do not decide `shifted` by eye, or by anything but the floor.** *Because* two numbers that round to the same two figures can genuinely differ, two that look far apart can be inside the floor, and every extra condition is one more thing a reader has to be taught. **Do** subtract the two worlds' numbers and compare the size of the difference against `0.005`. *(Until 2026-09-22 this warned against reading two ranges for an overlap. There are no ranges — decision record 0028 — so the temptation has gone with the thing that tempted.)*
 
-**2. Do not fold range width or agreement into the rank.** *Because* "this moved a lot", "we are unsure how much" and "we are sure which way" are three separate facts a trader weighs separately, and one blended score hides which is talking; multiplying width in would also sink exactly the wide claims FR-21 is trying to float as the ones worth researching. **Do** rank on two factors — the size of the move times the weakest backing on the path — and show width and agreement as their own columns.
+**2. Do not put a third factor in the rank.** *Because* "this moved a lot" and "the evidence behind it is this good" are the two facts a trader weighs, and any third — how unsure we are, how many runs agreed, how wide anything is — hides which one is talking. **Do** rank on the size of the move times the weakest backing on the best-backed route, and on nothing else.
 
 **3. Do not call a small number `killed`, and do not call a lost path `killed` either.** *Because* `killed` means one thing — the claim was forced false — and stretching it to cover "the likelihood got low" tells the user their argument was severed when it is merely losing, while stretching it to cover "no path reaches this from the hypothesis" puts one word on two unrelated facts: on the fixture a claim can lose its last path and still be the biggest mover on the map. **Do** report a large move as `shifted` with its before and after, reserve `killed` for an assignment to false, and let the Inspector's path bar say *"no path from the hypothesis reaches this claim any more"* where that is what happened.
 
@@ -421,15 +398,15 @@ This chapter uses the local numbers `INV-multiverse.18` through `.34`. `.1`–`.
 
 **6. Do not read a delta row on the claim's distant resolve-by day.** *Because* two worlds' curves pull apart at different rates and are not furthest apart on the day the claim is judged — on this fixture M1's row reads `−.077` on day 3 against a headline move of `−.042` on its own resolve-by day three weeks later — so a row read there shows a little over half the move and calls it the answer. **Do** read the row at the day of largest divergence, carry that day as `at_day`, and name it on screen.
 
-**7. Do not weight one version more than another.** *Because* a weight is a second way of counting, and the moment two ways exist somebody reads the number with one and the direction with the other. The engine used to need one — *This happened* threw draws away, so a version could be left with none — and the rule then was that a version counts for the move by as much as it counted for the two numbers. **Do** condition on what was seen instead of discarding what disagrees with it ([`propagation.md`](propagation.md) B6), so every version counts the same and there is only one way of counting to get wrong. *(Rewritten 2026-09-22; decision record 0016. What the old weight was worth is in B3, as history.)*
+**7. Do not bring back a second reading of the map.** *Because* the moment there are two readings there are two ways of counting them, and somebody reads the number with one and its direction with the other — which is the defect that cost this chapter its weighting rule, and then its versions. **Do** compute one reading from what the map states, and read a difference as one subtraction. *(Rewritten 2026-09-22; decision records 0016 and 0028. What the versions and the weighting were worth is in B3, as history.)*
 
 **8. Do not add a fifth state for the half of the test a claim failed.** *Because* the four states answer one question — what happened to this claim — and a word that instead answers *how was this number read* puts two unrelated facts under one heading, which is the mistake `killed` nearly made (B2, anti-pattern 3). **Do** leave the state alone, carry `unchanged_because` on the claim's row, and let the chip and the Inspector turn it into words beside the number. *(Amended 2026-09-22: this used to name `moved_only_by_reweighting` first. That field is always false now and means nothing; the rule it taught is what survives.)*
 
 **10. Do not work out in the browser which half of the `shifted` test a claim failed.** *Because* the floor and the bar are constants inside `domain/diff.py` and reach no reader, so re-deciding at the other end means a second copy of both, re-running the engine's own test against the engine's own answer — and the day the two disagree nobody can say which is right. **Do** let the engine say it, in one word, on the row, and let the browser choose which of two fixed words to draw for it (B2).
 
-**11. Do not print *no change* over a number that changed.** *Because* the reader believes the words before the figures, and a chip reading *no change* above a tile that fell from `.40` to `.31` tells them the opposite of what the rail's own row says; the same fault in the summary called two claims that had moved nine and ten points *untouched*, and called an ending the reader had just forced false *no ending moved*. **Do** draw the engine's own reason — *no change* under the floor, *no agreed direction* above it — and name a killed ending in the summary rather than counting it among the quiet (B2, B6).
+**11. Do not print *no change* over a number that changed.** *Because* the reader believes the words before the figures, and a chip reading *no change* above a tile that fell from `.40` to `.31` tells them the opposite of what the rail's own row says; the same fault in the summary called two claims that had moved nine and ten points *untouched*, and called an ending the reader had just forced false *no ending moved*. The first cannot recur: an `unchanged` claim is now one whose move is under the floor, so the words and the figures agree (B2). **Do** keep it that way, and name a killed ending in the summary rather than counting it among the quiet (B6).
 
-**9. Do not build the two worlds of a difference from different seeds, or different loop sizes.** *Because* the whole comparison rests on version *k* of both worlds having been built from the same numbers; break that and every difference is the user's edit plus a wash of sampling noise, which is unreadable and untraceable. **Do** take one seed for the pair, refuse two worlds that disagree about it, and keep the versions stream free of any dependence on the branch.
+**9. Do not build the two worlds of a difference from different seeds.** *Because* the one place a seed still reaches is the forward sample that answers *This happened*, and two worlds sampled differently differ by the sampling as well as by the edit. **Do** take one seed for the pair, and refuse two worlds that disagree about it.
 
 ---
 
@@ -444,7 +421,7 @@ Raised 2026-09-17. The first four were settled the same day and their answers ar
    **Decided 2026-09-17:** the route is read over **the same map the affected set is computed over**, so the question answers itself — five operations follow the arrows, and `observe`'s affected set already reaches upstream, so its routes do too. Feedback arrows are set aside in both, by [`interventions.md`](interventions.md)'s named rule. See B4.
 
 3. **What `range_width` measures.** The draft proposed the width of the paired difference's own band.
-   **Decided 2026-09-17:** the width of **world B's own 10-to-90 band on that claim at `at_day`** — the same quantity the tile shows, so the rail and the tile cannot disagree. On screen the column is headed *how firm*. See the Data model and B3.
+   **Decided 2026-09-17:** the width of world B's own 10-to-90 band on that claim at `at_day` — the same quantity the tile shows, so the rail and the tile could not disagree. **Closed for good on 2026-09-22 by decision record 0028:** there is no range on a tile or anywhere else, the field is always zero until it leaves the wire, and the column it fed is gone from the rail.
 
 4. **A claim cut off from the hypothesis can still move.** Losing the last path from the hypothesis was going to be the second half of `killed`, and on the fixture such a claim can be the biggest mover on the map — the state would have said it left the argument while the rail showed it moving hardest.
    **Decided 2026-09-17:** it is not a diff state at all. `killed` means forced false, full stop. Losing the path is a fact about the **path**, reported by the Inspector's path bar — *"no path from the hypothesis reaches this claim any more"* (`spec/workbench/inspector.md`). See B2.
