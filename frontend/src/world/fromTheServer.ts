@@ -64,11 +64,13 @@ export function seedFor(bundle: FixtureBundle): number {
  * The number is copied across at full precision. Rounding is a display decision
  * and is made once, in the chip that prints it.
  *
- * **The server sends three numbers and this keeps one** *(2026-09-22, R48)*. A
- * `lo` and a `hi` still arrive beside every `p`, because the engine that works
- * them out is another stack's to rewrite; there is nowhere on this side of the
- * wire to put them and nothing on screen that would print them, so they stop
- * here.
+ * **The server sends three numbers and this keeps one** *(2026-09-22; Kent's row
+ * R48 and decision record 0028)*. A `lo` and a `hi` still arrive beside every
+ * `p`, and every one of them now *is* `p` — the engine works out one likelihood
+ * per claim and there is no range. There is nowhere on this side of the wire to
+ * put them and nothing on screen that would print them, so they stop here. The
+ * two fields leave the wire in the follow-up that takes down the other constant
+ * ones.
  */
 export function filled(belief: Belief): Known<Likelihood> {
   return { reading: { p: belief.p } };
@@ -152,10 +154,17 @@ function source(item: Source): SourceView {
  * How often this kind of thing has happened before — or, when the map records
  * no such count, the sentence saying so.
  *
- * The count is printed as `7 of 9` and never as a rate. Dividing one by the
- * other would be this half of the product doing arithmetic on the map's
- * numbers, and it would also quietly claim that seven-in-nine is the answer,
- * which is exactly what a prior is for and exactly what it is not.
+ * A count is printed as `k of n` — *four of eleven* — and never as a rate.
+ * Dividing one by the other would be this half of the product doing arithmetic on
+ * the map's numbers, and it would also quietly claim that four-in-eleven is the
+ * answer, which is exactly what a prior is for and exactly what it is not.
+ *
+ * **No claim on the curated map carries one today** *(2026-09-22)*. The one that
+ * did counted Hormuz *disruptions* against a claim about a *closure*, which is a
+ * different kind of event, so the fixture dropped it rather than replace it with
+ * a number nobody had counted. So the absence below is the live path and the
+ * reading is the one that waits: a generated map can carry a count the model
+ * researched, and this reads it when it does.
  */
 function baseRate(
   proposition: Proposition,
