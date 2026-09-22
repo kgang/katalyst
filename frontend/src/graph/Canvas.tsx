@@ -22,10 +22,11 @@
  *   2. **The hover lens.** Point at a claim and everything not on its path —
  *      neither one of its causes nor one of the things it causes — drops to
  *      fifteen per cent.
- *   3. **Whether a wire's plate has room for its words.** Below the same zoom at
- *      which a tile switches to its summary, a plate's words would land under
- *      eleven pixels on the glass, so the plates go. Nothing is scaled down to
- *      dodge the rule.
+ *   3. **Whether a wire's plate has room for its words.** It follows the tile
+ *      through the same three forms at the same two thresholds: near, the whole
+ *      plate; below the first, the push alone, set large; below the second, no
+ *      plate at all, because a plate is words and out there the map draws none.
+ *      Nothing is scaled down to dodge the eleven-pixel rule.
  */
 
 import {
@@ -48,13 +49,7 @@ import type { MapKeys } from "../keyboard/useMapKeys";
 import { useMapKeys } from "../keyboard/useMapKeys";
 import type { Selection, WorldView } from "../world";
 import { NOT_ON_THIS_MAP } from "../world/naming";
-import {
-  firstFrame,
-  LARGEST_ZOOM,
-  SMALLEST_ZOOM,
-  SUMMARY_BELOW_ZOOM,
-  TILE_WIDTH,
-} from "./geometry";
+import { detailAt, firstFrame, LARGEST_ZOOM, SMALLEST_ZOOM, TILE_WIDTH } from "./geometry";
 import { assignLayers } from "./layers";
 import { useLayout } from "./layoutRunner";
 import { type PlacedBox, whatIsOnTheGlass } from "./onTheGlass";
@@ -197,12 +192,15 @@ function MapSurface({
   // one moment, and there is nothing that could make them come apart.
   const layout = useLayout(drawing.tiles, drawing.layoutEdges, mapKey, frameAgainOn);
 
-  // How far the map is zoomed out. Below the threshold a wire's plate would
-  // have its words drawn under eleven pixels on the glass, which is the one
-  // thing nothing in this product is allowed to do, so the plates go and the
-  // stroke keeps saying what kind of push each wire is.
+  // How far the map is zoomed out, said as which of the three forms everything
+  // on the map is drawing. Below the first threshold a wire's plate would have
+  // its words drawn under eleven pixels on the glass, which is the one thing
+  // nothing in this product is allowed to do, so the plate keeps only its
+  // number and the stroke keeps saying what kind of push the wire is. Below the
+  // second there is no type size left that would clear the floor, so the plate
+  // goes altogether — a plate is words, and out here the map draws no words.
   const zoom = useStore((state) => state.transform[2]);
-  const tooSmallForWords = zoom < SUMMARY_BELOW_ZOOM;
+  const detail = detailAt(zoom);
 
   /** How tall a tile turned out to be, so the view can be centred on its middle. */
   const heightOf = useCallback(
@@ -345,11 +343,11 @@ function MapSurface({
           plateAt: plates.get(edge.id),
           wave: Math.min(column.get(edge.source) ?? 0, 5),
           dimmed: lens !== null && !lens.wires.has(edge.id),
-          tooSmallForWords,
+          detail,
         },
       };
     });
-  }, [drawing, boxes, lens, selection, tooSmallForWords, world, column]);
+  }, [drawing, boxes, lens, selection, detail, world, column]);
 
   /**
    * Everything the first frame has to hold: every tile, and the strip of empty
@@ -833,6 +831,13 @@ function MapSurface({
       className="canvas"
       ref={surface}
       data-arriving={arriving ? "yes" : "no"}
+      // Which of the three forms the map is drawing, written once on the
+      // surface so that the two boxes that are not claims — a rectangle held
+      // open at a growing edge, and the "+n more" that stands for a column's
+      // overflow — drop their words at the same zoom every tile does. Neither
+      // is a tile, so neither carries the attribute itself; both are inside
+      // this.
+      data-detail={detail}
       {...edgeMarks(beyond)}
       onFocusCapture={onFocus}
       onPointerDownCapture={onPointAt}
@@ -871,9 +876,9 @@ function MapSurface({
         // Panning and zooming both move what is on the glass, so both change
         // which edges have map beyond them.
         onMove={measureTheEdges}
-        // As far out as the map goes, and no further: past this the summary
-        // tile's words would be drawn smaller than anything in this product is
-        // allowed to be.
+        // As far out as the map goes, and no further: past this a tile's box
+        // would be drawn smaller than anything a reader has to point at is
+        // allowed to be. `geometry.ts` works it out.
         minZoom={SMALLEST_ZOOM}
         maxZoom={LARGEST_ZOOM}
         proOptions={{ hideAttribution: false }}

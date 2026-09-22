@@ -92,8 +92,13 @@ test("test_a_tile_seen_from_far_away_prints_every_belief_line_whole", async ({ p
 /**
  * Zoom out until the tiles change to their far-away form.
  *
- * The map does not zoom out past half, so this ends; if the form never comes,
- * that is a failure of this test's own premise and it says so.
+ * It stops on the **first** press that produces one, which is the summary — the
+ * middle of the tile's three forms, and the one this file is about. It is
+ * bounded as well, so a form that never comes is a failure of this test's own
+ * premise and says so rather than pressing for ever. *(The bound used to be
+ * carried by the zoom floor, which was half; since 2026-09-22 the map goes a
+ * good deal further out than that, and the tiles drop their words altogether
+ * below half — `layout-and-zoom.md` B6.)*
  *
  * @param page The page the map is on.
  */

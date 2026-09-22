@@ -28,6 +28,7 @@
 
 import { toTwoFigures } from "../../components/BeliefChip";
 import type { Known, Likelihood } from "../../world";
+import type { TileDetail } from "../geometry";
 import { lagInWords, likelihoodStep, pushAsNumber, pushInWords } from "./encodings";
 
 /** What the chip needs to draw itself. */
@@ -45,16 +46,17 @@ export interface WireChipProps {
    */
   readonly conditional: Known<Likelihood>;
   /**
-   * How much of the plate there is room for.
+   * How much of the plate there is room for — the same three forms the tile
+   * has, at the same two thresholds.
    *
-   * Below the zoom at which a tile switches to its summary, thirteen-pixel words
-   * would land under eleven pixels on the glass — so the plate changes what it
-   * draws rather than drawing it smaller, exactly as the tile does. The summary
-   * is the signed push alone, set in the largest size, which clears the floor
-   * all the way down to the zoom floor. The words and the delay are one click
-   * away in the panel, and the stroke still says what kind of push it is.
+   * Below the first, thirteen-pixel words would land under eleven pixels on the
+   * glass, so the plate changes what it draws rather than drawing it smaller,
+   * exactly as the tile does: the signed push alone, set in the largest size.
+   * Below the second even that size would fall under eleven, and there is no
+   * size left — so **nothing is drawn at all**. The words and the delay are one
+   * press away in the panel, and the stroke still says what kind of push it is.
    */
-  readonly detail: "full" | "summary";
+  readonly detail: TileDetail;
   /**
    * The shape of the room this plate has.
    *
@@ -79,6 +81,13 @@ export interface WireChipProps {
 
 /** The plate in the middle of a wire. */
 export function WireChip({ strength, lag, conditional, detail, layout, reflexive }: WireChipProps) {
+  // Out where the map draws no words, the plate is one of the things that goes.
+  // Said here as well as in the wire that draws it, so that a plate can never
+  // be asked for a form it has nothing to print in.
+  if (detail === "silhouette") {
+    return null;
+  }
+
   if (detail === "summary") {
     return (
       <span className="wire-chip" data-reading="push" data-detail="summary" data-layout={layout}>

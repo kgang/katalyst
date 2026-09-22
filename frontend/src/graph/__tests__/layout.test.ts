@@ -33,16 +33,19 @@ import {
 } from "../elkGraph";
 import {
   claimLines,
+  detailAt,
   firstFrame,
   LARGEST_ZOOM,
   PAST_THE_ZOOM_BUTTONS,
   roomFor,
+  SILHOUETTE_BELOW_ZOOM,
   SMALLEST_ZOOM,
   SUMMARY_BELOW_ZOOM,
   smallestTextAt,
   TEXT_FLOOR,
   TILE_MAX_HEIGHT,
   TILE_MIN_HEIGHT,
+  TILE_WIDTH,
   TILES_PER_LAYER,
   tileHeight,
 } from "../geometry";
@@ -291,21 +294,84 @@ describe("how tall a tile is", () => {
 describe("the eleven-pixel floor", () => {
   it("test_no_text_lands_under_eleven_pixels_at_any_zoom", () => {
     // Swept rather than spot-checked, because the whole point of the floor is
-    // that there is no zoom at which it fails.
+    // that there is no zoom at which it fails. **At every zoom at which a word
+    // is drawn** — which is what the rule says now the map goes further out
+    // than any word can follow it. Where nothing is drawn there is nothing to
+    // hold to eleven pixels, and the second half of this says exactly where
+    // that begins, so "no size" can never be an answer that quietly spreads.
+    let wordless = 0;
     for (let zoom = SMALLEST_ZOOM; zoom <= LARGEST_ZOOM + 0.0001; zoom += 0.005) {
-      const onGlass = smallestTextAt(zoom) * zoom;
-      expect(onGlass).toBeGreaterThanOrEqual(TEXT_FLOOR - 0.0001);
+      const size = smallestTextAt(zoom);
+      if (size === null) {
+        expect(zoom).toBeLessThan(SILHOUETTE_BELOW_ZOOM);
+        expect(detailAt(zoom)).toBe("silhouette");
+        wordless += 1;
+        continue;
+      }
+      expect(size * zoom).toBeGreaterThanOrEqual(TEXT_FLOOR - 0.0001);
     }
+    // The sweep really did cross into the form that draws no words. Without
+    // this the test would pass on a floor that never reached it.
+    expect(wordless).toBeGreaterThan(0);
   });
 
   it("test_the_summary_starts_exactly_where_a_full_tile_would_fall_below_the_floor", () => {
     // A hair under the threshold the summary is drawing; a hair over, the full
     // tile is — and both clear eleven pixels.
-    expect(
-      smallestTextAt(SUMMARY_BELOW_ZOOM - 0.001) * (SUMMARY_BELOW_ZOOM - 0.001),
-    ).toBeGreaterThan(TEXT_FLOOR);
-    expect(smallestTextAt(SUMMARY_BELOW_ZOOM) * SUMMARY_BELOW_ZOOM).toBeCloseTo(TEXT_FLOOR, 6);
-    expect(smallestTextAt(SMALLEST_ZOOM) * SMALLEST_ZOOM).toBeCloseTo(TEXT_FLOOR, 6);
+    const justUnder = smallestTextAt(SUMMARY_BELOW_ZOOM - 0.001);
+    expect(justUnder).not.toBeNull();
+    expect((justUnder ?? 0) * (SUMMARY_BELOW_ZOOM - 0.001)).toBeGreaterThan(TEXT_FLOOR);
+    expect((smallestTextAt(SUMMARY_BELOW_ZOOM) ?? 0) * SUMMARY_BELOW_ZOOM).toBeCloseTo(
+      TEXT_FLOOR,
+      6,
+    );
+    // And the summary holds all the way to the zoom at which its own type size
+    // would fall under the floor — which is where the last word leaves.
+    expect((smallestTextAt(SILHOUETTE_BELOW_ZOOM) ?? 0) * SILHOUETTE_BELOW_ZOOM).toBeCloseTo(
+      TEXT_FLOOR,
+      6,
+    );
+  });
+
+  it("test_no_word_is_drawn_below_the_silhouette_threshold", () => {
+    // The third form draws no words, so there is no smallest word to report —
+    // and a size reported here would be a size nothing is set in. Swept from
+    // the floor up to the threshold rather than spot-checked, for the same
+    // reason the sweep above is a sweep.
+    expect(smallestTextAt(SILHOUETTE_BELOW_ZOOM - 0.001)).toBeNull();
+    for (let zoom = SMALLEST_ZOOM; zoom < SILHOUETTE_BELOW_ZOOM; zoom += 0.005) {
+      expect(smallestTextAt(zoom), `a word is drawn at ${zoom}`).toBeNull();
+      expect(detailAt(zoom)).toBe("silhouette");
+    }
+    // And at the threshold itself the words are back.
+    expect(smallestTextAt(SILHOUETTE_BELOW_ZOOM)).not.toBeNull();
+    expect(detailAt(SILHOUETTE_BELOW_ZOOM)).toBe("summary");
+  });
+
+  it("test_the_zoom_floor_is_worked_out_and_not_written_down", () => {
+    // **The floor is a consequence, not a taste.** Below the silhouette
+    // threshold there is no word left to hold above eleven pixels, so the next
+    // rule down decides: a tile's box has to stay big enough to point at. The
+    // smallest target anything may be drawn at is 24 by 24 — the Web Content
+    // Accessibility Guidelines 2.2, success criterion 2.5.8, at level AA — and
+    // the shortest box this map ever draws is a tile at the floor of its
+    // clamped height.
+    //
+    // So this reads the floor back through the thing it was derived from,
+    // rather than comparing it with a number typed here: at the floor the
+    // shortest box's shortest side lands on the smallest target exactly, and a
+    // hair further out it would not.
+    expect(TILE_MIN_HEIGHT * SMALLEST_ZOOM).toBeCloseTo(24, 6);
+    expect(TILE_MIN_HEIGHT * (SMALLEST_ZOOM - 0.001)).toBeLessThan(24);
+
+    // And the other side of the box comes out of it: 44 across, which clears
+    // the same guidelines' stricter rule (2.5.5, level AAA, 44 by 44).
+    expect(TILE_WIDTH * SMALLEST_ZOOM).toBeGreaterThanOrEqual(44);
+
+    // The floor really is further out than the zoom at which the last word
+    // left, which is the whole of what changed on 2026-09-22.
+    expect(SMALLEST_ZOOM).toBeLessThan(SILHOUETTE_BELOW_ZOOM);
+    expect(detailAt(SMALLEST_ZOOM)).toBe("silhouette");
   });
 });
 
@@ -686,9 +752,21 @@ describe("the union of two worlds", () => {
     const room = { width: 1600 - 336, height: 1000 - 150 };
     const frame = firstFrame(map, room);
     expect(frame.zoom).toBeGreaterThanOrEqual(SUMMARY_BELOW_ZOOM);
-    expect(smallestTextAt(frame.zoom) * frame.zoom).toBeGreaterThanOrEqual(TEXT_FLOOR);
+    expect((smallestTextAt(frame.zoom) ?? 0) * frame.zoom).toBeGreaterThanOrEqual(TEXT_FLOOR);
+    // **And so it never shows a silhouette either** *(2026-09-22)*, now that
+    // the map zooms out a great deal further than it did: the third form begins
+    // further out than the second, so holding the frame above the second holds
+    // it above both. The reader goes out there by asking, never by opening a
+    // map.
+    expect(detailAt(frame.zoom)).toBe("full");
     // Never blown up past life size, however small the map.
     expect(firstFrame({ x: 0, y: 0, width: 300, height: 200 }, room).zoom).toBe(1);
+
+    // A map far too big for the room it is given is held at the same zoom and
+    // started from its beginning, rather than shrunk into the new floor.
+    const huge = firstFrame({ x: 0, y: 0, width: 6000, height: 4000 }, room);
+    expect(huge.zoom).toBe(SUMMARY_BELOW_ZOOM);
+    expect(detailAt(huge.zoom)).toBe("full");
   });
 
   it("test_a_map_too_big_to_fit_is_framed_from_its_beginning", () => {

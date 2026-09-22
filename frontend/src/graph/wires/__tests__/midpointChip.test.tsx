@@ -126,4 +126,44 @@ describe("the plate in the middle of a wire", () => {
     // shrunk below the size the type scale allows.
     expect(container.textContent).toBe("+1.6");
   });
+
+  it("test_further_out_still_the_plate_is_not_drawn_at_all", () => {
+    // Past the zoom at which even the largest of the three type sizes would
+    // land under eleven pixels on the glass, there is no size left to fall back
+    // to — so the plate is not drawn. A plate is words, and out there the map
+    // draws none: every tile is down to its shape, and a lone number floating
+    // between two shapes would be the one word left on a wordless map.
+    //
+    // **The whole plate, not an empty box in its place.** An element with
+    // nothing in it still takes a mark from its own stylesheet, and a mark that
+    // says nothing is worse than no mark.
+    const { container } = render(
+      <WireChip
+        strength={1.6}
+        lag={2}
+        conditional={NO_ENGINE}
+        detail="silhouette"
+        layout="stacked"
+        reflexive={false}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("test_even_the_backwards_wire_drops_its_delay_where_there_are_no_words", () => {
+    // The one arrow allowed to keep its delay when every other plate is down to
+    // its number keeps it because a loop that takes no time is a contradiction.
+    // That is an argument about which words survive, and out here none do.
+    const { container } = render(
+      <WireChip
+        strength={0.6}
+        lag={14}
+        conditional={NO_ENGINE}
+        detail="silhouette"
+        layout="inline"
+        reflexive={true}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
 });

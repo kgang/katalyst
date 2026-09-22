@@ -11,10 +11,17 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { render, screen } from "@testing-library/react";
-import { ReactFlowProvider } from "@xyflow/react";
+import { act, render, screen } from "@testing-library/react";
+import { ReactFlowProvider, useStoreApi } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import { TILE_MIN_HEIGHT, TILE_WIDTH, tileHeight } from "../../graph/geometry";
+import {
+  SILHOUETTE_BELOW_ZOOM,
+  SMALLEST_ZOOM,
+  SUMMARY_BELOW_ZOOM,
+  TILE_MIN_HEIGHT,
+  TILE_WIDTH,
+  tileHeight,
+} from "../../graph/geometry";
 import type { ReadEvent } from "../../stream/events";
 import { joined } from "../../stream/generate";
 import { foldAll, waitingFor } from "../../stream/growth";
@@ -31,6 +38,40 @@ function draw(claim: ClaimView) {
       <Tile claim={claim} isHypothesis={false} />
     </ReactFlowProvider>,
   );
+}
+
+/**
+ * Hand the map's own store out to the test around it.
+ *
+ * A tile reads how far it is zoomed off that store and nothing else, so the one
+ * honest way to draw a tile at a zoom is to set the zoom the map would have set
+ * and let the tile read it. Nothing here tells the tile which form to take.
+ */
+function TheMapsStore({ hold }: { hold: (store: ReturnType<typeof useStoreApi>) => void }) {
+  hold(useStoreApi());
+  return null;
+}
+
+/**
+ * Draw one tile with the map zoomed to a given amount.
+ *
+ * @param claim The claim the tile is for.
+ * @param zoom How far the map is zoomed in, where 1 is life size.
+ */
+function drawAt(claim: ClaimView, zoom: number) {
+  const held: { store: ReturnType<typeof useStoreApi> | null } = { store: null };
+  const drawn = render(
+    <ReactFlowProvider>
+      <TheMapsStore
+        hold={(store) => {
+          held.store = store;
+        }}
+      />
+      <Tile claim={claim} isHypothesis={false} />
+    </ReactFlowProvider>,
+  );
+  act(() => held.store?.setState({ transform: [0, 0, zoom] }));
+  return drawn;
 }
 
 /** Whose belief columns this tile drew, in the order it drew them. */
@@ -344,6 +385,108 @@ describe("what a tile draws, and what it never draws", () => {
     for (const claim of OF_EVERY_KIND.filter((one) => one.kind !== "market")) {
       expect(draw(claim).container.querySelector(".tile__cut")).toBeNull();
     }
+  });
+
+  it("test_a_tile_at_the_furthest_zoom_draws_its_shape_and_not_one_word", () => {
+    // **The third form** *(2026-09-22, Kent: "Can we make it so it's possible
+    // to zoom out a lot more?")*. Out past the zoom at which even the largest
+    // of the three type sizes would land under eleven pixels on the glass,
+    // there is no size left to fall back to — so the tile stops printing words
+    // rather than printing them smaller, and what is left is the one thing
+    // still legible at that size: its shape.
+    for (const claim of OF_EVERY_KIND) {
+      const { container } = drawAt(claim, SMALLEST_ZOOM);
+      const tile = container.querySelector<HTMLElement>(".tile");
+
+      expect(tile?.dataset.detail).toBe("silhouette");
+      // Not one word, anywhere in the box — including the words a screen reader
+      // is given inside the tile, which are drawn at a pixel and would be a
+      // word drawn under eleven pixels just the same.
+      expect(tile?.textContent).toBe("");
+      // What it still says, it says without words: which kind of claim this is,
+      // as a shape, and as the kind on its own box so that a reader who hears
+      // the map rather than seeing it loses nothing out here.
+      expect(tile?.dataset.kind).toBe(claim.kind);
+      expect(container.querySelector(".tile__outline path")?.getAttribute("d")).not.toBe("");
+      expect(tile?.getAttribute("aria-label")).toContain(claim.claim);
+      // And the box is the box: the layout reserved room from the near form and
+      // the far forms are drawn inside it, so nothing moves when the zoom
+      // crosses either threshold.
+      expect(tile?.style.width).toBe(`${TILE_WIDTH}px`);
+      expect(tile?.style.height).toBe(`${tileHeight(claim)}px`);
+    }
+  });
+
+  it("test_the_four_kinds_are_still_four_shapes_at_the_furthest_zoom", () => {
+    // **The silhouette is the one form where the shape is all there is** — no
+    // heading, no printed kind — so it is the one form where a kind carried by
+    // hue alone would be carried by hue alone, which nothing in this product
+    // may be (INV-12). Two of the four take a hue; all four must still differ
+    // without one.
+    //
+    // **And the shapes have to be big enough to be shapes.** The map draws at
+    // about a sixth of life size out here, so the near form's eighteen-pixel
+    // cut corner and fourteen-pixel notch are both under three pixels on the
+    // glass — gone. Measured in grey on the generated map at the floor on
+    // 2026-09-22: the four kinds read as two. So the far shapes grow each mark,
+    // and this reads that back off the drawing rather than off a number typed
+    // here: each far shape differs from every other, and each differs from its
+    // own near shape by more than the rounding.
+    const near = OF_EVERY_KIND.map(
+      (claim) =>
+        draw(claim).container.querySelector(".tile__outline path")?.getAttribute("d") ?? "",
+    );
+    const far = OF_EVERY_KIND.map(
+      (claim) =>
+        drawAt(claim, SMALLEST_ZOOM)
+          .container.querySelector(".tile__outline path")
+          ?.getAttribute("d") ?? "",
+    );
+
+    expect(new Set(far).size).toBe(OF_EVERY_KIND.length);
+    for (const shape of far) {
+      expect(shape).not.toBe("");
+    }
+    // Three of the four say what they are with a mark, and all three grew it.
+    // The fourth is the plain rectangle, which is what an ordinary step is: the
+    // absence of a mark, and an absence cannot be grown.
+    const grew = OF_EVERY_KIND.filter((_, at) => far[at] !== near[at]).map((one) => one.kind);
+    expect(grew.sort()).toEqual(["hypothesis", "market", "not_tradeable"]);
+
+    // The second stroke on a tradeable outcome's cut corner is drawn out here
+    // too, and it is the far cut rather than the near one — the outline's own
+    // diagonal both times, so a grey print keeps it.
+    const stub = drawAt(
+      OF_EVERY_KIND.find((one) => one.kind === "market") as ClaimView,
+      SMALLEST_ZOOM,
+    );
+    const farCut = stub.container.querySelector(".tile__outline .tile__cut")?.getAttribute("d");
+    const nearCut = draw(OF_EVERY_KIND.find((one) => one.kind === "market") as ClaimView)
+      .container.querySelector(".tile__outline .tile__cut")
+      ?.getAttribute("d");
+    expect(farCut).not.toBeUndefined();
+    expect(farCut).not.toBe(nearCut);
+  });
+
+  it("test_the_three_forms_are_chosen_by_the_zoom_and_nothing_else", () => {
+    // One tile, three zooms, three forms — read off the tile's own box rather
+    // than told to it. A hair inside each threshold, because the thresholds are
+    // where a form starts and a test that only looks at the middle of a range
+    // never meets the edge.
+    const claim = aClaim({ id: "C", kind: "event" });
+    const formAt = (zoom: number) =>
+      drawAt(claim, zoom).container.querySelector<HTMLElement>(".tile")?.dataset.detail;
+
+    expect(formAt(1)).toBe("full");
+    expect(formAt(SUMMARY_BELOW_ZOOM)).toBe("full");
+    expect(formAt(SUMMARY_BELOW_ZOOM - 0.001)).toBe("summary");
+    expect(formAt(SILHOUETTE_BELOW_ZOOM)).toBe("summary");
+    expect(formAt(SILHOUETTE_BELOW_ZOOM - 0.001)).toBe("silhouette");
+    expect(formAt(SMALLEST_ZOOM)).toBe("silhouette");
+
+    // The two forms that print words print them; only the third does not.
+    expect(drawAt(claim, SUMMARY_BELOW_ZOOM - 0.001).container.textContent).toContain(claim.claim);
+    expect(drawAt(claim, SMALLEST_ZOOM).container.textContent).toBe("");
   });
 
   it("test_the_kind_hue_is_named_only_by_the_tiles_own_stylesheet", () => {

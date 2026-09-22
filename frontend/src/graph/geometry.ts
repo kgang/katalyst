@@ -291,32 +291,114 @@ const LARGEST_TEXT = 22;
  * nothing is ever drawn below eleven. Eleven over thirteen is the exact zoom at
  * which thirteen-pixel type lands at eleven pixels, so a full tile is only ever
  * shown at or above it, and below it the summary takes over — which sets every
- * word in the largest size and so clears the floor all the way down.
+ * word in the largest size and so clears the floor down to the zoom at which
+ * even that size would fall under it, `SILHOUETTE_BELOW_ZOOM`.
  */
 export const SUMMARY_BELOW_ZOOM = SMALLEST_READABLE_TEXT / SMALLEST_TEXT;
 
 /**
- * How far out the map may be zoomed.
+ * Below this zoom a tile stops showing words at all and shows its shape.
  *
  * The summary sets every word it draws in the largest of the three type sizes,
- * so the floor is the one zoom at which that size arrives at eleven pixels:
- * eleven over twenty-two, which is a half.
+ * so this is the one zoom at which that size arrives at eleven pixels: eleven
+ * over twenty-two, which is a half. Below it there is no size left to fall back
+ * to — the largest one has run out — so the answer is the same answer the tile
+ * gave at the first threshold, taken one step further: draw less rather than
+ * draw it smaller, and what is left when the last word goes is the shape.
+ *
+ * **This was the floor until 2026-09-22.** Kent asked whether the map could
+ * zoom out a lot more; it can, because below this line the eleven-pixel rule
+ * has nothing left to say about a tile that prints nothing. The number has not
+ * moved and is derived exactly as it was — it has stopped being the end of the
+ * zoom and become the last of the three forms.
  */
-export const SMALLEST_ZOOM = SMALLEST_READABLE_TEXT / LARGEST_TEXT;
+export const SILHOUETTE_BELOW_ZOOM = SMALLEST_READABLE_TEXT / LARGEST_TEXT;
+
+/**
+ * The smallest a thing the reader points at may be drawn, in pixels.
+ *
+ * Twenty-four by twenty-four, from the Web Content Accessibility Guidelines
+ * 2.2, success criterion 2.5.8 *Target Size (Minimum)*, at level AA. It is the
+ * published floor for anything a pointer has to land on, and it is what the
+ * zoom floor below is worked out from — the same way the text floor above
+ * works out the other two zoom numbers.
+ */
+const SMALLEST_TARGET = 24;
+
+/**
+ * How far out the map may be zoomed.
+ *
+ * **It is derived, not chosen** *(2026-09-22, Kent: "Can we make it so it's
+ * possible to zoom out a lot more?")*. Below the silhouette threshold there is
+ * no word left on a tile to keep above eleven pixels, so the eleven-pixel rule
+ * has stopped being the thing that decides. The next question down is the one
+ * that decides instead: **how small may a tile's box get and still be something
+ * a reader can point at, and tell apart from a wire?**
+ *
+ * The shortest box this map ever draws is `TILE_MIN_HEIGHT` — a hundred and
+ * fifty-two pixels, the floor of a tile's clamped height, and the exact height
+ * of a reserved rectangle and of a "+n more" tile as well. So the floor is the
+ * zoom at which that shortest side lands on the smallest target anything may be
+ * drawn at: twenty-four over a hundred and fifty-two, about 0.158.
+ *
+ * **The other side of the box comes out of it for free, and is worth writing
+ * down.** At that zoom a tile's two hundred and eighty pixels of width land at
+ * 44.2 — clear of the forty-four by forty-four of the same guidelines' stricter
+ * rule, success criterion 2.5.5 *Target Size* at level AAA, which Apple's
+ * interface guidelines name as well. So the smallest box on the map is
+ * forty-four across and twenty-four down: a target in both directions, and
+ * nothing like the one-pixel stroke of a wire.
+ *
+ * The old floor, eleven over twenty-two, is `SILHOUETTE_BELOW_ZOOM` above.
+ */
+export const SMALLEST_ZOOM = SMALLEST_TARGET / TILE_MIN_HEIGHT;
 
 /** How far in the map may be zoomed. Past this a tile is merely large. */
 export const LARGEST_ZOOM = 1.4;
 
 /**
- * The smallest type size a tile draws at this zoom, in pixels, before the map's
- * own scaling is applied.
+ * Which of the three forms a tile takes, from nearest to furthest.
  *
- * Multiply it by the zoom and you have what lands on the reader's screen, which
- * is what `layout.test.ts` checks never falls below eleven.
+ * - **full** — everything: the heading, the claim, the chips, the foot.
+ * - **summary** — the claim and the chips, set in the largest type size.
+ * - **silhouette** — the shape and its kind's colour, and no words at all.
+ */
+export type TileDetail = "full" | "summary" | "silhouette";
+
+/**
+ * Which form a tile takes at this zoom.
+ *
+ * Written once, here, beside the two thresholds it reads, because three things
+ * have to agree on it: the tile itself, the plate in the middle of a wire —
+ * which is words, and goes when the words go — and the reserved rectangles at a
+ * growing map's edge.
  *
  * @param zoom How far the map is zoomed in, where 1 is life size.
  */
-export function smallestTextAt(zoom: number): number {
+export function detailAt(zoom: number): TileDetail {
+  if (zoom < SILHOUETTE_BELOW_ZOOM) {
+    return "silhouette";
+  }
+  return zoom < SUMMARY_BELOW_ZOOM ? "summary" : "full";
+}
+
+/**
+ * The smallest type size a tile draws at this zoom, in pixels, before the map's
+ * own scaling is applied — or nothing at all, where the tile draws no words.
+ *
+ * Multiply it by the zoom and you have what lands on the reader's screen, which
+ * is what `layout.test.ts` checks never falls below eleven. Below the
+ * silhouette threshold the answer is `null` rather than a number, because there
+ * is no smallest word where there is no word: a size returned there would be a
+ * size nothing is set in, and the eleven-pixel check would be checking a
+ * fiction.
+ *
+ * @param zoom How far the map is zoomed in, where 1 is life size.
+ */
+export function smallestTextAt(zoom: number): number | null {
+  if (zoom < SILHOUETTE_BELOW_ZOOM) {
+    return null;
+  }
   return zoom < SUMMARY_BELOW_ZOOM ? LARGEST_TEXT : SMALLEST_TEXT;
 }
 
@@ -398,6 +480,12 @@ const TOP_GAP = CONTROLS_INSET;
 /**
  * How the map is framed the first time it is drawn — and the one promise that
  * framing makes: **the first frame never shows summary tiles.**
+ *
+ * **And so it never shows silhouettes either** *(2026-09-22)*. The frame is
+ * held at or above the zoom at which a full tile would have to become a
+ * summary, and the third form begins further out still — so the promise covers
+ * both without being widened. The map now zooms out a great deal further than
+ * it did; the reader goes there by asking, and never by opening a map.
  *
  * The obvious rule is "fit the whole map". On a wide screen with the panel beside
  * it that lands at about 0.8 zoom on the stored example, which is under the zoom
