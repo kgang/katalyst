@@ -118,3 +118,51 @@ Amended in place rather than superseded, because nothing in the decision changed
 ## Amendment (2026-09-21)
 
 The `instant` flag named in *Decision Outcome* above is now one setting, `KATALYST_REPLAY_PACE`, the pause between two events in seconds, where `0` means no pause at all — a length and a switch that means *none* are two answers to one question. Pacing is otherwise exactly as decided: cosmetic, fixed on the server, never a field on the request.
+
+## Amendment (2026-09-21, later the same day) — the request names what it wants, and the server never substitutes
+
+**Status: `accepted` — 2026-09-22, Kent, by merging the round (decisions note, row R43).** It was written `proposed` on 2026-09-21; the first screen that depends on it landed in the same batch. Everything above stands unless this section says otherwise.
+
+### What changes
+
+The rule **How the app chooses** in the table above — *"No key → the launchpad offers the four as replays… Key present → the same four run live, untouched by any recording"* — is replaced by:
+
+> **A generation is asked for as a live run or as a recording, and the request says which.** The server does what it was asked, or says plainly why it cannot. **It never substitutes one for the other**, in either direction.
+
+`settings.py` is still the only place the environment is read, and the key is still what decides whether a live run is *possible*. What the key no longer decides is what a reader gets.
+
+### Why this is not a retreat from the no-fallback rule
+
+**A reader choosing a recording, labelled a replay, is not a fallback.** A fallback is the server quietly handing back one thing when another was asked for, and that is still forbidden here — a live run that fails is a live run that failed and says so. What this record has always been against is *the server choosing on the reader's behalf*, and reading the key to make that choice is exactly that. It leaves the reader with no say in either direction: with a key the committed recording is unreachable, and with none a live run cannot even be asked for, so the only control anybody has over which path runs is deleting a line from a file.
+
+Kent found that by hand on 2026-09-21 and asked the two questions this amendment answers: *"Why do i need to blank out the anthropic key?"* and *"How can i test out all the functionality if I run it with a valid anthropic key?"* The answer to the first was *because blanking it is the only control there is*, and to the second, *you cannot*. Both stop being true here.
+
+### The four cases, all honest
+
+| Asked for | Key configured | What happens |
+|---|---|---|
+| A recording | yes | **The recording plays**, badged a replay, receipt saying `replay` and zero dollars. The key is not read. This is the case that could not happen before |
+| A recording | no | The recording plays, exactly as it does today |
+| A live run | yes | A model is called, exactly as it does today |
+| A live run | no | **Refused in one sentence** naming what is missing and what can be asked for instead. Nothing is played in its place. This is the case that could not happen before |
+
+A recording that was asked for and does not exist keeps the sentence it already has: *"…no recording of that sentence, so there is nothing it can honestly show you."* Four cases, four answers, and no path where the server picks for you.
+
+### What a request that says nothing gets, and why
+
+**A request that does not name a start plays a recording.** The reasoning is one sentence: *a request that did not ask to spend money must never spend it.* The recorded Hormuz run's own receipt, in `backend/recordings/hormuz.jsonl`, says what the other reading would cost — **29 model calls, 2,179 seconds (about thirty-six minutes) and $4.04, on 2026-09-21**, at the recorder's effort. Between two readings of a silent request, the one that cannot surprise anybody with a bill is the only defensible one, and it is also the one that keeps every keyless caller working unchanged: the browser's end-to-end tests, the `curl` recipes, the committed recording.
+
+**A default is not the server choosing.** It is a property of the request shape, published in the server's own description of itself, the same on every copy of this program; it reads no key, no environment and no folder. What this record forbids is the server reading the situation and deciding — and a default reads nothing.
+
+### What this does not change
+
+* **Pacing** stays cosmetic, fixed on the server, never a field on the request (amendment above). Naming *which* start a run has is a different question from naming how fast it is shown.
+* **What a recording contains** is untouched: `make record-demo` is still the only writer, a recording still shows every refusal that occurred, and nothing is re-run to improve one.
+* **Nothing that changes what is recorded.** The field is a field of this product's own HTTP body. It never reaches the vendor, so it is not in the prompt's fingerprint — which covers the standing text and the shapes an answer must fit (`engine/prompt.py`) — and it is not in the cassettes, which record vendor HTTP (`backend/tests/conftest.py`). The committed recording stays playable and the freeze on prompt changes is untouched.
+* **Interventions** are unchanged: live arithmetic on a replayed map, with the one scripted insert each recording carries.
+
+### What it leaves room for
+
+A finished generation served back by its identifier — planned for stack 07 — is **a third value of the same field**, not a second route: three ways a run can start, one field that names which, one place that reads it.
+
+Amended in place rather than superseded, because the decision is unchanged. Replay still plays the real stream through the real canvas; the only rule that moved is *who* says which of the two a reader is watching.
