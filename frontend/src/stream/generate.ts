@@ -72,6 +72,9 @@ export interface HowToAsk {
  * `start` follows the same rule as the rest: sent when the caller said, left out
  * when they did not. Left out, the server plays a recording.
  *
+ * `start` follows the same rule as the rest: sent when the caller said, left out
+ * when they did not. Left out, the server plays a recording.
+ *
  * @param request What the screen asked for.
  */
 function bodyOf(request: GenerateRequest): Record<string, unknown> {

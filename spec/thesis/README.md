@@ -42,4 +42,20 @@ A map of causes is not a trade. This part turns it into one, and is careful abou
 | [`what-takes-you-out.md`](what-takes-you-out.md) | Lift over the worlds where the stop went first; the two-way sweep and the watchlist | stack 06 |
 | [`card-and-export.md`](card-and-export.md) | The card's sections and who owns each number; **tails and reader-placed shocks**; ranked endings; the export that carries its own refusals | stack 06 |
 
+---
+
+## Routes
+
+Five routes carry this part to the browser, all under the `/api/` prefix. One is built.
+
+| Route | What it answers | |
+|---|---|---|
+| `POST /api/thesis/position` | The reader's exit, how often each end of it is reached first, the rail of *what takes you out*, and the greyed ceiling | **built** — [`position.md`](position.md) §B6 |
+| `POST /api/thesis/quote` | A venue's two prices for a contract, recorded first and fetched second | planned |
+| `POST /api/thesis/quote/refresh` | The same prices, read again on request | planned |
+| `POST /api/thesis/card` | The whole thesis a reader carries away, in six sections | planned |
+| `GET /api/thesis/export` | That card as a document a program can read | planned |
+
+---
+
 Decision records behind this part: **0010** (grounding sources), **0013** (a payoff names the trade, a quote names the price), **0018** (an edge comes from the world with no supposition in force), **0019** (a stop is a price the reader owns), **0020** (a quote is recorded first; an economic figure is an observation).
