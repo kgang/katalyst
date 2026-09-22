@@ -8,18 +8,34 @@ A take-home prototype for [Catalyst](https://catalyst.app). The brief it answers
 
 ## Run it
 
-Docker is all you need. No key, nothing to configure.
+**First time.** You need [Docker Desktop](https://docs.docker.com/get-docker/) (or Docker Engine with the `compose` plugin) and `make`, which macOS and Linux ship with. Nothing else is installed on your machine: both halves build and run inside containers.
 
 ```sh
+git clone https://github.com/kgang/katalyst.git && cd katalyst
+cp .env.example .env      # optional — everything runs with it left as it is
 make dev
 ```
+
+The first `make dev` builds two images and takes a few minutes; after that it is seconds. Every later `make dev` rebuilds what changed, so what you have checked out is what runs.
 
 | | |
 |---|---|
 | **The app** | <http://localhost:5173/> |
 | **The server's routes**, each with a box for calling it from the browser | <http://localhost:8000/docs> |
 
-`make dev` prints both addresses before it starts, copies files into the running containers as you save them so both halves reload themselves, and on **Ctrl+C** stops both halves and removes their containers. `make up` is the same without the watching, and `make down` stops them by hand.
+`make dev` prints both addresses before it starts, copies files into the running containers as you save them so both halves reload themselves, and on **Ctrl+C** stops both halves and removes their containers. `make down` does the same from another terminal.
+
+**The model key.** Everything on the first screen works with no key at all: the drawn map, its edits and branches, and a recorded generation played back claim by claim. A key is needed only to build a map of your own, live, and it costs money when you do. To add one:
+
+```sh
+cp .env.example .env
+# then set, in .env:
+ANTHROPIC_API_KEY=sk-ant-...        # from https://console.anthropic.com/
+```
+
+Docker reads `.env` from this directory by itself; restart `make dev` after changing it. `.env` is git-ignored and never committed. `/api/readyz` reports whether a key is present, never what it is. With a key the first screen offers the same four ways to start, in the same words; without one the two that call a model are greyed out and say why. The other settings in `.env.example` are all optional — see *Settings* below.
+
+**Without Docker** — if you would rather run the two halves on this machine — see the end of *Commands*.
 
 ## What to try first
 
@@ -39,14 +55,15 @@ Press `?` for every key. The whole map works from the keyboard alone, and exists
 |---|---|---|
 | The stored map, its six edits, the branch, the change list | yes | yes |
 | Every test, and the whole build | yes | yes |
-| *Watch it build* — a sentence becoming a map claim by claim, each proposal the rules refused shown beside it | the Strait of Hormuz card only, played back from a committed recording at the pace it was made | all four cards, and any sentence you type, live |
+| *Watch the recording* — a sentence becoming a map claim by claim, each proposal the rules refused shown beside it, played back from a committed recording at the pace it was made | the Strait of Hormuz, the one example recorded so far | the same |
+| *Run it live* on an example, or *Build the map* from a sentence of your own | greyed out, with the reason | yes |
 | What it costs | nothing | a live map is about a dollar and about ten minutes at the default effort; the first claim takes about half a minute to appear |
 
-**Today a key makes every *Watch it build* card run live, and the recording is reachable only without one.** That is being changed: choosing the replay, and seeing it labelled a replay, is not the same as being handed it because something is missing.
+**Which of the two happens is the reader's choice, not the key's.** Each press names how the run starts — *Watch the recording* plays the recording back whether or not a key is present; *Run it live* and a sentence of your own call a model, and are greyed out with the reason when there is none. The server does what it was asked or says why it cannot, and never substitutes one for the other (decision record 0012, amended 2026-09-21).
 
 What the paid runs have actually cost is written down, dated, in [`docs/measurements.md`](docs/measurements.md) — the committed Strait of Hormuz recording was $4.04 over 36 minutes, and `make eval ONLY=hormuz` was $0.94 over 11 minutes (2026-09-21).
 
-If you have a key, copy `.env.example` to `.env` and fill it in; Docker reads that file by itself. `/api/readyz` reports which keys are present and never what they are.
+How to add a key is under *Run it*. `/api/readyz` reports which keys are present and never what they are.
 
 ## Commands
 
