@@ -85,9 +85,6 @@ FOUR_ENDINGS = "four-tradeable-endings"
 HORMUZ_PAIR = "M2"
 """The curated example's ending that names an instrument: the XLE-against-SPY pair."""
 
-HORMUZ_CONTRACT = "M1"
-"""The curated example's ending that names a contract no committed file prices."""
-
 A_CONTRACTS_PRICES: dict[str, float] = {"entry": 0.5, "stop": 0.3, "target": 0.8}
 """What a reader types on the **yes** side of a contract: a price is between nothing and one.
 
