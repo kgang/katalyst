@@ -190,8 +190,12 @@ export function MapFrame({
               className="dock-tab"
               type="button"
               aria-label="Show the panel beside the map"
+              // Which way the panel is, for a reader who hears the screen. It
+              // names no element, unlike the control at the head of the panel:
+              // the panel is not on the page at all while this button is, and
+              // pointing at an identifier nothing carries is a worse answer than
+              // pointing at nothing.
               aria-expanded={false}
-              aria-controls={THE_PANEL_BESIDE_THE_MAP}
               onClick={onShowPanel}
             >
               <Chevron pointing="left" />
