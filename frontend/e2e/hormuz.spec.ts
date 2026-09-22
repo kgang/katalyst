@@ -598,12 +598,21 @@ const SOMETHING_MOVED = new RegExp(
  * map and a reader who can are told the same thing** — and it is a claim that
  * survives the day the engine's numbers all move at once.
  *
+ * **The count is read back with the very shape that was waited for**, whose one
+ * group is that count. It used to be read with a second pattern of its own, and
+ * a second pattern is a second thing to keep in step: that one ended `moved,`
+ * from the days a third clause followed — *one supposition retracted* — and when
+ * the clause went (2026-09-22, decision record 0017) the line ended `moved.` and
+ * matched nothing. The wait passed, the reading came back empty, and the failure
+ * arrived as a count of minus one several assertions later. One pattern cannot
+ * drift from itself.
+ *
  * @param page The page the map is on.
  */
 async function howManyTheMapSaidMoved(page: Page): Promise<number> {
   const live = page.locator(".map-live");
   await expect(live).toHaveText(WHAT_THE_STRIKE_DID);
-  const said = /, (\w+) claims? moved,/.exec((await live.textContent()) ?? "")?.[1] ?? "";
+  const said = WHAT_THE_STRIKE_DID.exec(((await live.textContent()) ?? "").trim())?.[1] ?? "";
   const many = IN_WORDS.indexOf(said as (typeof IN_WORDS)[number]);
   // Greater than one, not greater than nothing: the strike branch reaches the
   // oil price, the insurance premium and both contracts, so a map saying it
