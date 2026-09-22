@@ -49,7 +49,11 @@ The reader is short oil through an ending the map offers, with a stop above thei
 
 The contract ending resolves at the end of October, and exactly one claim resolves strictly before it — the oil-price step the thesis rests on, a fortnight earlier — and it is publicly observable, because its resolution names published settlement prices. So the watchlist has one row and the card says so; everything else adverse resolves on the same day or later and is listed as **unhedgeable** with its date. A reader who learns that nothing else on this map can warn them in time has learned something true about the trade.
 
-### B3 — A claim the reader has supposed
+### B3 — Where the rail is served from
+
+The rail comes back on `POST /api/thesis/position`, beside the exit it is about, because it is ranked over the worlds where **that** exit's stop went first and means nothing without it. Every row carries its lift, the two shares it is made of, the interval on the numerator, the count of equally-weighted worlds it rests on and the coverage that interval claims; the section carries the **effective-draw floor** as a number with its own words — *a chosen floor, carried over from the finance analysis and not measured* — and, where the rail is empty because the draws behind it are too few, the sentence saying so. An ending that names a **contract** has no first touch at all, so it gets no rail and the reason sits on the exit instead. The chapter for the route itself is [`position.md`](position.md) §B6.
+
+### B4 — A claim the reader has supposed
 
 They suppose the strait opens, then ask what takes them out. The supposed claim is true in every drawn world, so its lift is exactly one and it never reaches the rail. The rail is about what varies.
 

@@ -77,7 +77,7 @@ from katalyst.thesis.ceiling import Ceiling
 from katalyst.thesis.draws import THE_SAMPLE_SAYS, SampleFrom
 from katalyst.thesis.edge import Edge, Mixture, NotComparable, NotComparableReason
 from katalyst.thesis.lift import WhatTakesYouOut
-from katalyst.thesis.paths import ChanceUsed, MarketChanceFrom
+from katalyst.thesis.paths import ChanceUsed, DecayShape, MarketChanceFrom
 from katalyst.thesis.position import (
     FirstTouch,
     Position,
@@ -151,6 +151,31 @@ drift at all; and the claim's printed likelihood, read on its own resolve-by day
 which answers a different question and whose gap from the first **is** drift. A
 card that could not tell them apart could not say whether the number beside it
 carries any.
+"""
+
+THE_GIVEBACK_FOLLOWED: Mapping[DecayShape, str] = {
+    "arrival_days": (
+        "the model's own spread of days this claim arrives on, read from the drawn worlds and "
+        "rescaled to the market's chance of it — the only schedule that leaves the price fair "
+        "on every day"
+    ),
+    "straight_line": (
+        "a straight run down to nothing, because no drawn world had this claim arrive inside "
+        "the window, so there was no spread of days to borrow. Fair over the window and "
+        "quietly unfair within it"
+    ),
+    "nothing_given_back": (
+        "nothing at all: the market is certain of this claim, so its whole move is already in "
+        "today's price and there is no surprise left to apply"
+    ),
+}
+"""How each claim gave back what the market had already priced, in plain words.
+
+The price carries part of a claim's move before the claim happens, because the
+market already thinks it might; that part is given back day by day while it has
+not happened. **Which shape that follows is an assumption**, and four to five
+points of *the stop is reached first* ride on it, so the shape is named wherever a
+first-touch number is shown rather than left in a comment.
 """
 
 NOT_ADVICE = "Educational, not investment advice, and not a recommendation."
@@ -1509,13 +1534,13 @@ def card_of(
         as_of=base.day_zero,
         hypothesis=hypothesis.id,
         hypothesis_says=hypothesis.claim,
-        the_trade=_the_trade(ending, position),
+        the_trade=the_trade(ending, position),
         carried_by=tuple(_carries(base, one) for one in carried_by),
         priced_in=_priced_in(answer, position, costs),
-        takes_you_out=_rail(base, takes_you_out, market_chance),
+        takes_you_out=the_rail(base, takes_you_out, market_chance),
         watch=tuple(_watch(base, one) for one in watch),
         unhedgeable=tuple(_unhedgeable(base, one) for one in unhedgeable),
-        your_exit=_your_exit(position, ceiling, touch, market_chance),
+        your_exit=the_exit(position, ceiling, touch, market_chance),
         tails=_tails(base, tails),
         shocks=tuple(_shock(one) for one in shocks),
         what_else=what_else_can_i_trade(base, priced, shifts),
@@ -1525,7 +1550,7 @@ def card_of(
     )
 
 
-def _the_trade(ending: Proposition, position: Position) -> TheTrade:
+def the_trade(ending: Proposition, position: Position) -> TheTrade:
     """Say what is traded, where and which way, reading the venue's facts off the payoff.
 
     Args:
@@ -1761,7 +1786,7 @@ def _mixture(mixture: Mixture | None) -> MixtureShown | None:
     )
 
 
-def _rail(
+def the_rail(
     base: World,
     rail: WhatTakesYouOut,
     market_chance: Mapping[PropositionId, ChanceUsed],
@@ -1926,7 +1951,7 @@ def _unhedgeable(base: World, one: Unhedgeable) -> UnhedgeableShown:
     )
 
 
-def _your_exit(
+def the_exit(
     position: Position,
     ceiling: Ceiling,
     touch: FirstTouch | Refusal,
