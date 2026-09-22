@@ -143,7 +143,7 @@ async function landedOn(page: Page, any: readonly string[]): Promise<string> {
  *
  * **The map is one stop in the page's tab order and then its own keys take
  * over** — j and k down and up a column, h and l along the wires. That is the
- * design rather than a shortfall: eight tiles and twenty-four chips as separate
+ * design rather than a shortfall: nine tiles and their chips as separate
  * tab stops would make Tab the slowest way to cross the map, and the line under
  * the map says which keys to use instead from the moment it opens.
  */
@@ -313,10 +313,18 @@ const WINDOWS = [
 /**
  * How many tiles are drawn past the right edge of the stage.
  *
- * **Framing the map again for a wider stage must not push anything off it.** A
- * re-frame zooms to fit what it can without going below the size a full tile
- * needs, so a map that fitted before must still fit; this is the reading that
- * would catch a re-frame that scaled or centred wrongly.
+ * **This is not a count that has to be nought**, and that is the framing rule
+ * rather than a shortcoming of it. The frame zooms to fit what it can and stops
+ * at the zoom where a full tile's smallest words would fall under eleven pixels;
+ * a map too wide to fit at that zoom is started at its beginning instead and the
+ * reader pans to the rest. The stored example is five columns wide and does not
+ * fit in this window — `src/graph/__tests__/layout.test.ts` works that out with
+ * no browser, in pixels — so some of it is past the edge whatever the framing
+ * does.
+ *
+ * What the count is for is the promise the map does make: it is never cut
+ * silently. The stage marks the edge that has map beyond it, and the reading
+ * below is what that mark is checked against.
  *
  * It is a count rather than a place, because the claim is about how many tiles a
  * reader can see and not about where any one of them is.
@@ -552,6 +560,11 @@ const WHAT_THE_STRIKE_DID = new RegExp(
   `^Branch created\\. One claim added, (${IN_WORDS.slice(1).join("|")}) claims? moved\\.$`,
 );
 
+/** The same counts with a capital, for a count that begins its own sentence. */
+const IN_WORDS_CAPITALISED = IN_WORDS.map(
+  (word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`,
+);
+
 /**
  * The same shape for a branch that adds no claim — the reader reporting a piece
  * of news on a claim the map already has.
@@ -562,9 +575,18 @@ const WHAT_THE_STRIKE_DID = new RegExp(
  * this asserts is that the map said a count at all, and that the count is not
  * nought — the line before the engine answers is a different sentence, and *no
  * claims moved* is the answer to a branch with nothing in it.
+ *
+ * **The count is capitalised here and not in the shape above, because it starts
+ * the sentence.** The line is built from clauses and the first letter of the
+ * first clause is made a capital, so a branch that adds a claim reads *"Branch
+ * created. One claim added, nine claims moved."* and a branch that adds none
+ * reads *"Branch created. Nine claims moved."* That is the map's own sentence
+ * casing and has been since the line was written; this shape was copied from the
+ * one above when the retraction clause went, and asked the map to start a
+ * sentence in lower case.
  */
 const SOMETHING_MOVED = new RegExp(
-  `^Branch created\\. (${IN_WORDS.slice(1).join("|")}) claims? moved\\.$`,
+  `^Branch created\\. (${IN_WORDS_CAPITALISED.slice(1).join("|")}) claims? moved\\.$`,
 );
 
 /**
@@ -883,8 +905,27 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     // transform read while it is still changing is a reading of a moment.
     const framedWider = await whereTheMapCameToRest(page);
     expect(framedWider, "the map was not framed again when the panel folded").not.toBe(framedOpen);
-    // And nothing was pushed off the glass by the new framing.
-    expect(await tilesOffTheGlass(page)).toBe(0);
+
+    // **And it is framed honestly, which is not the same as everything fitting.**
+    // This map is five columns of tiles, and at the zoom the frame holds — the
+    // one where a full tile's smallest words still land at eleven pixels — it is
+    // wider than the stage even with the panel gone. The rule for that case is
+    // the rule a tile follows when it runs out of room: draw less rather than
+    // draw it smaller. So the map is started at its beginning and the reader
+    // pans, and the two promises worth reading are these two.
+    //
+    // The first: every tile is still a whole tile, which is what the zoom floor
+    // exists for and the reason the map does not fit.
+    await expect(page.locator('.tile[data-detail="full"]')).toHaveCount(9);
+    // The second: the map never cuts itself silently. The stage carries a mark
+    // for each edge that has map beyond it, and it says so exactly when there is
+    // something out there — read as the two agreeing rather than as either one
+    // on its own, so this says the same thing at a window the map does fit in.
+    const cut = await tilesOffTheGlass(page);
+    await expect(page.locator(".canvas")).toHaveAttribute(
+      "data-more-right",
+      cut > 0 ? "yes" : "no",
+    );
 
     // **Walking the map does not bring the panel back.** Every step along a
     // wire selects the claim it lands on — reaching one with the keyboard and
@@ -1554,6 +1595,16 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
   // The two are the engine's readings of this claim, and they are not the same
   // number — which is the whole point: the source moved.
   expect(readings[0]).not.toBe(readings[1]);
+  // **And it moved the way the rule says it must, in the engine's own word.**
+  // The claim reported as news is *the premium is under 0.4%*, and the arrow
+  // retuned is the one that holds it there: the lane staying open keeps the rate
+  // low, a push in favour rather than against. So news that the rate is low is
+  // evidence that the lane is open, and pushing harder along that arrow can only
+  // make the news say more of it — the source goes up. Which way it went is read
+  // off the sentence the engine's own difference wrote rather than worked out
+  // here by comparing the two numbers, and no number is written into this file
+  // either way.
+  await expect(movement).toHaveAttribute("title", /moved this claim up/);
 
   await expect
     .poll(() => tile.evaluate((el) => (el as HTMLElement).offsetHeight))

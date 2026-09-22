@@ -159,6 +159,40 @@ describe("what a branch says out loud", () => {
     );
   });
 
+  it("test_a_count_that_begins_the_sentence_is_capitalised", () => {
+    // **A reader reporting a piece of news adds no claim**, so the count of what
+    // moved is the line's first clause — and the first clause begins the sentence
+    // after *Branch created.*, which means a capital. The line the browser waits
+    // on is this one, and the shape it waits with had been copied from the branch
+    // that does add a claim, where the count sits mid-sentence and is lower case.
+    // Both readings are here so that neither can drift again without a test that
+    // needs no browser saying so.
+    const report: BranchView = {
+      id: "br_the_premium_fell",
+      label: "The premium fell",
+      hue: "teal",
+      edits: [{ op: "observe", target: "C", value: true, at: "2026-10-01" }],
+      claims: [],
+      links: [],
+    };
+    const change: DiffView = {
+      claims: new Map<string, ClaimChange>([
+        ...["H", "C", "B", "M1", "M2"].map((id): [string, ClaimChange] => [
+          id,
+          { state: "shifted" },
+        ]),
+        ["R", { state: "unchanged" }],
+        ["N1", { state: "unchanged" }],
+      ]),
+      rows: [],
+      summary: { reading: "It moves two endings." },
+      warnings: [],
+    };
+    expect(branchAnnouncement(branchWorld(base(), report), change)).toBe(
+      "Branch created. Five claims moved.",
+    );
+  });
+
   it("test_the_base_world_announces_nothing", () => {
     expect(branchAnnouncement(base())).toBe("");
   });

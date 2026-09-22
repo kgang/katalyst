@@ -506,14 +506,22 @@ const TOP_GAP = CONTROLS_INSET;
  * float — and at 1280 × 800 on the stored example the hypothesis, the first
  * tile anybody reads, was drawn underneath them. See `EDGE_GAP`.
  *
- * **What this does not fix, measured the same day.** At 1600 × 1000 the stored
- * map *does* fit, and it is centred with six pixels to spare on each side, so
- * its last column sits all but touching the panel beside the map. That is not a
- * margin that was forgotten: at the readable zoom the map is 1252 pixels wide in
- * a stage 1264 pixels wide, so there are twelve pixels in the whole stage to
- * share out. Leaving a proper gap would make the map stop fitting and be cut
- * instead, which is worse. The fix for that one is a narrower panel or a lower
- * floor on the zoom, and it is neither of them here.
+ * **What this does not fix, measured the same day.** The stored map was four
+ * columns then, and at 1600 × 1000 it *did* fit: 1252 pixels of map at the
+ * readable zoom in a stage 1264 wide, centred with six pixels to spare on each
+ * side and its last column all but touching the panel. That was not a margin
+ * somebody forgot — there were twelve pixels in the whole stage to share out,
+ * and leaving a proper gap would have made the map stop fitting and be cut
+ * instead, which is worse.
+ *
+ * **It is five columns now, and it no longer fits at all** *(2026-09-22, when
+ * the map gained the claim that the strait stays open)*. Five columns is 1880
+ * pixels of map, 1591 at the readable zoom, against 1264 of stage with the panel
+ * beside it and 1574 with the panel folded away — so the map is started at its
+ * beginning and its last column is past the right edge either way, which is what
+ * the rule above says to do and what the stage's own *there is more this way*
+ * mark is for. The fix for both of these is a narrower panel or a lower floor on
+ * the zoom, and it is neither of them here.
  *
  * @param map Everything the frame has to hold, in the map's own coordinates.
  * @param canvas How much room there is for it, in screen pixels.
