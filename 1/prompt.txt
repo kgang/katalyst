@@ -1523,3 +1523,252 @@ The silhouette draws each kind's mark about 48 px deep rather than the near form
 - **No new zoom threshold for UX-4's "far" rung.** That rung is several worlds side by side; this is one world seen whole.</result>
 <usage><subagent_tokens>351519</subagent_tokens><tool_uses>9</tool_uses><duration_ms>153039</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ac859ad9c0e830dea</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b0c894cc-4ecb-4c15-9930-d321fce0a448/tasks/ac859ad9c0e830dea.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane: edit a generated map" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Servers stopped; everything committed; both heavy runs are through the queue. Report follows.
+
+---
+
+**What the coordinator must run to check me** (in order, from `/Users/kentgang/git3/katalyst-wt/feat-04-edit-a-generated-map`):
+
+1. `cd backend &amp;&amp; uv run pytest` — or the queue: `plans/scripts/heavy.sh "04-edit: server" -- uv run pytest`
+2. `cd frontend &amp;&amp; npm run check`
+3. The browser run I am not allowed to make (needs four free ports; these are the ones I used for the look, pick any free four):
+```
+cd /Users/kentgang/git3/katalyst-wt/feat-04-edit-a-generated-map/frontend &amp;&amp; \
+KATALYST_E2E_BACKEND_PORT=8067 KATALYST_E2E_FRONTEND_PORT=5167 \
+KATALYST_E2E_SLOW_BACKEND_PORT=8068 KATALYST_E2E_SLOW_FRONTEND_PORT=5168 \
+npx playwright test e2e/generate.spec.ts
+```
+The new test is `a finished generation takes the six edits, like any other map`. **It is the one thing in this lane I could not run**; I walked the identical flow by hand against a real server instead (pictures below), and the `.delta-rail__row` count there was 11.
+
+## What I built
+
+**The server already did it — proved first, as instructed.** `engine/worlds.py:example_named` falls through to `held.map_of(base_id)`, so `/api/worlds` with a generated map's own identifier folds a branch onto it exactly as onto a stored example. Three tests in `backend/tests/api/test_worlds.py` now say so: `test_a_world_is_built_on_a_generated_map_held_by_its_id` (folds a stand-in generation into `held`, then compares the world with the stored one — identical to the byte apart from the name), `test_a_branch_folded_onto_a_generated_map_moves_the_same_endings`, and `test_a_generation_this_process_no_longer_holds_says_so`. Nothing on the server needed fixing except that last sentence.
+
+**One rule over two: a finished generation is a map like any other.** I chose the hand-off, not a copy. When a run has stopped *and* the engine has named the map (`finished &amp;&amp; world.baseId !== ""` — the same pair `AddAClaim` waits on), the panel that reads out a chosen claim carries **Change this claim**, in the same place and the same words as on a stored map; `E` and a palette command do the same. Pressing it calls `onChangeAClaim(selection, runDetails)`; `App.tsx` gains a screen state `{at: "editing", run, base, source, details, changing}` and renders `MapScreen` with the generated map as its base, the claim already selected and the six edits already open. Everything after that is machinery that already existed — `InterventionPanel`, `BranchPanel`, `bothPaintings`, `railRows`, `DeltaRail`.
+
+**The one new part is the world source.** `ApiWorldSource` reads `/api/fixtures/&lt;id&gt;` for the map's claims, date and seed — a generated map is in no such store, so it would 404 mid-edit. `world/generatedSource.ts` (`GeneratedMapSource`) is handed what the reader already watched arrive (the map's name, the title, the run's seed, the claims) and asks the same three routes. It shares both converters with the stored source (`toWorldView`, `toDiffView` — I exported `toDiffView` and `sendable`), so a generated map and a stored one cannot come to disagree about a number neither computed.
+
+**Run details and the refusals travel with the map.** `MapScreen` takes an optional `generation` and passes it to the `Inspector` it already renders, which draws the *Run details* section; a conditional palette command *Read the working of this run* selects the generation, which puts the whole working — every call, every refusal in the rules' own words — on the same panel.
+
+**The map is handed over exactly as it is on screen** (`growth.world`), so nothing is re-fetched and no number changes as the screens swap.
+
+Pictures (1600×1000, keyless, the committed recording replayed, servers on 8057/5157, both stopped): `/Users/kentgang/git3/katalyst/plans/logs/04c/edit/0{1..6}-*.png`, with `findings.json` and the throwaway `look.mjs`. Against the checklist: VR1, VR2, VR4, VR5, VR6, VR11 hold on the new states (the panel is the stored map's panel, unchanged). The two worlds paint (`.57 ▲ .79` under a tile), the branch chip and *with your edits* are on the bar, the change list has 11 rows, and the foot carries the origin sentence.
+
+## What is rough — plainly
+
+1. **The crossing is one-way.** Once the reader takes up *Change this claim*, the run's own screen is gone until they go back to the launchpad; with it go the verdict card, the receipt strip, the replay badge and *Add a claim*. I dropped a *Back to the run* command on purpose: `MapScreen` holds the branch workshop in its own state, so a way back that unmounts it would silently throw the reader's edits away — worse than a one-way door. *Run details* and the working (refusals included) do travel across.
+2. **The bar says "The map as it was written" on a map nobody wrote.** Same for *as it was written* when the reader flips worlds, and for the first row of the branch panel. One word, in three places — but one of them is `BranchPanel.tsx`, which is not mine, and fixing only mine would make the two disagree. Left alone deliberately.
+3. **The "held for the life of the process" sentence only appears once a branch is open.** The untouched generated map shows `growth.ts`'s origin sentence, which is another lane's to phrase (see below). My source's sentence carries it for every branch world.
+4. **No `MapScreen` panel named *The run*.** The brief sketched one; I judged the panel composition too hot to touch with a sibling lane in the frame and the foot, and reached the same two things (Run details, the working) through the `Inspector` prop and one palette command. If the coordinator wants the fourth panel, it is a contained change in `panels` and `THE_PANEL`.
+5. **`readBundle` on a generated map rejects** rather than being absent from the interface. `WorldSource` requires it; nothing on this path calls it; it says why in one sentence.
+6. **Two viewings of one recording share a map identifier**, so the newer viewing wins in the server's `_which_generation`. Pre-existing, harmless here (both are the same map), noted because I read it.
+
+## Where I deviated and why
+
+- **Commit trailer.** A system reminder in this session replaces the brief's `Co-Authored-By: Claude Fable 5.1` with `Co-Authored-By: Claude Opus 5 (1M context)`; my three commits carry the latter. Say the word and I will amend.
+- **`no_such_example`'s sentence changed**, which is inside my grant (*the sentence for a generation not held*) but is also read by `api/generate.py:_no_such_map`. It now reads: *"There is no map called 'X' here. The examples this program ships with are: hormuz. A map this program generated is held under its own identifier for the life of the process that built it, so one built before a restart is gone."* The insert route then adds its own clause about which of two identifiers to send; the two read fine together, slightly long.
+- **The base world is the stream's, not re-read from `/api/worlds`.** Re-reading would have given my origin sentence on the untouched map and re-proved the map is still held, at the cost of a round trip and a flicker on a map that is already the engine's own world at the same seed and loop sizes. I took the instant one.
+
+## What outside my files must change
+
+**One sentence for the origin-words lane** (`stream/growth.ts`, `originOfTheFinishedMap`) — append to the finished map's sentence:
+
+&gt; This map is held in the server's memory under 01…, for the life of the process that built it, and is written to no disk — so a restart forgets it and the same sentence asked again builds a new one.
+
+Also outside me, for whoever next owns them: the *as it was written* wording on a generated map (`MapScreen.tsx`'s `where`/`flipWorlds` and `BranchPanel.tsx`'s first row).
+
+## Files touched (`git diff --stat 9767f7c HEAD`)
+
+```
+ ARCHITECTURE.md                                    |   2 +
+ backend/src/katalyst/engine/worlds.py              |  18 +-
+ backend/tests/api/test_worlds.py                   | 133 ++++++++-
+ frontend/e2e/generate.spec.ts                      |  64 +++++
+ frontend/src/App.tsx                               |  87 ++++++
+ frontend/src/components/MapScreen.tsx              |  75 +++++-
+ frontend/src/stream/GenerationScreen.tsx           | 133 +++++++--
+ .../stream/__tests__/editAGeneratedMap.test.tsx    | 296 +++++++++++++++++++++
+ .../src/world/__tests__/generatedSource.test.ts    | 221 +++++++++++++++
+ frontend/src/world/apiSource.ts                    |  21 +-
+ frontend/src/world/generatedSource.ts              | 213 +++++++++++++++
+ frontend/src/world/index.ts                        |   1 +
+ spec/workbench/diff-view.md                        |   2 +
+ spec/workbench/inspector.md                        |   2 +-
+ spec/workbench/streaming-growth.md                 |  42 +++
+ 15 files changed, 1277 insertions(+), 33 deletions(-)
+```
+
+Three commits: `5afa38b` (route test), `cec6e4a` (the hand-off), `8a72989` (docs + end-to-end). Nothing pushed; `MapFrame.tsx`, `RunStrip.tsx`, `PanelSwitch.tsx`, `Tile.tsx`, `BeliefChip.tsx`, `Inspector.tsx`'s insides, `graph/**` and the records are untouched; so are the `strip=`/`origin=`/`status=`/`panel=` lines of `MapScreen`.
+
+## Verification tails
+
+`plans/scripts/heavy.sh "04-edit-a-generated-map: whole server suite" -- uv run pytest` → exit 0
+```
+TOTAL                                   2808      0    646      0   100%
+================= 1029 passed, 1 warning in 173.84s (0:02:53) ==================
+```
+
+`plans/scripts/heavy.sh "04-edit-a-generated-map: npm run check" -- npm run check` → exit 0 (biome clean, tsc clean)
+```
+ Test Files  47 passed (47)
+      Tests  429 passed (429)
+   Duration  4.48s
+```
+
+Real-app walk (`plans/logs/04c/edit/findings.json`): `offered: 1` (*Change this claim*), `rows: 11`, bar `Your own branch / with your edits`, `200 /api/worlds`, `200 /api/worlds/diff`, palette carrying *Read the working of this run*.
+
+## Draft pull request body
+
+**What** — A finished generation is a map like any other. When a run has stopped and the engine has named its map, the reader takes up *Change this claim* on any tile and gets the six edits, a branch, the two worlds painted together and the change list — the ones the stored map already has, on the screen that already draws them, through the same three world routes with the generated map's own identifier as the base. The server needed no new behaviour (three tests now say so); the browser needed a hand-off and one world source, `GeneratedMapSource`, for a map that is in no store. *Run details* and the whole working of the run travel across with the map. A replayed recording is a generated map too, so all of it works with no model key.
+
+**Which invariant it satisfies** — `(map, branch, seed)` still determines a world, whatever the map came from: the three routes take a generated map's identifier exactly where they take a stored example's name, and both kinds go through one converter, so nothing can grow a second engine in the browser. Nothing computes a likelihood on this side; every number on a branch world is the engine's. And the honesty rule about a number nobody can trace: a generated map is held in memory for the life of the process, and the sentence under a branch world on one says so rather than letting a map vanish without explanation.
+
+**What is deliberately not here** — No fourth panel on the map screen; *Run details* rides the panel that was already there and the working is one palette command away. No way back to the run's own screen: it would have to unmount the branch the reader is building. No re-fetch of the map at the hand-off — the map on screen is already the engine's own world at the run's own seed. The *as it was written* wording, which is wrong on a generated map, is one word in a file this branch does not own. And the sentence saying how long a generated map will answer is missing from the untouched map's origin line, which is another lane's to phrase.</result>
+<usage><subagent_tokens>337549</subagent_tokens><tool_uses>27</tool_uses><duration_ms>587317</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a5031b4029d1ae96a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b0c894cc-4ecb-4c15-9930-d321fce0a448/tasks/a5031b4029d1ae96a.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane: no range on screen" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Servers stopped, everything committed.
+
+---
+
+**Run these, in order, to check me:**
+
+```bash
+cd /Users/kentgang/git3/katalyst-wt/feat-04-no-range-on-screen/frontend
+npm run check                      # already green through the queue; 8 s
+KATALYST_E2E_BACKEND_PORT=8015 KATALYST_E2E_FRONTEND_PORT=5187 \
+KATALYST_E2E_SLOW_BACKEND_PORT=8016 KATALYST_E2E_SLOW_FRONTEND_PORT=5188 \
+  /Users/kentgang/git3/katalyst/plans/scripts/heavy.sh \
+  "04-no-range: browser walk" -- npx playwright test
+```
+
+I may not run playwright; the second command is the one I could not run. Three spec files changed under it: `e2e/hormuz.spec.ts`, `e2e/farTiles.spec.ts`, `e2e/generate.spec.ts`.
+
+## What I built
+
+**One likelihood per claim, and no range on any surface** (three commits: `14ecb90` product, `231ae25` tests, `e78acaf` spec).
+
+- **The chip** is the owner, the mark and the number. The third line (`.24–.56`) and the shelf behind it are gone, and so is the shelf's sentence pair — *model interval, uncalibrated · … Across 2 000 versions of this map…* against *stated range · not computed*. The face is no longer a button (nothing to open), and its accessible name is what it reads, not a string composed on top of it. The one `!important` in the product, which lifted a tile so its shelf could slide out, went with it.
+- **The panel** loses the range note, the reserved band slot, the *same direction* column and the reweighting sentence. Every reading is `toTwoFigures`.
+- **The change list** is one column: the claim, its number before and after, the direction. *How firm* and *same direction* are gone from the row, the builder, the stylesheet and the view model.
+- **The footer / Run details** sentences drop versions and worlds; route, generation and seed stay.
+- **Both reader's-own-number forms** take one number — the panel's and the first screen's slider (three handles → one).
+- **`Ranged` → `Likelihood`, one field.** `WorldView.versions`/`worldsPerVersion` → one flag `workedOut`. `lo`/`hi`, `agreement`, `moved_only_by_reweighting` and `versions_disagree` are dropped at the wire in `world/fromTheServer.ts` and `world/apiSource.ts`, each with a comment saying it dies with the engine half.
+- **New test** `frontend/src/graph/__tests__/noRange.test.tsx`: three walks — every tile on the curated map and on the committed recording folded through the app's own reader; every tile plus the panel for *version/versions/worlds/interval/uncalibrated/middle 80*; and every string, template and markup text in `src/**` product code, read with the compiler's own parser. I proved both walks bite by putting a range and a sentence back and watching them go red.
+- **Spec**: the six chapters the brief names, plus `keyboard-and-access.md` and `streaming-growth.md`, PRD NFR-1 and one ARCHITECTURE passage. Every passage dated and citing R48.
+
+**The belief rail stays 69 px, and the brief's escape clause is why.** Measured in the browser at 1600×1000 on the real stylesheet: one number chip 52, three number chips 52, **two chips where one reads *Supposed · Oct 1* → 69**, three chips with *the ask did not come back* → 69. The 69 was never sized by the range line; it is sized by the tallest chip a tile can draw, which is a two-line words reading. Shrinking it to 52 would clip a supposed claim on the stored example's own strike branch. Recorded in `geometry.ts` and in `tiles-ports-wires.md`; raw numbers in `plans/logs/04c/norange/measurements.json`.
+
+## What is rough
+
+1. **Seventeen pixels of dead space on most tiles.** The rail reserves 69 and a row of one-line readings comes to 52. Visible in `01-stored-map.png` as air under each number. Fixing it means the layout predicting what a chip will read before it is drawn.
+2. **`TILE_MIN_HEIGHT` (152) is now above the smallest tile's natural height (136).** Its docstring's claim — "what a tile holding only a heading, a one-line claim and the three belief chips comes to" — is no longer exact. I left it: lowering it re-lays out every map, and that is scope I was not given.
+3. **The panel no longer explains a claim with no causes whose number moved under *This happened*.** The move shows, the decomposition is empty in the middle, nothing says why. Said plainly in `inspector.md`; the replacement wording is the engine half's.
+4. **A claim the engine calls unchanged because its versions disagreed carries no half-line at all** — the row reads *no change* and stops. Honest, and thinner than what it replaced.
+5. **The reader's own number goes on the wire as `lo = hi = p`.** A range of nothing, not an invented number, but a shape the route was not designed for. Flagged in `branchReducer.ts`, `generate.ts` and `streaming-growth.md`.
+6. **`workedOut` is set unconditionally on any engine answer** rather than read off a count. Right for the screen, but the flag now means "the engine answered".
+7. **The change list's one-column table reads a little loose** — the reading sits on its own line under the row's words (`04-the-change-list.png`). That is what one column leaves.
+8. **The book disagrees with itself across the engine/screen boundary**, deliberately and as instructed: `spec/multiverse/` still says two thousand versions while `spec/workbench/` says there are none.
+
+Pictures and scripts: `/Users/kentgang/git3/katalyst/plans/logs/04c/norange/` (8 PNGs at 1600×1000, `measurements.json`, `look.mjs`, `worst-chip.mjs`, `measure.mjs`). Read against the checklist: **VR4** now asks for no range anywhere and passes on all eight; **VR5** holds (every absence still carries its reason, in the panel); **VR14** unaffected; **VR2** improved — the hover shelf was the nearest thing to a pop-up on a tile and is gone.
+
+## Where I deviated and why
+
+- **Two chapters not in my list.** `keyboard-and-access.md` owns the rendering rule (INV-workbench.36, INV-7's pixel half, the certainty guard, the spoken map) and `streaming-growth.md` owns the input bar and `Ranged`. Both were left flatly untrue by the cut, both are `spec/workbench/`, which R48 assigns to this lane. Edited rather than reported.
+- **`InputBar.tsx`**, the first screen's three-handle range slider, is not named in the brief. R48 says *no range anywhere, ever*, and that is a reader's-own-number form.
+- **`Ranged` renamed to `Likelihood`.** A one-number type called `Ranged` breaks the house rule that a word means what it says. Mechanical, ~20 files.
+- **`versions`/`worldsPerVersion` replaced by `workedOut`** rather than kept as a dead flag. Three surfaces asked it one question, and that question survives.
+- **Commit attribution.** The brief says `Claude Fable 5.1`; my harness instruction names `Claude Opus 5 (1M context)`, which is the model that did the work. I used the latter. Say the word and I will amend the three messages.
+- **Rail left at 69**, under the brief's own clause.
+
+## What outside my files must change — every passage my change made stale
+
+**`backend/**` (all of it, the 05/06 session's):** `domain/propagation.py` (two nested loops, 2 000 versions × 8 worlds, the range); `domain/diff.py` (`range_width`, `agreement`, the 90 % bar, `moved_only_by_reweighting`, `unchanged_because = "versions_disagree"`); `domain/belief.py` (`Belief{p,lo,hi}`, `two_figures`); the world routes' `versions`, `worlds` and `range_shares`; the OpenAPI description behind `frontend/src/api/schema.ts` — which I did not touch and which still carries every one of those fields. `make types` after the flip.
+
+**`spec/multiverse/`:** `diff.md` (agreement, the two-halves test, the *how firm* / *same direction* columns, open question 5's closing), `propagation.md` (the two nested loops and the range they produce), `README.md`'s curl recipes if the request fields change.
+
+**`spec/graph/belief.md`:** `{p, lo, hi}`, "two significant figures with its range", `_two_figures`, open question 5.
+
+**`docs/adr/`:** **0005** (the range as *how sure we are of the numbers we put in*) and **0014** (the range's meaning, the 2 000 versions, the *model interval, uncalibrated* sentence) — R48 reverses both; **0015** (ships "the range the model stated, labelled as stated"); **0016**/**0017** wherever they describe the range surviving the flip.
+
+**`docs/worked-numbers.txt`:** the band lines (`B · base · band from B`) are now cited by nothing on screen — `inspector.md` B3 was their reader.
+
+**`PRODUCT_REQUIREMENTS.md`** beyond the one NFR-1 line I changed: **INV-7** (line 203, "rendered at two significant figures with its range"), **D2** ("a likelihood *range*, not a point"), the **Belief** glossary row, **FR-2** (range slider), **FR-8** (*model interval, uncalibrated*), **FR-16** (range width and agreement as columns; the two-halves test), **FR-21** (range shares), **FR-23**/**FR-25** (intervals, the quartered Kelly at the unfavourable end of the range), **NFR-7** (600 ms "for one world with its range … at 2 000 versions"), anti-pattern 5.
+
+**`ARCHITECTURE.md`** beyond the one passage I changed: §"Step 7" (lines 111 and 113), the `Belief`/`World`/`Diff` rows in the model table, the INV-5 and INV-7 rows, `test_band_is_not_sampling_noise` and its two siblings, the ADR index rows for 0014/0015, and the `range_shares` sentence at line 346.
+
+## Files touched
+
+`git diff --stat 9767f7c HEAD` — **62 files, +1557 / −1868**. Largest: `noRange.test.tsx` (+339 new), `BeliefChip.tsx` (−291 net), `Inspector.tsx`, `beliefChip.test.tsx`, `diff-view.md`, `inspector.md`, `hormuz.spec.ts`, `deltaRail.test.tsx`, `inspector.test.tsx`, `diffState.test.ts`, `types.ts`, `farTiles.spec.ts`, `apiSource.ts`, `tiles-ports-wires.md`, `noChange.ts`, `beliefChip.css`, `DeltaRail.tsx`, `InputBar.tsx`, `BranchPanel.tsx`, `tile.css`, `keyboard-and-access.md`, `streaming-growth.md`.
+
+## Verification output
+
+```
+04:56:45 START feat/04-no-range-on-screen: npm run check (waited 270s, load 5.02)
+04:56:53 END   feat/04-no-range-on-screen: npm run check exit=0 took=8s
+
+ Test Files  46 passed (46)
+      Tests  424 passed (424)
+
+&gt; biome ci . &amp;&amp; node scripts/no-library-stylesheet.mjs
+Checked 183 files in 49ms. No fixes applied.
+
+&gt; tsc -b --noEmit
+(no output)
+```
+
+Chip measurement, in the pixels the stylesheet wrote (1600×1000, stored example):
+
+```
+asDrawn                     52
+oneNumber                   52   tallest chip 43
+threeNumbers                52   tallest chip 43
+twoSupposed                 69   tallest chip 60   lines [36, 19]
+twoAskFailed                69   tallest chip 60   lines [36, 19]
+threeWithTheLongestAbsence  69   tallest chip 60   lines [36, 19, 19]
+```
+
+---
+
+## Draft pull request body
+
+**What**
+
+Kent's R48: the two thousand versions of the map are cut from this product, and everything that only meant something under them goes with them. This is the **screen half**. The engine half — the arithmetic, the API fields, `spec/multiverse/`, records 0005 and 0014 — is the stack 05 session's and has not started, so the wire still carries `lo`, `hi`, the diff's agreement share and `versions_disagree`, and the browser drops all four at its boundary with a comment at each saying it dies with the engine half.
+
+A belief chip is the owner, the mark and the number. The panel loses its range note, its reserved band slot, its *same direction* column and its reweighting sentence. The change list is one column — the claim, its number before and after, the direction. The sentences under a map keep the route, the generation and the seed and drop the versions and the worlds. Both forms that take the reader's own number take one number. `Ranged` becomes `Likelihood`; the world's count of versions becomes one flag, `workedOut`, which is the only question any surface ever asked it.
+
+**Which invariant it satisfies**
+
+- **INV-workbench.4**, rewritten: two significant figures, one number, and no range on any surface.
+- **INV-workbench.36**, amended the same way; **INV-workbench.47**, rewritten (a row is the ending, its two readings and the direction); **INV-workbench.55**, rewritten (nothing in the panel says anything about a range or about versions of the map).
+- **VR4** on the visual review checklist, rewritten: no range appears anywhere on the screen.
+- The traceability rule is untouched and is what the new test enforces: `noRange.test.tsx` walks every tile on the curated map and on the committed recording, the panel on every claim, and every sentence in the product's own source.
+
+**What is deliberately not here**
+
+- The belief rail is still 69 pixels. It was never sized by the range line — it holds the tallest chip a tile can draw, a two-line words reading — so a tile whose chips all read one line now carries seventeen pixels it does not use. Re-measured and written down.
+- Nothing under `backend/`, `spec/multiverse/`, `spec/graph/belief.md` or `docs/adr/` is touched; the pull request lists every passage there the change makes stale.
+- The panel no longer explains a claim with no causes whose number moved under **This happened**. The explanation that fits a product with no versions of the map in it has not been written; `inspector.md` says so in the reader's own terms.
+- No end-to-end run: three browser specs changed and the command to run them is in the description.</result>
+<usage><subagent_tokens>568935</subagent_tokens><tool_uses>21</tool_uses><duration_ms>597060</duration_ms></usage>
+</task-notification>
