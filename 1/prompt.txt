@@ -1558,3 +1558,25 @@ can you explain to me what feature or product changes you've been working on thi
 **Tip:** `lift.py`'s `too_few_draws` now carries two reasons; rename to `empty_because` in a lane that owns `thesis/`.</result>
 <usage><subagent_tokens>280274</subagent_tokens><tool_uses>111</tool_uses><duration_ms>1470253</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ac948628be142ac76</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ac948628be142ac76.output</output-file>
+<status>completed</status>
+<summary>Agent "Flip F5: remaining range mentions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Verification: `pre-commit run --files &lt;the 7 files&gt;` passed; `grep -n "2 000\|2,000\|versions" PRODUCT_REQUIREMENTS.md` returns only FR-12, FR-16 and NFR-7, all inside dated amendments quoting the old wording.
+
+**Changed** (`/Users/kentgang/git3/katalyst-wt/feat-05-the-flip/`):
+- `PRODUCT_REQUIREMENTS.md` — D2, glossary *Belief* and *Link* (retraction now built), FR-2 (single slider), FR-8, FR-12 (provenance sets no width), FR-25 + FR-26, NFR-7 reference point, INV-7 (`lo == p == hi`), §1 "version"→"branch", one note in Answered.
+- `docs/adr/0019-*` — footer only: the ceiling reads the claim's one likelihood (`ceiling_of` asks low when buying, high when selling — the same ask twice); the *range disagrees* zero is unreachable since `inside_the_model_range` is pinned false; the *nothing worth taking* zero stands.
+- `spec/generation/{grounding,evaluation,proposals,README,streaming}.md` — the arrow-width paragraph, *agreement*, INV-generation.31, the *uncalibrated* chip, B9, anti-pattern 9, `versions`/`worlds` accepted-and-ignored.
+
+**Left on purpose:** `spec/graph/proposition.md` (no range/version text); `docs/measurements.md` (dated journal, "change nothing beneath it" — every hit is a run's own conditions); `spec/generation/replay.md` (its no-World rule is unaffected); the Proposition glossary row (the `step` rename genuinely has not happened); roadmap stack-05 status "not started" — coordinator's call.
+
+**Commit:** `docs: the requirements, record 0019 and the generation chapters lose the range and the versions`</result>
+<usage><subagent_tokens>147250</subagent_tokens><tool_uses>80</tool_uses><duration_ms>475275</duration_ms></usage>
+</task-notification>
