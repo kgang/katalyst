@@ -197,3 +197,17 @@ So **`Draws.weight` is real, not all ones**, and **the 200-draw floor counts *ef
 **What is unchanged.** A venue quote on the claim's own resolution test still comes first; the reader may still override and never must; and the three conditions of R28 — a level gap, additive moves in price units, and a chance of *this* claim's own test — all stand.
 
 **To overturn:** say so; it is one argument in `thesis/paths.py`.
+
+---
+
+## Dated amendment — 2026-09-22: the greyed ceiling reads one number
+
+**Kent's decision, row R48 of `plans/notes/2026-09-21-decisions-after-review.md`, written up as decision record 0028: one likelihood per claim, computed once, and no range anywhere.** Nothing above is rewritten; this says what R29's wording now points at.
+
+**What R29 says.** *Quartered Kelly at the unfavourable end of the model's range.* There is no range to read: every number the engine computes has the same value at its low end, its likelihood and its high end.
+
+**What it reads instead.** The claim's **one likelihood**, for the side of the trade being priced — turned over for an ending that takes the *no* side, since that contract pays out when the claim fails. The rule is unchanged; the unfavourable end of a range with no width is the number itself. `ceiling_of` in `backend/src/katalyst/thesis/ceiling.py` still asks for the low end when buying and the high end when selling, which is now the same ask twice, and the fields go with the rest of the range in a later pull request.
+
+**One of its two zeros can no longer happen.** The ceiling reads zero for two different reasons, and this record distinguishes them. *The model's own range does not agree which side of this price to be* required a range with two ends and a sign that changed between them; record 0028 pins the flag behind it, `inside_the_model_range`, to false for good, so nothing computes that case any more. The other zero stands and is the only one a reader will meet: **at the venue's own price, fees paid, neither buying nor selling is worth taking.** *Absent with the refusal's own sentence* — no contract, no quote, a value fixed by an edit — is untouched.
+
+**What is unchanged.** Greyed, never a size, always under the words *never size to this*; the reader's own risk budget is still the only number that sets a size.
