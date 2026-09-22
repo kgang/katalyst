@@ -13,6 +13,12 @@ on the maps this product builds it is a few milliseconds of work.
 Exactly means exactly. No sampling, no iteration, no tolerance. The only thing
 between the answer and arithmetic truth is the tables themselves.
 
+**Two questions, one procedure.** *Is this claim true?* sums out every other claim
+and leaves one (`solve`). *Are all of these claims true at once?* sums out every
+other claim and leaves several, then reads the corner where all of them are true
+(`all_true`). The second is never the first multiplied together: claims that share
+a cause are not independent, and a product would say so anyway.
+
 The two verbs
 -------------
 * ***Suppose this is true*** pins the claim to its day and **redoes the forward
@@ -155,6 +161,74 @@ def all_marginals(
             *This happened* reported.
     """
     return solve(forward, pinned)
+
+
+def all_true(
+    forward: Forward,
+    pinned: Mapping[PropositionId, Pin],
+    claims: Sequence[PropositionId],
+) -> NDArray[numpy.float64]:
+    """The chance **every one** of these claims is true at once, given everything fixed.
+
+    Decision record 0022 calls this number *the joint*, and it is precisely the
+    thing multiplying a list of claims together is not. Multiplying each claim's
+    own chance assumes the claims are independent; two claims that share a cause
+    are not. If a second claim is true exactly when the first is and both stand at
+    a half, the product says a quarter where the chance both are true is a half.
+
+    **One elimination, over the same tables `solve` reads.** Every claim that can
+    move any of the ones asked about is summed out; the ones asked about are kept.
+    What is left is a table over them, and the answer is the corner where all of
+    them are true, divided by the whole of that table. Each claim's factors are
+    gathered **once for the whole question** rather than once per claim, which is
+    what makes this a joint rather than several separate answers stuck together.
+
+    Locality holds here for the same reason it holds in `solve`: a claim joined to
+    none of these by any chain of arrows and sharing no cause with any of them is
+    never multiplied in at all, so it cannot move the answer by a rounding error.
+
+    Args:
+        forward: The finished forward pass, whose tables this solves over.
+        pinned: The claims an edit fixed a value on. The *Suppose this is true*
+            entries were already honoured by the pass; the *This happened* entries
+            are applied here as a mask, exactly as `solve` applies them.
+        claims: The claims that must all be true. At least one. Naming the same
+            claim twice changes nothing — a claim is asked about once either way.
+
+    Returns:
+        `(versions,)` the chance every one of them is true.
+
+    Raises:
+        ValueError: If no claim was named, so there is nothing to be true.
+        ImpossibleObservation: If nothing the map can produce agrees with what
+            *This happened* reported.
+    """
+    wanted = tuple(claims)
+    if not wanted:
+        raise ValueError(
+            "Nothing was named, so there is no chance to work out: the question "
+            "'are all of these true' needs at least one claim in it."
+        )
+    order = elimination_order(forward)
+    reported = tuple(claim for claim in forward.order if _verb(pinned, claim) == "observe")
+    if reported:
+        _refuse_if_nothing_agrees(forward, pinned, reported, order)
+    inside: set[PropositionId] = set()
+    for claim in wanted:
+        inside |= _can_reach(forward, pinned, claim)
+    kept = set(wanted)
+    factors = _factors(forward, pinned, inside)
+    summing = tuple(other for other in order if other in inside and other not in kept)
+    left = _eliminate(factors, summing)
+    # One axis per claim still standing, each running `[it did not, it did]`. Take
+    # the "it did" half of each in turn and what is left is the one corner of the
+    # table where every one of them is true, a number per version.
+    every_one_true = left.values
+    for _ in left.over:
+        every_one_true = every_one_true[..., 1]
+    whole = left.values.reshape(left.values.shape[0], -1).sum(axis=-1)
+    answer: NDArray[numpy.float64] = every_one_true / whole
+    return answer
 
 
 def elimination_order(forward: Forward) -> tuple[PropositionId, ...]:
