@@ -259,16 +259,22 @@ describe("what the browser asks for", () => {
 
   it("test_the_readers_own_number_is_named_as_theirs", async () => {
     sent.length = 0;
-    const belief = { p: 0.55, lo: 0.4, hi: 0.7 };
+    const belief = { p: 0.55 };
     await everything(
       [block("done", { reason: "reached_terminal", claims: 0, links: 0, rejected: 0 })],
       { hypothesis: THE_SENTENCE, user_belief: belief },
     );
 
     const body = JSON.parse(sent[0] ?? "{}") as { user_belief?: Record<string, unknown> };
-    // The three numbers are the reader's, untouched; the owner is a label rather
-    // than a number, and it is the one thing the browser writes.
-    expect(body.user_belief).toEqual({ ...belief, owner: "user" });
+    // The number is the reader's, untouched; the owner is a label rather than a
+    // number, and it is the one thing the browser writes.
+    //
+    // **The route still asks for a bottom and a top** and there is no longer
+    // either (2026-09-22, R48), so both are the reader's own number: a range of
+    // nothing, which is what "one likelihood, no range" is when it has to be
+    // written in the old shape. Nothing is invented, and both fields go when the
+    // engine half lands.
+    expect(body.user_belief).toEqual({ p: 0.55, lo: 0.55, hi: 0.55, owner: "user" });
   });
 });
 

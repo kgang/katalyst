@@ -53,7 +53,7 @@
  */
 
 import type { components } from "../api/schema";
-import type { Ranged } from "../world/types";
+import type { Likelihood } from "../world/types";
 
 /** An identifier the engine minted for a claim. Nothing in the browser ever makes one. */
 export type PropositionId = string;
@@ -344,7 +344,7 @@ export interface GenerateRequest {
   /** The Verify door's destination, in the reader's words. Absent is the Explore door. */
   readonly target?: string;
   /** The reader's own likelihood on the hypothesis. Absent when they chose "I don't know". */
-  readonly user_belief?: Ranged;
+  readonly user_belief?: Likelihood;
   /**
    * Only when reproducing a run we were handed a seed for.
    *

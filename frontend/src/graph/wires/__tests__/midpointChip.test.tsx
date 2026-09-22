@@ -10,12 +10,12 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Known, Ranged } from "../../../world";
+import type { Known, Likelihood } from "../../../world";
 import { absence } from "../../../world/absence";
 import { WireChip } from "../WireChip";
 
 /** The absence every arrow carries in this build, and the reason beside it. */
-const NO_ENGINE: Known<Ranged> = {
+const NO_ENGINE: Known<Likelihood> = {
   absence: absence("no_engine", "Nothing has worked this number through the map yet."),
 };
 
@@ -80,7 +80,7 @@ describe("the plate in the middle of a wire", () => {
       <WireChip
         strength={1.6}
         lag={2}
-        conditional={{ reading: { p: 0.61, lo: 0.45, hi: 0.74 } }}
+        conditional={{ reading: { p: 0.61 } }}
         detail="full"
         layout="stacked"
         reflexive={false}
@@ -88,7 +88,10 @@ describe("the plate in the middle of a wire", () => {
     );
     expect(screen.getByText(".61")).toBeInTheDocument();
     expect(screen.getByText("with its cause supposed true")).toBeInTheDocument();
-    expect(screen.getByText(".45–.74")).toBeInTheDocument();
+    // And no range under it: R48 took the range off every surface on
+    // 2026-09-22, this plate included.
+    expect(screen.queryByText(".45–.74")).toBeNull();
+    expect(screen.getByText(".61")).toBeInTheDocument();
   });
 
   it("test_the_one_backwards_wire_keeps_its_delay_when_zoomed_out", () => {

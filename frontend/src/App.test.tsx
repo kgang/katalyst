@@ -112,7 +112,7 @@ const WORLD: WorldView = aWorld({
       claim: "The Strait of Hormuz reopens to unrestricted commercial transit.",
       kind: "hypothesis",
       beliefs: {
-        model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
+        model: { reading: { p: 0.35 } },
         user: { absence: absence("not_said", "You have not said.") },
         market: {
           absence: absence("no_market", "No venue quotes this claim."),
@@ -125,7 +125,7 @@ const WORLD: WorldView = aWorld({
       resolvesBy: "2026-11-15",
       resolutionSource: "ICE Brent front-month settlement prices.",
       beliefs: {
-        model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
+        model: { reading: { p: 0.46 } },
         user: { absence: absence("not_said", "You have not said.") },
         market: {
           absence: absence("no_market", "No venue quotes this claim."),
@@ -290,7 +290,7 @@ describe("opening a map", () => {
     expect(source.readConditional).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
-    await screen.findByText(".58 (.42–.73)");
+    await screen.findByText(".58");
     expect(source.readConditional).toHaveBeenCalledTimes(1);
     expect(source.readConditional).toHaveBeenCalledWith({
       baseId: "hormuz",
@@ -302,7 +302,7 @@ describe("opening a map", () => {
     // and the same seed, is the same question — so it is answered from what was
     // kept rather than asked again.
     fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
-    await screen.findByText(".58 (.42–.73)");
+    await screen.findByText(".58");
     expect(source.readConditional).toHaveBeenCalledTimes(1);
   });
 
@@ -322,7 +322,7 @@ describe("opening a map", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Start this branch" }));
     fireEvent.click(await screen.findByRole("button", { name: "select H->B" }));
-    await screen.findByText(".58 (.42–.73)");
+    await screen.findByText(".58");
     expect(source.readConditional).toHaveBeenCalledTimes(1);
 
     // Now an edit. The branch is append-only, so this is a different branch
@@ -392,7 +392,7 @@ describe("opening a map", () => {
     // work out cannot be worked out.
     fireEvent.click(screen.getByRole("button", { name: "select H->B" }));
     await waitFor(() => expect(source.readConditional).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(".58 (.42\u2013.73)")).toBeInTheDocument();
+    expect(await screen.findByText(".58")).toBeInTheDocument();
   });
 
   it("test_a_wires_number_belongs_to_the_map_that_is_showing", async () => {

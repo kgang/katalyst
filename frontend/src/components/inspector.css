@@ -152,14 +152,6 @@
   text-wrap: pretty;
 }
 
-/* The empty slot kept for "why is this band wide?", which arrives in a later
- * piece of work. It is drawn only where the range above it was computed, and
- * nothing computes one yet — so this rule reserves no height today and will
- * hold the sentence when there is one to hold. */
-.inspector__band-slot {
-  min-height: 0;
-}
-
 .inspector__mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -208,16 +200,6 @@
   border-left: 1px solid var(--hairline);
   font-size: var(--text-md);
   color: var(--text);
-}
-
-/* The one sentence a claim that moved only by reweighting gets, at the head of
- * the decomposition. It is set in the body size rather than the muted reason
- * size: it is the reading of the number, not a footnote about it. */
-.inspector__reweighted {
-  margin: 0 0 var(--space-1) 0;
-  font-size: var(--text-md);
-  color: var(--text);
-  text-wrap: pretty;
 }
 
 /* ---- What your edit did: the two readings with a chevron between them ----- *

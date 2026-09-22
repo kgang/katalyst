@@ -26,8 +26,8 @@
  * than as a diagram.
  */
 
-import { toRange, toTwoFigures } from "../../components/BeliefChip";
-import type { Known, Ranged } from "../../world";
+import { toTwoFigures } from "../../components/BeliefChip";
+import type { Known, Likelihood } from "../../world";
 import { lagInWords, likelihoodStep, pushAsNumber, pushInWords } from "./encodings";
 
 /** What the chip needs to draw itself. */
@@ -43,7 +43,7 @@ export interface WireChipProps {
    * parameter rather than an assumption so that the day the engine answers,
    * this component already knows what to do with it.
    */
-  readonly conditional: Known<Ranged>;
+  readonly conditional: Known<Likelihood>;
   /**
    * How much of the plate there is room for.
    *
@@ -98,8 +98,9 @@ export function WireChip({ strength, lag, conditional, detail, layout, reflexive
       <span className="wire-chip" data-reading="likelihood" data-detail="full" data-layout={layout}>
         <span className="wire-chip__bar" data-step={likelihoodStep(answer.p)} aria-hidden="true" />
         <span className="wire-chip__push">{toTwoFigures(answer.p)}</span>
+        {/* Two lines, not three: the range that stood on the third went with
+            every other range on 2026-09-22 (R48). */}
         <span className="wire-chip__words">with its cause supposed true</span>
-        <span className="wire-chip__lag">{toRange(answer.lo, answer.hi)}</span>
       </span>
     );
   }

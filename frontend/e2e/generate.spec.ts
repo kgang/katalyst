@@ -282,13 +282,16 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   );
 
   // The likelihoods land once, at the end, all together: every claim on the map
-  // now reads a number at two significant figures with its range, and none of
-  // them reads an absence any more.
+  // now reads one number at two significant figures — and no range, which R48
+  // cut on 2026-09-22 — and none of them reads an absence any more.
   const claims = await page.locator(".tile").count();
   await expect(page.locator('.belief-chip[data-owner="model"][data-reading="number"]')).toHaveCount(
     claims,
   );
   await expect(page.locator(".tile").first()).not.toContainText("no engine yet");
+  // One reading a chip, and the line a range stood under it on is gone rather
+  // than standing empty (2026-09-22, R48).
+  await expect(page.locator(".belief-chip__under")).toHaveCount(0);
 
   // The map is framed once more when it stops, and settles in the same moment —
   // every pin dropped, the whole map laid out as one thing — and then it stays

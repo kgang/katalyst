@@ -590,11 +590,7 @@ export function fold(was: Growth, event: ReadEvent): Growth {
         day: event.world.day_zero,
         // The seed the run reported, not the one on the world: both are the
         // same seed, and only the first was read as its digits.
-        origin: originOfTheFinishedMap(
-          was,
-          was.seed ?? String(event.world.seed),
-          event.world.versions,
-        ),
+        origin: originOfTheFinishedMap(was, was.seed ?? String(event.world.seed)),
       };
       return {
         ...was,
@@ -666,14 +662,21 @@ export function fold(was: Growth, event: ReadEvent): Growth {
   }
 }
 
-/** The one sentence under a finished map, saying where every number on it came from. */
-function originOfTheFinishedMap(was: Growth, seed: string, versions: number): string {
-  const spelled = versions.toLocaleString("en-GB").replace(/,/g, " ");
+/**
+ * The one sentence under a finished map, saying where every number on it came
+ * from.
+ *
+ * **It used to say how the engine got there** *(until 2026-09-22, R48)*: *"over
+ * 2 000 versions of the map"*. That count only meant something while a claim
+ * carried a range, and there is no range. The seed stays, because a run is still
+ * reproducible from it, and so does the run's own name.
+ */
+function originOfTheFinishedMap(was: Growth, seed: string): string {
   return (
     `Every claim and arrow on this map was proposed at /api/generate and accepted by the map's ` +
-    `own rules; every likelihood was worked out by the engine from that map, at seed ${seed}, ` +
-    `over ${spelled} versions of the map. The working is generation ` +
-    `${was.generationId ?? "this run"}, and the same sentence and seed give the same map again.`
+    `own rules; every likelihood was worked out by the engine from that map, at seed ${seed}. ` +
+    `The working is generation ${was.generationId ?? "this run"}, and the same sentence and ` +
+    `seed give the same map again.`
   );
 }
 

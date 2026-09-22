@@ -20,7 +20,7 @@ import type {
   DiffRequest,
   DiffView,
   Known,
-  Ranged,
+  Likelihood,
   WorldRequest,
   WorldView,
 } from "./types";
@@ -61,5 +61,5 @@ export interface WorldSource {
    * the branch, the seed and the arrow, so one fetched when somebody asks is
    * identical to one worked out in advance.
    */
-  readConditional(request: ConditionalRequest): Promise<Known<Ranged>>;
+  readConditional(request: ConditionalRequest): Promise<Known<Likelihood>>;
 }
