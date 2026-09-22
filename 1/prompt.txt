@@ -1,0 +1,1749 @@
+Could you please read 
+
+<pasted_content id="a56a">
+/Users/kentgang/git3/katalyst/plans/HANDOFF-stacks-05-06.md
+</pasted_content id="a56a">
+
+ and orchestrate the completion of it using opus sub-agents? Try to resolve as much as you can using your best judgement. Cut scope if there's significant complexity and you can justify that the payoff isn't impactful relative to its effort. One of the goals now is to get towards completion.
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/72786.sock" from-name="katalyst-a4" from-mode="bypass">
+UX-round (stack 04c) coordinator here: no code collision with your list, three shared-document overlaps to expect — no reply needed.
+State: #50 open (fix/04-the-question-mark, keyboard only), not merged — this session opens pull requests and Kent merges. Running: D1 adr/04-what-the-run-says-and-when-a-tile-moves (records 0023 + 0024 proposed), D2 adr/04-what-a-start-is (record 0012 amendment, spec/workbench/first-screen.md, then GenerateRequest's replay|live field in generate.py/replay.py + regenerated frontend/src/api/schema.ts), feat/04-the-quieter-tile (Tile.tsx, BeliefChip.tsx, graph/wires/encodings.ts, tiles-ports-wires.md), feat/04-the-run-strip (GenerationScreen.tsx, MapFrame, Inspector.tsx gains a Run details section, e2e/generate.spec.ts). Later: feat/04-the-settle (graph/layoutRunner.ts, elkGraph.ts, layers.ts, Canvas.tsx, geometry.ts), feat/04-one-first-screen (Launchpad.tsx, InputBar.tsx, App.tsx, api/client.ts).
+Overlaps with yours: (1) docs/adr/README.md — D1 adds rows 0023 and 0024, beside your 0018–0020. (2) ARCHITECTURE.md — D1 touches the passages restating "a placed tile never moves" and the strip (marked planned), D2 the generate-route/replay passage, the run strip one small passage; none is an engine passage. (3) PRODUCT_REQUIREMENTS.md — D1 touches only the lines restating "a placed tile never moves" and UX-8/anti-pattern 9 on the spinner wording; your R-catch-up owns the rest. Whoever lands second rebases and keeps both sides, as you said.
+For your engine flip: Tile.tsx and Inspector.tsx are both open in my lanes right now (the quieter tile; the run strip). Please do message before an agent of yours opens them; I will tell you when those two pull requests are up so you can branch from them. schema.ts will also change under you once D2's server commit lands — regenerate with make types rather than merging it by hand. Whole suites and browser runs go through plans/scripts/heavy.sh here too; my end-to-end runs use ports 8041/5141, my agents 8031/5131 and 8033/5133.
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>ade075983b566095a</task-id>
+<tool-use-id>toolu_01XDW8SVa7mSuXpNwWTcqAQS</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ade075983b566095a.output</output-file>
+<status>completed</status>
+<summary>Agent "E-plan: stack-05 plan and shapes" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>`/Users/kentgang/git3/katalyst/plans/stack-05-sound-numbers.md` — 527 lines. Repo otherwise untouched; no git command run.
+
+**Five decisions to look at**
+
+1. **E1 cannot hold record 0016's first oracle.** `test_the_elimination_is_exact` is defined *over the core's own tables*, and in E1 no core exists. Plan: E1 lands the two enumerators plus three defect tests as `xfail(strict)`; both oracles proper run in E2 against both cores. One sentence of deviation — it rides the dated amendment to record 0016's *How it lands* that the flip already carries for R39.
+2. **A bridge the stack cannot avoid: `strength → q1`.** The core needs `q0`/`q1`; the model is not asked for them until the freeze (R6). So `rates.stated_chance_with` derives `q1 = sigmoid(logit(q0) + strength)` with a dated docstring — and every number moves at the flip *and again* at the freeze. `numbers-check` makes both a build failure, not a sweep, but the chapter must say it.
+3. **Cut the two-pass solve** (~1–1.5 sessions saved, ~80 ms of 360/644 ms lost; `all_marginals` kept as the seam). This contradicts a line in accepted record 0016, so it needs a decisions-note row under Kent's cut instruction, or a question to him.
+4. **The flip keeps two wire fields empty rather than deleting them** — `World.retractions` and `ClaimDiff.moved_only_by_reweighting` — because their readers are `Tile.tsx`/`Inspector.tsx`, the other session's this week. A follow-up `fix/05-browser-readers` deletes them.
+5. **Freeze cut to 10 of 14 items** (~2 sessions vs 3.2). Cut: `move` as a range, `what_would_change_my_mind`, and — most importantly — ***what would stop this step***, which record 0016 itself warns raises the count of hold-back arrows, the one place the core still enumerates (ten cost 70×). The verdict should **not** be slimmed: it is 0.5–1 session and closes two P0s.
+
+**Checked:** `Sample` matches `Draws` in `spec/thesis/position.md` field for field. One thing T2a needs today: sample days are **slice middles rounded to whole days**, so at 24 slices arrivals land on ~24 days, ~2.5 apart.
+
+**Could not determine:** whether the hard case (states *and* hold-back arrows together) is over target — nobody has measured it; the 8-vs-32 integration-point error (`1.8e-2` vs `5e-3`) is uncosted; whether `q1` derived from `strength` reproduces the spike's accuracy (the spike drew `q1` directly). `test_propagation.py` has **51** module-level tests on `main`, not the 46 record 0016 counted.</result>
+<usage><subagent_tokens>215664</subagent_tokens><tool_uses>37</tool_uses><duration_ms>586912</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b0963bs6i</task-id>
+<tool-use-id>toolu_01S78JTiBiBJ1YHeJnp6Pxfm</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/b0963bs6i.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait until T2a's shapes commit exists on feat/06-position" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>adc0f1d8855034c2e</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/adc0f1d8855034c2e.output</output-file>
+<status>completed</status>
+<summary>Agent "T-land: finish landing prep" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both branches are finished, committed, and local only.
+
+**To check me, in order:**
+```
+cd /Users/kentgang/git3/katalyst-wt/adr-06-the-trade &amp;&amp; git log --oneline -5 &amp;&amp; git diff --stat origin/main...HEAD
+cd /Users/kentgang/git3/katalyst-wt/feat-06-quote  &amp;&amp; git diff --stat adr/06-the-trade..HEAD &amp;&amp; make numbers-check
+cd /Users/kentgang/git3/katalyst-wt/feat-06-quote/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest -q   # through heavy.sh
+cd /Users/kentgang/git3/katalyst-wt/feat-06-quote/backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run python /Users/kentgang/git3/katalyst/plans/analysis/scripts/t-land/check_record_quotes_offline.py
+```
+
+**What I built.** `adr/06-the-trade` rebased clean onto `03794cf` (tip `5fbf160`); `spec/graph/belief.md` did not conflict — `main` never touched it. One new commit adds index rows 0018–0020 (`accepted`, R32; 0023–0025 not claimed) and the two record-0014 corrections: `two_figures`, public in `domain/belief.py`, replaces `_two_figures` in `diff.py`; the typed `.36 · up by .0090` in both places now cites `H · observed C · reading` and `H · observed C · move` in `docs/worked-numbers.txt` by line name, no figure typed. `feat/06-quote` rebased with `--onto` (tip `2514b77`), one new commit: the `ARCHITECTURE.md` paragraph marking `grounding/` and `thesis/` `[built]` (plus the diagram, the layout tree, §8's empty-directory sentence, §10's now-false "`grounding/` is an empty package", and INV-13's row for the no-network test), and `make record-quotes` — `scripts/record-quotes.sh`, in the style of `gen-types.sh`. I did not run it.
+
+**Evidence.** `make record-quotes` reaches a venue, so I checked everything after the two reads offline: `plans/analysis/scripts/t-land/check_record_quotes_offline.py` lifts the program out of the script, feeds it agent P's saved raw answers, and the file it writes is named `3501950-2026-09-21.json` and reads back through `recorded_quote` with **zero fields differing** from the committed quote.
+
+**Verification.** ruff + format clean · `mypy --strict` on `domain`, `grounding`, `thesis`: 18 files, no issues · `mypy src`: 50 files, no issues · `make numbers-check`: "still says what the engine says" · whole suite through the queue: **722 passed**, 147 s, 100% statements and branches on all three packages (`.heavy.log:191–192`, log at `plans/analysis/scripts/t-land/suite.log`).
+
+**Drafts written:** `notes/msgs/pr-adr06-body.md`, `pr-06-quote-body.md`, `merge-adr06.txt`, `merge-06-quote.txt`.
+
+**Owed outside my files.**
+- `docs/adr/0010-*.md`: the five dated amendments of owed-note §1.5, and its index row's amendment clause (§1.4). I left both out — an index row claiming an amendment the record does not carry is drift.
+- `ARCHITECTURE.md` *planned* passages, R-catch-up's: the `Thesis` data-model row (line 130) still says "Planned (stack 05)" and "invalidation"; line 138's count; §10's *The thesis* bullet.
+- `feat/06-position` and `feat/06-card` (both `6d76a7e`) still sit on the pre-rebase lineage: `git rebase --onto feat/06-quote 7a71697 &lt;branch&gt;`.
+- **Deviation:** `scripts/record-quotes.sh` is a new file outside the stated owned list (25 files + `ARCHITECTURE.md` + `Makefile`). A Makefile target needs a body, and putting the recorder in `grounding/` would have added uncoverable lines to a package held at 100%.
+
+**Not checked:** the two network reads themselves; no browser run (neither branch touches `frontend/`).</result>
+<usage><subagent_tokens>194815</subagent_tokens><tool_uses>97</tool_uses><duration_ms>865660</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a4ad652f575623f09</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a4ad652f575623f09.output</output-file>
+<status>completed</status>
+<summary>Agent "R-catch-up: requirements catch-up docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Check me:** `cd /Users/kentgang/git3/katalyst-wt/docs-05-06-requirements-catch-up &amp;&amp; git diff 03794cf --stat &amp;&amp; git diff 03794cf` (branch `docs/05-06-requirements-catch-up`, 2 commits, clean); then open `plans/notes/msgs/pr-catch-up-body.md` and `merge-catch-up.txt`.
+
+**What I built.** Every PRD edit both owed notes list: INV-8/FR-11 (0022); INV-13, INV-14, FR-19, FR-22–27, anti-pattern 11, the three prose passages and the export open question (0018/0019/0020); FR-15, UX-14 (0017); record 0021's cuts written onto FR-8, FR-17, FR-18, FR-20, FR-24, FR-29, FR-30, FR-31, INV-10, anti-pattern 12; NFR-7's map-proportional target; §12 rows for 05, 06, new 07 and the cap of two. `spec/vocabulary.md`: the planned engine words, the retired *invalidation*, a new §*The trade* (18 entries), two absence rows. `ARCHITECTURE.md`: planned engine/trade passages only — step 7, four data-model rows, INV-8/10/13/14, no database, the path-product bullet **deleted**, record 0016's timings beside stack 03a's (never instead), decisions rows 0016/0017/0021/0022.
+
+**Deviations.** (1) FR-24 cites records **0019 and 0021** — each record's *Confirmation* demands a pointer — and uses 0021's plain words for the three cut quantities instead of "expected shortfall / max drawdown / ruin"; likewise "the barrier shift" → "the standard correction for checking only once a day". (2) The vocabulary's *Retracted* badge is **not deleted** as the note directs: it still exists in the build the day this lands, so it is marked on its way out. Same for `persistence`, `step`, `sustain`, the inner eight worlds, the both-ways sweep — all marked planned, naming stack 05/06 but **not** a pull request, so the text is true under record 0017 *and* under R39. Only `ARCHITECTURE.md`'s step-7 passage names *the flip*, per R39. (3) `ARCHITECTURE.md` §9 gains no rows for 0018–0020 — those records are not on `main`; T-land owes them. (4) Beyond the notes, because plainly false: PRD §4 table (Proposition/Link/Probe/Thesis), §5 flow diagram, §13 answered list; `ARCHITECTURE.md` §4 World/Proposition/Link/Thesis and §5 INV-10/INV-13 rows. No note/record disagreement found.
+
+**Stale outside my files** (not edited): INV-8's product — `spec/workbench/README.md:19,36`, `inspector.md:65,313`, `diff-view.md:105`, `streaming-growth.md:146,863`, `generation/streaming.md:59,160`, `multiverse/diff.md:293`, `propagation.md:285`. FR-31/SQLite — `inspector.md:463`, `generation/streaming.md:208,307,419`, `replay.md:324`, `streaming-growth.md:843`. Derived stop-loss — `spec/thesis/README.md:21`, `multiverse/diff.md:332,334`. INV-13's narrow wording — `generation/README.md:25`. FR-30 "stack 07" — `evaluation.md:194,243,322`, `generation/README.md:47`. INV-10/`refine` — `multiverse/interventions.md:126,201,372,399`, `multiverse/README.md:24`, `probes/README.md:25`. Retraction — `graph/link.md`, `multiverse/{interventions,propagation,diff,branches-and-worlds}.md`, `workbench/{tiles-ports-wires,diff-view,streaming-growth}.md`, `generation/streaming.md`.
+
+**Owed outside my files.** Index rows 0018–0020 and record 0010's in-body amendment (T-land); `ARCHITECTURE.md` §9 rows for 0018–0020 when those records land; `plans/PLAN.md`'s stale "0.5 ms" / "200 versions".
+
+**Verified.** `pre-commit run --files PRODUCT_REQUIREMENTS.md ARCHITECTURE.md spec/vocabulary.md` → `Detect hardcoded secrets…Passed / fix end of files…Passed / trim trailing whitespace…Passed / check for added large files…Passed` (ruff, biome, check-yaml skipped, no files). Markdown table pipe counts checked by script; no trailing whitespace; all files end in a newline.
+
+**Not checked.** `make numbers-check` — the repository's only docs check, needs `uv sync` in a fresh worktree and no number moved. No link or markdown lint exists in the `Makefile` or `.github/workflows/`.</result>
+<usage><subagent_tokens>271514</subagent_tokens><tool_uses>106</tool_uses><duration_ms>850858</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bnsa54bil</task-id>
+<tool-use-id>toolu_01CZejHV4k46UQpk4EuAn8fn</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/bnsa54bil.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for checks and squash-merge the docs pull request #53" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae06581488ed95b1a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ae06581488ed95b1a.output</output-file>
+<status>completed</status>
+<summary>Agent "Review R-catch-up docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Review written to `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-22-review-catch-up.md`. Nothing else touched; no git command run.
+
+**Counts:** 6 must-fix, 12 should-fix. Every prescribed replacement in both owed notes matches its source word for word; the failures are all in *unchanged* text the same records falsify, plus one measured number dropped.
+
+**Must-fix, one line each:**
+
+1. `ARCHITECTURE.md:337` — "not measured" for five states at 200 versions; record 0016 measures it at **126 ms** (`:109`, `:149`).
+2. `ARCHITECTURE.md:124` — `Intervention` row still says `refine` "arrives in stack 06"; record 0021 cuts it, and the code's own sentence names no stack.
+3. `ARCHITECTURE.md:316` vs `:341` and `PRODUCT_REQUIREMENTS.md:279` — reflexive propagation is "unscheduled" in one place and "stack 06" in two, after the roadmap was renumbered.
+4. `ARCHITECTURE.md:325` — the third copy of the FR-30 escape-hatch sentence was left uncorrected; the branch fixed the other two (PRD `:116`, `:281`).
+5. `spec/vocabulary.md:89` and `PRODUCT_REQUIREMENTS.md:140` — *barrier shift* loses its name, though both owed notes prescribe it and three `spec/thesis/` passages use it as a term.
+6. `ARCHITECTURE.md:277-295` — §9 gains rows for 0016/0017/0021/0022 but none for 0018/0019/0020, which the same file cites four times.</result>
+<usage><subagent_tokens>240039</subagent_tokens><tool_uses>36</tool_uses><duration_ms>507949</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aae68215c11ac949a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/aae68215c11ac949a.output</output-file>
+<status>completed</status>
+<summary>Agent "Red-team the stack-05 plan" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>`/Users/kentgang/git3/katalyst/plans/analysis/2026-09-22-redteam-stack-05-plan.md` — 16 must-changes, 9 should-changes, an honest count, a four-PR stack 05. Evidence script and log under `plans/analysis/scripts/stack-05-plan/redteam/`.
+
+**Top five must-changes**
+
+1. **The cheap path — the plan's only MUST speed-up — saves nothing against the benchmark it quotes.** `cost2.log:27-32` reads `78.93 × 3 = 236.79`, and the log's own prose says three of five states have a `sustain` child; the `508.92 ms` total *already* skips the joint for the other two. Record 0016 `:119` carries the same slip and needs a dated correction.
+2. **The `strength → q1` bridge ships a number the core cannot deliver, unflagged.** On the committed fixture 2 of 4 holding-back arrows clamp; `S-&gt;B` — the strike into Brent, the brief's central story — asks `.0341` and delivers `.1115` (`bridge.log` §C). `Rates.saturated` has no reader anywhere. That is Kent's traceability veto. For an ending arrow the same `strength` of −0.5 means `stops` from `.0609` to `.3686` depending on the state's prior.
+3. **Writer D is pointed at the oracle.** `by_integrating.py` and `domain/states.py` are both lifts of `st2_core.py`'s one call chain (`_push` → `pmf_off` → `hold_prob` → `exact_over_times`), so a shared error agrees with itself to `1e-16`. The vectorised state code is in `cost2.py`, already checked to `5.6e-17`. Also writer C cannot start from stubs — the control variate needs A's and B's bodies.
+4. **The flip does not leave the browser green.** The *"one supposition retracted"* sentence is client-side (`a11y/announcement.ts:58`) and asserted end-to-end; `hormuz.spec.ts:1107` asserts the reweighting sentence *is* visible and dies the moment the field is always false; four unit-test files pin the badge; `worlds` is required in `schema.ts` six times with readers in the other session's `stream/` and `replay.py`. Keep all three fields empty, not two. The "69 px badge" is `BELIEF_RAIL`, not a badge.
+5. **`width_shares(tables, pinned)` can't compute what it claims** (a prior changes the table it's handed) and, read as record 0016 does, costs 20 × 80.4 ms per world for a P2 no route reads until stack 06 — today it's six free lines. Cut it; that also removes the only caller that made the two-pass solve worth its 65 ms (not 80).
+
+Honest count: **20.9 sessions of work, ~14 wall** against the plan's 13.3/9 — 1.57×, matching lesson 21's 1.6×. Smallest sound stack 05: four PRs, ~16.5/10.5.</result>
+<usage><subagent_tokens>232764</subagent_tokens><tool_uses>59</tool_uses><duration_ms>794630</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a4ad652f575623f09</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a4ad652f575623f09.output</output-file>
+<status>completed</status>
+<summary>Agent "R-catch-up: requirements catch-up docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Tip: `9f62417`** on `docs/05-06-requirements-catch-up`, rebased onto `c7f8657`, three commits, tree clean.
+
+**Must-fix — all six fixed.**
+1. `126 ms` restored (record 0016:109, :149; 0017:94 agrees).
+2. `Intervention` row: `refine` is not built in version one, and the refusal names no stack.
+3. Reflexive propagation now unscheduled in both `ARCHITECTURE.md` and the PRD's answered list; the §10 bullet kept.
+4. FR-30's escape-hatch clause appended to the third copy.
+5. *Barrier shift* keeps its name in both places, explained once in the vocabulary as the coordinator directed.
+6. §9 rows for ADR-0018, 0019, 0020 added in number order (22 rows, 0001–0022).
+
+**Should-fix — twelve fixed, none declined.** 1 "enough", not "the smallest"; 2 caption names slices, rate, arrival convention, sample size; 3 "about fifteen lines"; 4 "one elimination pass per claim"; 5 "the paragraph above"; 6 "no database is planned"; 7 PRD §4 `Provenance` and `refine` rows given the vocabulary's dated clauses; 8 `thesis/` drawn in §1 and §8, and §10 now carries the file lists, `draws.py` as the one contract, "`domain/` gains nothing", two worlds on a card request and the five routes; 9 ADR-0010's amendment clause; 10 and 12 named as deliberate departures in the pull-request body; 11 `ask_failed` named.
+
+**Still owed, not mine:** record 0010's in-body amendment and its `docs/adr/README.md` clause.
+
+**Verified:** `pre-commit run --files …` → secrets, end-of-file, trailing-whitespace, large-files all Passed; box-drawing and table column counts checked by script.
+
+`pr-catch-up-body.md` and `merge-catch-up.txt` updated: the two departures are now their own section, §9 covers all seven records, and the "not here" bullet is record 0010's amendment.</result>
+<usage><subagent_tokens>304693</subagent_tokens><tool_uses>39</tool_uses><duration_ms>188103</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b4teegdrg</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/b4teegdrg.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for checks and squash-merge PR #54" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ade075983b566095a</task-id>
+<tool-use-id>toolu_013o8DPyqgMFqT92FMmNvuV5</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ade075983b566095a.output</output-file>
+<status>completed</status>
+<summary>Agent "E-plan: stack-05 plan and shapes" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Revised in place: 595 lines. All 16 M and 9 S verified against the files and lines they cite — M1 (`cost2.log:27-32`: the joint row is ×3, not ×5), M3/M4/M5 (`bridge.log` §A–C), M10 (six required `worlds: number;` in `schema.ts`), M11, M12, M15 (`Verdict` is absent from `schema.ts`) all hold.
+
+**Declined, with evidence (§10):**
+1. **M15 in part** — `PathBar.tsx`/`pathBar.test.tsx` stay in PR 3. Record 0022 names one browser deletion, and it is real: the wart sentence lives at `PathBar.tsx:51-52`, prints at `:287`, is asserted at `pathBar.test.tsx:133`; neither file is the other session's. The server-only half of M15 is applied.
+2. **M13's conditions, not its numbers.** `96.9/42.9` applied; but M13 calls round one "12 slices" and `candidates.log:17` reads `K=24`. I quote the log, and do not assert a world count that line lacks.
+3. **M6's "median version"** — undefined; Latin-hypercube rows carry no order. Named **version 0**, with the `.0020` bound on sharing one correction.
+
+**Still unsure in §2–§3:** whether `shapes_of` needs the *target's* persistence too (a `sustain` arrow into a state), so its `carried` cases may be three, not two; and whether `solve`'s mask for *This happened* on a state needs the coarse `hold` code or the raw bit — I specified the bit, per record 0017.</result>
+<usage><subagent_tokens>277863</subagent_tokens><tool_uses>13</tool_uses><duration_ms>403697</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a4ad652f575623f09</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a4ad652f575623f09.output</output-file>
+<status>completed</status>
+<summary>Agent "R-catch-up: requirements catch-up docs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Tip: `c379d3c`** on `docs/05-06-requirements-catch-up`, four commits on `fd12092`, tree clean, rebase finished.
+
+**Kept from #54:** the §1 diagram lines for `grounding/` and `thesis/`, the §8 preamble and layout tree (with its real file lists), INV-13's row with `test_no_quote_test_touches_the_network`, and the "half built" framing of both §10 bullets.
+
+**Kept from mine:** INV-13's widened invariant name, INV-14's rewrite, the planned engine passages, `draws.py` as the one contract, `domain/` gains nothing, two worlds on a card request, the five thesis routes, "no database is planned" (record 0021), FRED as an observation, Kalshi cut, the §9 rows (22) and the timing table.
+
+**Contradictions found and fixed** in one commit: the `Thesis` row said "no type and no code today" and called `thesis/` a new package; `spec/vocabulary.md`'s *The trade* said none of its words were in the build — seven now are.
+
+**Verified:** no conflict markers, box lines all 69 chars, 22 ADR rows, pre-commit clean.</result>
+<usage><subagent_tokens>335069</subagent_tokens><tool_uses>27</tool_uses><duration_ms>205000</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a009c2b19f4e76d27</task-id>
+<tool-use-id>toolu_01So3ThK5oRF4sEryT1joP43</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a009c2b19f4e76d27.output</output-file>
+<status>completed</status>
+<summary>Agent "T2a: reader's position, pure" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me, in order:** from `/Users/kentgang/git3/katalyst-wt/feat-06-position/backend` — `uv run ruff check . &amp;&amp; uv run ruff format --check .` · `uv run mypy --strict src/katalyst/domain src/katalyst/grounding src/katalyst/thesis` · `uv run pytest tests/thesis -q` · the measurement script `plans/analysis/scripts/T2a/check_the_path.py` (recipe in the long report) · `git log --oneline 7a71697..`. All with `env -u ANTHROPIC_API_KEY -u FRED_API_KEY`. Long report: `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-22-T2a-report.md`.
+
+**What I built.** Seven commits on `feat/06-position`. The shapes commit is `6d76a7e` — **T3a branches from that**; nothing in it was renamed or removed afterwards. Then `draws.py` (the engine contract, two days and two distinct markers per claim, weighted counts, effective-draw arithmetic), `paths.py` (the daily walk applying the surprise, giveback on the model's own arrival days with a named straight-line fallback), `position.py` (the reader's three prices, every form fault at once, first touch with the barrier shift, a contract refused by name), `lift.py` (the rail, Wilson on the numerator only, three named drop reasons, the floor in effective worlds), `ceiling.py` (quartered Kelly at the unfavourable end, zero vs absent kept apart, *never size to this* carried as data). Both chapters updated to match.
+
+**Verification.** Whole server suite once through the queue: **797 passed**, `100%` statements and branches on `domain`, `grounding` and `thesis` — every new module at 100%. `ruff`, `ruff format --check`, `mypy --strict` over the three packages and `mypy src`: all clean.
+
+**Shape changes after the shapes commit** (additive, flagged as the brief asks): `Paths` gained `daily_move` and `sample`; `LiftRow.days_before_the_stop` became `float | None`. `Draws` matches the engine's `Sample` field for field plus one extra, `sample`, so an adapter is a rename plus one constant.
+
+**Two real gaps found, written down rather than hidden.** The path prices the chance a claim comes true and not *the chance it stops*, so a state already on at day zero gives up its whole level gap when it stops, and a state that comes on and stops inside one day is never carried. INV-thesis.16 is therefore stated over **events**, with two tests pinning what the antecedent costs. Fixing it needs R26's freeze line.
+
+**Measured** (seeded, script kept): the barrier shift moves *the stop is touched* from `.5149` (daily, uncorrected) to `.5874` against `.5786` watching continuously. The surprise rule's mean move is `+0.0083 ± 0.0158` points where the rule it replaced reads `+2.7933` — matching `m × p` — worth `.112` of *target first*.
+
+**Owed outside my files:** a pointer fix in `card-and-export.md` (T3a), the stale *"This is the stop-loss"* line in `spec/vocabulary.md` (R-catch-up), a `Draws` name collision at `domain/propagation.py:76` (engine lane), and an `ARCHITECTURE.md` line for T-land. **One question worth putting to Kent:** which number *the model's own chance* means — the base world's likelihood, or the sample's own arrival share inside the trade window; I recommend the second, because it makes the no-drift rule exact and costs nothing.</result>
+<usage><subagent_tokens>387099</subagent_tokens><tool_uses>154</tool_uses><duration_ms>2341864</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bl937ouk8</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/bl937ouk8.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for checks and squash-merge the catch-up PR #57" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2afcaa46dc1adfe9</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a2afcaa46dc1adfe9.output</output-file>
+<status>completed</status>
+<summary>Agent "T3a: the card and export" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Run this to check me, in order:**
+```bash
+cd /Users/kentgang/git3/katalyst-wt/feat-06-card/backend
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync ruff check . &amp;&amp; \
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync ruff format --check . &amp;&amp; \
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync mypy --strict src/katalyst/domain src/katalyst/grounding src/katalyst/thesis &amp;&amp; \
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync pytest tests/thesis -q --cov=src/katalyst/thesis --cov-report=term-missing
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync python /Users/kentgang/git3/katalyst/plans/analysis/scripts/T3a/mutants.py
+```
+Then read `spec/thesis/card-and-export.md` against `card.py`. Long material: `plans/analysis/2026-09-22-T3a-report.md`.
+
+**What I built.** `thesis/card.py` and `thesis/export.py`, four commits on `6d76a7e`, nothing pushed.
+
+- **Every number is a `Figure`** carrying one of four owners — reader, model, venue, computed. INV-thesis.14 became a shape rather than a static check. A price the reader typed is *theirs*, never a venue's.
+- **The card assembles and computes nothing another module owns.** It ranks only the endings and the tails.
+- **Two ranking rules, two lists, never blended**; each row names its rule and carries the numbers its key is made of. Record 0018's two thresholds kept apart: range-straddling → not ranked; narrower than a tick → ranked, never led with.
+- **A price ending is a first-class trade**: the refusal plus a break-even in price units (entry moved by costs; costs unknown → the entry, said out loud).
+- **The shock has no field a probability could go in**; the document writes `probability: null` and the schema types it `"null"`.
+- **Tails rank by harm alone** — answers the chapter's open question 2; harm×likelihood is an expected loss by another name.
+- **`export.schema.json` generated and committed**; one test compares byte for byte, another checks every document against the committed file, a third shows that checker biting on every rule it understands.
+- The shift arrives through a small `Shift` shape (record 0022 doesn't exist yet); tests use synthetic values and assert orderings only.
+
+**Deviations.** `card_of` takes `market_chance_from` rather than `ClaimMove`s and `implied_size` as an argument — T2a's `ClaimMove.__post_init__` and `what_your_risk_budget_implies` are unimplemented, and the card owns neither. `execution` is a third data field beside `refuses`/`not_advice`. Export numbers are figures, not the digest's bare values.
+
+**Verification.** ruff clean · `mypy --strict` clean on all three packages · `mypy src` clean · **97 thesis tests, `card.py` and `export.py` at 100% statements and branches** · whole suite through the queue: **714 passed in 137 s**. The only 17 uncovered lines anywhere in `domain`/`grounding`/`thesis` are T2a's `raise NotImplementedError` bodies in `draws/paths/position/lift/ceiling` — theirs to close; there is no `fail_under`, so nothing failed. Mutation check: 16 rules broken, **16 caught** (one was a miss first time — the leg's size — closed by `a37022e`).
+
+**Owed outside my files** (exact words in the report): the `thesis/__init__.py` package docstring's *What lives here now* paragraph; `ARCHITECTURE.md`'s T-land paragraph; two stale `spec/vocabulary.md` entries (**Thesis**, **Strategy export**); optionally `jsonschema` in the dev group to replace my small description reader.
+
+**Not checked:** any route or browser file, T2a's bodies, a card over the real Hormuz recording, and the half of INV-thesis.15 that needs a route to rebuild a world.</result>
+<usage><subagent_tokens>367930</subagent_tokens><tool_uses>118</tool_uses><duration_ms>2077178</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a4449f7e273b096ee</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a4449f7e273b096ee.output</output-file>
+<status>completed</status>
+<summary>Agent "Core stubs: shapes as code" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me, from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`:** `uv run ruff check src benchmarks tests/unit` · `uv run ruff format --check src benchmarks tests/unit` · `uv run mypy --strict src/katalyst/domain` · `uv run mypy src` · `uv run pytest tests/unit/domain tests/unit/engine -x -q --no-cov` · `uv run pytest -q tests/unit/domain tests/unit/engine` (read the missing-branch column) · then `make numbers-check` from the worktree root.
+
+**Deviations** (file · plan said · I wrote · why)
+
+1. `rates.py` `shapes_of` · `(claim, arrows, source_persistence, window)` · adds `*, persistence: Persistence` · **the first open point, decided yes.** `ClaimShapes` must split `holds_back` from `ends`, and only the *target's* persistence tells them apart. `Proposition.persistence` does not exist until the flip, so it is passed, exactly as `rates_of` already does. `carried` stays **two** cases: the half-gated array an ending arrow needs is `ender_slices`, writer D's named lift into `states.py`, derivable from `points` and `carried`.
+2. `states.py` `needs_the_joint` · `(graph, claim)` with a body · adds `persistence`, body raises · same missing field; a real body would not type-check.
+3. All five modules · `NDArray`, `Mapping[...]`, `Literal["event","state"]` inline, `pinned = {}` · parameterised arrays, spelled-out returns, a `Persistence` alias, `NOTHING_PINNED = MappingProxyType({})` · `disallow_any_generics`, and ruff's mutable-default trap. House style: `NOTHING_ADDED`.
+4. `diff.py:481` · untouched · `**budget` expanded to `versions=`/`worlds=` at both call sites · `dict[str, int]` no longer type-checks against the `engine` literal. Two lines, no behaviour.
+5. `pyproject.toml` · new `[tool.coverage.report] exclude_also = ["raise NotImplementedError"]`, commented dated and temporary.
+6. `engine/worlds.py` · "three pass-throughs" · `ENGINE` passed once, at the single `propagate` call in `_worked_through`, which all three of `build_world`, `difference`, `conditional` reach. One place, named in the docstring.
+
+Second open point kept as the plan says.
+
+**Owed outside my files:** `ARCHITECTURE.md` (hot) needs `domain/` listing the five new modules.
+
+**Tails**
+
+```
+All checks passed!
+96 files already formatted
+Success: no issues found in 17 source files   (mypy --strict domain)
+Success: no issues found in 50 source files   (mypy src)
+428 passed in 76.40s (0:01:16)
+TOTAL   1556   0   356   0   100%             (rates/states/forward/solving/sampling all 100%)
+worked-numbers: worked-numbers.txt still says what the engine says.
+```
+
+Remaining 4 ruff errors and 1 format diff repo-wide are all in `tests/oracles/**` — the oracle agent's, untouched.
+
+**Suggested commit**
+
+```
+feat(engine): the shapes of the by-deadline core, behind a flag that still says "today"
+
+Five new modules under domain/ — rates, states, forward, solving, sampling —
+with every constant, frozen dataclass and signature record 0016 asks for, full
+docstrings, and bodies that raise. propagate gains engine/slices/sampled_worlds
+and dispatches to _by_deadline; the "today" path is untouched and make
+numbers-check is green. Six test files name the tests their writers owe.
+raise NotImplementedError is excluded from coverage, dated and temporary.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+```</result>
+<usage><subagent_tokens>167545</subagent_tokens><tool_uses>78</tool_uses><duration_ms>982331</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a47d020d55ec40775</task-id>
+<tool-use-id>toolu_01BfiRXVMBXjJXJY3jj8HwEV</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a47d020d55ec40775.output</output-file>
+<status>completed</status>
+<summary>Agent "Review T2a position code" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Review written to `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-22-review-T2a.md`. Worktree untouched; scripts in `plans/analysis/scripts/T2a-review/`.
+
+**Counts:** 180 tests pass, ruff/mypy clean, 100% coverage. **4 must-fix, 12 should-fix, 8 of 46 mutants survived.** 41 hand-worked answers matched exactly — first touch both sides, the barrier shift's direction, the giveback schedule to 12 places, the no-drift identity at `0.0e+00`, and Kelly on a no-side contract read off `pays_on` (last review's defect not repeated).
+
+**Must-fix**
+1. `lift.py:317` — `came_on &lt; stopped_on` excludes the arrival day, but `paths.py` applies the move *on* that day. Measured: the adverse claim reads lift **0.040, ranked last** where `&lt;=` reads **3.190, first**. The rail inverts its own answer.
+2. `position.py:339` — `first_touch` never reads `position.horizon`; same paths over 60 days vs the reader's 20 give stop-first `.6311` vs `.5063`, target-first `.3533` vs `.2089`.
+3. `synthetic.py:248` — the neutral `q` can be exactly `1.0`, which `ClaimMove` refuses; the suite errors at `--hypothesis-seed=7` (2 of 15 seeds).
+4. `test_position.py:322` — the "crosses both levels" test never touches the target; the tie-break mutant survives, and the stated intraday rule is one closes cannot deliver.
+
+**Item 5:** 0019's words name the base world's likelihood, but the same paragraph's no-drift guarantee is true only of the sample's arrival share (measured drift +0.16 pts otherwise). Today the code takes `q` on trust and does neither. Take the builder's recommendation, amend 0019 in the same PR, split `MarketChanceFrom`'s `model`, and close must-fix 3 first.</result>
+<usage><subagent_tokens>240758</subagent_tokens><tool_uses>54</tool_uses><duration_ms>1184094</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a5ce355daa417b56b</task-id>
+<tool-use-id>toolu_012QNPwKvL88pmo6P6cmbytS</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a5ce355daa417b56b.output</output-file>
+<status>completed</status>
+<summary>Agent "E1: oracles and defect tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Final verification: lint, format, mypy, the owned tests, and the whole suite through the queue — all green.
+
+**Run, in order, from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`:** `uv run ruff check tests/oracles &amp;&amp; uv run ruff format --check tests/oracles` · `env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest tests/oracles tests/unit/domain/test_the_engine_is_right.py -q --no-cov` · the same with `--runxfail --tb=line` to see the three defects fail on their assertions · `uv run mypy src`. Long version: `plans/analysis/2026-09-22-E1-report.md`.
+
+**What I built.** `tests/oracles/by_summing.py` — the whole joint multiplied out over somebody else's yes/no tables and added up; both verbs; an optional version axis; blind to a wrong table and saying so. `by_integrating.py` — forbidden every table the core builds, enumerating the joint of event times from the arrow parameters alone, events and states, 24 slices, arrival at the middle of its slice, both conditions in one docstring sentence. Lifted from the spike's `st2_core.exact_over_times`; the two branches Kent has since decided (R26, record 0017) are dropped rather than carried, so the bisection goes too. `maps.py` — the three seeded recipes on the spike's own seeds (140 event maps, 82 skeletons both ways, 150 hard), holding an impulse, a diamond and states; a plain generator, no `assume()`. `test_the_two_enumerators_agree.py` — nine tests, 7.3 s.
+
+**Measured.** The committed maps are the spike's maps field for field. `by_integrating` against the scratch judge: **worst gap `0.000e+00`** over 264 questions on 16 maps. The two enumerators agree to `1e-12` at one slice, where an event map's factors *are* yes/no tables. A `prepare()` step cut the oracle from 59 s to 5.9 s and moved no number.
+
+**The three defect tests fail today on their own assertions**, not exceptions: `.30000001` before and after observing; the ending unmoved at `.44634187` while the middle moves; day-states reading `['pushed']`. Suite: **653 passed, 4 xfailed** (mine; no other xfail exists).
+
+**Deviations.** The scratch judge is compared through a committed, script-written JSON rather than a git-ignored path import — otherwise the test is green here and red everywhere else. The enumerator agreement is at one slice; states are excluded there and the docstring says why.
+
+**`test_a_claim_cut_off_from_the_evidence_is_bit_for_bit` needs no mark — today's engine already passes it byte-identically.**
+
+**Owed outside my files:** E2 needs a `Graph → by_integrating.Map` adapter (the oracles import no `katalyst` on purpose); it needs `rates.stated_chance_with`. `test_the_elimination_is_exact` must run on ≤12 claims. Stack plan §4 still cites `redteam/attack2.py`; M12's wording is what I built to.
+
+**Files touched:** `tests/oracles/**` (new, 1 634 lines + 36K JSON), `test_the_engine_is_right.py` (new, 310), `test_propagation.py` +51, `test_patches.py` +47.
+
+**Commit message:**
+
+```
+test(oracles): two enumerators that judge the engine, and its three defects written down
+
+Record 0016 asks for two oracles because they see different things. `by_summing`
+adds the whole joint up over the engine's own yes/no tables, proves the
+elimination and both verbs, and is blind to a wrong table. `by_integrating` is
+forbidden every table the engine builds: from the arrow parameters alone it
+enumerates the full joint of event times, events and states, at the engine's own
+24 slices with an arrival taken at the middle of its slice. It reproduces the
+spike's own judge to 0.000e+00 on 264 questions over sixteen seeded adversarial
+maps carrying an impulse, a diamond and states.
+
+The three defects are three xfail(strict) tests against today's public
+`propagate`, each naming its record row and each failing on its own assertion.
+The observation test record 0016 reverses gains its reversal beside it, also
+xfail(strict); the flip deletes the first and unmarks the second. The locality
+oracle is restated for evidence alone, bit for bit — and today's engine passes it.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+```
+
+(The attribution line above follows this session's reminder; `04-common.md` names a different one — your call.)</result>
+<usage><subagent_tokens>285138</subagent_tokens><tool_uses>111</tool_uses><duration_ms>2105907</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa86df0b8c920a6be</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/aa86df0b8c920a6be.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer B: the exact solve" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. All green.
+
+**Run this to check me** (from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`, each prefixed `env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync`): `pytest tests/unit/domain/test_solving.py --cov=src/katalyst/domain/solving --cov-branch --cov-report=term-missing -q` · `mypy --strict src/katalyst/domain/solving.py tests/unit/domain/test_solving.py` · `ruff check` + `ruff format --check` on those two files.
+
+**Signature changes.** None to `solve`, `all_marginals`, `elimination_order`. One addition in my file: `ImpossibleObservation(ValueError)`, carrying `.claims`, raised when no world agrees with *This happened* — the stub's "answered, never divided through." Checked **once for the whole map before any claim is answered**, because a claim cut off from the news would otherwise answer cheerfully while the map says something impossible happened.
+
+**How locality is bit for bit by construction.** Each claim is answered over its own relevant set only — the ancestors of it and of the reported claims, narrowed to the piece of the moral graph it sits in. A factor that would sum to one is never multiplied in, so a cut-off claim runs *the same arithmetic* as with no evidence. Asserted with `array_equal`, plus the collider case (reporting one cause leaves the other identical; reporting where they meet moves it).
+
+**Timings** (`plans/analysis/scripts/stack-05-core/B/time_the_solve.{py,log}`). Twenty claims, 33 arrows, at most three causes each, 2 000 versions, seed 20260922, clock covering the solve alone with tables drawn before it starts and the forward pass not timed, 7 runs: `solve` no edit **fastest 20.50 ms, median 21.10 ms**; `all_marginals` 20.61 / 20.87 (it is the same call today); *This happened* on the last claim 21.01 / 21.21; *Suppose* on the first 20.43 / 20.71.
+
+**Owed outside my files.** `tests/oracles/by_summing.py` cannot answer a pinned claim when tables carry versions — `_spread` gets a `(2,)` certainty and `ValueError: cannot reshape array of size 2 into shape (3,2,1,1,1,1)`. Uncovered: its versions test passes no pins (`:209`), its pin tests no versions (`:266`, `:291`). Fix: `def _certainly(value: bool, lead: tuple[int, ...])` building `np.zeros(lead + (2,))` and setting `row[..., int(value)] = 1.0`, with `lead` passed at `:133` and `:146`. My test works around it by asking the oracle one version at a time. Also: `domain/__init__.py` should export `ImpossibleObservation`, and writer A's assembly must catch it.
+
+**Tails.** `2 files already formatted` · `All checks passed!` · `Success: no issues found in 2 source files` · `src/katalyst/domain/solving.py  140  0  44  0  100%` · `9 passed in 0.88s`. No `NotImplementedError` left (`grep -c` = 0).
+
+**Commit message:** `feat(solving): whether, exactly — variable elimination over the yes/no tables, and locality bit for bit`</result>
+<usage><subagent_tokens>171079</subagent_tokens><tool_uses>40</tool_uses><duration_ms>721681</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a5ce355daa417b56b</task-id>
+<tool-use-id>toolu_01RqHkbS5v285nvk1Xm1aNvd</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a5ce355daa417b56b.output</output-file>
+<status>completed</status>
+<summary>Agent "E1: oracles and defect tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Reproduced red first: `ValueError: cannot reshape array of size 2 into shape (3,2,1)`. Fixed as B suggested — `_certainly(value, lead)` builds the certainty already carrying the version axis, passed at both call sites. Added `test_a_version_axis_answers_both_verbs_too`: both verbs, both values, every claim, three versions, each equal to the one-version answer bit for bit. Watched it go red on the old file, then restored. `ruff check` + `format --check` on `tests/oracles` clean; `tests/oracles` **10 passed in 7.17 s**.
+
+```
+fix(oracles): by_summing answers a pinned claim when the tables carry versions
+```</result>
+<usage><subagent_tokens>291099</subagent_tokens><tool_uses>9</tool_uses><duration_ms>83160</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a72bded863b11d4d1</task-id>
+<tool-use-id>toolu_01YANqSzfNiUqPoCWAQXEWDY</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a72bded863b11d4d1.output</output-file>
+<status>completed</status>
+<summary>Agent "Review T3a card and export" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>`/Users/kentgang/git3/katalyst/plans/analysis/2026-09-22-review-T3a.md` — worktree untouched, all mutation on a scratch copy.
+
+**Counts:** 5 must-fix · 15 should-fix · 6/24 mutants survive · 63/73 hand checks pass · 10 documents validate against the committed schema with a real validator (`jsonschema` 4.23.0, system python3) · round trip byte-identical. The builder's verification claims all hold (97 pass, 100% branch coverage, ruff + `mypy --strict` clean, schema byte-identical).
+
+**Must fix**
+1. `export.py:409` — the page prints likelihoods at six significant figures (`0.462076`), with a leading nought, and in scientific notation (`4e-07`); NFR-1/INV-7 want `.46` and the `&lt;.01`/`&gt;.99` guards. Needs a `kind` field on `Figure` and `two_figures` made public.
+2. `card.py:1452-1493` — `inside_the_model_range` is never read in `_priced_in`, so an edge whose sign flips across the model's own range leads with a side; record 0018 says neither headline nor rank, and the ceiling on the same edge reads zero-with-reason.
+3. `card.py:1176-1195` — a ranked row with best edge −0.40 gets `headline=True`, while −0.004 does not: `abs(best)` makes the tick guard run backwards.
+4. `card.py:1110`/`:1307` — nothing checks `answer.claim`; an edge for `other-contract` filed under `contract` prints the wrong claim's numbers silently.
+5. `card.py:1579` — rebase breaks: the sibling lane's `LiftRow.days_before_the_stop` is `float | None` and `Figure.value` rejects `None`.
+
+Three survivors trace to one gap: no `no`-side contract card exists anywhere in the lane's tests.</result>
+<usage><subagent_tokens>267122</subagent_tokens><tool_uses>85</tool_uses><duration_ms>984878</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ab3ed22df46a3dbae</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ab3ed22df46a3dbae.output</output-file>
+<status>completed</status>
+<summary>Agent "S-chapters: draft engine chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Open, in order:** `git diff main...spec/05-sound-numbers` in `/Users/kentgang/git3/katalyst-wt/spec-05-sound-numbers` (5 commits, 5 files, all under `spec/multiverse/`); then `spec/multiverse/propagation.md` whole; then `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-22-S-chapters-line-names.md`.
+
+**Built.** `propagation.md` rewritten whole to the owed note's outline, **539 → 398 lines**: what a number means; rates add; three shapes and the closed-form calibration; the holding-back clamp and the sentence it puts on `World.warnings`; events and states; 24 slices, the middle-of-slice convention, and the grid's own error (`1.8e-2`/`1.9e-2` at 24 slices × 8 points against a dense integral) said in the same sentence as the `.005` oracle, which runs on that same grid and cannot see it; *Suppose* and *This happened*; the control variate in one sentence; versions and the range; locality as a theorem; R24's target; the `strength → q1` conversion and that numbers move once at the flip and once at the freeze. Data model gives shapes and names the six modules. **No engine figure is typed — every one is a line name.**
+
+`diff.md` amended only where the flip makes it false (version weights, `moved_only_by_reweighting`, `series`), with a banner saying amended-not-converted. Kent's **three wordings** land in B2 and B6. `interventions.md`'s showcase rewritten; `branches-and-worlds.md` one sentence; `README.md`'s `curl` recipes checked — routes unchanged in shape, `worlds` ignored and answering `0`.
+
+**11 `VERIFY AT FLIP` comments:** 9 in `propagation.md`, 1 in `diff.md` (does the rail still peak before the judged day once an event's series can only rise), 1 in `interventions.md` (`S-&gt;H` is a `sustain` arrow out of an event).
+
+**Line names:** 17 to keep, 8 to create (the state claim's family, `&lt;claim&gt; · persistence`, `base · warnings`, the clamped arrows' asked/delivered, the summary's new count), 2 to delete, plus a shell check.
+
+**One finding for E2 and the flip.** `window_of` cuts **one window per map** into 24 slices, so inserting a claim judged far out widens every slice and re-grids short-deadline claims — the defect B1's old text existed to cure, returning by another route. `test_a_longer_window_moves_nothing_it_cannot_reach` and INV-4's byte-identity decide it. Nothing in the records or the plan addresses it.
+
+**Stale, not edited.** `spec/workbench/diff-view.md:102-103, 426-443, 460-474, 503, 582-599, 645` (retraction badge, the two day-states), `:434` (*nothing but the path product reads the stored number*), `:176, 344, 369-382, 419` (*no change* — my replacement: *no change* under the floor, **no agreed direction** above it); `spec/workbench/inspector.md:201-213, 510-517` (the reweighting sentence, now dead) and `:313-315, 578` (the path-product bar).
+
+**R25's sentence, for `inspector.md`'s branch panel — on a branch where *This happened* is in force, nowhere else:**
+
+&gt; *This happened* moves numbers upstream as well as down. This one is worked out by a seeded sample of 50 000 worlds; on the four-claim maps our own enumerator can check, no number was off by more than `.005`.</result>
+<usage><subagent_tokens>320470</subagent_tokens><tool_uses>103</tool_uses><duration_ms>1116632</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ace5bdcb8b3b8f796</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ace5bdcb8b3b8f796.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer D: states" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Run to check me** (from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`):
+```
+uv run pytest tests/unit/domain/test_states.py --cov=src/katalyst/domain/states --cov-branch --cov-report=term-missing
+uv run mypy --strict src/katalyst/domain/states.py &amp;&amp; uv run ruff check src/katalyst/domain/states.py tests/unit/domain/test_states.py &amp;&amp; uv run ruff format --check src/katalyst/domain/states.py tests/unit/domain/test_states.py
+uv run --no-sync python -u /Users/kentgang/git3/katalyst/plans/analysis/scripts/stack-05-core/D/check_states.py
+```
+
+**Signature changes (mine, in `states.py`).** `Times` now carries three arrays: `spread` is **always** `(V, S+1)` — the slice it came on in, for both kinds; new `holding` `(V, S)`; new `pairs: NDArray|None`, the flattened `(on, off)` square, `None` on the cheap path. A state's joint could not live in `spread`, because the cheap path must answer `holding_curve` without building the square. `on_and_off` gained keyword-only `window: Window` (the off-rate accrues from `Window.middle_day`, which nothing else carries) and `persistence` (`ClaimShapes` has no such field, and an empty `ends` does not mean *event*). `as_joint` gained a second named refusal: a state whose pair was never built. **Writer A's `forward.py` has already converged on exactly these** — no fix owed.
+
+**Consumed as landed, not as planned:** `AddedUp` entries are running totals already multiplied by their rate, so nothing is summed twice. Combination order and `carried`'s flattened arrival axes match `rates.added_up` (`numpy.indices`, on-slice slowest).
+
+**Tails.** `11 passed`; `states.py 137 stmts 0 miss 24 branch 0 partial 100%`; `Success: no issues found`; `All checks passed!` / `2 files already formatted`. Evidence (`D/check_states.log`): against a scalar reference written from record 0017 that enumerates causes jointly — came-on `4.996e-15`, holding `3.386e-15`, pair `3.345e-15`, cheap-vs-pair `1.110e-16`; through real `shapes_of`/`rates_of`/`added_up` with a 7-combination holding-back axis, `1.110e-16`. Separately, my `holding` equals `forward._holding_from_the_pairs` to `1.110e-16`.
+
+**Owed / phase 2.** `test_a_states_range_is_measured_and_written_down` needs `Drawn` + `all_marginals`; it is not written and not skipped.
+
+**Not checked.** The whole suite; `numpy.einsum` cost at 24 slices; an *ending* arrow that is also `sustain` (supported by flattening, untimed).
+
+**Commit:** `feat(engine): a state's two times — on at most once, off at most once, and a cheap path for the ones nobody reads the stretch of`</result>
+<usage><subagent_tokens>238731</subagent_tokens><tool_uses>61</tool_uses><duration_ms>1242911</duration_ms></usage>
+</task-notification>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
+UX-round (stack 04c) coordinator: three things that touch your stacks — the right-hand panel is being restructured at Kent's request, Tile.tsx/Inspector.tsx status, and a join fault you may share. No reply needed.
+1. THE PANEL. Kent asked today for buttons to switch between the right-hand panels, and for a click on a tile to bring its details to the top. A lane is building a switcher at the head of the panel on both map screens (branch feat/04-the-panel-switch, on feat/04-the-run-strip): it owns MapFrame.tsx's panel slot and the panel= composition in MapScreen.tsx and GenerationScreen.tsx, and MOVES where <Inspector> is mounted. It does NOT fold the sections inside the Inspector — that stays yours with 06-4 (C-declutter §2b), and I told the lane so. Your pinned YOUR TRADE strip, the card and the dock will land into a panel that shows one part at a time, so expect to add your part to the switcher's list rather than to a long column. Spec: spec/workbench/inspector.md gains a passage on which panels exist in which context.
+2. Tile.tsx and Inspector.tsx. Tile.tsx: #52 (feat/04-the-quieter-tile) is open and verified; a second small lane is stacked on it (feat/04-kind-colour — Kent's decision R42: the hypothesis keeps the teal accent, a tradeable outcome gets ONE new hue on its outline and kind label only; it amends the colour law in color-motion-type.md with a dated passage; one new token in tokens.css). Inspector.tsx: the run strip added a Run details section (R16 pulled forward); verified, not yet pushed. Branch from these rather than from main if your flip needs those files, and still message me first as you offered.
+3. Kent decided (R43) that I land this round's batch with land.sh and that merging accepts records 0023, 0024 and 0012's amendment. It will touch docs/adr/README.md, ARCHITECTURE.md, PRODUCT_REQUIREMENTS.md (UX-8, anti-pattern 9 only), spec/workbench/README.md, streaming-growth.md. I will rebase over whatever you have landed by then and keep both sides; I already kept both in ARCHITECTURE.md §3 against your docs catch-up.
+4. A fault worth checking in any browser test of yours: once this round's first screen lands, the words "Strait of Hormuz" appear on three kinds of row. A press by getByRole('button', {name: /Strait of Hormuz/}).first() locks onto the DISABLED "Run it live" row when it runs before the stored maps arrive, and waits for ever (3 tests failed one run in two). Every press must name its row: /Strait of Hormuz[\s\S]*Open the map/ for the stored map, /…[\s\S]*Watch the recording/ for the recording. The suite also has a second pair of servers now (KATALYST_E2E_SLOW_BACKEND_PORT / _SLOW_FRONTEND_PORT, defaults 8016/5188).
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>a009c2b19f4e76d27</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a009c2b19f4e76d27.output</output-file>
+<status>completed</status>
+<summary>Agent "T2a: reader's position, pure" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**New tip `315372c`**, nine commits on `origin/main` (`3d2c9e8`). Two new commits: `9512635` (must-fixes + mutants), `315372c` (R41 amendment + should-fixes).
+
+**Must-fix, each red before green** (mutation harness: `/tmp/t2amut/mutate.sh`, re-runnable):
+1. **Arrival day.** Added `on-the-day` to the rail → `assert 0.0 == 0.95` red; `&lt;` → `&lt;=`; green. Boundary pinned both sides (on the day counts, the day after does not). One convention, stated in `lift.py`, `paths.py` and the chapter.
+2. **Horizon.** Five new tests red (`.neither` read `0.0`, wanted `1.0`); `first_touch` now walks to `position.horizon`, refuses paths that fall short, and carries `through`.
+3. **Chance of one.** Reproduced the reviewer's exact input (`on=[[0],[0],[0],[1]]` → `q = 1.0` → `ValueError`). Now allowed: flat schedule, named `nothing_given_back`. Ten hypothesis seeds (7, 13, 3, 21, 42, 99, 1234, 5, 11, 17) all pass.
+4. **The tie.** Old test never touched the target. Replaced with the clamped input (`stop=99.9, target=100.1, daily_move=5.0`, close exactly 100); rule reworded everywhere to *when both levels are first reached on the same day*.
+
+**Mutants: 10 of 10 caught** (the 8 listed plus two on the shared `holding` rule). Survivors 4–7 are killed by real tests, not assertions bolted on: one expression in `draws.py` read two ways, the whole path around a state's off day, a weighted rail where effective ≠ row count, and gaps of 9/9/9/1 where median ≠ mean.
+
+**R41 implemented**: `the_sample_s_own_chance` computes the share from `Draws`; `model` split into `sample_share` / `base_world`; `ClaimMove.market_chance=None` means *read it off the sample*, refused if source and value disagree; `Paths.market_chance` carries value + source. Dated amendment appended to record 0019, attributed to the coordinator under Kent's delegation.
+
+**Should-fix: 11 of 12 closed. Declined: 8 (`ARCHITECTURE.md`)** — outside this lane's owned files; exact replacement wording is in the PR body.
+
+**Suite tail:** `896 passed, 1 warning in 158.82s`; `TOTAL 2123 0 530 0 100%`. `ruff`, `ruff format --check`, `mypy --strict` clean.
+
+Drafts written: `plans/notes/msgs/pr-06-position-body.md`, `merge-06-position.txt`.</result>
+<usage><subagent_tokens>475795</subagent_tokens><tool_uses>52</tool_uses><duration_ms>1092546</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>abb88ce76be6fc358</task-id>
+<tool-use-id>toolu_01HwUWiZRPA13tWy2MSuzJVo</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/abb88ce76be6fc358.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer A: rates and forward pass" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Report:
+
+**Run, in order (from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`):**
+`uv run ruff check src/katalyst/domain/{rates,forward}.py tests/unit/domain/test_{rates,forward}.py &amp;&amp; uv run ruff format --check &lt;same&gt; &amp;&amp; uv run mypy --strict src/katalyst/domain/{rates,forward}.py &amp;&amp; uv run pytest tests/unit/domain/test_rates.py tests/unit/domain/test_forward.py --cov=src/katalyst/domain/rates --cov=src/katalyst/domain/forward --cov-branch --cov-report=term-missing`
+
+**Signature changes (tell B, C, D):**
+1. `shapes_of(..., source_persistence, source_deadline: Mapping[LinkId, int], window, *, persistence)` — new 4th positional.
+2. `clamped(shapes, rates, with_this_cause)` — a clamped rate cannot say what it was asked for.
+3. `forward_pass(..., persistence: Mapping[PropositionId, Persistence] = EVERY_CLAIM_IS_AN_EVENT)` — the in-between until the flip.
+4. `ClaimShapes` gains `edges`, `middle_day` (the claim's own grid). New public `window_cut_to(day_zero, days, slices)`.
+5. `AddedUp` is the **running total** with the rate multiplied in — I matched D's committed reading and documented it.
+
+**The window risk — I chose a refinement of (a).** Each claim is cut into `SLICES` slices over **its own** `[day zero, resolve-by]`; `window_of` still gives the map's window but no arithmetic reads it. Locality becomes structural, not threaded: no base window, no `introduced_by`, nothing to get wrong. **S is always `SLICES`** — no writer's shapes change. `test_a_longer_window_moves_nothing_it_cannot_reach` passes byte-identical with an inserted 365-day claim. Cost: the oracle is on the old shared grid.
+
+**Owed outside my files (both break today):**
+- `tests/unit/domain/test_states.py:117`, in `some_shapes`, after `deadline=int(window.edges[slices]),` add `edges=window.edges,` and `middle_day=window.middle_day,`. Fixes all 10 failures (`ClaimShapes.__init__() missing 2 required positional arguments`). `test_solving.py`: 9 passed, untouched.
+- `tests/oracles/by_integrating.py:389` `_window_of` must become `edges = np.linspace(0.0, deadline, grid.slices + 1)` with no clipping, and `middle_days(grid)` (`:285`) must take the claim's own deadline. Otherwise `test_by_deadline.py` compares two different grids.
+
+**Waiting on D:** nothing — `states.py` landed (`bea8271`) and all 14 forward tests, including four state tests, run against it.
+
+**Tails** (`plans/analysis/scripts/stack-05-core/A/verify.log`): `All checks passed!` · `4 files already formatted` · `Success: no issues found in 2 source files` · `forward.py 159 0 26 0 100%` · `rates.py 226 0 34 0 100%` · `36 passed`. Zero `NotImplementedError` left in either module.
+
+**Commit:** `feat(engine): the rate model and the forward pass — a claim cut from its own deadline, and causes averaged one at a time`</result>
+<usage><subagent_tokens>352943</subagent_tokens><tool_uses>91</tool_uses><duration_ms>1996331</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2afcaa46dc1adfe9</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a2afcaa46dc1adfe9.output</output-file>
+<status>completed</status>
+<summary>Agent "T3a: the card and export" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**New tip `9580ce4`** (two commits on `a37022e`). Check: `ruff check . &amp;&amp; ruff format --check . &amp;&amp; mypy --strict src/katalyst/{domain,grounding,thesis} &amp;&amp; pytest tests/thesis -q --cov=src/katalyst/thesis`, then `plans/analysis/scripts/T3a/mutants.py`. Detail in `plans/analysis/2026-09-22-T3a-report.md`.
+
+**Must-fixes, red then green**
+
+| | Red test | Before → after |
+|---|---|---|
+| MF-1 | the reviewer's seven values, parametrised, plus a move of `.0090` | `0.462076 (range 0.297995 to 0.6541)` → `.46 (range .30 to .65)`, `&gt;.99`, `&lt;.01`. A `kind` on every figure (likelihood/share/move/size/ratio/price/count/days) picks the rule; a move never gets the likelihood guards |
+| MF-2 | his §5 quote | `headline='buying'` → leads with neither, naming the model's own range |
+| MF-3 | his §10 quote, and the same with no tick | `key=-0.4 headline=True` → `False`; the guard reads the gap, not its size |
+| MF-4 | an answer for `other-contract` filed under `contract` | silent → `ValueError`, in `edge.py`'s wording |
+| MF-5 | a `LiftRow` with `days_before_the_stop=None` | `ValidationError` → an absence with its reason. **The rest of the rebase waits for you.** |
+
+**One line for you at the rebase:** `two_figures` is public on the trunk, not in this worktree (four commits behind). `export.py` imports it as `domain.diff._two_figures` with the note beside it.
+
+**Mutants** 30 run, 30 caught. The three no-side survivors die to a new `no`-side card worked by hand in its docstring; the two S-6 ones to ordering tests. Two equivalent mutations named, not counted: the tie-break (stable sort) and `abs(best) &lt; tick`, unreachable behind the loss case.
+
+**Should-fixes** All closed except three outside my files — S-10 (`Paths` is the sibling's; written into the chapter as B5a, the one unenforced promise), S-13 `ARCHITECTURE.md`, S-14 `vocabulary.md` (wording owed in the report). **`jsonschema` declined**: his own measurement found no disagreement, and the new drift test closes the only real risk.
+
+Chapter marks the tails rule **proposed, for Kent**. ruff, format, mypy strict clean; 116 tests; `card.py` and `export.py` 100% statements and branches.</result>
+<usage><subagent_tokens>484932</subagent_tokens><tool_uses>67</tool_uses><duration_ms>1130744</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ace5bdcb8b3b8f796</task-id>
+<tool-use-id>toolu_01XbX1DMxRT26RtSXU1J3eWe</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ace5bdcb8b3b8f796.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer D: states" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Applied, plus one design change the new field forces.
+
+**Fixed.** `some_shapes` now passes `edges=window.edges, middle_day=window.middle_day`.
+
+**Changed in `states.py`:** `on_and_off` and `_ending_pushes` **lost the `window` argument**. The state's off-rate accrues from the middle of its *own* slice, which is now `ClaimShapes.middle_day`. A's two call sites passed *different* windows — `window=window` (`forward.py:405`, the map's) and `window=mine` (`:516`) — so one was reading another claim's grid.
+
+**Owed in `forward.py` (not mine):** delete `window=window,` at `:405` and `window=mine,` at `:516`.
+
+**Tails:** `All checks passed!` · `2 files already formatted` · `Success: no issues found` · `states.py 137 stmts 0 miss 24 branch 0 partial 100%` · `11 passed`. Evidence re-run: worst gap `3.386e-15`, seam `2.220e-16`.
+
+**Commit:** `fix(engine): a state's off-rate starts at the middle of its own slice, not the map's`</result>
+<usage><subagent_tokens>247336</subagent_tokens><tool_uses>7</tool_uses><duration_ms>74144</duration_ms></usage>
+</task-notification>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
+UX-round coordinator: I have taken decision record number 0027 (0025 stays reserved for the word help, 0026 stays yours) — and the generate stream is gaining a ninth event. No reply needed.
+Kent decided today (R44–R47 in plans/notes/2026-09-21-decisions-after-review.md): (R44) a ninth stream event, `activity`, EPHEMERAL by rule — the model's own web searches and what they found, sent on a live run only, never written to a recording, a transcript or a kept run, never replayed, never billed, no `at` counter; shape {"about": "<proposition id>"|null, "kind": "searching"|"found"|"thinking", "text": "..."}; record 0027 (accepted) amends 0023's "no ninth event" and generate.py's "never send anything that is not one of the eight events". (R47) summarised thinking rides the same channel. (R45) engine/grow.py hands each answer of a round over as its own call returns instead of holding all three for the slowest; each call is billed the moment it returns, before it is folded. None of it touches the prompt, the fingerprint, a cassette or a recording: the recorder's request stays byte-identical, only the LIVE request streams (R34 is the precedent) — so your one shape freeze is untouched.
+Files now open in my lanes that your engine work may want: backend/src/katalyst/engine/grow.py, engine/client.py, engine/events.py, engine/replay.py, api/generate.py, and in the browser stream/events.ts, stream/growth.ts, components/RunStrip.tsx. If your exact-core or card work needs any of them, tell me and we order it; otherwise whoever lands second rebases and keeps both sides. Stack 07's "a finished generation served back by its id" should treat `activity` like a replay does: there is none.
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>b9tnytzt4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/b9tnytzt4.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for checks and squash-merge PR #58" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a5ce355daa417b56b</task-id>
+<tool-use-id>toolu_01ALgpcWXYckVpAfspfpPiUe</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a5ce355daa417b56b.output</output-file>
+<status>completed</status>
+<summary>Agent "E1: oracles and defect tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>`by_integrating` now cuts each claim from **its own** deadline (`slice_edges`, `middle_days(deadline, grid)`, `_window_of`), and a cause's arrival day is read off the **cause's** window — `_times_of` and `_one_claims_block` take the source's deadline. The grid is a named choice: `Grid.cut` defaults to `EACH_CLAIMS_OWN`; `ONE_SHARED` keeps the spike regression. Docstring states both conditions. Two new tests: every claim's last edge is its own deadline; the two cuts really differ.
+
+**Scratch-judge comparison on the shared grid still reads `worst gap 0.000e+00`**, 264 questions over 16 maps; the committed file now records `"cut": "one shared window"` and the test asserts it.
+
+`tests/oracles`: 12 passed in 7.09 s. ruff + format clean.
+
+```
+fix(oracles): by_integrating cuts each claim from its own deadline, as the core does
+```</result>
+<usage><subagent_tokens>318764</subagent_tokens><tool_uses>22</tool_uses><duration_ms>243594</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a56d01eb4fdefef92</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a56d01eb4fdefef92.output</output-file>
+<status>completed</status>
+<summary>Agent "T3a fit-up after rebase" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Branch `feat/06-card` is 8 commits on `origin/main`, working tree clean.
+
+**To check me, in order** (from `/Users/kentgang/git3/katalyst-wt/feat-06-card/backend`):
+```bash
+env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run --no-sync ruff check . &amp;&amp; \
+  … ruff format --check . &amp;&amp; \
+  … mypy --strict src/katalyst/domain src/katalyst/grounding src/katalyst/thesis &amp;&amp; … mypy src &amp;&amp; \
+  … pytest tests/thesis -q --cov=src/katalyst/thesis --cov-report=term-missing
+… python /Users/kentgang/git3/katalyst/plans/analysis/scripts/T3a-fitup/mutants.py
+```
+Then read `spec/thesis/card-and-export.md` §B5a against `thesis/card.py`.
+
+**What changed.** `export.py` now imports the public `katalyst.domain.two_figures` — on `main` the old private name is gone, so the branch did not import at all. `card_of` takes `market_chance: Mapping[PropositionId, ChanceUsed]` — `Paths.market_chance` whole — instead of a caller's list of source words; that closes S-10 by shape, not by convention, and a test drives the real route (`worlds_of` → `walk` → `first_touch` → card). `THE_CHANCE_CAME_FROM` had a stale `model` key and was missing R41's `sample_share`/`base_world`; it now names all four and says why the model's belief is two of them. The exit carries `through` (the horizon in days) beside the shares, and the method sentence says the walk stops there. `implied_size` became a call to `what_your_risk_budget_implies` — the argument's only reason was that the body did not exist. The argument is kept for `market_chance` because a contract card has no paths at all. Stand-ins stayed hand-built except `implied_size` (not one-line swaps; `cards.py` says why).
+
+**Found wrong in the builder's work:** nothing beyond the rebase drift — but their shapes tripped the *position* lane's source checker (`stop`/`target`/`horizon` declared as `= Field(...)` read as worked-out numbers). Fixed inside my files with `Annotated[...]` declarations; the alternative is widening that checker, which is not mine.
+
+**Suite tail:** `985 passed, 1 warning in 166.68s` · `TOTAL 2808 0 646 0 100%` — every file in `domain`, `grounding`, `thesis` at 100% statements and branches. Mutants: 33 broken rules, 0 not caught.
+
+Drafted `plans/notes/msgs/pr-06-card-body.md` and `merge-06-card.txt`. Owed outside my files and written into the PR body: `ARCHITECTURE.md` (four passages, with replacement wording), `spec/vocabulary.md` (**Thesis**, **Strategy export**), and the `thesis/__init__.py` package docstring.</result>
+<usage><subagent_tokens>247963</subagent_tokens><tool_uses>119</tool_uses><duration_ms>1057454</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bzmeoulgj</task-id>
+<tool-use-id>toolu_01PQqPYobsvJGRHifaQtzacR</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/bzmeoulgj.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for checks and squash-merge PR #59" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a742cc09ea5d16cfb</task-id>
+<tool-use-id>toolu_01JxFBcDxm8angW8NJ3tucaP</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a742cc09ea5d16cfb.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer C: the weighted sample" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>**Check me:** from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend` — `uv run pytest tests/unit/domain/test_sampling.py -q --cov=src/katalyst/domain/sampling --cov-report=term-missing` · `uv run ruff check src/katalyst/domain/sampling.py tests/unit/domain/test_sampling.py` · `uv run ruff format --check` the same two · `uv run mypy --strict src/katalyst/domain` · read `plans/analysis/scripts/stack-05-core/C/time_the_sample.log`.
+
+**Signature changes (my file only)** — `sample_forward` gained keyword-only `window: Window`: `Forward` carries no date, and `Sample.day_zero`/`days` cannot be invented. *Someone already applied the matching change to `propagation.py` while I worked — it is green.* `Ready` gained `stops: Mapping[int, NDArray]` — `(cause readings, on-slice, slices)`, a state's off-survival exponentiated once; `AddedUp` carries no ending rate, so a sampler that draws off days must build it. `exact` is kept and given one job: the correction is one scalar for 2 000 versions, so it is held to a step none of them can take outside 0–1 — clipping *after* the sum (`propagation.py:870`) would flatten a range end onto one and report a width the sample moved.
+
+**Timings** (log; one machine shared with other agents, load average 32): twenty claims, thirty arrows, 24 slices, 2 000 versions, 50 000 worlds in one block, seed 20260922, *This happened* on one claim, three runs — `sample_forward` alone (exponentiate, draw, weight, days, correction; **not** the pass or the solve) is **191.2 ms** median of 191.1/200.3/191.2 all-events, and **278.5 ms** median of 271.9/301.3/278.5 with five of the twenty states that can really stop.
+
+**Two findings outside my files.** On that same map the **forward pass takes 56 099 ms** with five states (245 ms all-events) — record 0016 quotes `508.9 ms`. And `_as_drawn` floors a prior of `0.0` at `1.0000000000000009e-09`, so nothing is ever impossible and `test_an_impossible_observation_answers_rather_than_dividing_by_nothing` gets no warning; `test_a_state_is_worked_through_when_a_map_says_which_claims_hold` also fails (endable state worth *more* than the event). Both are A/D's.
+
+**Open:** a claim the evidence cannot reach still gets a weighted correction, so `test_a_claim_cut_off_from_the_evidence_is_bit_for_bit` needs the correction zeroed there; my per-claim seed streams already draw such a claim identical worlds.
+
+**Tails:** `16 passed`; `sampling.py 224 0 36 0 100%`; `All checks passed!`; `2 files already formatted`; `Success: no issues found in 17 source files`.
+
+**Commit:** `feat(domain): draw worlds forward, weight them, and correct the exact answer`</result>
+<usage><subagent_tokens>306205</subagent_tokens><tool_uses>114</tool_uses><duration_ms>1687071</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a742cc09ea5d16cfb</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a742cc09ea5d16cfb.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer C: the weighted sample" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>**Check me, in order** (from `katalyst-wt/feat-05-exact-core/backend`): `uv run pytest tests/unit/domain/test_sampling.py -q --cov=src/katalyst/domain/sampling --cov-report=term-missing` · `uv run mypy --strict src/katalyst/domain` · `uv run ruff check src/katalyst/domain/sampling.py tests/unit/domain/test_sampling.py &amp;&amp; uv run ruff format --check` the same two · read `plans/analysis/scripts/stack-05-core/C/time_the_sample.log`.
+
+**Signature changes (my file only)**
+1. `sample_forward` gained keyword-only `window: Window` — `Forward` carries no `day_zero`, and `Sample` needs it. **Already applied at `propagation.py:857` by someone else; nothing owed.**
+2. `Ready` gained `stops: Mapping[int, NDArray]` — `(cause readings, on-slice, slices)` survival of the off-process. `AddedUp` carries no ending rate, so a state's off day was unreachable without it.
+3. `exact` kept and given a job: the one scalar correction is held to a step every version can take, so the whole range moves together and keeps its width (`propagation.py:870`'s per-version clip would flatten a range end onto one).
+
+**Timings** — `sample_forward` alone (exponentiate once, draw, weight, days, correction; *not* the pass or solve) on twenty claims, 30 arrows, 24 slices, 2 000 versions, 50 000 worlds in one block, seed 20260922, one *This happened*: **191.2 ms** median of 191.1/200.3/191.2 all-event, **278.5 ms** median of 271.9/301.3/278.5 with five states feeding `sustain` arrows. Machine load average was 32 (other agents), so read these as a ceiling.
+
+**Two findings, not mine to fix.** Same log, same map: the **forward pass** with five endable states is **56 099 ms** median of 56 099/66 251/54 261, against record 0016's `508.92 ms`. And `test_by_deadline.py` has 2 failures: the impossible-observation warning never fires because `_as_drawn` floors a prior of 0.0 at `1e-09` in every version, so nothing is impossible; and `test_a_state_is_worked_through…` has the endable state *above* the event.
+
+**Open:** with no news `_answers_from` returns the tables alone, where record 0016's *no edit* row (worst `.0025`) was measured with the correction applied.
+
+**Tail:** `16 passed`; `sampling.py 224 0 36 0 100%`; `Success: no issues found in 17 source files`; `All checks passed!`; `2 files already formatted`.
+
+**Commit:** `feat(domain): draw weighted worlds forward with the exact solve as a control variate`</result>
+<usage><subagent_tokens>304808</subagent_tokens><tool_uses>114</tool_uses><duration_ms>1701055</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a742cc09ea5d16cfb</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a742cc09ea5d16cfb.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer C: the weighted sample" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>**Run to check me** (from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`):
+`uv run pytest tests/unit/domain/test_sampling.py -q --cov=src/katalyst/domain/sampling --cov-report=term-missing` · `uv run ruff check src/katalyst/domain/sampling.py tests/unit/domain/test_sampling.py &amp;&amp; uv run ruff format --check` on both · `uv run mypy --strict src/katalyst/domain` · log at `plans/analysis/scripts/stack-05-core/C/time_the_sample.log`.
+
+**Signature changes (my file only).** `sample_forward` gained keyword-only `window: Window` — `Forward` carries no `day_zero`, and `Sample` promises one. Someone already applied the matching `window=window` to `propagation.py:679/857`, so nothing is owed. `Ready` gained `stops: Mapping[int, NDArray]` — `(cause readings, on-slice, slices)`, the survival of a state's stopping rate; `AddedUp` carries no ending rate, so a state's off day could not be drawn without it. `exact` kept and given a job: it holds the one shared correction to a step **every** version can take, so the range moves whole instead of being flattened onto 0/1 afterwards.
+
+**Timings**, twenty claims / 30 arrows / 24 slices / 2 000 versions / 50 000 worlds in one block / seed 20260922 / one *This happened*, on a machine at load average 32 with other agents running: `sample_forward` **191.2 ms** median of 191.1, 200.3, 191.2 with every claim an event, and **278.5 ms** median of 271.9, 301.3, 278.5 with five states feeding `sustain` arrows. The clock covers only `sample_forward` — exponentiating once, drawing, weighting, days, corrections — not the pass or the solve, printed beside it.
+
+**Found while timing, not mine:** on that same states map the **forward pass is 56 099 ms** median (record 0016 quotes `508.92 ms`). Also `test_by_deadline.py` fails two: `test_a_state_is_worked_through_when_a_map_says_which_claims_hold` (an endable state came out *above* the event) and `test_an_impossible_observation…` — `_as_drawn` floors a prior of 0 at `1e-9`, so nothing is ever impossible. And `_answers_from` applies no correction when nothing is reported, where 0016's *no edit* `.0025` was measured with it.
+
+**Tails:** `16 passed`; `sampling.py 224 0 36 0 100%`; `All checks passed!`; `2 files already formatted`; `Success: no issues found in 17 source files`.
+
+**Commit:** `feat(domain): draw worlds forward with weights, and the days stack 06 reads`</result>
+<usage><subagent_tokens>305139</subagent_tokens><tool_uses>114</tool_uses><duration_ms>1713115</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a742cc09ea5d16cfb</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a742cc09ea5d16cfb.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer C: the weighted sample" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Work is complete and the machine is clean — those last notifications are my own leftover wait-loops, which I killed (exit 144 is the kill, not a failed run). The timing run itself finished cleanly and its log is committed to disk.
+
+Nothing changed since my report. Restating the essentials:
+
+**Run to check me** (from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`):
+- `uv run pytest tests/unit/domain/test_sampling.py -q --cov=src/katalyst/domain/sampling --cov-report=term-missing` → `16 passed`, `sampling.py 224 0 36 0 100%`
+- `uv run ruff check` / `ruff format --check` on `src/katalyst/domain/sampling.py tests/unit/domain/test_sampling.py` → `All checks passed!` / `2 files already formatted`
+- `uv run mypy --strict src/katalyst/domain` → `Success: no issues found in 17 source files`
+- `plans/analysis/scripts/stack-05-core/C/time_the_sample.{py,log}`
+
+**Signature changes, mine only:** `sample_forward` gained keyword-only `window: Window`; `Ready` gained `stops`; `exact` kept and given the job of holding the one shared correction to a step every version can take. The matching `window=window` is already present at `propagation.py:679/857`, so nothing is owed outside my files.
+
+**Timings** — twenty claims, 30 arrows, 24 slices, 2 000 versions, 50 000 worlds in one block, seed 20260922, one *This happened*, machine at load average 32 with other agents running: `sample_forward` **191.2 ms** median of 191.1, 200.3, 191.2 all-events, and **278.5 ms** median of 271.9, 301.3, 278.5 with five states feeding `sustain` arrows. The clock covers `sample_forward` alone.
+
+**Three findings outside my files**, in the report above: the 56 099 ms forward pass on the states map; the two `test_by_deadline.py` failures; and `_answers_from` applying no correction when nothing is reported.
+
+**Commit:** `feat(domain): draw worlds forward with weights, and the days stack 06 reads`</result>
+<usage><subagent_tokens>308176</subagent_tokens><tool_uses>117</tool_uses><duration_ms>1774723</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aa6dbaed5934b8287</task-id>
+<tool-use-id>toolu_01RVitrc3WTjwZRkW1fhuQUc</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/aa6dbaed5934b8287.output</output-file>
+<status>completed</status>
+<summary>Agent "Docs owed by thesis lanes" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Two commits on `docs/06-owed` (`1aea9c6`, `e9204c7`), working tree clean, nothing pushed.
+
+**Placed**
+
+- **`ARCHITECTURE.md`** (5 passages): `grounding/`+`thesis/` marked built through card and export; the layer box and tree list all eight files; the shapes table's `Thesis` row became `Card`, `Export` with the tests that hold it; the "nothing is created before it holds something" paragraph now accounts for `thesis/export.schema.json`; the roadmap's thesis bullet rewritten. Planned stays planned and named: the `Draws` adapter, the two-way sweep, the five routes, the dock.
+- **`spec/vocabulary.md`**: **Thesis** and **Strategy export** rewritten; *The trade*'s built/planned opening corrected, with **spot anchor** and **watchlist** carrying their own not-built clauses.
+- **`thesis/__init__.py`**: *What lives here now* extended to `card.py` and `export.py`.
+- **`docs/adr/0010`**: five inline pointers plus one dated amendment at the foot (nothing rewritten); its index row gained the same clause.
+
+**Corrections to what was owed**
+
+- The *"This is the stop-loss"* vocabulary entry was **already fixed** (now **What to watch**, PR #57) — nothing to do.
+- T-land's claim that INV-14 "waits for code that does not exist" is wrong: the *no claim is a stop* half is held by `test_a_stop_is_never_derived` and its source walk. I marked INV-14 **half done** rather than built.
+- The lanes implied *what to watch* was built. `card_of` takes `watch:` rows as an argument; the two filters do not exist. Said so in all three places.
+- The table intro's "four rows carry a `[planned]` clause" counted three; it is four now.
+- **Named, not fixed** (other lanes' files): record 0018's *In short* contradicts `edge.py`'s table on a supposed base world.
+
+**Verified**: pre-commit clean on all five files; `ruff`, `ruff format --check`, `mypy --strict src/katalyst/thesis` clean; `pytest tests/thesis -q --no-cov` → **293 passed**.
+
+**Tails**: `plans/notes/msgs/pr-06-owed-body.md` and `merge-06-owed.txt`.</result>
+<usage><subagent_tokens>154952</subagent_tokens><tool_uses>80</tool_uses><duration_ms>496737</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bvsrjv6ku</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/bvsrjv6ku.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for checks and squash-merge PR #60" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ac42d12ae8555d932</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ac42d12ae8555d932.output</output-file>
+<status>completed</status>
+<summary>Agent "Writer E: assemble by-deadline core" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**To check me,** from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core`: `make numbers-check`; then from `backend/`: `uv run ruff check . &amp;&amp; uv run ruff format --check .` · `uv run mypy --strict src/katalyst/domain src/katalyst/grounding` · `uv run mypy src` · `uv run pytest tests/unit/domain/test_by_deadline.py -q` · `uv run pytest tests/unit/domain tests/oracles -q --cov=src/katalyst/domain --cov-report=term-missing`. Long version: `plans/analysis/2026-09-22-E-assembly-report.md`. (`states.py` in my `git status` is the performance agent's, not mine.)
+
+**Built.** `_by_deadline` and eight helpers in `propagation.py` (today's path byte-identical); `ImpossibleObservation` exported; `tests/oracles_adapter.py` (the adapter E1 owed, both directions); twelve tests; the benchmark; a dated `docs/measurements.md` section. 100% statement and branch on all of `domain/`; whole suite **739 passed, 4 xfailed** (the oracle lane's four, untouched).
+
+**Oracle agreement, both conditions in one sentence:** sixteen seeded maps from `tests/oracles/maps.py` at 24 slices of each claim's own window, eight points inside each slice, an arrival at the middle of its slice, one version whose stated range is a point, *This happened* answered by a seeded sample of 50 000 worlds, judged by `by_integrating` on the same map through the adapter at that same grid and convention — **1 030 numbers, none over `.005`**: worst `.0015` (no edit, 62), `.0014` (*Suppose*, 484), `.0049` (*This happened*, 484). Elimination vs `by_summing` at `1e-9` over seventeen questions.
+
+**Your four.** (1) Locality: the map is solved again with the report set aside, and a correction added only where the two differ — exact, needs nothing of `solving.py`, costs one extra `all_marginals` (31.7–33.8 ms); tested byte-identical. (2) Impossible observation: nothing to change — the `1e-9` floor is `main`'s own documented `TINY`, shared by both engines; impossibility is reachable without it (a claim judged on day zero has no window), and today's engine reports `0.0` for every claim the news reaches where this one answers with the map plus a naming sentence. (3) The test was wrong, not `forward.py`/`states.py`: by hand, `leaves = .2715` on the event against `stops = .6763` on the state — the sign picks which rate it bends (0017), and `by_integrating.fit` agrees. Fixed. (4) The correction in every world is *worse* — same maps, seed, grid: `.0015/.0014` without against `.0018/.0031` with — so it stays where something is reported.
+
+**Benchmark** (M3 Max, `a5551f7`, forward/solve/sample timed separately, 20 claims, 2 000 versions, 24 slices, 2 repeats, one claim reported): all-event **483.7 ms**; three holding-back arrows **978.2 ms**; five states **7 490.8 ms**, 8.03 GB, against a 600 ms target. Hormuz base end to end **380.1 ms**. **Finding:** the strike branch puts two holding-back arrows on Brent — 625 combinations, **12.53 GB at 2 000 versions** — so it does not run at the shipped budget. Cause: `rates.added_up` allocates `(versions, combos, cause times, slices)`.
+
+**Owed, not edited:** `rates.py` `added_up` (keep terms factored, or block the versions); `solving.py` `_can_reach` → `can_reach`; `ARCHITECTURE.md:101` ("two nested loops" → two engines). Replacement words in §6.
+
+**C:** stub at my start; `sample_forward` grew keyword-only `window` mid-way, which I matched; committed `a5551f7` and everything works.
+
+**Commit:** `feat(engine): a claim's number becomes the chance it happens by its deadline — the new core, assembled behind its flag`</result>
+<usage><subagent_tokens>427600</subagent_tokens><tool_uses>141</tool_uses><duration_ms>2392877</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a787c1c11149d4b12</task-id>
+<tool-use-id>toolu_011aVEVn8tzqrKgWTAVkVeyn</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a787c1c11149d4b12.output</output-file>
+<status>completed</status>
+<summary>Agent "Perf: forward pass with states" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Report:
+
+**To check me, in order** (from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`):
+1. `uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy --strict src/katalyst/domain &amp;&amp; uv run mypy src`
+2. `uv run python -m pytest tests/unit/domain/test_{rates,states,forward}.py -q --cov=src/katalyst/domain/states.py --cov-report=term-missing` (100% each from its own file)
+3. `uv run python /Users/kentgang/git3/katalyst/plans/analysis/scripts/stack-05-core/perf/same_answers.py check`
+4. `plans/analysis/scripts/stack-05-core/perf/` — `profile_the_pass.{before,after}.log`, `the_table.log`, `the_strike_branch_at_two_thousand.log`, `anatomy.log`, `whole-suite.log`
+
+**The hot spot.** `states.py:329 _still_on_at_each_slice` and `states.py:385 _holding_without_the_square` (17.7 s and 20.1 s own time of 50.6 s, `profile_the_pass.before.log`). Two causes, one shared root: an ending arrow out of a state is a `sustain` arrow, so it carries `(slices+1)² = 625` arrival readings, and both built `exp(−rate × stretch[reading, on-slice, end-slice])` at `(versions, readings, slices, slices)` — 5.76 GB an arrow. The exponent is an on-slice term plus an end-slice term, so it splits into two `(versions, readings, slices)` arrays and one batched matrix multiply. Third cause: `forward._a_states_table` re-ran the **whole** state pass once per combination of its causes' truths (23 runs) when it needed only the deadline number, and every exponential in it is truth-independent — now `states.holding_under_each_truth`, one pass per arrow. Ruled out: the `wants_pairs` `or` clause — all five states source `sustain` arrows, so `needs_the_joint` is already true (`anatomy.log`), and the clause is load-bearing for `_told_twice`.
+
+**Timings, both conditions in one run.** Writer C's twenty-claim map, 30 arrows, 24 slices, 2 000 versions, seed 20260922, clock = `forward_pass` alone: **before** five states 58 539.7 ms against every-claim-an-event 228.0 ms (load avg 8.8); **after** 6 007.7 ms against 220.7 ms (load avg 3.7). I did **not** reach ~1 s. The prototype's 508.92 ms used *trigger* enders (24 readings); this map's are `sustain` (625). The 25× collapse exists — a sustain push is the trigger push gated by the off-day, so the average factorises into a running total over the off-slice (`cost2.py:119-139`) — but it lives in `ClaimShapes.carried`'s shape and every reader including `sampling.py`.
+
+**Memory (second remit).** `AddedUp.helps` is now `rates.Spread`: one version-free block per subset term plus one number per version, materialised at most `MOST_NUMBERS_AT_ONCE` (16 M) at a time. `sampling.py` untouched — `Spread.__getitem__(version)` replaces `total[version]` exactly.
+
+| case (2 000 versions, 24 slices, seed 7) | before e1548eb | after | peak GB |
+|---|---|---|---|
+| 0 states, 0 holding back | 483.7 ms | 510.2 ms | 0.21 |
+| 0 states, 3 holding back | 978.2 ms | 980.4 ms | 0.79 |
+| 5 states, 3 holding back | 7 490.8 ms / 8.03 GB | **5 927.4 ms** | **0.96** |
+| hormuz base, end to end | 380.1 ms | 390.1 ms | 0.68 |
+| hormuz **strike branch** | **did not run** (12.53 GB) | **10.35 s** | **3.78** |
+| strike branch at 200 versions | 1.28 s / 6.00 GB | 1.03 s | 1.15 |
+
+Before figures are the assembler's (`E/bench-*.log`, `E/the-strike-branch.log`); after are mine via `/usr/bin/time -l` on the interpreter. 10.35 s is far over the 240 ms target for eight claims, but the branch runs.
+
+**Equality.** `same_answers.py`, three seeded maps (events only; states on the cheap path with a holding-back arrow; five states with `sustain` children), 7 versions, 225 arrays: worst gaps 2.220e-16 / 2.671e-16 / 9.992e-16 against a 1e-12 bar; 116 of 225 bit-identical.
+
+**For other authors.** `AddedUp.helps[p]` is a `Spread`, not an array — `whole()`, `between(first,last)`, `over_the_window()`, `[version]`. `states.on_and_off` keeps its signature; `_a_states_table` is gone. `solving._can_reach` left private: nothing outside `solving.py` calls it. Whole suite: **743 passed, 4 xfailed**, domain 100% statement and branch.
+
+**Suggested commit:** `perf(domain): a state's pass stops redoing itself, and the added-up rates stop holding every version`</result>
+<usage><subagent_tokens>310725</subagent_tokens><tool_uses>123</tool_uses><duration_ms>2421382</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>adf772f68209ee8a5</task-id>
+<tool-use-id>toolu_01GJ5hn4uMYYkPuPYGFhTHW5</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/adf772f68209ee8a5.output</output-file>
+<status>completed</status>
+<summary>Agent "Review the new engine core" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both trees clean; only the git-ignored `plans/` scratch was written.
+
+**Report:** `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-22-review-05-core.md`
+
+**Counts:** 4 must-fix · 6 should-fix · 37 mutants run, 32 killed, 5 survived (2 real gaps, 3 equivalent). Reviewed at `e1548eb`; `HEAD` moved to `524058e` mid-review and every finding was re-checked there and survives.
+
+**Must-fix, one line each**
+1. `propagation.py:704` vs `:693` — a claim reached two ways prints one number on its tile and another at the end of its own series: `events000/c3`, no edit, 24 slices — tile `.51`, series `.50`, `4.49e-3` apart, different at two figures; the series is the forward pass's marginal, the tile is the exact solve.
+2. `engine/worlds.py:93` claims the flip is one word in one place; `engine/replay.py:454` and `domain/diff.py:482,513` call `propagate` with no `engine=`, so a replay would keep today's arithmetic while a live run changes — against `replay.py:438`'s own promise of "identical arithmetic".
+3. `docs/measurements.md:31,32,43` — 0.92 GB, 2.77 GB and 1.36 GB have no log line anywhere; the benchmark prints no memory and only `bench-states.log` carries one.
+4. `test_by_deadline.py:237` says 990 numbers; instrumented, it compares 1 030 (62 + 484 + 484) and skips none.
+
+**Verdict.** The arithmetic is the strongest thing here. I wrote a third enumerator from records 0016 and 0017 alone — reading neither the core nor the committed oracle — and it agrees with the core to `5.6e-17` on a chain, a diamond, a holding-back arrow, a state with an ending cause and `sustain` against `trigger` out of the same state, with no edit and under *Suppose*; the identities hold by hand (`1−(1−a)(1−b)/(1−q0)` = `.600000`, an arrow alone reproducing `.50`, the chance it stops `.800000`); *This happened* matches full-joint Bayes exactly. `engine="today"` is byte-identical to `origin/main` over 4.58 MB of dumped output. Locality is bit-for-bit in every shape I could build, including a fork whose only route to the evidence runs through a supposed claim. 32 of 37 broken rules go red, and the `.005` oracle is genuinely carrying the load — it alone catches seven. What is not sound is the join to the screen: one claim, one day, two numbers, no sentence. Fix findings 1–4 and this can become the default.</result>
+<usage><subagent_tokens>316994</subagent_tokens><tool_uses>83</tool_uses><duration_ms>2099796</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7a164efb921088b7</task-id>
+<tool-use-id>toolu_01Y3BL2HMHE4hbgoeumGHZmC</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a7a164efb921088b7.output</output-file>
+<status>completed</status>
+<summary>Agent "Perf round 2: strike branch" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Final verification is green across the board.
+
+**Run, in order, from `/Users/kentgang/git3/katalyst-wt/feat-05-exact-core/backend`:** `uv run pytest -q tests/unit/domain tests/oracles` · `uv run mypy --strict src/katalyst/domain` · `uv run ruff check . &amp;&amp; uv run ruff format --check .` · `make numbers-check` (from the worktree root) · then the three logs under `plans/analysis/scripts/stack-05-core/perf-2/`: `the_table.log`, `the_same_worlds.log`, `where_the_ten_seconds_go.after.log`.
+
+**Where the 10 s went** (`where_the_ten_seconds_go.log`, profiled at `524058e`, 9.94 s wall): 9.167 s cumulative in `domain/states.py:243 _a_helping_arrows_factors` — of which 3.496 s is its own `numpy.exp` and 4.635 s is `domain/rates.py:422 Spread.between`, itself 2.441 s of `cumsum`. Everything else is under 0.5 s: `forward.py:317 _an_events_table` 0.485 s, `propagation.py:935 _lines_of` 0.027 s. No sample and no locality re-solve on that branch — every edit is *Suppose*.
+
+**Cause:** Brent is judged in a fortnight; its two holding-back arrows carry 25 arrival slices each and 625 combinations, so each helping arrow exponentiated a `2000 × 625 × 25 × 24` = 750-million-number array.
+
+**Two fixes, both exact re-orderings.**
+1. **`rates.Carried` — an arrow's push is kept once per *different* array of numbers.** A cause judged long after its target has arrival slices starting past that target's deadline; those push nothing at all, the same array of noughts. On Brent the readings fall to `[7, 10, 5, 25]` and the combinations from 625 to 125; the largest working array from 750M to 60M numbers. Readers fold arrival chances through one new function, `states.chance_of_each_reading` (it replaces `_arrival_weight` and `forward._reading_of` — one function where there were two).
+2. **Blocks are added up across slices where they are small**, not once per version: `Spread.blocks` are running totals, so `between` no longer cumsums and `over_the_window` reads the last slice.
+
+Also structural: a state nothing can end now takes the event's own table, so record 0017's "identical to the same claim written as an event" is a property of the code rather than two routes agreeing.
+
+**Before → after** (`perf-2/the_table.log` against `perf/the_table.log` and `perf/the_strike_branch_at_two_thousand.log`, all 2 000 versions, 24 slices, same seeds, same machine, load 2.7–3.5):
+
+| | before | now |
+|---|---|---|
+| **Hormuz strike branch, end to end** | 10.35 s, 3.78 GB | **0.72 s, 1.43 GB** |
+| strike branch at 200 versions | 1.03 s, 1.15 GB | **0.09 s, 0.40 GB** |
+| **Hormuz base world** | 390.1 ms, 0.68 GB | **71.1 ms, 0.21 GB** |
+| 20 claims, no states, no holding-back | 510.2 ms | 451.6 ms |
+| 20 claims, three holding-back | 980.4 ms | 787.5 ms |
+| 20 claims, five states + three holding-back | 5 927.4 ms | 3 294.9 ms |
+
+Both Hormuz cases now sit inside the 30 ms-a-claim target. I stopped there per the time-box.
+
+**Equality.** `perf/same_answers.py check` re-run unchanged on its three generated maps: worst gap `1.554e-15`. A new `perf-2/the_same_worlds.py` compares whole worlds — Hormuz base, strike branch, and strike branch with *This happened* on Brent — every belief point, lo, hi, every day of every series, warnings, range shares, plus 50 000 drawn worlds: worst `4.441e-16`; the sample's **on-days and off-days are identical bit for bit**, weights and corrections to `2.220e-16`. Bar was 1e-12. Both oracle tests pass; `make numbers-check` unchanged; 100% statement and branch coverage on `domain/`; whole suite 745 passed, 4 xfailed (`plans/.heavy.log`, label "perf-2: whole server suite").
+
+**No approximation is proposed** — neither fix needed one, so I built nothing to hand you for a decision.
+
+**What other authors must know.** `ClaimShapes.carried` now maps an arrow position to a `Carried`, not a raw array: use `.push` for the distinct rows, `.of_each_reading` to turn a reading into a row, `.whole_stretch` in place of the old `ndim == 3` test, `.fold(chances)` to fold a spread, `.for_each_reading()` to see it written out. `Spread.readings` and `AddedUp`'s `combos` now count *different pushes*, not arrival slices.
+
+**Owed outside my files.** Record `0016`'s *Still open*, fourth bullet, says an arrow that holds a claim back forces "an enumeration over the days it might have arrived on". That is now per *different push*: it should read "over the **different pushes** its arrival days produce — arrival days whose push over the claim's window is the same array of numbers count once, which on the committed strike branch takes 625 combinations to 125". The 1.8× / 5.4× / 70× figures were measured on generated maps where every arrival pushes differently and still stand for those; the "cap per claim" lever is unchanged. `docs/measurements.md` I did edit (the brief told me to) — a new dated entry above the existing 2026-09-22 one, nothing beneath it touched.
+
+**What I did not check.** The browser; anything outside `backend/`; whether the five-state row can be brought under target — its remaining 3.05 s is measured and left for whoever takes it (`perf-2/what_is_left_on_the_states_map.log`: 1.51 s in numpy's `einsum` inside `states.py`, 1.09 s in the helping arrows' averaging, and the sustain arrows' 625 readings folding only to 142–301).
+
+**Suggested commit message:**
+
+```
+perf(engine): an arrow's push is kept once per different array of numbers
+
+A cause judged long after the claim it pushes has arrival slices that start
+after that claim's deadline, and an arrow whose cause arrives then pushes
+nothing at all over the window — the same array of noughts, over and over.
+They are now kept once between them, and the chances of the readings that
+share a push are added together first, which is the same sum in a different
+order. On the committed Hormuz strike branch the two arrows holding Brent
+back go from 625 combinations to 125, and the largest working array from 750
+to 60 million numbers.
+
+Each block is also added up across the slices where it is a few hundred
+numbers rather than once per version, so no version takes a running total.
+
+The strike branch end to end at 2 000 versions: 10.35 s and 3.78 GB, now
+0.72 s and 1.43 GB. The base world: 390.1 ms and 0.68 GB, now 71.1 ms and
+0.21 GB. Both inside the thirty-milliseconds-a-claim target. No answer moved:
+whole worlds agree to 4.441e-16 and the drawn worlds' days bit for bit.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+```</result>
+<usage><subagent_tokens>311470</subagent_tokens><tool_uses>121</tool_uses><duration_ms>1840739</duration_ms></usage>
+</task-notification>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
+Kent decided today (R48, in plans/notes/2026-09-21-decisions-after-review.md) to cut the 2,000 versions of the map AND the range they produce from the product entirely — and the engine half of that is yours, since it is the core feat/05-exact-core is rewriting.
+His words, 2026-09-22, after trying the batch: "The 2,000 runs thing is confusing. Can we cut that from the scope of this project completely for the sake of defending its design and also potentially to make the speed of the real time map construction a lot snappier and quicker?" He was told first that the engine pass is 0.1 ms and the model calls are the time (so the cut buys simplicity, not speed), and shown three options; he chose the full cut over "screen only". What it means: one likelihood per claim, computed once; no range anywhere, ever; no "same direction N%" on the change list (a share of versions); no 8 worlds either, unless your exact core needs a sampling loop for the coin flips — that arithmetic is yours to design. It reverses records 0005 and 0014's range and the PRD's "two significant figures with an interval", so it needs a dated amendment (your next record number, 0028 — 0027 is mine, accepted today).
+Split: I am doing the SCREEN half now (branch feat/04-no-range-on-screen: BeliefChip stops drawing lo–hi, the hover note about 2,000 versions and the footer sentence "over 2 000 versions of the map with 8 worlds under each" go, the change list drops its versions-derived columns, spec/workbench chapters say so; the browser IGNORES lo/hi on the wire so nothing breaks while you remove them). The ENGINE half is yours: domain/propagation.py and the exact core, the API shapes (Belief.lo/hi, the diff's agreement share), spec/multiverse/*, spec/graph/belief.md, docs/worked-numbers.txt, the recorded numbers. Please keep the wire fields present (even if constant) until your flip lands, so the browser's generated types stay valid in between; remove them at the flip and I regenerate. Tell me when your removal is near so the change-list rows agree on both sides (branchWorld.ts railRows is the one builder). No reply needed unless the split collides with something you have in flight.
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
+Agreed on all three: core lands as built, the flip absorbs R48 with record 0028, and every versions-derived wire field stays constant until your one follow-up. My browser lane (feat/04-no-range-on-screen) ignores lo/hi, the agreement share, moved_only_by_reweighting and the worlds count from today, with dated comments saying they die with your follow-up. I will regenerate schema.ts and railRows when you message.
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>a9b6277e96d42a717</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a9b6277e96d42a717.output</output-file>
+<status>completed</status>
+<summary>Agent "Core fix round after review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Tip **`6658619`**, 9 new commits, tree clean.
+
+**Check me:** from `backend/` — `uv run pytest -q tests/unit/domain/test_by_deadline.py -k "line_ends or one_word or sweep_re_runs or starts_at_nought"`; `uv run pytest -q tests/unit/domain tests/oracles --cov=katalyst.domain --cov-fail-under=100`; `uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src &amp;&amp; uv run mypy --strict src/katalyst/domain src/katalyst/grounding`; from root `make numbers-check`; read `docs/adr/0016-*.md` from *Amendment (2026-09-22)*, `ARCHITECTURE.md` §3, `docs/measurements.md:19-24`.
+
+**Must-fix, each red first**
+1. **Tile ≠ chart.** Reproduced exactly (`fix/tile_against_series.py`): `events000/c3` tile `.51`, series end `.50`, 234 of 544 claim-questions different at two figures. Fixed: a day is the pass's *share* × the solve's *number*, so the last day is the answer exactly. Now 0 apart; new test red under a reverted `_lines_of` (`+2.641e-04`).
+2. **The flip.** Red: a spy-free sweep of a by-deadline world returned `today`'s deltas; a re-added `ENGINE` in `worlds.py` tripped the new source check. `DEFAULT_ENGINE` is now `propagate`'s default — `replay.py` and `generate.py` are mended unopened. `diff.sensitivity` and `versions_of` name `engine_that_built(world)` (`worlds == 0`).
+3. **Measurements.** Only `bench-states.log` carried memory; the three others re-measured at `e1548eb` under `/usr/bin/time -l` (`fix/memory-at-e1548eb.log`): 2.77 and 1.36 GB to the digit, 0.92 → **0.95**. Also: the entry named `a5551f7`, whose benchmark raises.
+4. **990 → asserted.** `NUMBERS_COMPARED` = 62/484/484, plus `skipped == 0`.
+
+**Should-fix:** 5 and 6 fixed with tests (prior of `1.0` filed 3 arrows as holding-back: 15 625 combos → 1); 7 both gaps tested, both red under their mutants; 8 and 9 are docstring/PR-body statements, no code — declined as changes; 10 needs no action.
+
+**Not checked:** the 37-mutant campaign was not re-run after the perf commits.
+
+**Suite:** `751 passed, 4 xfailed in 176.93s`; domain 100% statements *and* branches. Drafts at `plans/notes/msgs/pr-05-core-body.md` and `merge-05-core.txt` (both carry R48).</result>
+<usage><subagent_tokens>334259</subagent_tokens><tool_uses>192</tool_uses><duration_ms>1983596</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ab3ed22df46a3dbae</task-id>
+<tool-use-id>toolu_01KgczNcZxJKJM5w3qgHuxN5</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ab3ed22df46a3dbae.output</output-file>
+<status>completed</status>
+<summary>Agent "S-chapters: draft engine chapters" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Record:** `docs/adr/0028-one-likelihood-per-claim-and-no-range.md`, accepted, citing R48 verbatim; index row added; dated amendments appended at the **foot** of 0005 (the interval on the canvas) and 0014 (a third amendment: decision B reversed, C and G's arrow spread and D's second half go with it). Branch `spec/05-sound-numbers`, 4 new commits.
+
+**Removed.** `propagation.md` B8 stops being *where the range comes from* and becomes *one likelihood, computed once*, keeping the cut design as history in Kent's words; the split logit-normal fit, the provenance-width table, `range_shares` and two of the three seed streams go; three invariants go and `.12` is retired. `diff.md`: `shifted` is the `.005` floor alone; `agreement` always absent, `range_width` always zero, `versions` always one, `unchanged_because` one reachable word; the rail's *same direction* and *how firm* columns leave both tables; yesterday's *no agreed direction* chip wording is gone. `belief.md`: title, `lo`/`hi` descriptions, *What the range means* → a dated note, every worked example debracketed; anti-pattern 3 inverted. The line-names file now lists the deletions (every `lo`/`hi`, 56 *band from* lines, every *same direction*) and the shell check tests for their absence.
+
+**Could not settle — three.** (1) **B and N1 flip from `unchanged` to `shifted`** on the fixture, because the test half they failed is gone; asserted with a VERIFY mark, not read off numbers. (2) Whether **N1 still reaches the rail** once only the rank discounts it. (3) Whether the **stated** `lo`/`hi` stay in the numbers file as inputs nothing reads, or go — the prompt still elicits them until the freeze, so I left it to the flip.
+
+12 VERIFY marks remain (8 propagation, 3 diff, 1 interventions); one range-only mark was deleted rather than verified.</result>
+<usage><subagent_tokens>429447</subagent_tokens><tool_uses>49</tool_uses><duration_ms>730619</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bzeqnc34z</task-id>
+<tool-use-id>toolu_01QDWRWpogpRrHbpiNrm3Vys</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/bzeqnc34z.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for checks and squash-merge the core PR #61" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>afab2b857b571fb16</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/afab2b857b571fb16.output</output-file>
+<status>failed</status>
+<summary>Agent "Flip F2: the Hormuz fixture" failed: Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 529, request id req_011CfHZqDteCwYJmo1H8TE9n, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Now I'll update the fixture's own tests.</result>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2fda5d0333a8ff46</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a2fda5d0333a8ff46.output</output-file>
+<status>failed</status>
+<summary>Agent "V: the verdict (record 0022)" failed: Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 529, request id req_011CfHZr14k7czSgp9z3atFr, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Now let me rewrite the computation helpers to share the two supposed passes.</result>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a532035361372c9d4</task-id>
+<tool-use-id>toolu_01EgdkYy2Eg521rqdcQnPQr3</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a532035361372c9d4.output</output-file>
+<status>failed</status>
+<summary>Agent "Flip F1: engine default and diff" failed: Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 529, request id req_011CfHZsM445CCzdYxNWbw3s, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Now the big test rewrite. Writing the new `test_propagation.py`.</result>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a532035361372c9d4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a532035361372c9d4.output</output-file>
+<status>failed</status>
+<summary>Agent "Flip F1: engine default and diff" failed: Agent terminated early due to an API error: API Error: 500 Internal server error. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 500, request id req_011CfHa1CzbRdwu79sriPZTz, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>afab2b857b571fb16</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/afab2b857b571fb16.output</output-file>
+<status>failed</status>
+<summary>Agent "Flip F2: the Hormuz fixture" failed: Agent terminated early due to an API error: API Error: 500 Internal server error. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 500, request id req_011CfHa1MiDFMJvF5BXuMozk, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2fda5d0333a8ff46</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a2fda5d0333a8ff46.output</output-file>
+<status>failed</status>
+<summary>Agent "V: the verdict (record 0022)" failed: Agent terminated early due to an API error: API Error: 500 Internal server error. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 500, request id req_011CfHa1qN7dCLE2nDgcVgjq, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bux4o0zvk</task-id>
+<tool-use-id>toolu_01LR5N34399J1M5NhxGwCQwi</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/bux4o0zvk.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait four minutes for the API to recover" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>afab2b857b571fb16</task-id>
+<tool-use-id>toolu_016jLcDE5gYt3g3yGnxGv6Xn</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/afab2b857b571fb16.output</output-file>
+<status>failed</status>
+<summary>Agent "Flip F2: the Hormuz fixture" failed: Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 529, request id REDACTED, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2fda5d0333a8ff46</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a2fda5d0333a8ff46.output</output-file>
+<status>failed</status>
+<summary>Agent "V: the verdict (record 0022)" failed: Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 529, request id req_011CfHae1BDpBZp1VnRhVJZx, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a532035361372c9d4</task-id>
+<tool-use-id>toolu_01TckYcuyVhuZGLCZ7kLaETW</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a532035361372c9d4.output</output-file>
+<status>failed</status>
+<summary>Agent "Flip F1: engine default and diff" failed: Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com. (error type server_error, HTTP 529, request id REDACTED, model sent to the API: claude-opus-5)</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bt3stgwvu</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/bt3stgwvu.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait nine minutes for the API to recover" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>afab2b857b571fb16</task-id>
+<tool-use-id>toolu_017RKJtUtVHzDcpJAcHggjXz</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/afab2b857b571fb16.output</output-file>
+<status>completed</status>
+<summary>Agent "Flip F2: the Hormuz fixture" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Run:** from `backend/` — `uv run ruff check src/katalyst/fixtures tests/unit/fixtures` · `uv run ruff format --check` same · `uv run mypy src` · `uv run pytest tests/unit/fixtures -q`. All green (31 passed). F1's flip landed mid-task: `propagate` no longer takes `engine=`, so **no test passes `engine="by_deadline"`** — the default is the new core.
+
+**Fixture changes** (`fixtures/hormuz.py`)
+
+| claim/arrow | was | is | why · source |
+|---|---|---|---|
+| all claims | — | `persistence` | R27/0017; `O`,`C` are states |
+| **O** (new) | — | *stays open to 1 Nov*, prior .12 | 0017's state; without it the strike moves nothing |
+| H resolution | Lloyd's 14 consecutive days | IMF PortWatch 7-day MA ≥ 60 | R30 §1.7a word for word; quote file `3501950` |
+| H prior | .35 | .20 | old derivation died with the base rate; venue test easier on duration, harder on volume |
+| H base rate | 7 of 9 | **none** | wrong population — Strait never closed |
+| H evidence | old test | transit-count items | re-pointed; one URL is the venue's own source page |
+| **M3** (new) | — | market ending, `contract_id="3501950"`, side `yes`, **no price typed** | R30; condition/token ids stay in the quote file, matched by test |
+| N1 reason | "No venue quotes…" (false) | contracts ask *any* mediated round | stays `not_tradeable` — adopting a near-miss is the trap |
+| M1 market | .48 (.45–.52) | point .48, stand-in | 0020, 0028 |
+| M1/all beliefs | ranges | points (`lo==hi==p`) | 0028; `_point()` helper |
+| M2 `move` | 0.03 | **0.063** | arithmetic in comment; script `plans/analysis/scripts/stack-05-flip-fixture/` |
+| R criteria | cut *or extension* | **new** cuts | audit-E §3.3 |
+| EIA source | bare share claim | year-labelled, share prose corrected | audit-E §3.1 |
+| `H-&gt;C` | — | **`O-&gt;C`** | its own rationale named the state |
+| `S-&gt;H` −1.9 sustain | — | **`S-&gt;O` −3.2 trigger** | 0017: events stand, state falls; −1.9 left the state *above* base (sweep committed) |
+| `S-&gt;B` | impulse h/l 10 | **step** | clamped: faded before B's fortnight. **Zero clamp warnings now** |
+| `R-&gt;B` lag | 5 | 1 | also clamped; a communiqué moves the curve same session |
+| `S-&gt;C` | sustain | trigger | S is an event |
+
+**Tests:** `test_hormuz_golden.py` deleted; `test_hormuz_story.py` has 0017's five + validates + contract-matches-quote-file + every-ending-has-a-row. No engine number typed. `test_a_state_with_nothing_to_end_it_is_an_event` asserts byte-identity on the state's own number only — the per-day series differs in its last bit (different pass); said so in the docstring.
+
+**Owed outside my files**
+- `tests/unit/domain/test_patches.py:58,1139` `STRIKE_TO_HORMUZ`→`STRIKE_ENDS_THE_OPENNESS`; `:1151-1152` `"S-&gt;H"`→`"S-&gt;O"`. Currently a collection error.
+- `frontend/e2e/hormuz.spec.ts:698-699` `toHaveCount(7)`→`(9)`; `:897` `(8)`→`(10)`. A fifth edit beyond the plan's four.
+- `.61 vs .48` prose: `spec/graph/belief.md:5,118,172,214` (`:172` is M1's row — delete the table's model/market numbers, cite `M1 · base · reading`), `:201` (`4 of 19 months` base rate — B has none), `spec/workbench/color-motion-type.md:67,130` (`.61`/`.35` are M1/H — now `.46`/`.20`, cite by line name), `spec/workbench/tiles-ports-wires.md:119`, `domain/belief.py:8`, `frontend/src/components/Inspector.tsx:634`, `components/__tests__/tile.test.tsx:238`; research notes `docs/research/02-causal-modeling-formalisms.md:131`, `03-ui-ux-directions.md:81,127`.
+- `spec/generation/grounding.md:199` repeats the deleted 7-in-9 reasoning.
+- `frontend/src/world/fromTheServer.ts:148` + `inspector.test.tsx:195` expect `7 of 9`; no claim has a base rate now.
+- **Not done, blocked:** digest item 5, B's FRED spot — no `DCOILBRENTEU` observation is committed anywhere and I may not fetch. B carries a dated comment saying so. Coordinator runs the recording.
+- Record 0017 needs no append: my state claim's wording matches it verbatim.
+
+**Blocked on F1:** at start `persistence` was absent and `domain/` briefly failed to import mid-edit; both resolved themselves within minutes and I built against the landed field.
+
+`test_worked_numbers_as_a_program.py` fails on the stale numbers file — expected, F1 runs `make numbers`. `test_diff.py`/`test_by_deadline.py`/`test_propagation.py` failures are F1's in-flight removals (`versions_of`, `Engine`), not mine.
+
+**Commit:** `feat(fixtures): the curated map gains its state, a real contract, and numbers that say why`</result>
+<usage><subagent_tokens>282365</subagent_tokens><tool_uses>8</tool_uses><duration_ms>179768</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2fda5d0333a8ff46</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a2fda5d0333a8ff46.output</output-file>
+<status>completed</status>
+<summary>Agent "V: the verdict (record 0022)" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>Done. Worktree clean, two commits on `feat/05-verdict`.
+
+**What you run, in order** (from `/Users/kentgang/git3/katalyst-wt/feat-05-verdict/backend`): `uv run ruff check . &amp;&amp; uv run ruff format --check .` · `uv run mypy src` · `uv run mypy --strict src/katalyst/domain src/katalyst/grounding src/katalyst/thesis` · `uv run pytest tests/unit/engine tests/unit/domain/test_solving.py -q` · then the whole suite through the queue. Read `plans/notes/msgs/pr-05-verdict-body.md` and `merge-05-verdict.txt`.
+
+**The three quantities.** *The shift* — the destination's number with the map's starting claim supposed **true**, minus its number with it supposed **false**. *The joint* — the chance every step after the starting claim on the best-backed route is true at once, with that claim supposed true, from one elimination (`domain/solving.py`'s new `all_true`) that keeps the whole route rather than each step's own number multiplied together. *The weakest arrow* — the single arrow on the route whose removal leaves the smallest shift behind, with `share_of_the_shift`; ties go to whichever the map lists first; absent when the shift is nought.
+
+**Cost:** 2 passes for the shift (both suppositions), 0 for the joint (read off the supposed-true pass's tables), 2 per arrow on the route. A three-arrow route = 8. The plan's §7.4 *"one re-solve per arrow"* undercounts: removing an arrow moves both supposed worlds.
+
+**Deviation, flagged:** your brief said *supposed true minus **nothing** supposed (one extra solve)*; record 0022's table, its test name (`…between_two_supposed_worlds`) and `ARCHITECTURE.md:160` all say *supposed **false***. I built the record.
+
+**Owed outside my files.** `api/generate.py:526` → `yield verdict(finished.graph, finished.destination, world=world)`. And one rename in `domain/propagation.py`: `_worked_out_by_deadline` → `worked_out_by_deadline` — the verdict needs the tables a finished world does not carry, and reaching the assembly's own single route beats a second assembly. Until generate.py moves, `verdict` still accepts `beliefs`, reads nothing from it, and says so. No `engine=` markers to strip: `_worked_out_by_deadline` *is* the by-deadline route.
+
+**Not run:** `make types` — `Verdict` is absent from `app.openapi()` (checked directly), so `schema.ts` cannot change; no frontend file is touched, `node_modules` absent.
+
+**Suite tail:** `1109 passed, 4 xfailed, 1 warning in 195.34s` · `TOTAL 3935 0 846 0 100%` · queue `END V: whole server suite exit=0 took=196s`.
+
+**Tip:** `ARCHITECTURE.md:147,160` still read `[planned]` for INV-8 — it's built now, and that file isn't mine; also stale are `spec/workbench/inspector.md:315` (B5, "the multiplied-out likelihood") and `:578` (rule 6, "do not print the path product as a joint"), and `spec/multiverse/propagation.md:285` ("that exists for exactly one reader: the path product") — the supposed claim's `1.0` now has no reader at all.</result>
+<usage><subagent_tokens>271838</subagent_tokens><tool_uses>36</tool_uses><duration_ms>320137</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2fda5d0333a8ff46</task-id>
+<tool-use-id>toolu_01Jt4DgAyyiowZJiE6sUDqDb</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a2fda5d0333a8ff46.output</output-file>
+<status>completed</status>
+<summary>Agent "V: the verdict (record 0022)" finished</summary>
+<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>
+<result>Done: `be0b203` touches only `ARCHITECTURE.md:147,160` (2 insertions, 2 deletions); the `[planned]` clause stays on the row as the browser half alone, so the preamble's count of four still holds. PR body now carries *What is deliberately not here* naming all three stale passages.
+
+**New tip:** `spec/workbench/inspector.md:65` types the bar's prop as `pathProduct: Known&lt;PathProduct&gt;` — the name outlives the number, and it's the flip lane's file too.</result>
+<usage><subagent_tokens>278969</subagent_tokens><tool_uses>44</tool_uses><duration_ms>403135</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2fda5d0333a8ff46</task-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a2fda5d0333a8ff46.output</output-file>
+<status>completed</status>
+<summary>Agent "V: the verdict (record 0022)" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>That was a leftover waiter from the whole-suite run, nothing new — it just confirms the queue lock released. No action needed, and my work is unchanged.
+
+**Final state:** worktree clean, three commits on `feat/05-verdict`, nothing pushed.
+
+- `d1dd403` — `all_true` in `domain/solving.py` (the joint, one elimination) + its tests
+- `cf78484` — the verdict: `_multiplied_out` deleted, `product` always empty, the shift, the joint and the weakest arrow + its tests
+- `be0b203` — `ARCHITECTURE.md:147,160` only
+
+Verification as reported earlier: ruff and its formatter clean, `mypy src` and `mypy --strict` on `domain`/`grounding`/`thesis` clean, `grep -rn "_multiplied_out" backend/src` finds nothing, and the whole server suite green through the queue — `1109 passed, 4 xfailed, 1 warning in 195.34s`, coverage `TOTAL 3935 0 846 0 100%`, `END V: whole server suite exit=0 took=196s`.
+
+Two one-line changes remain owed outside my files (`api/generate.py:526` → `world=world`; `domain/propagation.py`'s `_worked_out_by_deadline` → public), both written up in `plans/notes/msgs/pr-05-verdict-body.md`.</result>
+<usage><subagent_tokens>280246</subagent_tokens><tool_uses>45</tool_uses><duration_ms>462126</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b4wnh93py</task-id>
+<tool-use-id>toolu_01UGUyBDMcktyTbUeUGeTGY2</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/b4wnh93py.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for checks and squash-merge the verdict PR #62" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a532035361372c9d4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a532035361372c9d4.output</output-file>
+<status>completed</status>
+<summary>Agent "Flip F1: engine default and diff" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The flip is built. Here is my report.
+
+**Run, in order:** `cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src &amp;&amp; uv run mypy --strict src/katalyst/domain src/katalyst/grounding src/katalyst/thesis` · `uv run pytest tests/unit tests/oracles tests/api -q` (721 pass, 100% statement **and** branch on `domain/propagation.py`, `diff.py`, `validity.py`) · `make numbers-check` (green) · then read **`plans/analysis/2026-09-22-flip-numbers-diff.md`** and give it to Kent.
+
+## What landed
+- **`persistence`** required on `Proposition` (R27); `validity.py` rule 2 `claim_without_persistence` (reject, never repair, reachable only via `model_construct` — the same net as `belief_out_of_range`); `forward_pass` reads the claim's own field, `EVERY_CLAIM_IS_AN_EVENT` gone; `expand.py` mints `persistence="event"` twice with dated comments.
+- **One engine.** `propagation.py` 2 837 → 865 lines; `diff.py` 1 450 → 1 169. `Engine`, `DEFAULT_ENGINE`, `engine=`, `engine_that_built`, `Versions`, `versions_of`, `Retraction`, `_retractions`, `_opposing`, `_spells_on`, `_band`, `_range_shares`, the version draws and the whole `_prepare`/`_draw`/`_one_pass` path all deleted. **Decision: `Engine` goes** — one rule, and `test_there_is_one_engine_and_nothing_names_a_second` fails if either name is written in any shipped file.
+- **R48.** Version axis length 1, `Belief.lo == p == hi`, `range_shares={}`, `World.worlds=0`, `versions=1`, `retractions=()` (element type had to become `str` — `Retraction` had to leave `src`), `ClaimDiff.agreement=None`, `moved_only_by_reweighting=False`, `DeltaRow.range_width=agreement=0.0`; all with dated comments. `versions`/`worlds`/`introduced_by` stay accepted-and-ignored on `propagate` and on the four request fields.
+- **`diff.py`** keeps `unchanged_because` · `killed` · `added`; `versions_of` **does not survive** — nothing read it once the paired-difference machinery went, and keeping a rebuild nothing reads is 0028's own objection. `sensitivity` loses its budget and the retraction rebuild.
+
+## Tests
+**30 deleted outright** (18 in `test_propagation.py`, 10 in `test_diff.py`, 2 in `test_by_deadline.py`) — every one about versions, the range, retraction, the version weights, or the map-wide day grid, which no longer exists (each claim is cut from its own window). **18 rewritten or renamed.** Three new: `test_a_computed_belief_has_no_range`, `test_nothing_draws_a_version`, `test_the_engine_carries_no_retraction` (source checks naming symbols). All eight tests 0028 lists as deleted are gone; all three it names as confirmation exist. The three `xfail(strict)` marks came off and pass; `test_an_observation_moves_a_cause_even_when_no_arrow_pushes` deleted, its reversal unmarked. `test_band_is_not_sampling_noise` → replaced by `test_a_computed_belief_has_no_range` (zero width, exactly).
+
+**Two honest softenings, measured, not guessed.** Locality is byte-identical for *evidence* (`test_a_claim_cut_off_from_the_evidence_is_bit_for_bit`, untouched), but an edit that changes the map's *shape* changes the elimination order, so `tests/comparisons.py` and the state machine now ask for the last bit (`1e-12`): measured `8.311121790768778e-10` vs `…79e-10`, and `5.2e-26` on `2.4e-10`. And two observations in disjoint pieces share one 50 000-world sample, so one moves the other by ≤ `2.7e-4` (floor is `.005`) — scripts in `plans/analysis/scripts/stack-05-flip/`.
+
+## VERIFY marks: all 12 cleared
+Notable corrections: **three of four endings now peak on their judged day** (only M3 does not) — `diff.md` B5 says so rather than pretending; **no arrow clamps on the shipped fixture** (all four `warnings` lines read *none*); the rail is four rows, **N1 is on it, second**; `S → H` became `S → O`; C is a state too.
+
+## Deviation you must sign off
+**I migrated `backend/recordings/hormuz.jsonl`** (19 claims gained `"persistence": "event"`, script + rationale in `plans/analysis/scripts/stack-05-flip/persistence_into_the_recording.py`). Without it the file is unreadable, killing replay, `make eval` and the browser. Proved identical once the field is removed. No model call, no cost. Not a re-recording.
+
+## Still red (13, none mine)
+- **8 `tests/boundary/test_expand_cassettes.py`** — F2's fixture rewrote H, C, R and added O and M3, so the prompt body no longer matches the cassettes (`match_on` includes `body`). Fix: `make record-cassettes` (~$1), or it rides the freeze. **Your call.**
+- **5 `tests/thesis/test_{edge,card}.py`** — `inside_the_model_range` rests on a range with width; with `lo==p==hi`, `_sign_changes_across_the_range` is always false and the tests fail on their own guard. `thesis/` is the trade lane's. Suggested: field always `False` with a dated comment, a dated line on record 0018, and the five tests deleted with that reason.
+
+## Browser, broken by me (frontend is the third writer's; `make types` was run, `schema.ts` regenerated)
+`tsc -b` gives exactly 6 errors: `src/world/apiSource.ts:150,151` (×5 — `world.retractions` is now `string[]`; the mapper returns `[]`) and `src/stream/__tests__/aStream.ts:59` (needs `persistence: "event"`). Also red at runtime: `e2e/hormuz.spec.ts:491, 664-666, 686, 867, 935, 1107-1140`; `src/graph/diff/noChange.ts:67,102,108-113`; `src/a11y/announcement.ts:28`; plus F2's `:698-699, :897` counts and `fromTheServer.ts:148`.
+
+## Owed outside my files
+`PRODUCT_REQUIREMENTS.md` **NFR-1** (0028 gives the words), **FR-16** (drop the 90% bar, the agreement column and the width column), **FR-21** (cites `B · base · band from B`, a line name that no longer exists — 0028's line applies). `spec/vocabulary.md` **Agreement** (:49), **Diff** (:45) and **Delta rail** (:116) still describe both side columns as live.
+
+## Commits (4)
+1. `feat(domain): a claim says which kind of truth it is` — `proposition.py`, `rates.py`, `states.py`, `forward.py`, `validity.py`, `link.py`, `engine/expand.py`, `recordings/hormuz.jsonl`, `tests/strategies.py`, `tests/oracles_adapter.py`, `tests/unit/domain/test_validity.py`, the one-line `persistence="event"` test builders, `frontend/src/api/schema.ts`.
+2. `feat(domain): the by-deadline engine becomes the only engine` — `propagation.py`, `domain/__init__.py`, `engine/worlds.py`, `api/worlds.py`, `tests/comparisons.py`, `test_propagation.py`, `test_by_deadline.py`, `test_the_engine_is_right.py`, `test_patches.py`, `tests/api/test_worlds.py`.
+3. `feat(domain): the change list loses the versions and the range` — `diff.py`, `belief.py`, `test_diff.py`.
+4. `docs: the chapters, the architecture and the numbers file catch up with the flip` — `spec/multiverse/**`, `spec/graph/belief.md`, `ARCHITECTURE.md`, `engine/worked_numbers.py`, `docs/worked-numbers.txt`.
+
+**Not checked:** any browser run (forbidden), `make eval`, the benchmark, and whether hypothesis finds a worse map than the three degenerate shapes I ruled out of `test_observe_may_update_ancestors` (day-zero windows, pushes of `2.2e-16`, causes judged after their effects — each named in its docstring).</result>
+<usage><subagent_tokens>694611</subagent_tokens><tool_uses>258</tool_uses><duration_ms>3506522</duration_ms></usage>
+</task-notification>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
+UX-round coordinator: please hold the flip's BROWSER share until my batch lands, and branch it from the batch's tip — the four files it owns are exactly the ones my R48 screen half just rewrote, so a parallel start would be a rebase of every line for one of us. Specifically, on `feat/04-no-range-on-screen` (verified, in my integration branch): `src/world/apiSource.ts` — the origin sentence is now ONE function `theSentenceUnderTheMap(world, whereTheMapCameFrom, branchLabel)` shared by the stored and the generated map source, and the "over 2 000 versions of the map with 8 worlds under each" tail is already gone; `retractions` is still mapped (yours to empty). `src/world/fromTheServer.ts` — drops `lo`/`hi`/agreement/`moved_only_by_reweighting` at the wire with dated comments naming your follow-up. `src/graph/diff/noChange.ts` — a `versions_disagree` quiet row now prints *the engine could not settle which way it moves* (R4: every quiet row says why); when your flip removes that reason, delete the branch and the note together. `e2e/hormuz.spec.ts` — edited by four of my lanes (panel tabs, fold, first-screen row names, range assertions inverted); your strike-branch counts and the retraction-badge deletion will apply cleanly on top, but not under. The engine half and `spec/05-sound-numbers` do not collide with anything of mine — go ahead there. On (1): I cannot add `persistence: "event"` to `aStream.ts:59` before your regenerated `schema.ts` lands — it is an excess property against my current types and fails `tsc` — so add it in the flip; it is one line and I will keep both sides. Timing: the batch is one lane from complete (the frame's fix round); Kent has not yet given the word to land. I will message you the moment it is on `main`.
+</cross-session-message>
+
+---
+
+<task-notification>
+<task-id>a450d5d8345332124</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a450d5d8345332124.output</output-file>
+<status>killed</status>
+<summary>Agent "Flip F4: browser share" was stopped by Claude</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I'll start by reading the briefs and getting oriented in the worktree.</result>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a26dcef08a9ae6879</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a26dcef08a9ae6879.output</output-file>
+<status>completed</status>
+<summary>Agent "Flip F3: server residue" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All thirteen red tests are green and the whole server suite is clean.
+
+**Run, in order** (from `/Users/kentgang/git3/katalyst-wt/feat-05-the-flip/backend`): `uv run ruff check . &amp;&amp; uv run ruff format --check .` · `uv run mypy --strict src/katalyst/{domain,grounding,thesis}` · `uv run mypy src` · `uv run pytest tests/boundary tests/thesis -q` · `make numbers-check` from the root · `env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run python plans/analysis/scripts/stack-05-flip/check_the_body_matches.py`.
+
+**Beyond the map: nothing.** The check script rebuilds all four pieces of every recorded body — standing half, varying half, answer shapes as the library sends them, settings — and all nine calls match exactly. `persistence` appears nowhere in a request body, so writing it into the frozen map moves no byte. No `match_on` was widened; nothing was re-recorded.
+
+**Suite tail:** `1066 passed, 1 warning in 217.86s`; `TOTAL 3441 0 738 0 100%` — `thesis/` 100% statement and branch, `card.py` included.
+
+**Commits**
+1. `test(boundary): the recorded exchanges get back the map they were recorded against` — `backend/tests/boundary/test_expand_cassettes.py`, `backend/tests/boundary/the_map_the_cassettes_saw.json` (**untracked — needs `git add`**).
+2. `feat(thesis): an edge cannot straddle a range that does not exist (0028)` — `backend/src/katalyst/thesis/edge.py`, `backend/tests/thesis/test_{edge,card}.py`, `docs/adr/0018-*.md`, `spec/thesis/{edge,card-and-export}.md`.
+3. `docs: the requirements and the vocabulary lose the versions, the range and the retraction badge` — `PRODUCT_REQUIREMENTS.md`, `spec/vocabulary.md`.
+
+**Deviation:** the two `test_card.py` tests were rewritten, not deleted — they now set the flag by hand (as `test_ceiling.py` does), which is the only way card.py's two refusal branches keep coverage.
+
+**Owed outside my files:** PRD D2, glossary *Belief*, FR-2, FR-8, FR-25, NFR-7 (its "2 000 versions" reference point) and INV-7 still describe a range; record 0019's ceiling now reads one number, not a range end.</result>
+<usage><subagent_tokens>202373</subagent_tokens><tool_uses>118</tool_uses><duration_ms>1139566</duration_ms></usage>
+</task-notification>
+
+---
+
+can you explain to me what feature or product changes you've been working on this session?
+
+---
+
+<task-notification>
+<task-id>a94e125a08b7c8680</task-id>
+<tool-use-id>toolu_01LaAJyMoxsZyLHXPRj9391G</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a94e125a08b7c8680.output</output-file>
+<status>completed</status>
+<summary>Agent "T3b: card and export routes" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Everything is committed on `feat/06-card-routes` in `/Users/kentgang/git3/katalyst-wt/feat-06-card-routes`.
+
+**Run, in order:** `cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest -q` · `uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src` · `./scripts/gen-types.sh &amp;&amp; git diff --stat frontend/src/api/schema.ts` (empty) · `cd frontend &amp;&amp; npm run check`.
+
+**The routes**
+
+- `POST /api/thesis/card` → `Card`; `POST /api/thesis/export` → `Export`; `POST /api/thesis/export/markdown` → `text/markdown`. One request body serves all three.
+- Body: `base_id`, `branch` (sent whole), `seed`, `ending`, `exit{entry,stop,target,horizon,risk_budget,daily_move}`, `shocks[]` (branches), `versions`, `worlds`.
+- New router `api/thesis_card.py`; one line at the **end** of `main.py`'s list.
+- Fetches four things — world (`engine.build_world`), drawn worlds, recorded quote by contract id, shift from `verify.verdict`. Computes nothing.
+- Never fetches a price; never assumes a fee of nothing; edge always read from the map as it stands.
+- One `ClaimMove`: the ending's own payoff, `entry × move`, signed by direction; market chance unhanded so the walk reads `sample_share` (R41).
+- Contract lead → first touch refused by name, rail empty **carrying that refusal**.
+- 422 lists every branch violation and every form refusal together; 404 names the examples.
+- Export checked against the committed description (drift + round-trip) before returning; 500 on drift.
+- 830 ms/card at 2 000 versions, 268 ms at 200.
+
+**Waiting:** watch/unhedgeable/tails are `()` until T2b's two-way sweep. `_drawn_worlds` holds a private `Sample → Draws` marked `# T2b: replace with the shared builder at the rebase`. `_worked_out_by_deadline` reached by its private name exactly as `verify.py` does — **the public-seam one-liner is owed, two files want it.** Flip makes the sample and the tiles one arithmetic.
+
+**Suite:** `1129 passed, 4 xfailed in 248.82s`; 100% on `domain`/`grounding`/`thesis`; `mypy --strict` 30 files clean; frontend 358 tests.
+
+**Tip:** `lift.py`'s `too_few_draws` now carries two reasons; rename to `empty_because` in a lane that owns `thesis/`.</result>
+<usage><subagent_tokens>280274</subagent_tokens><tool_uses>111</tool_uses><duration_ms>1470253</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ac948628be142ac76</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ac948628be142ac76.output</output-file>
+<status>completed</status>
+<summary>Agent "Flip F5: remaining range mentions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Verification: `pre-commit run --files &lt;the 7 files&gt;` passed; `grep -n "2 000\|2,000\|versions" PRODUCT_REQUIREMENTS.md` returns only FR-12, FR-16 and NFR-7, all inside dated amendments quoting the old wording.
+
+**Changed** (`/Users/kentgang/git3/katalyst-wt/feat-05-the-flip/`):
+- `PRODUCT_REQUIREMENTS.md` — D2, glossary *Belief* and *Link* (retraction now built), FR-2 (single slider), FR-8, FR-12 (provenance sets no width), FR-25 + FR-26, NFR-7 reference point, INV-7 (`lo == p == hi`), §1 "version"→"branch", one note in Answered.
+- `docs/adr/0019-*` — footer only: the ceiling reads the claim's one likelihood (`ceiling_of` asks low when buying, high when selling — the same ask twice); the *range disagrees* zero is unreachable since `inside_the_model_range` is pinned false; the *nothing worth taking* zero stands.
+- `spec/generation/{grounding,evaluation,proposals,README,streaming}.md` — the arrow-width paragraph, *agreement*, INV-generation.31, the *uncalibrated* chip, B9, anti-pattern 9, `versions`/`worlds` accepted-and-ignored.
+
+**Left on purpose:** `spec/graph/proposition.md` (no range/version text); `docs/measurements.md` (dated journal, "change nothing beneath it" — every hit is a run's own conditions); `spec/generation/replay.md` (its no-World rule is unaffected); the Proposition glossary row (the `step` rename genuinely has not happened); roadmap stack-05 status "not started" — coordinator's call.
+
+**Commit:** `docs: the requirements, record 0019 and the generation chapters lose the range and the versions`</result>
+<usage><subagent_tokens>147250</subagent_tokens><tool_uses>80</tool_uses><duration_ms>475275</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae2ae456e3cdccbce</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ae2ae456e3cdccbce.output</output-file>
+<status>completed</status>
+<summary>Agent "T2b: Draws adapter and position route" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>T2b is built, committed on `feat/06-position-route` (6 commits, clean tree). Nothing pushed.
+
+**What I run to check it**
+```
+cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest tests/thesis/test_adapter.py tests/api/test_thesis.py -q
+cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy --strict src/katalyst/thesis &amp;&amp; uv run mypy src
+cd frontend &amp;&amp; npm run check
+```
+
+**The shape**
+```
+POST /api/thesis/position
+→ {base_id, branch?, seed, ending, entry, stop, target, horizon,
+   risk_budget, daily_move, versions?, worlds?, drawn_worlds?}
+← {base_id, branch_id, seed, as_of, drawn_worlds, effective_draws,   (Figures)
+   the_trade,        card.TheTrade — ending, instrument, side, test, venue
+   your_exit,        card.YourExit — reader's four, implied size, ceiling,
+                     stop_first/target_first/neither, stop_at/target_at, through,
+                     first_touch_refused, method, sample_says
+   takes_you_out,    card.WhatTakesYouOutShown | null (null on a contract)
+   path_applied}     per claim: market_chance + came_from + stated_move +
+                     level_gap + converted + decay_shape
+404 no such example · 422 RefusedEdit | RefusedPosition {code, field, sentence}
+```
+Ten refusal codes: the form's six, reprinted from `position.py`, plus `unknown_ending`, `the_ending_names_no_trade`, `horizon_outside_the_window`, `nothing_agrees_with_what_happened`.
+
+**`# the flip:` markers** — both in `engine/worlds.py`: line 70, the import of `_worked_out_by_deadline` (strip the underscore when it becomes a public seam); line 367, the note in `sample_of` that until the flip the world shown beside these draws is the old engine's. `domain/diff.py` untouched.
+
+**Suite tail** — `1151 passed, 4 xfailed in 248.70s`; `domain`, `grounding`, `thesis` at 100% statement and branch, `adapter.py` and `card.py` included. `schema.ts` regenerated, 571 lines inserted and none removed, so `types-fresh` passes; frontend 358 tests green. `worked-numbers` still current.
+
+**Three things I did outside the two named files.** `engine/worlds.py` gains `sample_of` and `DRAWN_WORLDS` (the drawn worlds must come from the by-deadline core, and duplicating `_fold` would be a second assembly). `card.py`'s `_the_trade`/`_your_exit`/`_rail` become `the_trade`/`the_exit`/`the_rail` plus a new `THE_GIVEBACK_FOLLOWED` — otherwise the route re-implements the card's Figure-building. `ARCHITECTURE.md` took four one-clause edits, not one: route count, testing table, the thesis bullet, and `adapter.py` in the tree.
+
+**Two notes for the reviewer.** R20's *conditional world* refusal is structurally unreachable through this route — the base world is built with `branch=None`, so `base.assignments` is always empty — but the rule is kept by construction and the discriminating test (`test_the_edge_behind_the_ceiling_is_read_from_the_map_with_nothing_fixed`) proves the branch world was not used instead. And `find_stops_worked_out` pointed at `api/` catches `generate.py`'s `target` field (the destination a story is graded against, a different word with the same spelling), so the new test filters to `thesis.py`; if the checker should cover the whole API layer, that field wants renaming in another lane.
+
+PR body: `plans/notes/msgs/pr-06-position-route-body.md`. Merge message: `plans/notes/msgs/merge-06-position-route.txt`. Evidence: `plans/analysis/scripts/T2b/probe_sample.py`.</result>
+<usage><subagent_tokens>351597</subagent_tokens><tool_uses>131</tool_uses><duration_ms>1740978</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a97f97eccbc411565</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a97f97eccbc411565.output</output-file>
+<status>completed</status>
+<summary>Agent "Review both thesis routes" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Report: `/Users/kentgang/git3/katalyst/plans/analysis/2026-09-22-review-thesis-routes.md`. Both worktrees untouched; all work on scratchpad copies.
+
+**3 must-fix · 6 should-fix · 3 conflicting files (18 hunks) · 3 surviving mutants**
+
+**MUST-FIX**
+- **T2b** `api/thesis.py:444` — `priced(base, shown, ending, None, fee=None)` passes a literal `None` quote, so the greyed ceiling can never be a number on any input. `thesis_card.py:546` reads `recorded_quote(payoff.contract_id)`; the position route must too, or the two surfaces will print different answers for the same map the day the `3501950` ending lands.
+- **T3b** `api/thesis_card.py:763` — `horizon` on or before the window's first day (e.g. `2026-10-01` on `hormuz`) is a **500** from `first_touch`'s `ValueError`; T2b refuses the same input with a named 422. Hits card, export and markdown.
+- **T3b** `api/thesis_card.py:866` — a shock is folded onto the bare map, not onto the reader's branch, so `change_to_the_position` differs by two edits; a shock parented to the branch is refused outright, so the documented behaviour is unreachable.
+
+**Verified good.** Every route number matched a by-hand run of the pure chain (9 values, exact). World selection is right on both — edge from `branch=None`, position/paths/sample from the branch shown. Owners correct on every `Figure`; the reader's three numbers never derived; R41's source read off the walk's own record. R20's *conditional world* refusal **is** honestly unreachable: no caller can supply a base map carrying a fixed value, since assignments exist only as `apply`'s output.
+
+**Rebase.** `ARCHITECTURE.md` (4), `main.py` (2, trivial), `schema.ts` (~13 — regenerate, don't merge). Two silent hazards: T3b's `_the_sample` passes `exact=all_marginals(...)` where T2b's `sample_of` passes `exact=worked.answers` — different numbers under *This happened*; and the replacement must add the `ImpossibleObservation` catch T3b lacks.
+
+**Surviving mutants (all T3b test holes, all guarded on T2b):** sample drawn on the base instead of the branch; `fee=None`→`0.0`; payoff side dropped from the level gap.</result>
+<usage><subagent_tokens>190104</subagent_tokens><tool_uses>66</tool_uses><duration_ms>741899</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aef225cce483e7660</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/aef225cce483e7660.output</output-file>
+<status>completed</status>
+<summary>Agent "Freeze Z2: prompt and proposal" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Report**
+
+Run: `cd backend &amp;&amp; uv run ruff check src/katalyst/engine tests/unit/engine tests/boundary &amp;&amp; uv run mypy src &amp;&amp; uv run pytest tests/unit/engine tests/boundary -q`
+
+**The ten items, as the model now sees them** (all in `engine/prompt.py` `STANDING_TEXT` + `engine/proposal.py` descriptions):
+1. **R6** — claim asked as *the chance by its deadline if none of the map's causes happens*; arrow as *the chance if this cause happens and no other does*. `strength` and *"+1 triples the odds"* deleted.
+2. **persistence** asked on `ClaimProposal` and `StartingClaim`, with the event/state distinction in plain words.
+3. **R26** — an arrow that ends a state gives `chance_it_stops`; exactly one of the two chances, refused by name otherwise.
+4. **R21** — `claim_kind: step`; `expand.py` mints `kind="step"`.
+5. **R22** — both drafted paragraphs, verbatim, in *What an arrow is*.
+6. **R28** — `move` is the level gap, not the announcement reaction.
+7. **R8** — `SourceDraft.quote` + `role`; joined to the search's page in the new `grounding.sources_for`.
+8. **Payoff `kind` required** — `2f0845a`'s prompt/parser half copied by hand (`test_a_payoff_must_say_which_of_the_two_shapes_it_is`).
+9. **Venue contract first** where one exists — one sentence.
+10. **R7** — no search on the first call or the ending call (decided in `expand.py`, not the caller); counts under five dropped by the parser. Plus the terse metaphor replacement at old `prompt.py:105`.
+
+**Fingerprint**: `test_the_freeze_moved_the_fingerprint_once` + three siblings compute it from `STANDING_TEXT` and `what_goes_out()`; no hex is typed anywhere.
+
+**Paid, coordinator only, in order**: `make record-cassettes` (~$1; now also re-makes the four hand-shaped ones) then `KATALYST_RUNS=/Users/kentgang/git3/katalyst/backend/.runs make record-demo` (~$20, ~45 min, EFFORT unset = service default, R49). Details in new `backend/recordings/README.md`.
+
+**Skips**: 8 boundary tests skip by name (stale request body); **0** in `tests/unit/engine`.
+
+**Owed outside my files**
+- `docs/worked-numbers.txt`: `make numbers` — 4 `test_worked_numbers_as_a_program` tests red on `kind says 'event' … 'step' now`.
+- `frontend/src/api/schema.ts`: `make types`.
+- `spec/vocabulary.md:10,11,19`: drop "**Planned, and not in the build yet**".
+- **I edited `engine/grounding.py`** (nobody's declared file): Z1 made `Source.quote`/`role` required, which broke `found_in`. Replaced by `sources_for`; `keep_cited` now takes `FoundPage`. Flag for reassignment.
+- `grow.py`: no change needed.
+
+**Commits**
+- `feat(engine): the model is asked one plain chance, which kind of truth, and what it read` — `prompt.py`, `proposal.py`, `expand.py`, `grounding.py`
+- `test(engine): the freeze's fields, its refusals, and a fingerprint nobody typed` — `tests/unit/engine/**`
+- `test(boundary): a stale recording skips by name and says what to run` — `tests/boundary/**`, `Makefile`
+- `adr,spec: the one shape freeze, the model-facing half` — `docs/adr/0006-*`, `spec/generation/{proposals,grounding}.md`, `backend/recordings/README.md`</result>
+<usage><subagent_tokens>369983</subagent_tokens><tool_uses>140</tool_uses><duration_ms>1526422</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae2ae456e3cdccbce</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ae2ae456e3cdccbce.output</output-file>
+<status>completed</status>
+<summary>Agent "T2b: Draws adapter and position route" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Fix round done: 2 new commits (`0165b2c`, `d769a1e`), tree clean.
+
+**Must-fix T2b-1.** Reproduced red first (`fraction is None`), then `priced` gets `recorded_quote(payoff.contract_id)` — read from the committed file, never fetched, `fee=None` kept. Two tests: a map whose ending names `3501950` → ceiling `0.1225`, owner `computed`, `taken_by: buying`, no sentence; no contract → the absence with its reason. Wire shape unchanged, so `make types` produced no diff.
+
+**Should-fix, closed.** (1)(2) code/sentence and envelope differ from T3b — cross-branch, unify at the rebase; mine is the `{code, field, sentence}` shape. (3) already `Annotated` with no value. (4) mine passes `exact=worked.answers`; `sample_of`'s docstring now says why. (5) the five-part dated comment belongs in the flip's PR. (6) mine already catches `ImpossibleObservation`. Not-a-finding: ending now looked up on the base world; the R20-unreachable note is in the comment and the chapter.
+
+Suite: `1153 passed, 4 xfailed in 195.17s`, `thesis` 100%. PR body updated.
+
+**Tip:** the rebase must keep `exact=worked.answers`, not T3b's uncorrected marginals — they differ under *This happened*.</result>
+<usage><subagent_tokens>381632</subagent_tokens><tool_uses>17</tool_uses><duration_ms>411282</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a94e125a08b7c8680</task-id>
+<tool-use-id>toolu_011UvqJpWRsfjuhj4LfjW62u</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a94e125a08b7c8680.output</output-file>
+<status>completed</status>
+<summary>Agent "T3b: card and export routes" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Fix round done, four new commits on `feat/06-card-routes`.
+
+**Run:** `cd backend &amp;&amp; uv run pytest -q` · `uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src` · `./scripts/gen-types.sh &amp;&amp; git diff --stat frontend/src/api/schema.ts` (empty) · `cd frontend &amp;&amp; npm run check` · `uv run python plans/analysis/scripts/T3b/mutants.py`.
+
+**Must-fix.** Both reds reproduced first. (1) Horizon on/before day zero was 500 on all three routes; guard now sits between the drawn worlds and the paths and gives T2b's `horizon_outside_the_window` / field `horizon` / same sentence. (2) Shocks fold onto the branch in force — edits placed after it, parent dropped, so a parented shock is accepted and gives the same number.
+
+**A third fault, not in the review.** `change_to_the_position` was structurally always `0.0`: the mean price at the horizon *is* the entry price in every branch (INV-thesis.16 — the paths carry no drift). It now reads the average price the position is **closed** at under the reader's exit; their stop and target break the symmetry.
+
+**Mutants.** All five killed (`mutants.py`): horizon guard, shock fold, sample-on-base, `fee=0.0`, dropped payoff sign.
+
+**Should-fix.** 1–3 closed: one refusal vocabulary and `{code, field, sentence}` shape (branch violations keep `{subject, message}`); `Annotated` exit fields; risk budget unbounded so the form's sentence shows. 4 and 6 written into the rebase note as instructed. 5 rides the flip. `SLICES` now from `katalyst.domain`.
+
+**Suite:** `1135 passed, 4 xfailed in 193.57s`; 100% on the three packages; frontend 358 tests.
+
+**Tip:** `_worth_of` weights four numbers `position.py` owns — its proper home is beside `first_touch`.</result>
+<usage><subagent_tokens>363113</subagent_tokens><tool_uses>52</tool_uses><duration_ms>909063</duration_ms></usage>
+</task-notification>
