@@ -70,9 +70,9 @@ const SUMMARY = {
  * real is the engine's own word for why it would not call the difference a move,
  * which is the only thing that changes between one call and the next.
  *
- * @param because The engine's own word, or nothing at all where it gave none —
- *   which is now also what a claim its two thousand versions disagreed about
- *   arrives as, because that word never reaches the browser (2026-09-22, R48).
+ * @param because The engine's own word, or nothing at all where it gave none.
+ *   Both of its words come across and neither is printed: the rail draws the
+ *   phrase `graph/diff/noChange.ts` writes for each (2026-09-22, R48).
  */
 function heldFor(because: Movement["unchangedBecause"]): DeltaRow {
   const moved: Movement = {
@@ -213,7 +213,7 @@ describe("the rail beside the map", () => {
     // drop the most interesting thing on the map without saying so.
     const { container } = render(
       <DeltaRail
-        rows={[RANKED[0] as DeltaRow, heldFor(undefined)]}
+        rows={[RANKED[0] as DeltaRow, heldFor("versions_disagree")]}
         ranked={true}
         summary={SUMMARY}
       />,
@@ -235,10 +235,10 @@ describe("the rail beside the map", () => {
     // words that go with it and works nothing out, because the floor that
     // decides it is a constant inside the engine and is on no wire.
     //
-    // **The engine has a second word and this product no longer shows it**
-    // *(2026-09-22, R48)*: *the versions of the map disagreed which way*. It is
-    // a fact about running the map two thousand times, so it stops at the wire
-    // and a claim that failed on it arrives here with no word at all.
+    // **The engine has a second word and its own spelling names the versions of
+    // the map** *(2026-09-22, R48)*. The versions leave the screen and the
+    // reason stays, because R4 is the older rule: every quiet row says why, in
+    // words, and a row with no reason is what R4 forbids.
     const { rerender } = render(
       <DeltaRail rows={[heldFor("under_the_floor")]} ranked={true} summary={SUMMARY} />,
     );
@@ -247,11 +247,21 @@ describe("the rail beside the map", () => {
       /smaller than it will report/,
     );
 
-    // And where the engine gave no word this product may show, neither does the
-    // rail: a half-line nobody can account for is exactly what this product
-    // refuses to draw.
+    rerender(<DeltaRail rows={[heldFor("versions_disagree")]} ranked={true} summary={SUMMARY} />);
+    const unsettled = screen.getByText("the engine could not settle which way it moves");
+    expect(unsettled).toBeInTheDocument();
+    expect(screen.queryByText("barely moved")).toBeNull();
+    // And not a word of it about versions of the map, on either the half-line or
+    // the sentence behind the cell.
+    const said = `${unsettled.textContent} ${screen.getByText("no change").getAttribute("aria-label")}`;
+    expect(said.toLowerCase()).not.toContain("version");
+
+    // And where the engine gave no word at all, neither does the rail: a
+    // half-line nobody can account for is exactly what this product refuses to
+    // draw.
     rerender(<DeltaRail rows={[heldFor(undefined)]} ranked={true} summary={SUMMARY} />);
     expect(screen.queryByText("barely moved")).toBeNull();
+    expect(screen.queryByText("the engine could not settle which way it moves")).toBeNull();
     expect(screen.getByText("no change")).toBeInTheDocument();
   });
 
@@ -261,12 +271,12 @@ describe("the rail beside the map", () => {
     // row says it twice: the change cell reads the engine's verdict in words,
     // and the half-line under the ending says why. Neither is a colour.
     const { container } = render(
-      <DeltaRail rows={[heldFor("under_the_floor")]} ranked={true} summary={SUMMARY} />,
+      <DeltaRail rows={[heldFor("versions_disagree")]} ranked={true} summary={SUMMARY} />,
     );
     const row = container.querySelector('.delta-rail__row[data-ranked="no"]') as HTMLElement;
     const words = (row.textContent ?? "").toLowerCase();
     expect(words).toContain("no change");
-    expect(words).toContain("barely moved");
+    expect(words).toContain("the engine could not settle which way it moves");
   });
 
   it("test_a_ranked_row_names_the_day_the_two_worlds_are_furthest_apart", () => {

@@ -54,7 +54,23 @@ const FORBIDDEN = [
   /\binterval\b/i,
   /\buncalibrated\b/i,
   /middle 80/i,
+  // The engine's own spelling, which an underscore hides from the pattern above.
+  // It is a wire word and is never printed: `graph/diff/noChange.ts` turns it
+  // into *the engine could not settle which way it moves*, which is what a
+  // reader is owed under R4 and says nothing about versions of the map.
+  /versions_disagree/i,
 ];
+
+/**
+ * The words the engine writes on a wire, which the browser copies and never
+ * prints.
+ *
+ * They are taken out of a **source** file before the words above are looked for,
+ * and never out of anything rendered: a wire word that reached the glass is
+ * exactly the fault this file exists to catch, so the rendered walk keeps them
+ * forbidden and only the source walk names the exemption.
+ */
+const WIRE_WORDS = /versions_disagree/g;
 
 /**
  * A reading with a range in it, however it is spelled.
@@ -316,7 +332,7 @@ describe("no sentence in the product says versions or worlds", () => {
     const said: string[] = [];
     for (const [path, source] of Object.entries(PRODUCT)) {
       for (const sentence of everySentence(path, source)) {
-        const words = sentence.replace(THE_ROUTE, " ");
+        const words = sentence.replace(THE_ROUTE, " ").replace(WIRE_WORDS, " ");
         if (FORBIDDEN.some((word) => word.test(words))) {
           said.push(`${path}: ${sentence}`);
         }

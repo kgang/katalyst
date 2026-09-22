@@ -344,11 +344,13 @@ describe("asking the engine", () => {
     // of the map did not agree which way it went. The two numbers below are
     // plainly made up; the words are what is under test.
     //
-    // **One of the two words stops here** *(Kent, 2026-09-22, R48)*.
-    // `versions_disagree` is a fact about running the map two thousand times,
-    // and there are no versions of the map on this screen, so it is dropped on
-    // the way in and a claim that failed on it carries no word at all. It is
-    // still on the wire, and it dies with the engine half.
+    // **Both words come across, and neither is ever printed** *(Kent,
+    // 2026-09-22, R48)*. `versions_disagree` names the two thousand versions of
+    // the map, which are cut from the screen — so the word is carried and
+    // `graph/diff/noChange.ts` words it without them. It is carried rather than
+    // dropped because R4 is the older rule: every quiet row on the change list
+    // says why, and a row with no reason is what R4 forbids. The reason itself
+    // dies with the engine half.
     vi.mocked(readDiff).mockResolvedValue({
       ...DIFFERENCE,
       claims: {
@@ -381,7 +383,7 @@ describe("asking the engine", () => {
     // this is the only way the browser can know which half a claim failed —
     // which is what stops a second engine growing here and disagreeing with
     // the first about which claims held still.
-    expect(change.claims.get("H")?.moved?.unchangedBecause).toBeUndefined();
+    expect(change.claims.get("H")?.moved?.unchangedBecause).toBe("versions_disagree");
     expect(change.claims.get("S")?.moved?.unchangedBecause).toBe("under_the_floor");
   });
 

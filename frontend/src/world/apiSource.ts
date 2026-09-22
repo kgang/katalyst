@@ -322,15 +322,19 @@ export function toWorldView(world: World, from: WorldSummary, branch?: BranchVie
  * which way it went. Nothing here subtracts, compares two numbers, or works
  * anything out.
  *
- * **Three fields the engine still sends are dropped here** *(2026-09-22, R48)*.
+ * **Two fields the engine still sends are dropped here** *(2026-09-22, R48)*.
  * `agreement` is the share of two thousand versions of the map that moved the
- * same way; `moved_only_by_reweighting` says a claim moved only because an
- * observation made some of those versions count for more; and the word
- * `versions_disagree` says the versions did not agree on a direction. All three
- * are facts about running the map many times, which is the thing Kent cut, so
- * none of them may reach a screen. They are still on the wire because the engine
- * that computes them is another stack's to rewrite; **they die with it**, and
- * until then this is the one place they stop.
+ * same way, and `moved_only_by_reweighting` says a claim moved only because an
+ * observation made some of those versions count for more. Both are facts about
+ * running the map many times, which is the thing Kent cut, so neither may reach
+ * a screen. They are still on the wire because the engine that computes them is
+ * another stack's to rewrite; **they die with it**, and until then this is the
+ * one place they stop.
+ *
+ * **The engine's word for why a claim is unchanged is not one of them.** It is
+ * carried across as it came, both of its spellings, because R4 requires every
+ * quiet row on the change list to say why in words — `graph/diff/noChange.ts`
+ * turns `versions_disagree` into a phrase with no versions in it.
  *
  * @param row The claim's own row of the engine's difference.
  */
@@ -347,15 +351,14 @@ function movement(row: ClaimDiff): Movement | undefined {
     // out how far anything moved.
     way: delta < 0 ? "down" : "up",
     by: delta,
-    // Why the engine would not call the difference a move, when its answer is
-    // one this product can still show: the move was smaller than it will report
-    // at all. Carried across as the word it came as — the floor that decides it
-    // is a constant inside the engine and is on no wire, so this is the only way
-    // the browser can know, which is what stops a second engine growing here and
-    // disagreeing with the first.
-    ...(row.unchanged_because === "under_the_floor"
-      ? { unchangedBecause: "under_the_floor" as const }
-      : {}),
+    // Why the engine would not call the difference a move, carried across as the
+    // word it came as. The floor and the bar that decide it are constants inside
+    // the engine and are on no wire, so this is the only way the browser can
+    // know — which is what stops a second engine growing here and disagreeing
+    // with the first. Neither spelling is ever printed; `graph/diff/noChange.ts`
+    // picks the words, and words the second of them without the versions of the
+    // map it names (2026-09-22, R48).
+    unchangedBecause: row.unchanged_because ?? undefined,
   };
 }
 

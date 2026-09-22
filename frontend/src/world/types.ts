@@ -334,22 +334,29 @@ export interface Movement {
   readonly by: number;
   /**
    * Why the engine would not call this claim's difference a move, in its own
-   * word — and **only the word that still means something** *(2026-09-22, R48)*.
+   * word — **both of its words, and neither of them printed** *(2026-09-22,
+   * R48)*.
    *
    * `under_the_floor` says the move is smaller than the engine will report at
-   * all, which is a fact about two numbers and survives. The engine's other
-   * word, `versions_disagree`, is a fact about running the map two thousand
-   * times, and running the map two thousand times is what R48 cut: the wire
-   * still carries that word, `world/apiSource.ts` drops it on the way in, and it
-   * dies for good when the engine half lands.
+   * all. `versions_disagree` says the move was far enough and the engine could
+   * not settle a direction for it — its own spelling names the two thousand
+   * versions of the map, which R48 cut from the screen, so `graph/diff/noChange.ts`
+   * words it without them. The word is carried rather than dropped because R4 is
+   * the older rule and the stronger one: every quiet row on the change list says
+   * why, in words, and a row with no reason is what R4 forbids.
    *
-   * **Nothing in the browser decides this.** The floor is a constant inside the
-   * engine and is on no wire, so the browser can copy the word and cannot re-run
-   * the test. Absent on every claim the engine did not call `unchanged`, and on
-   * an `unchanged` claim the engine gave no word for.
-   * `graph/diff/noChange.ts` turns it into the words on screen.
+   * **The second reason dies with the engine half**, which decides a claim's
+   * direction differently; until then this is the true thing to say. The
+   * engine's other two answers about versions — the agreement share and *moved
+   * only by reweighting* — reach no screen at all and stop at the wire in
+   * `world/apiSource.ts`.
+   *
+   * **Nothing in the browser decides this.** The floor and the bar are constants
+   * inside the engine and are on no wire, so the browser can copy the word and
+   * cannot re-run the test. Absent on every claim the engine did not call
+   * `unchanged`, and on an `unchanged` claim the engine gave no word for.
    */
-  readonly unchangedBecause?: "under_the_floor";
+  readonly unchangedBecause?: "under_the_floor" | "versions_disagree";
 }
 
 /**

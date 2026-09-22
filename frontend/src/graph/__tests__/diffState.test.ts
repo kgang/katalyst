@@ -356,18 +356,48 @@ describe("the second world", () => {
     });
 
     it("test_the_no_change_reason_invents_no_reason_the_engine_left_out", () => {
-      // The engine leaves the word out where there was no test to fail, and it
-      // is also left out where the word it gave is one this product may not show
-      // — *the versions of the map disagreed which way* (2026-09-22, R48).
-      // Either way the browser cannot work the reason out for itself, because
-      // the floor is nowhere in the engine's answer, so no reason is named.
+      // The engine leaves the word out where there was no test to fail. The
+      // browser cannot work the reason out for itself, because neither constant
+      // is anywhere in the engine's answer, so no reason is named.
       const silent = tileLine({ from: 0.41, to: 0.46, way: "up", by: 0.05 });
       expect(silent?.words).toBe("no change");
       expect(silent?.reason).not.toMatch(/smaller than it will report/);
-      expect(silent?.reason).toMatch(/gave no reason this product can show/);
-      // And nothing about versions of the map, on a sentence that used to name
-      // them twice.
-      expect(silent?.reason.toLowerCase()).not.toContain("version");
+      expect(silent?.reason).not.toMatch(/could not settle which way/);
+      expect(silent?.reason).toMatch(/gave no reason for that verdict/);
+      expect(noChangeInAWord({ from: 0.41, to: 0.46, way: "up", by: 0.05 })).toBeUndefined();
+    });
+
+    it("test_the_engines_second_word_says_why_without_naming_the_versions", () => {
+      // **R4 wins over word purity** *(2026-09-22)*. The engine's second reason
+      // for calling a claim unchanged is that its two thousand versions of the
+      // map could not agree on a direction; R48 cut the versions from the
+      // screen, and R4 requires every quiet row to carry its reason in words. So
+      // the word comes across and is said without them.
+      const unsettled = tileLine({
+        from: 0.41,
+        to: 0.46,
+        way: "up",
+        by: 0.05,
+        unchangedBecause: "versions_disagree",
+      });
+      expect(unsettled?.words).toBe("no change");
+      expect(unsettled?.reason).toMatch(/could not settle which way it goes/);
+      expect(unsettled?.reason).not.toMatch(/smaller than it will report/);
+
+      // The half-line under the ending's own words, which is what a reader gets
+      // without pressing anything — and not one word of it about versions.
+      const note = noChangeInAWord({
+        from: 0.41,
+        to: 0.46,
+        way: "up",
+        by: 0.05,
+        unchangedBecause: "versions_disagree",
+      });
+      expect(note).toBe("the engine could not settle which way it moves");
+      for (const said of [note ?? "", unsettled?.reason ?? ""]) {
+        expect(said.toLowerCase()).not.toContain("version");
+        expect(said.toLowerCase()).not.toContain("worlds");
+      }
     });
 
     it("test_the_tile_and_the_rail_give_one_reason_and_not_two", () => {
@@ -405,11 +435,16 @@ describe("the second world", () => {
       // behind the map's one bare assertion — and a list that quietly dropped it
       // would drop the most interesting thing on the map without saying so.
       //
-      // The engine's reason for that one is *the versions of the map disagreed
-      // which way*, which this product no longer shows (2026-09-22, R48), so the
-      // move reaches the browser with no word at all: the row is still there,
-      // still marked, and simply carries no half-line.
-      const moved: Movement = { from: 0.28, to: 0.38, way: "up", by: 0.1 };
+      // The engine's reason for that one is `versions_disagree`; the browser
+      // says it without the versions of the map it names (2026-09-22, R48), and
+      // the row carries that reason under the ending's own words.
+      const moved: Movement = {
+        from: 0.28,
+        to: 0.38,
+        way: "up",
+        by: 0.1,
+        unchangedBecause: "versions_disagree",
+      };
       const change = saysUnchanged(moved, "N1");
       const listed = railRows(
         branchWorld(base(), branch(), { at: "answered", now: base(), change }),
@@ -419,7 +454,9 @@ describe("the second world", () => {
       const talks = listed.find((row) => row.claimId === "N1");
       expect(talks?.unranked).toBe(true);
       expect(talks?.move.absence?.words).toBe("no change");
-      expect(talks?.note).toBeUndefined();
+      // **R4: a quiet row says why, in words.** A row that is only a shade paler
+      // than the ones above it says nothing in grey and nothing read aloud.
+      expect(talks?.note).toBe("the engine could not settle which way it moves");
     });
 
     it("test_an_ending_you_forced_false_stays_on_the_list_and_is_not_no_change", () => {

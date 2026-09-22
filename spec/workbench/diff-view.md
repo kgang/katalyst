@@ -135,17 +135,20 @@ export interface ClaimDiffView {
   // the share of versions of the map that moved the same way — the rail's *same direction*
   // column — and `movedOnlyByReweighting` said a claim moved only because an observation
   // made some of those versions count for more. Both are facts about running the map two
-  // thousand times, which is the thing Kent cut. The engine still sends them;
-  // `frontend/src/world/apiSource.ts` is where they stop, and they die with the engine half.
+  // thousand times, which is the thing Kent cut, and neither was a reason a row owed a
+  // reader. The engine still sends them; `frontend/src/world/apiSource.ts` is where they
+  // stop, and they die with the engine half.
   /** Why the engine would not call this claim's difference a move, in its own word:
-      `under_the_floor`, it barely moved. **One word, not two** (2026-09-22, R48): the
-      engine's other word, `versions_disagree`, is a fact about the versions of the map and
-      is dropped at the wire, so a claim that failed on it arrives with no word at all. Null
-      on any claim that is not `unchanged`, on one with no move to measure, and on one the
-      engine turned down for a reason this product may not show. The browser prints the
-      sentence that goes with the word and works nothing out: the floor is a constant inside
-      the engine and is on no wire. The server's name is `unchanged_because`. */
-  unchangedBecause: "under_the_floor" | null;
+      `under_the_floor`, it barely moved, or `versions_disagree`, the move was far enough
+      and it could not settle a direction. **Both are carried and neither is printed**
+      (2026-09-22, R48): the second names the versions of the map, which are cut from the
+      screen, so `graph/diff/noChange.ts` words it without them — *the engine could not
+      settle which way it moves*. It is carried rather than dropped because R4 requires
+      every quiet row to say why in words. Null on any claim that is not `unchanged` and on
+      one with no move to measure. The browser prints the phrase that goes with the word and
+      works nothing out: the floor and the bar are constants inside the engine and are on no
+      wire. The server's name is `unchanged_because`. */
+  unchangedBecause: "under_the_floor" | "versions_disagree" | null;
 }
 ```
 
@@ -179,7 +182,7 @@ change list — and the change list keeps it.
 | The engine's word | The row |
 |---|---|
 | **`shifted`** | Ranked: in the engine's order, above the rest, with its move and nothing beside it |
-| **`unchanged`** | Quiet: *no change* where the move would be, **and the engine's own reason where it gave one this product may show** — *barely moved* (`under_the_floor`). Its other reason, *the versions disagreed which way*, is cut (2026-09-22, R48), and a claim it applies to carries no half-line at all |
+| **`unchanged`** | Quiet: *no change* where the move would be, **and the engine's own reason, in words** — *barely moved* (`under_the_floor`) or *the engine could not settle which way it moves* (`versions_disagree`). The second is the engine's word said without the versions of the map it names *(2026-09-22, R48: the versions leave the screen, the reason stays, because R4 is the older rule and every quiet row says why)* |
 | **`killed`** — an edit fixed its value to false | Quiet: **the word its tile shows**, never a likelihood. The engine stores a flat zero on such a claim, and a row reading `.46 ▼ <.01` would be that zero wearing the certainty guard's clothes |
 | **`added`** — it arrived with the edit | Quiet: *Added*. There is no earlier reading of it to put beside this world's, so there is no move to rank |
 
@@ -338,11 +341,12 @@ claim · `.43 → .36` ▼ · largest on Oct 6. This stack draws neither number;
 
 **The third ending is the one worth reading.** N1, the talks that cannot be traded, makes the biggest
 move on the map — `.28 → .38` — and the engine still calls it `unchanged`, so it is **not** a ranked
-row. Why it will not call that a move is one of the two answers this product may no longer show
-*(2026-09-22, R48)*: the engine's reason is that its versions of the map did not agree which way the
-talks went. So the row says the verdict and **no half-line at all** rather than a reason nobody on
-this screen could check. The rail still lists N1: greyed, beneath the two ranked rows, reading **no
-change**. That is the case B5's greyed row was written for, arriving.
+row. Its only incoming arrow is the map's one bare assertion, `H → N1`, and the engine will not put a
+direction on a move behind one. The rail lists N1: greyed, beneath the two ranked rows, reading **no
+change**, with *the engine could not settle which way it moves* under the ending's own words. That is
+the case B5's greyed row was written for, arriving. *(The engine's own word for it names the versions
+of the map; R48 cut the versions from the screen on 2026-09-22 and the row is worded without them.
+The reason itself dies with the engine half, which decides a direction differently.)*
 
 That order is the size of the move times the **weakest arrow on the best-backed route** from any of
 the branch's edits to that ending — the route whose weakest arrow is strongest. Two factors and no
@@ -377,17 +381,18 @@ numbers — that would be the browser re-running the shifted test, with its own 
 90% bar, and two answers to that question is one too many. The two numbers behind a greyed row are
 still one click away in the Inspector; the row itself says the thing that is true.
 
-**And a row that held still says why, where the engine gave a reason this product may show**
-*(amended 2026-09-22, R48)*. The engine writes one of two words on the claim's own row —
-`under_the_floor`, it barely moved, or `versions_disagree`, it moved and the versions of the map did
-not agree which way. **The second is cut**: it is a fact about running the map two thousand times,
-and `frontend/src/world/apiSource.ts` drops it at the wire. So a claim that barely moved says
-*barely moved*, and a claim the versions disagreed about says nothing beyond the verdict — which is
-the honest answer while the engine half is still another session's. On the Hormuz strike branch that
-is B and N1 with no half-line, and R, which did not move at all, reading *barely moved*. The browser
-still works nothing out: the floor is a constant inside the engine and is on no wire, so it could not
-re-run the test if it wanted to — [`../multiverse/diff.md`](../multiverse/diff.md) owns that rule and
-the constants.
+**And a row that held still says why** *(amended 2026-09-22, R48)*. The engine writes one of two
+words on the claim's own row — `under_the_floor`, it barely moved, or `versions_disagree`, the move
+was far enough and it could not settle a direction — and the browser picks the phrase that goes with
+it. **Neither spelling is ever printed**, and the second is said without the versions of the map it
+names: *the engine could not settle which way it moves*. The word is carried rather than dropped
+because **R4 is the older rule and the stronger one** — every ending the edit can reach has a row,
+and a quiet row carries its reason in words rather than in being a shade paler; a row with no reason
+is exactly what R4 forbids. On the Hormuz strike branch B and N1 read the second phrase, and R, which
+did not move at all, reads *barely moved*. The browser still works nothing out: the floor and the bar
+are constants inside the engine and are on no wire, so it could not re-run the test if it wanted to —
+[`../multiverse/diff.md`](../multiverse/diff.md) owns that rule and the constants. *(The second
+reason dies with the engine half, which decides a direction differently.)*
 
 **Before the engine — this stack — the rail does not rank and does not compute.** It lists the
 terminals the edit can reach, in **map order**, each with an absence and a reason where the number
