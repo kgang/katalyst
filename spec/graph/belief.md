@@ -1,8 +1,8 @@
-# Belief — a likelihood with a range and an owner
+# Belief — a likelihood with an owner
 
 ## Purpose
 
-A bare number on a box is a claim from nowhere. A **belief** is a likelihood that says whose it is and how sure it is: a value between 0 and 1, an honest range around it, and an **owner** — the model, the user, or a market. Every claim on the map carries up to three of them side by side, and they are never combined into one. That is the whole product in one design choice: the model's `.61`, the market's `.48` and your own `.30` on the same claim are not three attempts at one true number to be averaged away, they are the disagreement you are about to trade. What a user can do that they could not before: see, on any step of an argument, where their own view differs from a model's and from a live price — and put their own number on the map without the model overwriting it.
+A bare number on a box is a claim from nowhere. A **belief** is a likelihood that says whose it is: a value between 0 and 1 and an **owner** — the model, the user, or a market. Every claim on the map carries up to three of them side by side, and they are never combined into one. That is the whole product in one design choice: the model's `.61`, the market's `.48` and your own `.30` on the same claim are not three attempts at one true number to be averaged away, they are the disagreement you are about to trade. What a user can do that they could not before: see, on any step of an argument, where their own view differs from a model's and from a live price — and put their own number on the map without the model overwriting it.
 
 ---
 
@@ -18,11 +18,15 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ```python
 class Belief(BaseModel):
-    """A likelihood with an honest range and a name on it.
+    """A likelihood with a name on it.
 
-    `p` is the likelihood, `lo` and `hi` are the range around it, and `owner`
-    says whose number this is. There are exactly three owners and no code path
-    ever combines two of them into one number.
+    `p` is the likelihood and `owner` says whose number it is. There are exactly
+    three owners and no code path ever combines two of them into one number.
+
+    `lo` and `hi` are **equal to `p` on every belief this product builds** and
+    are on their way out (decision record 0028, 2026-09-22): no number here
+    carries a range. They are kept for one more pull request because the browser
+    still reads them.
 
     A belief is a number, never text. The domain does not round it and does not
     store it as a string; rounding happens once, at the moment of display.
@@ -36,11 +40,11 @@ class Belief(BaseModel):
     )
     lo: float = Field(
         ge=0.0, le=1.0,
-        description="The bottom of the honest range around `p`. Never above `p`.",
+        description="Equal to `p`. No number carries a range; this field is on its way out.",
     )
     hi: float = Field(
         ge=0.0, le=1.0,
-        description="The top of the honest range around `p`. Never below `p`.",
+        description="Equal to `p`. No number carries a range; this field is on its way out.",
     )
     owner: Literal["model", "user", "market"] = Field(
         description="Whose number this is: the model's estimate, the user's own, or a live price at a venue.",
@@ -93,22 +97,19 @@ class Beliefs(BaseModel):
 
 **On the field named `model`.** It is legal. Pydantic protects names beginning with `model_` (so `model_config` and `model_dump` are reserved); plain `model` is not one of them. It stays `model` because that is the word the vocabulary uses, on the canvas and in the code alike.
 
-### What the range means
+### There is no range — what this section used to say
 
-Two kinds of not-knowing, and they are kept apart on purpose.
+**One likelihood per claim, computed once, and no number on this product carries a range** *(decision record 0028, 2026-09-22; Kent, decisions note row R48)*. `lo` and `hi` are equal to `p` on every belief the engine builds, and they leave the wire in one follow-up pull request once the browser has stopped reading them. **`p` is still the whole answer**, rendered at two significant figures with the two guards below.
 
-* **How the dice fall** is already inside `p`. The event may happen or it may not; `p` says how often.
-* **How sure we are of the numbers we put in** is `lo` and `hi`. A wide range means *we are not certain what number to give you; more homework would move it*. It never means the event is more volatile.
+**What stood here, so a reader who knew it is told it is gone.** `lo` and `hi` were the 10th and 90th percentiles **of the likelihood itself** — an 80 per cent band about *our own number* rather than about the world. `.35 (.20–.49)` read: *our number is .35; if we somehow learned the true likelihoods, about 8 times in 10 the answer would land between .20 and .49.* A wide range meant *more homework would move this*, never *the event is more volatile*, and the chip carried a label saying so because the two are so easy to confuse. It was produced by working the whole map out two thousand times over, each version drawing every stated number from the range around it, and reporting the middle 80% of the answers; a companion quantity said whose stated number explained whose width.
 
-`lo` and `hi` are the **10th and 90th percentiles of the likelihood itself**. `.35 (.20–.49)` reads: *our number is .35; if we somehow learned the true likelihoods, about 8 times in 10 the answer would land between .20 and .49.*
+**Why it went.** Kent tried the built product and said *"The 2,000 runs thing is confusing. Can we cut that from the scope of this project completely for the sake of defending its design…?"* He was told first that the engine pass is a fraction of a millisecond beside the model calls, so the cut buys simplicity rather than speed, and chose it with that in front of him. Record 0028 carries the reasoning and what it costs; [`../multiverse/propagation.md`](../multiverse/propagation.md) B8 carries what the engine no longer does.
 
-Where a computed range comes from: the engine draws **two thousand versions of the map**, each version taking every claim's likelihood from that claim's own stated range — one coherent set of numbers this model would have stood behind, never every low end at once. It runs eight worlds under each version, subtracts the wobble that comes from having run only eight, and reports the middle 80% of what is left. A stated `{p, lo, hi}` is read as a bell curve on the log-odds scale with its two halves fitted separately, so all three numbers are honoured exactly and the range can never leave 0–1. The arithmetic is decision record 0014's, and the propagation chapter of the multiverse part spells it out.
-
-**Nothing here is calibrated, and the interface says so.** No claim on any map has resolved yet, so the 8-in-10 has never been checked against the world. The chip's label is *model interval, uncalibrated · how sure we are of `.35` — not how much the world can move*, and the hover reads: *"Across 2 000 versions of this map — each one a set of numbers this model would have stood behind — the answer landed between .20 and .49 eight times in ten. Nobody has checked whether that 8-in-10 holds up; no claim on this map has resolved yet."* That copy belongs to `spec/workbench/`, which owns every word on screen; it is quoted here so the domain knows what its numbers are being asked to mean.
+**Nothing here was calibrated, and that is part of why it went.** No claim on any map has resolved, so the 8-in-10 had never been checked against the world; the product was making a statement about its own uncertainty that nobody could check and few readers could read.
 
 ### Two rules, two places
 
-The range rule `0 ≤ lo ≤ p ≤ hi ≤ 1` is a **pydantic validator**: an out-of-range belief cannot be constructed at all. That is different from the "a `market` terminal needs a payoff" rules in [`proposition.md`](proposition.md), which are checked by `validate` and come back as messages the user reads. The line between them: *a rule that only our own arithmetic could break raises; a rule a well-formed model proposal could plausibly break becomes a violation with a plain sentence.*
+The ordering rule `0 ≤ lo ≤ p ≤ hi ≤ 1` is a **pydantic validator**: a belief that breaks it cannot be constructed at all. It is now satisfied by equality on every belief this product builds, and it stays until the two fields go, because a field on the wire with no rule on it is a field somebody will put anything in. That is different from the "a `market` terminal needs a payoff" rules in [`proposition.md`](proposition.md), which are checked by `validate` and come back as messages the user reads. The line between them: *a rule that only our own arithmetic could break raises; a rule a well-formed model proposal could plausibly break becomes a violation with a plain sentence.*
 
 There is still a violation code `belief_out_of_range` — rule 11 in [`validity.md`](validity.md) — and it is not redundant. It exists so that (a) the engine can catch a malformed proposal and report it alongside the other violations as interface text rather than as a stack trace, and (b) a graph that arrived some other way — a stored fixture, or the output of the propagation pass in stack 03a — is re-checked rather than trusted. Belt and braces, on purpose.
 
@@ -129,7 +130,7 @@ Both are the model's number. They differ in what has been taken into account.
 | Plain meaning | What the model thinks about this claim **on its own**, before looking at what causes it | What the model thinks **after** the claim's causes have pushed on it |
 | Where it comes from | Elicited once, anchored on a base rate where there is one (see [`proposition.md`](proposition.md)) | Computed: start from the prior, add one push per active incoming link, on a scale where pushes add up (decision record 0005) |
 | When it is computed | At generation | By propagation, in stack 03a. Until then the Hormuz fixture stores an illustrative value and says so |
-| For the hypothesis | `.35` — the root has no causes, so there is nothing to add | `.36` — a hair higher, and not a bug. The reported number is the average across two thousand versions of the map, and that average sits slightly above the middle one whenever `p` is below `.5` (decision record 0014) |
+| For the hypothesis | the line named `H · prior` in [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) — the root has no causes, so there is nothing to add | the line named `H · base · reading`. *(It used to read a hair higher than the prior, because the reported number was an average across two thousand versions of the map and that average sat above the middle one below `.5`. There are no versions — decision record 0028 — so whether the two now agree is a fact the generated numbers file states.)* |
 | Owner | `model` | `model` |
 
 Keeping both is what lets the Inspector answer "why is this `.71` when the base rate says `.20`?" with a list: the prior, then each incoming link and the push it contributed. The audit trail *is* the arithmetic.
@@ -138,7 +139,7 @@ Keeping both is what lets the Inspector answer "why is this `.71` when the base 
 
 A `market` belief is a read-only price at a real venue — Polymarket (decision record 0010). The mid-price of a contract — halfway between the best bid and the best offer — becomes `p`; its provenance is `market_implied`, meaning "this came from a price, not from an argument".
 
-**It has no range** *(corrected 2026-09-21, decision record 0020)*. The sentence that stood here — the quoted spread becomes `lo` and `hi` — is withdrawn. The difference between the best bid and the best offer is what it **costs to deal**, not how unsure the venue is, and the venue publishes no interval at all, so `lo` and `hi` equal `p` and the chip says in words that no interval was published rather than implying certainty. What the two sides of the book differ by shows up on the thesis card, where you buy at the offer and sell at the bid, giving a gain from buying and a gain from selling with no spread term beside them. Record 0020 also makes a measured economic level — what a barrel actually settled at — an **observation** that never fills this slot; it anchors a price ending instead, with its own attribution line.
+**It has no range** *(corrected 2026-09-21, decision record 0020; and since 2026-09-22 nothing else has one either, decision record 0028)*. The sentence that stood here — the quoted spread becomes `lo` and `hi` — is withdrawn. The difference between the best bid and the best offer is what it **costs to deal**, not how unsure the venue is. What the two sides of the book differ by shows up on the thesis card, where you buy at the offer and sell at the bid, giving a gain from buying and a gain from selling with no spread term beside them. Record 0020 also makes a measured economic level — what a barrel actually settled at — an **observation** that never fills this slot; it anchors a price ending instead, with its own attribution line.
 
 Two things follow. **Absent is a state, not a gap.** `beliefs.market is None` renders as the words *"no market"* with the reason beside it, never as a blank chip and never as a placeholder number. Many honest hypotheses have no contract — that is the path to a `not_tradeable` terminal, and it is information. **Two venues are two rows.** If two venues ever quote one claim, both are shown and the gap between them is called out as a signal. They are not averaged into a single market number, for the same reason the three owners are not. Version one asks one venue — Kalshi is cut (decision record 0020) — so the card says which venue quoted the claim and that no other was asked.
 
@@ -150,7 +151,7 @@ The first `user` belief usually arrives before the map exists: the likelihood sl
 
 ### The domain never rounds, and never stores a string
 
-Beliefs are rendered at **two significant figures with the range** — the number and both ends — `.35 (.22–.50)`, never `.347`, and never as a certainty: a likelihood above `.99` prints `>.99` and one below `.01` prints `<.01` (Kent, 2026-09-20; the boundary is worked in B5). Precision beyond two figures on an elicited number is a lie about how much we know — the honesty requirement, NFR-1 in `PRODUCT_REQUIREMENTS.md` §8.
+Beliefs are rendered at **two significant figures and nothing else** — `.35`, never `.347`, and never as a certainty: a likelihood above `.99` prints `>.99` and one below `.01` prints `<.01` (Kent, 2026-09-20; the boundary is worked in B5). Precision beyond two figures on an elicited number is a lie about how much we know — the honesty requirement, NFR-1 in `PRODUCT_REQUIREMENTS.md` §8, amended 2026-09-22 by decision record 0028 to drop the range it used to ask for.
 
 That is a rendering rule, and the rendering lives in the workbench spec. What belongs here is the half of it the domain must obey:
 
@@ -164,21 +165,19 @@ That is a rendering rule, and the rendering lives in the workbench spec. What be
 
 ### B1 — Three numbers, side by side, on one claim
 
-*(2026-09-21: the market row below still shows a range. Under the correction above a market belief has none — that table belongs to the sweep that owns this example's numbers and moves with it.)*
-
-The Hormuz map reaches terminal M1, *a Polymarket contract "Brent below $70 on 2026-10-31" resolves YES*. Its tile shows three chips. The numbers below are an **illustration of the form**, taken from research report 02 §3 before there was an engine; the shipped engine computes `.46 (.32–.60)` for this claim (seed 20261001), and until a world has been computed the stored example shows the claim's own prior, `.40 (.28–.55)`, under a label saying the range is stated and not computed:
+The Hormuz map reaches terminal M1, *a Polymarket contract "Brent below $70 on 2026-10-31" resolves YES*. Its tile shows three chips, each one number. The numbers below are an **illustration of the form**, taken from research report 02 §3 before there was an engine; what the shipped engine computes is the line named `M1 · base · reading`, and until a world has been computed the stored example shows the claim's own stated number, `M1 · prior`.
 
 | Owner | Shown | Where it came from |
 |-------|-------|--------------------|
-| model | `.61 (.45–.75)` | Propagated: prior `.30`, plus the push from *Brent crude settles below $68 for five sessions* |
-| market | `.48 (.46–.50)` | The contract's mid-price, read minutes ago from Polymarket, `market_implied` |
-| user | `.30 (.20–.45)` | What you typed on the slider |
+| model | `.61` | Propagated: its own stated chance, plus the push from *Brent crude settles below $68 for five sessions* |
+| market | `.48` | The contract's mid-price, read minutes ago from Polymarket, `market_implied` |
+| user | `.30` | What you typed on the slider |
 
 Nothing on this tile is an average. The thesis card later reports `model − market = +.13` as an **edge**, computed outside the domain and labelled a difference. The gap is the point of the screen.
 
 ### B2 — "I think that is less likely than that"
 
-You drag the user chip on the Hormuz hypothesis from nothing to `.20 (.10–.35)`. What happens: a `believe` intervention is appended to the current branch, carrying a `Belief` with owner `user`. The `model` and `market` chips do not move, now or ever, on account of it. Because the change is a patch on a branch, it replays, it diffs, and it can be undone by dropping the intervention — there is no hidden "user override" flag anywhere in the graph.
+You drag the user chip on the Hormuz hypothesis from nothing to `.20`. What happens: a `believe` intervention is appended to the current branch, carrying a `Belief` with owner `user`. The `model` and `market` chips do not move, now or ever, on account of it. Because the change is a patch on a branch, it replays, it diffs, and it can be undone by dropping the intervention — there is no hidden "user override" flag anywhere in the graph.
 
 What does **not** happen in this version: your `.20` does not flow downstream. The map still shows the model's propagated numbers; yours sits beside them on the claims you have touched.
 
@@ -187,7 +186,7 @@ What does **not** happen in this version: your `.20` does not flow downstream. T
 *"Photonic chips get adopted faster than expected"* produces a chain whose most interesting claim — datacentre transceiver share crossing a threshold — has no contract anywhere. The tile shows two chips and one sentence:
 
 ```
-model   .42 (.25–.60)
+model   .42
 user    —
 market  no market · "no venue quotes datacentre photonic transceiver share"
 ```
@@ -199,20 +198,20 @@ The empty `user` slot renders as a dash inviting you to say what you think. The 
 Click the model chip on *"Brent crude settles below $68 for five sessions"* and the Inspector unrolls it (illustrative):
 
 ```
-prior                            .20 (.10–.35)   base rate: 4 of 19 months since 2022 in which
+prior                            .20             base rate: 4 of 19 months since 2022 in which
                                                  Brent crude settled below $68 for five sessions
 + H, the strait opens (trigger)  +1.6 push       "the war-risk premium in the price unwinds"
 + C, the Lloyd's war-risk
   premium for Gulf transits
   falls below 0.4% (sustain)     +0.7 push       "cheaper insurance lowers delivered cost"
-= model                          .71 (.55–.83)
+= model                          .71
 ```
 
-A *push* is decision record 0005's link strength: a signed amount added on the log-odds scale — the scale on which independent influences add up instead of multiplying. Two pushes of `+1.6` and `+0.7` on a prior of `.20` land on `.71`; the propagation chapter of the multiverse part (stack 03a) spells out the arithmetic and where the range comes from. The rule this chapter enforces is narrower: no line of that list may be a number whose owner cannot be named.
+A *push* is decision record 0005's link strength: a signed amount on an arrow, which under decision record 0016 bends the **rate** at which a claim comes about rather than a likelihood read on one day. The propagation chapter of the multiverse part spells out the arithmetic. The rule this chapter enforces is narrower: no line of that list may be a number whose owner cannot be named.
 
 ### B5 — Two significant figures, always, and only at the last moment
 
-`p = 0.6134` is what the domain stores, sends over the wire, and replays. `.61` is what the chip shows. `p = 0.6134, lo = 0.4471, hi = 0.7522` displays as `.61 (.45–.75)`. A chip is never permitted to show `.6134`; the rendering test in the frontend checks exactly that, and that the range is never omitted.
+`p = 0.6134` is what the domain stores, sends over the wire, and replays. `.61` is what the chip shows, and it is the whole of what the chip shows. A chip is never permitted to show `.6134`; the rendering test in the frontend checks exactly that.
 
 **Where the two guards begin** *(Kent, 2026-09-20 — the decision recorded as G10)*. The whole rule in one sentence: **round to two significant figures, then use a guard word exactly when it is true of the rounded number.** `<.01` when the rounded number is below a hundredth, `>.99` when it is above ninety-nine hundredths, and the two figures themselves otherwise.
 
@@ -237,7 +236,7 @@ Generators live in `backend/tests/strategies.py`: `beliefs()`, `propositions()` 
 
 ### INV-graph.12 — Honest numbers *(refines INV-7)*
 
-- For every belief drawn from `backend/tests/strategies.py::beliefs()`: `0 ≤ lo ≤ p ≤ hi ≤ 1`.
+- For every belief drawn from `backend/tests/strategies.py::beliefs()`: `0 ≤ lo ≤ p ≤ hi ≤ 1`. **And on every belief this product builds, `lo == p == hi`** *(added 2026-09-22; decision record 0028)* — no number carries a range. Test: `test_a_computed_belief_has_no_range`.
 - For every three floats drawn from the `hypothesis` property-testing library's own `floats()` and every owner drawn from its `sampled_from(("model", "user", "market"))` — that pair is `backend/tests/strategies.py::raw_belief_fields()`: constructing a `Belief` from them either produces one satisfying that chain of inequalities, or raises. There is no third outcome, and no silent clamping to fit.
 - For every graph drawn from `backend/tests/strategies.py::graphs()` driven through a random sequence of interventions by the state machine `GraphEditMachine`: after **every** step, every belief on every proposition still satisfies it.
 - **Tests:** `test_belief_bounds_at_construction` — introduced by this chapter, **stack 02**. And `test_belief_bounds_after_any_sequence` — named in decision record 0008's invariant table, driven by `GraphEditMachine`, **stack 03a**, because nothing applies an intervention until then.
@@ -262,11 +261,11 @@ Two checks, one test name.
 
 1. **Do not average the three owners, weight them, or reconcile them.** Because the average is a number nobody holds, and it deletes the two gaps that are the product's entire output — model against market is the edge, user against model is the argument. **Instead:** store three slots, render three chips, and where a single number is genuinely needed (the thesis card's `edge`), compute it outside the domain, label it a *difference*, and show both sides of it.
 
-2. **Do not store a display string on a belief.** No `p_display`, no `".35 (.22–.50)"` field, no pre-rounded `p`. Because a number turned into text can no longer be compared, diffed or replayed, and a rounded stored value makes two worlds differ on replay for a display reason. **Instead:** store the full float; format once, in the component that draws the chip.
+2. **Do not store a display string on a belief.** No `p_display`, no `".35"` field, no pre-rounded `p`. Because a number turned into text can no longer be compared, diffed or replayed, and a rounded stored value makes two worlds differ on replay for a display reason. **Instead:** store the full float; format once, in the component that draws the chip.
 
-3. **Do not ship a bare point with no range.** `.35` on its own claims a precision that an elicited number does not have, and it hides the one thing that tells you where to spend more effort: the width. **Instead:** `lo` and `hi` are required fields, and the chip always draws the range. If the range is honestly unknown, that is a question for the model, not a reason to drop the field.
+3. **Do not put a second number beside a likelihood.** Not a range, not a width, not a share of runs that agreed. Because one number that answers the claim's own sentence is what a reader can act on, and the second costs attention on every chip and gives back a caveat. It was tried and cut (decision record 0028). **Instead:** one likelihood, two significant figures, with `<.01` and `>.99` where they are true, and say the rest in words where there is room for a sentence. *(This anti-pattern was the exact opposite until 2026-09-22 — "do not ship a bare point with no range". A bare point is what this product ships. The reason it once read the other way was real and is kept in* There is no range *above: a range is the honest thing to show if a reader can read it, and this one could not be made readable.)*
 
-4. **Do not say "confidence" when you mean probability.** Because the word has been retired: as of 2026-09-17 nothing in the product carries a field called `confidence` — the one that lived on a link was dropped (see [`link.md`](link.md), Open questions 1) — and reintroducing it as a loose synonym for a likelihood puts two ideas under one word and makes both unreadable. **Instead:** say *likelihood* or *probability* for the number and *range* for `lo`–`hi`. How well-founded a mechanism is, say with `provenance` and the rationale; how much independent runs of the model agreed, say *agreement*, and only where something has actually computed it.
+4. **Do not say "confidence" when you mean probability.** Because the word has been retired: as of 2026-09-17 nothing in the product carries a field called `confidence` — the one that lived on a link was dropped (see [`link.md`](link.md), Open questions 1) — and reintroducing it as a loose synonym for a likelihood puts two ideas under one word and makes both unreadable. **Instead:** say *likelihood* or *probability* for the number. How well-founded a mechanism is, say with `provenance` and the rationale; how much independent runs of the model agreed, say *agreement*, and only where something has actually computed it — nothing does, and the word is free.
 
 5. **Do not fill an absent market quote with a stand-in** — not 0.5, not the model's number, not a blank chip. Because "no venue prices this" is a finding, and it is the finding that drives a chain to a `not_tradeable` ending. **Instead:** `None` in the slot, the words "no market" on the chip, and the reason beside them.
 
@@ -278,8 +277,8 @@ Two checks, one test name.
 
 1. **A belief has no provenance field.** Invariants INV-2 and INV-12 say provenance is encoded on every chip. Owner implies it for two of the three (`user`, and `market_implied` for a market), but a `model` belief anchored on a documented base rate and one asserted from nothing look identical. Add `provenance` to `Belief`, carry it on the proposition, or derive it from whether `base_rate.sources` is empty?
 2. **Where do a quote's `as_of`, venue and link live?** Decision record 0010's grounding-layer quote carries them; the domain `Belief` has four fields and no clock. Does the domain gain a small `MarketQuote` wrapper, or does the Inspector read them from the grounding cache alongside the belief?
-3. **What does the range actually mean?** Decision record 0005 says the Inspector labels it "model interval, uncalibrated" and that it mixes simulation noise with the elicited spread. Is `lo`–`hi` an 80 per cent band, a plausible minimum and maximum, or "the model's honest spread"? Nothing tests it today, and no calibration claim can be made until it is pinned down.
-   **Decided 2026-09-17 (decision record 0014):** an 80 per cent band, and about *our numbers* rather than about the world. `lo` and `hi` are the 10th and 90th percentiles of the likelihood itself, and the simulation noise is subtracted out rather than mixed in. See *What the range means* above.
+3. **What does the range actually mean?** Raised because record 0005 labelled it "model interval, uncalibrated" and said it mixed simulation noise with the elicited spread.
+   **Decided 2026-09-17 (decision record 0014):** an 80 per cent band about *our numbers* rather than about the world — the 10th and 90th percentiles of the likelihood itself, with the simulation noise subtracted rather than mixed in. **Closed for good 2026-09-22 (decision record 0028): there is no range.** The question is not reopened by the answer changing; it is removed by its subject going.
 4. **Is a zero-width range legal?** `.35 (.35–.35)` satisfies every rule and claims certainty the model does not have. Leave it, or have `validate` warn?
-   **Decided 2026-09-17 (decision record 0014):** legal; almost always wrong; the Inspector says so. `0 ≤ lo ≤ p ≤ hi ≤ 1` is satisfied, so `Belief` constructs and `validate` does not reject it — `validate` returns violations, and a zero-width range is not a violation. It is legal for a reason: a claim pinned to a point is exactly the "what if we knew this exactly" case, and it is what `test_band_is_not_sampling_noise` sets up. It is almost always wrong because a stated range of zero says the model would never revise, which no elicited number earns. The Inspector reads the width out and says which stated ranges the width came from (decision record 0014's variance shares), so a zero says "nothing here is in doubt" in words, where a reader can disagree with it.
-5. **Two significant figures, precisely.** *Decided 2026-09-17: two significant figures on the number and on both ends of the range — one rule — plus a guard against certainty: a chip never prints `1.0` or `.0`, it prints `>.99` and `<.01`. Trailing zeros stay (`.060`). The worked table is in [`../workbench/keyboard-and-access.md`](../workbench/keyboard-and-access.md); the example here and in `PRODUCT_REQUIREMENTS.md` NFR-1 now reads `.35 (.22–.50)`.* **Refined 2026-09-20 (G10), which is what settled where the lower guard begins:** *round to two significant figures, then use a guard word exactly when it is true of the rounded number* — so a likelihood below `.01` prints `<.01` and one above `.99` prints `>.99`, while `.010` and `.99` print their figures. The words of a guard have to mean what they say. **A move is not a likelihood and keeps two significant figures however small.** B5 works that boundary, on the line named `H · observed C · move` in [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) rather than on a figure written out here; the table in the workbench chapter is the one that needed re-measuring, because under the earlier reading `.0035` printed itself. As first asked: the honesty requirement's own example, `.35 (.2–.5)`, rendered the point at two figures and the bounds at one. Deliberate — a coarser range is the honest one — or shorthand? And what is two significant figures for `p = 0.035` or `p = 0.9962`? One worked table in the workbench chapter settles it; the domain stores the full float either way.
+   **Decided 2026-09-17 (decision record 0014):** legal, almost always wrong, and the Inspector says so. **Closed for good 2026-09-22 (decision record 0028): zero width is the only width.** `lo == p == hi` on every belief this product builds, the two fields leave the wire in one follow-up, and nothing warns about a shape that is now universal and means nothing.
+5. **Two significant figures, precisely.** *Decided 2026-09-17: two significant figures on the number — and, while there was one, on both ends of its range — one rule, plus a guard against certainty: a chip never prints `1.0` or `.0`, it prints `>.99` and `<.01`. Trailing zeros stay (`.060`). The worked table is in [`../workbench/keyboard-and-access.md`](../workbench/keyboard-and-access.md); the example here and in `PRODUCT_REQUIREMENTS.md` NFR-1 read `.35 (.22–.50)` until decision record 0028 cut the range, and now read `.35`.* **Refined 2026-09-20 (G10), which is what settled where the lower guard begins:** *round to two significant figures, then use a guard word exactly when it is true of the rounded number* — so a likelihood below `.01` prints `<.01` and one above `.99` prints `>.99`, while `.010` and `.99` print their figures. The words of a guard have to mean what they say. **A move is not a likelihood and keeps two significant figures however small.** B5 works that boundary, on the line named `H · observed C · move` in [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) rather than on a figure written out here; the table in the workbench chapter is the one that needed re-measuring, because under the earlier reading `.0035` printed itself. As first asked: the honesty requirement's own example, `.35 (.2–.5)`, rendered the point at two figures and the bounds at one. Deliberate — a coarser range is the honest one — or shorthand? And what is two significant figures for `p = 0.035` or `p = 0.9962`? One worked table in the workbench chapter settles it; the domain stores the full float either way.

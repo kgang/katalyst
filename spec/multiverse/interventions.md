@@ -159,7 +159,7 @@ class Believe(BaseModel):
     target: PropositionId = Field(description="The claim the user is putting a number on.")
     belief: Belief = Field(
         description=(
-            "The user's likelihood with its honest range. Its owner must be 'user'; "
+            "The user's own likelihood for this claim. Its owner must be 'user'; "
             "a belief owned by the model or by a market is rejected."
         )
     )
