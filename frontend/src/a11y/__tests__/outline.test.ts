@@ -5,9 +5,9 @@
  * map is not a tree, so the outline is a spanning tree and a claim with several
  * causes names them in its own sentence instead of appearing twice. And **the
  * announcement says only what somebody computed**: with no engine, nothing has
- * changed, so the line says what arrived, what the edit can reach, what was
- * retracted, and that there are no numbers yet — out loud, rather than as a
- * silence the reader has to notice.
+ * changed, so the line says what arrived, what the edit can reach, and that there
+ * are no numbers yet — out loud, rather than as a silence the reader has to
+ * notice.
  */
 
 import { describe, expect, it } from "vitest";
@@ -121,13 +121,13 @@ describe("the map as a list", () => {
 describe("what a branch says out loud", () => {
   it("test_the_announcement_names_no_number_the_world_does_not_carry", () => {
     // Before the engine has answered there is no count of what moved, so the
-    // line says what is true — what arrived, what the edit can reach, what was
-    // taken back — and says the numbers are still coming rather than leaving a
-    // reader who cannot see the screen to guess.
+    // line says what is true — what arrived and what the edit can reach — and
+    // says the numbers are still coming rather than leaving a reader who cannot
+    // see the screen to guess.
     const world = branchWorld(base(), strike());
     expect(branchAnnouncement(world)).toBe(
-      "Branch created. One claim added, six claims your edit can reach, one supposition " +
-        "retracted. The numbers are on their way from the engine.",
+      "Branch created. One claim added, six claims your edit can reach. The numbers are on " +
+        "their way from the engine.",
     );
   });
 
@@ -155,7 +155,7 @@ describe("what a branch says out loud", () => {
       warnings: [],
     };
     expect(branchAnnouncement(branchWorld(base(), strike()), change)).toBe(
-      "Branch created. One claim added, six claims moved, one supposition retracted.",
+      "Branch created. One claim added, six claims moved.",
     );
   });
 

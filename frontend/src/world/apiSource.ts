@@ -36,7 +36,7 @@
 
 import type { ClaimDiff, Diff, World } from "../api/client";
 import { readConditional, readDiff, readExample, readWorld } from "../api/client";
-import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
+import { ADDED, happened, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
 import { NOT_ON_THIS_MAP } from "./naming";
@@ -98,11 +98,19 @@ function whereItsDaySits(world: World, resolvesBy: string): number | null {
  * What a tile says about the edits behind it, read off the world rather than
  * worked out from the branch.
  *
- * The world carries both halves: every value an edit fixed, in the order the
- * edits were made, and every supposition a later edit undermined with the day
- * and the arrow that did it. Reading the badges off those is what closes the
- * question the diff chapter left open — two derivations of one line eventually
- * disagree, so there is one, and it is the world's.
+ * The world carries every value an edit fixed, in the order the edits were made.
+ * Reading the badges off that is what closes the question the diff chapter left
+ * open — two derivations of one line eventually disagree, so there is one, and it
+ * is the world's.
+ *
+ * **There used to be a second half, and there is no longer anything in it**
+ * *(2026-09-22; decision record 0017)*. A supposition could be undermined by a
+ * later edit, and the world listed each one it had taken back with the day and
+ * the arrow responsible, which earned the claim a **Retracted** badge. Nothing
+ * takes a supposition back any more: a supposition holds until the reader lifts
+ * it. The world still carries a `retractions` list on the wire and it is always
+ * empty, so nothing here reads it; the field leaves the wire in the follow-up
+ * that takes down the other constant fields.
  *
  * One badge is not on the world and cannot be: **Added**. Whether a claim
  * arrived with an edit is a fact about the branch, and the branch is what says
@@ -110,16 +118,11 @@ function whereItsDaySits(world: World, resolvesBy: string): number | null {
  * claim looks like any other.
  *
  * @param world The world as the engine built it.
- * @param words Every claim's own words, so a badge can quote one.
  * @param added The claims this branch brought with it.
  * @returns One list of badges per claim that has any, in the order they were
  *   earned.
  */
-function badgesFromTheWorld(
-  world: World,
-  words: ReadonlyMap<string, string>,
-  added: ReadonlySet<string>,
-): Map<string, Badge[]> {
+function badgesFromTheWorld(world: World, added: ReadonlySet<string>): Map<string, Badge[]> {
   const badges = new Map<string, Badge[]>();
   const add = (claim: string, badge: Badge): void => {
     badges.set(claim, [...(badges.get(claim) ?? []), badge]);
@@ -132,22 +135,13 @@ function badgesFromTheWorld(
     add(claim, ADDED);
   }
 
-  const supposedOn = new Map<string, string>();
   for (const fixed of world.assignments) {
     const day = fixed.at ?? world.day_zero;
     if (fixed.kind === "do") {
       add(fixed.target, supposed(day, fixed.value));
-      if (fixed.value) {
-        supposedOn.set(fixed.target, day);
-      }
     } else {
       add(fixed.target, happened(day, fixed.value));
     }
-  }
-
-  for (const end of world.retractions) {
-    const cause = words.get(end.by_claim) ?? end.by_claim;
-    add(end.target, retracted(end.at, cause, supposedOn.get(end.target) ?? end.at));
   }
 
   return badges;
@@ -166,11 +160,11 @@ function badgesFromTheWorld(
  * certainty guard's clothes.
  *
  * **The two are found in different places, and that is the engine's shape rather
- * than ours.** A supposition can be undermined by a later edit, so whether it
- * still holds is a fact about a *day*, and the world's `states` carry it — H
- * reads *supposed* on the first and *pushed* by the day it is judged. An
- * observation is news: nothing takes it back, it holds across the whole window,
- * and the world records it as an assignment rather than as a state.
+ * than ours.** A supposition is a fact about a *day* — it is in force from the day
+ * the reader fixed it, and the world's `states` carry that day by day, so H reads
+ * *supposed* wherever the supposition reaches. An observation is news: it holds
+ * across the whole window, and the world records it as an assignment rather than
+ * as a state.
  *
  * @param world The world as the engine built it.
  * @param claims The claims, so each one's resolve-by day can be found.
@@ -299,11 +293,10 @@ export function toWorldView(world: World, from: WorldSummary, branch?: BranchVie
   // The map the engine's edits left behind, which is the map to draw: a branch
   // that added a claim added it here too.
   const claims = world.graph.propositions.map(toClaim);
-  const words = new Map(claims.map((claim) => [claim.id, claim.claim]));
   const added = new Set(
     (branch?.edits ?? []).flatMap((edit) => (edit.op === "insert" ? [edit.claimId] : [])),
   );
-  const badges = badgesFromTheWorld(world, words, added);
+  const badges = badgesFromTheWorld(world, added);
   const standing = standingFromTheWorld(world, claims, badges);
 
   return {
@@ -360,9 +353,10 @@ export function toWorldView(world: World, from: WorldSummary, branch?: BranchVie
  * one place they stop.
  *
  * **The engine's word for why a claim is unchanged is not one of them.** It is
- * carried across as it came, both of its spellings, because R4 requires every
- * quiet row on the change list to say why in words — `graph/diff/noChange.ts`
- * turns `versions_disagree` into a phrase with no versions in it.
+ * carried across as it came, because R4 requires every quiet row on the change
+ * list to say why in words, and `graph/diff/noChange.ts` picks those words. There
+ * is one such word now — *under the floor*, the claim moved by less than the
+ * engine will call a move.
  *
  * @param row The claim's own row of the engine's difference.
  */
@@ -380,12 +374,10 @@ function movement(row: ClaimDiff): Movement | undefined {
     way: delta < 0 ? "down" : "up",
     by: delta,
     // Why the engine would not call the difference a move, carried across as the
-    // word it came as. The floor and the bar that decide it are constants inside
-    // the engine and are on no wire, so this is the only way the browser can
-    // know — which is what stops a second engine growing here and disagreeing
-    // with the first. Neither spelling is ever printed; `graph/diff/noChange.ts`
-    // picks the words, and words the second of them without the versions of the
-    // map it names (2026-09-22, R48).
+    // word it came as. The floor that decides it is a constant inside the engine
+    // and is on no wire, so this is the only way the browser can know — which is
+    // what stops a second engine growing here and disagreeing with the first. The
+    // word itself is never printed; `graph/diff/noChange.ts` picks the words.
     unchangedBecause: row.unchanged_because ?? undefined,
   };
 }

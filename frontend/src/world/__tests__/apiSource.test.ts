@@ -5,8 +5,8 @@
  * is about the requests themselves: which routes, with which map, which branch
  * and which seed. Everything after it is about the answers — that they are
  * carried across unchanged, that a supposed claim gets the word rather than the
- * `1` the engine stores for it, and that the badge saying a supposition was
- * taken back is read off the world rather than worked out a second time here.
+ * `1` the engine stores for it, and that the badges a claim wears are read off the
+ * world rather than worked out a second time here.
  *
  * **The server is replaced by a stand-in.** Its answers below are the *shapes*
  * the engine produces, with numbers chosen to be obviously made up, and no test
@@ -69,8 +69,15 @@ const BUNDLE = {
 } as unknown as FixtureBundle;
 
 /**
- * A world as the engine builds one: H supposed on the first, a strike added and
- * supposed on the second, and the supposition on H taken back by it.
+ * A world as the engine builds one: H supposed on the first, and a strike added
+ * and supposed on the second. **Both suppositions stand** — nothing takes a
+ * supposition back (decision record 0017), so `retractions` is empty here as it is
+ * on every world the engine builds, and no day of a series ever reads *withdrawn*.
+ *
+ * `versions` and `worlds` read `1` and `0`: the engine works out one version of
+ * the map and runs no inner loop (decision record 0028), and both fields are on
+ * the wire only until the follow-up takes them down. Every belief's `lo` and `hi`
+ * are its `p` for the same reason — there is no range.
  *
  * The numbers are plainly made up. What matters below is that they come out the
  * other side as themselves.
@@ -79,8 +86,8 @@ const WORLD = {
   base_id: "example",
   branch_id: "b",
   seed: 20261001,
-  versions: 2000,
-  worlds: 8,
+  versions: 1,
+  worlds: 0,
   day_zero: "2026-10-01",
   days: 60,
   graph: BUNDLE.graph,
@@ -88,15 +95,15 @@ const WORLD = {
     { target: "H", value: true, at: "2026-10-01", by: 0, kind: "do" },
     { target: "S", value: true, at: "2026-10-02", by: 2, kind: "do" },
   ],
-  retractions: [{ target: "H", at: "2026-10-02", by_link: "S->H", by_claim: "S", by: 1 }],
+  retractions: [],
   beliefs: {
-    H: { p: 0.081, lo: 0.04, hi: 0.13, owner: "model" },
+    H: { p: 0.081, lo: 0.081, hi: 0.081, owner: "model" },
     S: { p: 1, lo: 1, hi: 1, owner: "model" },
   },
   series_days: [0, 1, 31],
   series: { H: [1, 0.36, 0.081], S: [0.06, 1, 1] },
   states: {
-    H: ["supposed", "withdrawn", "pushed"],
+    H: ["supposed", "supposed", "supposed"],
     S: ["sampled", "supposed", "supposed"],
   },
   conditionals: {},
@@ -129,8 +136,8 @@ const DIFFERENCE = {
   branch_a: null,
   branch_b: "b",
   seed: 20261001,
-  versions: 2000,
-  worlds: 8,
+  versions: 1,
+  worlds: 0,
   claims: {
     H: { target: "H", state: "shifted", before: 0.356, after: 0.081, delta: -0.275, agreement: 1 },
     S: { target: "S", state: "added", before: null, after: 1, delta: null, agreement: null },
@@ -290,17 +297,19 @@ describe("asking the engine", () => {
     const world = await new ApiWorldSource().readWorld({ baseId: "example", branch: BRANCH });
     const h = world.claims.find((claim) => claim.id === "H");
 
-    // Read off `World.retractions` — which claim, which day, and whose doing —
-    // rather than worked out a second time from the branch. Two derivations of
-    // one line eventually disagree, so there is one.
-    expect((h?.badges ?? []).map((badge) => badge.words)).toEqual([
-      "Supposed · Oct 1",
-      'Retracted · Oct 2 · by "S — a claim that will be true or false by a date"',
-    ]);
-    expect((h?.badges ?? [])[1]?.overrides).toBe(true);
-    // And the claim no longer stands on the reader's say-so, because the badge
-    // pair says what happened instead.
-    expect(h?.standing).toBeUndefined();
+    // Read off the world's own assignments rather than worked out a second time
+    // from the branch. Two derivations of one line eventually disagree, so there
+    // is one.
+    expect((h?.badges ?? []).map((badge) => badge.words)).toEqual(["Supposed · Oct 1"]);
+
+    // **And there is no second badge** *(2026-09-22; decision record 0017)*. H was
+    // supposed on the first and a strike was supposed on the second; the strike
+    // used to take the first supposition back and earn H a **Retracted** badge.
+    // Nothing takes a supposition back any more, so H's supposition stands all the
+    // way to the day it is judged, and the tile says so where its likelihood would
+    // be.
+    expect((h?.badges ?? []).some((badge) => badge.overrides === true)).toBe(false);
+    expect(h?.standing?.words).toBe("Supposed · Oct 1");
   });
 
   it("test_a_refused_branch_arrives_with_every_reason", async () => {
@@ -338,39 +347,31 @@ describe("asking the engine", () => {
     expect(readWorld).not.toHaveBeenCalled();
   });
 
-  it("test_the_engines_word_for_which_half_a_claim_failed_arrives_as_it_came", async () => {
-    // A claim the engine calls `unchanged` failed one of the two halves of its
-    // test, and the engine says which: the move was too small, or the versions
-    // of the map did not agree which way it went. The two numbers below are
-    // plainly made up; the words are what is under test.
+  it("test_the_engines_word_for_why_a_claim_held_still_arrives_as_it_came", async () => {
+    // A claim the engine calls `unchanged` moved by less than it will report at
+    // all, and the engine says so in one word. The numbers below are plainly made
+    // up; the word is what is under test.
     //
-    // **Both words come across, and neither is ever printed** *(Kent,
-    // 2026-09-22, R48)*. `versions_disagree` names the two thousand versions of
-    // the map, which are cut from the screen — so the word is carried and
-    // `graph/diff/noChange.ts` words it without them. It is carried rather than
-    // dropped because R4 is the older rule: every quiet row on the change list
-    // says why, and a row with no reason is what R4 forbids. The reason itself
-    // dies with the engine half.
+    // **The word comes across and is never printed as it is spelled** *(Kent,
+    // 2026-09-22, R48)*. It is carried rather than dropped because R4 is the older
+    // rule: every quiet row on the change list says why, and a row with no reason
+    // is what R4 forbids. `graph/diff/noChange.ts` picks the words.
+    //
+    // **There used to be a second word here** — `versions_disagree`, meaning the
+    // move was far enough to report and the two thousand versions of the map had
+    // not agreed which way it went. The engine works out one version, so a move
+    // has one direction; the word is never written and the test for it went with
+    // the phrase the browser wrote for it.
     vi.mocked(readDiff).mockResolvedValue({
       ...DIFFERENCE,
       claims: {
-        H: {
-          target: "H",
-          state: "unchanged",
-          before: 0.3,
-          after: 0.4,
-          delta: 0.1,
-          agreement: 0.5,
-          moved_only_by_reweighting: false,
-          unchanged_because: "versions_disagree",
-        },
         S: {
           target: "S",
           state: "unchanged",
           before: 0.3,
           after: 0.3,
           delta: 0.001,
-          agreement: 0.99,
+          agreement: null,
           moved_only_by_reweighting: false,
           unchanged_because: "under_the_floor",
         },
@@ -378,12 +379,10 @@ describe("asking the engine", () => {
     } as unknown as Diff);
 
     const change = await new ApiWorldSource().readDiff({ baseId: "example", branch: BRANCH });
-    // Carried across as the word it came as. The floor and the bar that decide
-    // it are constants inside the engine and appear nowhere in its answer, so
-    // this is the only way the browser can know which half a claim failed —
-    // which is what stops a second engine growing here and disagreeing with
-    // the first about which claims held still.
-    expect(change.claims.get("H")?.moved?.unchangedBecause).toBe("versions_disagree");
+    // Carried across as the word it came as. The floor that decides it is a
+    // constant inside the engine and appears nowhere in its answer, so this is the
+    // only way the browser can know why a claim held still — which is what stops a
+    // second engine growing here and disagreeing with the first.
     expect(change.claims.get("S")?.moved?.unchangedBecause).toBe("under_the_floor");
   });
 
