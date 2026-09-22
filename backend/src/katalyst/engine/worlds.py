@@ -364,6 +364,13 @@ def sample_of(
     and no browser should ever be sent them. So a caller that needs the days asks
     for them here, from the same map, branch and seed a world is built from.
 
+    **The answers the draw is corrected against are the finished ones**, the numbers
+    the world shown actually carries, and not the uncorrected marginals the solve
+    produces before a report is folded in. Under a *This happened* edit those are
+    two different sets of numbers, and only the first makes this the same sample the
+    world was built from. Said here because a second builder elsewhere is the sort
+    of thing that quietly picks the other one.
+
     the flip: until the flip lands, the world a route shows beside these draws is
     still worked out by the day-by-day engine while these days come from the
     by-deadline core. Afterwards both are the same arithmetic. `engine/verify.py`

@@ -45,6 +45,7 @@ from katalyst.api.worlds import RefusedEdit
 from katalyst.domain import (
     Branch,
     BranchId,
+    ContractPayoff,
     ImpossibleObservation,
     PricePayoff,
     Proposition,
@@ -55,6 +56,7 @@ from katalyst.domain import (
 )
 from katalyst.engine import worlds as engine
 from katalyst.engine.ids import BIGGEST_SEED
+from katalyst.grounding import Quote, recorded_quote
 from katalyst.thesis.adapter import A_MOVE_IS_A_SHARE_OF_THE_PRICE, draws_of, moves_on
 from katalyst.thesis.card import (
     THE_CHANCE_CAME_FROM,
@@ -406,7 +408,28 @@ def take_a_position(request: PositionRequest) -> PositionAnswer:
         ),
         request.base_id,
     )
-    ending = _the_ending(shown, request.ending)
+    # The second world, and the reason there are two: an edge is read from the map
+    # with **nothing** fixed by an edit, so this one is built with no branch at all
+    # however much the reader has supposed on the one above. It is built with no
+    # branch by construction, so `priced`'s own *conditional world* refusal cannot
+    # be reached from here — that guard stands against a caller who hands the world
+    # on screen in twice, and a mutant that does exactly that is what catches it.
+    base = _answered(
+        engine.build_world(
+            request.base_id,
+            None,
+            request.seed,
+            versions=request.versions,
+            worlds=request.worlds,
+        ),
+        request.base_id,
+    )
+    # Looked up on the world with nothing fixed rather than on the one shown: an
+    # edge is priced on that map, and a claim that existed only on the branch would
+    # reach `priced` as a claim it has never heard of. No edit that can be sent over
+    # this wire adds a claim today, so the two maps carry the same claims; this is
+    # the line that keeps it true the day one can.
+    ending = _the_ending(base, request.ending)
     wanted = position_on(
         ending,
         entry=request.entry,
@@ -436,20 +459,18 @@ def take_a_position(request: PositionRequest) -> PositionAnswer:
     # place the rule had to be remembered. What it costs is one throwaway walk.
     paths = walk(draws, moves, entry=wanted.entry, daily_move=wanted.daily_move, seed=request.seed)
     touch = first_touch(paths, wanted)
-    # The second world, and the reason there are two: an edge is read from the map
-    # with **nothing** fixed by an edit, so this one is built with no branch at all
-    # however much the reader has supposed on the one above.
-    base = _answered(
-        engine.build_world(
-            request.base_id,
-            None,
-            request.seed,
-            versions=request.versions,
-            worlds=request.worlds,
-        ),
-        request.base_id,
+    ceiling = ceiling_of(
+        priced(
+            base,
+            shown,
+            wanted.ending,
+            _the_recorded_price(ending),
+            # Nobody has read this venue's fee schedule and written it down, so the
+            # fee is unknown rather than nothing. An edge quietly netted against a
+            # fee of nothing is an edge that looks net and is not.
+            fee=None,
+        )
     )
-    ceiling = ceiling_of(priced(base, shown, wanted.ending, None, fee=None))
     return PositionAnswer(
         base_id=shown.base_id,
         branch_id=shown.branch_id,
@@ -507,6 +528,32 @@ def _drawn(request: PositionRequest) -> Sample:
             detail=[_refusing("nothing_agrees_with_what_happened", "branch").model_dump()],
         ) from None
     return _answered(drawn, request.base_id)
+
+
+def _the_recorded_price(ending: Proposition) -> Quote | None:
+    """The committed price for this ending's contract, read from the file and never fetched.
+
+    **Recorded first, fetched second** (decision record 0020): the one function in
+    this program that opens a connection to a venue is never reached from a route,
+    and a price that has not been written down is an absence the card says out loud
+    rather than a reason to dial out. The file is found by the venue's own
+    identifier for the market, which is what the ending's payoff names.
+
+    An ending that names an **instrument** has no contract to price, so there is
+    nothing to read: what a venue charges for something else is not a price on this
+    claim.
+
+    Args:
+        ending: The claim being traded.
+
+    Returns:
+        The venue's two prices and the day they were read, or nothing at all where
+        the ending names no contract or nobody has recorded one for it.
+    """
+    payoff = ending.payoff
+    if not isinstance(payoff, ContractPayoff):
+        return None
+    return recorded_quote(payoff.contract_id)
 
 
 def _the_ending(shown: World, wanted: PropositionId) -> Proposition:

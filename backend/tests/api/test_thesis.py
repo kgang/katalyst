@@ -72,6 +72,9 @@ A_CONTRACT_ENDING = "M1"
 THE_MAP_THIS_FILE_BUILDS = "a-map-this-test-built"
 """What the map written down below answers to, so a request can name it."""
 
+THE_RECORDED_CONTRACT = "3501950"
+"""What the map written down below answers to, so a request can name it."""
+
 
 def an_exit(**over: Any) -> dict[str, Any]:
     """One filled-in form on the stored example's instrument ending.
@@ -166,6 +169,65 @@ A_BUILT_MAP = Graph(
     hypothesis_id="H",
 )
 """A map of three claims ending in something traded, so nothing here rests on the fixture."""
+
+
+A_MAP_A_VENUE_PRICES = Graph(
+    id="a-map-a-venue-prices",
+    propositions=(
+        a_claim("H", days=12),
+        a_claim(
+            "Q",
+            days=30,
+            prior=0.5,
+            payoff=ContractPayoff(
+                venue="Polymarket",
+                contract_id=THE_RECORDED_CONTRACT,
+                title="Strait of Hormuz traffic returns to normal by October 31?",
+                side="yes",
+            ),
+        ),
+    ),
+    links=(
+        Link(
+            id="H->Q",
+            source="H",
+            target="Q",
+            mode="trigger",
+            strength=1.5,
+            lag=0.0,
+            shape="step",
+            rationale="The first claim moves the contract's own question, for a stated reason.",
+            provenance="argued",
+        ),
+    ),
+    hypothesis_id="H",
+)
+"""A map whose ending names the one contract this repository has a committed price for.
+
+The stored worked example names a contract nobody has recorded a price for, so on
+it a route that reads the file and a route that never looks agree by accident.
+This map is the one that tells them apart.
+"""
+
+
+@pytest.fixture
+def the_priced_map() -> Graph:
+    """Hold the map whose ending a committed quote prices, under its own name.
+
+    Returns:
+        That map.
+    """
+    held.remember(
+        Transcript(
+            generation_id="for-a-map-a-venue-prices",
+            hypothesis="A map whose ending a venue prices.",
+            seed=SEED,
+            on=DAY_ZERO,
+            mode="replay",
+        ),
+        A_MAP_A_VENUE_PRICES,
+    )
+    return A_MAP_A_VENUE_PRICES
 
 
 @pytest.fixture
@@ -373,6 +435,58 @@ def test_the_ceiling_is_absent_with_its_reason_and_never_without_its_words() -> 
     ceiling = asked().json()["your_exit"]["ceiling"]
 
     assert ceiling["fraction"] is None
+    assert ceiling["warning"] == NEVER_SIZE_TO_THIS
+    assert ceiling["sentence"] == f"{A_CEILING_NEEDS_AN_EDGE} {NO_CONTRACT_QUOTES_IT}"
+
+
+def test_the_ceiling_is_a_number_where_a_committed_file_prices_the_contract(
+    the_priced_map: Graph,
+) -> None:
+    """The greyed ceiling has a reachable path to a fraction, and it is the recorded price.
+
+    A quote is **recorded first and fetched second** (record 0020), so the route
+    reads the committed file by the contract's own identifier and never dials out.
+    Without that read the ceiling would be absent on every request this route can
+    be given, and the feature would be unreachable rather than merely rare.
+
+    No number is written down here: the fraction is checked for being a fraction,
+    for being owned by a computation, and for carrying the words it is never shown
+    without.
+    """
+    with TestClient(app) as client:
+        answer = client.post(
+            "/api/thesis/position",
+            json={
+                "base_id": the_priced_map.id,
+                "seed": SEED,
+                "ending": "Q",
+                "entry": 0.5,
+                "stop": 0.4,
+                "target": 0.7,
+                "horizon": (DAY_ZERO + timedelta(days=20)).isoformat(),
+                "risk_budget": 0.05,
+                "daily_move": 0.02,
+                **SMALL,
+            },
+        )
+
+    assert answer.status_code == 200
+    ceiling = answer.json()["your_exit"]["ceiling"]
+    assert ceiling["fraction"] is not None, "a ceiling that can never be a number is not a feature"
+    assert 0.0 < ceiling["fraction"]["value"] < 1.0
+    assert ceiling["fraction"]["owner"] == "computed"
+    assert ceiling["taken_by"] in ("buying", "selling")
+    assert ceiling["at"]["owner"] == "computed"
+    assert ceiling["warning"] == NEVER_SIZE_TO_THIS
+    assert ceiling["sentence"] is None, "a fraction came out, so there is nothing to explain"
+
+
+def test_the_ceiling_is_the_absence_with_its_reason_where_no_contract_quotes_the_claim() -> None:
+    """The other half of the rule: zero and absent are different answers, and neither is blank."""
+    ceiling = asked().json()["your_exit"]["ceiling"]
+
+    assert ceiling["fraction"] is None
+    assert ceiling["taken_by"] is None and ceiling["at"] is None
     assert ceiling["warning"] == NEVER_SIZE_TO_THIS
     assert ceiling["sentence"] == f"{A_CEILING_NEEDS_AN_EDGE} {NO_CONTRACT_QUOTES_IT}"
 
