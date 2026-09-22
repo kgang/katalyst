@@ -1798,3 +1798,35 @@ Suite: `1153 passed, 4 xfailed in 195.17s`, `thesis` 100%. PR body updated.
 - `chore: regenerate the browser's types` — `frontend/src/api/schema.ts`</result>
 <usage><subagent_tokens>519000</subagent_tokens><tool_uses>270</tool_uses><duration_ms>3591811</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a279b9750a2fe9685</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a279b9750a2fe9685.output</output-file>
+<status>completed</status>
+<summary>Agent "T3b fit-up onto position route" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Rebase and fit-up done; working tree clean, three new commits on `feat/06-card-routes`.
+
+**Conflicts (3 files, all keep-both):**
+- `api/main.py` — both routers, `thesis_card` last.
+- `frontend/src/api/schema.ts` — took the incoming side, regenerated with `make types` at the end (stable on a second run).
+- `ARCHITECTURE.md` — 3 hunks merged by hand into one sentence each: **fifteen** routes (verified against the OpenAPI description), the Routes testing row naming the position route *and* the three card routes, and one thesis bullet saying four of six routes built. `card.py`'s renames needed nothing — grep for `_the_trade`/`_rail(`/`_your_exit` in `backend/` is clean.
+
+**The swap's evidence** (`plans/analysis/scripts/T3b-fitup/`): `card_now.py` posts four cards — plain, branched, shocked, and *This happened* — before and after; **byte-identical**. `exact_differs.py` explains why: the two `exact` arguments do differ under *This happened* (max gap 0.0077 on `hormuz`), but `exact` reaches only `Sample.correction`, through clamp bounds that do not bite here, and `Draws` copies seven fields and not that one. So the swap moves no number **under either condition** — contrary to the review's expectation. It is still right (one sampler, corrected answers, `ImpossibleObservation` caught), and two new tests pin it.
+
+**Also done:** one vocabulary/envelope — `AskedWrong`, `REFUSES`, `ThesisRefused`/`RefusedThesis` (renamed from `PositionRefused`), plus `the_ending_on`, `the_position_from`, `the_horizon_is_inside_the_window`, `draws_for` live in `api/thesis.py` and are imported. `_worth_of` lifted cleanly to `thesis/position.py` as `worth_of` with a hand-computed unit test. `CardRequest` gained `drawn_worlds`.
+
+**Suite:** ruff, format, `mypy --strict` (31 files), `mypy src` (65) clean; `tests/api tests/thesis` 446 passed, `thesis/` 100%; mutants **6/6 killed** (script updated for moved sites, one new mutant added); `npm run check` 42 files / 369 tests; whole suite `1183 passed, 4 xfailed in 193s`, **100% total coverage**.
+
+**Tip:** the mutant script's sites moved with the refactor — I updated `plans/analysis/scripts/T3b/mutants.py` in place and added `T3b-J` (the shared sampler ignoring the branch), which is the line the rebase rewrote and had nothing guarding it.</result>
+<usage><subagent_tokens>216820</subagent_tokens><tool_uses>123</tool_uses><duration_ms>1523079</duration_ms></usage>
+</task-notification>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
+UX-round coordinator: the whole batch is on `origin/main` — tip `ba08f92` (#64), on top of #50, #52, #51, #55, #56. Your flip's browser share can be written from that tip now. What you will find there: `src/world/apiSource.ts` has `theSentenceUnderTheMap` (one function for stored and generated maps) and still maps `retractions` (yours to empty); `src/world/fromTheServer.ts` drops lo/hi/agreement/moved_only_by_reweighting at the wire with dated comments naming your follow-up; `src/graph/diff/noChange.ts` prints "the engine could not settle which way it moves" for `versions_disagree` — delete the branch and the note together at the flip; `e2e/hormuz.spec.ts` presses first-screen rows by name and turns the panel to "Branches and changes" before touching a branch. Record 0023 carries 0027's dated amendment; `INV-generation.22` for activity was renumbered to `.33` (0027 has a dated correction) because `.22` is `replay.md`'s. `aStream.ts:59` still lacks `persistence: "event"` — yours, as agreed. I am now deleting this round's branches and worktrees (04/04c/04d/try only; `fix/04-payoff-kind-required` and `adr05-before-rebase` untouched). Records 0023, 0024, 0027 and 0012's amendment are `accepted`; your next number remains 0028.
+</cross-session-message>
