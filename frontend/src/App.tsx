@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { About, FixtureSummary, Health, Readiness } from "./api/client";
 import { readAbout, readExampleList, readHealth, readReadiness } from "./api/client";
 import type { Asked } from "./components/InputBar";
+import type { GenerationDetail } from "./components/Inspector";
 import { Launchpad } from "./components/Launchpad";
 import { MapScreen } from "./components/MapScreen";
 import { GenerationScreen } from "./stream/GenerationScreen";
@@ -29,6 +30,8 @@ import {
   type BranchView,
   branchesOf,
   FixtureWorldSource,
+  GeneratedMapSource,
+  type Selection,
   type WorldSource,
   type WorldView,
 } from "./world";
@@ -219,6 +222,32 @@ type Screen =
    * spend twice"* would be broken on every machine this product is built on.
    */
   | { at: "growing"; run: TheRun }
+  /**
+   * A map that was built in front of the reader, finished, and now being
+   * edited.
+   *
+   * **A finished generation is a map like any other**, so this is not a fourth
+   * kind of screen: it is the screen a stored map is read and edited on, with a
+   * generated map as its base. The six edits, a branch, the two worlds painted
+   * together and the change list are the ones that were already there, asked of
+   * the same three routes with this map's own name.
+   *
+   * The run is kept beside it for two reasons. Leaving the map lets go of the
+   * run, which is what stops a live one spending; and the panel reads out where
+   * this map came from — the run's own name, its seed, and every call it made.
+   */
+  | {
+      at: "editing";
+      run: TheRun;
+      /** The finished map, exactly as the reader watched it arrive. */
+      base: WorldView;
+      /** Where a branch's world on that map is asked for. */
+      source: WorldSource;
+      /** What the run was, for the panel's *Run details* and its working. */
+      details: GenerationDetail;
+      /** What they pressed *Change this claim* about. */
+      changing: Selection;
+    }
   | {
       at: "map";
       world: WorldView;
@@ -367,6 +396,45 @@ export function App({
     [],
   );
 
+  /**
+   * Take up *Change this claim* on a map that has just finished building
+   * itself.
+   *
+   * **The press is what carries it over, and nothing else happens on its own.**
+   * A run that stops does not throw the reader onto another screen: they watched
+   * it build, and the moment it stops is the moment they start reading it. What
+   * this does is answer the press, with the claim it was made about.
+   *
+   * The map is the one already on screen — the engine's own world, arriving with
+   * the likelihoods — so nothing is fetched again and no number changes as the
+   * screens swap. What is fetched from here on is every branch world, from the
+   * same three routes the stored map uses, with this map's own name and the run's
+   * own seed.
+   */
+  const changeAClaim = useCallback(
+    (run: TheRun) => (selection: Selection, details: GenerationDetail) => {
+      const { growth } = run.now();
+      setScreen({
+        at: "editing",
+        run,
+        base: growth.world,
+        details,
+        changing: selection,
+        source: new GeneratedMapSource({
+          id: growth.world.baseId,
+          title: growth.world.title,
+          // The run's own seed, as its digits, so the map a branch is folded
+          // onto is the map the reader watched arrive. Seeds are minted inside
+          // what a browser holds exactly, so reading the digits back is safe —
+          // that is what the bound on them is for.
+          seed: Number(growth.seed ?? "0"),
+          claims: growth.world.claims,
+        }),
+      });
+    },
+    [],
+  );
+
   /** Ask the same question again, which is a new run and a new screen. */
   const runAgain = useCallback(
     (run: TheRun) => () => {
@@ -400,6 +468,25 @@ export function App({
         // takes its word.
         replaying={screen.run.asked.start === "replay"}
         onRunAgain={runAgain(screen.run)}
+        onLeave={leaveTheRun(screen.run)}
+        onChangeAClaim={changeAClaim(screen.run)}
+      />
+    );
+  }
+
+  if (screen.at === "editing") {
+    return (
+      <MapScreen
+        base={screen.base}
+        // A generated map ships with no branches: nobody has edited it before,
+        // because it did not exist until a minute ago. The first edit forks one.
+        branches={[]}
+        source={screen.source}
+        insteadOfTheEngine={null}
+        changing={screen.changing}
+        generation={screen.details}
+        // Leaving lets the run go, which is what stops a live one spending —
+        // the same thing leaving the growing screen does, for the same reason.
         onLeave={leaveTheRun(screen.run)}
       />
     );

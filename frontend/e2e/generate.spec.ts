@@ -576,6 +576,70 @@ test("a run that was cut still offers its working", async ({ page }) => {
   expect(await boxesRunningIntoEachOther(page)).toEqual([]);
 });
 
+test("a finished generation takes the six edits, like any other map", async ({ page }) => {
+  await page.goto("/");
+
+  const replayable = await whatCanBeReplayed(page);
+  test.skip(
+    replayable.length === 0,
+    "This server has no committed recording to play, so there is no generated map to edit.",
+  );
+
+  // **A replayed recording is a generated map too**, and this is the case a
+  // keyless reviewer will try: no model key anywhere, and the whole of the six
+  // edits, a branch and the change list on a map nobody stored.
+  await page.getByRole("button", { name: THE_RECORDING_ROW }).click();
+  await waitUntilItStops(page);
+
+  // Choose a claim on the finished map, exactly as on a stored one. Which claim
+  // is read off the map's own ring rather than written down here.
+  await page.locator(".react-flow__node.react-flow__node-claim").first().click();
+  await expect(page.getByRole("tab", { name: /This claim/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
+  // The way in that was not here before Kent asked for it: *"the change this
+  // claim button and flow is available for the prebuilt map but doesn't exist
+  // for the map that's generated live"* (2026-09-22).
+  const wayIn = page.getByRole("button", { name: /Change this claim/ });
+  await expect(wayIn).toBeVisible();
+  await wayIn.click();
+
+  // The six edits are on the panel, on the claim that was chosen, and the map
+  // is still the map — same claims, nothing re-fetched, nothing re-drawn from
+  // somewhere else.
+  const sixEdits = page.locator(".intervene");
+  await expect(sixEdits).toBeVisible();
+  await expect(sixEdits.locator(".intervene__button").first()).toBeVisible();
+
+  // And where this map came from travelled with it: the run's own name, its
+  // seed and the route are read out in *Run details*, beside the claim.
+  await expect(page.locator(".dock")).toContainText("Run details");
+
+  // Suppose it true. This is the edit with no model in it at all — pure
+  // arithmetic in the rules layer — which is why a reviewer with no key gets
+  // the whole multiverse on a map they watched build itself.
+  await page.getByRole("button", { name: /Suppose this is true/ }).click();
+
+  // A branch exists and the screen says which of the two worlds is in front.
+  // The branch was forked by the edit itself, so its name and its hue are on
+  // the bar; the map as it was built is one press of Space away.
+  await expect(page.locator(".map-bar__chip")).toBeVisible();
+  await expect(page.locator(".map-bar__where")).toContainText("with your edits");
+
+  // And the change list is filled from the engine's own difference. One press
+  // of the name at the head of the panel, exactly as a reader reaches it.
+  await page.getByRole("tab", { name: /Branches and changes/ }).click();
+  const rows = page.locator(".delta-rail__row");
+  await expect(rows.first()).toBeVisible({ timeout: 30_000 });
+  expect(await rows.count()).toBeGreaterThan(0);
+
+  // Nothing about this opened over the map, and nothing spun.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
+});
+
 test("add a claim on a generated map declines in the server's own words", async ({ page }) => {
   await page.goto("/");
 

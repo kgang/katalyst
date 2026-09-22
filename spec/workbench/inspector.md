@@ -110,7 +110,7 @@ crude settles below $68 for five sessions* — the busiest claim on the map, thr
 | A map building itself | **This claim** / **This arrow** — whatever the reader chose · **The run** — the verdict, every refusal, the receipt, *Run details*, and every call the run made · **Outline** — the map as a list |
 | A stored map | **This claim** / **This arrow** — whatever the reader chose, and the six things you can do to it · **Branches and changes** — your branches, the open one's edits, the engine's refusals, and the endings the edit reaches · **Outline** |
 
-**A panel a screen does not have is not offered.** A generated map has no branches to open; nobody generated a stored map, so there is no run to read out. Three each, never seven. A panel that exists and is empty says so in a sentence, as everything else in this product does — *Nothing selected. Choose a claim or an arrow on the map…*
+**A panel a screen does not have is not offered.** A map still being built has no branches to open; nobody generated a stored map, so there is no run to read out. Three each, never seven. *(Amended 2026-09-22: a **finished** generation does have branches — taking up *Change this claim* on one hands it to the stored map's screen, which is the screen with the branch panel on it, and carries its **Run details** and its working across. See [`streaming-growth.md`](streaming-growth.md) B11.)* A panel that exists and is empty says so in a sentence, as everything else in this product does — *Nothing selected. Choose a claim or an arrow on the map…*
 
 **The name follows the subject.** *This claim* becomes *This arrow* when an arrow is what is selected, because the name is what says what the panel is about.
 

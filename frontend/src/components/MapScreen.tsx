@@ -47,7 +47,7 @@ import { asOneSentence } from "../world/failures";
 import { BranchPanel, InterventionPanel } from "./BranchPanel";
 import { type Command, CommandPalette } from "./CommandPalette";
 import { DeltaRail } from "./DeltaRail";
-import { Inspector } from "./Inspector";
+import { type GenerationDetail, Inspector } from "./Inspector";
 import { MapFrame } from "./MapFrame";
 import { Outline } from "./Outline";
 import { type PanelChoice, PanelSwitch, theLabelFor } from "./PanelSwitch";
@@ -187,6 +187,8 @@ export function MapScreen({
   source,
   insteadOfTheEngine,
   onLeave,
+  changing,
+  generation,
 }: {
   base: WorldView;
   branches: readonly BranchView[];
@@ -195,11 +197,34 @@ export function MapScreen({
   /** Why this map is the stored example rather than the engine's, or nothing. */
   insteadOfTheEngine: string | null;
   onLeave: () => void;
+  /**
+   * What the reader has **already** asked to change, when they asked for it
+   * somewhere else and this screen is where the asking is answered.
+   *
+   * That is one case and one only: a map they watched build itself. *Change this
+   * claim* is pressed on the screen the run is on, and this screen is what opens
+   * — so it has to open on the claim they pressed it about, with the six things
+   * they can do to it already in front of them. Landing them on the same map with
+   * nothing selected would make the press look as though it had done nothing.
+   */
+  readonly changing?: Selection;
+  /**
+   * The run that built this map, when one did.
+   *
+   * Absent on a stored example, which nobody generated. Given, the panel reads
+   * out *Run details* — where the map came from, the run's own name and its seed
+   * — and the whole working of the run is one command away, refusals and all.
+   */
+  readonly generation?: GenerationDetail;
 }) {
   const [shop, setShop] = useState(() => workshopOf(branches));
   const [showing, setShowing] = useState<"now" | "before">("now");
-  const [selection, setSelection] = useState<Selection>(null);
-  const [focused, setFocused] = useState<string | null>(null);
+  // Whatever the reader already asked about, so a press made on another screen
+  // is answered here rather than dropped on the way over.
+  const [selection, setSelection] = useState<Selection>(changing ?? null);
+  const [focused, setFocused] = useState<string | null>(
+    changing?.kind === "claim" ? changing.id : null,
+  );
   // Which of this screen's three panels is on the glass. It opens on the one
   // that says what to do next — *choose a claim or an arrow on the map* — which
   // is the sentence a reader who has never seen this screen needs first.
@@ -213,7 +238,9 @@ export function MapScreen({
     claims: readonly string[];
   } | null>(null);
   const [overlay, setOverlay] = useState<"palette" | "sheet" | null>(null);
-  const [intervening, setIntervening] = useState(false);
+  // Open from the first frame when the reader already pressed *Change this
+  // claim* on the screen they came from.
+  const [intervening, setIntervening] = useState(changing !== undefined);
   const [naming, setNaming] = useState(false);
   const [status, setStatus] = useState(
     "Press ? for every key. j and k walk a column; h and l follow the wires.",
@@ -570,6 +597,10 @@ export function MapScreen({
     },
   });
 
+  // The run's own name, when this map came from one and the run got far enough
+  // to have one. It is what the working is asked for by.
+  const theRunsName = generation?.generationId ?? null;
+
   const commands: Command[] = useMemo(() => {
     const made: Command[] = [
       {
@@ -624,6 +655,24 @@ export function MapScreen({
         does: "The same as pressing the question mark.",
         run: () => setOverlay("sheet"),
       },
+      // Two commands a stored map has no use for. They are here rather than as
+      // controls on the glass because this screen's panel is the stored map's
+      // panel — one screen, two kinds of map — and a fourth panel that appears
+      // on one kind of map and not the other is a screen a reader has to learn
+      // twice.
+      ...(theRunsName === null
+        ? []
+        : [
+            {
+              name: "Read the working of this run",
+              does: "Every call the run made, in order, and every proposal its rules refused.",
+              run: () => {
+                setAway(false);
+                setDock("subject");
+                setSelection({ kind: "generation", id: theRunsName });
+              },
+            },
+          ]),
       {
         name: "Back to the launchpad",
         does: "The same as the link at the top left.",
@@ -631,7 +680,7 @@ export function MapScreen({
       },
     ];
     return made;
-  }, [shop.branches, keys, onLeave]);
+  }, [shop.branches, keys, onLeave, theRunsName]);
 
   const pick = useCallback((id: string) => {
     setFocused(id);
@@ -673,7 +722,18 @@ export function MapScreen({
    */
   const panels: readonly PanelChoice[] = useMemo(
     () => [
-      { name: "subject", label: selection?.kind === "wire" ? "This arrow" : "This claim" },
+      {
+        name: "subject",
+        label:
+          selection?.kind === "wire"
+            ? "This arrow"
+            : // A generated map's own run is read out on this panel too, when
+              // the reader asks for it, and the name has to follow the subject
+              // like the other two.
+              selection?.kind === "generation"
+              ? "The run"
+              : "This claim",
+      },
       {
         name: "branches",
         label: "Branches and changes",
@@ -741,6 +801,9 @@ export function MapScreen({
             world={world}
             selection={selection}
             changeRef={theWayIn}
+            // Where this map came from, when it came from a run of its own.
+            // Absent on a stored example, which nobody generated.
+            {...(generation === undefined ? {} : { generation })}
             {...(intervening ? {} : { onChangeThis: keys.intervene })}
           />
         </>
