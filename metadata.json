@@ -3,7 +3,7 @@
   "checkpoint_id": "01M33KAJH00EWGRH5GVA0GTD97",
   "strategy": "manual-commit",
   "branch": "feat/05-shape-freeze",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": null,
   "sessions": [
     {
@@ -19,20 +19,27 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 374,
-    "cache_creation_tokens": 11779,
-    "cache_read_tokens": 10254856,
-    "output_tokens": 10420,
-    "api_call_count": 15,
+    "input_tokens": 509,
+    "cache_creation_tokens": 19590,
+    "cache_read_tokens": 12730734,
+    "output_tokens": 14348,
+    "api_call_count": 21,
     "subagent_tokens": {
-      "input_tokens": 18,
-      "cache_creation_tokens": 6185,
-      "cache_read_tokens": 3410046,
-      "output_tokens": 5797,
-      "api_call_count": 9
+      "input_tokens": 380,
+      "cache_creation_tokens": 278875,
+      "cache_read_tokens": 53827564,
+      "output_tokens": 130640,
+      "api_call_count": 190
     }
   }
 }
