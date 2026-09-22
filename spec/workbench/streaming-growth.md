@@ -1150,6 +1150,48 @@ And the outline view grows too. Each accepted claim gets its item at the moment 
 same causal order — a reader who never sees the canvas hears the map being built, not a silence
 followed by a finished list.
 
+### B11 — A finished generation is a map like any other
+
+**When the run has stopped and the engine has named the map, the reader can change any claim on it,
+exactly as on the stored example** *(Kent, 2026-09-22: "for completed maps, can we include the
+ability to make changes on the cards? I see that the change this claim button and flow is available
+for the prebuilt map but doesn't exist for the map that's generated live")*.
+
+Nothing new was built for it, and that is the point. A generated map has claims, arrows, dates and
+sources; a branch folds onto it; the engine works every likelihood through it from a seed. The
+server already answers about one — a finished generation is held in memory under **the map's own
+identifier**, for the life of the process, and `/api/worlds`, `/api/worlds/diff` and
+`/api/worlds/conditional` take that identifier wherever they take a stored example's name. So the
+six operations, a branch, the two worlds painted together and the change list are the ones
+[`diff-view.md`](diff-view.md) already describes, on the screen that already draws them.
+
+**Two conditions, and they are two different facts.** The run has *stopped* — however it stopped,
+its own ending or a cap, because either way nothing more is coming. And the map has a *name of its
+own*, which is the `base_id` arriving with the likelihoods: a run that broke, or whose stream was
+dropped, never gets one, and there is nothing for the engine to fold a branch onto. They are the
+same pair **Add a claim** waits for, for the same reasons.
+
+**The way across is a press, never a stop.** A run that ends does not throw the reader onto another
+screen — they watched it build, and the moment it stops is the moment they start reading it. What
+they press is *Change this claim*, in the same place and with the same words as on a stored map:
+the panel that reads out whatever they are pointing at. The map itself is handed over exactly as it
+is on screen, so nothing is fetched again and no number changes as the screens swap.
+
+**Where the map came from travels with it.** *Run details* — the route, the run's own name and its
+seed — is on the panel beside the claim, and the whole working of the run, every refusal in the
+rules' own words among it, is one command away. What stays behind on the run's own screen is what
+is about the *run* rather than about the map: the verdict card, the receipt strip, the replay badge
+and **Add a claim**.
+
+**And the map says how long it will answer.** A generated map is held in memory and written to no
+disk, so a restarted server has forgotten it. The sentence under a branch world on one says so, and
+a reader who comes back to a restarted server and finds it gone has been told rather than left
+hunting for a name they think they mistyped.
+
+**A replayed recording is a generated map too**, and it is the case that matters most: it needs no
+model key, so a reviewer who has configured nothing gets the whole multiverse on a map they watched
+build themselves. Five of the six operations call no model at all.
+
 ---
 
 ## INVARIANTS
