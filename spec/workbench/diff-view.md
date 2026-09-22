@@ -37,7 +37,7 @@ export interface WorldSource {
 }
 ```
 
-*(Amended 2026-09-22: there is a third implementation, `GeneratedMapSource`, for a map somebody watched build itself. It asks the same three routes with the map's own identifier and the run's own seed, and has no bundle to read because a generated map is in no store — see [`streaming-growth.md`](streaming-growth.md) B11.)*
+*(Amended 2026-09-22: there is a third implementation, `GeneratedMapSource`, for a map somebody watched build itself. It asks the same three routes with the map's own identifier and the run's own seed, and has no bundle to read because a generated map is in no store — see [`streaming-growth.md`](streaming-growth.md) B13.)*
 
 Two implementations, and the screen cannot tell which it has. `FixtureWorldSource` reads
 `GET /api/fixtures/hormuz` and uses the fixture's stored `beliefs.model` for the **base** world —
