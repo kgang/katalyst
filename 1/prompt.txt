@@ -1328,3 +1328,7 @@ When adding the anthoripc key, I still see nothing happening immediately after c
 ---
 
 After running it correctly, it looks like the two screens are unified. I can see and properly run the prebuilt map and the replay even though the key was provided
+
+---
+
+Could you please make a small update to the README to include instructions regarding installing the right technologies/getting it running for the first time and the environment settings (anthropic key) required?
