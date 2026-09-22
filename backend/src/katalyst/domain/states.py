@@ -62,8 +62,8 @@ from numpy.typing import NDArray
 
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import PropositionId
-from katalyst.domain.proposition import Proposition
-from katalyst.domain.rates import AddedUp, Carried, ClaimShapes, Persistence, Rates, Spread
+from katalyst.domain.proposition import Persistence, Proposition
+from katalyst.domain.rates import AddedUp, Carried, ClaimShapes, Rates, Spread
 
 NEVER: Final = -1
 """The marker for *this claim never came on*, where a day index is expected."""

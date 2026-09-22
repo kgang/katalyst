@@ -205,6 +205,7 @@ def _claim(
         id=identifier,
         claim=f"The claim called {identifier} comes out true.",
         kind=kind,
+        persistence="event",
         resolution=_resolution(),
         prior=prior,
         beliefs=Beliefs(model=prior),

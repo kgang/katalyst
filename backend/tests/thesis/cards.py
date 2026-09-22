@@ -83,6 +83,7 @@ def a_claim(
         id=identifier,
         claim=f"The claim called {identifier} comes out true.",
         kind=kind,
+        persistence="event",
         resolution=Resolution(
             criteria="A counted threshold over a named window, as the venue states it.",
             source="The publication that actually publishes this number.",

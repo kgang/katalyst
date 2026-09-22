@@ -42,6 +42,7 @@ from katalyst.domain.proposition import Proposition
 
 ViolationCode = Literal[
     "missing_resolution",
+    "claim_without_persistence",
     "missing_rationale",
     "documented_without_source",
     "cycle",
@@ -62,9 +63,9 @@ ViolationCode = Literal[
     "edit_not_applicable",
     "worlds_not_comparable",
 ]
-"""The twenty things that can be wrong: fifteen faults in a map, five refusals.
+"""The twenty-one things that can be wrong: sixteen faults in a map, five refusals.
 
-The first fifteen are what `validate` finds in a map. The last five are what our
+The first sixteen are what `validate` finds in a map. The last five are what our
 own code refuses to do, and no map can carry any of them. Four are about an
 *edit*, found when a branch is folded onto a map:
 
@@ -117,7 +118,9 @@ class Violation(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    code: ViolationCode = Field(description="Which rule was broken. One of twenty stable strings.")
+    code: ViolationCode = Field(
+        description="Which rule was broken. One of twenty-one stable strings."
+    )
     subject: str = Field(
         description=(
             "The identifier of the thing at fault: a proposition id, a link id, the graph's own "
@@ -160,6 +163,7 @@ def validate(graph: Graph) -> list[Violation]:
 
     rules_in_order = (
         _claims_say_how_they_are_judged(graph),
+        _claims_say_which_kind_of_truth_they_are(graph),
         _exactly_one_starting_claim(graph),
         _map_ends_somewhere_actionable(graph),
         _tradeable_claims_name_an_instrument(graph),
@@ -251,7 +255,52 @@ def _claims_say_how_they_are_judged(graph: Graph) -> list[Violation]:
     return found
 
 
-# --- Rule 2 — exactly one claim is the hypothesis the user started from -----
+# --- Rule 2 — every claim says whether it happens once or holds for a while --
+
+
+def _claims_say_which_kind_of_truth_they_are(graph: Graph) -> list[Violation]:
+    """Find claims that do not say whether they are an event or a state.
+
+    **Every claim says which kind of truth it is, and none is given one we guessed.**
+    An `event` happens once and stays happened; a `state` holds over a stretch of
+    time and can stop holding. The whole of the arithmetic downstream turns on the
+    difference — an arrow that keeps pushing for as long as its cause is true can
+    only leave a state — so a claim that does not say is a claim nobody can work
+    through, and it is refused rather than quietly treated as an event. Decision
+    record 0017; Kent settled it on 2026-09-21.
+
+    Checked here on purpose even though the claim's own class requires the field,
+    so this can never fire for a map assembled through our own classes. It is the
+    net under maps that arrive some other way: a hand-written stored example, a
+    recording read back from before the field existed, a future path that builds
+    claims from raw values. The same net, and for the same reason, as the rule
+    about a likelihood sitting inside its own range.
+
+    Args:
+        graph: The map to read.
+
+    Returns:
+        One violation per claim that does not say which kind of truth it is.
+    """
+    found: list[Violation] = []
+    for proposition in sorted(graph.propositions, key=lambda one: one.id):
+        said: object = getattr(proposition, "persistence", None)
+        if said in ("event", "state"):
+            continue
+        found.append(
+            Violation(
+                code="claim_without_persistence",
+                subject=proposition.id,
+                message=(
+                    f"The claim {_quoted(proposition.claim)} does not say whether it "
+                    "happens once and stays happened, or holds for a while and can stop."
+                ),
+            )
+        )
+    return found
+
+
+# --- Rule 3 — exactly one claim is the hypothesis the user started from -----
 
 
 def _exactly_one_starting_claim(graph: Graph) -> list[Violation]:
@@ -303,7 +352,7 @@ def _exactly_one_starting_claim(graph: Graph) -> list[Violation]:
     return []
 
 
-# --- Rule 3 — the map ends somewhere you can act on ------------------------
+# --- Rule 4 — the map ends somewhere you can act on ------------------------
 
 
 def _map_ends_somewhere_actionable(graph: Graph) -> list[Violation]:
@@ -329,7 +378,7 @@ def _map_ends_somewhere_actionable(graph: Graph) -> list[Violation]:
     ]
 
 
-# --- Rules 4 and 5 — what each of the two endings must carry ---------------
+# --- Rules 5 and 6 — what each of the two endings must carry ---------------
 
 
 def _tradeable_claims_name_an_instrument(graph: Graph) -> list[Violation]:
@@ -384,7 +433,7 @@ def _untradeable_claims_say_why(graph: Graph) -> list[Violation]:
     ]
 
 
-# --- Rules 6 and 7 — what every arrow must carry ---------------------------
+# --- Rules 7 and 8 — what every arrow must carry ---------------------------
 
 
 def _arrows_say_why(graph: Graph, claims: dict[PropositionId, Proposition]) -> list[Violation]:
@@ -444,7 +493,7 @@ def _arrows_claiming_evidence_cite_it(
     ]
 
 
-# --- Rule 8 — both ends of every arrow are on this map ---------------------
+# --- Rule 9 — both ends of every arrow are on this map ---------------------
 
 
 def _arrows_join_claims_on_this_map(
@@ -484,7 +533,7 @@ def _arrows_join_claims_on_this_map(
     return found
 
 
-# --- Rule 9 — one arrow between any two claims -----------------------------
+# --- Rule 10 — one arrow between any two claims ----------------------------
 
 
 def _one_arrow_between_any_two_claims(
@@ -538,7 +587,7 @@ def _one_arrow_between_any_two_claims(
     return found
 
 
-# --- Rule 10 — no loops, once the feedback arrows are set aside ------------
+# --- Rule 11 — no loops, once the feedback arrows are set aside ------------
 
 
 def _walkable_map(
@@ -683,7 +732,7 @@ def _no_loops_once_feedback_is_set_aside(
     return found
 
 
-# --- Rule 10 — every feedback arrow takes time ----------------------------
+# --- Rule 12 — every feedback arrow takes time ----------------------------
 
 
 def _feedback_arrows_take_time(
@@ -717,7 +766,7 @@ def _feedback_arrows_take_time(
     ]
 
 
-# --- Rules 11 and 12 — a shape and its numbers agree, checked both ways ----
+# --- Rules 13 and 14 — a shape and its numbers agree, checked both ways ---
 
 
 def _half_lives_belong_to_pushes_that_fade(
@@ -791,7 +840,7 @@ def _pushes_that_fade_say_how_fast(
     ]
 
 
-# --- Rule 13 — every likelihood sits inside its own range ------------------
+# --- Rule 15 — every likelihood sits inside its own range ------------------
 
 
 def _out_of_range(belief: Belief) -> bool:

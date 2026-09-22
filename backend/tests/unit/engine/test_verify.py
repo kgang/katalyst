@@ -53,6 +53,7 @@ def a_claim_nobody_reaches(claim: str = SOMEWHERE_ELSE) -> Proposition:
         id="WANTED",
         claim=claim,
         kind="event",
+        persistence="event",
         resolution=Resolution(
             criteria="A test two people reading it would agree on.",
             source="A named judge.",

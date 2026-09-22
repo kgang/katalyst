@@ -37,7 +37,6 @@ dividing by nothing, so it is carried across as a step, which is that same curve
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
 from datetime import date, timedelta
 
 import numpy
@@ -49,7 +48,6 @@ from katalyst.domain import (
     Link,
     Persistence,
     Proposition,
-    PropositionId,
     Resolution,
     stated_chance_with,
 )
@@ -62,25 +60,17 @@ A_PLAIN_TEST = "A check two readers of it would agree on."
 """How every generated claim is settled. The maps are drawn, not argued."""
 
 
-def a_map_the_oracle_reads(
-    graph: Graph,
-    day_zero: date,
-    persistence: Mapping[PropositionId, Persistence] | None = None,
-) -> Map:
+def a_map_the_oracle_reads(graph: Graph, day_zero: date) -> Map:
     """Write down what the time-enumerating oracle has to be told about one of the engine's maps.
 
     Args:
         graph: The map, as the engine holds it.
         day_zero: The day the window starts on, from which every deadline is
             counted. This layer reads no clock.
-        persistence: Which claims hold over a stretch of time and can stop. A claim
-            not named is an event, which is what every claim on a map is until the
-            flip puts the field on the claim itself.
 
     Returns:
         The same map in the oracle's dialect.
     """
-    kinds = dict(persistence or {})
     claims = {one.id: one for one in graph.propositions}
     return {
         name: Claim(
@@ -91,15 +81,13 @@ def a_map_the_oracle_reads(
                 for arrow in sorted(graph.links, key=lambda link: link.id)
                 if arrow.target == name and not arrow.reflexive
             ),
-            persistence=kinds.get(name, "event"),
+            persistence=one.persistence,
         )
         for name, one in claims.items()
     }
 
 
-def a_graph_the_engine_reads(
-    name: str, oracle_map: Map, day_zero: date
-) -> tuple[Graph, dict[PropositionId, Persistence]]:
+def a_graph_the_engine_reads(name: str, oracle_map: Map, day_zero: date) -> Graph:
     """Build one of the engine's maps from a map the oracle's own generator drew.
 
     Every stated range is a **point** — the same number at both ends — so a version
@@ -112,7 +100,7 @@ def a_graph_the_engine_reads(
         day_zero: The day the window starts on.
 
     Returns:
-        The map the engine reads, and which of its claims are states.
+        The map the engine reads, each claim saying which kind of truth it is.
     """
     order = sorted(oracle_map)
     claims = tuple(
@@ -120,6 +108,7 @@ def a_graph_the_engine_reads(
             id=who,
             claim=f"The claim written down under the name {who}, on the map {name}.",
             kind="hypothesis" if who == order[0] else "event",
+            persistence=_a_kind_of_truth(oracle_map[who].persistence),
             resolution=Resolution(
                 criteria=A_PLAIN_TEST,
                 source="The publication that would carry it.",
@@ -147,11 +136,22 @@ def a_graph_the_engine_reads(
         for who in order
         for arrow in oracle_map[who].causes
     )
-    graph = Graph(id=name, propositions=claims, links=arrows, hypothesis_id=order[0])
-    states: dict[PropositionId, Persistence] = {
-        who: "state" for who in order if oracle_map[who].persistence == "state"
-    }
-    return graph, states
+    return Graph(id=name, propositions=claims, links=arrows, hypothesis_id=order[0])
+
+
+def _a_kind_of_truth(said: str) -> Persistence:
+    """Read the oracle's own word for which kind of truth a claim is.
+
+    The oracle writes it as a plain string, because its map shapes are its own and
+    carry no types from the engine. This is the one place the two words meet.
+
+    Args:
+        said: The oracle's word.
+
+    Returns:
+        `state` where the oracle says so, and `event` everywhere else.
+    """
+    return "state" if said == "state" else "event"
 
 
 def _one_arrow(arrow: Link, own_chance_of_the_target: float) -> Arrow:

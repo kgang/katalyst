@@ -37,12 +37,11 @@ from numpy.typing import NDArray
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import PropositionId
 from katalyst.domain.link import Link
-from katalyst.domain.proposition import Proposition
+from katalyst.domain.proposition import Persistence, Proposition
 from katalyst.domain.rates import (
     AddedUp,
     ClaimShapes,
     Drawn,
-    Persistence,
     Pin,
     Rates,
     Window,
@@ -65,17 +64,6 @@ NOTHING_PINNED: Mapping[PropositionId, Pin] = MappingProxyType({})
 
 A frozen mapping rather than an empty dictionary, so that a default cannot be
 written into by accident and quietly outlive the call that did it.
-"""
-
-EVERY_CLAIM_IS_AN_EVENT: Mapping[PropositionId, Persistence] = MappingProxyType({})
-"""Nothing on the map holds over a stretch of time: every claim happens once and stays happened.
-
-**Dated 2026-09-22 and temporary.** Which kind of truth a claim is becomes a field
-on the claim itself at the flip (decision record 0017, `persistence` required on
-every claim), and this argument goes with the flip that adds it. Until then the
-code that mints a claim from a recorded proposal makes every one an event, so the
-ordinary case is that this mapping is empty and a claim not named in it is an
-event.
 """
 
 _NOT_ZERO: Final = 1e-12
@@ -356,7 +344,6 @@ def forward_pass(
     drawn: Drawn,
     *,
     pinned: Mapping[PropositionId, Pin] = NOTHING_PINNED,
-    persistence: Mapping[PropositionId, Persistence] = EVERY_CLAIM_IS_AN_EVENT,
 ) -> Forward:
     """Work out, in one pass over the map, when every claim happens and its small yes/no table.
 
@@ -380,9 +367,6 @@ def forward_pass(
         drawn: One draw per version of every number a person stated.
         pinned: The claims an edit fixed a value on, and which verb fixed it. Only
             the *Suppose this is true* entries change this pass.
-        persistence: Which claims hold over a stretch of time rather than happening
-            once. A claim not named here is an event. **Dated 2026-09-22 and
-            temporary:** the flip puts this on the claim itself.
 
     Returns:
         The finished pass: the order, each claim's causes, its times, its yes/no
@@ -415,7 +399,7 @@ def forward_pass(
         fixed = pinned.get(name)
         supposed = fixed if fixed is not None and fixed.kind == "do" else None
         arrows = () if supposed is not None else into[name]
-        kind = persistence.get(name, "event")
+        kind = claim.persistence
 
         with_this_cause = {
             position: drawn.with_this_cause[arrow.id] for position, arrow in enumerate(arrows)
@@ -423,7 +407,7 @@ def forward_pass(
         shapes = shapes_of(
             claim,
             arrows,
-            {arrow.id: persistence.get(arrow.source, "event") for arrow in arrows},
+            {arrow.id: claims[arrow.source].persistence for arrow in arrows},
             {arrow.id: day_of[arrow.source] for arrow in arrows},
             window,
             persistence=kind,

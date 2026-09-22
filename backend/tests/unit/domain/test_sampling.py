@@ -51,6 +51,7 @@ def _claim(identifier: str, *, prior: float = 0.3, days: int = 60) -> Propositio
         id=identifier,
         claim=f"The claim written down under the name {identifier}.",
         kind="event",
+        persistence="event",
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",
@@ -115,6 +116,25 @@ def _drawn(
     )
 
 
+def _which_kinds_of_truth(graph: Graph, persistence: Mapping[str, Persistence] | None) -> Graph:
+    """Write which kind of truth each named claim is onto the map itself.
+
+    The pass reads `persistence` off the claim (decision record 0017), so a test
+    that wants a state writes it on the map rather than handing it in beside it.
+    A claim not named keeps whatever it was built with.
+    """
+    if not persistence:
+        return graph
+    return graph.model_copy(
+        update={
+            "propositions": tuple(
+                one.model_copy(update={"persistence": persistence.get(one.id, one.persistence)})
+                for one in graph.propositions
+            )
+        }
+    )
+
+
 def _pass(
     graph: Graph,
     *,
@@ -125,13 +145,13 @@ def _pass(
     persistence: Mapping[str, Persistence] | None = None,
 ) -> tuple[Window, Forward]:
     """One forward pass over a map, and the window it was cut on."""
-    window = window_of(graph, DAY_ZERO, slices=slices)
+    told = _which_kinds_of_truth(graph, persistence)
+    window = window_of(told, DAY_ZERO, slices=slices)
     forward = forward_pass(
-        graph,
+        told,
         window,
-        _drawn(graph, versions=versions, with_cause=with_cause),
+        _drawn(told, versions=versions, with_cause=with_cause),
         pinned=dict(pinned or {}),
-        persistence=dict(persistence or {}),
     )
     return window, forward
 

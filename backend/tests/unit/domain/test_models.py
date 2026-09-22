@@ -73,6 +73,7 @@ def a_proposition(
         id=identifier,
         claim=claim,
         kind=kind,  # type: ignore[arg-type]
+        persistence="event",
         resolution=a_resolution(),
         prior=a_belief(),
         beliefs=Beliefs(model=a_belief()),
@@ -208,6 +209,7 @@ def test_prior_is_owned_by_the_model() -> None:
             id="H",
             claim="The Strait of Hormuz reopens.",
             kind="hypothesis",
+            persistence="event",
             resolution=a_resolution(),
             prior=a_belief("user"),
             beliefs=Beliefs(model=a_belief("model")),

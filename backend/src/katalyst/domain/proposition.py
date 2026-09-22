@@ -40,6 +40,25 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from katalyst.domain.belief import Belief, Beliefs
 from katalyst.domain.ids import PropositionId
 
+Persistence = Literal["event", "state"]
+"""Which kind of truth a claim is: something that happens, or something that holds.
+
+`event` — it happens once and stays happened. *The strait reopens* is an event:
+once it has reopened, it has reopened, and no later news un-happens it.
+`state` — it holds over a stretch of time and can stop holding. *The strait stays
+open to commercial transit through 1 November* is a state: it can be true today
+and false next week.
+
+The difference is not a nicety. An arrow that keeps pushing for as long as its
+cause goes on being true — a `sustain` arrow — can only leave a state, because
+only a state has a stretch for it to read. And a claim that a later event pushes
+back on falls as a state and stands as an event: a strike on Iran lowers *the
+strait stays open*, while leaving *the strait reopened* exactly where it was.
+
+Decision record 0017 is where this comes from, and it is the reason nothing on
+this product retracts itself any more.
+"""
+
 
 class Resolution(BaseModel):
     """How a claim gets settled: the test, who applies it, and by when.
@@ -259,6 +278,14 @@ class Proposition(BaseModel):
             "What this proposition is for: `hypothesis` is the user's root input, "
             "`event` a step in the middle, `market` an ending that names an "
             "instrument, `not_tradeable` an ending that names why there is none."
+        )
+    )
+    persistence: Persistence = Field(
+        description=(
+            "Which kind of truth this claim is: `event` for something that happens "
+            "once and stays happened, `state` for something that holds over a stretch "
+            "of time and can stop holding. Required on every claim — a map that omits "
+            "it is refused rather than given a kind we guessed."
         )
     )
     resolution: Resolution = Field(description="How and when this claim gets settled, and by whom.")

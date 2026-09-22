@@ -130,6 +130,7 @@ TERMINAL_KINDS: tuple[str, ...] = ("market", "not_tradeable")
 
 BREAKABLE_RULES: tuple[str, ...] = (
     "missing_resolution",
+    "claim_without_persistence",
     "belief_out_of_range",
     "no_hypothesis",
     "no_terminal",
@@ -154,6 +155,7 @@ earlier damage invented.
 
 INDEPENDENTLY_BREAKABLE: tuple[str, ...] = (
     "missing_resolution",
+    "claim_without_persistence",
     "belief_out_of_range",
     "missing_rationale",
     "documented_without_source",
@@ -608,6 +610,7 @@ def propositions(
         id=chosen_id,
         claim=draw(st.sampled_from(CLAIM_SENTENCES)),
         kind=chosen_kind,
+        persistence="event",
         resolution=draw(resolutions()),
         prior=draw(priors if priors is not None else beliefs(owner="model")),
         beliefs=draw(belief_sets()),
@@ -897,6 +900,25 @@ def _break_missing_resolution(draw: Any, graph: Graph) -> Graph:
     return _with_claim(graph, victim.model_copy(update={"resolution": resolution}))
 
 
+def _break_claim_without_persistence(draw: Any, graph: Graph) -> Graph:
+    """Take away one claim's word for which kind of truth it is.
+
+    Built with `model_construct`, the one way of making a model without running its
+    checks, because the claim's own class requires the field. That is the point of
+    the rule: it is the net under maps that arrive some other way than through our
+    own classes — a hand-written stored example, or a recording made before the
+    field existed.
+    """
+    victim = draw(st.sampled_from(graph.propositions))
+    # Read off the claim's own attributes rather than `model_dump`, which would
+    # turn every nested shape into a plain dictionary and break rules this one is
+    # not about.
+    kept = {
+        name: getattr(victim, name) for name in Proposition.model_fields if name != "persistence"
+    }
+    return _with_claim(graph, Proposition.model_construct(**kept))
+
+
 def _break_belief_out_of_range(draw: Any, graph: Graph) -> Graph:
     """Put a likelihood on one claim that its own class would have refused.
 
@@ -1141,6 +1163,7 @@ def _break_not_tradeable_without_reason(draw: Any, graph: Graph) -> Graph:
 
 BREAKERS = {
     "missing_resolution": _break_missing_resolution,
+    "claim_without_persistence": _break_claim_without_persistence,
     "belief_out_of_range": _break_belief_out_of_range,
     "no_hypothesis": _break_no_hypothesis,
     "no_terminal": _break_no_terminal,
