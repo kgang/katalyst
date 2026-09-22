@@ -764,6 +764,37 @@ export interface components {
             does_not_know: components["schemas"]["WhatThisDoesNotKnow"];
         };
         /**
+         * CardRefused
+         * @description One thing this route will not do, the field at fault, and what it says.
+         *
+         *     A refusal is never a blank: it names a stable code a screen can switch on, the
+         *     field the reader should look at, and one plain sentence. Nothing is silently
+         *     repaired, and every fault the request has comes back together — a form that
+         *     reveals one mistake at a time is a form nobody finishes.
+         *
+         *     **A branch that does not fit the map is a different shape**, and deliberately:
+         *     it comes back as the list of violations the world routes already give, naming a
+         *     `subject` and a `message`, because that fault is about a claim or an arrow and
+         *     not about a field a reader can look at.
+         */
+        CardRefused: {
+            /**
+             * Code
+             * @description Which rule this is, from the closed list of nine.
+             */
+            code: ("stop_on_the_wrong_side" | "target_not_beyond_entry" | "horizon_after_the_claim" | "risk_budget_out_of_range" | "price_outside_the_contract" | "first_touch_on_a_contract") | ("unknown_ending" | "the_ending_names_no_trade" | "horizon_outside_the_window");
+            /**
+             * Field
+             * @description The field at fault, named as the reader sees it.
+             */
+            field: string;
+            /**
+             * Sentence
+             * @description What the screen prints.
+             */
+            sentence: string;
+        };
+        /**
          * CardRequest
          * @description What it takes to build one card: a map, a branch, a seed, an ending, and an exit.
          *
@@ -793,7 +824,7 @@ export interface components {
             exit: components["schemas"]["ExitAsked"];
             /**
              * Shocks
-             * @description Suppositions the reader placed on top of the branch above, each named in their own words. The card reports what each did to the position and **no probability**: supposing something is not a forecast.
+             * @description Suppositions the reader placed **on top of the branch above**, each named in their own words. Each one's edits are folded after that branch's, so what is reported is what the shock did and not what the branch and the shock did together; a shock's own `parent` is therefore not read, because the branch in force is its parent by construction. With no branch in force there is nothing to place it on top of, so the shock is folded as it stands, parent and all. The card reports what each did to the position and **no probability**: supposing something is not a forecast.
              * @default []
              */
             shocks: components["schemas"]["Branch"][];
@@ -1291,33 +1322,33 @@ export interface components {
         ExitAsked: {
             /**
              * Entry
-             * @description The price they entered at, in the instrument's own units.
+             * @description The price you entered at, in the instrument's own units. Yours.
              */
             entry: number;
             /**
              * Stop
-             * @description The price at which they get out for a loss. Theirs.
+             * @description The price at which you get out for a loss. Yours, and never derived.
              */
             stop: number;
             /**
              * Target
-             * @description The price at which they get out for a gain. Theirs.
+             * @description The price at which you get out for a gain. Yours, and never derived.
              */
             target: number;
             /**
              * Horizon
              * Format: date
-             * @description The day by which they expect to be out. The two first-touch shares are read to this day and no further: shares over a window nobody named are two numbers nobody can check.
+             * @description The day you expect to be out. The two first-touch shares are read to this day and no further, because reading to the end of whatever window the drawn worlds carry answers a question nobody asked.
              */
             horizon: string;
             /**
              * Risk Budget
-             * @description The share of their capital they are prepared to lose here. The size it implies is worked out from it and the distance to their stop, and is never a recommendation.
+             * @description The share of your capital you are prepared to lose on this trade. What it implies about size is arithmetic on it and your stop, and is never a recommendation. Bounded by the position form rather than here, so that a reader who types a hundred instead of a hundredth is told what a risk budget is in the form's own words, beside every other fault at once.
              */
             risk_budget: number;
             /**
              * Daily Move
-             * @description How far the instrument moves in a day, in price units — one standard deviation of a day's change. The reader's own number today.
+             * @description How far the instrument moves in a day, in price units — one standard deviation of a day's change. Yours today: nothing in this program measures it.
              */
             daily_move: number;
         };
@@ -2243,42 +2274,15 @@ export interface components {
             reconcile: "marginalize";
         };
         /**
-         * Refused
-         * @description One reason a card could not be built: a stable code, the thing at fault, a sentence.
-         *
-         *     Two different kinds of fault arrive here and both are shaped the same way, so a
-         *     screen has one thing to read. A **branch that does not fit the map** names the
-         *     claim or arrow at fault. A **form the reader filled in** names the field they
-         *     should look at. Neither is ever repaired silently and neither arrives one at a
-         *     time: every reason comes back together.
-         */
-        Refused: {
-            /**
-             * Code
-             * @description Which rule this is, as a stable string a screen can switch on.
-             */
-            code: string;
-            /**
-             * Subject
-             * @description What is at fault: the identifier of a claim or an arrow for a branch that does not fit, or the name of a form field as the reader sees it.
-             */
-            subject: string;
-            /**
-             * Message
-             * @description One plain sentence the person reads.
-             */
-            message: string;
-        };
-        /**
          * RefusedCard
-         * @description Every reason a card was refused, in a settled order, never just the first.
+         * @description Every reason a card could not be built, in a settled order, never just the first.
          */
         RefusedCard: {
             /**
              * Detail
-             * @description Every reason the card could not be built, in a settled order.
+             * @description Every reason at once, never just the first one found.
              */
-            detail: components["schemas"]["Refused"][];
+            detail: components["schemas"]["CardRefused"][];
         };
         /**
          * RefusedEdit
@@ -3724,13 +3728,20 @@ export interface operations {
                     "application/json": components["schemas"]["Card"];
                 };
             };
-            /** @description The request cannot be carried out as written — either the branch does not fit the map, or the exit the reader typed is not one a position can be taken on. The answer lists every reason at once, each with a stable code a screen can switch on, the thing at fault, and one plain sentence. */
+            /** @description No example is stored under that name. The answer is one sentence naming the examples this program does ship with. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A request or a form the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RefusedCard"];
+                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedCard"];
                 };
             };
         };
@@ -3757,13 +3768,20 @@ export interface operations {
                     "application/json": components["schemas"]["Export"];
                 };
             };
-            /** @description The request cannot be carried out as written — either the branch does not fit the map, or the exit the reader typed is not one a position can be taken on. The answer lists every reason at once, each with a stable code a screen can switch on, the thing at fault, and one plain sentence. */
+            /** @description No example is stored under that name. The answer is one sentence naming the examples this program does ship with. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A request or a form the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RefusedCard"];
+                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedCard"];
                 };
             };
         };
@@ -3791,13 +3809,20 @@ export interface operations {
                     "text/markdown": string;
                 };
             };
-            /** @description The request cannot be carried out as written — either the branch does not fit the map, or the exit the reader typed is not one a position can be taken on. The answer lists every reason at once, each with a stable code a screen can switch on, the thing at fault, and one plain sentence. */
+            /** @description No example is stored under that name. The answer is one sentence naming the examples this program does ship with. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A request or a form the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RefusedCard"];
+                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedCard"];
                 };
             };
         };
