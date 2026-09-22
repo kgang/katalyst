@@ -23,23 +23,16 @@ state this product refuses to show.
 
 What this file must never do
 ----------------------------
-- Never decide that something moved by asking whether two ranges overlap. The
-  ranges answer a different question — how sure we are of each world's own
-  number — and two wide ranges can overlap while the difference between them is
-  tight and all one way. The move is read off the **paired** difference: version
-  7 of one world against version 7 of the other, which cancels the elicitation
-  noise because both versions were built from the same numbers.
-- Never count the versions one way for the number and another way for the
-  direction. **The direction is read with the same weights the number was read
-  with.** When something was observed, a version counts by the share of its
-  worlds that survived, so a version with no surviving world counts for nothing
-  in the number and must not vote on the direction either. Let it vote and a
-  version that contributed nothing to either number argues about which way they
-  moved.
-- Never fold how wide a range is, or how much the versions agreed, into the
-  rank. "This moved a lot", "we are unsure how much" and "we are sure which way"
-  are three separate facts a trader weighs separately, and one blended score
-  hides which of them is talking.
+- Never decide that something moved by anything but the move. A claim is
+  `shifted` when the second world's number is at least `0.005` away from the
+  first world's on the claim's own resolve-by day, and on nothing else. There
+  used to be a second half to that test — did at least nine versions in ten of
+  the map move the same way — and it went with the versions (decision record
+  0028, Kent's row R48): there is one reading of the map now, so a share of the
+  versions is a share of one thing.
+- Never fold anything but the size of the move and the backing behind it into
+  the rank. "This moved a lot" and "the route it travelled is well-backed" are
+  the two factors, and there are only two.
 - Never call a small number `killed`. `killed` means the claim was forced false,
   and nothing else. A claim whose likelihood fell to `.02` moved a long way; it
   is `shifted`, and saying it was cut would tell the user their argument was
@@ -68,21 +61,7 @@ from katalyst.domain.ids import BranchId, PropositionId
 from katalyst.domain.intervention import Do
 from katalyst.domain.link import Link, Provenance
 from katalyst.domain.patch import apply
-
-# `_band` is borrowed from the file that works the likelihoods through, so that
-# the width this file reports on a given day and the width a tile shows on that
-# day are produced by the very same arithmetic. The noise correction inside it is
-# subtle enough that a second copy would drift, and the two numbers disagreeing
-# would be a state no reader could account for.
-from katalyst.domain.propagation import (
-    Numbers,
-    Versions,
-    World,
-    _band,
-    engine_that_built,
-    propagate,
-    versions_of,
-)
+from katalyst.domain.propagation import World, propagate
 from katalyst.domain.proposition import Proposition
 
 # `_quoted` is borrowed from the file that decides whether a map is valid, so
@@ -94,9 +73,8 @@ from katalyst.domain.validity import TERMINAL_KINDS, Violation, _quoted
 ClaimState = Literal["unchanged", "shifted", "added", "killed"]
 """What happened to one claim between two worlds, in one word.
 
-`unchanged` — it is in both worlds and it fails either half of the test below.
-`shifted` — it is in both, it moved by at least 0.005 on its own resolve-by day,
-and it moved the same way in at least 90% of the versions of the map.
+`unchanged` — it is in both worlds and it moved by less than 0.005.
+`shifted` — it is in both, and it moved by at least 0.005 on its own resolve-by day.
 `added` — it is in the second world and not in the first.
 `killed` — it is in both, and the second world forces it false. Never "its number
 got small", and never "nothing reaches it from the hypothesis any more", which is
@@ -106,36 +84,21 @@ a fact about the path rather than about the claim.
 MOVED_AT_LEAST = 0.005
 """How far a claim has to move before the move counts as a move at all."""
 
-AGREEING_AT_LEAST = 0.90
-"""How many of the versions have to move the same way before the move counts."""
-
 UnchangedBecause = Literal["under_the_floor", "versions_disagree"]
-"""Which half of the moved-at-all test an `unchanged` claim failed, in one word.
+"""Why a claim reads `unchanged`, in one word.
 
-`under_the_floor` — the claim did move, but by less than `MOVED_AT_LEAST`.
-`versions_disagree` — the move cleared the floor, and fewer than
-`AGREEING_AT_LEAST` of the versions of the map moved that way.
+`under_the_floor` — the claim did move, but by less than `MOVED_AT_LEAST`. **It is
+the only answer this engine can give.**
+`versions_disagree` — the move cleared the floor and fewer than nine versions of
+the map in ten moved that way. **Never written.** The versions were cut on
+2026-09-22 (decision record 0028), and a share of them is a share of nothing; the
+word stays on the wire, unreachable, until one follow-up after the browser round
+takes it off with the two range fields.
 
-**The floor is read first**, so a claim that fails both halves says
-`under_the_floor`. Something has to choose, and the floor is the cheaper fact to
-act on: a move nobody would notice needs no second sentence about direction.
-
-Both constants live in this file and on no wire, so without this word a reader is
-told only that the engine says nothing moved. It is a fact about how the number
-was **read**, exactly as `moved_only_by_reweighting` is, and it never becomes a
-fifth state.
+The floor lives in this file and on no wire, so without this word a reader is told
+only that the engine says nothing moved. It is a fact about how the number was
+**read**, and it never becomes a fifth state.
 """
-
-SWEEP_VERSIONS = 250
-"""The outer loop a one-at-a-time sweep runs at.
-
-A sweep is one whole run of the engine per claim, which at the shipped budget
-would be sixteen thousand worlds per flip. A quarter of the versions is enough to
-say which way each flip pushes each ending, and every row says so.
-"""
-
-SWEEP_WORLDS = 8
-"""The inner loop a one-at-a-time sweep runs at, which is the shipped one."""
 
 PROVENANCE_WEIGHT: Mapping[Provenance, float] = MappingProxyType(
     {
@@ -178,26 +141,23 @@ class ClaimDiff(BaseModel):
     already refers to. So a claim's state is about the number the reader is
     looking at, and not about some other day.
 
-    `agreement` is carried on every claim both worlds hold, not only the ones
-    that moved, so a reader — or a test — can check the rule that decided the
-    state without recomputing anything. It is read with the same weights the two
-    numbers above were read with, so a version that counted for nothing in them
-    does not vote on which way they moved.
-
     A claim still supposed on its own resolve-by day carries the stored 1 (or 0,
     where it was supposed false) so that the arithmetic stays ordinary. **No
     surface prints that number**: every reader looks at the world's `states`
     first and writes the word *Supposed* where the number would go.
 
-    `unchanged_because` says which half of the moved-at-all test an `unchanged`
-    claim failed. It is here because the floor and the bar are constants inside
-    this file and appear on no wire, so a reader who is only told *unchanged*
-    cannot tell "it barely moved" from "nobody agrees which way it went" — and
-    working it out at the other end would mean a second copy of both constants,
-    disagreeing with these ones. Where `moved_only_by_reweighting` is also true
-    it is the fuller answer and is the one to show: such a claim always says
-    `versions_disagree`, because every version that counts moved by exactly
-    nothing, and *nothing agreed with the direction* is a thin way to put that.
+    `unchanged_because` says why an `unchanged` claim is unchanged. It is here
+    because the floor is a constant inside this file and appears on no wire, so a
+    reader who is only told *unchanged* cannot tell "it barely moved" from
+    anything else — and working it out at the other end would mean a second copy
+    of the floor, disagreeing with this one.
+
+    **Two fields on this shape are now always the same value**, and both say so
+    in their own description: `agreement` is always nothing at all, and
+    `moved_only_by_reweighting` is always false. Both were about the two thousand
+    versions of the map, which were cut on 2026-09-22 (decision records 0028 and
+    0016). They stay on the wire until one follow-up after the browser round,
+    because their readers are that round's files.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -226,31 +186,28 @@ class ClaimDiff(BaseModel):
     )
     agreement: float | None = Field(
         description=(
-            "The share of versions of the map that moved the same way as the move above, "
-            "each version counted by as much as it counted for the two numbers. Nothing at "
-            "all when there is no direction to report: when only one of the two worlds "
-            "holds the claim, and when no version of the map counted in both numbers. On "
-            "screen this column is headed 'same direction'."
+            "Always nothing at all. It was the share of the versions of the map that "
+            "moved the same way as the move above, and there is one version (decision "
+            "record 0028). Kept on the wire, always absent, until the browser round "
+            "closes."
         )
     )
     moved_only_by_reweighting: bool = Field(
         description=(
-            "True when the move above came from nothing but the observation changing how "
-            "much each version counts: the claim is in both worlds, it moved by at least "
-            "0.005, and not one version that counts moved at all. Only an observation can "
-            "produce it, and the Inspector says so in one sentence."
+            "Always false. It was true when a claim's whole move came from an observation "
+            "changing how much each version of the map counted, and no version counts for "
+            "anything any more (decision record 0016: there is no inner loop for a world "
+            "to survive). Kept on the wire, always false, until the browser round closes."
         )
     )
     unchanged_because: UnchangedBecause | None = Field(
         description=(
-            "Which half of the moved-at-all test this claim failed, in one word: "
-            "'under_the_floor' when the move is smaller than the floor, "
-            "'versions_disagree' when it cleared the floor and too few versions of the map "
-            "moved that way. The floor is read first, so a claim that fails both says "
-            "'under_the_floor'. Nothing at all unless the claim is 'unchanged', and nothing "
-            "when there is no test to fail: a claim only one world holds, and a claim no "
-            "version counted in both numbers, whose absent 'agreement' already says there "
-            "was no direction to read."
+            "Why this claim is unchanged, in one word: 'under_the_floor', because the "
+            "move is smaller than the floor, which is the only answer this engine gives. "
+            "The other word, 'versions_disagree', is never written — it was about the two "
+            "thousand versions of the map, and there is one. Nothing at all unless the "
+            "claim is 'unchanged', and nothing where there is no move to measure: a claim "
+            "only one of the two worlds holds."
         )
     )
 
@@ -264,11 +221,11 @@ class DeltaRow(BaseModel):
     example reading a row on its distant resolve-by day shows about two thirds of
     the move and calls it the answer.
 
-    `range_width` and `agreement` are **columns, never factors**. They answer two
-    different questions — how unsure are we of this number, and how sure are we of
-    its direction — and a trader weighs them separately from how big the move is.
-    Multiplying either into the rank would bury exactly the wide claims that are
-    worth researching, and would hide which of the three facts is talking.
+    **`range_width` and `agreement` are both always nought**, and each says so in
+    its own description. They were the width of a range and a share of the two
+    thousand versions of the map, and Kent cut both on 2026-09-22 (decision record
+    0028). They stay on the wire until one follow-up after the browser round,
+    because their readers are that round's files.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -293,16 +250,17 @@ class DeltaRow(BaseModel):
     )
     range_width: float = Field(
         description=(
-            "How wide the second world's own range on this claim is on that day — the same "
-            "width its tile shows, so the list and the tile can never disagree about how "
-            "firm a number is. On screen this column is headed 'how firm'."
+            "Always nought, and truthfully so: no number on this product carries a range "
+            "any more, so every range is nought wide (decision record 0028). Kept on the "
+            "wire until the browser round closes."
         )
     )
     agreement: float = Field(
         description=(
-            "The share of versions of the map that moved the same way on that day, each "
-            "version counted by as much as it counted for the two numbers. A column, never "
-            "a factor. On screen it is headed 'same direction'."
+            "Always nought. It was the share of the versions of the map that moved the "
+            "same way on that day; there is one version, so there is no share of them to "
+            "report, and nought is what a field that counts nothing carries. Kept on the "
+            "wire until the browser round closes (decision record 0028)."
         )
     )
     rank: float = Field(
@@ -333,8 +291,18 @@ class Diff(BaseModel):
         description="The second world's branch. Nothing at all means the base world."
     )
     seed: int = Field(description="The one seed both worlds were built from.")
-    versions: int = Field(description="The outer loop both worlds ran: versions of the map.")
-    worlds: int = Field(description="The inner loop both worlds ran: worlds per version.")
+    versions: int = Field(
+        description=(
+            "How many versions of the map both worlds worked out. Always 1 (decision "
+            "record 0028). Kept on the wire until the browser round closes."
+        )
+    )
+    worlds: int = Field(
+        description=(
+            "How many worlds ran inside each version. Always 0 — there is no inner loop "
+            "(decision record 0016). Kept on the wire until the browser round closes."
+        )
+    )
     claims: Mapping[PropositionId, ClaimDiff] = Field(
         description="Every claim either world holds, exactly once."
     )
@@ -362,6 +330,12 @@ class SensitivityRow(BaseModel):
     whoever reads them, because which direction hurts depends on the trade: the
     flip that damages a long position helps a short one, and this file has no idea
     which trade is being run.
+
+    A row used to carry the budget it was produced at, because a sweep ran the
+    engine at a quarter of the versions the shipped world used and nobody should
+    lay a cheap number beside a dear one without noticing. There is one version of
+    the map now (decision record 0028), so every run is the same run and there is
+    no budget to report.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -376,23 +350,14 @@ class SensitivityRow(BaseModel):
     deltas: Mapping[PropositionId, float] = Field(
         description="The signed change the flip made to each ending."
     )
-    versions: int = Field(
-        description=(
-            "The outer loop this row was produced at. A sweep is one whole run per claim, so "
-            "it runs at a reduced budget and says so, and nobody compares a swept number "
-            "with a full-budget one without noticing."
-        )
-    )
-    worlds: int = Field(description="The inner loop this row was produced at.")
 
 
 def diff(world_a: World, world_b: World, *, edit_in_words: str) -> Diff | list[Violation]:
     """Say what moved between two worlds, and rank the endings that moved.
 
-    Pure: no clock, no network, no global random state. The two worlds carry the
-    three things they were built from, so the version-by-version numbers behind
-    each of them are recomputed here rather than carried on the wire — millions of
-    numbers no browser should ever be sent.
+    Pure: no clock, no network, no global random state. Everything is read off the
+    two finished worlds: their beliefs for what each claim came out at, and their
+    series for the day the two are furthest apart.
 
     Both worlds must have been built from the same map, the same seed and the same
     two loop sizes. Anything else is refused with a plain sentence, because a
@@ -421,10 +386,9 @@ def diff(world_a: World, world_b: World, *, edit_in_words: str) -> Diff | list[V
     if refused:
         return refused
 
-    behind_a, behind_b = versions_of(world_a), versions_of(world_b)
     days, where_a, where_b = _days_both_worlds_drew(world_a, world_b)
-    claims = _states(world_a, world_b, behind_a, behind_b)
-    rows = _ranked_endings(world_a, world_b, behind_a, behind_b, claims, days, where_a, where_b)
+    claims = _states(world_a, world_b)
+    rows = _ranked_endings(world_a, world_b, claims, days, where_a, where_b)
     named = {one.id: one for one in world_b.graph.propositions}
 
     return Diff(
@@ -441,29 +405,20 @@ def diff(world_a: World, world_b: World, *, edit_in_words: str) -> Diff | list[V
     )
 
 
-def sensitivity(
-    world: World, *, versions: int = SWEEP_VERSIONS, worlds: int = SWEEP_WORLDS
-) -> tuple[SensitivityRow, ...]:
+def sensitivity(world: World) -> tuple[SensitivityRow, ...]:
     """Flip each claim in turn and record what the flip does to every ending.
 
     One claim at a time, to the opposite of whichever way it more often comes out
     in this world, with the map worked through again from scratch each time. That
-    is one whole run of the engine per claim, so the sweep runs at a **reduced
-    budget** — 250 versions of the map rather than 2 000 — and **every row says
-    which budget produced it**, so nobody lays a swept number beside a
-    full-budget one without noticing.
+    is one whole run of the engine per claim, and there is nothing to choose about
+    how big a run is: the engine works out one version of the map (decision record
+    0028), so a sweep costs what it costs and every row is produced the same way as
+    every other.
 
-    The world it starts from is worked out again at that same reduced budget, so
-    that the difference each row reports is the flip and nothing else. Comparing a
-    reduced-budget flip against a full-budget starting point would report part of
-    the budget change as an effect.
-
-    **And with the engine that built the world handed in, not the one the server
-    happens to run now.** Two arithmetics stand side by side while the second is
-    checked against the first, and a world says which one built it by whether it
-    ran an inner loop at all. A sweep of a world built one way, re-run the other,
-    would report the change of engine as part of the flip — the same mistake as the
-    budget, in a bigger size, and just as invisible in the answer.
+    This used to take a budget, because the engine ran two thousand versions of the
+    map and a sweep could not afford twenty of those. It also used to be handed the
+    arithmetic that built the world, because two engines stood side by side. Both
+    are gone: one engine, one version, one kind of run.
 
     Nothing on screen reads this yet. It is written now because the engine it
     needs is written now, and bolting it on later would mean a second pass over
@@ -472,31 +427,18 @@ def sensitivity(
     Args:
         world: The world to sweep. Its map, the values its edits fixed, its day
             zero and its seed are all read from it.
-        versions: The outer loop to sweep at. The default is the reduced budget.
-        worlds: The inner loop to sweep at. The default is the shipped one.
 
     Returns:
         One row per claim on the map, in the map's own order, each naming the
-        claim it flipped, what it flipped it to, the signed change on every
-        ending, and the budget it was produced at. Unranked, on purpose.
+        claim it flipped, what it flipped it to, and the signed change on every
+        ending. Unranked, on purpose.
     """
     endings = tuple(one.id for one in world.graph.propositions if one.kind in TERMINAL_KINDS)
-    # Which edit added each arrow that ever undermined a supposition. A world
-    # already knows: it carries one retraction per supposition that ended, and
-    # each of those names both the arrow and the edit. So a sweep can work the
-    # same map through again without being handed the branch a second time.
-    told = {one.by_link: one.by for one in world.retractions}
-    arithmetic = engine_that_built(world)
-
     start = propagate(
         world.graph,
         world.assignments,
         as_of=world.day_zero,
         seed=world.seed,
-        introduced_by=told,
-        versions=versions,
-        worlds=worlds,
-        engine=arithmetic,
     )
 
     swept: list[SensitivityRow] = []
@@ -525,18 +467,12 @@ def sensitivity(
             fixed,
             as_of=world.day_zero,
             seed=world.seed,
-            introduced_by=told,
-            versions=versions,
-            worlds=worlds,
-            engine=arithmetic,
         )
         swept.append(
             SensitivityRow(
                 flipped=claim.id,
                 to=to,
                 deltas={one: flipped.beliefs[one].p - start.beliefs[one].p for one in endings},
-                versions=versions,
-                worlds=worlds,
             )
         )
     return tuple(swept)
@@ -638,181 +574,28 @@ def _days_both_worlds_drew(
     return shared, tuple(in_a[day] for day in shared), tuple(in_b[day] for day in shared)
 
 
-def _read_on(world: World, claim: Proposition) -> int:
-    """Find where a claim's own resolve-by day sits among the days its series carries.
+def _why_it_is_unchanged(state: ClaimState, move: float | None) -> UnchangedBecause | None:
+    """Say why an `unchanged` claim is unchanged.
 
-    That day is the day the claim is judged, and it is the day its tile's number is
-    read on, so it is the day this file reads a claim's state on. It is always one
-    of the days the series carries: a window longer than 180 days is drawn at fewer
-    points, and every claim's resolve-by day is kept among them precisely so that a
-    tile's number is always a point of the line drawn beneath it.
-
-    Args:
-        world: The world to read.
-        claim: The claim whose day is wanted.
-
-    Returns:
-        The position of that day in the world's list of drawn days.
-    """
-    day = min(max(0, (claim.resolution.by - world.day_zero).days), world.days)
-    return min(int(numpy.searchsorted(world.series_days, day)), len(world.series_days) - 1)
-
-
-def _counting_for(behind_a: Versions, behind_b: Versions, claim_id: PropositionId) -> Numbers:
-    """Say how much each version of the map counts when one claim's move is read.
-
-    **One rule: the direction is read with the same weights the number was read
-    with.** A world reads a claim's number off every version equally — unless an
-    observation is evidence about that claim, in which case each version counts by
-    the share of its worlds that survived what was observed. The two worlds of a
-    difference can each answer that differently, so a version counts for the move
-    by **the smaller of the two weights it carried**: a version can only speak
-    about a difference as far as it counted in both numbers. A version with no
-    surviving world therefore counts for nothing and does not vote.
-
-    Three cases fall out of that one sentence, and none of them is a special case.
-    Only the second world observed something: the version weights that world read
-    the claim with. Both observed something: the smaller of the two. The claim is
-    one the observation is not evidence about — it is joined to what was observed
-    by no chain of arrows and shares no cause with it — so both worlds read it off
-    every world equally, and every version counts the same here too.
-
-    Under every edit that is not an observation neither world weights anything, so
-    every version counts 1 and nothing this file reports can move by a bit.
-
-    **Each world's own weights are asked for first, one world at a time**, because
-    that is what each world's number was read with, fallbacks and all: a world that
-    kept nothing anywhere read every version equally, and so it counts equally
-    here. Taking the smaller of two vectors before letting either of them fall back
-    would leave the direction read with weights *neither* number was read with,
-    which is the one sentence this whole rule rests on, broken in a corner.
-
-    **When no version counted in both numbers the answer is nothing at all.** Two
-    branches that each observed something can keep disjoint sets of versions alive:
-    every version then counted in one number or the other and in neither pair. That
-    is not a direction anybody can read — the paired difference this file is built
-    on has no pair left — and inventing one by counting every version equally would
-    report a direction out of versions that contributed to neither reading. So it
-    comes back as a vector of nothing but zeroes, and `_states` says *no direction*
-    rather than guessing one. Reject, never repair.
-
-    Args:
-        behind_a: The version-by-version numbers behind the first world.
-        behind_b: The same behind the second.
-        claim_id: The claim whose move is being read.
-
-    Returns:
-        How much each version counts, one number per version. All zeroes when no
-        version counted in both numbers, which is the one case with no direction
-        to report; every caller checks the total before dividing by it.
-    """
-    together: Numbers = numpy.minimum(
-        behind_a.counting_for(claim_id), behind_b.counting_for(claim_id)
-    )
-    return together
-
-
-def _agreement_on(before: Numbers, after: Numbers, move: float, counting: Numbers) -> float:
-    """Say what share of the versions of the map moved the way the reported move says.
-
-    Subtract the first world's version *k* from the second world's version *k*, for
-    every version. Because the stream that picks the versions never depends on the
-    branch, both versions were built from the same underlying numbers, so the
-    elicitation noise cancels and what is left is the edit. This counts how many of
-    those paired differences point the same way as the move being reported, **each
-    version counted by as much as it counted for the two numbers** — which is what
-    `_counting_for` works out, and is why a version with no surviving world says
-    nothing here.
-
-    A claim that did not move at all in any version that counts comes out at 0
-    unless the move is itself nothing: no paired difference points the reported
-    way, because none of them points any way at all. That is the claim an
-    observation moved through the version weights alone, and `_states` names it.
-
-    Args:
-        before: The first world's answer for one claim on one day, per version.
-        after: The second world's answer for the same claim and day, per version.
-        move: The move being reported, whose direction the versions are counted
-            against.
-        counting: How much each version counts, one number per version.
-
-    Returns:
-        The share of the counted versions that moved that way, between 0 and 1.
-    """
-    paired = after - before
-    agreeing = numpy.sign(paired) == numpy.sign(move)
-    return float((counting * agreeing).sum() / counting.sum())
-
-
-def _moved_only_by_reweighting(
-    before: Numbers, after: Numbers, move: float, counting: Numbers
-) -> bool:
-    """Say whether a claim's whole move came from how much each version counts.
-
-    True when the claim moved far enough for the move to count at all and **not one
-    version that counts moved by so much as a bit**: every paired difference among
-    them is exactly zero. Then the two worlds' version-by-version answers are the
-    same numbers, and the only thing left that can have moved the reported number is
-    how much each of those versions counts.
-
-    Only an observation can produce it. Under every other edit both worlds count
-    every version the same, so identical version-by-version answers give identical
-    numbers and the move is exactly nothing, which is below the floor.
-
-    The claim it happens to is a claim with **no causes** — the hypothesis, usually.
-    Inside one version such a claim is its own prior in every world, so throwing
-    worlds away cannot change what that version says about it, and only the version
-    weights are left to move it.
-
-    Args:
-        before: The first world's answer for one claim on one day, per version.
-        after: The second world's answer for the same claim and day, per version.
-        move: The move being reported.
-        counting: How much each version counts, one number per version.
-
-    Returns:
-        True when the move is at least the floor and no counted version moved.
-    """
-    if abs(move) < MOVED_AT_LEAST:
-        return False
-    return not bool(numpy.any((after != before) & (counting > 0.0)))
-
-
-def _which_half_failed(
-    state: ClaimState, move: float | None, agreement: float | None
-) -> UnchangedBecause | None:
-    """Say which half of the moved-at-all test an `unchanged` claim failed.
-
-    A claim is `shifted` only when it moved by at least the floor **and** at
-    least the bar's share of the versions moved that way. `unchanged` is what it
-    gets when either half fails, and which one it was is a fact only this file
-    can state: both constants live here and neither is ever put on a wire.
-
-    **The floor is read first**, so a claim that fails both halves says
-    `under_the_floor`. Something has to choose between two true answers, and this
-    one is the cheaper fact to act on.
+    One answer, because there is one test: a claim is `shifted` when it moved by
+    at least the floor, and `unchanged` when it did not. The floor lives in this
+    file and is never put on a wire, so a reader who is only told *unchanged*
+    could not otherwise tell that the claim moved at all.
 
     Nothing at all where there is no test to fail: every state but `unchanged`,
-    a claim only one world holds (there is no move to measure), and a claim no
-    version counted in both numbers (there is no direction to read, which the
-    absent `agreement` beside it already says).
+    and a claim only one of the two worlds holds, where there is no move to
+    measure.
 
     Args:
         state: The word this claim came out with.
         move: The move, or nothing at all where one of the worlds has no number.
-        agreement: The share of counted versions that moved that way, or nothing
-            at all where no version counted in both numbers.
 
     Returns:
         The word, or nothing at all.
     """
     if state != "unchanged" or move is None:
         return None
-    if abs(move) < MOVED_AT_LEAST:
-        return "under_the_floor"
-    if agreement is not None and agreement < AGREEING_AT_LEAST:
-        return "versions_disagree"
-    return None
+    return "under_the_floor"
 
 
 def _forced_false_in(world: World, claim_id: PropositionId) -> bool:
@@ -833,40 +616,25 @@ def _forced_false_in(world: World, claim_id: PropositionId) -> bool:
     return bool(said) and not said[-1].value
 
 
-def _states(
-    world_a: World,
-    world_b: World,
-    behind_a: Versions,
-    behind_b: Versions,
-) -> dict[PropositionId, ClaimDiff]:
+def _states(world_a: World, world_b: World) -> dict[PropositionId, ClaimDiff]:
     """Work out what happened to every claim either world holds.
 
     Four checks, in order, and the first that matches wins: added, then killed,
     then shifted, then unchanged. Each claim is read on **its own resolve-by day**
     — the day it is judged, and the day its tile's number already refers to.
 
-    `shifted` needs **both** halves: the claim moved by at least 0.005, and it
-    moved the same way in at least 90% of the versions of the map. Reading the
-    second half off whether the two ranges overlap would be badly wrong — on this
-    product's own worked example two ranges overlap across two fifths of their
-    width while 99.9% of versions move the same way, so overlap would report "no
-    change" about the clearest change on the map.
+    `shifted` needs one thing: the claim moved by at least 0.005. It needed a
+    second thing once — that at least nine versions of the map in ten moved the
+    same way — and that went with the versions on 2026-09-22 (decision record
+    0028, Kent's row R48). There is one reading of the map, so there is nothing
+    for a share of it to be a share of.
 
-    Each claim's direction is read with the same weights its two numbers were read
-    with, so a version an observation left with no surviving world does not vote.
-    A claim whose whole move came from those weights — every version that counts
-    says exactly the same thing in both worlds — keeps whichever of the four words
-    it had and says so in one field of its own, which the Inspector turns into one
-    sentence.
-
-    An `unchanged` claim also says **which** half it failed, in `unchanged_because`,
-    because both constants live in this file and never reach a reader.
+    An `unchanged` claim also says **why**, in `unchanged_because`, because the
+    floor lives in this file and never reaches a reader.
 
     Args:
         world_a: The world to compare from.
         world_b: The world to compare to.
-        behind_a: The version-by-version numbers behind the first world.
-        behind_b: The same behind the second.
 
     Returns:
         One entry per claim either world holds, by identifier.
@@ -910,22 +678,10 @@ def _states(
         before = world_a.beliefs[claim_id].p
         after = world_b.beliefs[claim_id].p
         move = after - before
-        each_version = behind_a.likelihood[claim_id][:, _read_on(world_a, in_a[claim_id])]
-        each_version_after = behind_b.likelihood[claim_id][:, _read_on(world_b, in_b[claim_id])]
-        counting = _counting_for(behind_a, behind_b, claim_id)
-        # No version of the map counted in both numbers, so there is no paired
-        # difference left and no direction to read off one. Everything that would
-        # have been read off it says nothing rather than guessing.
-        speaks = bool(counting.sum() > 0.0)
-        agreement = (
-            _agreement_on(each_version, each_version_after, move, counting) if speaks else None
-        )
         state: ClaimState = "unchanged"
         if _forced_false_in(world_b, claim_id):
             state = "killed"
-        elif (
-            agreement is not None and abs(move) >= MOVED_AT_LEAST and agreement >= AGREEING_AT_LEAST
-        ):
+        elif abs(move) >= MOVED_AT_LEAST:
             state = "shifted"
         found[claim_id] = ClaimDiff(
             target=claim_id,
@@ -933,10 +689,13 @@ def _states(
             before=before,
             after=after,
             delta=move,
-            agreement=agreement,
-            moved_only_by_reweighting=speaks
-            and _moved_only_by_reweighting(each_version, each_version_after, move, counting),
-            unchanged_because=_which_half_failed(state, move, agreement),
+            # Two fields, one dated reason: there is one version of the map, so
+            # there is no share of the versions to agree and nothing for an
+            # observation to reweight. 2026-09-22, records 0028 and 0016; both
+            # leave the wire in one follow-up when the browser round closes.
+            agreement=None,
+            moved_only_by_reweighting=False,
+            unchanged_because=_why_it_is_unchanged(state, move),
         )
     return found
 
@@ -1287,8 +1046,6 @@ def _best_backed_routes(
 def _ranked_endings(
     world_a: World,
     world_b: World,
-    behind_a: Versions,
-    behind_b: Versions,
     claims: Mapping[PropositionId, ClaimDiff],
     days: Sequence[int],
     where_a: Sequence[int],
@@ -1304,8 +1061,6 @@ def _ranked_endings(
     Args:
         world_a: The world to compare from.
         world_b: The world to compare to.
-        behind_a: The version-by-version numbers behind the first world.
-        behind_b: The same behind the second.
         claims: What happened to each claim.
         days: The days both worlds drew.
         where_a: Where each of those days sits in the first world's series.
@@ -1319,16 +1074,12 @@ def _ranked_endings(
     rows: list[DeltaRow] = []
 
     for claim in world_b.graph.propositions:
-        # Only a `shifted` ending gets a row, and `shifted` needed a direction to
-        # be readable in the first place — so the weights below always have some
-        # version counting in both numbers, and nothing here divides by nothing.
         if claim.kind not in TERMINAL_KINDS or claims[claim.id].state != "shifted":
             continue
         before = numpy.array([world_a.series[claim.id][one] for one in where_a])
         after = numpy.array([world_b.series[claim.id][one] for one in where_b])
         gap = after - before
         at = int(numpy.argmax(numpy.abs(gap)))
-        column = where_b[at]
         peak = float(gap[at])
         rows.append(
             DeltaRow(
@@ -1337,48 +1088,16 @@ def _ranked_endings(
                 after=float(after[at]),
                 peak_delta=peak,
                 at_day=world_b.day_zero + timedelta(days=int(days[at])),
-                range_width=_width_of_the_band(world_b, behind_b, claim.id, column),
-                agreement=_agreement_on(
-                    behind_a.likelihood[claim.id][:, where_a[at]],
-                    behind_b.likelihood[claim.id][:, column],
-                    peak,
-                    _counting_for(behind_a, behind_b, claim.id),
-                ),
+                # Both nought, for one dated reason: no number carries a range, so
+                # every range is nought wide, and there is one version of the map,
+                # so there is no share of the versions to report. 2026-09-22,
+                # decision record 0028; both leave the wire with the follow-up.
+                range_width=0.0,
+                agreement=0.0,
                 rank=abs(peak) * widest.get(claim.id, 0.0),
             )
         )
     return tuple(sorted(rows, key=lambda one: (-one.rank, one.target)))
-
-
-def _width_of_the_band(
-    world: World, behind: Versions, claim_id: PropositionId, column: int
-) -> float:
-    """Work out how wide one claim's range is on one day of the window.
-
-    A world carries its range only on each claim's own resolve-by day, because that
-    is the day the tile reads. A change list reads a different day — the day the
-    two worlds are furthest apart — so the range for that day is worked out again
-    here, from the same version-by-version numbers the world itself was built from
-    and through the same arithmetic, which is what stops the list and the tile ever
-    disagreeing about how firm a number is.
-
-    Args:
-        world: The world whose range is wanted.
-        behind: The version-by-version numbers behind it.
-        claim_id: The claim.
-        column: Which of the drawn days to read.
-
-    Returns:
-        The distance between the bottom and the top of the range, on that day.
-    """
-    counting = behind.counting_for(claim_id)
-    _, bottom, top = _band(
-        behind.likelihood[claim_id][:, [column]],
-        behind.inner_spread[claim_id][:, [column]],
-        counting,
-        world.worlds,
-    )
-    return float(numpy.clip(top[0], 0.0, 1.0) - numpy.clip(bottom[0], 0.0, 1.0))
 
 
 # --- The one sentence beside the list --------------------------------------
