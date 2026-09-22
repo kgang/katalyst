@@ -220,16 +220,44 @@ function standingFromTheWorld(
  * *"over 2 000 versions of the map with 8 worlds under each"*. Those two
  * numbers only meant something while a claim carried a range, and there is no
  * range. The seed stays, because a run is still reproducible from it.
+ *
+ * **Both kinds of map say it in these words.** A stored example and one
+ * somebody watched build itself differ in exactly one clause — where the claims
+ * and arrows came from — so that clause is the argument and the rest is written
+ * once. Two sentences would drift the next time one of them was improved, and
+ * then the same map read two ways would explain itself two ways.
+ *
+ * @param world The world as the engine built it, for its seed.
+ * @param whereTheMapCameFrom The one clause that differs, with no punctuation
+ *   at the end of it: the rest of the sentence is joined onto it.
+ * @param branchLabel The name of the branch folded on, or nothing on the base
+ *   world.
  */
-function originOf(world: World, bundle: FixtureBundle, branchLabel: string | null): string {
+export function theSentenceUnderTheMap(
+  world: World,
+  whereTheMapCameFrom: string,
+  branchLabel: string | null,
+): string {
   const which =
     branchLabel === null
       ? "with nothing done to it"
       : `with the branch "${branchLabel}" folded onto it`;
   return (
-    `Every claim, arrow and date came from /api/fixtures/${bundle.id}; every likelihood was ` +
-    `worked out by /api/worlds from that map ${which}, at seed ${world.seed}. Nothing here was ` +
-    `typed in: the same map, branch and seed give the same answer every time.`
+    `${whereTheMapCameFrom}; every likelihood was worked out by /api/worlds from that map ` +
+    `${which}, at seed ${world.seed}. Nothing here was typed in: the same map, branch and seed ` +
+    `give the same answer every time.`
+  );
+}
+
+/**
+ * The same sentence for a stored example, which says where the map itself was
+ * read from.
+ */
+function originOf(world: World, bundle: FixtureBundle, branchLabel: string | null): string {
+  return theSentenceUnderTheMap(
+    world,
+    `Every claim, arrow and date came from /api/fixtures/${bundle.id}`,
+    branchLabel,
   );
 }
 

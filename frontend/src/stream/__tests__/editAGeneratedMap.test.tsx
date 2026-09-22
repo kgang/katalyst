@@ -128,11 +128,11 @@ function aSourceThatAnswers(base: WorldView) {
         claimId: base.claims[0]?.id ?? "H",
         label: base.claims[0]?.claim ?? "an ending",
         kind: "market" as const,
+        // One likelihood each side and how far it moved, in the shape the rail
+        // reads now — no range, and no share of anything that agreed (R48).
         move: {
-          reading: { from: 0.4, to: 0.6, largestOn: 3, way: "up" as const, by: 0.2 },
+          reading: { from: 0.4, to: 0.6, largestOn: "2026-09-25", way: "up" as const, by: 0.2 },
         },
-        rangeWidth: { reading: 0.2 },
-        agreement: { reading: 0.8 },
       },
     ],
     summary: { reading: "The edit moved one ending." },
@@ -142,7 +142,7 @@ function aSourceThatAnswers(base: WorldView) {
     readBundle: vi.fn().mockRejectedValue(new Error("a generated map has no stored example")),
     readWorld,
     readDiff,
-    readConditional: vi.fn().mockResolvedValue({ reading: { p: 0.5, lo: 0.4, hi: 0.6 } }),
+    readConditional: vi.fn().mockResolvedValue({ reading: { p: 0.5 } }),
   };
   return { source, readWorld, readDiff };
 }
@@ -232,7 +232,7 @@ describe("the screen a map is edited on takes a generated map", () => {
           claim: "The Strait of Hormuz reopens to unrestricted commercial transit.",
           kind: "hypothesis",
           beliefs: {
-            model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
+            model: { reading: { p: 0.35 } },
             user: { absence: absence("not_said", "You have not said.") },
             market: { absence: absence("no_market", "No venue quotes this claim.") },
           },

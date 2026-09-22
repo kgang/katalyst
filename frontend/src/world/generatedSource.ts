@@ -32,7 +32,7 @@
 
 import type { World } from "../api/client";
 import { readConditional, readDiff, readWorld } from "../api/client";
-import { sendable, toDiffView, toWorldView } from "./apiSource";
+import { sendable, theSentenceUnderTheMap, toDiffView, toWorldView } from "./apiSource";
 import { filled } from "./fromTheServer";
 import type { FixtureBundle, WorldSource } from "./source";
 import type {
@@ -41,7 +41,7 @@ import type {
   DiffRequest,
   DiffView,
   Known,
-  Ranged,
+  Likelihood,
   WorldRequest,
   WorldView,
 } from "./types";
@@ -96,16 +96,13 @@ export interface TheGeneratedMap {
  *   world.
  */
 function originOf(world: World, map: TheGeneratedMap, branchLabel: string | null): string {
-  const which =
-    branchLabel === null
-      ? "with nothing done to it"
-      : `with the branch "${branchLabel}" folded onto it`;
-  const spelled = world.versions.toLocaleString("en-GB").replace(/,/g, " ");
   return (
-    `Every claim and arrow on this map was proposed at /api/generate and accepted by the map's ` +
-    `own rules; every likelihood was worked out by /api/worlds from that map ${which}, at seed ` +
-    `${world.seed}, over ${spelled} versions of the map with ${world.worlds} worlds under each. ` +
-    `The map answers to ${map.id} for as long as the server that built it is running, and is ` +
+    `${theSentenceUnderTheMap(
+      world,
+      "Every claim and arrow on this map was proposed at /api/generate and accepted by the " +
+        "map's own rules",
+      branchLabel,
+    )} The map answers to ${map.id} for as long as the server that built it is running, and is ` +
     `forgotten when it restarts — nothing here is written to disk.`
   );
 }
@@ -201,7 +198,7 @@ export class GeneratedMapSource implements WorldSource {
    *
    * @param request Which map, which branch, and which arrow.
    */
-  async readConditional(request: ConditionalRequest): Promise<Known<Ranged>> {
+  async readConditional(request: ConditionalRequest): Promise<Known<Likelihood>> {
     const answer = await readConditional(
       request.baseId,
       request.branch === undefined ? null : sendable(request.branch),
