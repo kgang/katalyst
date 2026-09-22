@@ -37,15 +37,17 @@ Nothing here asks a language model anything.
 """
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from datetime import date
-from typing import Any, Final
+from typing import Annotated, Any, Final, Literal
 
 import numpy
 from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from katalyst.api.worlds import RefusedEdit
 from katalyst.domain import (
+    SLICES,
     Assignment,
     Branch,
     ContractPayoff,
@@ -54,7 +56,6 @@ from katalyst.domain import (
     Proposition,
     PropositionId,
     Sample,
-    Violation,
     World,
     all_marginals,
     sample_forward,
@@ -73,7 +74,6 @@ from katalyst.domain import (
 # the same state the Verify door's three numbers are already in, and it is said here
 # rather than left for a reader to discover.
 from katalyst.domain.propagation import SAMPLED_WORLDS, _worked_out_by_deadline
-from katalyst.domain.rates import SLICES
 from katalyst.engine import worlds as engine
 from katalyst.engine.ids import BIGGEST_SEED
 from katalyst.engine.verify import Verdict, verdict
@@ -92,6 +92,7 @@ from katalyst.thesis import (
     Paths,
     Position,
     Refusal,
+    RefusalCode,
     Shift,
     Shocked,
     WhatTakesYouOut,
@@ -147,44 +148,90 @@ rather than a `None` somebody may later fill in by accident.
 """
 
 
-class Refused(BaseModel):
-    """One reason a card could not be built: a stable code, the thing at fault, a sentence.
+AskedWrongHere = Literal[
+    "unknown_ending",
+    "the_ending_names_no_trade",
+    "horizon_outside_the_window",
+]
+"""The three refusals this route owns, as a closed list.
 
-    Two different kinds of fault arrive here and both are shaped the same way, so a
-    screen has one thing to read. A **branch that does not fit the map** names the
-    claim or arrow at fault. A **form the reader filled in** names the field they
-    should look at. Neither is ever repaired silently and neither arrives one at a
-    time: every reason comes back together.
+They are about the **request** rather than about the form: an ending that is not on
+the map, an ending that names no trade, and a horizon outside the window the map
+covers.
+
+Dated 2026-09-22: these three codes and the sentences below are written character
+for character as the position route writes them, so that at the rebase one of the
+two copies is deleted and the other imported rather than reconciled. A screen
+switching on a code must never meet two spellings of one rule.
+"""
+
+AskedWrong = RefusalCode | AskedWrongHere
+"""Every reason this route will not answer, as one closed list of nine.
+
+Six are the position form's own, written once in `thesis/position.py` and
+reprinted rather than reworded; three are this route's.
+"""
+
+REFUSES: Final[dict[AskedWrongHere, str]] = {
+    "unknown_ending": "That claim is not on this map, so there is no position to take on it.",
+    "the_ending_names_no_trade": (
+        "This claim names nothing you could buy or sell, so there is no position to take on it."
+    ),
+    "horizon_outside_the_window": (
+        "The day you expect to be out is outside the window this map covers, so there is no "
+        "path to walk to it."
+    ),
+}
+"""What each of this route's own refusals says, in plain words the reader can act on."""
+
+
+class CardRefused(BaseModel):
+    """One thing this route will not do, the field at fault, and what it says.
+
+    A refusal is never a blank: it names a stable code a screen can switch on, the
+    field the reader should look at, and one plain sentence. Nothing is silently
+    repaired, and every fault the request has comes back together — a form that
+    reveals one mistake at a time is a form nobody finishes.
+
+    **A branch that does not fit the map is a different shape**, and deliberately:
+    it comes back as the list of violations the world routes already give, naming a
+    `subject` and a `message`, because that fault is about a claim or an arrow and
+    not about a field a reader can look at.
     """
 
-    code: str = Field(description="Which rule this is, as a stable string a screen can switch on.")
-    subject: str = Field(
-        description=(
-            "What is at fault: the identifier of a claim or an arrow for a branch that "
-            "does not fit, or the name of a form field as the reader sees it."
-        )
-    )
-    message: str = Field(description="One plain sentence the person reads.")
+    model_config = ConfigDict(frozen=True)
+
+    code: AskedWrong = Field(description="Which rule this is, from the closed list of nine.")
+    field: str = Field(description="The field at fault, named as the reader sees it.")
+    sentence: str = Field(description="What the screen prints.")
 
 
 class RefusedCard(BaseModel):
-    """Every reason a card was refused, in a settled order, never just the first."""
+    """Every reason a card could not be built, in a settled order, never just the first."""
 
-    detail: tuple[Refused, ...] = Field(
-        description="Every reason the card could not be built, in a settled order."
+    detail: tuple[CardRefused, ...] = Field(
+        description="Every reason at once, never just the first one found."
     )
 
 
 REFUSED: dict[int | str, dict[str, Any]] = {
-    422: {
-        "model": RefusedCard,
+    404: {
         "description": (
-            "The request cannot be carried out as written — either the branch does not fit "
-            "the map, or the exit the reader typed is not one a position can be taken on. "
-            "The answer lists every reason at once, each with a stable code a screen can "
-            "switch on, the thing at fault, and one plain sentence."
+            "No example is stored under that name. The answer is one sentence naming the "
+            "examples this program does ship with."
+        )
+    },
+    422: {
+        "model": RefusedEdit | RefusedCard,
+        "description": (
+            "The request cannot be carried out as written, and there are two ways it can be. "
+            "A branch that does not fit the map comes back as the list of violations the "
+            "world routes give. A request or a form the reader can fix comes back as the "
+            "list of refusals — each with a stable code, the field at fault and one plain "
+            "sentence. Read the first entry to know which: a violation names a `subject` and "
+            "a `message`, a refusal names a `field` and a `sentence`."
         ),
-    }
+    },
 }
 """How a refused card is described to whatever generates the browser's types."""
 
@@ -197,30 +244,49 @@ class ExitAsked(BaseModel):
     what to watch.
     """
 
-    entry: float = Field(description="The price they entered at, in the instrument's own units.")
-    stop: float = Field(description="The price at which they get out for a loss. Theirs.")
-    target: float = Field(description="The price at which they get out for a gain. Theirs.")
-    horizon: date = Field(
+    entry: float = Field(
+        gt=0.0, description="The price you entered at, in the instrument's own units. Yours."
+    )
+    # The reader's three own numbers are **declared** here and never set: written as
+    # an annotation with no value beside it, so that the check which reads our own
+    # source and fails on anything that sets a name called `stop`, `target` or
+    # `horizon` can tell a field a reader fills in from a number somebody worked
+    # out. That check walks `thesis/` today and not `api/`, so this file would pass
+    # either way; it is written this way so the day the walk is widened, nothing
+    # here has to move. Required all the same — a field with no default is one every
+    # caller has to send.
+    stop: Annotated[
+        float,
+        Field(description="The price at which you get out for a loss. Yours, and never derived."),
+    ]
+    target: Annotated[
+        float,
+        Field(description="The price at which you get out for a gain. Yours, and never derived."),
+    ]
+    horizon: Annotated[
+        date,
+        Field(
+            description=(
+                "The day you expect to be out. The two first-touch shares are read to this day "
+                "and no further, because reading to the end of whatever window the drawn "
+                "worlds carry answers a question nobody asked."
+            )
+        ),
+    ]
+    risk_budget: float = Field(
         description=(
-            "The day by which they expect to be out. The two first-touch shares are read "
-            "to this day and no further: shares over a window nobody named are two numbers "
-            "nobody can check."
+            "The share of your capital you are prepared to lose on this trade. What it "
+            "implies about size is arithmetic on it and your stop, and is never a "
+            "recommendation. Bounded by the position form rather than here, so that a "
+            "reader who types a hundred instead of a hundredth is told what a risk budget "
+            "is in the form's own words, beside every other fault at once."
         )
     )
-    risk_budget: float = Field(
-        gt=0.0,
-        le=1.0,
-        description=(
-            "The share of their capital they are prepared to lose here. The size it "
-            "implies is worked out from it and the distance to their stop, and is never a "
-            "recommendation."
-        ),
-    )
     daily_move: float = Field(
-        gt=0.0,
+        ge=0.0,
         description=(
             "How far the instrument moves in a day, in price units — one standard "
-            "deviation of a day's change. The reader's own number today."
+            "deviation of a day's change. Yours today: nothing in this program measures it."
         ),
     )
 
@@ -261,9 +327,14 @@ class CardRequest(BaseModel):
     shocks: tuple[Branch, ...] = Field(
         default=(),
         description=(
-            "Suppositions the reader placed on top of the branch above, each named in "
-            "their own words. The card reports what each did to the position and **no "
-            "probability**: supposing something is not a forecast."
+            "Suppositions the reader placed **on top of the branch above**, each named in "
+            "their own words. Each one's edits are folded after that branch's, so what is "
+            "reported is what the shock did and not what the branch and the shock did "
+            "together; a shock's own `parent` is therefore not read, because the branch in "
+            "force is its parent by construction. With no branch in force there is nothing "
+            "to place it on top of, so the shock is folded as it stands, parent and all. "
+            "The card reports what each did to the position and **no probability**: "
+            "supposing something is not a forecast."
         ),
     )
     versions: int = Field(
@@ -394,6 +465,7 @@ def _card_for(request: CardRequest) -> Card:
 
     answers = _every_answer(plain, shown)
     drawn = _drawn_worlds(shown)
+    _the_horizon_is_inside_the_window(position, drawn)
     touch, rail, paths = _position_of(shown, ending, position, drawn)
     return card_of(
         shown,
@@ -412,9 +484,33 @@ def _card_for(request: CardRequest) -> Card:
         watch=(),
         unhedgeable=(),
         tails=(),
-        shocks=_every_shock(request, ending, position, paths),
+        shocks=_every_shock(request, ending, position, touch, paths),
         costs=NOBODY_HAS_STATED_THE_COSTS,
     )
+
+
+def _the_horizon_is_inside_the_window(position: Position, drawn: Draws) -> None:
+    """Check the day the reader expects to be out falls inside the window the map covers.
+
+    **The form cannot ask this.** Its own `horizon_after_the_claim` compares the
+    horizon with the day the *claim* is judged, which is a different question: a map
+    whose furthest resolve-by date is earlier still has a shorter window, and a
+    horizon on or before the day the window opens leaves no days to walk at all.
+    Without this the paths are walked and `first_touch` raises, which reaches a
+    reader as a 500 — and a date picker defaulting to today is the obvious way there.
+
+    Args:
+        position: What the reader typed, read for their horizon.
+        drawn: The drawn worlds, read for the day the window opens and how long it
+            runs.
+
+    Raises:
+        HTTPException: 422 naming the field `horizon`, in the same words and under
+            the same code the position route uses for the same input.
+    """
+    through = (position.horizon - drawn.day_zero).days
+    if not 1 <= through <= drawn.days:
+        raise _refusing((_refusal("horizon_outside_the_window", "horizon"),))
 
 
 def _built(base_id: str, branch: Branch | None, request: CardRequest) -> World:
@@ -438,7 +534,10 @@ def _built(base_id: str, branch: Branch | None, request: CardRequest) -> World:
     if built is None:
         raise HTTPException(status_code=404, detail=engine.no_such_example(base_id))
     if isinstance(built, list):
-        raise _refusing(_from_violations(built))
+        # A branch that does not fit the map keeps the world routes' own shape, a
+        # `subject` and a `message`, because the fault is about a claim or an arrow
+        # rather than about a field the reader can look at.
+        raise HTTPException(status_code=422, detail=[one.model_dump() for one in built])
     return built
 
 
@@ -457,17 +556,7 @@ def _the_ending(base: World, ending: PropositionId) -> Proposition:
     """
     found = next((one for one in base.graph.propositions if one.id == ending), None)
     if found is None:
-        raise _refusing(
-            (
-                Refused(
-                    code="unknown_ending",
-                    subject=ending,
-                    message=(
-                        "This map has no claim by that name, so there is no position to take on it."
-                    ),
-                ),
-            )
-        )
+        raise _refusing((_refusal("unknown_ending", "ending"),))
     return found
 
 
@@ -488,18 +577,7 @@ def _the_position(ending: Proposition, asked: ExitAsked) -> Position:
             the claim names no trade at all.
     """
     if ending.payoff is None:
-        raise _refusing(
-            (
-                Refused(
-                    code="ending_names_no_trade",
-                    subject=ending.id,
-                    message=(
-                        "This claim names nothing that can be bought or sold, so there is "
-                        "no position to take on it."
-                    ),
-                ),
-            )
-        )
+        raise _refusing((_refusal("the_ending_names_no_trade", "ending"),))
     built = position_on(
         ending,
         entry=asked.entry,
@@ -510,9 +588,7 @@ def _the_position(ending: Proposition, asked: ExitAsked) -> Position:
         daily_move=asked.daily_move,
     )
     if isinstance(built, tuple):
-        raise _refusing(
-            tuple(Refused(code=one.code, subject=one.field, message=one.sentence) for one in built)
-        )
+        raise _refusing(tuple(_reprinted(one) for one in built))
     return built
 
 
@@ -695,6 +771,14 @@ def _the_sample(graph: Graph, fixed: tuple[Assignment, ...], world: World) -> Sa
         The drawn worlds, their weights and the day every claim came on and went
         off.
     """
+    # T2b, at the rebase: this whole function goes and `engine.sample_of` takes its
+    # place. It is not a rename, and three things have to be taken deliberately.
+    # (1) It corrects the draw with `exact=worked.answers` — the answers the world
+    # shown actually carries — where this line passes the uncorrected marginals;
+    # under a *This happened* edit those are different numbers and the corrected ones
+    # are right. (2) It raises `ImpossibleObservation` where nothing here catches
+    # one, and the route must turn that into the named 422 the position route gives.
+    # (3) It takes `(base_id, branch, seed, …)` rather than a built world.
     worked = _worked_out_by_deadline(
         graph,
         fixed,
@@ -834,83 +918,153 @@ def _no_rail(drawn: Draws) -> WhatTakesYouOut:
 
 
 def _every_shock(
-    request: CardRequest, ending: Proposition, position: Position, paths: Paths | None
+    request: CardRequest,
+    ending: Proposition,
+    position: Position,
+    touch: FirstTouch | Refusal,
+    paths: Paths | None,
 ) -> tuple[Shocked, ...]:
     """Re-run the position on each supposition the reader placed, and say what it did.
 
-    **What the position is worth** is the weighted average price at the reader's
-    own horizon, over the drawn worlds. The change a shock makes is that number on
-    the shocked branch less the same number without it, in the instrument's own
-    price units — two computed quantities and their difference, and nothing else.
-    The paths either side are walked from the same seed and the same entry price,
-    so the difference is the supposition and not the dice.
+    **Each shock is folded on top of the branch in force**, never instead of it: its
+    edits are placed after that branch's, so what is reported is what the shock did
+    rather than what the branch and the shock did together. A shock's own `parent` is
+    not read when there is a branch, because the branch in force is its parent by
+    construction; with no branch there is nothing to place it on top of and the shock
+    is folded as it stands.
+
+    The change a shock makes is what the position is worth on the shocked branch,
+    less what it is worth without it, in the instrument's own price units — two
+    computed quantities and their difference, and nothing else. Both sides are walked
+    from the same seed, the same entry price and the same move, so the difference is
+    the supposition and not the dice.
 
     **No probability, ever.** They supposed it; that is not a forecast, and the
     map's own number for a claim an edit has just fixed is not one either.
 
     Args:
-        request: The request, read for the map, the seed and the loop sizes.
+        request: The request, read for the map, the branch, the seed and the loop
+            sizes.
         ending: The ending the card leads with.
         position: What the reader typed.
+        touch: The first-touch answer without the shock, whose exit levels the worth
+            below is read against.
         paths: The paths without the shock, or nothing at all on a contract ending,
             which has no paths and therefore no shock rows.
 
     Returns:
         One row per supposition, in the order the reader placed them.
     """
-    if paths is None or not request.shocks:
+    if paths is None or isinstance(touch, Refusal) or not request.shocks:
         return ()
-    without = _worth_at(paths, position.horizon)
+    moves = _what_moves_the_price(ending, position)
+    without = _worth_of(touch, paths, position)
     placed: list[Shocked] = []
-    for branch in request.shocks:
-        shocked = _built(request.base_id, branch, request)
+    for shock in request.shocks:
+        drawn = _drawn_worlds(_built(request.base_id, _on_top_of(request.branch, shock), request))
         walked = walk(
-            _drawn_worlds(shocked),
-            _what_moves_the_price(ending, position),
+            drawn,
+            moves,
             entry=position.entry,
             daily_move=position.daily_move,
             seed=request.seed,
         )
+        after = first_touch(walked, position)
+        if isinstance(after, Refusal):  # pragma: no cover - a contract returned above
+            continue
         placed.append(
             Shocked(
-                name=branch.label,
-                change_to_the_position=_worth_at(walked, position.horizon) - without,
+                name=shock.label,
+                change_to_the_position=_worth_of(after, walked, position) - without,
             )
         )
     return tuple(placed)
 
 
-def _worth_at(paths: Paths, horizon: date) -> float:
-    """What the position is worth on the reader's own horizon: the weighted average price.
+def _on_top_of(branch: Branch | None, shock: Branch) -> Branch:
+    """Put one shock's edits after the branch in force, as one branch the engine can fold.
+
+    Flattened rather than parented, because the branch in force is sent whole and is
+    in no table of branches the engine could look a parent up in — a shock naming it
+    as its parent is refused outright.
 
     Args:
-        paths: The daily price path through every drawn world.
-        horizon: The day the reader expects to be out by.
+        branch: The edits in force, or nothing at all.
+        shock: The supposition the reader placed.
 
     Returns:
-        The average price on that day, each drawn world counting for its own
-        weight.
+        The shock as it stands where there is no branch; otherwise the shock's own
+        identity and name over both sets of edits, in order, with no parent.
     """
-    day = (horizon - paths.day_zero).days
-    return float(numpy.average(paths.level[:, day], weights=paths.weight))
+    if branch is None:
+        return shock
+    return shock.model_copy(
+        update={
+            "parent": None,
+            "interventions": (*branch.interventions, *shock.interventions),
+        }
+    )
+
+
+def _worth_of(touch: FirstTouch, paths: Paths, position: Position) -> float:
+    """What the position is worth: the average price it is closed at under the reader's exit.
+
+    The stop's own level where the stop went first, the target's level where the
+    target went first, and the price on the reader's horizon where neither was
+    touched — each weighted by how often that happened. Every one of the five numbers
+    is one `position.py` worked out over the drawn worlds; what is done here is
+    weighting them, which is the whole of what *what the position is worth* means and
+    which no module owns today.
+
+    **Why not the plain average price on the horizon.** Because it is the entry price,
+    exactly, in every branch: the price paths apply only a claim's surprise at a market
+    chance read off those same worlds, so they carry no drift by construction
+    (`INV-thesis.16`). A shock measured that way would report nothing at all, for ever.
+    The reader's own stop and target are what break that symmetry — they cut the two
+    tails at different distances — so the worth has to be read at the exit rather than
+    at the horizon.
+
+    Args:
+        touch: How often each end of the exit was reached first, and at which levels.
+        paths: The daily price path through every drawn world.
+        position: What the reader typed, read for their horizon.
+
+    Returns:
+        The average price the position is closed at, in the instrument's own units.
+    """
+    day = (position.horizon - paths.day_zero).days
+    held = float(numpy.average(paths.level[:, day], weights=paths.weight))
+    return (
+        touch.stop_first * touch.stop_at
+        + touch.target_first * touch.target_at
+        + touch.neither * held
+    )
 
 
 # --- Refusing, and the committed description of the document -----------------
 
 
-def _from_violations(found: Sequence[Violation]) -> tuple[Refused, ...]:
-    """Turn the rules layer's complaints about a branch into this route's own shape.
+def _refusal(code: AskedWrongHere, field: str) -> CardRefused:
+    """One of this route's own refusals, with its sentence written once for every screen."""
+    return CardRefused(code=code, field=field, sentence=REFUSES[code])
+
+
+def _reprinted(one: Refusal) -> CardRefused:
+    """Reprint the position form's own refusal, keeping its code, its field and its words.
+
+    The sentence is `thesis/position.py`'s, unchanged. A second wording of the same
+    rule is exactly what a shared list of sentences exists to prevent.
 
     Args:
-        found: Every reason the branch could not be folded.
+        one: What the form refused.
 
     Returns:
-        The same reasons, each with its code, its subject and its sentence.
+        The same refusal, as the shape this route answers with.
     """
-    return tuple(Refused(code=one.code, subject=one.subject, message=one.message) for one in found)
+    return CardRefused(code=one.code, field=one.field, sentence=one.sentence)
 
 
-def _refusing(reasons: tuple[Refused, ...]) -> HTTPException:
+def _refusing(reasons: tuple[CardRefused, ...]) -> HTTPException:
     """Build the 422 that carries every reason at once.
 
     Args:
