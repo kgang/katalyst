@@ -631,13 +631,13 @@ def _by_deadline(
     3. **`World.worlds = 0`**, which means *there is no inner loop*.
 
     **What a day of a series is here.** The chance the claim has happened by that
-    day, read off the cumulative arrival curve the forward pass worked out, on the
-    claim's own grid. It can only rise for an event, and a claim a supposition holds
-    reads that supposition's value on every day. **Dated 2026-09-22:** where *This
-    happened* was used, the number on a claim's tile is the answer conditioned on
-    the news and the days beneath it are the map's own timing, because the
-    conditioning lives in the solve and the timing in the pass. Reconciling the two
-    is the `spec/multiverse/propagation.md` rewrite's, at the flip.
+    day. The forward pass says what share of the whole window's chance has arrived
+    by each day; the solve says what the whole window's chance is; a day of the
+    series is the first times the second. So **a claim's series ends on exactly the
+    number on its tile**, for every claim and under every edit — the two are one
+    number read through one shape, not two arithmetics that have to be talked into
+    agreeing. `_lines_of` below is where that is done and why. A claim a supposition
+    holds reads that supposition's value on every day.
 
     **Every claim is an event here.** Which kind of truth a claim is becomes a field
     on the claim at the flip (decision record 0017); until then the code that mints a
@@ -666,19 +666,17 @@ def _by_deadline(
         One world, with every claim's number read on its own resolve-by day.
     """
     claims: Mapping[PropositionId, Proposition] = {one.id: one for one in graph.propositions}
-    ordinary = _ordinary_arrows(graph, claims)
-    # A feedback arrow is carried as data and set aside, exactly as the map's own
-    # loop check sets it aside, so the pass below is handed a map it can walk
-    # causes-before-effects. The world still reports the map it was given.
-    walkable = graph.model_copy(update={"links": ordinary})
-
-    window = window_of(graph, as_of, slices=slices)
-    drawn = _as_drawn(claims, ordinary, seed, versions)
-    pinned = _pinned_from(assignments, claims)
-    forward = forward_pass(walkable, window, drawn, pinned=pinned)
-    answers, refusals = _answers_from(
-        forward, pinned, window=window, seed=seed, worlds=sampled_worlds
+    worked = _worked_out_by_deadline(
+        graph,
+        assignments,
+        as_of=as_of,
+        seed=seed,
+        versions=versions,
+        slices=slices,
+        sampled_worlds=sampled_worlds,
     )
+    window, drawn, pinned, forward = worked.window, worked.drawn, worked.pinned, worked.forward
+    answers, refusals = worked.answers, worked.refusals
 
     sent = _days_to_send(claims, as_of, window.days)
     beliefs: dict[PropositionId, Belief] = {}
@@ -700,7 +698,7 @@ def _by_deadline(
         )
         held = pinned.get(claim_id)
         supposed = held is not None and held.kind == "do"
-        lines = _lines_of(forward, claim_id, sent, _at_day_zero(held))
+        lines = _lines_of(forward, claim_id, sent, _at_day_zero(held), answers[claim_id])
         series[claim_id] = tuple(float(one) for one in lines.mean(axis=0))
         named_days[claim_id] = (("supposed" if supposed else "sampled"),) * len(sent)
 
@@ -740,6 +738,72 @@ def _by_deadline(
 
 
 # --- The pieces the by-deadline assembly owns ------------------------------
+
+
+@dataclass(frozen=True)
+class _WorkedOut:
+    """Everything the by-deadline core works out from a map, a branch and a seed."""
+
+    window: Window
+    drawn: Drawn
+    pinned: Mapping[PropositionId, Pin]
+    forward: Forward
+    answers: Mapping[PropositionId, Numbers]
+    refusals: tuple[str, ...]
+
+
+def _worked_out_by_deadline(
+    graph: Graph,
+    assignments: tuple[Assignment, ...],
+    *,
+    as_of: date,
+    seed: int,
+    versions: int,
+    slices: int,
+    sampled_worlds: int,
+) -> _WorkedOut:
+    """Draw the numbers, work out when, and solve whether — the whole of the arithmetic.
+
+    **One route, used twice.** A world is built from this, and the version-by-version
+    numbers a comparison reads are rebuilt from it. Two routes would be two chances
+    for a world and the comparison of two worlds to disagree about the same map — and
+    the disagreement would not be visible, because each is separately reasonable.
+
+    Args:
+        graph: The map a fold left behind.
+        assignments: Every value that fold fixed, in order.
+        as_of: Day zero — the day the window starts on.
+        seed: The one number every random draw comes from.
+        versions: How many versions of the map to work out.
+        slices: How many equal pieces to cut each claim's window into.
+        sampled_worlds: How many worlds to draw where something was observed.
+
+    Returns:
+        The window, the drawn numbers, what each edit fixed, the finished pass, every
+        claim's solved number one per version, and any sentence the reader is owed.
+    """
+    claims: Mapping[PropositionId, Proposition] = {one.id: one for one in graph.propositions}
+    ordinary = _ordinary_arrows(graph, claims)
+    # A feedback arrow is carried as data and set aside, exactly as the map's own
+    # loop check sets it aside, so the pass below is handed a map it can walk
+    # causes-before-effects. The world still reports the map it was given.
+    walkable = graph.model_copy(update={"links": ordinary})
+
+    window = window_of(graph, as_of, slices=slices)
+    drawn = _as_drawn(claims, ordinary, seed, versions)
+    pinned = _pinned_from(assignments, claims)
+    forward = forward_pass(walkable, window, drawn, pinned=pinned)
+    answers, refusals = _answers_from(
+        forward, pinned, window=window, seed=seed, worlds=sampled_worlds
+    )
+    return _WorkedOut(
+        window=window,
+        drawn=drawn,
+        pinned=pinned,
+        forward=forward,
+        answers=answers,
+        refusals=refusals,
+    )
 
 
 def _as_drawn(
@@ -937,14 +1001,41 @@ def _lines_of(
     claim_id: PropositionId,
     sent: NDArray[numpy.int64],
     at_day_zero: float,
+    answer: Numbers,
 ) -> Numbers:
     """Read one claim's chance of having happened at each day the reader is sent.
 
-    The forward pass leaves, for every claim and every version, the chance it is
-    holding at the end of each slice of **its own** window. This reads those curves
-    at the days a reader is given, straight-lining between slice ends and holding the
-    last value past the claim's own deadline — an event that has happened never
-    un-happens, and a claim is not judged twice.
+    **A shape from the pass, a size from the solve.** The forward pass leaves, for
+    every claim and every version, the chance it is holding at the end of each slice
+    of **its own** window. Read at the days the reader is given — straight-lining
+    between slice ends, and holding the last value past the claim's own deadline,
+    because an event that has happened never un-happens and a claim is not judged
+    twice — that curve says **what share** of the claim's whole chance has arrived by
+    each day. The exact solve says **how much** that whole chance is. A day of the
+    line is the share times the whole.
+
+    **Why the two have to be married here.** The pass and the solve answer the same
+    question by different routes, and on a claim reached two ways at once they do not
+    give the same number: the pass averages each cause's timing one cause at a time,
+    so it treats two causes' arrival days as independent even when both descend from
+    one claim, and the solve does not. Left as they were, a tile read `.51` above a
+    chart that ended at `.50` — two numbers for one claim on one day, different at the
+    two figures the product prints, with no edit in force
+    (`plans/analysis/2026-09-22-review-05-core.md`, must-fix 1). Dividing the curve by
+    its own last value throws away exactly the quantity the two disagree about and
+    keeps the only thing the pass is the authority on, which is the *order* the chance
+    arrives in. The last day then reads the solved number **exactly**: the share on
+    that day is a number divided by itself, which is one.
+
+    A claim whose whole chance is nought has no shape to speak of — its curve is flat
+    along the bottom — and its solved number is nought too, because a claim the timing
+    model can never bring about is a claim no solve over those same tables can either.
+    Such a line is left on the floor rather than dividing nought by nought.
+
+    The line is held between nought and one. That binds on a **state** and only a
+    state: a state's curve can fall as well as rise, so its share of the whole can
+    read above one on a day it was more likely to be holding than it is on its
+    deadline. It never binds on the last day, which is the solved number itself.
 
     **Written once and used twice**: the world's own series is the average of these
     lines, and the version-by-version numbers a comparison reads are the lines
@@ -956,16 +1047,23 @@ def _lines_of(
         claim_id: The claim whose lines are wanted.
         sent: The days of the window the reader is given.
         at_day_zero: What the claim reads on the first day of the window.
+        answer: `(versions,)` the claim's solved number — the very numbers the tile
+            and the range are read off, so that the line and the tile cannot part.
 
     Returns:
-        `(versions, days sent)` the chance the claim has happened by each of them.
+        `(versions, days sent)` the chance the claim has happened by each of them,
+        ending on `answer`.
     """
     curves = forward.times[claim_id].holding
     edges = forward.shapes[claim_id].edges
     days = sent.astype(numpy.float64)
     start = numpy.full((curves.shape[0], 1), at_day_zero)
     whole = numpy.concatenate([start, curves], axis=1)
-    return numpy.array([numpy.interp(days, edges, row) for row in whole])
+    arrived = numpy.array([numpy.interp(days, edges, row) for row in whole])
+    by_the_end = arrived[:, [-1]]
+    share = numpy.divide(arrived, by_the_end, out=numpy.zeros_like(arrived), where=by_the_end > 0.0)
+    lines: Numbers = numpy.clip(share * answer[:, None], 0.0, 1.0)
+    return lines
 
 
 def _clamps_said_out_loud(
@@ -1030,10 +1128,13 @@ def _versions_by_deadline(world: World) -> Versions:
     **How much the worlds inside a version disagreed is nought**, for the same
     reason: there is no inner loop for them to disagree in.
 
-    **Dated 2026-09-22.** The lines below are the map's own timing, so on a branch
-    where *This happened* is in force they are not conditioned on the news the way
-    the tile's own number is. Reworking what a comparison reads is the flip's, in
-    the pull request that makes this engine the default.
+    **The whole arithmetic is run again, the solve included, and not the pass
+    alone.** A day of a line is the share of the claim's chance that has arrived by
+    then times the claim's solved number, so a rebuild that stopped at the pass would
+    hand a comparison lines that end somewhere other than the tiles it is comparing —
+    and the change list reads both, the tiles for its two numbers and these lines for
+    which way the versions agreed and how firm the number is on the day the two
+    worlds are furthest apart.
 
     Args:
         world: The world to look behind. Its map, the values its edits fixed, its
@@ -1042,26 +1143,33 @@ def _versions_by_deadline(world: World) -> Versions:
     Returns:
         One record of the version-by-version numbers.
     """
-    claims: Mapping[PropositionId, Proposition] = {one.id: one for one in world.graph.propositions}
-    ordinary = _ordinary_arrows(world.graph, claims)
-    walkable = world.graph.model_copy(update={"links": ordinary})
-    drawn = _as_drawn(claims, ordinary, world.seed, world.versions)
-    pinned = _pinned_from(world.assignments, claims)
-    forward = forward_pass(
-        walkable, window_of(world.graph, world.day_zero, slices=SLICES), drawn, pinned=pinned
+    worked = _worked_out_by_deadline(
+        world.graph,
+        world.assignments,
+        as_of=world.day_zero,
+        seed=world.seed,
+        versions=world.versions,
+        slices=SLICES,
+        sampled_worlds=SAMPLED_WORLDS,
     )
     sent = numpy.array(world.series_days, dtype=numpy.int64)
     nothing = numpy.zeros((world.versions, len(world.series_days)))
     return Versions(
         days=tuple(world.series_days),
-        weights={one: numpy.ones(world.versions) for one in forward.order},
+        weights={one: numpy.ones(world.versions) for one in worked.forward.order},
         reweighted=frozenset(),
-        priors=dict(drawn.own_chance),
+        priors=dict(worked.drawn.own_chance),
         likelihood={
-            one: _lines_of(forward, one, sent, _at_day_zero(pinned.get(one)))
-            for one in forward.order
+            one: _lines_of(
+                worked.forward,
+                one,
+                sent,
+                _at_day_zero(worked.pinned.get(one)),
+                worked.answers[one],
+            )
+            for one in worked.forward.order
         },
-        inner_spread={one: nothing for one in forward.order},
+        inner_spread={one: nothing for one in worked.forward.order},
     )
 
 

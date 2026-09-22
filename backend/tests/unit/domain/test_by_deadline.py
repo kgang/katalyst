@@ -87,7 +87,6 @@ Decision record 0016 calls the solve exact, and this is what exact means when tw
 programs add the same numbers up in a different order.
 """
 
-
 # --- Small maps these tests build by hand -----------------------------------
 
 
@@ -346,6 +345,49 @@ def _map_with_a_diamond() -> Graph:
 
 
 # --- The three defects record 0016 exists to fix ----------------------------
+
+
+def test_a_claims_line_ends_on_the_number_on_its_tile() -> None:
+    """One claim, one day, one number — the end of a chart is the tile above it.
+
+    A claim's number is the exact solve's. The chart beneath it is the forward
+    pass's arrival curve. On a **diamond** — a claim reached both straight in and
+    round through a third — the two routes do not agree: the pass averages each
+    cause's timing one cause at a time and so treats two causes' arrival days as
+    independent even when both descend from one claim, and the solve does not. Left
+    alone, a tile read one number and the end of its own chart read another, far
+    enough apart to print differently at the two figures the product shows
+    (`plans/analysis/2026-09-22-review-05-core.md`, must-fix 1).
+
+    So the line carries the pass's **shape** and the solve's **size**, and its last
+    day is the solved number by construction. This checks it on the diamond under
+    every question the product can ask — no edit, *Suppose this is true* both ways
+    on every claim, *This happened* both ways on every claim — and to a
+    ten-thousandth of a millionth of a millionth, which is the distance two ways of
+    adding the same eight numbers up can drift apart.
+
+    Every claim's own resolve-by day is on its series whatever the cap says, and a
+    claim is not judged twice, so the last day of a line is the claim's own deadline
+    for every claim on the map.
+    """
+    graph = _map_with_a_diamond()
+    every_claim = sorted(one.id for one in graph.propositions)
+    asked: list[tuple[str, tuple[object, ...]]] = [("no edit", ())]
+    for who in every_claim:
+        for value in (True, False):
+            asked.append((f"suppose {who} is {value}", (Do(target=who, value=value, at=None),)))
+            asked.append(
+                (f"this happened: {who} is {value}", (Observe(target=who, value=value, at=None),))
+            )
+
+    for said, edits in asked:
+        world = _by_deadline(graph, *edits)
+        for claim_id, belief in world.beliefs.items():
+            ends_at = world.series[claim_id][-1]
+            assert ends_at == pytest.approx(belief.p, abs=1e-12), (
+                f"under {said}, {claim_id}'s tile and the last day of its own chart are two "
+                f"different numbers, {belief.p - ends_at:+.3e} apart"
+            )
 
 
 def test_this_happened_moves_what_caused_it() -> None:
