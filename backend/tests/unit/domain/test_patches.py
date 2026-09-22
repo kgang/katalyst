@@ -1260,6 +1260,53 @@ def test_intervention_locality(kind: str, data: st.DataObject) -> None:
     _same_on_the_days_they_share(base, branched, pinned)
 
 
+@given(st.data())
+@a_few
+def test_a_claim_cut_off_from_the_evidence_is_bit_for_bit(data: st.DataObject) -> None:
+    """A claim the evidence cannot reach is byte-identical, not merely close.
+
+    The locality oracle of decision record 0016, restated for the one verb that
+    can move a claim upstream. *This happened* is news: it may revise what we
+    believe about what caused the claim, and about everything those causes lead
+    to. It may revise **nothing else at all** — and *nothing else at all* means
+    the last bit of every number, not a small difference somebody would have to
+    judge.
+
+    The reach is worked out here from the shape of the map and never asked of the
+    engine, the way the test above works it out: a claim is cut off from the
+    evidence when no chain of arrows runs between the two in either direction and
+    no claim is a cause of both. The test pins one such claim, checks the whole
+    set of them, and asks for four things bit for bit — every version's answer,
+    the spread inside each version, how much each version counts, and the one
+    number they average to — plus every day of every series they both drew.
+
+    Both pieces of news are run against one base world, because *it happened* and
+    *it did not happen* keep different worlds and either could leak.
+
+    Under record 0016 this stops being a property somebody has to keep true and
+    becomes a theorem: a claim cut off from the evidence has a factor that adds up
+    to one, so it comes out of the arithmetic untouched. It is written here
+    because it has to hold **before and after**, and a rule that only holds after
+    is a plan rather than a rule.
+    """
+    graph = data.draw(graphs(separated=True))
+    subject, pinned = data.draw(separated_pair(graph))
+    base = _world_of(graph)
+
+    for value in (True, False):
+        news = Observe(target=subject, value=value)
+        told = _world_of(graph, news)
+        may_move = _affected_from_the_shape(graph, news)
+
+        assert pinned not in may_move
+        cut_off = [one for one in told.beliefs if one not in may_move]
+        assert cut_off, "this map left no claim the evidence cannot reach"
+        every_version_answered_the_same(base, told, cut_off)
+        for claim_id in cut_off:
+            assert told.beliefs[claim_id] == base.beliefs[claim_id], (claim_id, value)
+            _same_on_the_days_they_share(base, told, claim_id)
+
+
 def _in_force(fixed: tuple[object, ...]) -> dict[str, tuple[str, bool]]:
     """Which value is in force on each claim, and which verb fixed it.
 

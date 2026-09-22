@@ -44,6 +44,23 @@ between, and a named state for each of those days. `diff.py` compares two such
 worlds: what happened to every claim, which endings moved and in what order, and
 one fixed sentence saying so; it also sweeps a world one claim at a time, to see
 what each flip would move.
+
+What is being built beside it
+-----------------------------
+Five modules — `rates.py`, `states.py`, `forward.py`, `solving.py` and
+`sampling.py` — are the new arithmetic of decision record 0016, in which a claim's
+number is **the chance it happens by its deadline** rather than a likelihood read
+on one day. `rates.py` turns the chances a person stated into rates; `states.py`
+gives a claim that can stop a second time; `forward.py` works out **when** every
+claim happens in one pass; `solving.py` answers **whether**, exactly; `sampling.py`
+draws weighted worlds where something was reported to have happened, and hands the
+days a later stack reads.
+
+`propagate` takes an `engine` argument naming which arithmetic to use, and **it
+still defaults to the one this layer has always run**. The two stand side by side
+while the second is checked against the first; which one every world on this server
+uses is that default, `DEFAULT_ENGINE` in `propagation.py`, so a caller that says
+nothing cannot be left behind when the flip changes it.
 """
 
 from katalyst.domain.belief import Belief, Beliefs, two_figures
@@ -58,6 +75,7 @@ from katalyst.domain.diff import (
     diff,
     sensitivity,
 )
+from katalyst.domain.forward import Forward, forward_pass
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import BranchId, LinkId, PropositionId
 from katalyst.domain.intervention import (
@@ -78,6 +96,9 @@ from katalyst.domain.patch import (
     introduced_by,
 )
 from katalyst.domain.propagation import (
+    DEFAULT_ENGINE,
+    SAMPLED_WORLDS,
+    Engine,
     Retraction,
     SeriesState,
     Versions,
@@ -94,9 +115,52 @@ from katalyst.domain.proposition import (
     Proposition,
     Resolution,
 )
+from katalyst.domain.rates import (
+    POINTS_IN_A_SLICE,
+    SLICES,
+    AddedUp,
+    ClaimShapes,
+    Clamp,
+    Drawn,
+    Persistence,
+    Pin,
+    Rates,
+    Spread,
+    Window,
+    added_up,
+    clamped,
+    rates_of,
+    shapes_of,
+    stated_chance_with,
+    window_of,
+)
+from katalyst.domain.sampling import Ready, Sample, ready_to_sample, sample_forward
+from katalyst.domain.solving import (
+    ImpossibleObservation,
+    all_marginals,
+    elimination_order,
+    solve,
+)
+from katalyst.domain.states import (
+    NEVER,
+    STILL_HOLDING,
+    Times,
+    as_joint,
+    holding_curve,
+    is_true_on_its_deadline,
+    needs_the_joint,
+    on_and_off,
+)
 from katalyst.domain.validity import Violation, ViolationCode, validate
 
 __all__ = [
+    "DEFAULT_ENGINE",
+    "NEVER",
+    "POINTS_IN_A_SLICE",
+    "SAMPLED_WORLDS",
+    "SLICES",
+    "STILL_HOLDING",
+    "AddedUp",
     "Assignment",
     "BaseRate",
     "Belief",
@@ -105,44 +169,75 @@ __all__ = [
     "Branch",
     "BranchId",
     "ClaimDiff",
+    "ClaimShapes",
     "ClaimState",
+    "Clamp",
     "ContractPayoff",
     "Days",
     "DeltaRow",
     "Diff",
     "Do",
+    "Drawn",
+    "Engine",
     "Evidence",
+    "Forward",
     "Graph",
+    "ImpossibleObservation",
     "Insert",
     "Intervention",
     "Link",
     "LinkId",
     "Observe",
     "Payoff",
+    "Persistence",
+    "Pin",
     "PricePayoff",
     "Proposition",
     "PropositionId",
     "Provenance",
+    "Rates",
+    "Ready",
     "Refine",
     "Resolution",
     "Retraction",
     "Retune",
+    "Sample",
     "SensitivityRow",
     "SeriesState",
     "Source",
+    "Spread",
+    "Times",
     "UnchangedBecause",
     "Versions",
     "Violation",
     "ViolationCode",
+    "Window",
     "World",
+    "added_up",
     "affected_set",
+    "all_marginals",
     "apply",
+    "as_joint",
+    "clamped",
     "diff",
+    "elimination_order",
     "flatten",
+    "forward_pass",
+    "holding_curve",
     "introduced_by",
+    "is_true_on_its_deadline",
+    "needs_the_joint",
+    "on_and_off",
     "propagate",
+    "rates_of",
+    "ready_to_sample",
+    "sample_forward",
     "sensitivity",
+    "shapes_of",
+    "solve",
+    "stated_chance_with",
     "two_figures",
     "validate",
     "versions_of",
+    "window_of",
 ]

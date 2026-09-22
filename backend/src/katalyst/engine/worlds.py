@@ -40,6 +40,7 @@ What this file must never do
 from collections.abc import Mapping
 
 from katalyst.domain import (
+    DEFAULT_ENGINE,
     Assignment,
     Belief,
     Branch,
@@ -442,5 +443,13 @@ def _worked_through(
         versions=versions,
         worlds=worlds,
         introduced_by=told,
+        # Which arithmetic works the map through is `DEFAULT_ENGINE`, one word in
+        # `katalyst.domain.propagation`, and the flip is changing it. It is named
+        # here rather than left implicit because the three ways into the engine —
+        # `build_world`, `difference` and `conditional` — all come through this
+        # function, so this is where a reader looks for it; but it is the same word
+        # every other caller of `propagate` gets by taking the default, which is
+        # what stops a caller being left behind by the flip.
+        engine=DEFAULT_ENGINE,
     )
     return world.model_copy(update={"branch_id": branch.id if branch is not None else None})

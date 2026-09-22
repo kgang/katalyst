@@ -63,19 +63,31 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from types import MappingProxyType
-from typing import Literal
+from typing import Final, Literal
 
 import networkx
 import numpy
 from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field
 
-from katalyst.domain.belief import Belief
+from katalyst.domain.belief import Belief, two_figures
+from katalyst.domain.forward import Forward, forward_pass
 from katalyst.domain.graph import Graph
 from katalyst.domain.ids import BranchId, LinkId, PropositionId
 from katalyst.domain.link import Link, Provenance
 from katalyst.domain.patch import Assignment
 from katalyst.domain.proposition import Proposition
+from katalyst.domain.rates import (
+    SLICES,
+    Drawn,
+    Pin,
+    Window,
+    clamped,
+    stated_chance_with,
+    window_of,
+)
+from katalyst.domain.sampling import sample_forward
+from katalyst.domain.solving import ImpossibleObservation, all_marginals
 from katalyst.domain.validity import _name_of
 
 Numbers = NDArray[numpy.float64]
@@ -107,6 +119,61 @@ tile shows a word rather than a number.
 `withdrawn` — the supposition has been undermined and no opposing push has
 arrived yet, so the claim reads its own prior again.
 `pushed` — an opposing push is live.
+"""
+
+Engine = Literal["today", "by_deadline"]
+"""Which arithmetic works the map through.
+
+`today` — the two nested loops this file has held since the engine was first
+written: versions of the map on the outside, worlds of dice on the inside.
+`by_deadline` — decision record 0016's core: one forward pass that works out when
+each claim happens, one exact solve for whether it happens, and one weighted sample
+of worlds where something was observed.
+
+The two stand side by side while the second is written and checked against the
+first. Which one runs is `DEFAULT_ENGINE` just below, and never a setting read out
+of the environment: a screen whose numbers depend on how a machine was started is
+exactly the state nobody can trace back to an input, a rule or a source.
+"""
+
+DEFAULT_ENGINE: Final[Engine] = "today"
+"""Which arithmetic works every map on this server through. **The flip is this word.**
+
+`today` is the pair of nested loops the engine has run since stack 03a — versions
+of the map on the outside, worlds of dice on the inside. `by_deadline` is decision
+record 0016's core, where a claim's number is the chance it happens by its
+deadline. Changing this one word moves every number the server prints, once, in one
+reviewable diff.
+
+**It lives here, as `propagate`'s own default, because that is the only place every
+caller already reads.** It was once a constant in `katalyst.engine.worlds` that the
+three routes through that file passed down by hand, and the review of 2026-09-22
+found what that costs: two more callers — `engine/replay.py`, which rebuilds the
+numbers behind a kept recording, and `diff.sensitivity`, which flips each claim in
+turn — reached `propagate` without passing it, so the flip would have left them on
+the old arithmetic. A replay would then have disagreed with the live run it is a
+recording of, silently, every number. A default is the one place a caller cannot
+forget to read.
+
+The one thing a caller must still say out loud is which engine built a world it is
+**re-running** — `versions_of` and `diff.sensitivity` both do, off the world itself
+— because there the answer is not "whatever the server runs now" but "whatever
+built the thing I am comparing against".
+
+It is never a setting read out of the environment. Two people looking at the same
+map, the same branch and the same seed must see the same numbers, and a screen
+whose numbers depend on how a machine happened to be started is exactly the state
+nobody can trace back to an input, a rule or a cited source. No route exposes it,
+and `test_the_flip_is_one_word_in_one_place` fails if any other module in the
+server writes an engine's name down.
+"""
+
+SAMPLED_WORLDS: Final = 50_000
+"""How many worlds the by-deadline engine draws when something has been observed.
+
+Nothing is thrown away: every one of them is kept and weighted by how well it
+matches what was seen. Ignored entirely by the `today` engine, which has its own
+inner loop.
 """
 
 PARAMS_STREAM = 1
@@ -487,6 +554,9 @@ def propagate(
     versions: int = 2_000,
     worlds: int = 8,
     introduced_by: Mapping[LinkId, int] = NOTHING_ADDED,
+    engine: Engine = DEFAULT_ENGINE,
+    slices: int = SLICES,
+    sampled_worlds: int = SAMPLED_WORLDS,
 ) -> World:
     """Work every likelihood on a map through time, and say how sure we are of each.
 
@@ -516,6 +586,16 @@ def propagate(
             it out is only safe when no supposition can be undermined; when one is,
             and its arrow is not in here, that is a broken promise between our own
             two pieces of code and it is said out loud rather than guessed at.
+        engine: Which arithmetic to use. `today` is the two nested loops below;
+            `by_deadline` is decision record 0016's core, which is being written
+            beside it. **Leave it out** unless you are re-running a world somebody
+            else built, in which case name the engine that built it: the default is
+            `DEFAULT_ENGINE`, the one word the flip changes, and a caller that
+            passes nothing is a caller that cannot be left behind by it.
+        slices: How many equal pieces the by-deadline engine cuts the window into.
+            Ignored by `today`.
+        sampled_worlds: How many worlds the by-deadline engine draws when something
+            has been observed. Ignored by `today`, which has its own inner loop.
 
     Returns:
         One world: a likelihood and a range for every claim on the day it is
@@ -529,6 +609,17 @@ def propagate(
             does not account for. The one thing this file raises for, and why is in
             `_retractions`.
     """
+    if engine == "by_deadline":
+        return _by_deadline(
+            graph,
+            assignments,
+            as_of=as_of,
+            seed=seed,
+            versions=versions,
+            introduced_by=introduced_by,
+            slices=slices,
+            sampled_worlds=sampled_worlds,
+        )
     return _propagated(
         graph,
         assignments,
@@ -539,6 +630,608 @@ def propagate(
         introduced_by=introduced_by,
         spreads=PROVENANCE_SPREAD,
     )
+
+
+def _by_deadline(
+    graph: Graph,
+    assignments: tuple[Assignment, ...],
+    *,
+    as_of: date,
+    seed: int,
+    versions: int,
+    introduced_by: Mapping[LinkId, int],
+    slices: int,
+    sampled_worlds: int,
+) -> World:
+    """Work the map through as decision record 0016 says, and build a world out of it.
+
+    Four steps and nothing else. Draw the numbers a person stated, once per version,
+    with the very draws today's engine uses. Work out **when** every claim happens,
+    in one pass, causes before effects. Solve **whether** every claim happens,
+    exactly. And where something was reported to have happened, draw worlds forward
+    and let them correct the exact answer for the timing the evidence moved.
+
+    Three things belong here and in none of the modules underneath.
+
+    1. **Where a claim's range comes from.** The six lines that split a claim's
+       range across the claims that caused it keep today's meaning and today's
+       shape, read off the exact per-version numbers rather than an average over
+       eight sampled worlds. It needs both the drawn priors and the per-version
+       answers, and this is the only place that holds both.
+    2. **The warnings about arrows that fell short.** An arrow whose push covers
+       only part of the window cannot always hold a claim back as far as its number
+       asks; each one that could not gets a plain sentence naming the arrow and both
+       numbers, beside the warning about a loud push that is already here.
+    3. **`World.worlds = 0`**, which means *there is no inner loop*.
+
+    **What a day of a series is here.** The chance the claim has happened by that
+    day. The forward pass says what share of the whole window's chance has arrived
+    by each day; the solve says what the whole window's chance is; a day of the
+    series is the first times the second. So **a claim's series ends on exactly the
+    number on its tile**, for every claim and under every edit — the two are one
+    number read through one shape, not two arithmetics that have to be talked into
+    agreeing. `_lines_of` below is where that is done and why. A claim a supposition
+    holds reads that supposition's value on every day.
+
+    **Every claim is an event here.** Which kind of truth a claim is becomes a field
+    on the claim at the flip (decision record 0017); until then the code that mints a
+    claim from a recorded proposal makes every one an event, so this passes no
+    persistence mapping and the pass takes its own default. The arithmetic
+    underneath already answers for states, and is reached by calling `forward_pass`
+    with a mapping.
+
+    Args:
+        graph: The map a fold left behind.
+        assignments: Every value that fold fixed, in order. When a claim carries
+            more than one, the last is the one in force, which is what `propagate`
+            promises; there is no calendar of stretches on this path, because a
+            claim's number is about its deadline rather than about a day.
+        as_of: Day zero — the day the window starts on.
+        seed: The one number every random draw comes from.
+        versions: How many versions of the map to try.
+        introduced_by: Which edit added each arrow, by position in the branch. Read
+            by nothing here: automatic retraction is gone under decision record
+            0017, so no supposition ends and there is no edit to blame. The argument
+            stays because `propagate` takes it for both engines.
+        slices: How many equal pieces to cut the window into.
+        sampled_worlds: How many worlds to draw where something was observed.
+
+    Returns:
+        One world, with every claim's number read on its own resolve-by day.
+    """
+    claims: Mapping[PropositionId, Proposition] = {one.id: one for one in graph.propositions}
+    worked = _worked_out_by_deadline(
+        graph,
+        assignments,
+        as_of=as_of,
+        seed=seed,
+        versions=versions,
+        slices=slices,
+        sampled_worlds=sampled_worlds,
+    )
+    window, drawn, pinned, forward = worked.window, worked.drawn, worked.pinned, worked.forward
+    answers, refusals = worked.answers, worked.refusals
+
+    sent = _days_to_send(claims, as_of, window.days)
+    beliefs: dict[PropositionId, Belief] = {}
+    series: dict[PropositionId, tuple[float, ...]] = {}
+    named_days: dict[PropositionId, tuple[SeriesState, ...]] = {}
+    evenly = numpy.ones(versions)
+    for claim_id in forward.order:
+        # No inner loop, so there is no coin-flip wobble to subtract: the spread
+        # handed in is nought and the one world said to have run under each version
+        # is this pass. The band is then the tenth and ninetieth percentiles across
+        # the versions, which is the rule the tile has always been drawn to.
+        read = answers[claim_id][:, None]
+        middle, bottom, top = _band(read, numpy.zeros_like(read), evenly, 1)
+        beliefs[claim_id] = Belief(
+            p=float(numpy.clip(middle[0], 0.0, 1.0)),
+            lo=float(numpy.clip(bottom[0], 0.0, 1.0)),
+            hi=float(numpy.clip(top[0], 0.0, 1.0)),
+            owner="model",
+        )
+        held = pinned.get(claim_id)
+        supposed = held is not None and held.kind == "do"
+        lines = _lines_of(forward, claim_id, sent, _at_day_zero(held), answers[claim_id])
+        series[claim_id] = tuple(float(one) for one in lines.mean(axis=0))
+        named_days[claim_id] = (("supposed" if supposed else "sampled"),) * len(sent)
+
+    said = [
+        *_warnings_about(graph, claims, window.days),
+        *_clamps_said_out_loud(forward, drawn, claims),
+        *refusals,
+    ]
+    return World(
+        base_id=graph.id,
+        branch_id=None,
+        seed=seed,
+        versions=versions,
+        # There is no inner loop. Dated 2026-09-22: the field stays on the wire,
+        # always nought, until the browser round closes and the three empty fields
+        # go together.
+        worlds=0,
+        day_zero=as_of,
+        days=window.days,
+        series_days=tuple(int(one) for one in sent),
+        graph=graph,
+        assignments=assignments,
+        # Nothing retracts itself any more (decision record 0017), so this is always
+        # empty, for the same dated reason as `worlds` above.
+        retractions=(),
+        beliefs=beliefs,
+        series=series,
+        states=named_days,
+        conditionals={},
+        range_shares=_shares_of_the_range(
+            list(forward.order),
+            numpy.array([answers[one] for one in forward.order]),
+            drawn.own_chance,
+        ),
+        warnings=tuple(said),
+    )
+
+
+# --- The pieces the by-deadline assembly owns ------------------------------
+
+
+@dataclass(frozen=True)
+class _WorkedOut:
+    """Everything the by-deadline core works out from a map, a branch and a seed."""
+
+    window: Window
+    drawn: Drawn
+    pinned: Mapping[PropositionId, Pin]
+    forward: Forward
+    answers: Mapping[PropositionId, Numbers]
+    refusals: tuple[str, ...]
+
+
+def _worked_out_by_deadline(
+    graph: Graph,
+    assignments: tuple[Assignment, ...],
+    *,
+    as_of: date,
+    seed: int,
+    versions: int,
+    slices: int,
+    sampled_worlds: int,
+) -> _WorkedOut:
+    """Draw the numbers, work out when, and solve whether — the whole of the arithmetic.
+
+    **One route, used twice.** A world is built from this, and the version-by-version
+    numbers a comparison reads are rebuilt from it. Two routes would be two chances
+    for a world and the comparison of two worlds to disagree about the same map — and
+    the disagreement would not be visible, because each is separately reasonable.
+
+    Args:
+        graph: The map a fold left behind.
+        assignments: Every value that fold fixed, in order.
+        as_of: Day zero — the day the window starts on.
+        seed: The one number every random draw comes from.
+        versions: How many versions of the map to work out.
+        slices: How many equal pieces to cut each claim's window into.
+        sampled_worlds: How many worlds to draw where something was observed.
+
+    Returns:
+        The window, the drawn numbers, what each edit fixed, the finished pass, every
+        claim's solved number one per version, and any sentence the reader is owed.
+    """
+    claims: Mapping[PropositionId, Proposition] = {one.id: one for one in graph.propositions}
+    ordinary = _ordinary_arrows(graph, claims)
+    # A feedback arrow is carried as data and set aside, exactly as the map's own
+    # loop check sets it aside, so the pass below is handed a map it can walk
+    # causes-before-effects. The world still reports the map it was given.
+    walkable = graph.model_copy(update={"links": ordinary})
+
+    window = window_of(graph, as_of, slices=slices)
+    drawn = _as_drawn(claims, ordinary, seed, versions)
+    pinned = _pinned_from(assignments, claims)
+    forward = forward_pass(walkable, window, drawn, pinned=pinned)
+    answers, refusals = _answers_from(
+        forward, pinned, window=window, seed=seed, worlds=sampled_worlds
+    )
+    return _WorkedOut(
+        window=window,
+        drawn=drawn,
+        pinned=pinned,
+        forward=forward,
+        answers=answers,
+        refusals=refusals,
+    )
+
+
+def _as_drawn(
+    claims: Mapping[PropositionId, Proposition],
+    arrows: Sequence[Link],
+    seed: int,
+    versions: int,
+) -> Drawn:
+    """Draw every number a person stated, once per version, for the by-deadline core.
+
+    **The draws themselves are today's, unchanged** — the split curve fitted to a
+    stated range on the log-odds scale, the evenly spread draw across it, and the
+    width read off where an arrow's number came from. Decision record 0016 replaces
+    what the engine does with these numbers, not how they are drawn, which is why
+    `_version_priors` and `_version_strengths` are called here rather than copied.
+
+    **What is new is the bridge**, and it is temporary: an arrow's drawn push is in
+    log-odds, and the new core wants *the chance this claim reaches its deadline
+    with that one cause on*. `stated_chance_with` converts one to the other, and its
+    own docstring says plainly that this is a conversion rather than an identity.
+    The one shape freeze asks the model for the number directly and the bridge goes
+    with it.
+
+    Args:
+        claims: Every claim on the map, by identifier.
+        arrows: The arrows the arithmetic uses, feedback arrows already set aside.
+        seed: The one number every draw comes from.
+        versions: How many versions of the map to draw.
+
+    Returns:
+        One draw per version of every claim's own chance and of the chance with each
+        one cause on.
+    """
+    own = {claim_id: _version_priors(one, seed, versions) for claim_id, one in claims.items()}
+    return Drawn(
+        versions=versions,
+        own_chance=own,
+        with_this_cause={
+            arrow.id: stated_chance_with(
+                own[arrow.target],
+                _version_strengths(arrow, seed, versions, PROVENANCE_SPREAD),
+            )
+            for arrow in arrows
+        },
+    )
+
+
+def _pinned_from(
+    assignments: Sequence[Assignment], claims: Mapping[PropositionId, Proposition]
+) -> dict[PropositionId, Pin]:
+    """Read the values a branch's edits fixed as one pin per claim.
+
+    **The last edit on a claim is the one in force**, which is what `propagate`
+    promises its caller. Today's engine works that out as a calendar of stretches,
+    because its numbers are read day by day; here a claim's number is about its own
+    deadline, so what is in force is a single value and there is no stretch to keep.
+
+    An edit naming a claim the map does not carry is passed over, the same way the
+    day-by-day engine passes it over: the fold already answered for it.
+
+    Args:
+        assignments: Every value the edits fixed, in the order they were made.
+        claims: Every claim on the map, by identifier.
+
+    Returns:
+        Claim -> the value fixed on it and which verb fixed it.
+    """
+    return {
+        one.target: Pin(value=one.value, kind=one.kind)
+        for one in assignments
+        if one.target in claims
+    }
+
+
+def _answers_from(
+    forward: Forward,
+    pinned: Mapping[PropositionId, Pin],
+    *,
+    window: Window,
+    seed: int,
+    worlds: int,
+) -> tuple[Mapping[PropositionId, Numbers], tuple[str, ...]]:
+    """Work out every claim's number, and say so plainly if the news cannot have happened.
+
+    Three cases. With nothing reported, the exact solve is the whole answer. With
+    something reported, the exact solve answers **whether** and a weighted sample of
+    worlds corrects it for the fact that learning a claim happened moves *when* its
+    causes happened as well as whether they did; one correction per claim, drawn at
+    one version and added to every version's answer.
+
+    **A claim the evidence cannot reach keeps its exact answer, untouched.** The
+    solve makes locality a theorem — a claim joined to the evidence by no chain of
+    arrows and sharing no cause with it comes out **bit for bit** as it would have
+    with nothing reported at all — and a sampled correction, however small, would
+    throw that away. So the map is solved a second time with the report set aside,
+    and a correction is added **only where those two answers differ**. That test is
+    the promise itself rather than a stand-in for it: the numbers compared are the
+    very numbers the promise is about.
+
+    **And when nothing the map can produce agrees with what was reported**, there is
+    no answer to condition on. Today's engine keeps none of its worlds, reads the
+    claims the news reaches off an empty set, and warns the reader loudly; this one
+    has no worlds to keep, so it answers with **the map's own numbers, worked out as
+    though nothing had been reported**, and says exactly that in a sentence naming
+    the claims. Neither engine raises and neither shows a number that is not a
+    number. What is different is which numbers stand beside the warning, and that is
+    said out loud here rather than left for a reader to discover.
+
+    Args:
+        forward: The finished forward pass.
+        pinned: The value fixed on each claim, and which verb fixed it.
+        window: The map's window, which the sample draws its days on.
+        seed: The one number every draw comes from.
+        worlds: How many worlds to draw where something was reported.
+
+    Returns:
+        Claim -> one number per version, and any sentence the reader must be told.
+    """
+    reported = tuple(one for one in forward.order if _pin_kind(pinned, one) == "observe")
+    if not reported:
+        return all_marginals(forward, pinned), ()
+    levers = {one: pin for one, pin in pinned.items() if pin.kind == "do"}
+    with_it_set_aside = all_marginals(forward, levers)
+    try:
+        exact = all_marginals(forward, pinned)
+        corrected = sample_forward(
+            forward,
+            pinned,
+            window=window,
+            version=0,
+            seed=seed,
+            worlds=worlds,
+            exact=exact,
+        ).correction
+    except ImpossibleObservation:
+        return with_it_set_aside, (_nothing_agrees_with(reported),)
+    return (
+        {
+            one: row
+            if numpy.array_equal(row, with_it_set_aside[one])
+            else numpy.clip(row + corrected[one], 0.0, 1.0)
+            for one, row in exact.items()
+        },
+        (),
+    )
+
+
+def _pin_kind(pinned: Mapping[PropositionId, Pin], claim_id: PropositionId) -> str | None:
+    """Say which verb fixed a claim's value, or nothing at all if no edit fixed it."""
+    pin = pinned.get(claim_id)
+    return None if pin is None else pin.kind
+
+
+def _nothing_agrees_with(reported: Sequence[PropositionId]) -> str:
+    """Say, in one sentence, that no world this map can produce matches what was reported.
+
+    Args:
+        reported: The claims *This happened* was used on, in the map's own order.
+
+    Returns:
+        One sentence for the reader, naming them.
+    """
+    which = ", ".join(reported)
+    return (
+        f"Nothing this map can produce agrees with what was reported about {which}, so "
+        "there is no world left to read a number off. Every number below is the map's "
+        "own, worked out as though nothing had been reported — the report itself has "
+        "moved nothing."
+    )
+
+
+def _at_day_zero(held: Pin | None) -> float:
+    """What a claim's line reads on the first day of the window.
+
+    Nought for an ordinary claim: nothing has happened yet. **A claim a supposition
+    holds reads that supposition**, day zero included, because what the reader typed
+    is a hard fact from the moment they typed it rather than something that arrives
+    partway through the first slice. A claim something was reported about reads
+    nought like any other: an observation is news about the whole window, not a value
+    fixed on a day.
+
+    Args:
+        held: The value an edit fixed on the claim, if one did.
+
+    Returns:
+        The claim's number on day zero.
+    """
+    if held is None or held.kind != "do":
+        return 0.0
+    return float(held.value)
+
+
+def _lines_of(
+    forward: Forward,
+    claim_id: PropositionId,
+    sent: NDArray[numpy.int64],
+    at_day_zero: float,
+    answer: Numbers,
+) -> Numbers:
+    """Read one claim's chance of having happened at each day the reader is sent.
+
+    **A shape from the pass, a size from the solve.** The forward pass leaves, for
+    every claim and every version, the chance it is holding at the end of each slice
+    of **its own** window. Read at the days the reader is given — straight-lining
+    between slice ends, and holding the last value past the claim's own deadline,
+    because an event that has happened never un-happens and a claim is not judged
+    twice — that curve says **what share** of the claim's whole chance has arrived by
+    each day. The exact solve says **how much** that whole chance is. A day of the
+    line is the share times the whole.
+
+    **Why the two have to be married here.** The pass and the solve answer the same
+    question by different routes, and on a claim reached two ways at once they do not
+    give the same number: the pass averages each cause's timing one cause at a time,
+    so it treats two causes' arrival days as independent even when both descend from
+    one claim, and the solve does not. Left as they were, a tile read `.51` above a
+    chart that ended at `.50` — two numbers for one claim on one day, different at the
+    two figures the product prints, with no edit in force
+    (`plans/analysis/2026-09-22-review-05-core.md`, must-fix 1). Dividing the curve by
+    its own last value throws away exactly the quantity the two disagree about and
+    keeps the only thing the pass is the authority on, which is the *order* the chance
+    arrives in. The last day then reads the solved number **exactly**: the share on
+    that day is a number divided by itself, which is one.
+
+    A claim whose whole chance is nought has no shape to speak of — its curve is flat
+    along the bottom — and its solved number is nought too, because a claim the timing
+    model can never bring about is a claim no solve over those same tables can either.
+    Such a line is left on the floor rather than dividing nought by nought.
+
+    The line is held between nought and one. That binds on a **state** and only a
+    state: a state's curve can fall as well as rise, so its share of the whole can
+    read above one on a day it was more likely to be holding than it is on its
+    deadline. It never binds on the last day, which is the solved number itself.
+
+    **Written once and used twice**: the world's own series is the average of these
+    lines, and the version-by-version numbers a comparison reads are the lines
+    themselves. Two copies would be two chances for a world and the difference
+    between two worlds to disagree about what a day means.
+
+    Args:
+        forward: The finished forward pass.
+        claim_id: The claim whose lines are wanted.
+        sent: The days of the window the reader is given.
+        at_day_zero: What the claim reads on the first day of the window.
+        answer: `(versions,)` the claim's solved number — the very numbers the tile
+            and the range are read off, so that the line and the tile cannot part.
+
+    Returns:
+        `(versions, days sent)` the chance the claim has happened by each of them,
+        ending on `answer`.
+    """
+    curves = forward.times[claim_id].holding
+    edges = forward.shapes[claim_id].edges
+    days = sent.astype(numpy.float64)
+    start = numpy.full((curves.shape[0], 1), at_day_zero)
+    whole = numpy.concatenate([start, curves], axis=1)
+    arrived = numpy.array([numpy.interp(days, edges, row) for row in whole])
+    by_the_end = arrived[:, [-1]]
+    share = numpy.divide(arrived, by_the_end, out=numpy.zeros_like(arrived), where=by_the_end > 0.0)
+    lines: Numbers = numpy.clip(share * answer[:, None], 0.0, 1.0)
+    return lines
+
+
+def _clamps_said_out_loud(
+    forward: Forward, drawn: Drawn, claims: Mapping[PropositionId, Proposition]
+) -> tuple[str, ...]:
+    """Name every arrow that could not hold its claim back as far as its number asks.
+
+    An arrow whose push covers only part of a claim's window cannot hold that claim
+    to the number stated for it, even with the claim's rate suppressed entirely
+    while the cause is on. The claim then comes out **above** the stated number, and
+    the reader is told which arrow, what it asked for and what it delivered, rather
+    than being shown a number that quietly disagrees with the arrow beside it.
+
+    In the same shape as the warning about a loud push, and sorted by the arrow's
+    own identifier for the same reason: two runs of one map say the same things in
+    the same order.
+
+    Args:
+        forward: The finished forward pass, whose shapes and rates this reads.
+        drawn: The drawn numbers, for what each arrow asked of its claim.
+        claims: Every claim on the map, by identifier.
+
+    Returns:
+        One sentence per arrow that fell short, in arrow order.
+    """
+    named = dict(claims)
+    found: list[tuple[LinkId, str]] = []
+    for claim_id in forward.order:
+        shapes = forward.shapes[claim_id]
+        asked_for = {
+            position: drawn.with_this_cause[arrow_id]
+            for position, arrow_id in enumerate(shapes.arrows)
+        }
+        for clamp in clamped(shapes, forward.rates[claim_id], asked_for):
+            found.append(
+                (
+                    clamp.arrow,
+                    f"The arrow {clamp.arrow} into {_name_of(named, claim_id)} is stated to "
+                    f"hold that claim to {two_figures(clamp.asked)} by its deadline, and the "
+                    f"most it can hold it to is {two_figures(clamp.delivered)}, because its "
+                    "push covers only part of the window. The map is still legal; the "
+                    "claim's own number comes out above the one stated for the arrow.",
+                )
+            )
+    return tuple(said for _arrow, said in sorted(found))
+
+
+def _versions_by_deadline(world: World) -> Versions:
+    """Rebuild a by-deadline world's version-by-version numbers, for comparing two of them.
+
+    The same three inputs give the same answer, so this runs the pass again rather
+    than a world carrying millions of numbers to a browser — exactly as the
+    day-by-day engine's own rebuild does.
+
+    **Every version counts the same, and no version is ever counted twice.** The
+    day-by-day engine weighs a version by the share of its worlds that survived what
+    was reported; here there are no worlds to survive, because *This happened* is
+    answered by conditioning the exact solve. So the weights are all ones and no
+    claim is reweighted, and both facts are properties of the arithmetic rather than
+    a default anybody chose.
+
+    **How much the worlds inside a version disagreed is nought**, for the same
+    reason: there is no inner loop for them to disagree in.
+
+    **The whole arithmetic is run again, the solve included, and not the pass
+    alone.** A day of a line is the share of the claim's chance that has arrived by
+    then times the claim's solved number, so a rebuild that stopped at the pass would
+    hand a comparison lines that end somewhere other than the tiles it is comparing —
+    and the change list reads both, the tiles for its two numbers and these lines for
+    which way the versions agreed and how firm the number is on the day the two
+    worlds are furthest apart.
+
+    Args:
+        world: The world to look behind. Its map, the values its edits fixed, its
+            day zero and its seed are all read off it.
+
+    Returns:
+        One record of the version-by-version numbers.
+    """
+    worked = _worked_out_by_deadline(
+        world.graph,
+        world.assignments,
+        as_of=world.day_zero,
+        seed=world.seed,
+        versions=world.versions,
+        slices=SLICES,
+        sampled_worlds=SAMPLED_WORLDS,
+    )
+    sent = numpy.array(world.series_days, dtype=numpy.int64)
+    nothing = numpy.zeros((world.versions, len(world.series_days)))
+    return Versions(
+        days=tuple(world.series_days),
+        weights={one: numpy.ones(world.versions) for one in worked.forward.order},
+        reweighted=frozenset(),
+        priors=dict(worked.drawn.own_chance),
+        likelihood={
+            one: _lines_of(
+                worked.forward,
+                one,
+                sent,
+                _at_day_zero(worked.pinned.get(one)),
+                worked.answers[one],
+            )
+            for one in worked.forward.order
+        },
+        inner_spread={one: nothing for one in worked.forward.order},
+    )
+
+
+def engine_that_built(world: World) -> Engine:
+    """Say which arithmetic built a world, reading the world itself and nothing else.
+
+    **A world already records this, and no flag was added for the purpose.** The
+    by-deadline core has no inner loop at all, so it writes `worlds = 0`; the
+    day-by-day engine runs at least two worlds under every version and could never
+    write nought. One field, two meanings that cannot overlap.
+
+    Anything **re-running** a world has to ask. Which engine a fresh world is built
+    with is whatever the server runs now, which is `DEFAULT_ENGINE`; but a run that
+    exists to be compared against a world somebody else built — the version-by-
+    version rebuild a comparison reads, the one-at-a-time sweep in `diff.py` — must
+    use the arithmetic that built the thing it is compared against, or the
+    difference it reports is partly the change of engine and nobody can tell which
+    part. Around the flip, when a screen may still be holding a world the old
+    engine built, that is the difference between a sound answer and a number nobody
+    can account for.
+
+    Args:
+        world: The world to ask about.
+
+    Returns:
+        The name `propagate` takes for the arithmetic that built it.
+    """
+    return "by_deadline" if world.worlds == 0 else "today"
 
 
 def _propagated(
@@ -641,6 +1334,12 @@ def versions_of(world: World) -> Versions:
     rather than storing them. The cost is one more run of the engine; the saving
     is that a world stays small enough to send to a browser.
 
+    **A world the by-deadline engine built says so by running no inner loop at
+    all**, and its numbers are rebuilt by that engine rather than by this one. That
+    is the one thing this function reads off a world to decide how to answer it,
+    and it is a fact the world already carries rather than a flag added for the
+    purpose.
+
     Args:
         world: The world to look behind.
 
@@ -649,6 +1348,8 @@ def versions_of(world: World) -> Versions:
         each version drew for each claim, and each version's answer for each claim
         on each day.
     """
+    if engine_that_built(world) == "by_deadline":
+        return _versions_by_deadline(world)
     setup = _prepare(world.graph, world.assignments, world.day_zero)
     sample = _draw(
         setup,
@@ -1941,14 +2642,19 @@ def _band(
             is also what guarantees these weights are never all zeroes — the
             "nothing survived anywhere" fallback lives there, so there is no second
             copy of it here to drift from it.
-        worlds: How many worlds ran under each version.
+        worlds: How many worlds ran under each version. **Nought means there was no
+            inner loop at all** — the by-deadline engine — and then there is no
+            coin-flip wobble to subtract and the spread handed in is nought. The
+            floor below keeps that case from dividing nought by nought; at one world
+            and above it changes nothing, so the day-by-day engine's arithmetic is
+            the arithmetic it always was.
 
     Returns:
         The likelihood, the bottom of the range, and the top.
     """
     middle = _weighted_mean(values, weights)
     across = _weighted_mean((values - middle[None, :]) ** 2, weights)
-    within = _weighted_mean(spread, weights) / worlds
+    within = _weighted_mean(spread, weights) / max(worlds, 1)
     shrink = numpy.sqrt(
         numpy.clip(
             1.0 - numpy.divide(within, across, out=numpy.ones_like(across), where=across > 0.0),
@@ -1990,6 +2696,31 @@ def _range_shares(
     if not order:  # pragma: no cover - a map always has at least one claim
         return {}
     read = numpy.array([sample.likelihood[one][:, setup.read_at[one]] for one in order])
+    return _shares_of_the_range(order, read, sample.priors)
+
+
+def _shares_of_the_range(
+    order: Sequence[PropositionId],
+    read: Numbers,
+    priors: Mapping[PropositionId, Numbers],
+) -> dict[PropositionId, dict[PropositionId, float]]:
+    """Split each claim's band across the priors, given each claim's number per version.
+
+    **The six lines both engines share**, written once so that the two cannot drift.
+    The day-by-day engine hands in each claim's number on its own resolve-by day,
+    averaged over that version's worlds; the by-deadline engine hands in the exact
+    per-version number. The arithmetic in between is the same either way, which is
+    why it is here rather than copied.
+
+    Args:
+        order: Every claim on the map, in a settled order.
+        read: `(claims, versions)` each claim's number in each version, laid out in
+            that order.
+        priors: Claim -> the likelihood each version drew for its prior.
+
+    Returns:
+        For each claim, how much of its band each claim's prior explains.
+    """
     middle = read.mean(axis=1)
     total = ((read - middle[:, None]) ** 2).mean(axis=1)
     groups = min(RANGE_BINS, read.shape[1])
@@ -1998,7 +2729,7 @@ def _range_shares(
 
     shares: dict[PropositionId, dict[PropositionId, float]] = {one: {} for one in order}
     for source in order:
-        by_prior = numpy.argsort(sample.priors[source], kind="stable")
+        by_prior = numpy.argsort(priors[source], kind="stable")
         grouped = numpy.add.reduceat(read[:, by_prior], edges, axis=1) / sizes[None, :]
         explained = ((grouped - middle[:, None]) ** 2 * sizes[None, :]).sum(axis=1) / read.shape[1]
         for index, target in enumerate(order):

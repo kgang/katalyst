@@ -64,7 +64,7 @@ Every document, identifier, and UI label uses these words exactly. If a better w
 
 ## The trade
 
-The words stack 06 adds, from decision records 0018 (like with like), 0019 (a stop is a price the reader owns) and 0020 (a quote is recorded first). **The price half is built** — *quote*, *edge*, *break-even*, *no-trade band*, *fee*, *tick* and *not comparable* are in `backend/src/katalyst/grounding/` and `thesis/edge.py`. **The rest is not in the build yet**; the words are settled here first, as this document's own rule asks.
+The words stack 06 adds, from decision records 0018 (like with like), 0019 (a stop is a price the reader owns) and 0020 (a quote is recorded first). **All but two of them are built**, in `backend/src/katalyst/grounding/` and `backend/src/katalyst/thesis/`. The two that are not say so in their own entries: a **spot anchor** waits on the economic-data adapter, and the two filters that fill a **watchlist** wait on a sweep that flips each claim both ways.
 
 **Edge.** The model's **unconditional** number for a claim against a price somebody will actually deal at: *buying* = model − the best offer − any fee; *selling* = the best bid − model − any fee. Computed only from the world with nothing fixed by an edit, by one function that takes that world and the world on screen as two separate arguments (decision record 0018). Signed, and a negative edge is a complete answer. Never used for an arrow on the map, and never for the gap between the model and a reader's own belief.
 
@@ -80,7 +80,7 @@ The words stack 06 adds, from decision records 0018 (like with like), 0019 (a st
 
 **Quote.** What a venue is charging for a contract: the venue; its condition, market and outcome-token identifiers; the side; the best bid and best offer as read; the instant; resting size and traded volume; whether it is closed and accepting orders; the venue's own question, rules and end date; the minimum price increment; a web address; and `source` — `fetched`, `recorded` or `user`. The midpoint is derived, never asserted. A `user` quote is the reader's **report of a price they could deal at**, which is not a `user` belief about the claim.
 
-**Spot anchor.** A measured historical level from an economic-data service — an **observation** with a series name and a vintage date. It anchors a price ending; it never fills the `market` belief (decision record 0020).
+**Spot anchor.** A measured historical level from an economic-data service — an **observation** with a series name and a vintage date. It anchors a price ending; it never fills the `market` belief (decision record 0020). **Not in the build yet**: the economic-data adapter is the one piece of the price layer still ahead.
 
 **Position.** The reader's trade on one ending: instrument or contract, side, entry, stop, target, horizon, **risk budget** — the share of their capital they are prepared to lose on this trade. Every field theirs; none derived.
 
@@ -98,7 +98,7 @@ The words stack 06 adds, from decision records 0018 (like with like), 0019 (a st
 
 **What takes you out.** The list of claims ranked by lift. Company, not cause.
 
-**Watchlist.** The rows under *what to watch*. The word *invalidation* is retired.
+**Watchlist.** The rows under *what to watch*. The word *invalidation* is retired. A card carries these rows and never calls one a stop, but **nothing computes them yet**: the two filters wait on a sweep that flips each claim both ways, and until then they are handed in.
 
 **Mixture.** The two terms shown after a *Suppose* — the map's own chance of the supposition times the supposed reading, plus one minus that chance times the reading with it supposed false. An **explanation with a measured residual**, never the number compared against a price.
 
@@ -106,9 +106,9 @@ The words stack 06 adds, from decision records 0018 (like with like), 0019 (a st
 
 ## The finale
 
-**Thesis.** The compiled trade: `hypothesis`, `horizon`, `legs[]` (instrument or contract, direction, size, driving claim, model p, quote, fee, the gain from buying and from selling — or a named refusal — and the break-even), `carried_by`, `takes_you_out`, `watch`, `unhedgeable`, `your_exit` (stop, target, horizon — the reader's), `distribution` (p10/p50/p90, the chance of the stop first, of the target first, of neither), `tails[]`, `stresses[]`, `refuses[]`, `not_advice`.
+**Thesis.** The compiled trade a reader carries away, in nine sections: the trade · what carries it · what is priced in · what takes you out · what to watch · your exit · tails and shocks · what else can I trade · what this does not know. Every number on it names exactly one owner and what kind of number it is. The owners are the **reader**, the **model**, a **venue**, and a **computation** over the drawn worlds — four, where a *belief* has three (`model`, `user`, `market`), because a thesis also holds numbers this program worked out. They line up: a belief's `user` is a thesis's *reader*, its `market` is a *venue*, `model` is `model`, and *computed* is the one a belief never has.
 
-**Strategy export.** A declarative JSON rendering of a thesis with graph references justifying each leg; the shape a downstream trading agent could ingest.
+**Strategy export.** A declarative document, `legs[]` and `conditions[]`, with the map, the branch, the seed and the day stamped on it so it replays, and with its own limits carried as data: a `refuses` list of full sentences, a `not_advice` line and one `execution` sentence. Never a venue's combination-leg structure, which is an **order** format — this product is not an execution layer. Its description is generated from the shapes and committed beside them, and that description pins the document's own name, refuses an empty `refuses`, and requires a shock's `probability` to be nothing.
 
 ## Surfaces
 
