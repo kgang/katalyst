@@ -1580,3 +1580,50 @@ can you explain to me what feature or product changes you've been working on thi
 **Commit:** `docs: the requirements, record 0019 and the generation chapters lose the range and the versions`</result>
 <usage><subagent_tokens>147250</subagent_tokens><tool_uses>80</tool_uses><duration_ms>475275</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>ae2ae456e3cdccbce</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/ae2ae456e3cdccbce.output</output-file>
+<status>completed</status>
+<summary>Agent "T2b: Draws adapter and position route" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>T2b is built, committed on `feat/06-position-route` (6 commits, clean tree). Nothing pushed.
+
+**What I run to check it**
+```
+cd backend &amp;&amp; env -u ANTHROPIC_API_KEY -u FRED_API_KEY uv run pytest tests/thesis/test_adapter.py tests/api/test_thesis.py -q
+cd backend &amp;&amp; uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy --strict src/katalyst/thesis &amp;&amp; uv run mypy src
+cd frontend &amp;&amp; npm run check
+```
+
+**The shape**
+```
+POST /api/thesis/position
+→ {base_id, branch?, seed, ending, entry, stop, target, horizon,
+   risk_budget, daily_move, versions?, worlds?, drawn_worlds?}
+← {base_id, branch_id, seed, as_of, drawn_worlds, effective_draws,   (Figures)
+   the_trade,        card.TheTrade — ending, instrument, side, test, venue
+   your_exit,        card.YourExit — reader's four, implied size, ceiling,
+                     stop_first/target_first/neither, stop_at/target_at, through,
+                     first_touch_refused, method, sample_says
+   takes_you_out,    card.WhatTakesYouOutShown | null (null on a contract)
+   path_applied}     per claim: market_chance + came_from + stated_move +
+                     level_gap + converted + decay_shape
+404 no such example · 422 RefusedEdit | RefusedPosition {code, field, sentence}
+```
+Ten refusal codes: the form's six, reprinted from `position.py`, plus `unknown_ending`, `the_ending_names_no_trade`, `horizon_outside_the_window`, `nothing_agrees_with_what_happened`.
+
+**`# the flip:` markers** — both in `engine/worlds.py`: line 70, the import of `_worked_out_by_deadline` (strip the underscore when it becomes a public seam); line 367, the note in `sample_of` that until the flip the world shown beside these draws is the old engine's. `domain/diff.py` untouched.
+
+**Suite tail** — `1151 passed, 4 xfailed in 248.70s`; `domain`, `grounding`, `thesis` at 100% statement and branch, `adapter.py` and `card.py` included. `schema.ts` regenerated, 571 lines inserted and none removed, so `types-fresh` passes; frontend 358 tests green. `worked-numbers` still current.
+
+**Three things I did outside the two named files.** `engine/worlds.py` gains `sample_of` and `DRAWN_WORLDS` (the drawn worlds must come from the by-deadline core, and duplicating `_fold` would be a second assembly). `card.py`'s `_the_trade`/`_your_exit`/`_rail` become `the_trade`/`the_exit`/`the_rail` plus a new `THE_GIVEBACK_FOLLOWED` — otherwise the route re-implements the card's Figure-building. `ARCHITECTURE.md` took four one-clause edits, not one: route count, testing table, the thesis bullet, and `adapter.py` in the tree.
+
+**Two notes for the reviewer.** R20's *conditional world* refusal is structurally unreachable through this route — the base world is built with `branch=None`, so `base.assignments` is always empty — but the rule is kept by construction and the discriminating test (`test_the_edge_behind_the_ceiling_is_read_from_the_map_with_nothing_fixed`) proves the branch world was not used instead. And `find_stops_worked_out` pointed at `api/` catches `generate.py`'s `target` field (the destination a story is graded against, a different word with the same spelling), so the new test filters to `thesis.py`; if the checker should cover the whole API layer, that field wants renaming in another lane.
+
+PR body: `plans/notes/msgs/pr-06-position-route-body.md`. Merge message: `plans/notes/msgs/merge-06-position-route.txt`. Evidence: `plans/analysis/scripts/T2b/probe_sample.py`.</result>
+<usage><subagent_tokens>351597</subagent_tokens><tool_uses>131</tool_uses><duration_ms>1740978</duration_ms></usage>
+</task-notification>
