@@ -85,7 +85,7 @@ Given a risk budget and the distance from entry to stop, the size that loses exa
 
 ### B6 — Asking for one over the wire
 
-One route, in `backend/src/katalyst/api/thesis.py`, under the `/api/` prefix like everything else the browser calls.
+One route, in `backend/src/katalyst/api/thesis.py`, under the `/api/` prefix like everything else the browser calls. **That file is also where the routes under this heading keep what they share**: the closed list of reasons a thesis route will not answer, the sentence each one prints, the `{code, field, sentence}` envelope they arrive in, and the four checks every one of them makes of a request — which claim is being traded, what the reader typed, whether the day they expect to be out falls inside the window the map covers, and which worlds were drawn. The card's routes in `api/thesis_card.py` import all of it rather than writing a second copy.
 
 | Route | Body | Answer |
 |---|---|---|
