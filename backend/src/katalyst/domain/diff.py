@@ -79,6 +79,7 @@ from katalyst.domain.propagation import (
     Versions,
     World,
     _band,
+    engine_that_built,
     propagate,
     versions_of,
 )
@@ -457,6 +458,13 @@ def sensitivity(
     reduced-budget flip against a full-budget starting point would report part of
     the budget change as an effect.
 
+    **And with the engine that built the world handed in, not the one the server
+    happens to run now.** Two arithmetics stand side by side while the second is
+    checked against the first, and a world says which one built it by whether it
+    ran an inner loop at all. A sweep of a world built one way, re-run the other,
+    would report the change of engine as part of the flip — the same mistake as the
+    budget, in a bigger size, and just as invisible in the answer.
+
     Nothing on screen reads this yet. It is written now because the engine it
     needs is written now, and bolting it on later would mean a second pass over
     the same arithmetic.
@@ -478,7 +486,7 @@ def sensitivity(
     # each of those names both the arrow and the edit. So a sweep can work the
     # same map through again without being handed the branch a second time.
     told = {one.by_link: one.by for one in world.retractions}
-    budget = {"versions": versions, "worlds": worlds}
+    arithmetic = engine_that_built(world)
 
     start = propagate(
         world.graph,
@@ -486,7 +494,9 @@ def sensitivity(
         as_of=world.day_zero,
         seed=world.seed,
         introduced_by=told,
-        **budget,
+        versions=versions,
+        worlds=worlds,
+        engine=arithmetic,
     )
 
     swept: list[SensitivityRow] = []
@@ -516,7 +526,9 @@ def sensitivity(
             as_of=world.day_zero,
             seed=world.seed,
             introduced_by=told,
-            **budget,
+            versions=versions,
+            worlds=worlds,
+            engine=arithmetic,
         )
         swept.append(
             SensitivityRow(
