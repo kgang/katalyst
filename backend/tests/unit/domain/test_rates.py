@@ -322,6 +322,42 @@ def test_the_number_stated_for_an_arrow_puts_it_in_one_of_three_lists() -> None:
     assert as_event.arrows == (up.id, down.id) == as_state.arrows
 
 
+def test_a_claim_a_map_calls_certain_or_impossible_still_sorts_its_arrows_by_their_sign() -> None:
+    """The floor under the log-odds scale must not decide which list an arrow goes in.
+
+    An arrow's number is read through the log-odds scale — the logarithm of the
+    ratio of a chance to its opposite — which has no room for exactly nought or
+    exactly one, so it is clipped a hair inside both. A claim's own stated chance
+    is not clipped: a map may say a thing is **certain** (one) or **impossible**
+    (nought), and no rule forbids it.
+
+    Compared raw against clipped, the floor wins over the arrow. Every arrow that
+    helps a certain claim then comes out fractionally below it and is filed among
+    the arrows that hold it back — which is the one list whose cost multiplies,
+    three such arrows costing fifteen thousand combinations instead of one — and
+    every arrow that holds an impossible claim back is filed among those that help.
+    Neither answer is wrong; the cost is (review of 2026-09-22, should-fix 5).
+
+    So both sides are read the same way, and this is the test that says so: the sign
+    of the push decides, at a stated chance of one, of nought, and in between.
+    """
+    for chance in (1.0, 0.0, 0.5):
+        claim = _claim("effect", prior=chance, days=40)
+        window = window_of(_map(claim), DAY_ZERO, slices=4)
+        up = _arrow("up", "effect", strength=1.2)
+        down = _arrow("down", "effect", strength=-1.2)
+
+        as_event = _shapes(claim, (up, down), window)
+        assert as_event.helps == (0,), (
+            f"an arrow that pushes a claim upward is not among the arrows that help it, "
+            f"on a claim the map states at {chance}"
+        )
+        assert as_event.holds_back == (1,), (
+            f"an arrow that pushes a claim downward is not among the arrows that hold it "
+            f"back, on a claim the map states at {chance}"
+        )
+
+
 def test_the_bridge_moves_the_odds_by_the_push_and_leaves_them_alone_at_nothing() -> None:
     own = numpy.array([0.1, 0.3, 0.6, 0.9])
     nothing = stated_chance_with(own, numpy.zeros(4))

@@ -102,8 +102,16 @@ _NOT_ZERO: Final = 1e-12
 An arrow whose push lands entirely after its target's deadline has no push at all
 over the window, and a claim whose deadline is day zero has no window. Dividing by
 either is a fault in the map, not in the arithmetic; the floor answers with a very
-large rate instead of with `inf`, and the claim's own number then comes out at one,
-which is what a map that says a thing is certain deserves.
+large rate instead of with `inf`.
+
+**What the claim's own number then comes out at is nought, and that is the honest
+answer.** A rate is turned into a chance by multiplying it by the width of the
+window it runs over, and a claim judged on day zero has a window of no width at
+all: however large the rate, nothing has time to happen. So the claim reads
+nought, not one. (This passage used to say the opposite. Measured and corrected on
+2026-09-22 — `plans/analysis/scripts/stack-05-core/review/edges.py`, which reads
+exactly `0.0`; `test_an_impossible_observation_answers_rather_than_dividing_by
+_nothing` is the test that rests on it.)
 """
 
 
@@ -771,6 +779,18 @@ def shapes_of(
     points = starts[:, None] + inside[None, :] * width[:, None]
 
     own = numpy.array([float(claim.prior.p)])
+    # Both sides of the comparison below are read through the same bridge. An
+    # arrow's number comes from `stated_chance_with`, which runs the claim's own
+    # chance through the log-odds scale and so cannot return exactly nought or
+    # exactly one; the claim's raw number can be either. Compared against the raw
+    # number, a map that calls a claim **certain** files every arrow that helps it
+    # under `holds_back` — the one axis whose cost multiplies, three such arrows
+    # costing 15 625 combinations instead of one — and a map that calls a claim
+    # **impossible** files every arrow that holds it back under `helps`. The map is
+    # legal either way: a stated chance of one or nought breaks no rule. So the
+    # claim's own chance is read the same way the arrow's is, and the sign of the
+    # push decides rather than a floor. (Review of 2026-09-22, should-fix 5.)
+    as_the_arrows_are_read = float(stated_chance_with(own, numpy.zeros(1))[0])
     helps: list[int] = []
     holds_back: list[int] = []
     ends: list[int] = []
@@ -778,7 +798,7 @@ def shapes_of(
     area: dict[int, float] = {}
     for position, arrow in enumerate(arrows):
         with_it = stated_chance_with(own, numpy.array([float(arrow.strength)]))
-        if float(with_it[0]) >= float(own[0]):
+        if float(with_it[0]) >= as_the_arrows_are_read:
             helps.append(position)
         elif persistence == "state":
             ends.append(position)
