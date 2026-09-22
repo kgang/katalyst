@@ -239,11 +239,11 @@ export function MapFrame({
             <div className="map-foot__row map-foot__quiet">
               <p className="map-status">
                 <span className="map-status__mark">last key</span>
-                {/* One line, cut with an ellipsis when it runs past its share of
-                    the row. It is a glance rather than a read — the useful words
-                    are the first ones, and a keystroke's account wrapping four
-                    times beside the provenance would make the quiet row the
-                    tallest thing at the foot. */}
+                {/* One line, cut with an ellipsis past forty-six characters. It
+                    is a glance rather than a read — the useful words are the
+                    first ones, and a keystroke's account wrapping four times
+                    beside the provenance made the quiet row the tallest thing at
+                    the foot for the most transient thing on it. */}
                 <span className="map-status__said">{status}</span>
               </p>
               <div className="map-origin">{origin}</div>

@@ -67,6 +67,19 @@
   color: var(--text);
 }
 
+/* **A name that no longer fits is cut, never drawn over the fold beside it.**
+ * Measured 2026-09-22 at 336 pixels: *This claim* 85, *Branches and changes*
+ * 163, *Outline* 66, the fold 18, three hairlines — 335 of 336. The row fits by
+ * one pixel, and the next panel to be renamed takes it. Cutting is the honest
+ * failure: a word with its end missing still says which panel it is, and a word
+ * printed over a control makes the control unreachable. */
+.panel-switch__word {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .panel-switch__label[data-showing="yes"] {
   color: var(--text);
   border-bottom-color: var(--accent);

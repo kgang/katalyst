@@ -92,7 +92,9 @@ export interface PanelSwitchProps {
  * and comes back from it — which is a direction rather than a name, and a
  * direction is the one thing a word says worse than a line does. And there is no
  * room beside three panel names for a fourth word: the panel is 336 pixels
- * whatever the window, and the names already take most of them.
+ * whatever the window, and measured on the stored map the three names take 314
+ * of them. This takes 18 and the row fits by one pixel; the word *hide* in the
+ * mono box would have taken about 47 and wrapped the row at every window.
  *
  * It is two strokes and no fill, so it reads at any size and in any theme, and
  * it carries `aria-hidden` because the button around it has the words.

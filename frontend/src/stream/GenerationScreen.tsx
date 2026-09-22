@@ -362,7 +362,7 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
       {
         name: "Show or hide the panel beside the map",
         does: "The same as pressing P, and as the control at the head of the panel, when you want the whole width for the map.",
-        run: () => foldThePanel(),
+        run: foldThePanel,
       },
       // **Only once there is a working.** It is read back from the server when
       // the run stops, so a press before then leaves the panel saying *Reading
