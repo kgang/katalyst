@@ -34,6 +34,16 @@
   text-wrap: pretty;
 }
 
+/* What stands where the list would be when there is nothing in it. The same
+ * type and colour as the note above it, because it is the same kind of thing:
+ * the view telling the reader what it is showing. */
+.outline__empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
 .outline__list {
   display: grid;
   row-gap: var(--space-hair);
