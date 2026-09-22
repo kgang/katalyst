@@ -16,10 +16,7 @@ import { portsForAWire, portsOf } from "./ports";
 import type { CausalEdge } from "./wires/CausalWire";
 
 /** A tile standing for one claim. */
-export type ClaimNode = Node<
-  { claim: ClaimView; isHypothesis: boolean; versions?: number; height: number },
-  "claim"
->;
+export type ClaimNode = Node<{ claim: ClaimView; isHypothesis: boolean; height: number }, "claim">;
 
 /** A tile standing for the claims a column had no room for. */
 export type OverflowNode = Node<{ count: number }, "overflow">;
@@ -140,7 +137,6 @@ export function toFlow(
       data: {
         claim,
         isHypothesis: claim.id === world.hypothesisId,
-        versions: world.versions,
         height: heights?.get(claim.id) ?? tileHeight(claim),
       },
     });

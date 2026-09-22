@@ -56,11 +56,18 @@ export interface HowToAsk {
  * Turn the request the screen made into the body the route takes.
  *
  * Two things happen here and nothing else. A field the reader left out is left
- * out — **"I don't know" sends no likelihood at all**, not a `.5`, not a wide
- * band and not a null, because a reader who has not said what they think has not
- * said what they think. And the reader's own likelihood is named as theirs, which
- * is a label rather than a number: the three numbers in it are the ones the
- * slider handed over, untouched.
+ * out — **"I don't know" sends no likelihood at all**, not a `.5` and not a
+ * null, because a reader who has not said what they think has not said what they
+ * think. And the reader's own likelihood is named as theirs, which is a label
+ * rather than a number: the number in it is the one the slider handed over,
+ * untouched.
+ *
+ * **The route still asks for a bottom and a top, and there is no longer either**
+ * *(2026-09-22, R48)*. The reader gives one number, so the bottom and the top
+ * sent with it are that same number: a range of nothing, which is what "one
+ * likelihood, no range" is when it has to be written in the old shape. It is
+ * the reader's own number in all three places and nothing is invented. Both
+ * fields go when the engine half lands.
  *
  * `start` follows the same rule as the rest: sent when the caller said, left out
  * when they did not. Left out, the server plays a recording.
@@ -73,7 +80,8 @@ function bodyOf(request: GenerateRequest): Record<string, unknown> {
     body.target = request.target;
   }
   if (request.user_belief !== undefined) {
-    body.user_belief = { ...request.user_belief, owner: "user" };
+    const { p } = request.user_belief;
+    body.user_belief = { p, lo: p, hi: p, owner: "user" };
   }
   if (request.seed !== undefined) {
     body.seed = request.seed;

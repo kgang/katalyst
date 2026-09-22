@@ -10,12 +10,12 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Known, Ranged } from "../../../world";
+import type { Known, Likelihood } from "../../../world";
 import { absence } from "../../../world/absence";
 import { WireChip } from "../WireChip";
 
 /** The absence every arrow carries in this build, and the reason beside it. */
-const NO_ENGINE: Known<Ranged> = {
+const NO_ENGINE: Known<Likelihood> = {
   absence: absence("no_engine", "Nothing has worked this number through the map yet."),
 };
 

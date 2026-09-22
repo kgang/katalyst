@@ -129,10 +129,16 @@ function asWireEdit(edit: Edit): WireEdit | null {
     case "retune":
       return { kind: "retune", link: edit.link, strength: edit.strength };
     case "believe":
+      // **The server still writes a bottom and a top beside every likelihood,
+      // and the reader gives one number** *(2026-09-22, R48)*. So the bottom
+      // and the top are that same number: a range of nothing, which is what
+      // "one likelihood, no range" comes to when it has to be written in the
+      // old shape. Nothing is invented — all three are the reader's own number
+      // — and both fields go when the engine half lands.
       return {
         kind: "believe",
         target: edit.target,
-        belief: { p: edit.belief.p, lo: edit.belief.lo, hi: edit.belief.hi, owner: "user" },
+        belief: { p: edit.belief.p, lo: edit.belief.p, hi: edit.belief.p, owner: "user" },
       };
     case "insert":
       // A claim somebody asked for can be written the server's way exactly when

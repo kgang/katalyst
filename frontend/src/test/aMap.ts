@@ -27,12 +27,12 @@ export function aClaim(over: Partial<ClaimView> = {}): ClaimView {
     resolvesBy: "2026-11-01",
     resolutionSource: "A named source.",
     resolutionCriteria: "The test, written so that two people reading it would agree.",
-    prior: { p: 0.28, lo: 0.15, hi: 0.42 },
+    prior: { p: 0.28 },
     baseRate: {
       absence: absence("not_said", "no reference class recorded for this claim"),
     },
     beliefs: {
-      model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
+      model: { reading: { p: 0.35 } },
       user: { absence: absence("not_said", "You have not said.") },
       market: {
         absence: absence("no_market", "no venue quotes this claim"),

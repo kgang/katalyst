@@ -364,16 +364,6 @@
   border-radius: var(--radius);
 }
 
-/* The likelihood, the bottom of its range and the top, side by side. The three
- * tracks share the room equally and may shrink to nothing, which is what
- * `minmax(0, 1fr)` says and `1fr` alone does not. A guard, not a fix: see the
- * note on the field above for what was measured. */
-.intervene__three {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: var(--space-hair);
-}
-
 .intervene__go {
   justify-self: start;
   margin: 0;

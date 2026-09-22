@@ -16,8 +16,7 @@
  *
  * **"I don't know" is a state of the control, not a value.** It is where the
  * control starts, and while it holds, the request carries **no** likelihood at
- * all — not a `.5`, not a wide band, not a null that something downstream treats
- * as a half. A reader who has not said what they think has not said what they
+ * all — not a `.5`, not a null that something downstream treats as a half. A reader who has not said what they think has not said what they
  * think, and a tool that fills that in for them has invented the one number it
  * had no business inventing.
  *
@@ -26,14 +25,18 @@
  * and then does nothing reads as a broken tool, where a field that says why reads
  * as an unfinished one, and only one of those is true.
  *
- * Nothing here computes anything. The three numbers the slider holds are the
- * three the reader put there; keeping them in order is a comparison, and the
- * guard that stops the control posting a certainty is a bound on the track.
+ * Nothing here computes anything. The number the slider holds is the one the
+ * reader put there, and the guard that stops the control posting a certainty is
+ * a bound on the track.
+ *
+ * **It was three handles and is one** *(Kent, 2026-09-22, R48)*: a likelihood,
+ * the bottom of a range and the top. The range is cut from this product, so the
+ * bar asks for the likelihood.
  */
 
 import { useId, useState } from "react";
-import type { Ranged } from "../world";
-import { toReading } from "./BeliefChip";
+import type { Likelihood } from "../world";
+import { toTwoFigures } from "./BeliefChip";
 import "./inputBar.css";
 
 /** What a reader asked for when they pressed the button. */
@@ -46,7 +49,7 @@ export interface Asked {
    * Their own likelihood, or nothing at all while the control is on *I don't
    * know*. Nothing at all is not a half.
    */
-  readonly belief: Ranged | null;
+  readonly belief: Likelihood | null;
   /**
    * How the run starts: `live` calls a model, `replay` plays the committed
    * recording of this sentence back. Absent leaves it to the route's own default,
@@ -86,17 +89,12 @@ const FLOOR = 0.01;
 const CEILING = 0.99;
 const STEP = 0.01;
 
-/** Where the three handles start, once the reader turns the control on. */
-const OPENING: Ranged = { p: 0.5, lo: 0.3, hi: 0.7 };
+/** Where the handle starts, once the reader turns the control on. */
+const OPENING: Likelihood = { p: 0.5 };
 
-/** Keep the three in order: the bottom is never above the number, the top never below it. */
-function inOrder(belief: Ranged): Ranged {
-  const p = Math.min(CEILING, Math.max(FLOOR, belief.p));
-  return {
-    p,
-    lo: Math.min(p, Math.max(FLOOR, belief.lo)),
-    hi: Math.max(p, Math.min(CEILING, belief.hi)),
-  };
+/** Keep the number on the track: never a certainty at either end. */
+function onTheTrack(belief: Likelihood): Likelihood {
+  return { p: Math.min(CEILING, Math.max(FLOOR, belief.p)) };
 }
 
 /** The way in. */
@@ -107,12 +105,12 @@ export function InputBar({ disabledBecause, onBuild }: InputBarProps) {
   const [target, setTarget] = useState("");
   // Null is *I don't know*, and it is where the control starts. It is a state of
   // the control rather than a value, so it is held as the absence of one.
-  const [belief, setBelief] = useState<Ranged | null>(null);
+  const [belief, setBelief] = useState<Likelihood | null>(null);
   const off = disabledBecause !== null;
   const ready = hypothesis.trim() !== "";
 
-  const handle = (over: Partial<Ranged>): void => {
-    setBelief((was) => inOrder({ ...(was ?? OPENING), ...over }));
+  const handle = (over: Partial<Likelihood>): void => {
+    setBelief((was) => onTheTrack({ ...(was ?? OPENING), ...over }));
   };
 
   return (
@@ -182,7 +180,7 @@ export function InputBar({ disabledBecause, onBuild }: InputBarProps) {
             <button
               className="input-bar__say"
               type="button"
-              onClick={() => setBelief(inOrder(OPENING))}
+              onClick={() => setBelief(onTheTrack(OPENING))}
             >
               Give my own number
             </button>
@@ -190,7 +188,7 @@ export function InputBar({ disabledBecause, onBuild }: InputBarProps) {
         ) : (
           <div className="input-bar__track">
             <p className="input-bar__reading" data-reading="said">
-              {toReading(belief.p, belief.lo, belief.hi)}
+              {toTwoFigures(belief.p)}
             </p>
             <label className="input-bar__handle">
               <span className="input-bar__handle-name">how likely</span>
@@ -203,32 +201,9 @@ export function InputBar({ disabledBecause, onBuild }: InputBarProps) {
                 onChange={(event) => handle({ p: Number(event.target.value) })}
               />
             </label>
-            <label className="input-bar__handle">
-              <span className="input-bar__handle-name">bottom of the range</span>
-              <input
-                type="range"
-                min={FLOOR}
-                max={CEILING}
-                step={STEP}
-                value={belief.lo}
-                onChange={(event) => handle({ lo: Number(event.target.value) })}
-              />
-            </label>
-            <label className="input-bar__handle">
-              <span className="input-bar__handle-name">top of the range</span>
-              <input
-                type="range"
-                min={FLOOR}
-                max={CEILING}
-                step={STEP}
-                value={belief.hi}
-                onChange={(event) => handle({ hi: Number(event.target.value) })}
-              />
-            </label>
             <p className="input-bar__hint">
-              The range says how sure you are of your own number, not how much the world can move.
-              It sits beside the model&rsquo;s and a market&rsquo;s, and is never averaged with
-              them.
+              Your own number sits beside the model&rsquo;s and a market&rsquo;s, and is never
+              averaged with them.
             </p>
             <button className="input-bar__say" type="button" onClick={() => setBelief(null)}>
               Back to &ldquo;I don&rsquo;t know&rdquo;

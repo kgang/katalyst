@@ -12,7 +12,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Known, Ranged } from "../../world";
+import type { Known, Likelihood } from "../../world";
 import { absence } from "../../world/absence";
 import {
   BeliefChip,
@@ -46,7 +46,7 @@ function underOf(container: HTMLElement): string {
 }
 
 /** A slot with a number in it. */
-function known(p: number, lo: number, hi: number): Known<Ranged> {
+function known(p: number, lo: number, hi: number): Known<Likelihood> {
   return { reading: { p, lo, hi } };
 }
 

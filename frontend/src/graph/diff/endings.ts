@@ -11,23 +11,18 @@
  * put them in — biggest move along the best-backed route first. Before the
  * engine there is no such order, and inventing one would be inventing the single
  * thing the rail exists to tell you. So the order is **map order**, which is
- * visibly arbitrary and says so on screen, and where each number will go there is
+ * visibly arbitrary and says so on screen, and where the change will go there is
  * an absence with its reason.
  *
- * The two columns beside the change are never folded into any ordering, before
- * the engine or after it:
- *
- * | On screen | The question it answers |
- * |---|---|
- * | **how firm** | How firm is this number? The width of this world's own range on the claim — the same quantity the tile shows, so the rail and the tile cannot disagree |
- * | **same direction** | Did it point the same way whatever numbers we started from? The share of the two thousand versions of the map that moved the same way |
- *
- * They answer different questions and a trader weighs them separately, which is
- * why they are columns and not one score. Folding the width into a rank would
- * sink exactly the claims that most deserve a second look.
+ * **A row used to carry two more columns and no longer does** *(Kent,
+ * 2026-09-22, R48)*. *How firm* was the width of the range around the new
+ * number; *same direction* was the share of the two thousand versions of the map
+ * that moved the same way. Both read a range or the versions that made one, and
+ * both are cut. A row is the ending, its number before and after, and the
+ * direction.
  */
 
-import { absence, noReadingAtAll } from "../../world/absence";
+import { absence } from "../../world/absence";
 import type { Absence, DeltaRow, Known, WorldView } from "../../world/types";
 
 /** Where the change itself will go. */
@@ -35,19 +30,6 @@ const NO_CHANGE_YET: Absence = absence(
   "no_engine",
   "Nothing has worked this ending's number through the map, so there is no before and no " +
     "after to show.",
-);
-
-/** Where **how firm** will go. */
-const NO_WIDTH_YET: Absence = noReadingAtAll(
-  "How firm a number is, is the width of this world's own range on the claim — the same " +
-    "range the tile shows. There is no number yet, so there is no range around it.",
-);
-
-/** Where **same direction** will go. */
-const NO_AGREEMENT_YET: Absence = noReadingAtAll(
-  "Whether an ending points the same way whatever numbers we started from is read across two " +
-    "thousand versions of the map — each one a coherent set of numbers this model would have " +
-    "stood behind. Nothing has run one yet.",
 );
 
 /** Where the one-line summary of the whole edit will go. */
@@ -81,8 +63,6 @@ export function endings(world: WorldView): DeltaRow[] {
         label: claim.claim,
         kind: claim.kind,
         move: { absence: NO_CHANGE_YET },
-        rangeWidth: { absence: NO_WIDTH_YET },
-        agreement: { absence: NO_AGREEMENT_YET },
       }),
     );
 }

@@ -38,7 +38,6 @@ import type { ClaimDiff, Diff, World } from "../api/client";
 import { readConditional, readDiff, readExample, readWorld } from "../api/client";
 import { ADDED, happened, retracted, supposed } from "../graph/diff/badges";
 import { daysApart } from "../graph/diff/days";
-import { noReadingAtAll } from "./absence";
 import { filled, NO_PATH_PRODUCT, seedFor, toClaim, toLink } from "./fromTheServer";
 import { NOT_ON_THIS_MAP } from "./naming";
 import type { FixtureBundle, WorldSource } from "./source";
@@ -52,8 +51,8 @@ import type {
   DiffRequest,
   DiffView,
   Known,
+  Likelihood,
   Movement,
-  Ranged,
   Standing,
   WireBranch,
   WorldRequest,
@@ -202,8 +201,8 @@ function standingFromTheWorld(
     standing.set(claim.id, {
       words: said?.words ?? word,
       reason:
-        `${said?.reason ?? "An edit fixed this claim's value."} It is settled in every version ` +
-        `of the map, so there is no likelihood to show.`,
+        `${said?.reason ?? "An edit fixed this claim's value."} It is settled wherever the ` +
+        `engine looks, so there is no likelihood to show.`,
     });
   }
   return standing;
@@ -216,6 +215,11 @@ function standingFromTheWorld(
  * It names both halves — the address the map was read from and the address its
  * likelihoods were worked out at — and the three things anyone would need to
  * rebuild the same answer: the map, the branch, and the seed.
+ *
+ * **It used to end with how the engine got there** *(until 2026-09-22, R48)*:
+ * *"over 2 000 versions of the map with 8 worlds under each"*. Those two
+ * numbers only meant something while a claim carried a range, and there is no
+ * range. The seed stays, because a run is still reproducible from it.
  */
 function originOf(world: World, bundle: FixtureBundle, branchLabel: string | null): string {
   const which =
@@ -224,10 +228,8 @@ function originOf(world: World, bundle: FixtureBundle, branchLabel: string | nul
       : `with the branch "${branchLabel}" folded onto it`;
   return (
     `Every claim, arrow and date came from /api/fixtures/${bundle.id}; every likelihood was ` +
-    `worked out by /api/worlds from that map ${which}, at seed ${world.seed}, over ` +
-    `${world.versions.toLocaleString("en-GB").replace(/,/g, " ")} versions of the map with ` +
-    `${world.worlds} worlds under each. Nothing here was typed in: the same map, branch and ` +
-    `seed give the same answer every time.`
+    `worked out by /api/worlds from that map ${which}, at seed ${world.seed}. Nothing here was ` +
+    `typed in: the same map, branch and seed give the same answer every time.`
   );
 }
 
@@ -301,8 +303,12 @@ export function toWorldView(world: World, from: WorldSummary, branch?: BranchVie
       };
     }),
     links: world.graph.links.map(toLink),
-    versions: world.versions,
-    worldsPerVersion: world.worlds,
+    // The engine answered, so these numbers are its own rather than the stored
+    // example's. **How** it got there — how many versions of the map it tried
+    // and how many worlds under each — is not carried onto the screen's own view
+    // of the world any more (2026-09-22, R48): the only thing any surface asked
+    // it was whether a range had been computed, and there is no range.
+    workedOut: true,
     seed: world.seed,
     warnings: world.warnings,
     origin: from.origin,
@@ -312,15 +318,24 @@ export function toWorldView(world: World, from: WorldSummary, branch?: BranchVie
 /**
  * How far one claim moved, as the engine read it.
  *
- * Every part of it is the engine's own: the two readings, the sign that says
- * which way it went, the share of versions that agreed, and whether the move
- * came from nothing but the observation changing how much each version counts.
- * Nothing here subtracts, compares two numbers, or works anything out.
+ * Every part of it is the engine's own: the two readings and the sign that says
+ * which way it went. Nothing here subtracts, compares two numbers, or works
+ * anything out.
+ *
+ * **Three fields the engine still sends are dropped here** *(2026-09-22, R48)*.
+ * `agreement` is the share of two thousand versions of the map that moved the
+ * same way; `moved_only_by_reweighting` says a claim moved only because an
+ * observation made some of those versions count for more; and the word
+ * `versions_disagree` says the versions did not agree on a direction. All three
+ * are facts about running the map many times, which is the thing Kent cut, so
+ * none of them may reach a screen. They are still on the wire because the engine
+ * that computes them is another stack's to rewrite; **they die with it**, and
+ * until then this is the one place they stop.
  *
  * @param row The claim's own row of the engine's difference.
  */
 function movement(row: ClaimDiff): Movement | undefined {
-  const { before, after, delta, agreement } = row;
+  const { before, after, delta } = row;
   if (before === null || after === null || delta === null) {
     return undefined;
   }
@@ -332,29 +347,15 @@ function movement(row: ClaimDiff): Movement | undefined {
     // out how far anything moved.
     way: delta < 0 ? "down" : "up",
     by: delta,
-    sameDirection:
-      agreement === null
-        ? {
-            absence: noReadingAtAll(
-              "Only one of the two worlds holds this claim, so there is no direction for the " +
-                "versions of the map to have agreed or disagreed about.",
-            ),
-          }
-        : { reading: agreement },
-    // A claim with no causes of its own can move under **This happened** without
-    // anything pushing on it: the observation makes the versions of the map in
-    // which it was likely count for more, and the average shifts. The engine
-    // says when that is the whole story, and the panel prints one sentence when
-    // it does. **The browser never works this out for itself** — it is a fact
-    // about how the engine read the numbers, and only the engine knows it.
-    onlyReweighted: row.moved_only_by_reweighting,
-    // And which half of its test a claim the engine called unchanged failed:
-    // the move was too small, or the versions of the map disagreed which way.
-    // Carried across as the word it came as. The floor and the bar that decide
-    // it are constants inside the engine and are on no wire, so this is the
-    // only way the browser can know — which is what stops a second engine
-    // growing here and disagreeing with the first.
-    unchangedBecause: row.unchanged_because ?? undefined,
+    // Why the engine would not call the difference a move, when its answer is
+    // one this product can still show: the move was smaller than it will report
+    // at all. Carried across as the word it came as — the floor that decides it
+    // is a constant inside the engine and is on no wire, so this is the only way
+    // the browser can know, which is what stops a second engine growing here and
+    // disagreeing with the first.
+    ...(row.unchanged_because === "under_the_floor"
+      ? { unchangedBecause: "under_the_floor" as const }
+      : {}),
   };
 }
 
@@ -387,8 +388,12 @@ function toDiffView(difference: Diff, claims: readonly ClaimView[]): DiffView {
           by: row.peak_delta,
         },
       },
-      rangeWidth: { reading: row.range_width },
-      agreement: { reading: row.agreement },
+      // **`range_width` and `agreement` arrive on this row and are dropped**
+      // *(2026-09-22, R48)*. One is the width of the range around the new
+      // number and the other the share of the versions of the map that moved
+      // the same way; they were the change list's *how firm* and *same
+      // direction* columns, and a row is now the claim, its number before and
+      // after, and the direction.
     };
   });
 
@@ -506,7 +511,7 @@ export class ApiWorldSource implements WorldSource {
    *
    * @param request Which map, which branch, and which arrow.
    */
-  async readConditional(request: ConditionalRequest): Promise<Known<Ranged>> {
+  async readConditional(request: ConditionalRequest): Promise<Known<Likelihood>> {
     const bundle = await this.readBundle(request.baseId);
     const answer = await readConditional(
       request.baseId,

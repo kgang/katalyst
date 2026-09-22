@@ -36,8 +36,8 @@ import type {
   DiffView,
   Edit,
   Known,
+  Likelihood,
   LinkView,
-  Ranged,
   WorldRequest,
   WorldView,
 } from "./types";
@@ -104,11 +104,10 @@ function toBranch(branch: Branch, graph: Graph, hue: BranchHue, today: string): 
       case "refine":
         return { op: "refine", target: made.target };
       case "believe":
-        return {
-          op: "believe",
-          target: made.target,
-          belief: { p: made.belief.p, lo: made.belief.lo, hi: made.belief.hi },
-        };
+        // The bottom and the top the server still writes beside a likelihood
+        // are dropped, the same way every other likelihood's are
+        // (`world/fromTheServer.ts`, 2026-09-22, R48).
+        return { op: "believe", target: made.target, belief: { p: made.belief.p } };
     }
   });
   return { id: branch.id, label: branch.label, hue, edits, claims, links, wire: branch };
@@ -196,7 +195,7 @@ export class FixtureWorldSource implements WorldSource {
    * The likelihood of an arrow's target with its cause supposed true costs a
    * whole extra run of the map.
    */
-  async readConditional(_request: ConditionalRequest): Promise<Known<Ranged>> {
+  async readConditional(_request: ConditionalRequest): Promise<Known<Likelihood>> {
     throw noEngineHere("Working out the number on one arrow");
   }
 }
