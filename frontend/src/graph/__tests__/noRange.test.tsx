@@ -55,9 +55,9 @@ const FORBIDDEN = [
   /\buncalibrated\b/i,
   /middle 80/i,
   // The engine's own spelling, which an underscore hides from the pattern above.
-  // It is a wire word and is never printed: `graph/diff/noChange.ts` turns it
-  // into *the engine could not settle which way it moves*, which is what a
-  // reader is owed under R4 and says nothing about versions of the map.
+  // It is a wire word the engine never writes any more (decision record 0028) and
+  // that no surface has ever printed; the server still declares it, so the browser
+  // still has to name it at the wire, and it stays forbidden everywhere else.
   /versions_disagree/i,
 ];
 

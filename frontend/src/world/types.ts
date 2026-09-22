@@ -334,27 +334,26 @@ export interface Movement {
   readonly by: number;
   /**
    * Why the engine would not call this claim's difference a move, in its own
-   * word — **both of its words, and neither of them printed** *(2026-09-22,
-   * R48)*.
+   * word — **carried, and never printed as it is spelled.**
    *
    * `under_the_floor` says the move is smaller than the engine will report at
-   * all. `versions_disagree` says the move was far enough and the engine could
-   * not settle a direction for it — its own spelling names the two thousand
-   * versions of the map, which R48 cut from the screen, so `graph/diff/noChange.ts`
-   * words it without them. The word is carried rather than dropped because R4 is
-   * the older rule and the stronger one: every quiet row on the change list says
-   * why, in words, and a row with no reason is what R4 forbids.
+   * all, and it is the only word the engine writes. The word is carried rather
+   * than dropped because R4 is the older rule and the stronger one: every quiet
+   * row on the change list says why, in words, and a row with no reason is what
+   * R4 forbids. `graph/diff/noChange.ts` turns it into *barely moved*.
    *
-   * **The second reason dies with the engine half**, which decides a claim's
-   * direction differently; until then this is the true thing to say. The
-   * engine's other two answers about versions — the agreement share and *moved
-   * only by reweighting* — reach no screen at all and stop at the wire in
-   * `world/apiSource.ts`.
+   * **`versions_disagree` is still in the list and is never written**
+   * *(2026-09-22; decision record 0028, Kent's row R48)*. It meant the move was
+   * far enough to report and the two thousand versions of the map had not agreed
+   * on a direction. The engine works out one version now, so a move has one
+   * direction and nothing can disagree; the spelling stays here only because the
+   * server still declares it, and it leaves both places together in the follow-up
+   * that takes down the other constant wire fields. **Nothing reads it.**
    *
-   * **Nothing in the browser decides this.** The floor and the bar are constants
-   * inside the engine and are on no wire, so the browser can copy the word and
-   * cannot re-run the test. Absent on every claim the engine did not call
-   * `unchanged`, and on an `unchanged` claim the engine gave no word for.
+   * **Nothing in the browser decides this.** The floor is a constant inside the
+   * engine and is on no wire, so the browser can copy the word and cannot re-run
+   * the test. Absent on every claim the engine did not call `unchanged`, and on an
+   * `unchanged` claim the engine gave no word for.
    */
   readonly unchangedBecause?: "under_the_floor" | "versions_disagree";
 }

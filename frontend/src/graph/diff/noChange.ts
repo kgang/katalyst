@@ -8,37 +8,29 @@
  * sentences, written apart, and each named a different cause — which is how two
  * of them came to be flatly false about half the claims they appeared on.
  *
- * **What the engine says.** A claim comes out `shifted` only when both halves of
- * its test pass, and `unchanged` when either fails — and it says which, on the
- * claim's own row, in one plain word: `under_the_floor` when the move is too
- * small to report at all, `versions_disagree` when the move was far enough and
- * it could not settle which way.
+ * **What the engine says.** A claim comes out `shifted` when it moved by enough
+ * to report, and `unchanged` when it did not — and where it did not, it says so
+ * on the claim's own row in one plain word: `under_the_floor`, the move is too
+ * small to report at all.
  *
  * **So the browser reports the engine's word and works nothing out.** The floor
- * and the bar are constants inside the engine and appear nowhere in its answer,
- * so re-running the test here is not possible even by accident — which is the
- * point. Where the engine gives no word, neither does this file.
+ * is a constant inside the engine and appears nowhere in its answer, so re-running
+ * the test here is not possible even by accident — which is the point. Where the
+ * engine gives no word, neither does this file.
  *
- * **One of the two words may not be said the way the engine says it**
- * *(2026-09-22, Kent's R48)*. `versions_disagree` means the two thousand
- * versions of the map did not agree on a direction, and there are no versions of
- * the map on this screen any more. **The row still says why**, because R4 is the
- * older rule and the stronger one: every ending the edit can reach has a row,
- * and a quiet row carries its reason in words rather than in being a shade
- * paler. So the word is carried across and worded without the versions — *the
- * engine could not settle which way it moves* — which is what the verdict comes
- * to for a reader who has no versions to be told about.
+ * **There used to be a second word, and it is gone** *(2026-09-22; decision
+ * record 0028, Kent's row R48)*. `versions_disagree` meant the two thousand
+ * versions of the map had not agreed on a direction: the move was far enough to
+ * report and the engine would not say which way it went. The engine works out one
+ * version of the map now, so a move has exactly one direction and there is nothing
+ * left to disagree. The word is off the wire, and the phrase this file wrote for
+ * it — *the engine could not settle which way it moves* — went with it. **The row
+ * still says why** where there is a why, because R4 is the older rule and the
+ * stronger one: every ending the edit can reach has a row, and a quiet row carries
+ * its reason in words rather than in being a shade paler.
  *
- * **That reason dies with the engine half.** The exact core being written in
- * another stack decides a claim's direction differently, so the second half of
- * the test, its word and this wording all go together; until then this is the
- * true thing to say. The engine's other two answers about versions — the
- * agreement share and *moved only by reweighting* — reach no screen at all and
- * stop in `world/apiSource.ts`.
- *
- * **The engine's own spellings are wire words and are never printed.** Neither
- * `under_the_floor` nor `versions_disagree` reaches the glass; each picks a
- * phrase written here.
+ * **The engine's own spelling is a wire word and is never printed.**
+ * `under_the_floor` does not reach the glass; it picks a phrase written here.
  */
 
 import { toTwoFigures } from "../../components/BeliefChip";
@@ -68,13 +60,6 @@ export function noChangeInAWord(moved: Movement | undefined): string | undefined
   if (moved?.unchangedBecause === "under_the_floor") {
     return "barely moved";
   }
-  // The engine's second word, said without the versions of the map it is about
-  // (2026-09-22, R48). A reader is owed the reason — R4 — and this is the whole
-  // of the reason that survives the cut: the engine had a move big enough to
-  // report and would not put a direction on it.
-  if (moved?.unchangedBecause === "versions_disagree") {
-    return "the engine could not settle which way it moves";
-  }
   return undefined;
 }
 
@@ -100,10 +85,7 @@ export function noChangeReason(moved: Movement | undefined): string {
   const why =
     moved.unchangedBecause === "under_the_floor"
       ? "It says why: the move is smaller than it will report at all."
-      : moved.unchangedBecause === "versions_disagree"
-        ? "It says why: the move is far enough to report, and it could not settle which way it " +
-          "goes."
-        : "It gave no reason for that verdict, so none is written here.";
+      : "It gave no reason for that verdict, so none is written here.";
   return (
     `The engine compared the two maps and reports no change on this claim: it read ` +
     `${toTwoFigures(moved.from)} then ${toTwoFigures(moved.to)}. ${why}`
