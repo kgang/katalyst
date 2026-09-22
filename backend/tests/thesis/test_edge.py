@@ -568,6 +568,10 @@ def test_a_price_the_reader_typed_is_taken_for_the_side_they_were_looking_at(
 
 # --- The arithmetic --------------------------------------------------------
 
+# Three tests of the range-straddling rule were deleted here on 2026-09-22: decision
+# record 0028 left every computed number with the same value at both ends of its
+# range, so an edge can no longer change sign across one.
+
 
 @given(graph=maps_with_a_contract_ending(), seed=seeds())
 @a_few
@@ -689,100 +693,6 @@ def test_an_unknown_fee_is_said_rather_than_counted_as_nothing(graph: Graph, see
     assert isinstance(no_quote, NotComparable)
     assert no_quote.fee is None
     assert no_quote.break_even is not None and no_quote.break_even.fee is None
-
-
-@given(seed=seeds())
-@a_few
-def test_an_edge_inside_the_model_range_is_not_ranked(seed: int) -> None:
-    """An edge worth taking at one end of the model's own range and not the other is marked.
-
-    The price is put in the middle of the model's stated range, so buying is worth
-    it if the model's number is at the top of its range and not if it is at the
-    bottom. A gap smaller than how unsure the model is of its own number is not
-    something to lead with.
-    """
-    base = world_of(every_row_map(), seed=seed)
-    model = base.beliefs["contract"]
-    assert model.lo < model.hi, (
-        "this map's claim was built with a prior the model is unsure of, so the world "
-        "it produces must carry a range with width for there to be a case here at all"
-    )
-    middle_of_the_range = (model.lo + model.hi) / 2.0
-
-    inside = priced(
-        base,
-        base,
-        "contract",
-        agreeing_quote(base, "contract", bid=middle_of_the_range, offer=middle_of_the_range),
-        fee=0.0,
-    )
-    outside = priced(
-        base, base, "contract", agreeing_quote(base, "contract", bid=0.0, offer=0.0), fee=0.0
-    )
-
-    assert isinstance(inside, Edge) and isinstance(outside, Edge)
-    assert inside.inside_the_model_range is True
-    assert outside.inside_the_model_range is False
-    # And that is exactly what "worth taking at one end and not the other" means.
-    assert (model.lo - middle_of_the_range > 0.0) != (model.hi - middle_of_the_range > 0.0)
-
-
-@given(seed=seeds())
-@a_few
-def test_the_selling_side_alone_can_mark_an_edge_as_inside_the_range(seed: int) -> None:
-    """Both sides are checked, so an offer nobody would cross does not hide a straddling bid.
-
-    An offer above the whole range makes buying worth nothing at either end, and a
-    bid *inside* the range makes selling worth taking at the bottom of it and not
-    at the top. Check only the buying side and this case reads as a clean edge.
-    """
-    base = world_of(every_row_map(), seed=seed)
-    model = base.beliefs["contract"]
-    assert model.lo < model.hi
-    inside_the_range = (model.lo + model.hi) / 2.0
-    above_everything = min(1.0, model.hi + (model.hi - model.lo))
-
-    answer = priced(
-        base,
-        base,
-        "contract",
-        agreeing_quote(base, "contract", bid=inside_the_range, offer=above_everything),
-        fee=0.0,
-    )
-
-    assert isinstance(answer, Edge)
-    # Buying is worth nothing at both ends of the range: only selling straddles.
-    assert model.lo - above_everything < 0.0
-    assert model.hi - above_everything <= 0.0
-    assert (inside_the_range - model.lo > 0.0) != (inside_the_range - model.hi > 0.0)
-    assert answer.inside_the_model_range is True
-
-
-@given(seed=seeds())
-@a_few
-def test_an_edge_of_exactly_nothing_at_one_end_counts_as_not_worth_taking(seed: int) -> None:
-    """Worth taking means strictly better than nothing, so an end reading nought is marked.
-
-    A gap of exactly nothing pays for nothing, so it sits with the ends not worth
-    crossing the spread for. Putting the price exactly on the top of the range
-    makes the buying edge nought there and negative below it.
-    """
-    base = world_of(every_row_map(), seed=seed)
-    model = base.beliefs["contract"]
-    assert model.lo < model.hi
-
-    answer = priced(
-        base,
-        base,
-        "contract",
-        agreeing_quote(base, "contract", bid=0.0, offer=model.hi),
-        fee=0.0,
-    )
-
-    assert isinstance(answer, Edge)
-    assert model.hi - model.hi == 0.0
-    assert model.lo - model.hi < 0.0
-    assert answer.inside_the_model_range is False
 
 
 # --- Every row of the decision table ---------------------------------------

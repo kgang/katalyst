@@ -490,17 +490,24 @@ def test_a_shift_that_points_the_other_way_ranks_on_its_size() -> None:
     assert down.by_the_shift_times_the_move[0].made_of[0].value < 0
 
 
-def test_an_edge_inside_the_model_range_is_not_ranked_and_says_so() -> None:
-    """An edge smaller than the model's own uncertainty is neither led with nor ranked."""
+def test_an_edge_marked_inside_the_model_range_is_not_ranked_and_says_so() -> None:
+    """An edge smaller than the model's own uncertainty is neither led with nor ranked.
+
+    **The mark is an input this test chose, not something the engine produced**
+    *(2026-09-22; decision record 0028, "one likelihood per claim, computed once;
+    no range anywhere")*. Nothing computes that mark any more: every number has the
+    same value at both ends of its range, so no edge can be worth taking at one end
+    and not at the other, and `edge.py` sets the field to false and says so. What is
+    under test here is the *reader* — that a card still refuses to rank an edge
+    carrying the mark, for the day a range with width comes back from somewhere.
+    """
     world = a_world()
-    pays = pays_on(world, "contract")
-    straddling = what_was_priced(
-        world, "contract", quote_at(world, "contract", bid=pays.p, offer=pays.p)
-    )
+    priced_plainly = what_was_priced(world, "contract", agreeing_quote(world, "contract"), fee=0.0)
+    assert isinstance(priced_plainly, Edge) and not priced_plainly.inside_the_model_range
+    straddling = priced_plainly.model_copy(update={"inside_the_model_range": True})
 
     ranked = what_else_can_i_trade(world, {"contract": straddling}, {})
 
-    assert isinstance(straddling, Edge) and straddling.inside_the_model_range
     assert ranked.by_the_size_of_its_edge == ()
     left_out = next(one for one in ranked.not_ranked if one.ending == "contract")
     assert left_out.because == "inside_the_model_range"
@@ -1014,24 +1021,26 @@ def a_contract_card(**rest: object) -> Card:
     )
 
 
-def test_an_edge_inside_the_model_range_is_not_led_with_either() -> None:
-    """Record 0018: such an edge is neither headlined nor ranked. Today only the ranking obeys.
+def test_an_edge_marked_inside_the_model_range_is_not_led_with_either() -> None:
+    """Record 0018: such an edge is neither headlined nor ranked. This is the headline half.
 
-    The reviewer's input: a quote five points under the claim's own number, so
-    buying is worth something at the middle of the model's stated range and
-    nothing at its bottom end.
+    **The mark is an input this test chose**, for the same reason as the ranking
+    test above: decision record 0028 left every number with the same value at both
+    ends of its range on 2026-09-22, so nothing computes the mark any more and the
+    card's refusal to lead with one is the only part still worth checking.
     """
     world = a_world()
     pays = pays_on(world, "contract")
-    straddling = what_was_priced(
+    priced_plainly = what_was_priced(
         world,
         "contract",
-        quote_at(world, "contract", bid=pays.lo - 0.05, offer=pays.p - 0.05),
+        quote_at(world, "contract", bid=pays.p - 0.10, offer=pays.p - 0.05),
     )
+    assert isinstance(priced_plainly, Edge) and not priced_plainly.inside_the_model_range
+    straddling = priced_plainly.model_copy(update={"inside_the_model_range": True})
 
     card = a_contract_card(answers={"contract": straddling})
 
-    assert isinstance(straddling, Edge) and straddling.inside_the_model_range
     assert isinstance(card.priced_in, PricedIn)
     assert card.priced_in.buying.value > 0.0
     assert card.priced_in.headline == "no_edge_at_this_price"

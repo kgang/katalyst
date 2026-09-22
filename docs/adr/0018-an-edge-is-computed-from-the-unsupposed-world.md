@@ -148,3 +148,17 @@ Where a quote comes from and what it carries (record 0020) · what a position is
 * **Records 0016 and 0017** belong to stack 05 and are accepted too; nothing here depends on a number either of them states.
 * Related: **0013** (the domain names the trade, the quote names the price), **0015** (a claim carries the range the model stated — the second threshold above), **0003** (`domain/` is pure), **0010** (grounding sources), **0020** (what a quote carries).
 * `plans/analysis/2026-09-21-digest-finance.md` §2.1 · `plans/analysis/2026-09-21-polymarket-look.md` · `plans/analysis/2026-09-21-review-adr-06.md`, whose measurements of the mixture are quoted above.
+
+## Amendment, 2026-09-22 — the second of the two thresholds is void, because there is no range
+
+**Decision record 0028** — *one likelihood per claim, computed once; no range anywhere*, Kent's decisions-note row R48 — removed the range from this product. Every number the engine computes now has the same value at its low end, its likelihood and its high end.
+
+So the second of the two thresholds in *Two thresholds stop a headline, and the card says which one bit* **can never fire again**. It asks whether an edge is worth taking at one end of the model's stated range and not at the other; with both ends the same number, no sign can change between them. As of today:
+
+* `inside_the_model_range` on an `Edge` is **always false**, set to that constant in `backend/src/katalyst/thesis/edge.py` with the same dated note. The two helpers that worked the edge out at each end of the range are deleted.
+* **The rule itself is not withdrawn, and every reader of the flag still obeys it.** A card neither headlines nor ranks an edge carrying the mark, and the size ceiling still refuses one. That is deliberate: if a range with width ever returns — a reader's own stated uncertainty is the obvious candidate — the refusals are already written down. Two tests in `backend/tests/thesis/test_card.py` set the mark by hand, exactly as `test_ceiling.py` already did, and say in their own words that nothing computes it.
+* `test_an_edge_inside_the_model_range_is_not_ranked`, named in *Confirmation* above, **is deleted**, with two more beside it in `backend/tests/thesis/test_edge.py` that checked the same rule from other angles. They asserted that `priced` derives the mark from a range with width, which is now an input nobody can build.
+
+**The first threshold — one tick — is untouched**, and it is now the only thing besides a negative edge that stops a headline.
+
+**Not settled here.** The greyed size ceiling of record 0019 also reads the model's range: it works its fraction out at the end of the range that flatters the trade least. With both ends the same number it now works it out at the likelihood itself, which is a quieter change than this one but a change all the same, and it belongs to that record to write down.
