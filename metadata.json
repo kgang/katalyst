@@ -3,7 +3,7 @@
   "checkpoint_id": "01M3385RHF5M6FWJTEVQYWC0D1",
   "strategy": "manual-commit",
   "branch": "feat/04-no-range-on-screen",
-  "checkpoints_count": 3,
+  "checkpoints_count": 5,
   "files_touched": null,
   "sessions": [
     {
@@ -19,20 +19,27 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 9,
-    "cache_creation_tokens": 7288,
-    "cache_read_tokens": 2598085,
-    "output_tokens": 5059,
-    "api_call_count": 5,
+    "input_tokens": 25,
+    "cache_creation_tokens": 12407,
+    "cache_read_tokens": 4482515,
+    "output_tokens": 8104,
+    "api_call_count": 11,
     "subagent_tokens": {
-      "input_tokens": 182,
-      "cache_creation_tokens": 123056,
-      "cache_read_tokens": 19422261,
-      "output_tokens": 56482,
-      "api_call_count": 91
+      "input_tokens": 284,
+      "cache_creation_tokens": 236058,
+      "cache_read_tokens": 38647665,
+      "output_tokens": 121621,
+      "api_call_count": 142
     }
   }
 }
