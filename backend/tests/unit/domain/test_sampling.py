@@ -26,7 +26,7 @@ from katalyst.domain.graph import Graph
 from katalyst.domain.link import Link
 from katalyst.domain.proposition import Proposition, Resolution
 from katalyst.domain.rates import Drawn, Persistence, Pin, Window, window_of
-from katalyst.domain.sampling import Sample, sample_forward
+from katalyst.domain.sampling import Sample, _a_step_every_version_can_take, sample_forward
 from katalyst.domain.solving import ImpossibleObservation, solve
 from katalyst.domain.states import NEVER, STILL_HOLDING
 from tests.oracles import by_integrating as integrating
@@ -356,6 +356,44 @@ def test_a_correction_never_takes_a_version_outside_nought_and_one() -> None:
     for claim in drawn.claims:
         corrected = exact[claim] + drawn.correction[claim]
         assert bool(((corrected >= 0.0) & (corrected <= 1.0)).all())
+
+
+def test_a_step_too_big_for_the_range_is_cut_back_and_the_width_is_kept() -> None:
+    """The guard itself, on a range the step really would push out of nought and one.
+
+    The test above asks the whole sample for a claim the map calls all but certain
+    and finds nothing outside nought and one — which is what it should find, but it
+    passes just as well with the guard deleted, because no map committed here draws
+    a correction big enough to bind it (review of 2026-09-22, should-fix 7). **A
+    guard nothing exercises is a guard somebody deletes.** So the guard is asked
+    directly, with a step far larger than the range has room for.
+
+    Three numbers stand for a range, and every expectation below is arithmetic on
+    those three rather than anything an engine worked out: a step of half is cut to
+    the room above the top, a step of minus a half to the room below the bottom, and
+    a step the range can take is handed back untouched. **And the width never
+    moves**, whichever of the three it is — cutting each version's answer back
+    afterwards instead would flatten the top of the range onto one and report a
+    range narrower than the numbers deserve, which is the noise this engine exists
+    to remove.
+    """
+    answers = numpy.array([0.10, 0.55, 0.96])
+    room_above = 1.0 - float(answers.max())
+    room_below = -float(answers.min())
+    small_enough = room_above / 2.0
+
+    assert _a_step_every_version_can_take(0.5, answers) == pytest.approx(room_above)
+    assert _a_step_every_version_can_take(-0.5, answers) == pytest.approx(room_below)
+    assert _a_step_every_version_can_take(small_enough, answers) == small_enough
+
+    for step in (0.5, -0.5, small_enough):
+        moved = answers + _a_step_every_version_can_take(step, answers)
+        assert bool(((moved >= 0.0) & (moved <= 1.0)).all()), (
+            f"a step of {step} left a version outside nought and one"
+        )
+        assert float(moved.max() - moved.min()) == pytest.approx(
+            float(answers.max() - answers.min())
+        ), f"a step of {step} changed how wide the range is"
 
 
 # --- The draw itself --------------------------------------------------------

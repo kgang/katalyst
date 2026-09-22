@@ -441,6 +441,45 @@ def test_a_claims_line_ends_on_the_number_on_its_tile() -> None:
             )
 
 
+def test_a_claims_line_starts_at_nought_unless_a_supposition_holds_it() -> None:
+    """The other end of the same chart: day zero.
+
+    A line is read at the days the reader is given, straight-lining between the ends
+    of the claim's own slices — and the first of those days is **before** the first
+    slice ends, so the line needs a value at day zero or it has nothing to start
+    from. Nothing has happened on day zero, so that value is nought.
+
+    **Except where a supposition holds the claim.** What the reader typed is a hard
+    fact from the moment they typed it, not something that arrives partway through
+    the first slice, so a claim supposed true reads one on day zero and a claim
+    supposed false reads nought. A claim something was *reported* about reads nought
+    like any other: news is about the whole window, not a value fixed on a day.
+
+    Nothing asserted this until now — dropping the day-zero anchor and reading the
+    slice ends alone passed every test file (review of 2026-09-22, should-fix 7).
+    """
+    graph = _map_with_a_diamond()
+    every_claim = sorted(one.id for one in graph.propositions)
+
+    plain = _by_deadline(graph)
+    for claim_id in every_claim:
+        assert plain.series[claim_id][0] == 0.0, (
+            f"{claim_id}'s line does not start at nought, though nothing has happened on day zero"
+        )
+
+    for claim_id in every_claim:
+        for value in (True, False):
+            supposed = _by_deadline(graph, Do(target=claim_id, value=value, at=None))
+            assert supposed.series[claim_id][0] == float(value), (
+                f"{claim_id} is supposed {value} and its line does not say so on day zero"
+            )
+            reported = _by_deadline(graph, Observe(target=claim_id, value=value, at=None))
+            assert reported.series[claim_id][0] == 0.0, (
+                f"{claim_id} was reported on and its line moved on day zero, where a report is "
+                "news about the whole window rather than a value fixed on a day"
+            )
+
+
 def test_this_happened_moves_what_caused_it() -> None:
     """Learning that an effect happened raises the odds on its cause, where supposing does not.
 
