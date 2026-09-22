@@ -63,7 +63,7 @@ Kent vetoes a template-looking interface on sight, so every screenshot is checke
 
 1. **VR1** — Nothing looks like a component library's defaults — no rounded blue button, no drop shadow, no system font stack, no default focus ring.
 2. **VR2** — There is no spinner, no pop-up, and no dialog that has to be dismissed.
-3. **VR3** — Converted to greyscale, the screenshot still reads: every arrow still says what kind of push it is and where it came from, every direction still reads up or down, every tail still shows as texture, and every tile still says what kind of claim it is — its silhouette, and the kind spelled out in its heading *(added 2026-09-22, when the two kinds at the ends of a map took a hue as well)* (INV-12 — nothing is carried by hue alone).
+3. **VR3** — Converted to greyscale, the screenshot still reads: every arrow still says what kind of push it is and where it came from, every direction still reads up or down, every tail still shows as texture, and every tile still says what kind of claim it is — its silhouette, and the kind spelled out in its heading *(added 2026-09-22, when the two kinds at the ends of a map took a hue as well)*. **Check it at the furthest the map zooms out as well**, where the heading is not drawn and the silhouette is the whole of the answer *(added 2026-09-22, with the third tile form)*. (INV-12 — nothing is carried by hue alone.)
 4. **VR4** — No number shows more than two significant figures, and none is missing its range.
 5. **VR5** — Every number's origin can be named in one click, and no empty slot has been filled in — a number nobody computed is an absence with a reason.
 6. **VR6** — The map is layered left to right; it is not a hairball of crossings.

@@ -418,6 +418,57 @@ describe("what a tile draws, and what it never draws", () => {
     }
   });
 
+  it("test_the_four_kinds_are_still_four_shapes_at_the_furthest_zoom", () => {
+    // **The silhouette is the one form where the shape is all there is** — no
+    // heading, no printed kind — so it is the one form where a kind carried by
+    // hue alone would be carried by hue alone, which nothing in this product
+    // may be (INV-12). Two of the four take a hue; all four must still differ
+    // without one.
+    //
+    // **And the shapes have to be big enough to be shapes.** The map draws at
+    // about a sixth of life size out here, so the near form's eighteen-pixel
+    // cut corner and fourteen-pixel notch are both under three pixels on the
+    // glass — gone. Measured in grey on the generated map at the floor on
+    // 2026-09-22: the four kinds read as two. So the far shapes grow each mark,
+    // and this reads that back off the drawing rather than off a number typed
+    // here: each far shape differs from every other, and each differs from its
+    // own near shape by more than the rounding.
+    const near = OF_EVERY_KIND.map(
+      (claim) =>
+        draw(claim).container.querySelector(".tile__outline path")?.getAttribute("d") ?? "",
+    );
+    const far = OF_EVERY_KIND.map(
+      (claim) =>
+        drawAt(claim, SMALLEST_ZOOM)
+          .container.querySelector(".tile__outline path")
+          ?.getAttribute("d") ?? "",
+    );
+
+    expect(new Set(far).size).toBe(OF_EVERY_KIND.length);
+    for (const shape of far) {
+      expect(shape).not.toBe("");
+    }
+    // Three of the four say what they are with a mark, and all three grew it.
+    // The fourth is the plain rectangle, which is what an ordinary step is: the
+    // absence of a mark, and an absence cannot be grown.
+    const grew = OF_EVERY_KIND.filter((_, at) => far[at] !== near[at]).map((one) => one.kind);
+    expect(grew.sort()).toEqual(["hypothesis", "market", "not_tradeable"]);
+
+    // The second stroke on a tradeable outcome's cut corner is drawn out here
+    // too, and it is the far cut rather than the near one — the outline's own
+    // diagonal both times, so a grey print keeps it.
+    const stub = drawAt(
+      OF_EVERY_KIND.find((one) => one.kind === "market") as ClaimView,
+      SMALLEST_ZOOM,
+    );
+    const farCut = stub.container.querySelector(".tile__outline .tile__cut")?.getAttribute("d");
+    const nearCut = draw(OF_EVERY_KIND.find((one) => one.kind === "market") as ClaimView)
+      .container.querySelector(".tile__outline .tile__cut")
+      ?.getAttribute("d");
+    expect(farCut).not.toBeUndefined();
+    expect(farCut).not.toBe(nearCut);
+  });
+
   it("test_the_three_forms_are_chosen_by_the_zoom_and_nothing_else", () => {
     // One tile, three zooms, three forms — read off the tile's own box rather
     // than told to it. A hair inside each threshold, because the thresholds are

@@ -84,6 +84,57 @@ const OUTLINES: Record<ClaimKind, (height: number) => string> = {
 };
 
 /**
+ * How big a mark has to be, in the map's own coordinates, to be seen at the
+ * furthest the map zooms out.
+ *
+ * **Measured against the floor rather than chosen** *(2026-09-22)*. A mark has
+ * to be about six pixels on the reader's screen to be a mark at all, and at the
+ * floor the map is drawn at about a sixth of life size — so about forty pixels
+ * in the map's own coordinates. Rounded up to the eight-pixel grid the whole
+ * interface sits on: forty-eight.
+ *
+ * The greyscale check is what this is for. At the near sizes a tradeable
+ * outcome's corner is cut eighteen pixels along each edge and a dead end is
+ * notched fourteen deep, and both read from a foot away. At the floor they are
+ * under three pixels — gone — and what was left telling those two kinds apart
+ * was the hue, which is the one thing nothing in this product is allowed to
+ * carry alone (INV-12: nothing is carried by hue alone). Measured on the
+ * replayed generated map at the floor, in grey, on 2026-09-22: the four kinds
+ * were two.
+ */
+const FAR_MARK = 48;
+
+/**
+ * The same four shapes, drawn for the zoom at which the shape is all there is.
+ *
+ * Each is its near form with its one distinguishing mark grown to `FAR_MARK`,
+ * and nothing else changed — the same box, the same four shapes, the same thing
+ * said louder. An `event` is the plain rectangle at both sizes, because what
+ * says *event* is the absence of a mark and an absence cannot be grown.
+ *
+ * **The cut corner is fifty-six rather than forty-eight**, because it is
+ * measured along the edge and runs at forty-five degrees: fifty-six along each
+ * edge is forty deep, which is the figure `FAR_MARK` is.
+ */
+const FAR_CUT = 56;
+
+const SILHOUETTES: Record<ClaimKind, (height: number) => string> = {
+  hypothesis: (h) =>
+    `M ${FAR_MARK + 0.5} 0.5 H ${TILE_WIDTH - 0.5} V ${h - 0.5} H ${FAR_MARK + 0.5} L 0.5 ${h / 2} Z`,
+  // The one that does not grow, and the one shape here that is the near shape
+  // itself rather than a copy of it: what says *event* is the absence of a
+  // mark, and an absence cannot be made bigger.
+  event: OUTLINES.event,
+  market: (h) =>
+    `M 0.5 0.5 H ${TILE_WIDTH - FAR_CUT - 0.5} L ${TILE_WIDTH - 0.5} ${FAR_CUT + 0.5} ` +
+    `V ${h - 0.5} H 0.5 Z`,
+  not_tradeable: (h) =>
+    `M 0.5 0.5 H ${TILE_WIDTH - 0.5} V ${h / 2 - FAR_MARK} ` +
+    `L ${TILE_WIDTH - FAR_MARK - 0.5} ${h / 2} L ${TILE_WIDTH - 0.5} ${h / 2 + FAR_MARK} ` +
+    `V ${h - 0.5} H 0.5 Z`,
+};
+
+/**
  * The one corner a kind draws twice.
  *
  * A tradeable outcome's outline has its top right corner cut away like a
@@ -97,6 +148,11 @@ const OUTLINES: Record<ClaimKind, (height: number) => string> = {
  */
 const CUT_CORNERS: Partial<Record<ClaimKind, string>> = {
   market: `M ${TILE_WIDTH - 18.5} 0.5 L ${TILE_WIDTH - 0.5} 18.5`,
+};
+
+/** The same second stroke, on the corner the silhouette cuts. */
+const FAR_CUT_CORNERS: Partial<Record<ClaimKind, string>> = {
+  market: `M ${TILE_WIDTH - FAR_CUT - 0.5} 0.5 L ${TILE_WIDTH - 0.5} ${FAR_CUT + 0.5}`,
 };
 
 /** What each kind is called on screen. No underscores and no code names. */
@@ -244,6 +300,13 @@ export function Tile({ claim, isHypothesis, versions, height: reserved }: TilePr
   // draws.
   const zoom = useStore((state) => state.transform[2]);
   const detail = detailAt(zoom);
+  // Which set of the four shapes to draw. The far set is the near set with each
+  // kind's one distinguishing mark grown until it survives being drawn at a
+  // sixth of life size — because out there the shape is the only thing saying
+  // what kind of claim this is, and a shape that has shrunk to nothing leaves
+  // the hue saying it alone.
+  const shapes = detail === "silhouette" ? SILHOUETTES : OUTLINES;
+  const cuts = detail === "silhouette" ? FAR_CUT_CORNERS : CUT_CORNERS;
 
   // Only one claim in four prints why it has no market: the kind that ends the
   // map without an instrument. That reason is a finding — somebody looked and
@@ -291,9 +354,9 @@ export function Tile({ claim, isHypothesis, versions, height: reserved }: TilePr
         aria-hidden="true"
         focusable="false"
       >
-        <path d={OUTLINES[claim.kind](height)} />
-        {CUT_CORNERS[claim.kind] === undefined ? null : (
-          <path className="tile__cut" d={CUT_CORNERS[claim.kind]} />
+        <path d={shapes[claim.kind](height)} />
+        {cuts[claim.kind] === undefined ? null : (
+          <path className="tile__cut" d={cuts[claim.kind]} />
         )}
       </svg>
 
