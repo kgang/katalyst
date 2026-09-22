@@ -12,20 +12,28 @@
  *
  * So there are now three ways to ask for the same thing, on both map screens: a
  * chevron at the head of the panel's own names, the key, and — while it is away
- * — a tab at the edge of the map. This holds that all three are there, that each
- * is a control with a name rather than a key somebody has to know about, and
- * that choosing a claim brings the panel back, because choosing a claim is the
- * reader asking to read something.
+ * — a tab at the edge of the map. This holds that all three are there and that
+ * each is a control with a name rather than a key somebody has to know about.
+ *
+ * **And what does NOT bring it back, which the browser caught and this had
+ * missed.** Every step along a wire selects the claim it lands on — reaching a
+ * claim with the keyboard and pointing at one both fill the panel, which is the
+ * product's own rule. A panel that came back on any selection therefore came
+ * back on the reader's first keystroke, and a fold you cannot walk away from is
+ * a fold that does not work. So: **pointing at a claim brings it back, walking
+ * to one does not.** The stand-in below draws the two paths as two buttons,
+ * because the real canvas has two paths.
  *
  * **What it cannot hold, and what does.** A simulated page measures nothing, so
  * *the stage widens* is checked in the browser, in the keyboard-only walk
  * (`e2e/hormuz.spec.ts`). What is checked here is the half that fails first: the
- * panel leaves the row entirely rather than being drawn over or shrunk, and a
- * tab of its own takes its place.
+ * panel leaves the row entirely rather than being drawn over or shrunk, a tab of
+ * its own takes its place, and the map is told to frame itself again exactly
+ * once per fold.
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { SHORTCUTS } from "../../keyboard/keys";
 import { THE_GROWTH, THE_SENTENCE } from "../../stream/__tests__/aStream";
 import type { StreamEvent } from "../../stream/events";
@@ -39,27 +47,81 @@ import { MapScreen } from "../MapScreen";
 // The map stands in for itself: one button per claim, each doing what pointing
 // at that claim on the real canvas does — it hands the screen a selection.
 //
+// **Two buttons per claim, because the real canvas has two ways to reach one.**
+// Pointing at a tile calls `onSelect` *and* `onPointedAt`; walking to one with
+// `h`, `l`, `j` or `k` calls `onSelect` alone (`graph/Canvas.tsx` — the pointer
+// path and the keyboard landing). The difference is the whole of what keeps a
+// folded panel folded while a reader walks the map, so the stand-in draws both.
+//
 // **And one more button for `P`.** The map's keys are bound on the map surface
 // (`keyboard/useMapKeys.ts`, which has its own tests), and the surface is what
 // is standing in here — so the key is pressed the way the real surface presses
 // it, by calling the screen's own `panel`. What is being asked below is what the
 // screen does about it, which is the half that was missing on one of them.
+/**
+ * Every word the screen has told the canvas to frame itself again on, in order.
+ *
+ * The canvas frames the map once for each value it is given, so the list of
+ * values **is** the list of framings. Reading it is how a test without a layout
+ * engine can ask whether folding the panel re-frames the map, and how many times.
+ */
+const framings: string[] = [];
+
 vi.mock("../../graph/Canvas", () => ({
   MapCanvas: ({
     world,
     onSelect,
+    onPointedAt,
     keys,
+    frameAgainWhen,
   }: {
     world: WorldView;
     onSelect: (selection: Selection) => void;
+    onPointedAt?: (selection: Selection) => void;
     keys: { panel: () => void };
-  }) => (
+    frameAgainWhen?: string;
+  }) => {
+    if (frameAgainWhen !== undefined && framings.at(-1) !== frameAgainWhen) {
+      framings.push(frameAgainWhen);
+    }
+    return (
+      <TheMapStandingIn world={world} onSelect={onSelect} onPointedAt={onPointedAt} keys={keys} />
+    );
+  },
+}));
+
+/** The tiles and the one key, drawn by the stand-in above. */
+function TheMapStandingIn({
+  world,
+  onSelect,
+  onPointedAt,
+  keys,
+}: {
+  world: WorldView;
+  onSelect: (selection: Selection) => void;
+  onPointedAt?: (selection: Selection) => void;
+  keys: { panel: () => void };
+}) {
+  return (
     <div data-testid="the-map">
       {world.claims.map((claim) => (
         <button
           key={claim.id}
           type="button"
           data-testid={`point-at-${claim.id}`}
+          onClick={() => {
+            onSelect({ kind: "claim", id: claim.id });
+            onPointedAt?.({ kind: "claim", id: claim.id });
+          }}
+        >
+          {claim.id}
+        </button>
+      ))}
+      {world.claims.map((claim) => (
+        <button
+          key={claim.id}
+          type="button"
+          data-testid={`walk-to-${claim.id}`}
           onClick={() => onSelect({ kind: "claim", id: claim.id })}
         >
           {claim.id}
@@ -69,8 +131,12 @@ vi.mock("../../graph/Canvas", () => ({
         P
       </button>
     </div>
-  ),
-}));
+  );
+}
+
+beforeEach(() => {
+  framings.length = 0;
+});
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class {
@@ -205,20 +271,61 @@ describe("there is a control on screen that folds the panel away", () => {
       unmount();
     });
 
-    it(`test_choosing_a_claim_brings_the_panel_back_on_${screenName.replaceAll(" ", "_")}`, () => {
+    it(`test_walking_leaves_it_folded_and_pointing_brings_it_back_on_${screenName.replaceAll(" ", "_")}`, () => {
       const { unmount } = open();
       fireEvent.click(screen.getByRole("button", { name: /Hide the panel beside the map/ }));
       expect(thePanelIsThere()).toBe(false);
 
-      // The reader points at a claim. That is a request to read something, and
-      // the place it is read is the panel — so the panel comes back rather than
-      // the answer landing off screen, which is the defect the panels were split
-      // up to fix in the first place.
+      // **Walking to a claim leaves it folded.** This is the half the browser
+      // caught: every step along a wire calls `onSelect`, so a panel that came
+      // back on any selection came back on the reader's first keystroke — and a
+      // fold a reader cannot walk away from is a fold that does not work.
+      const walks = screen.getAllByTestId(/^walk-to-/);
+      expect(walks.length, "the map drew no claim to walk to").toBeGreaterThan(0);
+      fireEvent.click(walks[0] as HTMLElement);
+      expect(thePanelIsThere()).toBe(false);
+
+      // **Pointing at one brings it back.** That is a request to read
+      // something, and the place it is read is the panel — so the panel comes
+      // back rather than the answer landing off screen, which is the defect the
+      // panels were split up to fix in the first place.
       const claims = screen.getAllByTestId(/^point-at-/);
       expect(claims.length, "the map drew no claim to point at").toBeGreaterThan(0);
       fireEvent.click(claims[0] as HTMLElement);
 
       expect(thePanelIsThere()).toBe(true);
+      unmount();
+    });
+  }
+
+  for (const [screenName, open] of BOTH_MAP_SCREENS) {
+    it(`test_folding_frames_the_map_again_once_on_${screenName.replaceAll(" ", "_")}`, () => {
+      const { unmount } = open();
+
+      // **The canvas frames the map once for each value it is handed**, so the
+      // list of values is the list of framings. It starts on one: the map was
+      // framed for the stage it was first drawn in.
+      expect(framings).toHaveLength(1);
+      const asItWasDrawn = framings[0];
+
+      // Folding hands the stage 310 pixels it did not have, and the map is
+      // framed for the stage it is now in. **Once**, not once per render: the
+      // screen redraws several times around a fold — the panel goes, the status
+      // line changes, the band loses a row — and a map that re-framed on each
+      // of those would jump three times for one press.
+      fireEvent.click(screen.getByRole("button", { name: /Hide the panel beside the map/ }));
+      expect(framings).toHaveLength(2);
+      expect(framings[1]).not.toBe(asItWasDrawn);
+
+      // Walking the map is not a resize, so it frames nothing.
+      fireEvent.click(screen.getAllByTestId(/^walk-to-/)[0] as HTMLElement);
+      expect(framings).toHaveLength(2);
+
+      // And bringing it back is the same size change the other way, framed once
+      // more and back to the word it was first drawn on.
+      fireEvent.click(screen.getByRole("button", { name: /Show the panel beside the map/ }));
+      expect(framings).toHaveLength(3);
+      expect(framings[2]).toBe(asItWasDrawn);
       unmount();
     });
   }

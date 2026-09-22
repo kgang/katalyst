@@ -301,6 +301,31 @@ const WINDOWS = [
  *
  * @param page The page the map is on.
  */
+/**
+ * How many tiles are drawn past the right edge of the stage.
+ *
+ * **Framing the map again for a wider stage must not push anything off it.** A
+ * re-frame zooms to fit what it can without going below the size a full tile
+ * needs, so a map that fitted before must still fit; this is the reading that
+ * would catch a re-frame that scaled or centred wrongly.
+ *
+ * It is a count rather than a place, because the claim is about how many tiles a
+ * reader can see and not about where any one of them is.
+ *
+ * @param page The page the map is on.
+ */
+async function tilesOffTheGlass(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const stage = document.querySelector(".canvas")?.getBoundingClientRect();
+    if (stage === undefined) {
+      return -1;
+    }
+    return [...document.querySelectorAll(".react-flow__node")].filter(
+      (tile) => tile.getBoundingClientRect().right > stage.right + 1,
+    ).length;
+  });
+}
+
 async function everyControlInThePanelIsWhole(page: Page): Promise<void> {
   // **The column, not the scrolling box.** The names at the head of the panel
   // are controls a reader has to reach too, and they sit above the part that
@@ -812,6 +837,7 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     const wide = async () => (await theStage.boundingBox())?.width ?? 0;
     const wasWide = await wide();
     expect(wasWide, "the stage was drawn at no width at all").toBeGreaterThan(0);
+    const framedOpen = await whereTheMapCameToRest(page);
 
     await page.getByRole("button", { name: "Hide the panel beside the map" }).click();
     await expect(page.locator(".dock-column")).toHaveCount(0);
@@ -823,15 +849,40 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     // went behind, which is the only control on screen while it is away.
     await expect(page.getByRole("button", { name: "Show the panel beside the map" })).toBeVisible();
 
-    // The key still does it. The keyboard goes back on the map first — pressing
-    // the control took it — which is the product's own rule about map keys
-    // rather than this test's convenience.
+    // **The map is framed again for the stage it is now in, once, as a cut.**
+    // 310 more pixels and the same map: framed for the narrower stage it would
+    // sit off to one side of the wider one. The reading is the viewport's own
+    // transform compared with itself across the press — no number is written
+    // here — and it is taken once the map has stopped moving, because a
+    // transform read while it is still changing is a reading of a moment.
+    const framedWider = await whereTheMapCameToRest(page);
+    expect(framedWider, "the map was not framed again when the panel folded").not.toBe(framedOpen);
+    // And nothing was pushed off the glass by the new framing.
+    expect(await tilesOffTheGlass(page)).toBe(0);
+
+    // **Walking the map does not bring the panel back.** Every step along a
+    // wire selects the claim it lands on — reaching one with the keyboard and
+    // pointing at one both fill the panel, which is this product's own rule —
+    // so a panel that returned on any selection returned on the reader's first
+    // keystroke, and a fold you cannot walk away from is a fold that does not
+    // work. The keyboard goes back on the map first, which is the product's
+    // rule about map keys rather than this test's convenience.
     await standOn(page, standingWhenTheWalkFoldedThePanel);
+    await expect(page.locator(".dock-column")).toHaveCount(0);
+    await page.keyboard.press("l");
+    await expect(page.locator(".map-status")).toContainText("along an arrow");
+    await expect(page.locator(".dock-column")).toHaveCount(0);
+
+    // The key still brings it back, and the map is framed back to where it was.
     await page.keyboard.press("P");
     await expect(page.locator(".dock-column")).toHaveCount(1);
     await expect
       .poll(wide, { timeout: 5_000, message: "the stage never gave the panel's width back" })
       .toBe(wasWide);
+    expect(await whereTheMapCameToRest(page)).toBe(framedOpen);
+
+    // And the walk goes on from the claim it was on before this step.
+    await standOn(page, standingWhenTheWalkFoldedThePanel);
   });
 
   await test.step("test_two_keys_in_one_frame_both_count", async () => {

@@ -316,10 +316,6 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
     if (selection === null) {
       return;
     }
-    // **And it brings the panel back if it was folded away.** Choosing a claim
-    // is the reader asking to read something, and the place it is read is the
-    // panel; leaving it folded would answer the question off screen.
-    setAway(false);
     setDock(selection.kind === "generation" ? "run" : "subject");
   }, [selection]);
 
@@ -472,6 +468,10 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
           world={growth.world}
           selection={selection}
           onSelect={setSelection}
+          // **Pointing at a claim brings a folded panel back; walking to one
+          // does not.** Pointing at one is the reader asking to read it, and the
+          // panel is where it is read. Walking the map is walking the map.
+          onPointedAt={() => setAway(false)}
           focused={focused}
           onFocused={setFocused}
           mapKey={generationId ?? "a run that has not started"}
@@ -484,6 +484,13 @@ export function GenerationScreen({ run, replaying, onRunAgain, onLeave }: Genera
           // the run stops — the one moment nothing on the map is moving and the
           // reader is about to start reading it.
           frameAgainOn={finished ? "the run stopped" : undefined}
+          // **And once more whenever the panel folds or comes back**, which
+          // changes the stage's width by 310 pixels without the window moving.
+          // It is a second word rather than part of the one above because that
+          // one also settles the map — drops every pin and lays the whole thing
+          // out again — and settling a map mid-run would move tiles that are
+          // already placed. The two compose in the frame's key and nowhere else.
+          frameAgainWhen={away ? "the panel folded" : "the panel returned"}
         />
       }
       overlay={

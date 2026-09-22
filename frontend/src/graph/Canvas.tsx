@@ -103,6 +103,16 @@ interface SurfaceProps {
   readonly selection: Selection;
   /** Called when the reader selects a claim or an arrow, by pointer or by keyboard. */
   readonly onSelect: (selection: Selection) => void;
+  /**
+   * Called only when the reader **pointed at** one, and never when the keyboard
+   * merely landed on it.
+   *
+   * Both fill the panel — `onSelect` says so and is unchanged. This is the
+   * narrower fact, and one thing needs it: a panel the reader folded away stays
+   * folded while they walk the map, and comes back when they point at something
+   * to read. Every screen may ignore it.
+   */
+  readonly onPointedAt?: (selection: Selection) => void;
   /** Which claim the keyboard is on. Held outside the map, because the keys are. */
   readonly focused: string | null;
   /** Put the keyboard on a claim. */
@@ -174,6 +184,27 @@ interface SurfaceProps {
    * the map is framed once, and settled once, for each value it has ever had.
    */
   readonly frameAgainOn?: string;
+  /**
+   * A word that changes when the map should be framed again and **not** settled
+   * *(2026-09-22)*.
+   *
+   * The stage can change width without the window changing and without a claim
+   * arriving: the reader folds the panel away and the map is handed 310 more
+   * pixels. Framing again is right there — the map was framed for a narrower
+   * stage and now sits off to one side of a wider one — and settling would be
+   * quite wrong, because a settle drops every pin and lays the whole map out
+   * again. During a run that would move tiles that are already placed, which is
+   * the one thing a growing map must never do.
+   *
+   * So it is a second word, and it goes nowhere near `useLayout`. `frameAgainOn`
+   * means *frame and settle*; this means *frame*. Both compose: on a finished
+   * generation the two are in the key together, and folding the panel re-frames
+   * without settling a second time.
+   *
+   * A word rather than a flag, for the same reason as above: the map is framed
+   * once for each value it has ever had. It is a cut, never a tween.
+   */
+  readonly frameAgainWhen?: string;
 }
 
 /** The surface itself. Lives inside the provider so it can move the view. */
@@ -181,6 +212,7 @@ function MapSurface({
   world,
   selection,
   onSelect,
+  onPointedAt,
   focused,
   onFocused,
   heights,
@@ -192,6 +224,7 @@ function MapSurface({
   reserved,
   badge,
   frameAgainOn,
+  frameAgainWhen,
 }: SurfaceProps) {
   const flow = useReactFlow();
   const surface = useRef<HTMLDivElement>(null);
@@ -480,8 +513,17 @@ function MapSurface({
     // moment settles the map (decision record 0024), which is one more layout,
     // so the last frame of all is taken on the map's settled shape and then
     // nothing lays it out again.
+    //
+    // **And the stage's own width is part of the answer too** *(2026-09-22)*.
+    // `frameAgainWhen` changes when the reader folds the panel away or brings
+    // it back, which hands the map 310 pixels it did not have and takes them
+    // away again. It is on the end of the key rather than folded into the
+    // settle's word because a settle drops every pin and lays the whole map out
+    // again: right when a run stops, and quite wrong when a reader widens the
+    // stage halfway through one. It never reaches `useLayout`.
     const frameFor =
-      frameAgainOn === undefined ? mapKey : `${mapKey}:${frameAgainOn}:${layout.runs}`;
+      (frameAgainOn === undefined ? mapKey : `${mapKey}:${frameAgainOn}:${layout.runs}`) +
+      (frameAgainWhen === undefined ? "" : `:${frameAgainWhen}`);
     if (layout.runs === 0 || layout.laidOutFor !== mapKey || framed.current === frameFor) {
       return;
     }
@@ -499,7 +541,7 @@ function MapSurface({
     });
     framed.current = frameFor;
     justFramed.current = true;
-  }, [layout.runs, layout.laidOutFor, flow, mapBounds, mapKey, frameAgainOn]);
+  }, [layout.runs, layout.laidOutFor, flow, mapBounds, mapKey, frameAgainOn, frameAgainWhen]);
 
   // The view follows whatever the keyboard is on, so a step along a wire never
   // walks off the edge of the glass — and so that a map building itself does not
@@ -685,6 +727,18 @@ function MapSurface({
         return;
       }
       onSelect(under);
+      // **This is the one path a reader POINTED at**, and the screen is told so
+      // separately *(2026-09-22)*. Landing on a claim and pointing at one both
+      // fill the panel, and that is right — but they are not the same request.
+      // Walking the map is walking the map; pointing at a claim is asking to
+      // read it. The screen needs the difference for one thing only: a panel
+      // the reader has folded away stays folded while they walk, and comes back
+      // when they point at something. Before this, every step along a wire
+      // called `onSelect` and unfolded the panel again, which made the fold
+      // useless to the reader it exists for.
+      if (under !== null) {
+        onPointedAt?.(under);
+      }
       if (under?.kind === "claim") {
         onFocused(under.id);
         // Pointing at a tile and reaching it with the keyboard land in the same
@@ -694,7 +748,7 @@ function MapSurface({
         putTheKeyboardOn(under.id);
       }
     },
-    [onSelect, whatIsUnder, onFocused, openColumn, putTheKeyboardOn],
+    [onSelect, onPointedAt, whatIsUnder, onFocused, openColumn, putTheKeyboardOn],
   );
 
   /**
