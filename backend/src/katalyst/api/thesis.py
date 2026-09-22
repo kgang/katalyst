@@ -430,8 +430,15 @@ def take_a_position(request: PositionRequest) -> PositionAnswer:
         )
 
     moves = moves_on(ending, entry=wanted.entry)
+    # A contract ending is walked and then refused, rather than never walked. The
+    # sentence that refuses it lives in `position.py`, with the other five, and
+    # asking there is what keeps it in one place; a branch here would be a second
+    # place the rule had to be remembered. What it costs is one throwaway walk.
     paths = walk(draws, moves, entry=wanted.entry, daily_move=wanted.daily_move, seed=request.seed)
     touch = first_touch(paths, wanted)
+    # The second world, and the reason there are two: an edge is read from the map
+    # with **nothing** fixed by an edit, so this one is built with no branch at all
+    # however much the reader has supposed on the one above.
     base = _answered(
         engine.build_world(
             request.base_id,
