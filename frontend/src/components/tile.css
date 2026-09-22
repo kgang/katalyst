@@ -462,6 +462,22 @@
   text-wrap: pretty;
 }
 
+/* Out where the map draws no words, this box draws none either — the same rule
+ * the tiles obey, for the same reason: its count is set at twenty-two pixels
+ * and its line at thirteen, and out there they land at three and two. What is
+ * left is the dashed rectangle, drawn six pixels wide in the map's own
+ * coordinates so that it is about one on the glass. The canvas says which form
+ * the map is in; this box is not a claim and carries nothing of its own.
+ * *(2026-09-22)* */
+.canvas[data-detail="silhouette"] .tile--overflow .tile__outline rect {
+  stroke-width: 6;
+}
+
+.canvas[data-detail="silhouette"] .tile__overflow-count,
+.canvas[data-detail="silhouette"] .tile__overflow-line {
+  display: none;
+}
+
 /* ---- Far out: the summary ---------------------------------------------- *
  * Zoomed out past the threshold a tile changes what it draws rather than
  * shrinking what it draws. It keeps the claim and the three readings and drops
@@ -622,6 +638,56 @@
  * written above it may never get its turn. */
 .tile[data-detail="summary"] .belief-chip[data-reading="words"] .belief-chip__reading {
   flex: 1 1 0;
+}
+
+/* ---- Further out still: the silhouette --------------------------------- *
+ * Past the zoom at which the largest of the three type sizes would itself land
+ * under eleven pixels, there is no size left to fall back to — so the tile
+ * stops printing words rather than printing them smaller, which is the same
+ * answer it gave at the first threshold taken one step further. `Tile.tsx`
+ * draws nothing but the outline out here; what is below is only how that
+ * outline has to change to be seen from where the reader now is.
+ *
+ * **Nothing here sets a type size**, and that is not an omission: a rule that
+ * set one would be a rule about words that are not drawn.
+ *
+ * Kent, 2026-09-22: *"Can we make it so it's possible to zoom out a lot more?"* */
+
+/* The outline is now the whole tile, so it is drawn to be seen at a sixth of
+ * life size. Two changes, and both are forced by the arithmetic rather than
+ * chosen: the stroke is six pixels in the map's own coordinates, which is about
+ * one pixel on the glass at the furthest the map zooms out and three at the
+ * nearest of this form; and the two kinds that keep the hairline step up to the
+ * muted text colour, because a tenth of the text colour is a separator between
+ * things a reader is reading and out here the outline is the only thing on the
+ * screen. The hue rule is untouched — the two kinds that take a hue still take
+ * it, below, and the other two still do not. */
+.tile[data-detail="silhouette"] .tile__outline path {
+  stroke: var(--text-muted);
+  stroke-width: 6;
+}
+
+.tile[data-kind="hypothesis"][data-detail="silhouette"] .tile__outline path {
+  stroke: var(--accent);
+}
+
+.tile[data-kind="market"][data-detail="silhouette"] .tile__outline path {
+  stroke: var(--kind-market);
+}
+
+/* The one corner a kind draws twice, at the same doubling it has near to: the
+ * ticket-stub cut is what tells a tradeable outcome from an ordinary step when
+ * neither is printing the word. */
+.tile[data-detail="silhouette"] .tile__outline .tile__cut {
+  stroke-width: 12;
+}
+
+/* The ports go with the words. A port is a two-pixel bar saying which socket a
+ * wire lands in, and at this zoom it is a third of a pixel — a smudge on the
+ * edge of the shape rather than a reading. The sockets themselves stay where
+ * they are, because the wires are drawn to them; only the ink goes. */
+.tile[data-detail="silhouette"] .tile__port {
+  background: none;
 }
 
 /* ---- The ports ---------------------------------------------------------- *

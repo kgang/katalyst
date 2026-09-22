@@ -32,11 +32,20 @@
  * grey — which a colour never does. Two of the four take a hue on that same
  * stroke as well (`tile.css` says which and why); the shape underneath is what
  * the grey print keeps.
+ *
+ * **It has three forms, and the zoom chooses between them** — `geometry.ts`
+ * owns the two thresholds and both are worked out from the rule that no word is
+ * ever drawn under eleven pixels. Near, it draws the six things above. Further
+ * out it drops the heading and the foot and sets what is left in the largest
+ * type size. Further out still, past the zoom at which even that size would
+ * fall under eleven pixels, it draws **only its outline** — the shape and its
+ * kind's hue, and not one word. Each step draws less; no step draws the same
+ * thing smaller.
  */
 
 import { Handle, useStore } from "@xyflow/react";
 import { toDay } from "../graph/diff/days";
-import { claimLines, SUMMARY_BELOW_ZOOM, TILE_WIDTH, tileHeight } from "../graph/geometry";
+import { claimLines, detailAt, TILE_WIDTH, tileHeight } from "../graph/geometry";
 import { PORTS, portBox } from "../graph/ports";
 import type { Badge, ClaimKind, ClaimView } from "../world";
 import { BeliefChip } from "./BeliefChip";
@@ -226,12 +235,15 @@ export interface TileProps {
 
 /** One claim's tile. */
 export function Tile({ claim, isHypothesis, versions, height: reserved }: TileProps) {
-  // How far the map is zoomed out. Below the threshold a tile stops showing
-  // everything and shows a summary instead — the claim and the three chips —
-  // because the alternative is type too small to read. The tile changes what it
-  // draws; it never shrinks what it draws.
+  // How far the map is zoomed out, and which of the tile's three forms that
+  // asks for. Below the first threshold the tile stops showing everything and
+  // shows a summary instead — the claim and the three chips — because the
+  // alternative is type too small to read. Below the second it stops showing
+  // words at all and shows only its shape, because there is no type size left
+  // to fall back to. The tile changes what it draws; it never shrinks what it
+  // draws.
   const zoom = useStore((state) => state.transform[2]);
-  const detail = zoom < SUMMARY_BELOW_ZOOM ? "summary" : "full";
+  const detail = detailAt(zoom);
 
   // Only one claim in four prints why it has no market: the kind that ends the
   // map without an instrument. That reason is a finding — somebody looked and
@@ -320,62 +332,76 @@ export function Tile({ claim, isHypothesis, versions, height: reserved }: TilePr
         );
       })}
 
-      <header className="tile__header">
-        <span className="tile__kind">{KIND_WORDS[claim.kind]}</span>
-        <time className="tile__resolves" dateTime={claim.resolvesBy}>
-          {`resolves ${toDay(claim.resolvesBy)}`}
-        </time>
-      </header>
+      {/* **The silhouette draws none of this.** Out past the second threshold
+          every word on the tile would land under eleven pixels however large it
+          was set, so the words are not set smaller — they are not drawn. What
+          the tile is still saying is drawn above: the shape that says what kind
+          of claim it is, in the hue two of the four kinds take. Which claim it
+          is, a reader asks for by pressing it, and the panel beside the map
+          answers in full. The name it is read out by is on the box itself and
+          does not change with the zoom, so a reader who hears the map rather
+          than seeing it loses nothing out here. */}
+      {detail === "silhouette" ? null : (
+        <>
+          <header className="tile__header">
+            <span className="tile__kind">{KIND_WORDS[claim.kind]}</span>
+            <time className="tile__resolves" dateTime={claim.resolvesBy}>
+              {`resolves ${toDay(claim.resolvesBy)}`}
+            </time>
+          </header>
 
-      <p className="tile__claim">{claim.claim}</p>
+          <p className="tile__claim">{claim.claim}</p>
 
-      <div className="tile__beliefs">
-        {/* The model's column is always drawn — it is the one number every
-            claim on every map has, and while a map is still being built it is
-            the column that says so. The reader's and a venue's are drawn only
-            where they hold a number; where they do not, the absence and its
-            reason are read in full in the panel beside the map. */}
-        <BeliefChip
-          owner="model"
-          slot={claim.beliefs.model}
-          standing={claim.standing}
-          versions={versions}
-        />
-        {claim.beliefs.user.reading === undefined ? null : (
-          <BeliefChip owner="user" slot={claim.beliefs.user} />
-        )}
-        {claim.beliefs.market.reading === undefined ? null : (
-          <BeliefChip owner="market" slot={claim.beliefs.market} />
-        )}
-      </div>
+          <div className="tile__beliefs">
+            {/* The model's column is always drawn — it is the one number every
+                claim on every map has, and while a map is still being built it
+                is the column that says so. The reader's and a venue's are drawn
+                only where they hold a number; where they do not, the absence and
+                its reason are read in full in the panel beside the map. */}
+            <BeliefChip
+              owner="model"
+              slot={claim.beliefs.model}
+              standing={claim.standing}
+              versions={versions}
+            />
+            {claim.beliefs.user.reading === undefined ? null : (
+              <BeliefChip owner="user" slot={claim.beliefs.user} />
+            )}
+            {claim.beliefs.market.reading === undefined ? null : (
+              <BeliefChip owner="market" slot={claim.beliefs.market} />
+            )}
+          </div>
 
-      {detail === "full" && hasFoot ? (
-        // The foot of the tile. It is pushed to the bottom edge as one block, so
-        // that on every tile alike the claim is at the top, the beliefs are in
-        // the middle and whatever is left sits on the floor — and the eye can
-        // read down a column without hunting for the line it wants.
-        <div className="tile__foot">
-          {finding === undefined ? null : <p className="tile__absence">{finding.reason}</p>}
+          {detail === "full" && hasFoot ? (
+            // The foot of the tile. It is pushed to the bottom edge as one
+            // block, so that on every tile alike the claim is at the top, the
+            // beliefs are in the middle and whatever is left sits on the floor —
+            // and the eye can read down a column without hunting for the line it
+            // wants.
+            <div className="tile__foot">
+              {finding === undefined ? null : <p className="tile__absence">{finding.reason}</p>}
 
-          {claim.evidence.length === 0 ? null : (
-            <ul className="tile__clippings">
-              {claim.evidence.map((item) => (
-                <Clipping
-                  key={item.line}
-                  monogram={item.monogram}
-                  host={item.host}
-                  line={item.line}
-                  direction={item.direction}
-                />
-              ))}
-            </ul>
-          )}
+              {claim.evidence.length === 0 ? null : (
+                <ul className="tile__clippings">
+                  {claim.evidence.map((item) => (
+                    <Clipping
+                      key={item.line}
+                      monogram={item.monogram}
+                      host={item.host}
+                      line={item.line}
+                      direction={item.direction}
+                    />
+                  ))}
+                </ul>
+              )}
 
-          {/* What the edits behind this claim did to it, in order. Empty on a
-              map nobody has edited, and then it takes no room at all. */}
-          <Badges badges={badges} />
-        </div>
-      ) : null}
+              {/* What the edits behind this claim did to it, in order. Empty on
+                  a map nobody has edited, and then it takes no room at all. */}
+              <Badges badges={badges} />
+            </div>
+          ) : null}
+        </>
+      )}
     </article>
   );
 }

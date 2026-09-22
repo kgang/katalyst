@@ -39,6 +39,7 @@ import {
 } from "@xyflow/react";
 import { OriginMark } from "../../components/OriginMark";
 import type { Known, LinkMode, LinkShape, Provenance, Ranged } from "../../world";
+import type { TileDetail } from "../geometry";
 import { strokeFor, widthFor } from "./encodings";
 import { MARK_STANDOFF } from "./plates";
 import {
@@ -72,8 +73,17 @@ export interface WireData extends Record<string, unknown> {
   readonly plan?: RoutePlan;
   /** True when the hover lens has put this wire off the path. */
   readonly dimmed?: boolean;
-  /** True when the map is zoomed out far enough that a plate's words would be too small. */
-  readonly tooSmallForWords?: boolean;
+  /**
+   * Which of the three forms the map is drawing, worked out from the zoom by
+   * `geometry.ts` and handed to every wire at once.
+   *
+   * The plate follows the tile: whole near to, the push alone once a
+   * thirteen-pixel word would land under eleven on the glass, and gone
+   * altogether once there is no type size left that would clear the floor. Left
+   * out, the wire draws its whole plate, which is what it does when it is drawn
+   * on its own in a test.
+   */
+  readonly detail?: TileDetail;
   /**
    * How far the mark at this arrow's tail is moved off the wire, so that two
    * arrows leaving the same socket do not draw their marks on top of each other.
@@ -189,6 +199,9 @@ export function WireLabels({
   const waveDelay = {
     "--wave-delay": `calc(${data.wave ?? 0} * var(--duration-stagger))`,
   } as React.CSSProperties;
+  // Drawn on its own, with no map around it, a wire is at life size and draws
+  // its whole plate.
+  const plateDetail = data.detail ?? "full";
 
   return (
     <>
@@ -208,31 +221,35 @@ export function WireLabels({
         <OriginMark provenance={data.provenance} use="alone" />
       </div>
 
-      {/* The plate. Below the zoom at which a tile switches to its summary it
-          switches to its own: the signed push alone, set large enough to clear
-          the eleven-pixel floor all the way down. The tile does the same thing
-          at the same threshold, and the answer in both cases is to draw less
-          rather than to draw it smaller. */}
-      <div
-        className="wire-plate"
-        data-detail={data.tooSmallForWords ? "summary" : "full"}
-        data-layout={plateLayout}
-        data-dimmed={data.dimmed ? "yes" : "no"}
-        data-selected={selected ? "true" : "false"}
-        style={{
-          ...waveDelay,
-          transform: `translate(-50%, ${plateAnchor}) translate(${plateAt[0]}px, ${plateAt[1]}px)`,
-        }}
-      >
-        <WireChip
-          strength={data.strength}
-          lag={data.lag}
-          conditional={data.conditional}
-          detail={data.tooSmallForWords ? "summary" : "full"}
-          layout={plateLayout}
-          reflexive={data.reflexive}
-        />
-      </div>
+      {/* The plate, which follows the tile through the same three forms at the
+          same two thresholds. Below the first it keeps the signed push alone,
+          set large enough to clear the eleven-pixel floor. Below the second it
+          is **not drawn at all**: a plate is words, there is no size left that
+          would clear the floor, and drawing an empty box in its place would be
+          a mark that says nothing. The stroke still says what kind of push the
+          wire is, and the words are one press away in the panel. */}
+      {plateDetail === "silhouette" ? null : (
+        <div
+          className="wire-plate"
+          data-detail={plateDetail}
+          data-layout={plateLayout}
+          data-dimmed={data.dimmed ? "yes" : "no"}
+          data-selected={selected ? "true" : "false"}
+          style={{
+            ...waveDelay,
+            transform: `translate(-50%, ${plateAnchor}) translate(${plateAt[0]}px, ${plateAt[1]}px)`,
+          }}
+        >
+          <WireChip
+            strength={data.strength}
+            lag={data.lag}
+            conditional={data.conditional}
+            detail={plateDetail}
+            layout={plateLayout}
+            reflexive={data.reflexive}
+          />
+        </div>
+      )}
     </>
   );
 }

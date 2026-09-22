@@ -253,3 +253,33 @@
   outline-offset: 4px;
   border-radius: 2px;
 }
+
+/* ---- Both rings, out where a tile is a shape and nothing else ----------- *
+ * A ring is drawn in the map's own coordinates, so the zoom shrinks it with
+ * everything else — and out at the floor the map is about a sixth of life size,
+ * which puts a one-pixel ring at a sixth of a pixel and a four-pixel gap at
+ * two thirds of one. Neither is there. That matters more out here than
+ * anywhere, not less: a silhouette says what **kind** of claim it is and
+ * nothing about which one, so the ring is the only thing on the glass saying
+ * which shape the panel beside the map is reading.
+ *
+ * So both rings are drawn wider and further out, by about the six the floor
+ * divides by: two pixels becomes eight and one becomes six, and the gap goes
+ * from four to sixteen. On the glass that is roughly the ring each was drawn to
+ * be at the furthest the map goes, and about four times it at the nearest of
+ * this form — heavier than near to, and right to be: at this size the reader is
+ * picking a shape out of a field of shapes rather than reading one.
+ *
+ * Neither ring changes colour, and neither is drawn any nearer the tile's own
+ * outline, so the shape that says what kind of claim this is is still whole.
+ * *(2026-09-22)* */
+
+.canvas[data-detail="silhouette"] .react-flow__node:focus-visible {
+  outline-width: 8px;
+  outline-offset: 16px;
+}
+
+.canvas[data-detail="silhouette"] .react-flow__node.selected {
+  outline-width: 6px;
+  outline-offset: 16px;
+}
