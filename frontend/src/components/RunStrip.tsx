@@ -1,5 +1,5 @@
 /**
- * The one strip at the foot of a map that says what is happening to it.
+ * What the run is doing, in the band at the foot of a map.
  *
  * **What it replaced.** The foot of a generating map used to carry three
  * stacked strips of prose and none of them was about the run: what the last
@@ -10,9 +10,16 @@
  * button and watched nothing happen for twenty-three seconds had no way at all
  * to tell a working tool from a broken one.
  *
- * Now there is one strip: the state as a single word, then the run's own
- * sentence — the same sentence the screen reader hears — and, only while a live
- * run is open, how long it has been since anything arrived.
+ * Now there is one row about the run: the state as a single word, then the run's
+ * own sentence — the same sentence the screen reader hears — and, only while a
+ * live run is open, how long it has been since anything arrived.
+ *
+ * **It is one row of a band rather than a bar of its own** *(2026-09-22)*. The
+ * three strips became one band with two rows, because three rules across the
+ * bottom of a screen say three unrelated things are competing and nothing says
+ * which to read — Kent's *"the triple nested bottom bar … somewhat garish"*. The
+ * band is `MapFrame`'s; what this draws is the run's row, and under it, on a
+ * live run, the band's second row.
  *
  * **The sentence is the live region.** Not a copy of it, the region itself, so
  * the two can never drift apart again. It keeps saying what *changed*, which is
@@ -201,7 +208,7 @@ export function RunStrip({ word, saying, arrivals, doing, after }: RunStripProps
 
   return (
     <div className="run-strip" data-state={word}>
-      <div className="run-strip__line">
+      <div className="run-strip__line map-foot__row">
         {/* A word rather than a glyph, in the same box the last-key line uses: a
             mark that has to survive every typeface says less than the word does. */}
         <span className="run-strip__mark">{word}</span>
@@ -229,7 +236,7 @@ export function RunStrip({ word, saying, arrivals, doing, after }: RunStripProps
         // an empty one is an empty line rather than no line, so a search
         // arriving or a claim clearing one changes the words and never the
         // height, and the map above does not jump every few seconds.
-        <div className="run-strip__doing">
+        <div className="run-strip__doing map-foot__row">
           <span className="run-strip__doing-line">
             {quiet.searching === null ? "" : asALine(quiet.searching)}
           </span>

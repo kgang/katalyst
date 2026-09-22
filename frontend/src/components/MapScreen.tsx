@@ -857,10 +857,21 @@ export function MapScreen({
           world={world}
           selection={selection}
           onSelect={setSelection}
+          // **Pointing at a claim brings a folded panel back; walking to one
+          // does not.** Both fill the panel, and the panel is where a claim is
+          // read — so pointing at one is the reader asking to read it, and the
+          // answer must not arrive off screen. Walking the map is walking the
+          // map: a reader who folded the panel to get the width would lose it
+          // again on their first step along a wire.
+          onPointedAt={() => setAway(false)}
           focused={focused}
           onFocused={setFocused}
           heights={heights}
           mapKey={`${base.baseId}:${shop.openId ?? "as-written"}`}
+          // Fold the panel and the stage is 310 pixels wider; the map is framed
+          // again for the stage it is now in, once, as a cut. It never settles
+          // on this — see `frameAgainWhen` in `Canvas.tsx`.
+          frameAgainWhen={away ? "the panel folded" : "the panel returned"}
           keys={keys}
           onStatus={setStatus}
           onOverflow={(column) => {
@@ -913,9 +924,10 @@ export function MapScreen({
       // The names of the three panels, at the head of the panel and outside the
       // part of it that scrolls, so the way to the other two is always on the
       // glass. This is the whole answer to *how do I know what panels exist*.
-      panelHead={<PanelSwitch panels={panels} showing={dock} onShow={turnTo} />}
+      panelHead={<PanelSwitch panels={panels} showing={dock} onShow={turnTo} onHide={keys.panel} />}
       panelNamedBy={theLabelFor(dock)}
       panel={away ? null : THE_PANEL}
+      onShowPanel={keys.panel}
       origin={
         <>
           <p className="map-origin__line">{world.origin}</p>

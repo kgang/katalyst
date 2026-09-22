@@ -118,7 +118,7 @@ crude settles below $68 for five sessions* — the busiest claim on the map, thr
 
 **Every name is a word.** Kent asked for *buttons or icons*; an icon with no word beside it is a thing a reader has to learn before they can use it, and this product has no icon set to learn from. Which name is chosen is said three ways — the word goes from the quiet colour to the text colour, a two-pixel rule of the accent runs under it, and `aria-selected` carries it for a reader who hears the screen. Two of the three survive greyscale, which is `VR3`.
 
-**And the panel is still always here.** It is inside the frame beside the map, it is 336 pixels wide whichever panel is chosen, and the map's stage does not change width when the reader turns to another one. *Nothing in this product opens over the map.*
+**The panel is one press away, and it never opens over the map** *(2026-09-22 — this replaces "this panel is always here")*. It is inside the frame beside the map, 336 pixels wide whichever panel is chosen, and the map's stage does not change width when the reader turns to another one. What it now also does is fold: a chevron at the head of its own names puts it away and gives the map those 336 pixels, `P` does the same from anywhere on either map screen, and while it is away a 26-pixel tab at the edge the panel went behind — a chevron and the word *panel* — brings it back. Kent asked for the control, 2026-09-22: *"can you introduce a button to be able to collapse and open the side bar."* The key already did it and nothing on screen said so, which is a panel a reader can lose. **Pointing at a claim or an arrow while it is folded brings it back**, because pointing at one is the reader asking to read something and the panel is where it is read. **Walking to one does not.** Reaching a claim with the keyboard and pointing at one both fill the panel — that rule is untouched — but they are not the same request: a panel that came back on every selection came back on the reader's first press of `l`, and a fold a reader cannot walk away from is a fold that does not work. So while the panel is folded the map keeps filling it quietly, and `P` or the tab is what puts it back on the glass. It opens on every screen and is not remembered between them. *Nothing in this product opens over the map* is untouched: the folded panel takes its width out of the row rather than sliding over the canvas, and the tab is beside the map, never on it.
 
 ### B1 — A claim, top to bottom
 
@@ -509,9 +509,10 @@ map is built rather than about how much of it has arrived, so it is true of an e
 finished one. The second sentence is true only until the numbers land, so it is printed only until
 then.
 
-**It is never a dialog, and it does not fold.** This panel is always here and nothing in this product
-opens over the map. Folding the panel's sections behind their summaries is a later stack's work;
-this section is written to be folded and is not folded yet.
+**It is never a dialog.** Nothing in this product opens over the map. The whole panel folds away from
+2026-09-22 — a chevron at the head of its names, `P`, and a tab at the edge while it is gone — but
+*this section* does not fold behind a summary of itself: that is a later stack's work, and this
+section is written to be folded and is not folded yet.
 
 **The run's own name is the one identifier this product prints.** Every other identifier on a
 generated map — a claim's, an arrow's — is twenty-six characters of the engine's bookkeeping and a

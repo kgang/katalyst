@@ -45,7 +45,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { key: "O", does: "Read the map as a list instead of a picture." },
   {
     key: "P",
-    does: "Show or hide the panel beside the map, when you want the whole width for the map.",
+    does:
+      "Show or hide the panel beside the map, when you want the whole width for the map. The " +
+      "chevron at the head of the panel does the same, and while the panel is away a tab at the " +
+      "edge of the map brings it back.",
   },
   {
     key: "N",

@@ -460,8 +460,13 @@ test("the edges of the stage and the panel stay true when the window changes", a
         one.getBoundingClientRect(),
       );
       const yes = (it: boolean) => (it ? "yes" : "no");
-      const frame = document.querySelector(".dock-frame") as HTMLElement;
-      const dock = document.querySelector(".dock") as HTMLElement;
+      // **The panel may not be there at all.** It folds away from 2026-09-22,
+      // and then the stage has the whole width — which is the one change to
+      // this screen's layout that nothing else on it causes, and so the one the
+      // stage's own edges are most likely to be wrong about.
+      const frame = document.querySelector(".dock-frame") as HTMLElement | null;
+      const dock = document.querySelector(".dock") as HTMLElement | null;
+      const folded = "the panel is folded away";
       return {
         stageSaid: {
           left: stage.dataset.moreLeft,
@@ -475,13 +480,42 @@ test("the edges of the stage and the panel stay true when the window changes", a
           above: yes(boxes.some((at) => at.top < room.top - 1)),
           below: yes(boxes.some((at) => at.bottom > room.bottom + 1)),
         },
-        panelSaid: { above: frame.dataset.moreAbove, below: frame.dataset.moreBelow },
-        panelTruly: {
-          above: yes(dock.scrollTop > 1),
-          below: yes(dock.scrollTop + dock.clientHeight < dock.scrollHeight - 1),
-        },
+        panelSaid:
+          frame === null
+            ? folded
+            : { above: frame.dataset.moreAbove, below: frame.dataset.moreBelow },
+        panelTruly:
+          dock === null
+            ? folded
+            : {
+                above: yes(dock.scrollTop > 1),
+                below: yes(dock.scrollTop + dock.clientHeight < dock.scrollHeight - 1),
+              },
       };
     });
+
+  /** Both boxes say what is beyond them, and both are right, at this window. */
+  const theEdgesComeTrue = async (where: string) => {
+    // **Waited for, not slept through, and the wait is the statement.** The
+    // edges are settled exactly when what the two boxes say is what is so; a
+    // fixed pause would be a guess about how long a resize takes on whatever
+    // machine this runs on.
+    await expect
+      .poll(
+        async () => {
+          const now = await bothReadings();
+          return (
+            JSON.stringify(now.stageSaid) === JSON.stringify(now.stageTruly) &&
+            JSON.stringify(now.panelSaid) === JSON.stringify(now.panelTruly)
+          );
+        },
+        {
+          timeout: 15_000,
+          message: `the edges never came true ${where}: ${JSON.stringify(await bothReadings())}`,
+        },
+      )
+      .toBe(true);
+  };
 
   // **Five windows, including the one everything was designed against.** The
   // rule is *at each edge that has content beyond it and at no edge that has
@@ -498,28 +532,29 @@ test("the edges of the stage and the panel stay true when the window changes", a
     { width: 1600, height: 1000 },
   ]) {
     await page.setViewportSize(size);
-    // **Waited for, not slept through, and the wait is the statement.** The
-    // edges are settled exactly when what the two boxes say is what is so; a
-    // fixed pause would be a guess about how long a resize takes on whatever
-    // machine this runs on.
-    await expect
-      .poll(
-        async () => {
-          const now = await bothReadings();
-          return (
-            JSON.stringify(now.stageSaid) === JSON.stringify(now.stageTruly) &&
-            JSON.stringify(now.panelSaid) === JSON.stringify(now.panelTruly)
-          );
-        },
-        {
-          timeout: 15_000,
-          message: `the edges never came true at ${size.width}x${size.height}: ${JSON.stringify(
-            await bothReadings(),
-          )}`,
-        },
-      )
-      .toBe(true);
+    await theEdgesComeTrue(`at ${size.width}x${size.height}`);
   }
+
+  // **And the same claim with the panel folded away** *(2026-09-22)*. Folding it
+  // gives the stage 310 more pixels without the window changing at all, which is
+  // a resize nothing outside this screen causes — so if the stage watched only
+  // the window, the rule at its right edge would go on claiming tiles that are
+  // now comfortably on the glass.
+  await page.getByRole("button", { name: "Hide the panel beside the map" }).click();
+  await expect(page.locator(".dock-column")).toHaveCount(0);
+  for (const size of [
+    { width: 1600, height: 1000 },
+    { width: 900, height: 620 },
+  ]) {
+    await page.setViewportSize(size);
+    await theEdgesComeTrue(`with the panel folded at ${size.width}x${size.height}`);
+  }
+
+  // And the panel comes back, with both boxes telling the truth again.
+  await page.getByRole("button", { name: "Show the panel beside the map" }).click();
+  await expect(page.locator(".dock-column")).toHaveCount(1);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await theEdgesComeTrue("with the panel back");
 });
 
 test("a run that was cut still offers its working", async ({ page }) => {

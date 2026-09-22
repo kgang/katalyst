@@ -153,6 +153,12 @@ export function GenerationScreen({
   // because at that moment the run is the only thing there is to read: nothing
   // is selected and there is no map yet.
   const [dock, setDock] = useState<PanelName>("run");
+  // And whether the panel is there at all. It folds away and gives the map the
+  // width, from `P` and from the control at the head of its own names — a fact
+  // about the panel rather than about which of them is showing, so it is kept
+  // apart from the three. It starts open on every screen and is not remembered:
+  // a reader who comes back to a run they left is shown the run.
+  const [away, setAway] = useState(false);
   const [openAt, setOpenAt] = useState<number | null>(null);
   const [status, setStatus] = useState(
     "Press ? for every key. j and k walk a column; h and l follow the wires.",
@@ -161,6 +167,14 @@ export function GenerationScreen({
 
   const { generationId, phase } = growth;
   const finished = hasStopped(phase);
+
+  // **Whether the foot's second row belongs to the model.** A recording holds no
+  // line about what a model was doing, so a replay has none to show; a run that
+  // has stopped has nothing out. Only a live run that is still open has, and
+  // then the room for both lines is held open whether or not either has anything
+  // in it yet. Worked out once, because two things read it: the lines
+  // themselves, and the quiet row at the foot that stands down for them.
+  const theModelSaysWhatItIsDoing = !replaying && !finished;
 
   // **How many events have arrived**, so the strip at the foot knows when to
   // start counting the silence again.
@@ -278,6 +292,26 @@ export function GenerationScreen({
     setSelection({ kind: "claim", id });
   }, []);
 
+  /**
+   * Fold the panel away, or bring it back — the same act however it is asked
+   * for.
+   *
+   * `P`, the control at the head of the panel, the tab at the edge of the map
+   * and the command by name are four ways of asking for one thing, so they are
+   * one function: four copies of this would be four chances for one of them to
+   * stop saying what the other three say.
+   */
+  const foldThePanel = useCallback(() => {
+    setAway((was) => {
+      setStatus(
+        was
+          ? "the panel is beside the map · press N for the next one"
+          : "the panel is away · press P to bring it back",
+      );
+      return !was;
+    });
+  }, []);
+
   // **Choosing something is the one thing that moves the panel on its own.**
   //
   // Pointing at a tile or an arrow, or reaching one with the keyboard, puts what
@@ -381,6 +415,7 @@ export function GenerationScreen({
         name: "Read the map as a list",
         does: "The same as pressing O. Every claim, one sentence each, in the order they arrived.",
         run: () => {
+          setAway(false);
           setDock("outline");
           setStatus(PANEL_IN_WORDS.outline);
         },
@@ -389,9 +424,15 @@ export function GenerationScreen({
         name: "Read what this run is doing",
         does: "What it refused, what it cost, and where it came from. Also a name at the head of the panel.",
         run: () => {
+          setAway(false);
           setDock("run");
           setStatus(PANEL_IN_WORDS.run);
         },
+      },
+      {
+        name: "Show or hide the panel beside the map",
+        does: "The same as pressing P, and as the control at the head of the panel, when you want the whole width for the map.",
+        run: foldThePanel,
       },
       // **Only once there is a working.** It is read back from the server when
       // the run stops, so a press before then leaves the panel saying *Reading
@@ -432,7 +473,7 @@ export function GenerationScreen({
         run: onLeave,
       },
     ],
-    [generationId, finished, onLeave, aMapToEdit, changeThis],
+    [generationId, finished, onLeave, aMapToEdit, changeThis, foldThePanel],
   );
 
   const keys: MapKeys = useMemo(
@@ -447,16 +488,18 @@ export function GenerationScreen({
             : "a branch is started on a finished map; this one is still being built",
         ),
       flipWorlds: () => setStatus("there is nothing to flip to — no branch is open"),
-      outline: () =>
+      outline: () => {
+        setAway(false);
         setDock((was) => {
           const next: PanelName = was === "outline" ? "subject" : "outline";
           setStatus(PANEL_IN_WORDS[next]);
           return next;
-        }),
-      panel: () => setStatus("the panel is beside the map · press N for the next one"),
+        });
+      },
+      panel: foldThePanel,
       palette: () => setOverlay("palette"),
     }),
-    [changeThis, aMapToEdit],
+    [changeThis, aMapToEdit, foldThePanel],
   );
 
   /**
@@ -518,6 +561,10 @@ export function GenerationScreen({
           world={growth.world}
           selection={selection}
           onSelect={setSelection}
+          // **Pointing at a claim brings a folded panel back; walking to one
+          // does not.** Pointing at one is the reader asking to read it, and the
+          // panel is where it is read. Walking the map is walking the map.
+          onPointedAt={() => setAway(false)}
           focused={focused}
           onFocused={setFocused}
           mapKey={generationId ?? "a run that has not started"}
@@ -530,6 +577,13 @@ export function GenerationScreen({
           // the run stops — the one moment nothing on the map is moving and the
           // reader is about to start reading it.
           frameAgainOn={finished ? "the run stopped" : undefined}
+          // **And once more whenever the panel folds or comes back**, which
+          // changes the stage's width by 310 pixels without the window moving.
+          // It is a second word rather than part of the one above because that
+          // one also settles the map — drops every pin and lays the whole thing
+          // out again — and settling a map mid-run would move tiles that are
+          // already placed. The two compose in the frame's key and nowhere else.
+          frameAgainWhen={away ? "the panel folded" : "the panel returned"}
         />
       }
       overlay={
@@ -561,7 +615,7 @@ export function GenerationScreen({
           // stopped has nothing out. Only a live run that is still open is
           // given them, and then the room for both is held open whether or not
           // either has anything in it yet.
-          doing={replaying || finished ? null : growth.activity}
+          doing={theModelSaysWhatItIsDoing ? growth.activity : null}
           after={
             <DoneLine
               done={growth.done}
@@ -581,14 +635,22 @@ export function GenerationScreen({
       // The names of the three panels, at the head of the panel and outside the
       // part of it that scrolls, so the way to the other two is always on the
       // glass. This is the whole answer to *how do I know what panels exist*.
-      panelHead={<PanelSwitch panels={panels} showing={dock} onShow={turnTo} />}
+      panelHead={
+        <PanelSwitch panels={panels} showing={dock} onShow={turnTo} onHide={foldThePanel} />
+      }
       panelNamedBy={theLabelFor(dock)}
+      onShowPanel={foldThePanel}
+      // The band at the foot has two rows, and on a live run the second of them
+      // is what the model is doing this second. The quiet row — the last key
+      // pressed, and where this map came from — stands down for exactly as long
+      // as that, which is the same condition the lines themselves are drawn on.
+      activityShowing={theModelSaysWhatItIsDoing}
       panel={
-        /* The map as a list, in place of the panel, exactly as it is on a
-           stored map: press O for it, press O again for the panel. It grows as
-           the map grows, in the same causal order, so a reader who never sees
-           the canvas hears the map being built rather than a silence followed
-           by a finished list. */
+        away ? null : /* The map as a list, in place of the panel, exactly as it
+           is on a stored map: press O for it, press O again for the panel. It
+           grows as the map grows, in the same causal order, so a reader who
+           never sees the canvas hears the map being built rather than a silence
+           followed by a finished list. */
         dock === "outline" ? (
           <Outline items={outline} onPick={pick} focused={focused} />
         ) : dock === "subject" ? (
