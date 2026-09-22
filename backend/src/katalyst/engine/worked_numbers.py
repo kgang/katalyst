@@ -58,6 +58,8 @@ from datetime import date
 from pathlib import Path
 
 from katalyst.domain import (
+    SAMPLED_WORLDS,
+    SLICES,
     Belief,
     Branch,
     ClaimDiff,
@@ -270,17 +272,19 @@ def _digits(value: float | None) -> str:
 def _chip(belief: Belief) -> tuple[str, str]:
     """Write a belief both ways: as the tile shows it, and at full precision.
 
+    **One number, not three.** No likelihood on this product carries a range
+    (decision record 0028, Kent's row R48, 2026-09-22), so a chip is the number
+    and nothing else. A stated prior still arrives with `lo` and `hi` on it,
+    because the model is still asked for them until the one shape freeze; nothing
+    reads them, and this file does not print them.
+
     Args:
-        belief: The likelihood with the range around it.
+        belief: The likelihood.
 
     Returns:
-        The chip as a reader sees it, and its three numbers at full precision.
+        The chip as a reader sees it, and the same number at full precision.
     """
-    band = f"{two_figures(belief.lo)}{BETWEEN}{two_figures(belief.hi)}"
-    return (
-        f"{two_figures(belief.p)} ({band})",
-        f"{_digits(belief.p)} {_digits(belief.lo)} {_digits(belief.hi)}",
-    )
+    return (two_figures(belief.p), _digits(belief.p))
 
 
 def _in_days(count: float) -> str:
@@ -546,14 +550,15 @@ def _input_lines(claims: Sequence[Proposition], arrows: Sequence[Link]) -> list[
     """
     run = [
         _line("run · seed", NOTHING, str(SEED)),
-        _line("run · versions of the map", NOTHING, f"{VERSIONS:,}"),
-        _line("run · worlds per version", NOTHING, str(WORLDS)),
         _line("run · day zero", NOTHING, str(FIXTURE_DATE)),
+        _line("run · slices", NOTHING, str(SLICES)),
+        _line("run · worlds in the sample", NOTHING, f"{SAMPLED_WORLDS:,}"),
     ]
 
     stated: list[str] = []
     for claim in claims:
         stated.append(_line(f"{claim.id} · kind", NOTHING, claim.kind))
+        stated.append(_line(f"{claim.id} · persistence", NOTHING, claim.persistence))
         stated.append(_line(f"{claim.id} · prior", *_chip(claim.prior)))
         stated.append(
             _line(
@@ -657,7 +662,10 @@ def _change_lines(name: str, answer: Diff, before: World, after: World) -> list[
         after: This branch's world, for the same.
 
     Returns:
-        Five lines per claim.
+        Three lines per claim, and a fourth where the claim is unchanged saying
+        why. *Same direction* and *moved only by reweighting* were two more; both
+        were about the two thousand versions of the map, and both went with them
+        (decision record 0028).
     """
     lines: list[str] = []
     for claim_id in sorted(answer.claims):
@@ -673,16 +681,10 @@ def _change_lines(name: str, answer: Diff, before: World, after: World) -> list[
             )
         )
         lines.append(_line(f"{claim_id} · {name} · move", NOTHING, _digits(row.delta)))
-        lines.append(
-            _line(f"{claim_id} · {name} · same direction", NOTHING, _digits(row.agreement))
-        )
-        lines.append(
-            _line(
-                f"{claim_id} · {name} · moved only by reweighting",
-                NOTHING,
-                "yes" if row.moved_only_by_reweighting else "no",
+        if row.unchanged_because is not None:
+            lines.append(
+                _line(f"{claim_id} · {name} · why unchanged", NOTHING, row.unchanged_because)
             )
-        )
     return lines
 
 
@@ -698,7 +700,8 @@ def _change_list_lines(name: str, rows: Sequence[DeltaRow]) -> list[str]:
         rows: The change list, already in the order the product shows it.
 
     Returns:
-        Seven lines per row.
+        Five lines per row. The band's width and how often the versions agreed
+        were two more, and both went with the versions (decision record 0028).
     """
     lines: list[str] = []
     for place, row in enumerate(rows, start=1):
@@ -713,36 +716,8 @@ def _change_list_lines(name: str, rows: Sequence[DeltaRow]) -> list[str]:
             )
         )
         lines.append(_line(f"{under} biggest move", NOTHING, _digits(row.peak_delta)))
-        lines.append(_line(f"{under} band width", NOTHING, _digits(row.range_width)))
-        lines.append(_line(f"{under} same direction", NOTHING, _digits(row.agreement)))
         lines.append(_line(f"{under} rank", NOTHING, _digits(row.rank)))
     return lines
-
-
-def _retraction_lines(name: str, world: World) -> list[str]:
-    """Write every supposition a later edit undermined, and what undermined it.
-
-    Args:
-        name: The short name this world's lines are filed under.
-        world: The world.
-
-    Returns:
-        A line saying how many there were, always, and then one line per
-        retraction. The counting line is there even when the count is none, so
-        that a chapter citing it keeps its link whichever way the number goes —
-        a name that exists only in one of two cases is a name that breaks.
-    """
-    return [
-        _line(f"{name} · suppositions that ended", NOTHING, str(len(world.retractions))),
-        *(
-            _line(
-                f"{one.target} · {name} · supposition ended",
-                NOTHING,
-                f"{one.at} · by {one.by_claim} · along {one.by_link} · edit {one.by + 1}",
-            )
-            for one in world.retractions
-        ),
-    ]
 
 
 def _computed_lines(
@@ -757,7 +732,7 @@ def _computed_lines(
         worlds: Each world with the short name its lines are filed under.
         answers: Each difference from the untouched map, with its name and its world.
         conditionals: Each arrow with the world it lives on and its own number.
-        base: The untouched world, whose bands the last block takes apart.
+        base: The untouched world, read for the numbers a difference reports.
 
     Returns:
         The whole COMPUTED part of the file.
@@ -765,7 +740,6 @@ def _computed_lines(
     summaries: list[str] = []
     changes: list[str] = []
     ranked: list[str] = []
-    ended: list[str] = []
     for name, answer, after in answers:
         # The sentence is a rendering, so it goes in the printed field: a check
         # reads its words and leaves its two-figure numbers alone, because those
@@ -777,21 +751,22 @@ def _computed_lines(
         summaries.append(_line(f"{name} · the sentence beside the list", answer.summary, NOTHING))
         untouched = sum(1 for one in answer.claims.values() if one.state == "unchanged")
         summaries.append(_line(f"{name} · claims the edit left unchanged", NOTHING, str(untouched)))
-        said = " ".join(answer.warnings) if answer.warnings else "none"
-        summaries.append(_line(f"{name} · warnings", NOTHING, said))
+
         changes += _change_lines(name, answer, base, after)
         ranked += _change_list_lines(name, answer.rows)
-        ended += _retraction_lines(name, after)
+
+    # **Every world says what it warned about, the untouched one included.** The
+    # chapters set the base world's line beside a branch's to show that a warning
+    # about an arrow is a fact about the map rather than about an edit.
+    said = [
+        _line(f"{name} · warnings", NOTHING, " ".join(world.warnings) or "none")
+        for name, world in worlds
+    ]
+    summaries = [*said, *summaries]
 
     arrows = [
         _line(f"{arrow.id} · {name} · conditional", *_chip(belief))
         for name, arrow, belief in conditionals
-    ]
-
-    bands = [
-        _line(f"{target} · base · band from {source}", NOTHING, _digits(share))
-        for target in sorted(base.range_shares)
-        for source, share in sorted(base.range_shares[target].items())
     ]
 
     return [
@@ -809,22 +784,10 @@ def _computed_lines(
         ),
         *_block("The one sentence the product writes beside each list.", summaries),
         *_block(
-            "Suppositions a later edit undermined: the day the cause became true, never\n"
-            "that day plus the arrow's delay.",
-            ended,
-        ),
-        *_block(
             "The number on each arrow: its target, with its source supposed true — never\n"
             "how often the two show up together. Each arrow appears once, on the world\n"
             "where it exists.",
             arrows,
-        ),
-        *_block(
-            "Where each claim's band comes from, on the untouched map: the share of it\n"
-            "owed to not being sure of each claim's own stated prior. A claim's shares\n"
-            "do not add up to one, and are not meant to — they are the engine's own\n"
-            "quantity, and it reports them near one rather than at it.",
-            bands,
         ),
     ]
 
@@ -1042,8 +1005,8 @@ Two parts, and the difference between them matters:
 
 Every line has three fields: the name, then what the product would show on screen
 for this fact, then the fact itself. A `—` in the middle field means the product
-does not render this fact at all — a move, a share of a band and how often the
-versions agreed are real quantities, and none of them is a likelihood.
+does not render this fact at all — a move and a rank are real quantities, and
+neither of them is a likelihood written the way a likelihood is written.
 
 Five decimal places is a choice about reading. The screen never shows more than
 two significant figures, and the rules layer will not call a claim *shifted*
@@ -1059,8 +1022,12 @@ about to eight decimal places can still round two ways, and neither is wrong.
 Each such number is checked at full precision on the line that owns it.
 
 A `—` in the printed column means the product has no way of writing that kind of
-number yet: a move, a share of a band, and how often the versions agreed are all
-real quantities, and none of them is a likelihood.
+number yet: a move and a rank are real quantities, and neither is a likelihood.
+
+**Every likelihood here is one number.** No number on this product carries a
+range (decision record 0028, 2026-09-22): one likelihood per claim, computed
+once. This file used to print three figures in the right-hand column of every
+reading and every prior, and a low-to-high pair beside the number in the middle one.
 """
 
 
