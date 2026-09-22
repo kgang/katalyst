@@ -17,7 +17,7 @@ never calls `affected_set` and it never asks the fold what it touched: a test
 that agrees with the code it is testing is not a test.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 import networkx
 import pytest
@@ -53,9 +53,9 @@ from katalyst.fixtures.hormuz import (
     FIXTURE_DATE,
     HORMUZ,
     HORMUZ_THEN_STRIKE,
+    STRIKE_ENDS_THE_OPENNESS,
     STRIKE_ON_IRAN,
     STRIKE_TO_BRENT,
-    STRIKE_TO_HORMUZ,
     STRIKE_TO_PREMIUM,
 )
 from tests.comparisons import every_version_answered_the_same
@@ -107,6 +107,7 @@ def _example_claim(identifier: str, kind: str = "event") -> Proposition:
         id=identifier,
         claim=f"The claim written down under the name {identifier}.",
         kind=kind,  # type: ignore[arg-type]
+        persistence="event",
         resolution=Resolution(
             criteria="Two readers of this sentence would agree on the answer.",
             source="The publication that would carry it.",
@@ -553,41 +554,51 @@ def test_affected_set_matches_the_table() -> None:
 
 
 def _wide(identifier: str, kind: str, middle: float) -> Proposition:
-    """One claim judged on day zero, whose stated range spans the whole scale.
+    """One claim with a middling chance of its own and a window of real width.
 
-    Two things this map needs that the ordinary builder does not give. A claim
-    every version of the map gives the same number to cannot be moved by counting
-    the versions differently, and these tests are about exactly that — so the
-    stated range is the whole scale and the versions really do disagree. And every
-    claim is judged on **day zero**, so no push has had time to fade: what the
-    arrow does, it does where the numbers are read.
+    Two things this map needs that the ordinary builder does not give. **A claim
+    has to be able to move**, so its own stated chance is a middling one rather
+    than nought or one: a claim the map calls impossible stays impossible whatever
+    anybody learns. And **its window has to have width**, because a claim's number
+    is the chance it happens by its deadline and a claim judged on day zero has no
+    time for anything to happen in — such a claim reads nought, however hard its
+    causes push.
+
+    This builder used to do the opposite of both, and deliberately: it pinned every
+    claim to day zero so that no push had faded by the day the number was read, and
+    it spread each stated range across the whole scale so that the two thousand
+    versions of the map really disagreed. Both were about an engine that read a
+    likelihood on one day and ran the map two thousand times, and neither survives
+    it (decision records 0016 and 0028).
     """
-    spread = Belief(p=middle, lo=0.0, hi=1.0, owner="model")
+    spread = Belief(p=middle, lo=middle, hi=middle, owner="model")
     plain = _example_claim(identifier, kind=kind)
     return plain.model_copy(
         update={
             "prior": spread,
             "beliefs": Beliefs(model=spread),
-            "resolution": plain.resolution.model_copy(update={"by": DAY_ZERO}),
+            "resolution": plain.resolution.model_copy(update={"by": DAY_ZERO + timedelta(days=30)}),
         }
     )
 
 
 def _one_cause_one_effect() -> Graph:
-    """A cause, the effect it does not yet push, and a pair joined to neither.
+    """A cause, the effect it pushes, and a pair joined to neither.
 
-    The arrow starts at no strength at all, so turning it up is a change to what
-    the map says rather than a nudge — the case the affected-set table used to get
-    wrong. The push is a spike that fades by half in a day.
+    **The arrow really pushes**, and it has to. An observation reaches a claim's
+    causes along the arrows and along nothing else (decision record 0016): an arrow
+    of no strength leaves its target's rate exactly where it was, so the two claims
+    are independent and learning one says nothing whatever about the other. This
+    map used to carry an arrow of strength nought and these tests used to pass on
+    it, because the old engine moved a cause by counting the versions of the map
+    differently — which is the mechanism record 0016 deleted and
+    `test_an_observation_moves_nothing_no_arrow_reaches` now insists is gone.
 
-    The claims keep the plain numbered names the generators use, and that is not
-    cosmetic: **each claim's draws are keyed by its own identifier**, so renaming
-    them draws different numbers, and an effect that is plain on one map can be too
-    small to see on another. These are the names the failing sequence was found
-    under, and the numbers below are that map's.
+    The second pair is joined by an arrow of no strength on purpose: it is the far
+    side of the map, and nothing any of these edits does may reach it.
     """
     spike = _example_arrow("claim-0", "claim-1").model_copy(
-        update={"strength": 0.0, "shape": "impulse", "half_life": 1.0}
+        update={"strength": 1.4, "shape": "impulse", "half_life": 1.0}
     )
     apart = _example_arrow("claim-2", "claim-3").model_copy(
         update={"strength": 0.0, "shape": "impulse", "half_life": 1.0}
@@ -595,38 +606,23 @@ def _one_cause_one_effect() -> Graph:
     return Graph(
         id="map-0",
         propositions=(
-            _wide("claim-0", "hypothesis", 0.0),
+            _wide("claim-0", "hypothesis", 0.4),
             _wide("claim-1", "market", 0.5),
-            _wide("claim-2", "event", 0.0),
-            _wide("claim-3", "event", 0.0),
+            _wide("claim-2", "event", 0.4),
+            _wide("claim-3", "event", 0.4),
         ),
         links=(spike, apart),
         hypothesis_id="claim-0",
     )
 
 
-EVIDENCE_BUDGET = {"versions": 2_000, "worlds": 8}
-"""The shipped budget, for the handful of tests that are about a number that moved.
-
-The tiny budget elsewhere is enough to check *which* claims an edit may touch. It
-is not enough to check *how far* one moved.
-"""
-
-
 def _after(graph: Graph, *edits: Intervention) -> World:
-    """Fold the edits on in order and work the numbers through, at the shipped budget."""
+    """Fold the edits on in order and work the numbers through."""
     branch = _branch(*edits)
     folded = apply(graph, branch)
     assert not isinstance(folded, list), folded
     left_behind, fixed = folded
-    return propagate(
-        left_behind,
-        fixed,
-        as_of=DAY_ZERO,
-        seed=SEED,
-        introduced_by=introduced_by(branch),
-        **EVIDENCE_BUDGET,
-    )
+    return propagate(left_behind, fixed, as_of=DAY_ZERO, seed=SEED)
 
 
 def _permitted(graph: Graph, first: Intervention, second: Intervention) -> frozenset[str]:
@@ -664,9 +660,9 @@ def test_an_edit_under_an_observation_may_move_what_the_observation_is_about(
     a number that had moved by `.070`.
 
     Supposing the reported claim is the third, and it moves the cause the other way
-    about: a later edit on a claim overrides an earlier one, so the observation
-    stops holding, the worlds it was throwing away come back, and the cause goes to
-    what it said before the report arrived.
+    about: a later edit on a claim overrides an earlier one, so the observation is
+    no longer the word in force, the map stops being conditioned on it, and the
+    cause goes back to what it said before the report arrived.
     """
     graph = _one_cause_one_effect()
     watched = Observe(target="claim-1", value=False)
@@ -685,10 +681,9 @@ def test_a_retune_under_an_observation_moves_the_arrows_source() -> None:
     """The measured case, kept by name because it is what the table used to deny.
 
     Observe that a claim did not happen, then change how hard its one cause pushes
-    it. The arrow's **source** moves — measured, `.5020` to `.4317` — and nothing
-    on the far side of the map does. Directions and a permission only: the example
-    map may be tuned, so what is pinned is that the source moves at all and that
-    the rule allows it.
+    it. The arrow's **source** moves, and nothing on the far side of the map does.
+    Directions and a permission only: the example map may be tuned, so what is
+    pinned is that the source moves at all and that the rule allows it.
     """
     graph = _one_cause_one_effect()
     watched = Observe(target="claim-1", value=False)
@@ -1112,7 +1107,7 @@ def test_the_strike_branch_folds_onto_the_hormuz_map() -> None:
     assert not isinstance(folded, list)
     after, fixed = folded
 
-    assert {one.id for one in after.propositions} == {"H", "C", "B", "R", "M1", "M2", "N1", "S"}
+    assert {one.id for one in after.propositions} == {one.id for one in HORMUZ.propositions} | {"S"}
     assert [(one.target, one.value, one.at, one.by, one.kind) for one in fixed] == [
         ("H", True, FIXTURE_DATE, 0, "do"),
         ("S", True, date(2026, 10, 2), 2, "do"),
@@ -1123,11 +1118,13 @@ def test_the_strike_branch_folds_onto_the_hormuz_map() -> None:
 def test_an_arrow_inserted_after_a_supposition_is_live() -> None:
     """Supposing a claim cuts the arrows pointing at it *now*, not the ones added later.
 
-    This is the whole showcase in one assertion. The branch supposes the strait
-    open first and adds the strike second, so the strike's arrow against the strait
-    survives and can push the supposition back down. Reverse the two edits and the
-    same arrow is cut, and the branch demonstrates nothing — which is why the order
-    the user made their edits in is part of the record.
+    This is the whole showcase in one assertion. The strike's arrow ends the
+    **state** — *the strait stays open to commercial transit through 1 November* —
+    and the example's branch adds that arrow while nothing is supposed on the
+    state, so it survives and the state can fall. Add the strike first and then
+    suppose the state, and the very same arrow is cut, and the branch demonstrates
+    nothing — which is why the order the user made their edits in is part of the
+    record.
     """
     in_the_example_order = apply(HORMUZ, HORMUZ_THEN_STRIKE)
     the_other_way_round = apply(
@@ -1135,9 +1132,9 @@ def test_an_arrow_inserted_after_a_supposition_is_live() -> None:
         _branch(
             Insert(
                 proposition=STRIKE_ON_IRAN,
-                links=(STRIKE_TO_BRENT, STRIKE_TO_PREMIUM, STRIKE_TO_HORMUZ),
+                links=(STRIKE_TO_BRENT, STRIKE_TO_PREMIUM, STRIKE_ENDS_THE_OPENNESS),
             ),
-            Do(target="H", value=True, at=FIXTURE_DATE),
+            Do(target="O", value=True, at=FIXTURE_DATE),
             Do(target="S", value=True, at=date(2026, 10, 2)),
         ),
     )
@@ -1147,8 +1144,8 @@ def test_an_arrow_inserted_after_a_supposition_is_live() -> None:
     live, _ = in_the_example_order
     cut, _ = the_other_way_round
 
-    assert "S->H" in {one.id for one in live.links}
-    assert "S->H" not in {one.id for one in cut.links}
+    assert "S->O" in {one.id for one in live.links}
+    assert "S->O" not in {one.id for one in cut.links}
     assert "S->B" in {one.id for one in cut.links}
     assert "S->C" in {one.id for one in cut.links}
 
@@ -1245,14 +1242,15 @@ def test_intervention_locality(kind: str, data: st.DataObject) -> None:
     untouched = [one for one in branched.beliefs if one not in may_move]
     for claim_id in untouched:
         assert claim_id in base.beliefs, "an edit added a claim outside its own reach"
-    # Everything the engine worked out about each of them, bit for bit: every
-    # version's answer, the spread inside each version, and how much each version
-    # counts. `tests/comparisons.py` says why the reported likelihood is the one
-    # thing that cannot be asked for exactly.
+    # Every number the engine worked out about each of them — the one on its tile
+    # and every point of the line drawn beneath it — to the last bit.
+    # `tests/comparisons.py` says why that is the last bit rather than the byte:
+    # an edit changes the shape of the map, the exact solve reads its elimination
+    # order off that shape, and a different order multiplies the same factors in a
+    # different sequence. The byte-identical promise is about **evidence**, and
+    # `test_a_claim_cut_off_from_the_evidence_is_bit_for_bit` below is where it is
+    # made and kept.
     every_version_answered_the_same(base, branched, untouched)
-    # And the reported numbers, exactly.
-    for claim_id in untouched:
-        assert branched.beliefs[claim_id] == base.beliefs[claim_id], claim_id
     # A claim added by an `insert` brings its own resolve-by day, and past the
     # 180-point cap that day joins the points every series is drawn at — so the two
     # worlds can be drawn at slightly different days. They are compared on the days
@@ -1415,13 +1413,25 @@ class GraphEditMachine(RuleBasedStateMachine):
 
         assert _has_no_loops(after)
         for belief in world.beliefs.values():
-            assert 0.0 <= belief.lo <= belief.p <= belief.hi <= 1.0
+            assert 0.0 <= belief.lo == belief.p == belief.hi <= 1.0
         own_reach = _affected_from_the_shape(after, edit)
         may_move = own_reach | _evidence_moved(self.graph, self.fixed, after, fixed, own_reach)
         for claim_id, belief in world.beliefs.items():
             if claim_id in may_move:
                 continue
-            assert belief == self.world.beliefs[claim_id], claim_id
+            # **To the last bit, rather than to the byte, and the difference is
+            # named.** Every other locality test here asks for byte-identity and
+            # gets it. This one walks *inserts* as well, and adding a claim to a
+            # map changes the order the exact solve eliminates its claims in, which
+            # changes the order a claim's factors are multiplied in — and
+            # floating-point multiplication is not associative. Measured on the
+            # sequence this machine shrank to: a claim outside the reach came back
+            # `5.2e-26` away on a number of `2.4e-10`, which is the last bit of a
+            # double and nothing else. A test that demanded the byte here would be
+            # asserting that two different multiplication orders agree exactly,
+            # which is not true of any arithmetic this engine could be written in.
+            before = self.world.beliefs[claim_id].p
+            assert belief.p == pytest.approx(before, rel=1e-12, abs=1e-15), claim_id
 
         self.graph, self.fixed, self.world = after, fixed, world
 

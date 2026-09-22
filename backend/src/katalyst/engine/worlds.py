@@ -40,7 +40,6 @@ What this file must never do
 from collections.abc import Mapping
 
 from katalyst.domain import (
-    DEFAULT_ENGINE,
     SLICES,
     Assignment,
     Belief,
@@ -70,22 +69,25 @@ from katalyst.domain import (
 # the flip: `katalyst.domain.propagation` belongs to another lane this week, so
 # the name is reached as it stands. The flip makes this a public seam and the
 # leading underscore goes; when it does, this import and the call below lose it.
-from katalyst.domain.propagation import SAMPLED_WORLDS, _worked_out_by_deadline
+from katalyst.domain.propagation import SAMPLED_WORLDS, _worked_out
 from katalyst.engine.transcript import held
 from katalyst.fixtures import EXAMPLES, StoredExample, find
 
 VERSIONS = 2_000
-"""How many versions of the map a world is built from when a request does not say.
+"""What a request's `versions` field defaults to. **Accepted and ignored.**
 
-The outer loop: how sure we are of the numbers put in. It is the same number
-`propagate` carries as its own default, and `test_a_world_is_built_at_the_shipped
-_budget` fails if the two ever part company.
+**Dated 2026-09-22.** The engine works out one version of the map and reports one
+likelihood per claim (decision record 0028, Kent's row R48), so this number reaches
+no arithmetic. It keeps its old value and its old ceiling so that nothing written
+against the old shape has to change today; the field, the ceiling and this constant
+go together in one follow-up when the browser round closes.
 """
 
 WORLDS = 8
-"""How many worlds run under each version when a request does not say.
+"""What a request's `worlds` field defaults to. **Accepted and ignored.**
 
-The inner loop: how the dice fall. The same number `propagate` defaults to.
+**Dated 2026-09-22.** There is no inner loop at all (decision record 0016). The
+same note as `VERSIONS` above.
 """
 
 DRAWN_WORLDS = SAMPLED_WORLDS
@@ -103,6 +105,12 @@ MOST_VERSIONS = 2_400
 
 MOST_WORLDS = 8
 """The most worlds one request may run under each version.
+
+**Dated 2026-09-22: neither ceiling bounds any work any more.** Both fields are
+accepted and ignored, so what they bound is what a caller may write down rather
+than what the server will do. The derivation below is kept because it was
+measured, and because it says what a cost model for the engine that replaced this
+one has to answer; it describes an engine this layer no longer runs.
 
 **Derived from a measurement and a stated budget, and re-derived on 2026-09-21**
 when the engine changed underneath the first one. Both ceilings come out of one
@@ -381,10 +389,8 @@ def sample_of(
     world was built from. Said here because a second builder elsewhere is the sort
     of thing that quietly picks the other one.
 
-    the flip: until the flip lands, the world a route shows beside these draws is
-    still worked out by the day-by-day engine while these days come from the
-    by-deadline core. Afterwards both are the same arithmetic. `engine/verify.py`
-    carries the same note for the same reason.
+    The world a route shows beside these draws is worked out by this same core, so
+    both are the same arithmetic. `engine/verify.py` reaches it the same way.
 
     Args:
         base_id: The short name of the stored example, such as `hormuz`.
@@ -392,9 +398,10 @@ def sample_of(
             with nothing done to it.
         seed: The one number every draw comes from. The same seed gives the same
             days and the same weights.
-        versions: How many versions of the map to work out. The draw itself is made
-            at the first of them; this is what the exact answers it corrects are
-            worked out across.
+        versions: **Accepted and ignored.** There is one version of the map and one
+            likelihood per claim (decision record 0028). The argument stays so that
+            callers written against the old engine keep working; it goes with the
+            two empty fields when the browser round closes. Dated 2026-09-22.
         drawn: How many worlds to draw.
 
     Returns:
@@ -413,12 +420,11 @@ def sample_of(
     if isinstance(folded, list):
         return folded
     graph, fixed, _ = folded
-    worked = _worked_out_by_deadline(
+    worked = _worked_out(
         graph,
         fixed,
         as_of=example.fixture_date,
         seed=seed,
-        versions=versions,
         slices=SLICES,
         # The correction inside the exact answers is drawn at the engine's own
         # count, never at the one this request asked for: those answers are the
@@ -556,16 +562,12 @@ def _worked_through(
         fixed,
         as_of=example.fixture_date,
         seed=seed,
+        # All three are accepted and ignored by the engine — there is one version
+        # of the map, no inner loop, and nothing that undermines a supposition.
+        # They are handed over all the same, so that the day the arguments go the
+        # compiler finds every caller. Dated 2026-09-22; records 0016, 0017, 0028.
         versions=versions,
         worlds=worlds,
         introduced_by=told,
-        # Which arithmetic works the map through is `DEFAULT_ENGINE`, one word in
-        # `katalyst.domain.propagation`, and the flip is changing it. It is named
-        # here rather than left implicit because the three ways into the engine —
-        # `build_world`, `difference` and `conditional` — all come through this
-        # function, so this is where a reader looks for it; but it is the same word
-        # every other caller of `propagate` gets by taking the default, which is
-        # what stops a caller being left behind by the flip.
-        engine=DEFAULT_ENGINE,
     )
     return world.model_copy(update={"branch_id": branch.id if branch is not None else None})

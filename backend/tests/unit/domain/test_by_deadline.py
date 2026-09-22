@@ -1,10 +1,10 @@
-"""The new engine, end to end, behind its flag.
+"""The engine, end to end.
 
 Decision record 0016 makes a claim's number **the chance it happens by its
 deadline**: one pass works out *when* every claim happens, an exact solve answers
 *whether*, and where something was reported to have happened a weighted sample of
 worlds corrects the answer for the timing the news moved. This file is that whole
-thing, assembled behind `engine="by_deadline"`, judged against two enumerators that
+thing, as `propagate` assembles it, judged against two enumerators that
 were written without seeing it.
 
 **Not one number the engine computes is typed in here.** Every assertion is an
@@ -24,9 +24,9 @@ and a test carrying one would have to move with it.
 
 import ast
 import math
+from collections.abc import Mapping
 from datetime import date, timedelta
 from pathlib import Path
-from typing import get_args
 
 import numpy
 import pytest
@@ -39,7 +39,6 @@ from katalyst.domain import (
     ContractPayoff,
     Do,
     Drawn,
-    Engine,
     Graph,
     Insert,
     Link,
@@ -51,13 +50,11 @@ from katalyst.domain import (
     apply,
     diff,
     forward_pass,
-    introduced_by,
     propagate,
     sample_forward,
     sensitivity,
     solve,
     stated_chance_with,
-    versions_of,
     window_of,
 )
 from katalyst.fixtures.hormuz import FIXTURE_DATE, HORMUZ, HORMUZ_THEN_STRIKE
@@ -120,6 +117,7 @@ def _plain(identifier: str, chance: float, days: int, kind: str = "event") -> Pr
         id=identifier,
         claim=f"The claim written down under the name {identifier}.",
         kind=kind,  # type: ignore[arg-type]
+        persistence="event",
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",
@@ -183,14 +181,34 @@ def _stated(graph: Graph) -> Drawn:
     )
 
 
-def _worked_through(graph: Graph, pinned: dict[str, Pin], states=None) -> dict[str, float]:
-    """Run the whole core over one map at one version, and give back every claim's number.
+def _which_kinds_of_truth(graph: Graph, states: Mapping[str, str] | None) -> Graph:
+    """Write which kind of truth each named claim is onto the map itself.
+
+    The pass reads `persistence` off the claim (decision record 0017), so a test
+    that wants a state writes it on the map rather than handing it in beside it. A
+    claim not named keeps whatever it was built with.
+    """
+    if not states:
+        return graph
+    return graph.model_copy(
+        update={
+            "propositions": tuple(
+                one.model_copy(update={"persistence": states.get(one.id, one.persistence)})
+                for one in graph.propositions
+            )
+        }
+    )
+
+
+def _worked_through(
+    graph: Graph, pinned: dict[str, Pin], states: Mapping[str, str] | None = None
+) -> dict[str, float]:
+    """Run the whole core over one map, and give back every claim's number.
 
     The forward pass, the exact solve, and — where something was reported — the
     weighted sample whose correction is added to that exact answer. This is what
-    `propagate(engine="by_deadline")` does, called a layer down so that a map
-    carrying states can be worked through before the field that says so exists on a
-    claim.
+    `propagate` does, called a layer down so that the oracle can be handed the same
+    numbers without a `World` in between.
 
     **One difference from the assembly, and it goes the safe way.** `propagate`
     adds the correction only to the claims the news actually moved — it solves the
@@ -205,8 +223,9 @@ def _worked_through(graph: Graph, pinned: dict[str, Pin], states=None) -> dict[s
     2026-09-22, *The oracles*, with `E/agreement.log` and
     `E/agreement-correction-always.log` beside each other.
     """
+    graph = _which_kinds_of_truth(graph, states)
     window = window_of(graph, DAY_ZERO)
-    forward = forward_pass(graph, window, _stated(graph), pinned=pinned, persistence=states or {})
+    forward = forward_pass(graph, window, _stated(graph), pinned=pinned)
     exact = solve(forward, pinned)
     if not any(pin.kind == "observe" for pin in pinned.values()):
         return {one: float(row[0]) for one, row in exact.items()}
@@ -225,21 +244,13 @@ def _worked_through(graph: Graph, pinned: dict[str, Pin], states=None) -> dict[s
     }
 
 
-def _by_deadline(graph: Graph, *edits: object, versions: int = 8, seed: int = SEED) -> World:
-    """Fold a branch onto a map and work the numbers through with the **new** engine."""
+def _by_deadline(graph: Graph, *edits: object, seed: int = SEED) -> World:
+    """Fold a branch onto a map and work the numbers through."""
     branch = Branch(id="branch-under-test", label="A branch a test wrote", interventions=edits)  # type: ignore[arg-type]
     folded = apply(graph, branch)
     assert not isinstance(folded, list), folded
     left_behind, fixed = folded
-    return propagate(
-        left_behind,
-        fixed,
-        as_of=DAY_ZERO,
-        seed=seed,
-        versions=versions,
-        introduced_by=introduced_by(branch),
-        engine="by_deadline",
-    )
+    return propagate(left_behind, fixed, as_of=DAY_ZERO, seed=seed)
 
 
 # --- The two oracles --------------------------------------------------------
@@ -292,8 +303,8 @@ def test_the_tables_agree_with_integrating_over_time() -> None:
     counted = dict.fromkeys(missed, 0)
     skipped = 0
     for name, oracle_map in drawn:
-        graph, states = a_graph_the_engine_reads(name, oracle_map, DAY_ZERO)
-        judged_map = a_map_the_oracle_reads(graph, DAY_ZERO, states)
+        graph = a_graph_the_engine_reads(name, oracle_map, DAY_ZERO)
+        judged_map = a_map_the_oracle_reads(graph, DAY_ZERO)
         ready = by_integrating.prepare(judged_map, maps.GRID)
         for asked, supposed, observed in maps.all_the_questions(sorted(oracle_map)):
             verb = "no edit" if asked == "no edit" else ("suppose" if supposed else "this happened")
@@ -305,7 +316,7 @@ def test_the_tables_agree_with_integrating_over_time() -> None:
                 continue
             pinned = {one: Pin(value=value, kind="do") for one, value in supposed.items()}
             pinned |= {one: Pin(value=value, kind="observe") for one, value in observed.items()}
-            ours = _worked_through(graph, pinned, states)
+            ours = _worked_through(graph, pinned)
             for who, answer in ours.items():
                 counted[verb] += 1
                 if abs(answer - judged[who]) > WITHIN:
@@ -597,119 +608,66 @@ def test_a_supposition_survives_a_claim_nobody_believes() -> None:
     )
 
 
-# --- The flag, and what it must not touch -----------------------------------
+# --- One engine ------------------------------------------------------------
 
 
-def test_todays_engine_is_byte_identical_under_the_flag() -> None:
-    """The arguments the new engine needs leave the old one exactly where it was.
+def test_there_is_one_engine_and_nothing_names_a_second() -> None:
+    """No file the server ships writes down the name of an arithmetic to choose between.
 
-    Three worlds: the default, the same thing with `engine="today"` written out, and
-    the same thing again with both of the new engine's own arguments handed in.
-    Every number of all three is the same number, bit for bit — not close — which is
-    what *the new core beside the old, behind a flag, default unchanged* has to mean.
-    """
-    graph = _map_with_a_diamond()
-    plain = propagate(graph, (), as_of=DAY_ZERO, seed=SEED, versions=64, worlds=8)
-    named = propagate(graph, (), as_of=DAY_ZERO, seed=SEED, versions=64, worlds=8, engine="today")
-    ignored = propagate(
-        graph,
-        (),
-        as_of=DAY_ZERO,
-        seed=SEED,
-        versions=64,
-        worlds=8,
-        engine="today",
-        slices=6,
-        sampled_worlds=17,
-    )
-    assert named.model_dump_json() == plain.model_dump_json(), (
-        "naming today's engine changed what today's engine answered"
-    )
-    assert ignored.model_dump_json() == plain.model_dump_json(), (
-        "the by-deadline engine's own arguments reached today's engine, which ignores them"
-    )
+    The flip has happened: a claim's number is the chance it happens by its
+    deadline, and the two nested loops that answered a different question are
+    deleted. What made the flip safe was that the choice lived in one word in one
+    place — `propagate`'s own default, the one place every caller already reads —
+    and what makes it *finished* is that the word is gone rather than merely
+    pointed the other way. A module that still held the name would be a module that
+    could still choose, and the second engine it would choose is not there to run.
 
-
-def test_the_flip_is_one_word_in_one_place() -> None:
-    """Nowhere in the server is an engine's name written down but the module that owns it.
-
-    The flip — the day a claim's number becomes the chance it happens by its
-    deadline — is meant to be one word changed once. It stops being that the moment
-    a second module keeps its own copy of the word, because then the flip is however
-    many copies there are, and the one somebody forgets is a route that quietly goes
-    on answering with the other arithmetic. The review of 2026-09-22 found exactly
-    that: a constant in `engine/worlds.py` that three routes passed by hand, and two
-    more callers of `propagate` that passed nothing and so took a default nobody was
-    going to change with it (must-fix 2).
-
-    So the word lives in `domain/propagation.py`, as `propagate`'s own default,
-    which is the one place every caller already reads. This parses every file the
-    server ships and fails if the text `today` or `by_deadline` is written as a
-    string anywhere else — a constant, a default, a keyword argument, any of them.
-    Passing an engine **by name** is still allowed and is what re-running somebody
-    else's world requires; what is not allowed is a second module deciding which.
+    This parses every file the server ships and fails if either name is written as
+    a string anywhere at all.
     """
     source_root = Path(katalyst.__file__).resolve().parent
-    names = set(get_args(Engine))
     written: list[str] = []
     for source in sorted(source_root.rglob("*.py")):
         tree = ast.parse(source.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and node.value in names:
+            if isinstance(node, ast.Constant) and node.value in ("today", "by_deadline"):
                 written.append(f"{source.relative_to(source_root)}:{node.lineno} {node.value!r}")
 
-    owner = "domain/propagation.py"
-    astray = [one for one in written if not one.startswith(owner)]
-    assert written, "no engine name is written down anywhere, so this check is reading nothing"
-    assert not astray, (
-        f"an engine's name is written outside {owner}, so the flip is no longer one word in "
-        f"one place: {astray}"
+    assert not written, (
+        f"an engine's name is still written down in the server, and there is only one "
+        f"engine: {written}"
     )
 
 
-def test_a_sweep_re_runs_a_world_with_the_engine_that_built_it() -> None:
-    """Flipping a claim one at a time uses the arithmetic that built the world being swept.
+def test_a_sweep_flips_each_claim_against_the_world_it_was_given() -> None:
+    """Flipping a claim one at a time reports the flip and nothing else.
 
     A sweep is one whole run of the engine per claim, and the number it reports is a
-    difference between two of those runs. Both have to be the same arithmetic as the
-    world the reader is looking at, or the difference carries the change of engine
-    inside it and nothing in the row says which part is which.
+    difference between two of those runs. Both are the same arithmetic — there is
+    only one — and both are worked out from the world's own map, day zero and seed,
+    so the row carries the flip and no part of a budget or an engine change.
 
-    A world says which engine built it without being asked: the by-deadline core has
-    no inner loop at all and writes `worlds = 0`, and the day-by-day engine always
-    runs at least two. So this compares a sweep of a by-deadline world against the
-    same flips worked through by hand with `engine="by_deadline"` named out loud —
-    equal to the last bit — and then checks that naming the other engine gives
-    different numbers, so that the first assertion cannot be passed by an argument
-    nothing reads.
+    A sweep used to take a budget, because the engine ran two thousand versions of
+    the map and one run per claim could not afford twenty of those. There is one
+    version now (decision record 0028), so every run is the same run.
     """
     graph = _map_with_a_diamond()
-    world = _by_deadline(graph, versions=SWEPT)
-    assert world.worlds == 0, "this world was not built by the engine this test is about"
+    world = _by_deadline(graph)
 
-    swept = sensitivity(world, versions=SWEPT, worlds=8)
+    swept = sensitivity(world)
     assert swept, "the sweep produced no rows, so it is asserting nothing"
 
-    by_hand = {engine: _swept_by_hand(graph, world, engine) for engine in get_args(Engine)}
+    by_hand = _swept_by_hand(graph, world)
     for row in swept:
-        assert row.deltas == by_hand["by_deadline"][row.flipped], (
-            f"the sweep's row for {row.flipped} is not what the engine that built this world "
-            "gives for the same flip"
+        assert row.deltas == by_hand[row.flipped], (
+            f"the sweep's row for {row.flipped} is not what the engine gives for the same flip"
         )
-    assert by_hand["today"] != by_hand["by_deadline"], (
-        "both engines answered the same sweep identically, so this test cannot tell them "
-        "apart and proves nothing"
-    )
 
 
-SWEPT = 8
-"""How many versions the sweep test runs at. Small on purpose: it is one run per claim."""
-
-
-def _swept_by_hand(graph: Graph, world: World, engine: Engine) -> dict[str, dict[str, float]]:
-    """Flip each claim of a map in turn, with the engine named out loud, and keep the moves."""
+def _swept_by_hand(graph: Graph, world: World) -> dict[str, dict[str, float]]:
+    """Flip each claim of a map in turn, by hand, and keep the moves."""
     endings = tuple(one.id for one in graph.propositions if one.kind in ("market", "not_tradeable"))
-    start = propagate(graph, (), as_of=DAY_ZERO, seed=SEED, versions=SWEPT, engine=engine)
+    start = propagate(graph, (), as_of=DAY_ZERO, seed=SEED)
     moves: dict[str, dict[str, float]] = {}
     for claim in graph.propositions:
         to = bool(world.beliefs[claim.id].p < 0.5)
@@ -723,14 +681,7 @@ def _swept_by_hand(graph: Graph, world: World, engine: Engine) -> dict[str, dict
         )
         assert not isinstance(folded, list), folded
         left_behind, fixed = folded
-        flipped = propagate(
-            left_behind,
-            fixed,
-            as_of=DAY_ZERO,
-            seed=SEED,
-            versions=SWEPT,
-            engine=engine,
-        )
+        flipped = propagate(left_behind, fixed, as_of=DAY_ZERO, seed=SEED)
         moves[claim.id] = {one: flipped.beliefs[one].p - start.beliefs[one].p for one in endings}
     return moves
 
@@ -925,21 +876,13 @@ def test_the_worked_example_runs_and_every_reader_of_a_world_accepts_it() -> Non
     assert not isinstance(folded, list), folded
     struck, fixed = folded
 
-    base = propagate(HORMUZ, (), as_of=FIXTURE_DATE, seed=SEED, versions=8, engine="by_deadline")
-    branch = propagate(
-        struck,
-        fixed,
-        as_of=FIXTURE_DATE,
-        seed=SEED,
-        versions=8,
-        introduced_by=introduced_by(HORMUZ_THEN_STRIKE),
-        engine="by_deadline",
-    )
+    base = propagate(HORMUZ, (), as_of=FIXTURE_DATE, seed=SEED)
+    branch = propagate(struck, fixed, as_of=FIXTURE_DATE, seed=SEED)
 
     assert base.worlds == 0 and branch.worlds == 0, "a world with no inner loop said it had one"
     assert base.retractions == () and branch.retractions == ()
     assert set(base.beliefs) == {one.id for one in HORMUZ.propositions}
-    assert set(base.range_shares) == set(base.beliefs)
+    assert base.range_shares == {}
     for who, line in base.series.items():
         assert len(line) == len(base.series_days) == len(base.states[who])
         assert list(line) == sorted(line), (
@@ -947,11 +890,6 @@ def test_the_worked_example_runs_and_every_reader_of_a_world_accepts_it() -> Non
         )
     assert set(branch.states["H"]) == {"supposed"}, branch.states["H"]
     assert set(branch.states["B"]) == {"sampled"}, branch.states["B"]
-
-    behind = versions_of(base)
-    assert set(behind.priors) == set(base.beliefs)
-    assert behind.days == base.series_days
-    assert behind.reweighted == frozenset()
 
     changed = diff(base, branch, edit_in_words=HORMUZ_THEN_STRIKE.label)
     assert not isinstance(changed, list), changed

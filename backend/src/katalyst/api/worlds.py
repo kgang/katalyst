@@ -105,12 +105,11 @@ class WorldRequest(BaseModel):
         gt=0,
         le=engine.MOST_VERSIONS,
         description=(
-            "How many versions of the map to try: how sure we are of the numbers put in. "
-            "Each version is one coherent set of numbers this model would have stood "
-            "behind, and the range on every answer is the spread across them. Bounded "
-            "at both ends: a request above the ceiling is refused, never quietly made "
-            "smaller, because a caller who asks for one run and gets another is reading "
-            "numbers that answer a question nobody asked."
+            "**Accepted and ignored.** The engine works out one version of the map and "
+            "reports one likelihood per claim (decision record 0028, 2026-09-22), so this "
+            "number reaches no arithmetic. It is still accepted, and still bounded at both "
+            "ends, so that nothing written against the old shape has to change today; the "
+            "field goes in one follow-up when the browser round closes."
         ),
     )
     worlds: int = Field(
@@ -118,9 +117,8 @@ class WorldRequest(BaseModel):
         gt=1,
         le=engine.MOST_WORLDS,
         description=(
-            "How many worlds to run under each version: how the dice fall. At least two, "
-            "or there is no spread inside a version to subtract from the range; and no "
-            "more than the ceiling, which is measured rather than chosen."
+            "**Accepted and ignored.** There is no inner loop at all (decision record "
+            "0016). The same dated note as `versions` above."
         ),
     )
 
@@ -155,13 +153,15 @@ class DiffRequest(BaseModel):
         default=engine.VERSIONS,
         gt=0,
         le=engine.MOST_VERSIONS,
-        description="The outer loop both worlds run.",
+        description=(
+            "**Accepted and ignored** — see `WorldRequest.versions`. Decision record 0028."
+        ),
     )
     worlds: int = Field(
         default=engine.WORLDS,
         gt=1,
         le=engine.MOST_WORLDS,
-        description="The inner loop both worlds run.",
+        description=("**Accepted and ignored** — see `WorldRequest.worlds`. Decision record 0016."),
     )
 
 
@@ -185,13 +185,15 @@ class ConditionalRequest(BaseModel):
         default=engine.VERSIONS,
         gt=0,
         le=engine.MOST_VERSIONS,
-        description="The outer loop. Match the world this number is shown beside.",
+        description=(
+            "**Accepted and ignored** — see `WorldRequest.versions`. Decision record 0028."
+        ),
     )
     worlds: int = Field(
         default=engine.WORLDS,
         gt=1,
         le=engine.MOST_WORLDS,
-        description="The inner loop, for the same reason.",
+        description=("**Accepted and ignored** — see `WorldRequest.worlds`. Decision record 0016."),
     )
 
 
