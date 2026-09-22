@@ -20,23 +20,19 @@
  * because `JSON.parse` has already rounded a nineteen-digit number by the time
  * anything here sees it. It is marked below, once, with the reason.
  *
- * **There is one dated allowance at the foot of this file**, for one event,
- * `activity`, whose server half has not landed yet. It is written as a check
- * that fails the day the server's description gains the shape, so it cannot be
- * forgotten. Read it before adding a second one.
- *
  * **What is not pinned, and why it cannot be.** The eight stream events are not
- * in `schema.ts` at all: they travel as server-sent events, and OpenAPI has no
- * way to describe the body of a stream — it describes `text/event-stream` and
- * stops. So the eight are pinned at the joints instead, which is where drift
- * would actually hurt: every piece an event is built from — `Proposition`,
- * `Link`, `World`, `Violation`, `Belief` — is *aliased* to the generated type in
- * `events.ts` rather than retyped, so a change to any of them is a compile
- * error in this half without anybody writing a test. What is left unpinned is
- * the eight envelopes: their names, and which of those pieces each carries.
- * The guard for those is the running app — an event name this build does not
- * know is counted and shown (`growth.ts`) — and a server test that the stream
- * emits exactly those eight names.
+ * in `schema.ts` at all, and neither is the ninth live-only line, `activity`:
+ * they travel as server-sent events, and OpenAPI has no way to describe the
+ * body of a stream — it describes `text/event-stream` and stops. So they are
+ * pinned at the joints instead, which is where drift would actually hurt: every
+ * piece an event is built from — `Proposition`, `Link`, `World`, `Violation`,
+ * `Belief` — is *aliased* to the generated type in `events.ts` rather than
+ * retyped, so a change to any of them is a compile error in this half without
+ * anybody writing a test. What is left unpinned is the envelopes: their names,
+ * and which of those pieces each carries. The guard for those is the running
+ * app — an event name this build does not know is counted and shown
+ * (`growth.ts`) — and a server test that the stream emits exactly those names.
+ * The foot of this file says what that means for `activity` in particular.
  */
 
 import type { components } from "../../api/schema";
@@ -101,28 +97,34 @@ pinned<Agree<Omit<TheDraftedArm, "state">, components["schemas"]["DraftedInsert"
 pinned<Agree<TranscriptLine, components["schemas"]["TranscriptLine"]>>(true);
 pinned<Agree<Transcript, components["schemas"]["Transcript"]>>(true);
 
-/* ---- One allowance, for one event, dated -----------------------------------
+/* ---- The ninth line, pinned the way the eight are ---------------------------
  *
- * **`activity` is hand-typed against the shapes sheet and pinned to nothing.**
- * *(2026-09-22, branch `feat/04d-the-strip-says-it`.)*
+ * **`activity` is hand-typed, and there is nothing generated to pin it to** —
+ * for exactly the reason the eight envelopes above have none. *(Both halves of
+ * it landed 2026-09-22; this block was a dated allowance while they were apart,
+ * and it is now the standing reason.)*
  *
- * The ninth event is being built in two halves at once — the server's in
- * `feat/04d-the-model-says-what-it-is-doing`, this one in the browser — against
- * one written sheet the two halves share. Until the server half lands there is
- * nothing generated to check this half against: `api/schema.ts` is generated
- * from the server's own description of itself, it is never edited by hand, and
- * it has no `Activity` in it at all.
+ * `api/schema.ts` is generated from the server's description of itself, which
+ * describes routes and the shapes their requests and answers carry. `activity`
+ * is neither: it travels only as a server-sent event, the route's answer is
+ * `text/event-stream`, and OpenAPI has no way to describe the body of a stream.
+ * So the server's `Activity` — `backend/src/katalyst/engine/events.py` — reaches
+ * the description no more than `proposal_accepted` does, and regenerating the
+ * types adds nothing. Checked, not assumed: `./scripts/gen-types.sh` was run on
+ * 2026-09-22 and changed no byte of `api/schema.ts`.
  *
- * That is the honest position, and this block is it written down rather than
- * left unsaid. It is **not** a skipped check: the line below is a check, and
- * what it holds is the very fact that makes the allowance necessary. The day
- * the server's description gains the shape, this stops compiling — `npm run
- * typecheck`, `npm run check` and the build all go red — and whoever is at the
- * join deletes this whole block and pins `Activity` to the generated shape
- * exactly as the receipt above is pinned.
+ * It is pinned the same way the eight are — at the joints. Its `about` is a
+ * claim identifier, its `kind` is one of three words this half owns and its
+ * `text` is the model's own words, so there is no generated piece to alias; the
+ * guard for the envelope is the running app, which counts and shows a name it
+ * does not know (`growth.ts`), and the server's own test that the stream emits
+ * exactly the eight names and this one.
  *
- * Until then, `Activity` is named here for one reason: so that this file
- * mentions the event it is making an exception for, and `tsc` fails if the
+ * **The check below is still a check, and it is a tripwire.** The day a route
+ * ever carries this shape as JSON — a transcript that kept one, a route that
+ * answered one — the server's description gains it, this stops compiling, and
+ * whoever is there pins `Activity` to the generated shape exactly as the receipt
+ * above is pinned. Until then the shape is named here so `tsc` fails if the
  * event is ever deleted or renamed without this being revisited.
  */
 type TheSchemasNamedActivity = Extract<keyof components["schemas"], `${string}Activity`>;

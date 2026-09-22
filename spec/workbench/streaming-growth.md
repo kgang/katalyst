@@ -373,6 +373,12 @@ export interface Growth {
   readonly waitingWires: readonly Link[];
   /** Event names this build does not know, and how many of each arrived. */
   readonly unknown: ReadonlyMap<string, number>;
+  /**
+   * What the model is doing right now — at most two lines, latest only — and
+   * the one thing an `activity` line changes. Empty on every replay, because a
+   * recording holds no such line. B12.
+   */
+  readonly activity: WhatTheModelIsDoing;
 }
 ```
 
@@ -1193,6 +1199,83 @@ hunting for a name they think they mistyped.
 model key, so a reviewer who has configured nothing gets the whole multiverse on a map they watched
 build themselves. Five of the six operations call no model at all.
 
+### B12 — What the model is doing, while a call takes a minute
+
+*(Added 2026-09-22, decision record 0027, Kent's R44 and R47.)*
+
+**The wait is the model's, and it is long.** Measured over the five kept runs under
+`backend/.runs/`, the **first** model call took 7, 67, 135, 152 and 223 seconds, and 61 to 80 per
+cent of everything the model wrote was thinking nobody could see. The eight events are the map's
+decisions, and between two of them the server has nothing new to report — so the strip could say
+*something is happening* and could not say **what**.
+
+**So a live call is streamed, and one line travels that is not a decision.** `activity` is the
+ninth name on the wire: `{about, kind, text}`, where `kind` is `searching`, `found` or `thinking`
+and `text` is somebody else's words, verbatim — the model's own search query, the title of one page
+the search returned, or the model's own summarised thinking. `spec/generation/streaming.md` owns the
+line and its six clauses; what this chapter owns is what the browser does with it.
+
+**It changes one field and nothing else.** `Growth` gains `activity`, and folding an `activity` line
+touches neither the map, the reserved rectangles, the counts, the frontier, the refusals, the
+receipt nor the phase. That is not taste: the line is never written to a recording, so anything it
+could move would be something a replay of the same run could not reproduce, and a recording is the
+real stream line for line. A line reaching a run that has already stopped changes nothing at all.
+
+**Two lines, latest only, never a list.** `WhatTheModelIsDoing` holds one slot for the latest
+`searching`-or-`found` line — *found* answers *searching*, so they share a slot — and one for the
+latest `thinking` line. The server sends at most about one a second per call and the newest wins, so
+a browser that kept them all would grow a log at the foot of the screen that nobody could read and
+that would push the map up the page every second. Two slots rather than one because they are two
+different things: a search is about the world and is checkable; a thought is about the model's own
+mind, and the line about the mind says whose mind it is every time it is drawn.
+
+**The words are fixed, and they are the whole of what the browser adds:**
+
+```
+searching the web: "<query>"
+found: <title> · <host>
+the model, in its own words: <text>
+```
+
+Everything after the colon is the model's or the search tool's, verbatim. A line longer than 160
+characters — the length the server already cuts its own thinking to — is cut at a word and closed
+with an ellipsis, never through the middle of one.
+
+**A line stops being true when its call comes back, and the browser stops saying it.** An accepted
+proposal clears the lines about the calls it answers — a call works on one open claim, and an
+accepted proposal names that claim as the source of the arrows it brought, while a proposal hanging
+off nothing at all is the opening call returning. A **refusal** clears both lines, because a refusal
+carries no claim it hangs off: the honest answer to *which of these is still true* is *we no longer
+know*, and a line that is still true is back within about a second. `done`, `failed` and a stream
+that simply stops clear them too — nothing is out, so nothing is being done.
+
+**Where they sit, and what they never do.** In the run strip only (`components/RunStrip.tsx`),
+under the run's own row, never on the map and never in the panel. **Both are outside the polite live
+region**, for the same reason the seconds counter is and more so: they change every few seconds, and
+a region that announced them would be reading a stopwatch over the top of the map being built. The
+room for two lines is held open on every live run whether or not either has anything in it, so a
+line arriving or clearing changes the words and never the height. **Nothing spins**: a line of text
+replaced by another line of text is a reading, not a motion.
+
+**And they leave the seconds counter alone.** The reading at the foot of the map says *nothing new
+on the map for N s* and starts again on every arrival. An `activity` line is not an arrival in that
+sense, so `onlyTheStripChanged` in `growth.ts` asks whether the last event moved anything but this
+field, and the counter ignores it. A counter that restarted on every line would read *nothing new
+for 1 s* for three solid minutes while nothing whatever reached the map — which is exactly the
+screen that looks busy while nothing happens.
+
+**A replay shows none, and nothing on screen says so.** A recording holds no `activity` line, so
+there is nothing to play back and nothing is invented; the screen passes the strip nothing on a
+replay, which is the same difference the seconds counter already makes. The fold is never told which
+it is folding and does not need to be — the screen knows.
+
+**Checked by** `frontend/src/stream/__tests__/theRunStrip.test.tsx`, which holds one test per rule
+above: the search line's words, the thinking line saying whose words they are, the cut at a word,
+both lines outside the live region, a claim arriving clearing the lines that were about it, a replay
+showing none even when one is fed to it, and a stopped run saying nothing. The fold itself is
+**growth**'s: `test_an_activity_line_changes_what_the_strip_may_say_and_nothing_else`.
+`noSpinner.test.ts` and `motionBudget.test.ts` are unchanged, which is the point.
+
 ---
 
 ## INVARIANTS
@@ -1492,11 +1575,27 @@ browser test asked for the stronger thing for a while and was quietly held up by
 
 *Raised 2026-09-17.*
 
-1. **Should the stream say when a call goes out?** The eight events say what came back, so the
+1. **Should the stream say when a call goes out?** **Answered 2026-09-22 by decision record 0027 —
+   and the answer is not the question.**
+
+   The count is still not on the wire and is not wanted. The eight events say what came back, so the
    browser can draw the frontier but cannot honestly say how many proposals are in flight — three
-   calls against one open claim show one rectangle (B2). A ninth event would fix it and would also be
-   the first event that carries no decision, only activity, which is a different kind of thing to put
-   on a stream. **Owner:** `spec/generation/streaming.md`, if anyone ever wants the count on screen.
+   calls against one open claim show one rectangle (B2) — and a number the browser guessed at would
+   be a number nobody computed.
+
+   What ships instead is a different thing altogether: the stream does not say **that** a call went
+   out, it says **what the call is doing**, on a line that is never recorded. `activity` carries the
+   model's own search query, the title of one page that search returned, or the model's own
+   summarised thinking — somebody else's words, verbatim, with nothing counted and nothing estimated.
+   It is sent on a live run only; no recording holds one, no replay invents one, and it is never
+   billed and never counted by the transcript counter. So a replay is not less alive than a live run
+   for want of a count it never had: it shows no activity for the same reason it shows no seconds,
+   which is that the thing being reported does not exist in a replay, and decision record 0012 —
+   *a recording is the real stream, line for line* — is left whole, because a recording is the real
+   stream of **decisions** and activity is not one.
+
+   What the browser does with it is B12. **Owner:** closed; the line and its six clauses are
+   `spec/generation/streaming.md`'s.
 
 2. **Does the map re-lay out once when the run finishes?** **Answered 2026-09-21: no — and the real
    question turned out to be a different one.**
