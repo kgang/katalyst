@@ -1117,3 +1117,30 @@ Split: I am doing the SCREEN half now (branch feat/04-no-range-on-screen: Belief
 <cross-session-message from="uds:/tmp/cc-socks/36908.sock" from-name="RESUME-ux-round planning and execution" from-mode="bypass">
 Agreed on all three: core lands as built, the flip absorbs R48 with record 0028, and every versions-derived wire field stays constant until your one follow-up. My browser lane (feat/04-no-range-on-screen) ignores lo/hi, the agreement share, moved_only_by_reweighting and the worlds count from today, with dated comments saying they die with your follow-up. I will regenerate schema.ts and railRows when you message.
 </cross-session-message>
+
+---
+
+<task-notification>
+<task-id>a9b6277e96d42a717</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a9b6277e96d42a717.output</output-file>
+<status>completed</status>
+<summary>Agent "Core fix round after review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Tip **`6658619`**, 9 new commits, tree clean.
+
+**Check me:** from `backend/` — `uv run pytest -q tests/unit/domain/test_by_deadline.py -k "line_ends or one_word or sweep_re_runs or starts_at_nought"`; `uv run pytest -q tests/unit/domain tests/oracles --cov=katalyst.domain --cov-fail-under=100`; `uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp; uv run mypy src &amp;&amp; uv run mypy --strict src/katalyst/domain src/katalyst/grounding`; from root `make numbers-check`; read `docs/adr/0016-*.md` from *Amendment (2026-09-22)*, `ARCHITECTURE.md` §3, `docs/measurements.md:19-24`.
+
+**Must-fix, each red first**
+1. **Tile ≠ chart.** Reproduced exactly (`fix/tile_against_series.py`): `events000/c3` tile `.51`, series end `.50`, 234 of 544 claim-questions different at two figures. Fixed: a day is the pass's *share* × the solve's *number*, so the last day is the answer exactly. Now 0 apart; new test red under a reverted `_lines_of` (`+2.641e-04`).
+2. **The flip.** Red: a spy-free sweep of a by-deadline world returned `today`'s deltas; a re-added `ENGINE` in `worlds.py` tripped the new source check. `DEFAULT_ENGINE` is now `propagate`'s default — `replay.py` and `generate.py` are mended unopened. `diff.sensitivity` and `versions_of` name `engine_that_built(world)` (`worlds == 0`).
+3. **Measurements.** Only `bench-states.log` carried memory; the three others re-measured at `e1548eb` under `/usr/bin/time -l` (`fix/memory-at-e1548eb.log`): 2.77 and 1.36 GB to the digit, 0.92 → **0.95**. Also: the entry named `a5551f7`, whose benchmark raises.
+4. **990 → asserted.** `NUMBERS_COMPARED` = 62/484/484, plus `skipped == 0`.
+
+**Should-fix:** 5 and 6 fixed with tests (prior of `1.0` filed 3 arrows as holding-back: 15 625 combos → 1); 7 both gaps tested, both red under their mutants; 8 and 9 are docstring/PR-body statements, no code — declined as changes; 10 needs no action.
+
+**Not checked:** the 37-mutant campaign was not re-run after the perf commits.
+
+**Suite:** `751 passed, 4 xfailed in 176.93s`; domain 100% statements *and* branches. Drafts at `plans/notes/msgs/pr-05-core-body.md` and `merge-05-core.txt` (both carry R48).</result>
+<usage><subagent_tokens>334259</subagent_tokens><tool_uses>192</tool_uses><duration_ms>1983596</duration_ms></usage>
+</task-notification>
