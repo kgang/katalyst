@@ -61,6 +61,9 @@ export interface HowToAsk {
  * is a label rather than a number: the three numbers in it are the ones the
  * slider handed over, untouched.
  *
+ * `start` follows the same rule as the rest: sent when the caller said, left out
+ * when they did not. Left out, the server plays a recording.
+ *
  * @param request What the screen asked for.
  */
 function bodyOf(request: GenerateRequest): Record<string, unknown> {
@@ -73,6 +76,9 @@ function bodyOf(request: GenerateRequest): Record<string, unknown> {
   }
   if (request.seed !== undefined) {
     body.seed = request.seed;
+  }
+  if (request.start !== undefined) {
+    body.start = request.start;
   }
   return body;
 }

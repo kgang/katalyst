@@ -92,6 +92,7 @@ function theRequest(asked: Asked) {
     hypothesis: asked.hypothesis,
     ...(asked.target === null ? {} : { target: asked.target }),
     ...(asked.belief === null ? {} : { user_belief: asked.belief }),
+    ...(asked.start === undefined ? {} : { start: asked.start }),
   };
 }
 

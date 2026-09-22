@@ -348,3 +348,58 @@ def test_a_refusal_that_says_nothing_at_all_is_named(tmp_path: Path) -> None:
     faults = replay.faults_in(silent, current_prompt_hash=prompt_hash())
 
     assert any("says nothing at all" in one for one in faults)
+
+
+# --- What a recorded run cost, read off the file that was paid for ----------
+
+
+def test_a_summary_quotes_the_recorded_runs_own_receipt() -> None:
+    """The three figures the first screen prints are the file's own, not ours.
+
+    **On the committed recording**, because that is the one a reviewer is shown
+    and the only paid run this product owns. Nothing here is a typed-in number:
+    each figure is compared with the very line it was read from, so the test
+    would still hold if the run were made again tomorrow at a different price.
+    """
+    committed = replay.read(replay.RECORDINGS / "hormuz.jsonl")
+    its_receipt = next(
+        payload for name, payload in committed.lines if name == events.NAMES[Receipt]
+    )
+
+    summary = replay.summary_of(committed)
+
+    assert summary.example == committed.example
+    assert summary.recording_date == committed.header.recording_date
+    assert (summary.calls, summary.seconds, summary.dollars) == (
+        its_receipt["calls"],
+        its_receipt["seconds"],
+        its_receipt["dollars"],
+    )
+    # It really was paid for, so an absence here would be this reading the wrong
+    # line rather than a recording that honestly has no receipt.
+    assert summary.calls is not None and summary.calls > 0
+    assert summary.dollars is not None and summary.dollars > 0
+
+
+def test_a_recording_whose_receipt_cannot_be_read_costs_nothing_it_can_name(
+    tmp_path: Path,
+) -> None:
+    """Three absences together, so the screen says it was not told rather than guessing.
+
+    A replay rebuilds the receipt rather than emitting the recorded one, so a
+    file whose receipt this engine cannot read still plays perfectly well. That
+    is an absence, not a fault.
+    """
+    unreadable = broken_into(
+        tmp_path,
+        lambda lines: [
+            *lines[:-2],
+            json.dumps({"event": "receipt", "data": {"nonsense": 1}}),
+            lines[-1],
+        ],
+    )
+
+    summary = replay.summary_of(unreadable)
+
+    assert (summary.calls, summary.seconds, summary.dollars) == (None, None, None)
+    assert summary.recording_date == unreadable.header.recording_date

@@ -179,6 +179,23 @@ describe("what the browser asks for", () => {
     expect(body.hypothesis).toBe(THE_SENTENCE);
   });
 
+  it("test_how_the_run_starts_is_sent_when_the_caller_said_and_left_out_when_they_did_not", async () => {
+    sent.length = 0;
+    await everything([
+      block("done", { reason: "reached_terminal", claims: 0, links: 0, rejected: 0 }),
+    ]);
+    await everything(
+      [block("done", { reason: "reached_terminal", claims: 0, links: 0, rejected: 0 })],
+      { hypothesis: THE_SENTENCE, start: "live" },
+    );
+
+    // Said nothing, so nothing is sent: the route's own default plays a
+    // recording, and a browser that filled the field in would be choosing on
+    // the reader's behalf — the very thing the server stopped doing.
+    expect("start" in (JSON.parse(sent[0] ?? "{}") as Record<string, unknown>)).toBe(false);
+    expect((JSON.parse(sent[1] ?? "{}") as Record<string, unknown>).start).toBe("live");
+  });
+
   it("test_the_browser_invents_no_seed", async () => {
     sent.length = 0;
     await everything([

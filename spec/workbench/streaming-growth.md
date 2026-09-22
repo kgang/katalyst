@@ -263,6 +263,13 @@ export interface GenerateRequest {
   readonly user_belief?: Ranged;
   /** Only when reproducing a run we were given a seed for. See below. */
   readonly seed?: number;
+  /**
+   * How the run starts: `live` calls a model, `replay` plays the committed
+   * recording of this sentence back. The caller says which and the server never
+   * chooses; left out, the route plays a recording. See
+   * [`first-screen.md`](first-screen.md).
+   */
+  readonly start?: "replay" | "live";
 }
 
 // The route takes `versions` and `worlds` too, both upper-bounded on it, and the
