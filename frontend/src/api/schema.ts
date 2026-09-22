@@ -357,6 +357,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/thesis/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take A Position
+         * @description Say how often each end of the reader's exit is reached first, and what takes them out.
+         *
+         *     Six steps, and every one of them can be read off the answer afterwards. The
+         *     branch is folded onto the map and the ending's payoff says what is traded and
+         *     which way. The reader's four numbers are checked, all faults at once. Worlds are
+         *     drawn forward from the same map, branch and seed, carrying the day each claim
+         *     came on. A daily price path is walked through every one of them, applying only
+         *     what the market has not already priced. The two first-touch shares are read to
+         *     the reader's own horizon and no further. And the claims over-represented in the
+         *     worlds where the stop went first are ranked beside them.
+         *
+         *     **The greyed ceiling is read from the map with nothing fixed by an edit**, never
+         *     from the branch the reader is looking at: a world in which something has been
+         *     supposed or recorded answers a different question from a venue's price, so an
+         *     edge read off it would be an edge against a question nobody asked.
+         *
+         *     Args:
+         *         request: Which map, which branch, which seed, which ending, and the
+         *             reader's own entry, exit and risk budget.
+         *
+         *     Returns:
+         *         The trade, the exit with its two first-touch shares and its greyed ceiling,
+         *         the rail of what takes the reader out, and what the path applied.
+         *
+         *     Raises:
+         *         HTTPException: With status 404 and a sentence naming the examples that do
+         *             exist, when nothing is stored under that name. With status 422 and
+         *             every reason at once, when the branch does not fit the map or the form
+         *             has faults.
+         */
+        post: operations["take_a_position_api_thesis_position_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/thesis/card": {
         parameters: {
             query?: never;
@@ -764,37 +812,6 @@ export interface components {
             does_not_know: components["schemas"]["WhatThisDoesNotKnow"];
         };
         /**
-         * CardRefused
-         * @description One thing this route will not do, the field at fault, and what it says.
-         *
-         *     A refusal is never a blank: it names a stable code a screen can switch on, the
-         *     field the reader should look at, and one plain sentence. Nothing is silently
-         *     repaired, and every fault the request has comes back together — a form that
-         *     reveals one mistake at a time is a form nobody finishes.
-         *
-         *     **A branch that does not fit the map is a different shape**, and deliberately:
-         *     it comes back as the list of violations the world routes already give, naming a
-         *     `subject` and a `message`, because that fault is about a claim or an arrow and
-         *     not about a field a reader can look at.
-         */
-        CardRefused: {
-            /**
-             * Code
-             * @description Which rule this is, from the closed list of nine.
-             */
-            code: ("stop_on_the_wrong_side" | "target_not_beyond_entry" | "horizon_after_the_claim" | "risk_budget_out_of_range" | "price_outside_the_contract" | "first_touch_on_a_contract") | ("unknown_ending" | "the_ending_names_no_trade" | "horizon_outside_the_window");
-            /**
-             * Field
-             * @description The field at fault, named as the reader sees it.
-             */
-            field: string;
-            /**
-             * Sentence
-             * @description What the screen prints.
-             */
-            sentence: string;
-        };
-        /**
          * CardRequest
          * @description What it takes to build one card: a map, a branch, a seed, an ending, and an exit.
          *
@@ -840,6 +857,12 @@ export interface components {
              * @default 8
              */
             worlds: number;
+            /**
+             * Drawn Worlds
+             * @description How many worlds to draw the event days from. A request above the ceiling is refused rather than quietly made smaller; the ceiling is the count the engine draws for itself, so the days this card reads and the days a claim's own number was corrected by are one sample and not two.
+             * @default 50000
+             */
+            drawn_worlds: number;
         };
         /**
          * CeilingShown
@@ -1953,6 +1976,129 @@ export interface components {
             value: boolean;
         };
         /**
+         * PositionAnswer
+         * @description The reader's exit, how often each end of it is reached first, and what takes them out.
+         *
+         *     A state of the panel that can always be thrown away and rebuilt: the map, the
+         *     branch, the seed and the number of worlds drawn are all on it, and the same
+         *     four produce the same answer.
+         */
+        PositionAnswer: {
+            /**
+             * Base Id
+             * @description The map this position was worked out on.
+             */
+            base_id: string;
+            /**
+             * Branch Id
+             * @description The branch in force, or nothing at all for the untouched map.
+             */
+            branch_id: string | null;
+            /**
+             * Seed
+             * @description The one number every random draw behind this answer came from.
+             */
+            seed: number;
+            /**
+             * As Of
+             * Format: date
+             * @description The first day of the window the numbers were worked out over.
+             */
+            as_of: string;
+            /** @description How many worlds the event days were read off. */
+            drawn_worlds: components["schemas"]["Figure"];
+            /** @description How many equally-weighted worlds those worlds' weights are worth, which is what every floor in this answer is measured against. */
+            effective_draws: components["schemas"]["Figure"];
+            the_trade: components["schemas"]["TheTrade"];
+            /** @description What you typed, what your own risk budget implies, how often each end is reached first, and the greyed ceiling that is never a size. */
+            your_exit: components["schemas"]["YourExit"];
+            /** @description The claims over-represented in the worlds where your stop went first, ranked. Nothing at all where there was no first touch to rank them over, which is a contract ending — the reason is on the exit above. */
+            takes_you_out: components["schemas"]["WhatTakesYouOutShown"] | null;
+            /**
+             * Path Applied
+             * @description What each claim did to the price on the walk, and what the market had already priced of it. Empty where no claim on this map moves this instrument.
+             */
+            path_applied: components["schemas"]["WhatThePathApplied"][];
+        };
+        /**
+         * PositionRequest
+         * @description What it takes to work out a position: a map, a branch, a seed, an ending, and an exit.
+         *
+         *     The first three are what every computed answer in this program is built from,
+         *     and the same three give the same answer on any machine and at any time. The
+         *     ending says which trade. The rest is the reader's own, and none of it is
+         *     derived from anything: a map of claims cannot say where somebody should get
+         *     out.
+         */
+        PositionRequest: {
+            /**
+             * Base Id
+             * @description The short name of the stored example, such as "hormuz".
+             */
+            base_id: string;
+            /** @description The branch in force, sent whole because there is nowhere to keep one yet. Leave it out for the map with nothing done to it. A position is **not** an edit: it appears on no branch and moves nothing on the map. */
+            branch?: components["schemas"]["Branch"] | null;
+            /**
+             * Seed
+             * @description The one number every random draw in the answer comes from — the drawn worlds and the price paths alike. Bounded by what a browser can hold exactly, so a browser can always send back a seed the server used.
+             */
+            seed: number;
+            /**
+             * Ending
+             * @description The ending being traded. What it names and which way is read off its payoff.
+             */
+            ending: string;
+            /**
+             * Entry
+             * @description The price you entered at, in the instrument's own units. Yours.
+             */
+            entry: number;
+            /**
+             * Stop
+             * @description The price at which you get out for a loss. Yours, and never derived.
+             */
+            stop: number;
+            /**
+             * Target
+             * @description The price at which you get out for a gain. Yours, and never derived.
+             */
+            target: number;
+            /**
+             * Horizon
+             * Format: date
+             * @description The day you expect to be out. The two first-touch shares are read to this day and no further, because reading to the end of whatever window the drawn worlds carry answers a question nobody asked.
+             */
+            horizon: string;
+            /**
+             * Risk Budget
+             * @description The share of your capital you are prepared to lose on this trade. What it implies about size is arithmetic on it and your stop, and is never a recommendation. Bounded by the position form rather than here, so that a reader who types a hundred instead of a hundredth is told what a risk budget is in the form's own words, beside every other fault at once.
+             */
+            risk_budget: number;
+            /**
+             * Daily Move
+             * @description How far the instrument moves in a day, in price units — one standard deviation of a day's change. Yours today: nothing in this program measures it.
+             */
+            daily_move: number;
+            /**
+             * Versions
+             * @description The outer loop the worlds beside this position are built at.
+             * @default 2000
+             */
+            versions: number;
+            /**
+             * Worlds
+             * @description The inner loop those worlds run.
+             * @default 8
+             */
+            worlds: number;
+            /**
+             * Drawn Worlds
+             * @description How many worlds to draw the event days from. A request above the ceiling is refused rather than quietly made smaller; the ceiling is the count the engine draws for itself, so the days a trade reads and the days a claim's own number was corrected by are one sample and not two.
+             * @default 50000
+             */
+            drawn_worlds: number;
+        };
+        /**
          * PricePayoff
          * @description An instrument you would buy or sell, which way, and how far you expect it to move.
          *
@@ -2274,17 +2420,6 @@ export interface components {
             reconcile: "marginalize";
         };
         /**
-         * RefusedCard
-         * @description Every reason a card could not be built, in a settled order, never just the first.
-         */
-        RefusedCard: {
-            /**
-             * Detail
-             * @description Every reason at once, never just the first one found.
-             */
-            detail: components["schemas"]["CardRefused"][];
-        };
-        /**
          * RefusedEdit
          * @description Why a branch could not be folded onto a map: every reason at once, never just the first.
          *
@@ -2300,6 +2435,17 @@ export interface components {
              * @description Every reason the branch was refused, in a settled order.
              */
             detail: components["schemas"]["Violation"][];
+        };
+        /**
+         * RefusedThesis
+         * @description Every reason a position or a card could not be worked out, in a settled order.
+         */
+        RefusedThesis: {
+            /**
+             * Detail
+             * @description Every reason at once, never just the first one found.
+             */
+            detail: components["schemas"]["ThesisRefused"][];
         };
         /**
          * Resolution
@@ -2680,6 +2826,32 @@ export interface components {
             resolved_by: string;
         };
         /**
+         * ThesisRefused
+         * @description One thing a thesis route will not do, the field at fault, and what it says.
+         *
+         *     A refusal is never a blank: it names a stable code a screen can switch on, the
+         *     field the reader should look at, and one plain sentence. Nothing is silently
+         *     repaired, and every fault the request has comes back together — a form that
+         *     reveals one mistake at a time is a form nobody finishes.
+         */
+        ThesisRefused: {
+            /**
+             * Code
+             * @description Which rule this is, from the closed list of ten.
+             */
+            code: ("stop_on_the_wrong_side" | "target_not_beyond_entry" | "horizon_after_the_claim" | "risk_budget_out_of_range" | "price_outside_the_contract" | "first_touch_on_a_contract") | ("unknown_ending" | "the_ending_names_no_trade" | "horizon_outside_the_window" | "nothing_agrees_with_what_happened");
+            /**
+             * Field
+             * @description The field at fault, named as the reader sees it.
+             */
+            field: string;
+            /**
+             * Sentence
+             * @description What the screen prints.
+             */
+            sentence: string;
+        };
+        /**
          * Transcript
          * @description The whole working of one generation, in the order it happened.
          */
@@ -2987,6 +3159,58 @@ export interface components {
              * @description Which sample these worlds came from and where the market's chance of each claim came from, in one sentence, said once for the whole section rather than on every line of it.
              */
             sample_says: string;
+        };
+        /**
+         * WhatThePathApplied
+         * @description What one claim did to the price on the walk, and what the market had already priced.
+         *
+         *     A price path that applied a claim's **whole** stated move on top of today's
+         *     price would count that move twice, because today's price already reflects the
+         *     market's own chance of the claim. So the path applies the **surprise** — the
+         *     move scaled by one minus that chance — and gives the priced-in part back day by
+         *     day while the claim has not happened. Which chance was used, where it came from,
+         *     and what shape the giving back followed are all here, because every one of them
+         *     moves the first-touch shares.
+         */
+        WhatThePathApplied: {
+            /**
+             * Claim
+             * @description The claim whose coming true moves the price.
+             */
+            claim: string;
+            /**
+             * Says
+             * @description Its claim, in one sentence.
+             */
+            says: string;
+            /** @description The market's own chance of the claim, which is what the path did not apply. */
+            market_chance: components["schemas"]["Figure"];
+            /**
+             * Came From
+             * @description Which of the four sources that chance came from, as a stable word.
+             * @enum {string}
+             */
+            came_from: "venue_quote" | "sample_share" | "base_world" | "reader";
+            /** @description How far the instrument moves if the claim comes true, as the model stated it. */
+            stated_move: components["schemas"]["Figure"];
+            /** @description That same move in the instrument's own price units, which is what a path takes. */
+            level_gap: components["schemas"]["Figure"];
+            /**
+             * Converted
+             * @description What turning a share of the price into price units costs, in plain words.
+             */
+            converted: string;
+            /**
+             * Decay Shape
+             * @description Which shape the giving back followed, as a stable word.
+             * @enum {string}
+             */
+            decay_shape: "arrival_days" | "straight_line" | "nothing_given_back";
+            /**
+             * Decay Says
+             * @description What that shape is, in plain words.
+             */
+            decay_says: string;
         };
         /**
          * WhatThisDoesNotKnow
@@ -3706,6 +3930,46 @@ export interface operations {
             };
         };
     };
+    take_a_position_api_thesis_position_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PositionAnswer"];
+                };
+            };
+            /** @description No example is stored under that name. The answer is one sentence naming the examples this program does ship with. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A position the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. A body the server cannot read at all is also a 422, and says so in its own words. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedThesis"];
+                };
+            };
+        };
+    };
     build_card_api_thesis_card_post: {
         parameters: {
             query?: never;
@@ -3735,13 +3999,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A request or a form the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. */
+            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A position the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. A body the server cannot read at all is also a 422, and says so in its own words. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedCard"];
+                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedThesis"];
                 };
             };
         };
@@ -3775,13 +4039,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A request or a form the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. */
+            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A position the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. A body the server cannot read at all is also a 422, and says so in its own words. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedCard"];
+                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedThesis"];
                 };
             };
         };
@@ -3816,13 +4080,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A request or a form the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. */
+            /** @description The request cannot be carried out as written, and there are two ways it can be. A branch that does not fit the map comes back as the list of violations the world routes give. A position the reader can fix comes back as the list of refusals — each with a stable code, the field at fault and one plain sentence. Read the first entry to know which: a violation names a `subject` and a `message`, a refusal names a `field` and a `sentence`. A body the server cannot read at all is also a 422, and says so in its own words. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedCard"];
+                    "application/json": components["schemas"]["RefusedEdit"] | components["schemas"]["RefusedThesis"];
                 };
             };
         };
