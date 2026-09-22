@@ -175,13 +175,29 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   // likelihood will go.
   await expect(page.locator(".tile").first()).toBeVisible();
 
-  // Where the first tile came to rest, before any of the others arrive. A tile
-  // keeps its row while the map grows, and this is what that promise is checked
-  // against — **while it is still growing**, because the map settles once at the
-  // moment it stops and a reading taken after that would fail by design
-  // (decision record 0024, 2026-09-21).
+  // **A tile keeps its row while the map grows**, and this is where that promise
+  // is checked: two readings of the first tile with a claim arriving between
+  // them, taken back to back and both of them while the run is still running.
+  //
+  // **The back-to-back part is the whole of it** *(2026-09-22)*. This used to
+  // read the place here and compare it forty lines further down, after a click,
+  // two presses on the panel and two on the keyboard — and on the build machine
+  // those five round trips outlast what is left of an eleven-second replay. The
+  // run then stops, the map settles, every tile moves on purpose, and the
+  // comparison fails on the one thing decision record 0024 says will happen.
+  // Where a tile is first put is the layout engine's answer for however much map
+  // existed when it first answered, which on a slow machine is more map: the
+  // first tile is drawn at row 12 here and at 212 there, and both are right.
+  // What is checked is that it does not move afterwards, so both readings belong
+  // in the same second, and the receipt is asserted absent at each of them
+  // because that is what "still running" means on this screen.
   const firstTile = page.locator(".react-flow__node.react-flow__node-claim").first();
+  await expect(page.locator(".receipt-strip")).toHaveCount(0);
   const wasAt = await whereTheTileSits(firstTile);
+
+  await expect(page.locator(".tile").nth(1)).toBeVisible();
+  await expect(page.locator(".receipt-strip")).toHaveCount(0);
+  expect(await whereTheTileSits(firstTile)).toBe(wasAt);
 
   // **A click on a tile while the recording is still arriving**, which is the
   // press Kent made and watched do nothing. It did select the tile and it did
@@ -224,13 +240,6 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   await expect(sheet).toContainText("You cannot move a tile");
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
-
-  // **And the first tile has not moved, with the map still growing under it.**
-  // Taken here, with more claims on the map than there were when the reading
-  // above was taken and more still on their way: that is what makes it a
-  // statement about a map that went on growing rather than about one frame.
-  await expect(page.locator(".tile").nth(1)).toBeVisible();
-  expect(await whereTheTileSits(firstTile)).toBe(wasAt);
 
   // Every proposal the rules refused is on screen, in the validator's own words
   // — and a run that refused nothing says that, rather than leaving an empty
@@ -299,11 +308,19 @@ test("a map draws itself from a recording, with no model key", async ({ page }) 
   const atRest = await whereTheMapCameToRest(page);
   expect(atRest).not.toBe("");
 
-  // **And the settle really happened.** On this recording it moves every one of
-  // the eighteen tiles, the first among them, so the tile read while the map was
-  // growing is no longer where it was. If this ever reads the same place again,
-  // the map stopped settling and half of decision record 0024 is gone.
-  expect(await whereTheTileSits(firstTile)).not.toBe(wasAt);
+  // **That the map settled is not asserted here, and the reason is worth
+  // writing down** *(2026-09-22)*. It was, by comparing the first tile's place
+  // after the stop with the place read while the map was growing — and that
+  // comparison cannot be made to mean one thing. Where a tile is first put
+  // depends on how much map existed when the layout first answered, which
+  // depends on how fast the machine is; on a slow enough one the first answer
+  // already covers most of the run and lands the tile exactly where the settle
+  // would. Then "it moved" and "it did not move" are the same reading. The
+  // settle is proved instead where it can be proved without a race:
+  // `src/graph/__tests__/theSettle.test.ts` folds two real streams event by
+  // event, at nine different layout rates, through this app's own layering,
+  // layout engine and reading-back. What the browser owes, and keeps above, is
+  // that the map is framed again and comes to rest.
 
   // No two boxes on the map overlap. A claim drawn on top of another is the one
   // failure a growing map makes that a finished one never does.

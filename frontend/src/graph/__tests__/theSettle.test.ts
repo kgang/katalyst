@@ -111,16 +111,25 @@ interface Frame {
  * is the one thing `useLayout` does that this walk has to say out loud, because
  * on the page it is driven by the same flag that re-frames the view.
  */
-async function everyFrameOf(events: readonly StreamEvent[]): Promise<Frame[]> {
+async function everyFrameOf(events: readonly StreamEvent[], landsEvery = 1): Promise<Frame[]> {
   const frames: Frame[] = [];
   let growth = waitingFor("the sentence this run was started from", null);
   let pinned = new Map<string, PinnedTile>();
   let settled = false;
 
-  for (const event of events) {
+  for (const [step, event] of events.entries()) {
     growth = fold(growth, event);
     const drawing = toFlow(growth.world, undefined, growth.skeletons);
     const stopped = hasStopped(growth.phase);
+    // **A late layout thread, injected.** The layout runs off the page's thread
+    // and `useLayout` throws away an answer a newer one has overtaken, so on a
+    // slow machine most passes never land and the one that does covers several
+    // events at once. `landsEvery` is how many events one landed pass covers:
+    // one is this machine, more is the build machine. The pass that stops the
+    // run always lands, because the settle is not something a reader can miss.
+    if (step % landsEvery !== landsEvery - 1 && step !== events.length - 1 && !stopped) {
+      continue;
+    }
     // The one pass where the run has just stopped is the settle: every pin goes
     // and the map is laid out once, whole. After it, the pins hold again and
     // nothing moves.
@@ -372,6 +381,45 @@ describe("a tile keeps its row while the map grows", () => {
     // The tie is a real tie, or this is testing the case above again.
     expect(Math.abs(above - wanted)).toBe(Math.abs(below - wanted));
     expect(took.y).toBe(below);
+  });
+
+  it("test_a_late_layout_thread_never_moves_a_tile_that_is_already_placed", async () => {
+    // **The build machine's fault, injected here rather than waited for.** The
+    // layout answers on a thread of its own, and on a slow machine most of its
+    // answers are overtaken before they land — so one landed pass covers three,
+    // five, a dozen events at once instead of one. That changes how much map
+    // exists the first time anything is placed, and so where the first tile
+    // lands: on the committed recording it is drawn at row 12 when the first
+    // pass covers one event, 24 at three, 212 at four, 456 at twelve. **Every
+    // one of those is the layout engine's own answer for the map it was given**,
+    // and the thing this test exists to say is that none of them moves
+    // afterwards: whatever row a tile is first given, it keeps, until the run
+    // stops. Nine rates, both real streams, every event.
+    //
+    // It is the no-browser half of decision record 0008's tier 2, and it is the
+    // twin of `e2e/lateLayout.spec.ts`, which starts the real thread 900
+    // milliseconds late in a real browser.
+    for (const [name, events] of THE_REAL_STREAMS) {
+      for (const landsEvery of [1, 2, 3, 4, 5, 6, 7, 9, 12]) {
+        const frames = await everyFrameOf(events, landsEvery);
+        const was = new Map<string, Position>();
+
+        for (const [pass, frame] of frames.entries()) {
+          for (const [id, box] of frame.boxes) {
+            const before = was.get(id);
+            if (before !== undefined && !frame.stopped && box.at.x === before.x) {
+              expect(
+                box.at.y,
+                `${name}, one pass per ${landsEvery} events, ${id}, after pass ${pass}`,
+              ).toBe(before.y);
+            }
+            was.set(id, box.at);
+          }
+          // And no box is ever drawn on another, at any rate.
+          expect(collide(frame), `${name}, one pass per ${landsEvery}, pass ${pass}`).toEqual([]);
+        }
+      }
+    }
   });
 
   it("test_no_two_boxes_are_drawn_on_top_of_each_other", async () => {
