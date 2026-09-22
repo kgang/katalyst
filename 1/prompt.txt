@@ -1392,3 +1392,134 @@ Could we also clean up the design somewhat? For the live flow, the triple nested
 ---
 
 Please revive the killed agents. The outage has resolved
+
+---
+
+<task-notification>
+<task-id>a4a3af75f46d3cdaa</task-id>
+<tool-use-id>toolu_014UQUioGkUP39tGe5V6qWAm</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b0c894cc-4ecb-4c15-9930-d321fce0a448/tasks/a4a3af75f46d3cdaa.output</output-file>
+<status>completed</status>
+<summary>Agent "Lane: zoom out further" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything is verified and both servers are stopped. Here is my report.
+
+---
+
+## What the coordinator must run to check me
+
+```bash
+# 1. The no-browser suite, linters and types (I already ran this once through the queue)
+cd /Users/kentgang/git3/katalyst-wt/feat-04-zoom-out/frontend &amp;&amp; npm run check
+
+# 2. The browser suite — I may not run this. It needs the four ports:
+cd /Users/kentgang/git3/katalyst-wt/feat-04-zoom-out/frontend &amp;&amp; \
+  KATALYST_E2E_BACKEND_PORT=8015 KATALYST_E2E_FRONTEND_PORT=5187 \
+  KATALYST_E2E_SLOW_BACKEND_PORT=8016 KATALYST_E2E_SLOW_FRONTEND_PORT=5188 \
+  npx playwright test
+```
+I added one new file, `e2e/zoomedOut.spec.ts`, and changed no existing e2e file. `e2e/farTiles.spec.ts` is untouched and still reaches the summary form in one press.
+
+## What I built
+
+**A third tile form, below 0.5 — the silhouette — and a floor that is derived, not chosen.**
+
+- `geometry.ts`: `SILHOUETTE_BELOW_ZOOM = 11/22 = 0.5` (the old floor, unchanged arithmetic, new job: the zoom at which the last word leaves a tile). `SMALLEST_ZOOM = 24/152 ≈ 0.158` — 24 px is WCAG 2.2 SC 2.5.8 *Target Size (Minimum)*, level AA; 152 is `TILE_MIN_HEIGHT`, the shortest box the map ever draws. At that zoom the tile's 280 px width lands at 44.2, clearing the stricter 44 × 44 (SC 2.5.5, AAA / Apple's HIG). **3.2× further out than before.** New `detailAt(zoom)` names the rule once; `smallestTextAt` returns `null` below 0.5.
+- `Tile.tsx` / `tile.css`: at `data-detail="silhouette"` the tile draws its outline and nothing else — no heading, claim, chips, foot, no port ink. Stroke 6 px in map coordinates (≈1 px on the glass at the floor). Kind colour intact: hypothesis accent + wash, `--kind-market`, hairline→`--text-muted` for the other two.
+- Plates (`CausalWire`/`WireChip`): not rendered at all below 0.5 — a plate is words.
+- Reserved rectangles and "+n more": keep their dashed outline (6 px), drop their lines. Driven by `data-detail` on the canvas root, since neither is a tile.
+- `canvas.css`: both rings drawn wider at silhouette, because a 1-px ring in map coordinates is a sixth of a pixel at the floor.
+- `firstFrame` is unchanged and its promise is now stated for both far forms and tested (`detailAt(frame.zoom) === "full"`).
+
+**The pictures found a real fault and I fixed it.** In grey at the floor, a tradeable ending and an ordinary step read identically — the 18-px cut corner is under 3 px out there, so the kind was carried by hue alone, which INV-12 forbids. The silhouette now grows each kind's one mark to ~48 px (≈6 px on the glass); an `event` stays the plain rectangle, because what says *event* is the absence of a mark. Greyscale re-checked: four kinds read as four.
+
+**Measured** (1600×1000 and 1280×800, replayed 18-claim map): at the floor the whole map is 297 × 317 on a 1264 × 863 stage, **0 tiles outside**, smallest box 44.2 × 30.3, 0 words in any tile, 0 plates. Clicking a silhouette selects it and the panel turns to *This claim* with the full claim; zooming back in restores the words. Pictures and measurements in `/Users/kentgang/git3/katalyst/plans/logs/04c/zoom/`.
+
+## What is rough
+
+1. **The zoom buttons now step past 0.5 rather than landing on it.** The steps from a map's opening zoom are 0.846 → 0.705 → 0.587 → 0.489. Before, 0.5 was `minZoom` and the last press clamped onto it; now it doesn't, so the *last* summary step a reader reaches by button is 0.587 and the next press is already a silhouette. Nothing is broken and the summary form is still reachable — but the reader can no longer land exactly on the threshold. If that matters, the fix is a zoom step that snaps to the thresholds, and it is not here.
+2. **The stroke widths (6 px outline, 8/6 px rings, 48 px marks) are single values across a range that spans 3.2×.** At the floor they are right; at 0.5, just inside the form, they are about four times heavier than they'd want to be. I chose the floor to be right because that is where the form earns its keep. A width that scaled with the zoom would be better and is more machinery than this needed.
+3. **At the floor the map is a small cluster in a large empty stage** — 297 px of map in 1264 px of stage — because zoom-out is about the viewport centre and the map isn't re-framed. A "fit everything" press would be the natural companion; the library's own fit-view button is already there and does it, and I left the two unjoined.
+4. **I could not run `e2e/zoomedOut.spec.ts`.** It's written against readings I took by hand with the same locators and the same button-disabled signal, and every one of those readings held — but it has never been executed by Playwright.
+5. **`plates.ts` still plans plate positions at silhouette** and the result is thrown away. Harmless, a little wasted work per frame.
+
+## Where I deviated and why
+
+- **The floor is derived from `TILE_MIN_HEIGHT` at 24 px, not `TILE_WIDTH` at 44 px** as the brief suggested. The two land within 0.5% of each other (0.1579 vs 0.1571), but the brief's version gives a box 44 × 23.9 — under the 44 × 44 it cites in one direction, and a hair under 24 in the other. Keying off the shortest side of the shortest box makes both figures true: 44.2 across, 24 exactly down. Both citations are in the docstring and the spec.
+- **I touched three files beyond the brief's list**, all for requirements the brief states: `canvas.css` (requirement 3 — the rings are invisible at the floor otherwise), `skeletonTile.css` (the brief names `SkeletonTile`), and `TileOverflow`'s rules in `tile.css` (its words would otherwise be drawn at 2 px, falsifying the reworded INV-27).
+- **I added `INV-workbench.31`** rather than folding the target-size rule into 27. 27 is about words; the floor is about boxes; one invariant saying both would say neither.
+- **The e2e test is a new file, `zoomedOut.spec.ts`, not an addition to `farTiles.spec.ts`.** The brief allowed "or beside it". It plays the recording, so it needs the whole-run timeout and the dropped-frame annotation, and putting those on `farTiles.spec.ts` would reconfigure a test that doesn't want them.
+
+## What outside my files must change — nothing
+
+I touched no belief row, no `BeliefChip.tsx`, no server file. Expect a small rebase against `feat/04-no-range-on-screen`: it shrinks the belief rail, and if `BELIEF_RAIL`/`TILE_MIN_HEIGHT` changes in `geometry.ts` then `SMALLEST_ZOOM = 24 / TILE_MIN_HEIGHT` moves with it — which is correct and automatic, but the two measured figures in the spec (≈0.158, 44.2) and the `FAR_MARK` docstring's "about a sixth of life size" would want re-reading.
+
+## Files touched
+
+```
+ frontend/e2e/zoomedOut.spec.ts                        | 220 +++++++++++++++
+ frontend/src/components/Tile.tsx                      | 209 ++++++++++----
+ frontend/src/components/__tests__/tile.test.tsx       | 149 +++++++++-
+ frontend/src/components/skeletonTile.css              |  25 ++
+ frontend/src/components/tile.css                      |  66 +++++
+ frontend/src/graph/Canvas.tsx                         |  47 ++--
+ frontend/src/graph/__tests__/layout.test.ts           |  96 ++++++-
+ frontend/src/graph/canvas.css                         |  30 ++
+ frontend/src/graph/geometry.ts                        | 104 ++++++-
+ frontend/src/graph/wires/CausalWire.tsx               |  71 +++--
+ frontend/src/graph/wires/WireChip.tsx                 |  25 +-
+ frontend/src/graph/wires/__tests__/midpointChip.test.tsx |  40 +++
+ spec/workbench/README.md                              |   2 +-
+ spec/workbench/layout-and-zoom.md                     |  20 +-
+ spec/workbench/tiles-ports-wires.md                   |  10 +-
+ 15 files changed, 968 insertions(+), 146 deletions(-)
+```
+Two commits: `0762d17`, `359bab6`. Nothing pushed.
+
+## Verification output
+
+```
+$ plans/scripts/heavy.sh "feat/04-zoom-out: npm run check" -- npm run check
+ Test Files  45 passed (45)
+      Tests  427 passed (427)
+   Duration  4.56s
+
+$ npm run lint
+Checked 183 files in 82ms. No fixes applied.
+
+$ npm run typecheck
+&gt; tsc -b --noEmit          (no output)
+
+$ git status --short
+(clean)
+```
+
+---
+
+## Draft pull request body
+
+### What
+
+The map zooms out about three times further than it did — Kent, 2026-09-22: *"Can we make it so it's possible to zoom out a lot more?"* — and the whole of a generated eighteen-claim map now fits on the glass at once.
+
+Below 0.5 a tile takes a **third form**: its outline shape and its kind's hue, and not one word. The plate in the middle of a wire goes with them, because a plate is words. A rectangle held open and a "+n more" keep their dashed outline and drop their lines. Arrows stay; both rings stay, drawn wider so they are still there at a sixth of life size.
+
+Both numbers are derived. 0.5 is the old floor with the same arithmetic (11 ÷ 22 — the zoom at which the largest type size lands on the eleven pixels nothing is drawn under) and a new job: the zoom at which the last word leaves. The new floor is 24 ÷ 152 ≈ 0.158 — the zoom at which the shortest box the map draws lands on the smallest target anything may be drawn at (WCAG 2.2, SC 2.5.8, level AA). Its width lands at 44.2 there, clear of the stricter 44 × 44.
+
+The silhouette draws each kind's mark about 48 px deep rather than the near form's 18 and 14, because at the floor those are under three pixels and what was left telling a tradeable ending from an ordinary step was the hue alone. Found in grey, on the replayed map, before it shipped.
+
+### Which invariant it satisfies
+
+- **INV-workbench.27**, reworded: *at every zoom at which a word is drawn at all*, the smallest type size × the zoom is at least 11. It was *from the 0.5 floor to the ceiling*, which stops being a statement the moment the floor goes below the last word.
+- **INV-workbench.31**, new: every tile's box is at least 24 px on its shortest side at every zoom the map allows. This is the rule the floor is a consequence of.
+- **INV-12** — nothing is carried by hue alone. The silhouette is the one form where the shape is the whole answer, and it now is one.
+- The first frame's promise is unchanged and covered without widening: it never opens on a summary tile, and the third form begins further out than the second, so it never opens on a silhouette either.
+
+### What is deliberately not here
+
+- **No snapping to the thresholds.** The zoom buttons step by a constant ratio, so a reader now steps past 0.5 rather than landing on it. Reachable summary tiles at 0.587 and 0.705; a stepper that knew about the thresholds is a separate change.
+- **No stroke width that scales with the zoom.** One value each, chosen to be right at the floor and therefore heavy at 0.5.
+- **No "fit everything" press.** Zoom-out is about the viewport centre, so the map ends up small and off-centre; the library's own fit-view button already does the other thing and the two are not joined.
+- **No new zoom threshold for UX-4's "far" rung.** That rung is several worlds side by side; this is one world seen whole.</result>
+<usage><subagent_tokens>351519</subagent_tokens><tool_uses>9</tool_uses><duration_ms>153039</duration_ms></usage>
+</task-notification>
