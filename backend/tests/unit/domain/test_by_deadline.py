@@ -22,12 +22,16 @@ and a test carrying one would have to move with it.
   what catches a wrong table, and it is why one oracle was never enough.
 """
 
+import ast
 import math
 from datetime import date, timedelta
+from pathlib import Path
+from typing import get_args
 
 import numpy
 import pytest
 
+import katalyst
 from katalyst.domain import (
     Belief,
     Beliefs,
@@ -35,6 +39,7 @@ from katalyst.domain import (
     ContractPayoff,
     Do,
     Drawn,
+    Engine,
     Graph,
     Insert,
     Link,
@@ -49,6 +54,7 @@ from katalyst.domain import (
     introduced_by,
     propagate,
     sample_forward,
+    sensitivity,
     solve,
     stated_chance_with,
     versions_of,
@@ -538,6 +544,111 @@ def test_todays_engine_is_byte_identical_under_the_flag() -> None:
     assert ignored.model_dump_json() == plain.model_dump_json(), (
         "the by-deadline engine's own arguments reached today's engine, which ignores them"
     )
+
+
+def test_the_flip_is_one_word_in_one_place() -> None:
+    """Nowhere in the server is an engine's name written down but the module that owns it.
+
+    The flip — the day a claim's number becomes the chance it happens by its
+    deadline — is meant to be one word changed once. It stops being that the moment
+    a second module keeps its own copy of the word, because then the flip is however
+    many copies there are, and the one somebody forgets is a route that quietly goes
+    on answering with the other arithmetic. The review of 2026-09-22 found exactly
+    that: a constant in `engine/worlds.py` that three routes passed by hand, and two
+    more callers of `propagate` that passed nothing and so took a default nobody was
+    going to change with it (must-fix 2).
+
+    So the word lives in `domain/propagation.py`, as `propagate`'s own default,
+    which is the one place every caller already reads. This parses every file the
+    server ships and fails if the text `today` or `by_deadline` is written as a
+    string anywhere else — a constant, a default, a keyword argument, any of them.
+    Passing an engine **by name** is still allowed and is what re-running somebody
+    else's world requires; what is not allowed is a second module deciding which.
+    """
+    source_root = Path(katalyst.__file__).resolve().parent
+    names = set(get_args(Engine))
+    written: list[str] = []
+    for source in sorted(source_root.rglob("*.py")):
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and node.value in names:
+                written.append(f"{source.relative_to(source_root)}:{node.lineno} {node.value!r}")
+
+    owner = "domain/propagation.py"
+    astray = [one for one in written if not one.startswith(owner)]
+    assert written, "no engine name is written down anywhere, so this check is reading nothing"
+    assert not astray, (
+        f"an engine's name is written outside {owner}, so the flip is no longer one word in "
+        f"one place: {astray}"
+    )
+
+
+def test_a_sweep_re_runs_a_world_with_the_engine_that_built_it() -> None:
+    """Flipping a claim one at a time uses the arithmetic that built the world being swept.
+
+    A sweep is one whole run of the engine per claim, and the number it reports is a
+    difference between two of those runs. Both have to be the same arithmetic as the
+    world the reader is looking at, or the difference carries the change of engine
+    inside it and nothing in the row says which part is which.
+
+    A world says which engine built it without being asked: the by-deadline core has
+    no inner loop at all and writes `worlds = 0`, and the day-by-day engine always
+    runs at least two. So this compares a sweep of a by-deadline world against the
+    same flips worked through by hand with `engine="by_deadline"` named out loud —
+    equal to the last bit — and then checks that naming the other engine gives
+    different numbers, so that the first assertion cannot be passed by an argument
+    nothing reads.
+    """
+    graph = _map_with_a_diamond()
+    world = _by_deadline(graph, versions=SWEPT)
+    assert world.worlds == 0, "this world was not built by the engine this test is about"
+
+    swept = sensitivity(world, versions=SWEPT, worlds=8)
+    assert swept, "the sweep produced no rows, so it is asserting nothing"
+
+    by_hand = {engine: _swept_by_hand(graph, world, engine) for engine in get_args(Engine)}
+    for row in swept:
+        assert row.deltas == by_hand["by_deadline"][row.flipped], (
+            f"the sweep's row for {row.flipped} is not what the engine that built this world "
+            "gives for the same flip"
+        )
+    assert by_hand["today"] != by_hand["by_deadline"], (
+        "both engines answered the same sweep identically, so this test cannot tell them "
+        "apart and proves nothing"
+    )
+
+
+SWEPT = 8
+"""How many versions the sweep test runs at. Small on purpose: it is one run per claim."""
+
+
+def _swept_by_hand(graph: Graph, world: World, engine: Engine) -> dict[str, dict[str, float]]:
+    """Flip each claim of a map in turn, with the engine named out loud, and keep the moves."""
+    endings = tuple(one.id for one in graph.propositions if one.kind in ("market", "not_tradeable"))
+    start = propagate(graph, (), as_of=DAY_ZERO, seed=SEED, versions=SWEPT, engine=engine)
+    moves: dict[str, dict[str, float]] = {}
+    for claim in graph.propositions:
+        to = bool(world.beliefs[claim.id].p < 0.5)
+        folded = apply(
+            graph,
+            Branch(
+                id="sweep",
+                label="One claim flipped, to see what it moves",
+                interventions=(Do(target=claim.id, value=to, at=None),),
+            ),
+        )
+        assert not isinstance(folded, list), folded
+        left_behind, fixed = folded
+        flipped = propagate(
+            left_behind,
+            fixed,
+            as_of=DAY_ZERO,
+            seed=SEED,
+            versions=SWEPT,
+            engine=engine,
+        )
+        moves[claim.id] = {one: flipped.beliefs[one].p - start.beliefs[one].p for one in endings}
+    return moves
 
 
 def test_a_longer_window_moves_nothing_it_cannot_reach() -> None:

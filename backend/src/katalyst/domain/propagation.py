@@ -131,10 +131,41 @@ each claim happens, one exact solve for whether it happens, and one weighted sam
 of worlds where something was observed.
 
 The two stand side by side while the second is written and checked against the
-first. Which one runs is one constant in one file, `ENGINE` in
-`katalyst.engine.worlds`, and never a setting read out of the environment: a screen
-whose numbers depend on how a machine was started is exactly the state nobody can
-trace back to an input, a rule or a source.
+first. Which one runs is `DEFAULT_ENGINE` just below, and never a setting read out
+of the environment: a screen whose numbers depend on how a machine was started is
+exactly the state nobody can trace back to an input, a rule or a source.
+"""
+
+DEFAULT_ENGINE: Final[Engine] = "today"
+"""Which arithmetic works every map on this server through. **The flip is this word.**
+
+`today` is the pair of nested loops the engine has run since stack 03a — versions
+of the map on the outside, worlds of dice on the inside. `by_deadline` is decision
+record 0016's core, where a claim's number is the chance it happens by its
+deadline. Changing this one word moves every number the server prints, once, in one
+reviewable diff.
+
+**It lives here, as `propagate`'s own default, because that is the only place every
+caller already reads.** It was once a constant in `katalyst.engine.worlds` that the
+three routes through that file passed down by hand, and the review of 2026-09-22
+found what that costs: two more callers — `engine/replay.py`, which rebuilds the
+numbers behind a kept recording, and `diff.sensitivity`, which flips each claim in
+turn — reached `propagate` without passing it, so the flip would have left them on
+the old arithmetic. A replay would then have disagreed with the live run it is a
+recording of, silently, every number. A default is the one place a caller cannot
+forget to read.
+
+The one thing a caller must still say out loud is which engine built a world it is
+**re-running** — `versions_of` and `diff.sensitivity` both do, off the world itself
+— because there the answer is not "whatever the server runs now" but "whatever
+built the thing I am comparing against".
+
+It is never a setting read out of the environment. Two people looking at the same
+map, the same branch and the same seed must see the same numbers, and a screen
+whose numbers depend on how a machine happened to be started is exactly the state
+nobody can trace back to an input, a rule or a cited source. No route exposes it,
+and `test_the_flip_is_one_word_in_one_place` fails if any other module in the
+server writes an engine's name down.
 """
 
 SAMPLED_WORLDS: Final = 50_000
@@ -523,7 +554,7 @@ def propagate(
     versions: int = 2_000,
     worlds: int = 8,
     introduced_by: Mapping[LinkId, int] = NOTHING_ADDED,
-    engine: Engine = "today",
+    engine: Engine = DEFAULT_ENGINE,
     slices: int = SLICES,
     sampled_worlds: int = SAMPLED_WORLDS,
 ) -> World:
@@ -557,7 +588,10 @@ def propagate(
             two pieces of code and it is said out loud rather than guessed at.
         engine: Which arithmetic to use. `today` is the two nested loops below;
             `by_deadline` is decision record 0016's core, which is being written
-            beside it. The default changes once, in one place, at the flip.
+            beside it. **Leave it out** unless you are re-running a world somebody
+            else built, in which case name the engine that built it: the default is
+            `DEFAULT_ENGINE`, the one word the flip changes, and a caller that
+            passes nothing is a caller that cannot be left behind by it.
         slices: How many equal pieces the by-deadline engine cuts the window into.
             Ignored by `today`.
         sampled_worlds: How many worlds the by-deadline engine draws when something
@@ -1173,6 +1207,33 @@ def _versions_by_deadline(world: World) -> Versions:
     )
 
 
+def engine_that_built(world: World) -> Engine:
+    """Say which arithmetic built a world, reading the world itself and nothing else.
+
+    **A world already records this, and no flag was added for the purpose.** The
+    by-deadline core has no inner loop at all, so it writes `worlds = 0`; the
+    day-by-day engine runs at least two worlds under every version and could never
+    write nought. One field, two meanings that cannot overlap.
+
+    Anything **re-running** a world has to ask. Which engine a fresh world is built
+    with is whatever the server runs now, which is `DEFAULT_ENGINE`; but a run that
+    exists to be compared against a world somebody else built — the version-by-
+    version rebuild a comparison reads, the one-at-a-time sweep in `diff.py` — must
+    use the arithmetic that built the thing it is compared against, or the
+    difference it reports is partly the change of engine and nobody can tell which
+    part. Around the flip, when a screen may still be holding a world the old
+    engine built, that is the difference between a sound answer and a number nobody
+    can account for.
+
+    Args:
+        world: The world to ask about.
+
+    Returns:
+        The name `propagate` takes for the arithmetic that built it.
+    """
+    return "by_deadline" if world.worlds == 0 else "today"
+
+
 def _propagated(
     graph: Graph,
     assignments: tuple[Assignment, ...],
@@ -1287,7 +1348,7 @@ def versions_of(world: World) -> Versions:
         each version drew for each claim, and each version's answer for each claim
         on each day.
     """
-    if world.worlds == 0:
+    if engine_that_built(world) == "by_deadline":
         return _versions_by_deadline(world)
     setup = _prepare(world.graph, world.assignments, world.day_zero)
     sample = _draw(

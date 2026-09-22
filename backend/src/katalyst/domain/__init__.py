@@ -59,7 +59,8 @@ days a later stack reads.
 `propagate` takes an `engine` argument naming which arithmetic to use, and **it
 still defaults to the one this layer has always run**. The two stand side by side
 while the second is checked against the first; which one every world on this server
-uses is one constant in one file, `ENGINE` in `katalyst.engine.worlds`.
+uses is that default, `DEFAULT_ENGINE` in `propagation.py`, so a caller that says
+nothing cannot be left behind when the flip changes it.
 """
 
 from katalyst.domain.belief import Belief, Beliefs, two_figures
@@ -95,6 +96,7 @@ from katalyst.domain.patch import (
     introduced_by,
 )
 from katalyst.domain.propagation import (
+    DEFAULT_ENGINE,
     SAMPLED_WORLDS,
     Engine,
     Retraction,
@@ -152,6 +154,7 @@ from katalyst.domain.states import (
 from katalyst.domain.validity import Violation, ViolationCode, validate
 
 __all__ = [
+    "DEFAULT_ENGINE",
     "NEVER",
     "POINTS_IN_A_SLICE",
     "SAMPLED_WORLDS",
