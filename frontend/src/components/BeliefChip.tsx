@@ -24,6 +24,14 @@
  * for it. A claim standing on the reader's own say-so shows the word — *Supposed
  * · Oct 1* — because while it is supposed it is true in every simulated world
  * and there is no number to show.
+ *
+ * **Which chips a tile draws is not decided here.** A chip draws whatever it is
+ * handed; `Tile.tsx` decides that the model's column is always drawn and that
+ * the reader's and a venue's are drawn only where they hold a number, because
+ * that is a statement about a tile rather than about a chip. So the absence
+ * states below are reached by the model's column, and the other two keep their
+ * words and their reasons in the panel beside the map, where a reason has room
+ * to be a sentence.
  */
 
 import { useId, useState } from "react";

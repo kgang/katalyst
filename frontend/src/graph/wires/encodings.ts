@@ -294,15 +294,28 @@ export function shapeInWords(shape: LinkShape, halfLife: number | null): string 
 
 /* ---- Whether it has to keep holding ------------------------------------- */
 
-/** What each of the two kinds of push means, in a sentence rather than a word. */
+/**
+ * What each of the two kinds of push means, in a sentence rather than a word.
+ *
+ * **Said plainly, with no picture to decode** (Kent, 2026-09-21). These two
+ * sentences are printed on the panel beside the map — on the arrow's *kind* row
+ * and on every line of a number's working — so they are read by somebody who
+ * came to judge a trade, not to learn a metaphor. Each one opens with what the
+ * push does and then says what follows from it; nothing here stands in for
+ * anything.
+ *
+ * The same distinction is described to the model in `backend`'s own field
+ * descriptions, and those words are part of what we ask it — changing them
+ * changes the prompt's fingerprint — so they are not changed here and the two
+ * are allowed to read differently until that one freeze.
+ */
 const MODES: Record<LinkMode, string> = {
   trigger:
-    "a domino — it fires once when the cause becomes true, and the effect stays " +
-    "pushed and fades on its own. Standing the first domino back up does not " +
-    "stand this one back up",
+    "fires once. The push lands when the cause becomes true and then decays on " +
+    "its own; undoing the cause later does not undo it",
   sustain:
-    "an apple on a desk — the push exists only while the cause holds, and it " +
-    "vanishes the moment the cause stops",
+    "holds while the cause holds. The push exists only while the cause is true, " +
+    "and goes the moment it stops",
 };
 
 /**

@@ -91,7 +91,7 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 | # | Region | How it is drawn |
 |---|---|---|
 | 1 | **The claim** | `--font-interface`, `--text-md` (15 px), `--weight-medium`, `--text`. Wraps to at most **three lines**, then ellipsized — **never truncated mid-word**. The full sentence lives in the Inspector |
-| 2 | **Three belief chips** — model, user, market | A three-up row, always three, always in that order. Each chip is three stacked lines: owner, number, range. Numbers and ranges in `--font-mono` with fixed-width digits, `--text-sm`; the number `--weight-medium` in `--text`, the owner and the range `--weight-regular` in `--text-muted`. On a `not_tradeable` ending the market chip prints that claim's own stored reason beneath it — part of this region, not a seventh thing |
+| 2 | **The belief chips** — the model's, and the reader's and a venue's where they hold a number *(amended 2026-09-21)* | A row of columns in that order, sharing the row's width between however many are drawn. Each chip is three stacked lines: owner, number, range. Numbers and ranges in `--font-mono` with fixed-width digits, `--text-sm`; the number `--weight-medium` in `--text`, the owner and the range `--weight-regular` in `--text-muted`. On a `not_tradeable` ending the tile prints that claim's own stored reason in its foot — part of this region, not a seventh thing |
 | 3 | **Evidence clippings** | At most two. Each is a **letter monogram** plus one line: monogram in `--font-mono`, `--weight-semibold`, `--text-muted`; line in `--font-interface`, `--text-sm`, `--text-muted`, one line, ellipsized. A leading `+` or `−` says whether the item supports the claim or cuts against it |
 | 4 | **The resolve-by date** | `--font-mono`, `--text-sm`, `--text-muted`. The day we will know |
 | 5 | **A kind silhouette** | The tile's own outline, four of them. **Shape carries the kind; hue never does** |
@@ -123,12 +123,51 @@ The three voices are stored and drawn separately and **never averaged** — INV-
 **A chip is three stacked lines**: the owner, then the number, then the range beneath it.
 
 ```
-model          user           market
-.61            —              .52
-.45–.74                       .49–.55
+ a venue quotes this claim, and           nobody quotes it and nothing
+ the reader has said nothing              has been said about it
+
+ ┌──────────────────────────────┐         ┌──────────────────────────────┐
+ │ model         market         │         │ model                        │
+ │ .61           .52            │         │ .61                          │
+ │ .45–.74       .49–.55        │         │ .45–.74                      │
+ └──────────────────────────────┘         └──────────────────────────────┘
 ```
 
 Stacked, because three numbers and three ranges strung along one line of a 280-pixel tile is a row of digits nobody parses. The one-line form `.61 (.45–.74)` is still the canonical spelling and is used everywhere the chip is not: in prose, in the outline view, and as the chip's own accessible name, so a screen reader hears one phrase rather than three fragments.
+
+#### The same chip, seen from far away *(added 2026-09-22)*
+
+Zoomed out past the threshold [`layout-and-zoom.md`](layout-and-zoom.md) owns, a tile drops its heading, its date and its foot, and sets everything it keeps in the largest of the three type sizes — 22 pixels, which at the furthest the map zooms out is 11 pixels on the reader's screen and may not be given up. Out there a belief stops being a stack of three and becomes **one line, read the way it would be said**: the owner, the number, the range.
+
+**A range is never dropped and never cut off, at any zoom — so out here it is allowed a line of its own.** At this size the longest line the engine can print does not fit: the owner *market*, a three-figure likelihood and a three-figure range come to about 281 pixels against the 256 a belief row has, and 244 on the two tiles whose outline cuts into one side. So the line wraps, and only when it has to — the range drops under the number, lined up with the number rather than with the owner, so it reads as the rest of that belief and not as a belief of its own.
+
+```
+ the line fits                             the line does not fit
+
+ ┌──────────────────────────────┐         ┌──────────────────────────────┐
+ │ model   .31  .16–.48         │         │ model   .074                 │
+ │                              │         │         .029–.13             │
+ └──────────────────────────────┘         └──────────────────────────────┘
+```
+
+**The tile does not grow to hold the second line.** Its box is reserved before anything is drawn, from what the near form needs, and the map measures nothing — so the room comes from inside the box the near form already had: out here there is no heading, the claim and the beliefs sit one step apart rather than two, and the belief lines are set a little tighter. **Where that does not stretch:** a tile reserved the smallest box that draws *two* beliefs whose ranges *both* need a second line. Neither map this product ships asks for that; the day one does, the claim's second line is what pays for it.
+
+- **Test:** `frontend/e2e/farTiles.spec.ts` › `test_a_tile_seen_from_far_away_prints_every_belief_line_whole` — a browser test, because whether a line fits is a fact about laid-out boxes and the tests with no layout all passed while two ranges ran off their tiles (2026-09-22). It reads the stored example both as it was written and with its branch open, because the branch is where the engine prints three-figure numbers.
+- **Also:** `frontend/src/components/__tests__/tile.test.tsx` › `test_the_far_away_form_sets_every_word_in_the_largest_size` and `test_the_far_away_form_puts_no_part_of_a_belief_out_of_sight` — the two wrong ways to make a line fit, ruled out in the stylesheet itself.
+
+#### A column with no number in it is not drawn *(amended 2026-09-21)*
+
+**One rule, and it takes no exception: the model's column is always drawn; the reader's and a venue's are drawn when they hold a number.** Kent, walking the app: *"In each of the nodes, the empty user specified values and the market values add visual clutter. The user and market values should only be viewable if they exist."*
+
+It was counted rather than guessed, on the maps a reviewer can actually open. On the curated example seven tiles carry **12 empty cells of 21**; on the **recorded generation a keyless reviewer watches build, 18 of 18 tiles show both empty columns — 36 cells of 54**. Two thirds of every tile's belief area was an apology, and not one tile was an exception. Every browser test in this project played the curated map, which is the one map where a reader's number and a venue's quote both exist, which is why nobody saw it.
+
+Three facts make the rule cheap and exact:
+
+* **The model's column is always drawn**, because on a map that is still being built all three slots are empty and that column is the one that says so — *no engine yet*, with its reason. It is also the one voice every claim on every map has.
+* **Collapsing a column cannot move the map.** The belief rail is a constant in `geometry.ts` — the same reserved height whatever the chips hold — and a tile's width is written on its own box. So a tile does not change size when a column is not drawn, its ports do not move, and a number arriving later widens the survivors and re-lays out nothing.
+* **The `not_tradeable` finding is already outside the chips.** A dead end's own stored reason is printed in the tile's foot and has its own reserved height, so it survives the market chip going away and the rule needs no special case for that kind.
+
+**Where the absences go: nowhere new.** The panel beside the map draws all three rows whatever they hold and prints each absence's own reason in full — *no venue quotes this claim* — which is what [INV-workbench.53](inspector.md) already requires and where a reason has room to be a sentence. No word changes; the tile stops repeating them down a column.
 
 **Two significant figures on the number and on both ends of the range, always.** Never `.6134`, and never a number with its range dropped. Two consequences worth naming here because they change what a reader sees: `.06` prints **`.060`**, because two figures means two figures; and a chip never prints `1.0` or `.0` — it prints **`>.99`** and **`<.01`**, because a chip that prints certainty has said something no elicited number earns. The rounding table and its awkward cases live in [`keyboard-and-access.md`](keyboard-and-access.md) B6, which owns the rule for the whole part.
 
@@ -152,16 +191,17 @@ Only the numerals are substituted — `2 000` is `versions`, and `.35`, `.20` an
 
 **In this stack every chip shows the stated sentence**, because nothing here computes: the numbers come from the stored example, whose own comments call them illustrative. The day the engine's world route is switched on, `versions` arrives on the world and the computed sentence appears **with no change to this component** — which is the whole reason the choice is made from data rather than from a flag somebody remembers to set.
 
-**The states of a chip:**
+**The states of a chip on a tile** *(amended 2026-09-21)*. An empty `user` slot and an empty `market` slot are no longer among them — those columns are not drawn, and the words and the reason for each are read in the panel beside the map:
 
 | State | What the chip shows | Where its reason is |
 |---|---|---|
 | A number | the three stacked lines, with a small bar behind the number painted from the likelihood ramp | — |
-| An empty `user` slot — `kind: "not_said"` | **—**, an em dash, and it is a control: it invites your own number | The control's own label: *"no number from you yet — say what you think"* |
-| An empty `market` slot — `kind: "no_market"` | **no market**, and nothing else | The hover shelf, the accessible name and the Inspector |
-| No number yet — `kind: "no_engine"` | **no engine yet** | Beside the words, on the tile |
+| No number yet, on the model's column — `kind: "no_engine"` | **no engine yet** | Beside the words, on the tile |
+| A value an edit fixed | the word and the date — *Supposed · Oct 1* — and no likelihood at all | The hover shelf and the accessible name |
 
-**Why "no market" is two words and no more.** The tile is not the place for the explanation: on most maps most claims have no contract, and a sentence repeated down a column is noise that crowds out the claims. The reason is still one hover away, it is written once in [`../vocabulary.md`](../vocabulary.md) rather than composed per tile, and it is chosen by the claim's `kind`:
+The five kinds of absence in [`../vocabulary.md`](../vocabulary.md) are unchanged and so are their words: what changed is where they are read. The **reader's own slot loses nothing a reader could use** — its em dash carried an *add yours* that was a span inside the chip's own button and opened nothing, an invitation with no way in.
+
+**Why "no market" is two words and no more, where it is shown.** The tile was never the place for the explanation: on most maps most claims have no contract, and a sentence repeated down a column is noise that crowds out the claims. The reason is written once in [`../vocabulary.md`](../vocabulary.md) rather than composed per tile, and it is chosen by the claim's `kind`:
 
 | `kind` | The reason a reader gets |
 |---|---|
@@ -169,7 +209,7 @@ Only the numerals are substituted — `2 000` is `versions`, and `.35`, `.20` an
 | `event`, `hypothesis` | "no venue quotes this claim" |
 | `not_tradeable` | **its own stored reason, printed on the tile** — that one is a finding, not a gap |
 
-An absence is never silent, but *silent on the tile* and *silent* are different things: every absence carries its reason, on the tile or as the element's own accessible name, which is what a hover shows and what a screen reader reads.
+An absence is never silent, but *silent on the tile* and *silent* are different things: every absence carries its reason — in the panel beside the map, and, on the one column a tile draws whatever it holds, on the tile itself or as the element's own accessible name, which is what a hover shows and what a screen reader reads.
 
 And one state that replaces the number entirely: **while an edit has fixed a claim's value, the chip shows the word** — *Supposed · Oct 1* where the user took it as given, *Happened · Oct 1* where they reported it as news, *Did not happen · Oct 1* where the news is that it did not (Kent, 2026-09-21, G12) — never `1.0`, never `.98` and never `>.99`. Either way the claim is settled in every simulated world, so there is no number to show, and inventing one would answer a question the user did not ask. (The engine stores `1.0` on such a claim — or `0.0` where the value fixed was false — so the path product has a factor to multiply; no surface but the path product ever reads it.)
 
@@ -177,7 +217,7 @@ And one state that replaces the number entirely: **while an edit has fixed a cla
 
 ### Typed ports
 
-One **input group** and one **output group** per tile, drawn as small sockets on the left and right edges. Within each group, `trigger` and `sustain` attach to **distinct handle identifiers** — `in-trigger`, `in-sustain`, `out-trigger`, `out-sustain` *(names proposed here; that the identifiers are distinct is settled, what they are called is not)* — so a wire's meaning is visible at the socket before you follow it. `trigger` is a domino — it fires once when its cause becomes true and the effect stays pushed, fading on its own. `sustain` is an apple on a desk — the push exists only while its cause holds, and vanishes the moment it stops.
+One **input group** and one **output group** per tile, drawn as small sockets on the left and right edges. Within each group, `trigger` and `sustain` attach to **distinct handle identifiers** — `in-trigger`, `in-sustain`, `out-trigger`, `out-sustain` *(names proposed here; that the identifiers are distinct is settled, what they are called is not)* — so a wire's meaning is visible at the socket before you follow it. A `trigger` **fires once**: the push lands when its cause becomes true and then decays on its own, and undoing the cause later does not undo it. A `sustain` **holds while its cause holds**: the push exists only while the cause is true, and goes the moment it stops. *(The wording is the browser's own, 2026-09-21 — the two sentences a reader is shown say what the push does rather than standing something in for it. The words the model is asked in are `backend`'s and are part of the prompt's fingerprint; they ride one freeze and are allowed to differ until then.)*
 
 **The ports' places are declared, not discovered** — worked out from the tile's own height and handed to the drawing library along with the tile's box, exactly as that height is. A wire is drawn between two ports, and a library left to find them by measuring the drawn page draws no wire at all on the day the browser drops that measurement: the map then holds every claim, in its place, and says nothing about how they are joined. So nothing about a port is ever read back off a drawn tile, and one set of numbers places the socket, places the wire's end and places the plate beside it.
 
@@ -401,11 +441,14 @@ Two statements, one subject: a chip never leaves a reader guessing what it is lo
 - **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_every_absence_renders_words_and_a_reason` and `test_a_computed_chip_says_it_is_uncalibrated`.
 - **Also:** visual review checklist `VR5` — is there a number nobody computed, an empty slot filled in rather than left as an absence with a reason, or a number whose origin cannot be named in one click?
 
-### INV-workbench.6 — Three voices, never merged *(refines INV-11)*
+### INV-workbench.6 — Three voices, never merged, and a column with no number is not drawn *(refines INV-11; amended 2026-09-21)*
 
-For every tile: exactly three chips are rendered, labelled model, user and market, in that order, and no rendered element shows a value derived from more than one of them.
+For every tile: the chips rendered are exactly the model's, plus the reader's and a venue's where those hold a number — labelled model, user and market, in that order, never more than one each — and no rendered element shows a value derived from more than one of them.
 
-- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_draws_three_chips_and_never_a_fourth`.
+Two halves, and the second is the amendment. The voices are never merged, and a voice with nothing to say takes no column: on the recorded generation that is 36 of 54 cells, and the map reads as numbers rather than as apologies.
+
+- **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_draws_one_chip_per_voice_and_never_a_fourth`, and `test_a_belief_column_with_no_number_is_not_drawn` — which is run over the claims folded out of `backend/recordings/hormuz.jsonl` by the app's own stream reducer, because the curated example is the one map where a reader's number and a venue's quote both exist and it hid this from every test in the tree. `test_a_belief_column_with_a_number_is_still_drawn` holds the other half, and `test_the_reserved_height_is_the_same_whether_one_column_is_drawn_or_three` holds the tile to its box over every claim on that same map.
+- **Also:** visual review checklist `VR14` — does any tile draw a belief column with no number in it?
 
 ### INV-workbench.7 — A claim whose value an edit fixed shows the word
 

@@ -263,9 +263,8 @@ WHY
   the lane is open. It is a one-time repricing, not a standing discount.
 
 PUSH      +1.6 — a strong push toward
-KIND      trigger — a domino: it fires once when the strait opens, and the
-          effect stays put and fades on its own. Standing the first domino
-          back up does not stand this one back up
+KIND      fires once. The push lands when the cause becomes true and then
+          decays on its own; undoing the cause later does not undo it
 DELAY     2 days from the strait opening
 OVER TIME impulse — a one-time spike, half gone after 30 days
 
@@ -286,9 +285,12 @@ WHERE IT CAME FROM
   them: on this map `+0.7` reads *a nudge toward*, `−0.4` *a nudge against*, `−2.4` *a strong push
   against*. The chip writes `+1.6 · a strong push toward` and the panel `+1.6 — a strong push
   toward`; that difference is the plan's.
-* **Mode is a sentence, not a word to look up.** `trigger` is the domino; `sustain` is the desk
-  holding the apple — remove the desk and the apple falls, which is the arrow that makes the Hormuz
-  showcase work.
+* **Mode is a sentence, not a word to look up — and a plain one.** `trigger` reads *fires once…*;
+  `sustain` reads *holds while the cause holds. The push exists only while the cause is true, and
+  goes the moment it stops* — which is the arrow that makes the Hormuz showcase work. The panel
+  prints the sentence and no picture of something else (Kent, 2026-09-21: terse and professional,
+  no domino and no apple on a desk). [`../graph/link.md`](../graph/link.md) still explains where
+  the distinction came from with both pictures; that is a chapter, not the screen.
 * **`fetched` is the day our own retrieval step pulled the page down.** On this fixture nothing was
   fetched — a person put the address in by hand — so the field renders its reason rather than a
   date. An arrow claiming `documented` with nothing behind it is rejected by the map's rules.
