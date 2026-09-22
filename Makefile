@@ -66,11 +66,11 @@ WHERE = printf '\n  The app                      http://localhost:5173/\n  The s
 
 dev: ## Start both halves in Docker, reload them as you edit, and stop them on Ctrl+C (http://localhost:5173/)
 	@$(WHERE)
-	@trap 'docker compose down' EXIT; trap 'exit 0' INT; docker compose up --watch
+	@trap 'docker compose down' EXIT; trap 'exit 0' INT; docker compose up --build --watch
 
 up: ## The same, without watching for edits (http://localhost:5173/)
 	@$(WHERE)
-	@trap 'docker compose down' EXIT; trap 'exit 0' INT; docker compose up
+	@trap 'docker compose down' EXIT; trap 'exit 0' INT; docker compose up --build
 
 down: ## Stop both halves and remove their containers
 	docker compose down
