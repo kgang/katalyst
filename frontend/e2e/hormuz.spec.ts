@@ -796,7 +796,43 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // And back along a wire, toward what causes it.
   await page.keyboard.press("h");
   await expect(page.locator(".map-status")).toContainText("along an arrow");
-  await landedOn(page, ["H", "C", "R"]);
+  const standingWhenTheWalkFoldedThePanel = await landedOn(page, ["H", "C", "R"]);
+
+  await test.step("test_the_panel_folds_from_a_control_and_the_key_brings_it_back", async () => {
+    // **The control Kent asked for**, 2026-09-22: *"the … large, uncollapsible
+    // side bar [is] somewhat garish. First, can you introduce a button to be
+    // able to collapse and open the side bar."* The panel had always folded from
+    // `P`, and nothing on screen said so — so a reader who found the key by
+    // accident had a map and no way back to the panel.
+    //
+    // The two halves of the claim are measured rather than read: the panel
+    // leaves the row, and the stage is wider afterwards than it was before. The
+    // width is compared with itself across the press; no number is written here.
+    const theStage = page.locator(".map-stage");
+    const wide = async () => (await theStage.boundingBox())?.width ?? 0;
+    const wasWide = await wide();
+    expect(wasWide, "the stage was drawn at no width at all").toBeGreaterThan(0);
+
+    await page.getByRole("button", { name: "Hide the panel beside the map" }).click();
+    await expect(page.locator(".dock-column")).toHaveCount(0);
+    await expect
+      .poll(wide, { timeout: 5_000, message: "the stage never took the panel's width" })
+      .toBeGreaterThan(wasWide);
+
+    // And the way back for a reader with a pointer: a tab at the edge the panel
+    // went behind, which is the only control on screen while it is away.
+    await expect(page.getByRole("button", { name: "Show the panel beside the map" })).toBeVisible();
+
+    // The key still does it. The keyboard goes back on the map first — pressing
+    // the control took it — which is the product's own rule about map keys
+    // rather than this test's convenience.
+    await standOn(page, standingWhenTheWalkFoldedThePanel);
+    await page.keyboard.press("P");
+    await expect(page.locator(".dock-column")).toHaveCount(1);
+    await expect
+      .poll(wide, { timeout: 5_000, message: "the stage never gave the panel's width back" })
+      .toBe(wasWide);
+  });
 
   await test.step("test_two_keys_in_one_frame_both_count", async () => {
     // The two steps again, pressed one after the other with nothing waited for

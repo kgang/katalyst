@@ -656,6 +656,11 @@ export function MapScreen({
     if (selection === null) {
       return;
     }
+    // **And it brings the panel back if it was folded away.** Choosing a claim
+    // is the reader asking to read something, and the place it is read is the
+    // panel; leaving it folded would answer the question off screen, which is
+    // the defect the panels were split up to fix.
+    setAway(false);
     setDock("subject");
   }, [selection]);
 
@@ -850,9 +855,10 @@ export function MapScreen({
       // The names of the three panels, at the head of the panel and outside the
       // part of it that scrolls, so the way to the other two is always on the
       // glass. This is the whole answer to *how do I know what panels exist*.
-      panelHead={<PanelSwitch panels={panels} showing={dock} onShow={turnTo} />}
+      panelHead={<PanelSwitch panels={panels} showing={dock} onShow={turnTo} onHide={keys.panel} />}
       panelNamedBy={theLabelFor(dock)}
       panel={away ? null : THE_PANEL}
+      onShowPanel={keys.panel}
       origin={
         <>
           <p className="map-origin__line">{world.origin}</p>

@@ -29,6 +29,16 @@
  * The motion budget has three movements in it and none of them is a panel
  * asking to be looked at.
  *
+ * **And one control that is not a name** *(2026-09-22, Kent: "can you introduce
+ * a button to be able to collapse and open the side bar")*. The panel folds away
+ * and gives the map the width. `P` has always done that and still does, but a
+ * key nobody has read about is not a control, so the fold is here, at the head
+ * of the panel, which is the only place on screen that is about the panel
+ * itself. It is drawn as a chevron rather than a word for the two reasons in
+ * `Chevron` below, and it is outside the row of names: a row of labels is a row
+ * of labels, and a button that is not one of them has no business being read as
+ * one.
+ *
  * It draws the labels and nothing else: which panel is showing is the screen's
  * own state, because only the screen knows what a selection should do to it.
  */
@@ -64,6 +74,52 @@ export interface PanelSwitchProps {
    * what says the line under the map naming what the last keystroke did.
    */
   readonly onShow: (name: string) => void;
+  /**
+   * Fold the whole panel away and give the map the width.
+   *
+   * The same act as pressing `P`, and the screen does it for the same reason it
+   * does the rest: the screen holds whether the panel is there, and the screen
+   * is what says what the last keystroke did.
+   */
+  readonly onHide: () => void;
+}
+
+/**
+ * A chevron, drawn here rather than fetched from an icon set.
+ *
+ * **It is the one mark in this product that is not a word**, and it earns that
+ * on two counts. It says *which way this goes* — the panel folds toward the edge
+ * and comes back from it — which is a direction rather than a name, and a
+ * direction is the one thing a word says worse than a line does. And there is no
+ * room beside three panel names for a fourth word: the panel is 336 pixels
+ * whatever the window, and the names already take most of them.
+ *
+ * It is two strokes and no fill, so it reads at any size and in any theme, and
+ * it carries `aria-hidden` because the button around it has the words.
+ *
+ * @param pointing Which way the panel is about to go.
+ */
+export function Chevron({ pointing }: { readonly pointing: "left" | "right" }) {
+  return (
+    <svg
+      className="chevron"
+      data-pointing={pointing}
+      viewBox="0 0 10 16"
+      width="10"
+      height="16"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d={pointing === "right" ? "M2 2 L8 8 L2 14" : "M8 2 L2 8 L8 14"}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 /**
@@ -96,7 +152,7 @@ function typing(target: EventTarget | null): boolean {
 }
 
 /** The panels this screen has, and which of them is on the glass. */
-export function PanelSwitch({ panels, showing, onShow }: PanelSwitchProps) {
+export function PanelSwitch({ panels, showing, onShow, onHide }: PanelSwitchProps) {
   const labels = useRef<(HTMLButtonElement | null)[]>([]);
 
   // The listener is bound once and reads the latest panels through this, so a
@@ -165,44 +221,66 @@ export function PanelSwitch({ panels, showing, onShow }: PanelSwitchProps) {
   };
 
   return (
-    // One tab stop for the whole row, and the arrow keys inside it: a row of
-    // labels that each took a Tab would put three more stops between the map and
-    // the panel every reader crosses.
-    //
-    // A row of labels is a role rather than an element: there is no HTML tag
-    // that means one, so the role is spelled out on the box that honestly holds
-    // them.
-    <div
-      className="panel-switch"
-      role="tablist"
-      aria-label="Which panel is beside the map"
-      onKeyDown={walk}
-    >
-      {panels.map((panel, at) => {
-        const chosen = panel.name === showing;
-        return (
-          <button
-            key={panel.name}
-            id={theLabelFor(panel.name)}
-            className="panel-switch__label"
-            type="button"
-            role="tab"
-            aria-selected={chosen}
-            aria-controls={THE_PANEL_BESIDE_THE_MAP}
-            tabIndex={chosen ? 0 : -1}
-            data-showing={chosen ? "yes" : "no"}
-            ref={(node) => {
-              labels.current[at] = node;
-            }}
-            onClick={() => onShow(panel.name)}
-          >
-            <span className="panel-switch__word">{panel.label}</span>
-            {panel.mark === undefined ? null : (
-              <span className="panel-switch__mark">{panel.mark}</span>
-            )}
-          </button>
-        );
-      })}
+    // The head of the panel: the names, and the one control that folds the whole
+    // thing away. The fold is **outside** the row of names on purpose — a row of
+    // labels is a row of labels, and a button that is not one of them has no
+    // business being read as one.
+    <div className="panel-switch">
+      {/* One tab stop for the whole row, and the arrow keys inside it: a row of
+          labels that each took a Tab would put three more stops between the map
+          and the panel every reader crosses.
+
+          A row of labels is a role rather than an element: there is no HTML tag
+          that means one, so the role is spelled out on the box that honestly
+          holds them. */}
+      <div
+        className="panel-switch__names"
+        role="tablist"
+        aria-label="Which panel is beside the map"
+        onKeyDown={walk}
+      >
+        {panels.map((panel, at) => {
+          const chosen = panel.name === showing;
+          return (
+            <button
+              key={panel.name}
+              id={theLabelFor(panel.name)}
+              className="panel-switch__label"
+              type="button"
+              role="tab"
+              aria-selected={chosen}
+              aria-controls={THE_PANEL_BESIDE_THE_MAP}
+              tabIndex={chosen ? 0 : -1}
+              data-showing={chosen ? "yes" : "no"}
+              ref={(node) => {
+                labels.current[at] = node;
+              }}
+              onClick={() => onShow(panel.name)}
+            >
+              <span className="panel-switch__word">{panel.label}</span>
+              {panel.mark === undefined ? null : (
+                <span className="panel-switch__mark">{panel.mark}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* **The one visible way to fold the panel away.** `P` did this before and
+          still does, and a key you have to have read the sheet to know about is
+          not a control. It sits at the head of the panel, beside the names,
+          because that is the only place on screen that is about the panel
+          itself. */}
+      <button
+        className="panel-switch__fold"
+        type="button"
+        aria-label="Hide the panel beside the map"
+        aria-expanded={true}
+        aria-controls={THE_PANEL_BESIDE_THE_MAP}
+        onClick={onHide}
+      >
+        <Chevron pointing="right" />
+      </button>
     </div>
   );
 }

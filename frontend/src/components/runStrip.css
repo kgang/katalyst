@@ -1,14 +1,21 @@
 /*
- * The one strip at the foot of a map that says what is happening to it.
+ * What the run is doing, in the band at the foot of a map.
  *
  * One row, three parts, and nothing in it moves: the state as one word in the
- * mono box the line above it already uses, the run's own sentence, and — only
+ * mono box the quiet row below it also uses, the run's own sentence, and — only
  * while a live run is open — how long it has been since anything arrived.
  *
  * Under that row, on a live run only, two quiet lines saying what the model is
  * doing this second. **Their room is held open whether or not there is anything
  * in them**, and each is exactly one line high whatever arrives, so the strip is
  * one height for the whole of a live run and the map above it never jumps.
+ *
+ * **The box, the hairline and the background are not here any more**
+ * *(2026-09-22)*. This used to be one of three bars stacked at the foot, each
+ * with its own rule and its own raised surface — the shape Kent read as "the
+ * triple nested bottom bar … somewhat garish". The band owns all of that now
+ * (`styles/app.css`, `.map-foot`); what is left here is how the run's own row
+ * reads inside it.
  *
  * **There is no animation in this file and there will not be one.** The seconds
  * change because a number in JavaScript changed, which spends no duration here
@@ -24,10 +31,7 @@
   flex-direction: column;
   gap: var(--space-hair);
   margin: 0;
-  padding: var(--space-1) var(--space-3);
-  border-top: 1px solid var(--hairline);
-  background: var(--surface-raised);
-  font-size: var(--text-sm);
+  min-width: 0;
   color: var(--text);
 }
 
