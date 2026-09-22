@@ -1,42 +1,32 @@
 /*
- * The belief chip: three lines in a narrow column, and a shelf behind it.
+ * The belief chip: two lines in a narrow column.
+ *
+ * **It was three lines and a shelf** *(until 2026-09-22, Kent's R48)*. The third
+ * line was the range under the number and the shelf explained where the range
+ * came from; the range is cut from this product, so both are gone and the chip
+ * is the owner and the number.
  *
  * Every value here is a token from `tokens.css`. There are three type sizes in
  * this product and no fourth one, so nothing below shrinks type to make text
- * fit — where the words do not fit, fewer words are shown and the rest goes on
- * the shelf.
+ * fit — where the words do not fit, fewer words are shown and the rest is read
+ * in the panel beside the map.
  */
 
-/* The chip is a column with a shelf behind it. It is deliberately not
- * positioned, so that the shelf below measures itself against the whole tile
- * rather than against this one narrow column, and all three chips open the same
- * shelf in the same place. */
 .belief-chip {
   display: block;
   min-width: 0;
-  position: static;
 }
 
-/* The face: the three lines you can see, and the thing you can reach. A button
- * because it really is one — pressing it pins the note open — and because a
- * thing the keyboard can land on should be a thing the keyboard knows about. It
- * looks nothing like a button: no fill, no border, no radius. */
+/* The face: the two lines you can see. Not a control — there is nothing behind
+ * a chip to open — so it is a plain box named by what it reads. */
 .belief-chip__face {
   display: grid;
   width: 100%;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto;
   align-content: start;
   justify-items: start;
   row-gap: var(--space-hair);
   min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  font-family: inherit;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
 }
 
 /* Whose number this is. Never abbreviated: the three owners are the whole
@@ -78,9 +68,8 @@
 /* A reading that is words rather than a number wraps to a second line instead of
  * being cut off. *no engine yet* does not fit in a third of a tile on one line,
  * and half of it — *no engi…* — is not an absence with a reason, it is a
- * mistake. The second line costs nothing: a chip showing words has no range
- * under it, so the line it would have taken is free. Two lines is the ceiling,
- * because the tile's height was worked out from exactly this. */
+ * mistake. Two lines is the ceiling, because the tile's height was worked out
+ * from exactly this. */
 .belief-chip[data-reading="words"] .belief-chip__figure {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -89,14 +78,6 @@
   white-space: normal;
   overflow: hidden;
   line-height: 1.2;
-}
-
-/* The line under the number holds its height so that three chips side by side
- * keep the same baselines — but only when it has something to hold. An empty one
- * under a two-line absence would push the tile taller than the box the map
- * reserved for it. */
-.belief-chip__under:empty {
-  display: none;
 }
 
 .belief-chip[data-reading="number"] .belief-chip__reading {
@@ -140,70 +121,16 @@
   background: var(--p-4);
 }
 
-/* The range under the number — never omitted — or, on the reader's own empty
- * slot, the invitation to fill it. */
-.belief-chip__under {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* Holds its height when there is nothing to say, so three chips side by side
-   * keep the same baselines. */
-  min-height: 1.2em;
-}
-
-.belief-chip[data-reading="number"] .belief-chip__under {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---- The shelf --------------------------------------------------------- *
- * What the chip says about itself when you look at it: its label, then one
- * sentence. It slides out of the bottom edge of the tile, on the tile's own
- * surface, and it is not a pop-up — there is nothing to dismiss, no overlay
- * behind it, and nothing underneath it stops working while it is open. Look
- * away, or move the keyboard on, and it closes.
- *
- * It is positioned against the tile rather than against the chip, so all three
- * chips open the same shelf in the same place and the eye does not have to
- * chase it. */
-
-.belief-chip__note {
+/* Said out loud but not drawn: why a slot has no number. The chip has no room
+ * for a sentence, and a reader who hears the map rather than seeing it has no
+ * panel to look across to. */
+.belief-chip__hidden {
   position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  display: grid;
-  row-gap: var(--space-hair);
-  padding: var(--space-1) var(--space-2) var(--space-2);
-  background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-  border-top: none;
-  border-radius: 0 0 var(--radius) var(--radius);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--duration-fast) ease-out;
-  pointer-events: none;
-}
-
-.belief-chip:hover .belief-chip__note,
-.belief-chip:focus-within .belief-chip__note,
-.belief-chip__note[data-pinned="yes"] {
-  opacity: 1;
-  visibility: visible;
-}
-
-.belief-chip__note-label {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  color: var(--text);
-  text-wrap: pretty;
-}
-
-.belief-chip__note-sentence {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  text-wrap: pretty;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

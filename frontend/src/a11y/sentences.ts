@@ -22,7 +22,7 @@
 
 import { toTwoFigures } from "../components/BeliefChip";
 import { asQuoted, toDay } from "../graph/diff/days";
-import type { ClaimView, Known, LinkView, Ranged, WorldView } from "../world";
+import type { ClaimView, Known, Likelihood, LinkView, WorldView } from "../world";
 import { NOT_ON_THIS_MAP } from "../world/naming";
 
 /** One claim in the outline, with the claims it causes under it. */
@@ -103,8 +103,8 @@ function movedInWords(claim: ClaimView): string {
   );
 }
 
-/** One belief, read out: `Model .46, range .30 to .63`, or the reason there is none. */
-function beliefInWords(owner: string, slot: Known<Ranged>): string {
+/** One belief, read out: `Model .46`, or the reason there is none. */
+function beliefInWords(owner: string, slot: Known<Likelihood>): string {
   if (slot.reading === undefined) {
     const { kind, words, reason } = slot.absence;
     // "no market" carries its own reason and is short enough to read whole; it
@@ -114,8 +114,7 @@ function beliefInWords(owner: string, slot: Known<Ranged>): string {
     }
     return `${owner} — ${ABSENCE_CLAUSE[kind] ?? reason}`;
   }
-  const { p, lo, hi } = slot.reading;
-  return `${owner} ${toTwoFigures(p)}, range ${toTwoFigures(lo)} to ${toTwoFigures(hi)}`;
+  return `${owner} ${toTwoFigures(slot.reading.p)}`;
 }
 
 /** Make the first letter of a clause a capital, and leave every other letter alone. */

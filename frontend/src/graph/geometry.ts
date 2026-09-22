@@ -64,11 +64,29 @@ const HEADER = 21;
 const CLAIM_LINE = 20.25;
 
 /**
- * The three belief chips: owner, number and range, with the rule above them.
+ * The belief chips: owner and number, with the rule above them.
  *
- * Measured at 69 in the browser, which is two pixels more than the 67 written
- * here before the chips grew their brightness bars. A row that is two pixels
- * short takes them off the bottom of the tile.
+ * **It is still 69, and the range line is not why** *(re-measured 2026-09-22,
+ * after R48 took the range off the chip)*. The rail has to hold the tallest chip
+ * a tile can ever draw, because the height is reserved before anything is drawn
+ * and the layout cannot know what a chip will end up reading. That tallest chip
+ * is not a number: it is a reading that is **words** in a narrow column, wrapping
+ * to the two lines the stylesheet allows it.
+ *
+ * Measured in the browser on the stored example, at 1600 × 1000, with the real
+ * stylesheet:
+ *
+ * | What the row holds | What it comes to |
+ * |---|---|
+ * | one chip, a number | 52 |
+ * | three chips, all numbers | 52 |
+ * | two chips, one reading *Supposed · Oct 1* | **69** |
+ * | three chips, one reading *the ask did not come back* | **69** |
+ *
+ * So the constant stays where it was, and a tile whose chips all read one line
+ * carries seventeen pixels it does not use. Shrinking it to 52 would take the
+ * second line off a supposed claim on the stored example's own strike branch —
+ * the one tile the diff view is there to show.
  */
 const BELIEF_RAIL = 69;
 

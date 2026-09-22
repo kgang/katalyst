@@ -28,7 +28,7 @@ import { Tile } from "../Tile";
 function draw(claim: ClaimView) {
   return render(
     <ReactFlowProvider>
-      <Tile claim={claim} isHypothesis={false} versions={2000} />
+      <Tile claim={claim} isHypothesis={false} />
     </ReactFlowProvider>,
   );
 }
@@ -111,7 +111,7 @@ const MOVED: ClaimView = aClaim({
   claim: 'A Polymarket contract "Brent below $70 on 2026-10-31" resolves YES.',
   diff: "shifted",
   beliefs: {
-    model: { reading: { p: 0.414, lo: 0.284, hi: 0.553 } },
+    model: { reading: { p: 0.414 } },
     user: { absence: absence("not_said", "You have not said.") },
     market: {
       absence: absence("no_market", "no venue quotes this claim"),
@@ -122,7 +122,6 @@ const MOVED: ClaimView = aClaim({
     to: 0.414,
     way: "down",
     by: -0.0421,
-    sameDirection: { reading: 0.9663 },
   },
   badges: [
     {
@@ -229,7 +228,7 @@ describe("what a tile draws, and what it never draws", () => {
       id: "N1",
       kind: "not_tradeable",
       beliefs: {
-        model: { reading: { p: 0.3, lo: 0.16, hi: 0.45 } },
+        model: { reading: { p: 0.3 } },
         user: { absence: absence("not_said", "You have not said.") },
         market: {
           absence: absence("no_market", "No venue quotes whether talks resume."),

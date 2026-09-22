@@ -23,11 +23,9 @@ Every number slot in this stack is optional, because the engine that computes th
 `BeliefView` is defined here, because the belief chip is the only component that takes one:
 
 ```ts
-/** One likelihood with its range and a name on it. Full precision; rounded once, at display. */
+/** One likelihood with a name on it. Full precision; rounded once, at display. */
 interface BeliefView {
   p: number;
-  lo: number;
-  hi: number;
   owner: "model" | "user" | "market";
 }
 ```
@@ -91,7 +89,7 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 | # | Region | How it is drawn |
 |---|---|---|
 | 1 | **The claim** | `--font-interface`, `--text-md` (15 px), `--weight-medium`, `--text`. Wraps to at most **three lines**, then ellipsized — **never truncated mid-word**. The full sentence lives in the Inspector |
-| 2 | **The belief chips** — the model's, and the reader's and a venue's where they hold a number *(amended 2026-09-21)* | A row of columns in that order, sharing the row's width between however many are drawn. Each chip is three stacked lines: owner, number, range. Numbers and ranges in `--font-mono` with fixed-width digits, `--text-sm`; the number `--weight-medium` in `--text`, the owner and the range `--weight-regular` in `--text-muted`. On a `not_tradeable` ending the tile prints that claim's own stored reason in its foot — part of this region, not a seventh thing |
+| 2 | **The belief chips** — the model's, and the reader's and a venue's where they hold a number *(amended 2026-09-21; the range dropped 2026-09-22, R48)* | A row of columns in that order, sharing the row's width between however many are drawn. Each chip is **two stacked lines: owner, then number**. Numbers in `--font-mono` with fixed-width digits, `--text-sm`, `--weight-medium` in `--text`; the owner `--weight-regular` in `--text-muted`. On a `not_tradeable` ending the tile prints that claim's own stored reason in its foot — part of this region, not a seventh thing |
 | 3 | **Evidence clippings** | At most two. Each is a **letter monogram** plus one line: monogram in `--font-mono`, `--weight-semibold`, `--text-muted`; line in `--font-interface`, `--text-sm`, `--text-muted`, one line, ellipsized. A leading `+` or `−` says whether the item supports the claim or cuts against it |
 | 4 | **The resolve-by date** | `--font-mono`, `--text-sm`, `--text-muted`. The day we will know |
 | 5 | **A kind silhouette** | The tile's own outline, four of them. **Shape carries the kind, always and on its own.** At the two ends of a map — the hypothesis and a tradeable outcome — a hue is drawn on that outline and on the kind's own word as well, so the eye lands there first; never the hue by itself *(amended 2026-09-22)* |
@@ -120,9 +118,9 @@ The badge words are copied from the **Interface words** table in [`../vocabulary
 
 The three voices are stored and drawn separately and **never averaged** — INV-11, the product rule that says no code path merges them. If the model says `.61` and the market says `.52`, the gap is the thing worth trading, and `.565` is a number nobody holds.
 
-**The chip drawn below belongs to no claim on this map.** `.61 (.45–.74)` is the rounding example the browser's own chip test is written against, and the market beside it is made up to go with it. M1, the Polymarket contract, is the real tradeable ending on this map and reads its own numbers at B2 below, where the gap between the model and the venue is a good deal narrower than this one. An illustration that borrowed M1's quote read as M1 and contradicted B2, which is how it was found.
+**The chip drawn below belongs to no claim on this map.** `.61` is the rounding example the browser's own chip test is written against, and the market beside it is made up to go with it. M1, the Polymarket contract, is the real tradeable ending on this map and reads its own numbers at B2 below, where the gap between the model and the venue is a good deal narrower than this one. An illustration that borrowed M1's quote read as M1 and contradicted B2, which is how it was found.
 
-**A chip is three stacked lines**: the owner, then the number, then the range beneath it.
+**A chip is two stacked lines**: the owner, then the number *(amended 2026-09-22, Kent's R48)*. It was three, and the third was the range under the number.
 
 ```
  a venue quotes this claim, and           nobody quotes it and nothing
@@ -131,30 +129,31 @@ The three voices are stored and drawn separately and **never averaged** — INV-
  ┌──────────────────────────────┐         ┌──────────────────────────────┐
  │ model         market         │         │ model                        │
  │ .61           .52            │         │ .61                          │
- │ .45–.74       .49–.55        │         │ .45–.74                      │
  └──────────────────────────────┘         └──────────────────────────────┘
 ```
 
-Stacked, because three numbers and three ranges strung along one line of a 280-pixel tile is a row of digits nobody parses. The one-line form `.61 (.45–.74)` is still the canonical spelling and is used everywhere the chip is not: in prose, in the outline view, and as the chip's own accessible name, so a screen reader hears one phrase rather than three fragments.
+Stacked rather than strung along one line, because three owners and three numbers on a 280-pixel tile is a row of words nobody parses. **A chip is named by what it reads** — the owner, then the number — so a screen reader hears exactly what is on the glass and the two cannot drift apart. There is no longer a one-line spelling different from the stacked one: the chip is the whole reading.
 
 #### The same chip, seen from far away *(added 2026-09-22)*
 
-Zoomed out past the threshold [`layout-and-zoom.md`](layout-and-zoom.md) owns, a tile drops its heading, its date and its foot, and sets everything it keeps in the largest of the three type sizes — 22 pixels, which at the furthest the map zooms out is 11 pixels on the reader's screen and may not be given up. Out there a belief stops being a stack of three and becomes **one line, read the way it would be said**: the owner, the number, the range.
+Zoomed out past the threshold [`layout-and-zoom.md`](layout-and-zoom.md) owns, a tile drops its heading, its date and its foot, and sets everything it keeps in the largest of the three type sizes — 22 pixels, which at the furthest the map zooms out is 11 pixels on the reader's screen and may not be given up. Out there a belief stops being a stack and becomes **one line, read the way it would be said**: the owner, then the number.
 
-**A range is never dropped and never cut off, at any zoom — so out here it is allowed a line of its own.** At this size the longest line the engine can print does not fit: the owner *market*, a three-figure likelihood and a three-figure range come to about 281 pixels against the 256 a belief row has, and 244 on the two tiles whose outline cuts into one side. So the line wraps, and only when it has to — the range drops under the number, lined up with the number rather than with the owner, so it reads as the rest of that belief and not as a belief of its own.
+**The third thing on that line has gone** *(amended 2026-09-22, Kent's R48)*. It was the range, and it was what made the line overrun: the owner *market*, a three-figure likelihood and a three-figure range came to about 281 pixels against the 256 a belief row has, and 244 on the two tiles whose outline cuts into one side, so the range dropped under the number. An owner and a number fit on one line on every tile this product draws.
+
+**A line may still wrap, and one kind still does.** A reading that is **words** rather than a number — *no engine yet*, *the ask did not come back*, *Supposed · Oct 2* — is longer than any likelihood, and out here it takes a second line. Nothing is dropped and nothing is cut off: the wrapped line starts where the number starts rather than where the owner does, so it reads as the rest of that belief and not as a belief of its own.
 
 ```
  the line fits                             the line does not fit
 
  ┌──────────────────────────────┐         ┌──────────────────────────────┐
- │ model   .31  .16–.48         │         │ model   .074                 │
- │                              │         │         .029–.13             │
+ │ model   .31                  │         │ model   Supposed             │
+ │                              │         │         · Oct 2              │
  └──────────────────────────────┘         └──────────────────────────────┘
 ```
 
-**The tile does not grow to hold the second line.** Its box is reserved before anything is drawn, from what the near form needs, and the map measures nothing — so the room comes from inside the box the near form already had: out here there is no heading, the claim and the beliefs sit one step apart rather than two, and the belief lines are set a little tighter. **Where that does not stretch:** a tile reserved the smallest box that draws *two* beliefs whose ranges *both* need a second line. Neither map this product ships asks for that; the day one does, the claim's second line is what pays for it.
+**The tile does not grow to hold the second line.** Its box is reserved before anything is drawn, from what the near form needs, and the map measures nothing — so the room comes from inside the box the near form already had: out here there is no heading, the claim and the beliefs sit one step apart rather than two, and the belief lines are set a little tighter. **Where that does not stretch:** a tile reserved the smallest box that draws *two* beliefs that *both* read words. Neither map this product ships asks for that; the day one does, the claim's second line is what pays for it.
 
-- **Test:** `frontend/e2e/farTiles.spec.ts` › `test_a_tile_seen_from_far_away_prints_every_belief_line_whole` — a browser test, because whether a line fits is a fact about laid-out boxes and the tests with no layout all passed while two ranges ran off their tiles (2026-09-22). It reads the stored example both as it was written and with its branch open, because the branch is where the engine prints three-figure numbers.
+- **Test:** `frontend/e2e/farTiles.spec.ts` › `test_a_tile_seen_from_far_away_prints_every_belief_line_whole` — a browser test, because whether a line fits is a fact about laid-out boxes and the tests with no layout all passed while two lines ran off their tiles (2026-09-22). It reads the stored example both as it was written and with its branch open, because the branch is where a claim stands on the reader's own say-so and its chip prints a word.
 - **Also:** `frontend/src/components/__tests__/tile.test.tsx` › `test_the_far_away_form_sets_every_word_in_the_largest_size` and `test_the_far_away_form_puts_no_part_of_a_belief_out_of_sight` — the two wrong ways to make a line fit, ruled out in the stylesheet itself.
 
 #### A column with no number in it is not drawn *(amended 2026-09-21)*
@@ -166,42 +165,36 @@ It was counted rather than guessed, on the maps a reviewer can actually open. On
 Three facts make the rule cheap and exact:
 
 * **The model's column is always drawn**, because on a map that is still being built all three slots are empty and that column is the one that says so — *no engine yet*, with its reason. It is also the one voice every claim on every map has.
-* **Collapsing a column cannot move the map.** The belief rail is a constant in `geometry.ts` — the same reserved height whatever the chips hold — and a tile's width is written on its own box. So a tile does not change size when a column is not drawn, its ports do not move, and a number arriving later widens the survivors and re-lays out nothing.
+* **Collapsing a column cannot move the map.** The belief rail is a constant in `geometry.ts` — the same reserved height whatever the chips hold — and a tile's width is written on its own box. So a tile does not change size when a column is not drawn, its ports do not move, and a number arriving later widens the survivors and re-lays out nothing. **The constant is 69 pixels and stayed 69 when the range went** *(re-measured 2026-09-22, R48)*: the rail has to hold the tallest chip a tile can draw, and that is a chip whose reading is words wrapping to two lines, not a chip with a range. A row of one-line readings comes to 52, so a tile whose chips all read one line now carries seventeen pixels it does not use.
 * **The `not_tradeable` finding is already outside the chips.** A dead end's own stored reason is printed in the tile's foot and has its own reserved height, so it survives the market chip going away and the rule needs no special case for that kind.
 
 **Where the absences go: nowhere new.** The panel beside the map draws all three rows whatever they hold and prints each absence's own reason in full — *no venue quotes this claim* — which is what [INV-workbench.53](inspector.md) already requires and where a reason has room to be a sentence. No word changes; the tile stops repeating them down a column.
 
-**Two significant figures on the number and on both ends of the range, always.** Never `.6134`, and never a number with its range dropped. Two consequences worth naming here because they change what a reader sees: `.06` prints **`.060`**, because two figures means two figures; and a chip never prints `1.0` or `.0` — it prints **`>.99`** and **`<.01`**, because a chip that prints certainty has said something no elicited number earns. The rounding table and its awkward cases live in [`keyboard-and-access.md`](keyboard-and-access.md) B6, which owns the rule for the whole part.
+**Two significant figures, always, on the one number a chip shows** *(amended 2026-09-22, R48)*. Never `.6134`. Two consequences worth naming here because they change what a reader sees: `.06` prints **`.060`**, because two figures means two figures; and a chip never prints `1.0` or `.0` — it prints **`>.99`** and **`<.01`**, because a chip that prints certainty has said something no elicited number earns. The rounding table and its awkward cases live in [`keyboard-and-access.md`](keyboard-and-access.md) B6, which owns the rule for the whole part.
 
-#### What the model chip says about its own range
+#### What a chip says about itself: nothing, because there is nothing left to say *(rewritten 2026-09-22, R48)*
 
-The range means *how sure we are of the number*, not how much the world can move — the second is already inside the likelihood, and a reader who confuses them reads a wide band as a volatile event. Which sentence says so depends on **whether anything actually computed this number**, and the world says: `WorldView` carries an optional `versions` — how many versions of the map the engine ran — defined in [`diff-view.md`](diff-view.md).
+**This section used to be the longest in the chapter and is now three paragraphs**, because the thing it explained is gone. Kent, after walking the app with a key: *"The 2,000 runs thing is confusing. Can we cut that from the scope of this project completely for the sake of defending its design…"*. He chose the full cut — **one likelihood per claim, no range anywhere, ever** — and the screen half landed here.
 
-**`versions` present — the number was computed.** The label and the hover are decision record 0014's, word for word:
+What went: the range under every number; the shelf a chip slid out of the bottom of its tile when you looked at it; and the pair of sentences that shelf chose between — *model interval, uncalibrated · how sure we are of `.35` — not how much the world can move*, with *"Across 2 000 versions of this map… the answer landed between .20 and .49 eight times in ten"* under it, against *stated range · not computed* over a number nothing had worked through the map. Both were true sentences about a thing this product no longer has, and the words *interval*, *uncalibrated* and *versions* leave the screen with them.
 
-> **model interval, uncalibrated** · how sure we are of `.35` — not how much the world can move
+**A chip's accessible name is what it reads**: the owner and the number. It is not written onto the element any more — the two lines say it themselves, so the glass and the screen reader cannot drift apart — and the chip is no longer a control, because there is nothing behind it to open.
 
-> "Across 2 000 versions of this map — each one a set of numbers this model would have stood behind — the answer landed between .20 and .49 eight times in ten. Nobody has checked whether that 8-in-10 holds up; no claim on this map has resolved yet."
+**The engine half is another session's.** Until it lands the wire still carries a `lo` and a `hi` beside every `p`, and a count of versions on the world; `frontend/src/world/fromTheServer.ts` and `frontend/src/world/apiSource.ts` drop them on the way in, and nothing on this side of the wire has anywhere to put them. What the world keeps is one flag — whether the engine worked these likelihoods out — which is the only question any surface ever asked that count.
 
-Only the numerals are substituted — `2 000` is `versions`, and `.35`, `.20` and `.49` are that chip's own `p`, `lo` and `hi` under the rounding rule. Every other word is fixed. Two things that sentence does on purpose: it says *eight times in ten* rather than naming a percentile, and its last clause admits that nothing is calibrated. Neither is optional.
-
-**`versions` absent — nothing computed this number.** The label and the hover are the *stated* pair, the same two sentences the Inspector prints under a prior:
-
-> **stated range · not computed**
-
-> "This range is stated, not computed — it says how sure the elicitation was. Nothing has worked this number through the map yet."
-
-**In this stack every chip shows the stated sentence**, because nothing here computes: the numbers come from the stored example, whose own comments call them illustrative. The day the engine's world route is switched on, `versions` arrives on the world and the computed sentence appears **with no change to this component** — which is the whole reason the choice is made from data rather than from a flag somebody remembers to set.
+- **Test:** `frontend/src/graph/__tests__/noRange.test.tsx` › `test_no_tile_draws_a_range`, `test_nothing_on_screen_mentions_versions_or_worlds` and `test_no_string_in_the_product_mentions_versions_or_worlds` — three walks, over the curated map, over the committed recording played back through the app's own reader, and over every sentence in the product's own source.
 
 **The states of a chip on a tile** *(amended 2026-09-21)*. An empty `user` slot and an empty `market` slot are no longer among them — those columns are not drawn, and the words and the reason for each are read in the panel beside the map:
 
 | State | What the chip shows | Where its reason is |
 |---|---|---|
-| A number | the three stacked lines, with a small bar behind the number painted from the likelihood ramp | — |
-| No number yet, on the model's column — `kind: "no_engine"` | **no engine yet** | Beside the words, on the tile |
-| A value an edit fixed | the word and the date — *Supposed · Oct 1* — and no likelihood at all | The hover shelf and the accessible name |
+| A number | the two stacked lines, with a small bar behind the number painted from the likelihood ramp | — |
+| No number yet, on the model's column — `kind: "no_engine"` | **no engine yet** | The panel beside the map, and the chip's own accessible name |
+| A value an edit fixed | the word and the date — *Supposed · Oct 1* — and no likelihood at all | The panel beside the map, and the chip's own accessible name |
 
-The five kinds of absence in [`../vocabulary.md`](../vocabulary.md) are unchanged and so are their words: what changed is where they are read. The **reader's own slot loses nothing a reader could use** — its em dash carried an *add yours* that was a span inside the chip's own button and opened nothing, an invitation with no way in.
+*(The rows read **two** stacked lines and no longer name a hover shelf: amended 2026-09-22, R48.)*
+
+The five kinds of absence in [`../vocabulary.md`](../vocabulary.md) are unchanged and so are their words: what changed is where they are read. The **reader's own slot loses nothing a reader could use** — its em dash carried an *add yours* that was a span inside the chip's own button and opened nothing, an invitation with no way in. That span shared its line with the range and went with it *(2026-09-22, R48)*.
 
 **Why "no market" is two words and no more, where it is shown.** The tile was never the place for the explanation: on most maps most claims have no contract, and a sentence repeated down a column is noise that crowds out the claims. The reason is written once in [`../vocabulary.md`](../vocabulary.md) rather than composed per tile, and it is chosen by the claim's `kind`:
 
@@ -341,10 +334,9 @@ H draws at 280 px with its top-left corner cut. The claim, *"The Strait of Hormu
 ```
 model          user           market
 .35            .55            no market
-.22–.50        .40–.70
 ```
 
-The market chip reads **no market** and nothing else; hovering it gives the reason for a hypothesis, *"no venue quotes this claim"*. Both numbered chips carry the **stated** label — *stated range · not computed* — because this world has no `versions`, and nothing has worked either number through the map.
+The market chip reads **no market** and nothing else; the panel beside the map gives the reason for a hypothesis, *"no venue quotes this claim"*. Neither numbered chip says anything else about itself: the range under each and the label that explained it went on 2026-09-22 (R48).
 
 Two evidence clippings, each a monogram and a line: **B** `+ An Omani-mediated round is reported, with both sides attending.` and **L** `− Three tankers remain held and no release has been announced.` Then the resolve-by date, 1 November 2026 — the day we will know. No badges, because nothing has been done to this tile yet.
 
@@ -352,7 +344,7 @@ The chips are the whole argument in one row: the model says `.35`, the user said
 
 ### B2 — a tradeable ending, and the edge
 
-M1 draws with a ticket-stub bottom edge. Read from the fixture, as this screenshot reads it, its model chip is the claim's stated prior — `.40` over `.28–.55` — and its market chip is the venue's quote, `.48` over `.45–.52`; the user slot is an em dash inviting a number. Eight points apart.
+M1 draws with a ticket-stub bottom edge. Read from the fixture, as this screenshot reads it, its model chip is the claim's stated prior — `.40` — and its market chip is the venue's quote, `.48`; the user column is not drawn, because it holds no number. Eight points apart. *(The ranges this passage used to print under both numbers went on 2026-09-22, R48.)*
 
 **Say which source a number came from before calling the gap an edge.** The model's half is a number nothing has worked through the map yet, so the gap is not yet the edge somebody would trade. Run the engine over this map and the model chip becomes the reading on the line named `M1 · base · reading` in [`../../docs/worked-numbers.txt`](../../docs/worked-numbers.txt) — the one generated file that owns every computed number this example quotes — which sits closer to the market's quote than the prior does. [`inspector.md`](inspector.md) B1 says the same thing at more length; the two chapters are describing one tile and must agree.
 
@@ -426,21 +418,21 @@ For every tile: the rendered regions are exactly those in the six-things table, 
 
 - **Test:** `frontend/src/components/__tests__/tile.test.tsx` › `test_tile_draws_the_six_regions_and_no_seventh`.
 
-### INV-workbench.4 — Two significant figures, and the range, always *(refines INV-7)*
+### INV-workbench.4 — Two significant figures, one number, and never a range *(refines INV-7; amended 2026-09-22, R48)*
 
-For every belief rendered in a chip: the likelihood and both ends of its range show at most two significant figures; the range is present; and the chip never prints `1.0` or `.0` — those print as `>.99` and `<.01`.
+For every belief rendered in a chip: the likelihood shows at most two significant figures; the chip never prints `1.0` or `.0` — those print as `>.99` and `<.01`; and **no surface prints a range at all**, on a tile, in the panel, on the change list, in the sentence under the map or in a note.
 
-- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_chip_never_shows_more_than_two_significant_figures`, `test_chip_never_omits_the_range` and `test_chip_never_prints_a_certainty`. This is decision record 0005's promised frontend rendering test, and it is the one test that holds the honesty requirement up — NFR-1: *every belief renders at two significant figures with its interval, never `.347`.*
-- **Also:** visual review checklist `VR4` — is any number on screen showing more than two significant figures, or missing its range?
+- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_chip_never_shows_more_than_two_significant_figures`, `test_no_chip_draws_a_range` and `test_chip_never_prints_a_certainty`, and `frontend/src/graph/__tests__/noRange.test.tsx` for the whole-screen and whole-source walks. This is decision record 0005's promised frontend rendering test, and it is the one test that holds the honesty requirement up. **It no longer satisfies NFR-1 as written** — *every belief renders at two significant figures with its interval* — and the requirements document's line is amended in the same change.
+- **Also:** visual review checklist `VR4` — is any number on screen showing more than two significant figures, or a range anywhere at all?
 
 ### INV-workbench.5 — Every number says where it came from, and every absence says why
 
 Two statements, one subject: a chip never leaves a reader guessing what it is looking at.
 
 - For every chip whose number is **absent**: the chip renders that absence's words, or its dash-with-invitation, **and** a non-empty reason, and renders no digit at all. The reason counts whether it is printed on the tile or carried as the element's own accessible name — and for every absence but a `not_tradeable` ending's, the accessible name is where it lives. There is no input for which the chip renders blank, `0`, or a stand-in value.
-- For every **model chip that has a number**: it renders the computed label and hover sentence exactly when the world carries `versions`, and the stated label and hover sentence exactly when it does not. There is no input for which it claims a computation over a number nothing computed.
+- For every **model chip that has a number**: it renders the number and its owner and says nothing else about itself. *(The second half of this invariant — the computed label against the stated one, chosen by whether the world carried a count of versions — went with the range on 2026-09-22, R48. There is no label to get wrong.)*
 
-- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_every_absence_renders_words_and_a_reason` and `test_a_computed_chip_says_it_is_uncalibrated`.
+- **Test:** `frontend/src/components/__tests__/beliefChip.test.tsx` › `test_every_absence_renders_words_and_a_reason` and `test_no_chip_draws_a_range`.
 - **Also:** visual review checklist `VR5` — is there a number nobody computed, an empty slot filled in rather than left as an absence with a reason, or a number whose origin cannot be named in one click?
 
 ### INV-workbench.6 — Three voices, never merged, and a column with no number is not drawn *(refines INV-11; amended 2026-09-21)*
@@ -515,7 +507,7 @@ For every module under `frontend/src/graph/` and for the tile and chip component
 *Raised 2026-09-17.*
 
 1. **The model chip's hover sentence claimed an arithmetic that had not run.** Record 0014's sentence is word for word what a *computed* number may say about itself, and in this stack every number comes from the stored example, which computed nothing.
-   **Decided 2026-09-17 (Kent, K3):** two sentences, chosen by whether the world carries `versions`. The body of this chapter now gives both, word for word, and says that in this stack every chip shows the stated one. No flag, no per-tile copy, and nothing to remember to switch when the engine lands.
+   **Decided 2026-09-17 (Kent, K3):** two sentences, chosen by whether the world carries `versions`. **Overtaken 2026-09-22 (Kent, R48):** both sentences are about a range, there is no range, and the chip says nothing about itself at all. The question is closed rather than answered.
 2. **Two significant figures for an awkward number.** The table is in [`keyboard-and-access.md`](keyboard-and-access.md) B6; `.995` and `.06` are still open there.
 3. **The "no market" reason when the world carries none.**
    **Decided 2026-09-17 (Kent, K7):** the tile says **no market** and nothing else; the reason lives on the hover, in the accessible name and in the Inspector, is written once in [`../vocabulary.md`](../vocabulary.md), and is chosen by the claim's `kind` — except on a `not_tradeable` ending, which keeps its own stored reason on the tile because that one is a finding. In the body above.
