@@ -181,9 +181,9 @@ def verdict(
         graph: The finished map.
         destination: The claim the person asked whether the story reaches.
         world: The world the numbers are read against — for the map it was built
-            from, the values its edits fixed, its first day, its seed and how many
-            versions of the map it tried. Without it the route is graded
-            structurally and all three numbers are absent rather than invented.
+            from, the values its edits fixed, its first day and its seed. Without
+            it the route is graded structurally and all three numbers are absent
+            rather than invented.
         beliefs: **Read by nothing, and it goes when its one caller moves.** This
             door used to be handed every claim's likelihood so it could multiply
             them along the route; decision record 0022 deleted that multiplication.

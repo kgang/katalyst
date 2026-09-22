@@ -20,7 +20,7 @@ number is read out of the committed quote file rather than written down here. So
 each of these tests would survive the engine's numbers all moving tomorrow.
 
 These run at a **small budget** unless the test is about the budget itself: the
-shipped run is two thousand versions of the map, and a card works a verdict out
+shipped run is one likelihood per claim, and a card works a verdict out
 for every ending that names an instrument. Nothing the routes answer changes with
 the budget, only how steady a number is, and nothing here reads a number for its
 own sake.
@@ -176,6 +176,7 @@ def _claim(
         id=identifier,
         claim=f"The claim called {identifier} comes out true.",
         kind=kind,
+        persistence="event",
         resolution=_resolution(by),
         prior=unsure,
         beliefs=Beliefs(model=unsure),

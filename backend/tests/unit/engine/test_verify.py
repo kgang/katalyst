@@ -46,9 +46,20 @@ addition is not associative.
 """
 
 
+def a_point(chance: float) -> Belief:
+    """One stated likelihood, with no width to it.
+
+    Every belief on this product is a point (decision record 0028): the engine
+    reads a claim's stated `p` and nothing else. `lo` and `hi` are still on the
+    shape, so they are written here as the same number rather than as a spread
+    that would read as though it did something. Dated 2026-09-22.
+    """
+    return Belief(p=chance, lo=chance, hi=chance, owner="model")
+
+
 def a_claim_nobody_reaches(claim: str = SOMEWHERE_ELSE) -> Proposition:
     """Build a claim to stand on the map as a destination."""
-    stated = Belief(p=0.2, lo=0.1, hi=0.4, owner="model")
+    stated = a_point(0.2)
     return Proposition(
         id="WANTED",
         claim=claim,
@@ -69,11 +80,12 @@ def a_claim_nobody_reaches(claim: str = SOMEWHERE_ELSE) -> Proposition:
 
 def a_claim(name: str, *, prior: float = 0.3) -> Proposition:
     """One plain claim, with the chance it comes true on its own and the day it is judged."""
-    stated = Belief(p=prior, lo=max(0.0, prior - 0.1), hi=min(1.0, prior + 0.1), owner="model")
+    stated = a_point(prior)
     return Proposition(
         id=name,
         claim=f"The claim written down under the name {name}.",
         kind="event",
+        persistence="event",
         resolution=Resolution(
             criteria="A check two readers of it would agree on.",
             source="The publication that would carry it.",
@@ -116,20 +128,12 @@ def a_map(name: str, claims: tuple[str, ...], arrows: tuple[tuple[str, str], ...
 
 
 def a_world(graph: Graph) -> World:
-    """Work a map through the exact core, at one version of it.
+    """Work a map through the exact core.
 
-    One version because decision record 0022's three numbers carry no range of
-    their own: a claim has one likelihood, and this is the map worked through once.
+    There is one engine and one likelihood per claim (decision records 0016 and
+    0028), so this is the map worked through once, with nothing to choose.
     """
-    return propagate(
-        graph,
-        (),
-        as_of=DAY_ZERO,
-        seed=SEED,
-        versions=1,
-        # The flip makes this the default.
-        engine="by_deadline",
-    )
+    return propagate(graph, (), as_of=DAY_ZERO, seed=SEED)
 
 
 def supposing(graph: Graph, *, value: bool) -> World:
@@ -149,15 +153,7 @@ def supposing(graph: Graph, *, value: bool) -> World:
     )
     assert not isinstance(folded, list), folded
     supposed, fixed = folded
-    return propagate(
-        supposed,
-        fixed,
-        as_of=DAY_ZERO,
-        seed=SEED,
-        versions=1,
-        # The flip makes this the default.
-        engine="by_deadline",
-    )
+    return propagate(supposed, fixed, as_of=DAY_ZERO, seed=SEED)
 
 
 A_CHAIN = a_map("chain", ("H", "A", "D"), (("H", "A"), ("A", "D")))
