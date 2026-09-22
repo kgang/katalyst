@@ -1952,3 +1952,13 @@ Checked 184 files in 75ms. No fixes applied.
 **What is deliberately not here.** The map does not re-frame when the panel folds: `Canvas` re-frames on a layout, not on a resize, and the only lever reachable from these files would re-frame a growing map on every claim. The collapsed state is not remembered between screens or sessions. The stored map's provenance sentence stays at the foot rather than moving into *Run details* — that is `Inspector.tsx`, another lane's file. And while a live run is saying what the model is doing, the last-key line stands down: the band has two rows and that is the second one.</result>
 <usage><subagent_tokens>344863</subagent_tokens><tool_uses>80</tool_uses><duration_ms>1249007</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>bii52j1j8</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b0c894cc-4ecb-4c15-9930-d321fce0a448/tasks/bii52j1j8.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the frame lane's whole browser suite once, cold, through the queue" completed (exit code 0)</summary>
+</task-notification>
