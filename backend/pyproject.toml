@@ -174,9 +174,4 @@ exclude_also = [
     # with its dots escaped, because these are regular expressions: an unanchored
     # one would take some future block with it and nobody would notice.
     "^\\s*with urllib\\.request\\.urlopen\\(",
-    # Added 2026-09-22, and temporary: the new engine of decision record 0016
-    # lands as shapes first, with bodies that are this one line. Every one is
-    # written before this pull request ends, and this entry goes out with the
-    # last of them.
-    "raise NotImplementedError",
 ]
