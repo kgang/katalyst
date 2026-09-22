@@ -34,6 +34,7 @@ from katalyst.domain.solving import (
     _eliminate,
     _factors,
     all_marginals,
+    all_true,
     elimination_order,
     solve,
 )
@@ -418,3 +419,140 @@ def test_the_versions_are_one_axis_and_each_one_stands_alone() -> None:
             assert numpy.array_equal(one[claim], many[claim][version : version + 1]), (
                 f"{claim}, version {version}"
             )
+
+
+# --- The joint: are all of these true at once? ------------------------------
+
+
+def by_the_chain_rule(
+    forward: Forward, pinned: Mapping[str, Pin], claims: Sequence[str]
+) -> NDArray[numpy.float64]:
+    """The same joint by a different road: each claim's number, then the next given it.
+
+    The chance all of them are true is the chance the first is, times the chance
+    the second is once the first is known true, and so on. Every factor is one call
+    to the solve, which is itself checked against adding the whole joint up — so
+    this is an independent route to the answer rather than a second copy of it.
+
+    A claim an edit already fixed keeps the pin it has: supposing it true and
+    learning it happened are not the same thing, and this must not quietly turn one
+    into the other.
+    """
+    so_far = dict(pinned)
+    answer = numpy.ones(forward.table[forward.order[0]].shape[0])
+    for claim in claims:
+        answer = answer * solve(forward, so_far)[claim]
+        so_far.setdefault(claim, Pin(value=True, kind="observe"))
+    return answer
+
+
+def test_the_joint_of_one_claim_is_that_claims_own_number() -> None:
+    """One claim being true is one claim being true, whichever call asks the question."""
+    for shape, causes in SHAPES.items():
+        forward = a_map(causes)
+        for name, pinned in every_edit(forward.order):
+            each = solve(forward, pinned)
+            for claim in forward.order:
+                numpy.testing.assert_allclose(
+                    all_true(forward, pinned, (claim,)),
+                    each[claim],
+                    rtol=0.0,
+                    atol=ROUND_OFF,
+                    err_msg=f"{shape}, {name}, {claim}",
+                )
+
+
+def test_the_joint_is_what_working_one_claim_at_a_time_says() -> None:
+    """Every shape, every verb: the joint agrees with the chain rule over the same tables.
+
+    The chain rule is the definition of a joint written out claim by claim, and the
+    solve it leans on is the one checked against adding the whole thing up. Two
+    roads to one number, and they must meet.
+    """
+    for shape, causes in SHAPES.items():
+        forward = a_map(causes, versions=2)
+        every = tuple(forward.order)
+        asked = [
+            every,
+            every[::-1],
+            *[(one, other) for one, other in itertools.combinations(every, 2)],
+        ]
+        for name, pinned in every_edit(forward.order):
+            for claims in asked:
+                numpy.testing.assert_allclose(
+                    all_true(forward, pinned, claims),
+                    by_the_chain_rule(forward, pinned, claims),
+                    rtol=0.0,
+                    atol=EXACT,
+                    err_msg=f"{shape}, {name}, {claims}",
+                )
+
+
+def test_the_joint_is_never_more_than_any_one_of_its_claims() -> None:
+    """Adding a claim to the list can only make everything harder, never easier."""
+    for shape, causes in SHAPES.items():
+        forward = a_map(causes)
+        each = solve(forward, {})
+        every = tuple(forward.order)
+        together = all_true(forward, {}, every)
+        for claim in every:
+            assert bool(numpy.all(together <= each[claim] + ROUND_OFF)), f"{shape}, {claim}"
+
+
+def test_claims_that_share_a_cause_are_not_their_numbers_multiplied() -> None:
+    """The whole point: two claims with one cause behind them are not independent.
+
+    On the diamond, two claims are both caused by the same claim. Multiplying their
+    own numbers together says they are independent, and they are not, so the two
+    answers differ — which is exactly why a route's likelihoods are never
+    multiplied along it.
+    """
+    forward = a_map(SHAPES["a diamond"])
+    each = solve(forward, {})
+    together = all_true(forward, {}, ("c1", "c2"))
+    assert not numpy.allclose(together, each["c1"] * each["c2"])
+
+
+def test_two_pieces_that_share_nothing_are_their_numbers_multiplied() -> None:
+    """And the other side of it: claims with nothing between them do multiply.
+
+    The joint is not "never a product". It is "a product only when the claims are
+    really independent", and on a map of two pieces that share no arrow and no
+    cause they are — so the joint and the product agree, and this is the case that
+    would fail if the elimination quietly dropped a factor.
+    """
+    forward = a_map(SHAPES["two pieces that share nothing"])
+    each = solve(forward, {})
+    numpy.testing.assert_allclose(
+        all_true(forward, {}, ("c1", "c3")),
+        each["c1"] * each["c3"],
+        rtol=0.0,
+        atol=EXACT,
+    )
+
+
+def test_asking_whether_nothing_is_true_is_refused_rather_than_answered() -> None:
+    """An empty list has no answer, so it is said out loud instead of guessed at."""
+    forward = a_map(SHAPES["a collider"])
+    with pytest.raises(ValueError, match="at least one claim"):
+        all_true(forward, {}, ())
+
+
+def test_a_joint_under_news_no_world_agrees_with_is_refused_by_name() -> None:
+    """The same refusal the solve makes, for the same reason and naming the same claims."""
+    forward = a_map({"c0": (), "c1": ("c0",)})
+    never = forward.table["c1"].copy()
+    never[..., 1] = 0.0
+    never[..., 0] = 1.0
+    impossible = Forward(
+        order=forward.order,
+        causes=forward.causes,
+        times={},
+        table={**forward.table, "c1": never},
+        shapes={},
+        rates={},
+        added={},
+    )
+    with pytest.raises(ImpossibleObservation) as refused:
+        all_true(impossible, {"c1": Pin(value=True, kind="observe")}, ("c0",))
+    assert refused.value.claims == ("c1",)
