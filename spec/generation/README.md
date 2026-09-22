@@ -30,7 +30,7 @@ Proposal · Rejection · Generation receipt · Grounding · Streaming · Transcr
 |---|---|
 | `proposals.md` | `INV-generation.1` – `.8` |
 | `grounding.md` | `.9` – `.15` |
-| `streaming.md` | `.16` – `.21` |
+| `streaming.md` | `.16` – `.22` |
 | `replay.md` | `.22` – `.27` |
 | `evaluation.md` | `.28` – `.32` |
 
@@ -40,7 +40,7 @@ Proposal · Rejection · Generation receipt · Grounding · Streaming · Transcr
 |---------|--------|-----------|
 | [`proposals.md`](proposals.md) | The proposal schema; one proposal per call; what the model may and may not name; accept and mint, or reject with every reason; the caps and the stop rules; the Verify door and `no_path` | stack 04 — written, `engine/` built |
 | [`grounding.md`](grounding.md) | Search at generation time; how a search result becomes a source; **how provenance is written by us from what was found**; base rates before the inside view | stack 04 — written, `engine/` built; `grounding/` is stack 05's |
-| [`streaming.md`](streaming.md) | The eight events, their order as a grammar, the transport, the three routes, what a client does with an event name it does not know | stack 04 — written, `api/generate.py` built |
+| [`streaming.md`](streaming.md) | The eight events and the one live-only line that is never recorded, their order as a grammar, the transport, the three routes, what a client does with an event name it does not know | stack 04 — written, `api/generate.py` built |
 | [`replay.md`](replay.md) | The recording format; what replay rebuilds and what it recomputes; the two recording commands and why a paid run is never discarded; the one recorded intervention; how refusals are shown honestly; the prompt hash; the `recordings` build job | stack 04 — written, `engine/replay.py` built; one recording committed |
 | [`evaluation.md`](evaluation.md) | The cassette layer; the four eval cases and their structure-only checks; the scorecard's columns and the one measured run they came from; what is deliberately not measured | stack 04 — written, `evals/` and the cassettes built |
 
