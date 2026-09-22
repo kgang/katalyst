@@ -18,9 +18,13 @@
  *    test wrote out. It is also where the browser's structural reading and the
  *    engine's meet: the browser is what puts *untouched* on OPEC's announcement,
  *    and the engine is what leaves its number where it was.
- * 3. **The hypothesis says its supposition was overridden**, word for word:
- *    *Supposed · Oct 1 → Retracted · Oct 2 · by "a confirmed military strike on
- *    Iranian territory"* — read off the world the engine built.
+ * 3. **The supposition the reader made still stands, and the *state* it was
+ *    holding up falls.** The hypothesis reads *Supposed · Oct 1* where its
+ *    likelihood would be, with no second badge behind it: nothing takes a
+ *    supposition back (decision record 0017). What the strike ends is the claim
+ *    that the strait *stays open* — a state, which is the only kind of claim a
+ *    `sustain` arrow can switch off — and that claim's number falls. Both facts
+ *    are read off the world the engine built.
  *
  * **The whole walk is done with the keyboard**, and that is not a flourish: it
  * is the check that the interface is usable without a mouse end to end. Every
@@ -49,24 +53,29 @@ import {
  * arrows between them is the wrong picture of the argument, and a silent one —
  * every tile is there, in its place, and nothing says how they are joined. The
  * suite met exactly that in the wild. On the stored example the only arrow ever
- * checked for was `H->C`, the one an edit is made to, so the other seven could
- * have gone without a word.
+ * checked for was the one an edit is made to, so the other seven could have gone
+ * without a word.
  *
- * By name rather than by count, because a map drawing six of the eight is the
+ * By name rather than by count, because a map drawing eight of the ten is the
  * same fault arriving quieter.
+ *
+ * **Ten, not eight** *(2026-09-22)*. The curated map gained the claim that the
+ * strait *stays open* — a state, sitting between the strait reopening and the
+ * insurance premium — so the one arrow `H->C` became the two arrows `H->O` and
+ * `O->C`, and it gained a contract on the reopening itself, `H->M3`.
  *
  * @param page The page the map is on.
  */
 async function everyArrowIsDrawn(page: Page): Promise<void> {
-  const eight = ["B->M1", "B->M2", "B->R", "C->B", "H->B", "H->C", "H->N1", "R->B"];
-  await expect(page.locator(".react-flow__edge")).toHaveCount(eight.length);
+  const ten = ["B->M1", "B->M2", "B->R", "C->B", "H->B", "H->M3", "H->N1", "H->O", "O->C", "R->B"];
+  await expect(page.locator(".react-flow__edge")).toHaveCount(ten.length);
   await expect
     .poll(() =>
       page
         .locator(".react-flow__edge")
         .evaluateAll((wires) => wires.map((wire) => (wire as HTMLElement).dataset.id).sort()),
     )
-    .toEqual(eight);
+    .toEqual(ten);
 }
 
 /**
@@ -493,19 +502,6 @@ async function everyOutlineItemIsASentenceWide(page: Page): Promise<void> {
     .toEqual([]);
 }
 
-/**
- * The shape of the line the map says out loud once the strike branch has been
- * folded on and the engine has answered.
- *
- * **Two of its three counts are written down and the third is not.** One claim
- * added and one supposition retracted are facts about the branch and about
- * which arrows lead where, so they read the same on every machine. *How many
- * claims moved* is the engine's own count of the claims it called shifted, and
- * it changes whenever the arithmetic does — as it did the day every arrow's
- * push was first drawn as wide as its backing says. A test that wrote it down
- * would be asserting today's arithmetic in the one file that is supposed to be
- * checking that the two halves are joined up.
- *
 /** The first twelve counts as the map says them, which is how it says a count. */
 const IN_WORDS = [
   "no",
@@ -526,14 +522,19 @@ const IN_WORDS = [
  * The shape of the line the map says out loud once the strike branch has been
  * folded on and the engine has answered.
  *
- * **Two of its three counts are written down and the third is not.** One claim
- * added and one supposition retracted are facts about the branch and about
- * which arrows lead where, so they read the same on every machine. *How many
- * claims moved* is the engine's own count of the claims it called shifted, and
- * it changes whenever the arithmetic does — as it did the day every arrow's
- * push was first drawn as wide as its backing says. A test that wrote it down
- * would be asserting today's arithmetic in the one file that is supposed to be
- * checking that the two halves are joined up.
+ * **One of its two counts is written down and the other is not.** One claim added
+ * is a fact about the branch, so it reads the same on every machine. *How many
+ * claims moved* is the engine's own count of the claims it called shifted, and it
+ * changes whenever the arithmetic does — as every number on this map did at the
+ * engine's flip. A test that wrote it down would be asserting today's arithmetic
+ * in the one file that is supposed to be checking that the two halves are joined
+ * up.
+ *
+ * **A third clause used to end it and is gone** *(2026-09-22; decision record
+ * 0017)*: *one supposition retracted*. A later edit could undermine the cause of
+ * an earlier supposition and the engine would take it back. Nothing takes a
+ * supposition back now, so the count is always nought and the clause is never
+ * said.
  *
  * **It refuses "no claims moved" by spelling out the words it will take.** With
  * a wildcard there it fitted a map that moved nothing at all, and the three
@@ -548,8 +549,22 @@ const IN_WORDS = [
  * rather than on a wait that runs out and says only that it ran out.
  */
 const WHAT_THE_STRIKE_DID = new RegExp(
-  `^Branch created\\. One claim added, (${IN_WORDS.slice(1).join("|")}) claims? moved, ` +
-    `one supposition retracted\\.$`,
+  `^Branch created\\. One claim added, (${IN_WORDS.slice(1).join("|")}) claims? moved\\.$`,
+);
+
+/**
+ * The same shape for a branch that adds no claim — the reader reporting a piece
+ * of news on a claim the map already has.
+ *
+ * **The count is the engine's and is never written here.** Reporting something
+ * travels back up the arrows into its causes and out again along everything they
+ * lead to, so how many claims that reaches is a fact about the arithmetic. What
+ * this asserts is that the map said a count at all, and that the count is not
+ * nought — the line before the engine answers is a different sentence, and *no
+ * claims moved* is the answer to a branch with nothing in it.
+ */
+const SOMETHING_MOVED = new RegExp(
+  `^Branch created\\. (${IN_WORDS.slice(1).join("|")}) claims? moved\\.$`,
 );
 
 /**
@@ -591,13 +606,13 @@ async function theStoredMapWithTheStrikeBranch(page: Page): Promise<void> {
     .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
-  await waitForTheLayout(page, 7);
+  await waitForTheLayout(page, 9);
 
   await page.keyboard.press("Meta+k");
   await expect(page.getByText(/Every command, by name/)).toBeVisible();
   await page.keyboard.type("Hormuz opens");
   await page.keyboard.press("Enter");
-  await waitForTheBranch(page, "Hormuz opens, then Iran is struck", 8);
+  await waitForTheBranch(page, "Hormuz opens, then Iran is struck", 10);
   // The engine has answered when the map says what the branch did, with the
   // counts in it — before that the panel is still holding the answer to the
   // question before this one.
@@ -691,7 +706,7 @@ test("test_the_mouse_alone_reaches_the_six_things_you_can_do", async ({ page }) 
     .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
-  await waitForTheLayout(page, 7);
+  await waitForTheLayout(page, 9);
 
   // A claim, chosen by pointing at it. No branch is open, so the edit below
   // starts one of the reader's own — which is this product's own rule, and is
@@ -739,15 +754,20 @@ test("test_the_mouse_alone_reaches_the_six_things_you_can_do", async ({ page }) 
 /**
  * What the hypothesis's tile must read, word for word, once the strike lands.
  *
- * Two badges with an arrow drawn between them, which is what makes the rule read
- * as a sequence: you supposed the strait reopens, and a later edit pushed it back
- * down. Each badge also carries the sentence behind it for a reader who is not
- * looking at the tile, and that sentence is not part of what is drawn.
+ * **One badge, and it stands** *(2026-09-22; decision record 0017)*. You supposed
+ * the strait reopens on the first, and it is still supposed after the strike: a
+ * supposition holds until the reader lifts it, and nothing on the map takes one
+ * back. There used to be a second badge here — *Retracted · Oct 2 · by "a
+ * confirmed military strike on Iranian territory"* — with an arrow drawn between
+ * the two so the pair read as a sequence. The engine cannot produce it any more,
+ * so the pair, the arrow and the words are all gone.
+ *
+ * What the strike ends instead is the claim the map gained at the same time: *the
+ * strait stays open to commercial transit through 1 November*, which is a **state**
+ * rather than an event, and a state is the only kind of claim a `sustain` arrow can
+ * switch off. That claim's number falls, and the check for it is below.
  */
-const OVERRIDDEN = [
-  "Supposed · Oct 1",
-  'Retracted · Oct 2 · by "a confirmed military strike on Iranian territory"',
-];
+const STILL_SUPPOSED = ["Supposed · Oct 1"];
 
 test("the stored example, opened and edited by keyboard alone", async ({ page }) => {
   await page.goto("/");
@@ -772,7 +792,7 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(page.locator(".map-origin")).toContainText("at seed");
   await expect(page.locator(".map-origin")).not.toContainText("versions of the map");
   await expect(page.locator(".map-origin")).not.toContainText("worlds under each");
-  await waitForTheLayout(page, 7);
+  await waitForTheLayout(page, 9);
 
   // And every arrow, by name. The map's claims are only half of what it says;
   // the other half is what points at what.
@@ -781,10 +801,10 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // Every tile is a whole tile on the first frame, not a summary. The zoom is
   // held at the point where a tile's smallest words land at eleven pixels, and
   // below that a tile changes what it draws rather than shrinking it. Counted
-  // rather than read into a list, so that "all seven of them" is what is waited
+  // rather than read into a list, so that "all nine of them" is what is waited
   // for rather than what happened to be there when the list was taken.
-  await expect(page.locator('.tile[data-detail="full"]')).toHaveCount(7);
-  await expect(page.locator(".tile")).toHaveCount(7);
+  await expect(page.locator('.tile[data-detail="full"]')).toHaveCount(9);
+  await expect(page.locator(".tile")).toHaveCount(9);
 
   // A tile is 280 pixels wide, measured rather than eyeballed — and measured
   // only once the framing animation has stopped, because a width read against a
@@ -817,11 +837,12 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   expect(entered).toBe("H");
   await page.keyboard.press("l");
   await expect(page.locator(".map-status")).toContainText("along an arrow");
-  // Whatever it landed on is one of the three claims the strait's opening
-  // causes. Which one it is falls out of which is nearest on the glass, and that
-  // rule is checked over every claim and both directions in
+  // Whatever it landed on is one of the four claims the strait's opening causes:
+  // the oil price, the strait staying open, the contract on the reopening itself,
+  // and the talks. Which one it is falls out of which is nearest on the glass, and
+  // that rule is checked over every claim and both directions in
   // `src/keyboard/__tests__/focusMap.test.ts`.
-  await landedOn(page, ["B", "C", "N1"]);
+  await landedOn(page, ["B", "M3", "N1", "O"]);
 
   // And back along a wire, toward what causes it.
   await page.keyboard.press("h");
@@ -987,9 +1008,9 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await page.keyboard.type("Hormuz opens");
   await page.keyboard.press("Enter");
   // The union of the two worlds is laid out again, once, before anything on it
-  // can be read — eight tiles now, each in a place of its own.
+  // can be read — ten tiles now, each in a place of its own.
   await expect(page.locator('.react-flow__node[data-id="S"]')).toBeVisible();
-  await waitForTheBranch(page, "Hormuz opens, then Iran is struck", 8);
+  await waitForTheBranch(page, "Hormuz opens, then Iran is struck", 10);
   // What the branch did, said out loud for a reader who is not looking at the
   // picture — the whole sentence, against the real engine. How many claims moved
   // is the engine's own count of the claims it called shifted, so it is read
@@ -1008,25 +1029,37 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // would go — never `1.0`, and never `.98`.
   await expect(strike.locator(".belief-chip__figure").first()).toHaveText("Supposed · Oct 2");
 
-  // The hypothesis: the overridden supposition, word for word — read off the
-  // world the engine built rather than worked out twice.
+  // The hypothesis: the supposition the reader made, still standing, word for
+  // word — read off the world the engine built rather than worked out twice. One
+  // badge, and nothing behind it: nothing takes a supposition back, so there is no
+  // second badge and no arrow drawn between a pair of them.
   const hypothesis = page.locator('.react-flow__node[data-id="H"]');
-  await expect(hypothesis.locator(".tile__badge-words")).toHaveText([
-    ...OVERRIDDEN,
-    // And how far its number moved, with a chevron between the two readings.
-    /^\.\d+ [▲▼] \.\d+$/,
-  ]);
-  await expect(hypothesis.locator(".tile__badge-arrow").first()).toHaveText("→");
-  // Its number is the engine's now, not an absence: the branch was worked
+  await expect(hypothesis.locator(".tile__badge-words")).toHaveText(STILL_SUPPOSED);
+  await expect(hypothesis.locator(".tile__badge-arrow")).toHaveCount(0);
+  // And while a supposition holds, the tile says the word where the likelihood
+  // would go rather than the flat `1` the engine stores behind it.
+  await expect(hypothesis.locator(".belief-chip__figure").first()).toHaveText("Supposed · Oct 1");
+  // Its numbers are the engine's now, not an absence: the branch was worked
   // through and the answer came back.
   await expect(hypothesis).not.toContainText("no engine yet");
-  await expect(hypothesis.locator(".belief-chip__figure").first()).toHaveText(/^[.>]\d/);
+
+  // **And the claim the strike actually ends.** *The strait stays open to
+  // commercial transit through 1 November* is a state, which is the one kind of
+  // claim a `sustain` arrow can switch off, and the strike switches it off — so
+  // its reading goes down. The direction is asserted and neither number is
+  // written here: the tile draws the reading it had and the reading it has, with
+  // a chevron between them, and the chevron is which way it went.
+  const staysOpen = page.locator('.react-flow__node[data-id="O"]');
+  await expect(staysOpen.locator(".tile")).toHaveAttribute("data-diff", "shifted");
+  await expect(
+    staysOpen.locator('.tile__badge[data-badge="movement"] .tile__badge-words'),
+  ).toHaveText(/^\.\d+ ▼ \.\d+$/);
 
   // The claim the edit provably cannot reach. Its number is the one it read
   // before the branch — the whole chip, unchanged.
   const opec = page.locator('.react-flow__node[data-id="R"]');
   await test.step("test_the_fully_separated_claim_does_not_change", async () => {
-    await expect(opec).toContainText("OPEC+ announces output restraint.");
+    await expect(opec).toContainText("OPEC+ announces a new output cut.");
     await expect(opec.locator(".belief-chip__reading").first()).toHaveText(opecBefore);
     await expect(opec).not.toContainText("no engine yet");
     await expect(opec.locator(".tile")).toHaveAttribute("data-diff", "untouched");
@@ -1041,7 +1074,7 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // the rule joining the two readings is checked claim by claim in
   // `src/graph/__tests__/diffState.test.ts`, and this is where it is checked
   // against the engine itself.
-  await expect(page.locator(".tile")).toHaveCount(8);
+  await expect(page.locator(".tile")).toHaveCount(10);
   const states = await page
     .locator(".tile")
     .evaluateAll((tiles) => tiles.map((tile) => (tile as HTMLElement).dataset.diff ?? "none"));
@@ -1122,23 +1155,30 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   );
   expect(onTheList.map((row) => row.about).sort()).toEqual([...endings].sort());
 
-  // **And the talks are one of the quiet ones.** This is the one place the
-  // engine's own verdict on one row is written down on purpose: the talks make
-  // the biggest move on the map, the only arrow into them is the map's one bare
-  // assertion, and the engine will not call that a move — which is the whole
-  // case the quiet row exists for. Without it the loop below has nothing to
-  // walk and passes on an empty list. `docs/worked-numbers.txt`, line
-  // `N1 · strike · what happened`, is where to look the day this goes red.
+  // **Every ending this branch reaches is one the engine ranked** *(2026-09-22)*.
+  // The talks used to be the quiet row written down here on purpose — the biggest
+  // move on the map, behind the map's one bare assertion, and the engine would not
+  // call it a move, because the two thousand versions of the map could not agree
+  // which way it went. There is one version now, so a move has one direction, and
+  // the strike moves every ending it reaches far enough to report. The quiet row
+  // itself is not untested: `test_nothing_on_screen_names_versions_when_an_observation_moves_a_claim`
+  // below reaches it against this same engine, and which words go with it are
+  // pinned in `src/components/__tests__/deltaRail.test.tsx`.
+  //
+  // Read off the page rather than written down, so the day one of them holds
+  // still the loop underneath has something to walk instead.
   const quiet = onTheList.filter((row) => row.ranked === "no");
   expect(
-    quiet.map((row) => row.about),
-    "the change list has no quiet row to check",
-  ).toContain("N1");
+    quiet.length,
+    "an ending this edit reaches held still, which this branch has not done since the flip",
+  ).toBe(0);
 
   // Every row the engine ranked carries **one** reading and nothing else — the
   // count of cells tied to the count of rows read off the same page, so a rail
   // that drew one row cannot pass for a rail that drew three. It was three
-  // readings a row until R48 took the other two columns (2026-09-22).
+  // readings a row until R48 took the other two columns (2026-09-22): *how firm*,
+  // the width of the range around the new number, and *same direction*, the share
+  // of the versions of the map that moved the same way.
   const ranked = rail.locator('.delta-rail__row[data-ranked="yes"]');
   const many = onTheList.length - quiet.length;
   expect(many, "the engine ranked no ending at all").toBeGreaterThan(0);
@@ -1186,7 +1226,7 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await page.keyboard.press("O");
   const outline = page.getByRole("tree");
   await expect(outline).toBeVisible();
-  await expect(outline.getByRole("treeitem")).toHaveCount(8);
+  await expect(outline.getByRole("treeitem")).toHaveCount(10);
   await expect(outline).toContainText("Your edit cannot reach this claim.");
 
   // And nothing anywhere on the screen is a pop-up: no dialog, and none of the
@@ -1198,9 +1238,8 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
 });
 
 /**
- * Pressing **This happened** on the Brent claim puts the two contracts on the
- * rail — and the panel says when a claim moved only because the observation
- * changed how much each version counts.
+ * Pressing **This happened** on the Brent claim puts the endings it reaches on
+ * the rail.
  *
  * This is the one thing the engine fix on `fix/04-observe-direction` bought, and
  * it is checked here rather than in a component test on purpose: what it claims
@@ -1220,7 +1259,7 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
     .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
-  await waitForTheLayout(page, 7);
+  await waitForTheLayout(page, 9);
 
   // A branch of the reader's own, and then the news, on the Brent claim.
   await page.locator('.react-flow__node[data-id="B"]').click();
@@ -1230,7 +1269,7 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   // The branch is folded on and the map is laid out again before the claim is
   // pointed at, because pointing at a tile that is still being placed points at
   // wherever it used to be.
-  await waitForTheBranch(page, "Brent settled below $68", 7);
+  await waitForTheBranch(page, "Brent settled below $68", 9);
   await waitForTheAnswer(page, "Branch created. No claims moved.");
 
   await page.locator('.react-flow__node[data-id="B"]').click();
@@ -1246,21 +1285,46 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   // and the new difference come back the rail is still showing the answer to
   // the question before this one, and "no claims moved" is a different sentence
   // from this one — so waiting for it is waiting rather than passing.
-  await waitForTheAnswer(page, "Branch created. Three claims moved.");
-  await waitForTheLayout(page, 7);
+  await waitForTheAnswer(page, SOMETHING_MOVED);
+  await waitForTheLayout(page, 9);
 
-  // Both contracts hang off that claim, so both of them move — and the rail is
-  // where a move turns into something a reader can act on. A rail that stayed
-  // empty here would make **This happened** a button that does nothing. It is on
-  // the panel your branches are on, which the edit above did not turn to: an
-  // arrival never moves the panel, only the reader does (2026-09-22).
+  // News about a claim travels back up the arrows into its causes and out again
+  // along everything they lead to, so the endings hanging off Brent move — and
+  // the rail is where a move turns into something a reader can act on. A rail
+  // that stayed empty here would make **This happened** a button that does
+  // nothing. It is on the panel your branches are on, which the edit above did
+  // not turn to: an arrival never moves the panel, only the reader does
+  // (2026-09-22).
   await turnThePanelTo(page, /Branches and changes/);
   const rail = page.locator(".delta-rail");
-  await expect(rail.locator('.delta-rail__row[data-ranked="yes"]')).toHaveCount(2);
   await expect(rail).toContainText("In the order the engine put them in");
-  // Every reading on those rows is the engine's, and none is typed in here.
+
+  // **How many rows is read off the map, never written down here.** An ending is
+  // a claim that names something you could trade or names why there is nothing to
+  // trade; the rail carries the ones this edit reaches, and how many that is is a
+  // fact about the map and the arithmetic rather than about this file.
+  const endings = await page.locator(".react-flow__node").evaluateAll((nodes) =>
+    nodes
+      .filter((node) => {
+        const { kind, diff } = node.querySelector<HTMLElement>(".tile")?.dataset ?? {};
+        return (kind === "market" || kind === "not_tradeable") && diff !== "untouched";
+      })
+      .map((node) => (node as HTMLElement).dataset.id ?? "?"),
+  );
+  expect(endings.length, "the map drew no ending this report can reach").toBeGreaterThan(0);
+  const rows = rail.locator(".delta-rail__row");
+  await expect(rows).toHaveCount(endings.length);
+  await expect
+    .poll(() =>
+      rows.evaluateAll((drawn) =>
+        drawn.map((row) => (row as HTMLElement).dataset.about ?? "?").sort(),
+      ),
+    )
+    .toEqual([...endings].sort());
+
+  // Every reading on a ranked row is the engine's, and none is typed in here.
   const moved = rail.locator('.delta-rail__row[data-ranked="yes"] .delta-rail__values');
-  await expect(moved).toHaveCount(2);
+  expect(await moved.count(), "the engine ranked no ending at all").toBeGreaterThan(0);
   for (const cell of await moved.all()) {
     await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+$/);
   }
@@ -1268,20 +1332,24 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
 
 /**
  * **The sentence this test was written for is gone, and this is what took its
- * place** *(Kent, 2026-09-22, R48)*.
+ * place** *(Kent, 2026-09-22, R48; decision record 0028)*.
  *
  * It was `test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector`.
  * Reporting the insurance premium as news moves the strait's own likelihood even
  * though nothing on the map pushes on it: what moved it was the observation
  * making the versions of the map in which it was likely count for more, and the
- * panel said so in one sentence. There are no versions of the map on this screen
- * any more, so the sentence has nothing to be about and is not drawn. The engine
- * still sends the field; `frontend/src/world/apiSource.ts` is where it stops.
+ * panel said so in one sentence. The engine works out one version of the map now,
+ * so there is nothing for a sentence about reweighting to be about. It reports the
+ * field as `false` on every claim and `frontend/src/world/apiSource.ts` is where
+ * it stops; both leave together in the follow-up that takes down the constant wire
+ * fields.
  *
  * What is left to hold up is the stronger claim: the engine can reach this state
  * against the real map, and **nothing anywhere on the screen names a version, a
- * world or an interval when it does**. The tile still says *no change*, in the
- * engine's own words, with its two readings behind it.
+ * world or an interval when it does**. Reporting the premium still reaches back up
+ * into the strait's own likelihood, which is the rule worth pinning; and the
+ * endings the report does *not* move far enough still hold a row each, saying *no
+ * change* in the engine's own words with its two readings behind them.
  */
 test("test_nothing_on_screen_names_versions_when_an_observation_moves_a_claim", async ({
   page,
@@ -1291,7 +1359,7 @@ test("test_nothing_on_screen_names_versions_when_an_observation_moves_a_claim", 
     .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
-  await waitForTheLayout(page, 7);
+  await waitForTheLayout(page, 9);
 
   // The news is the insurance premium falling. Nothing on this map pushes on
   // the strait's own likelihood — it is the claim the map starts from — so this
@@ -1300,52 +1368,56 @@ test("test_nothing_on_screen_names_versions_when_an_observation_moves_a_claim", 
   await page.keyboard.press("b");
   await page.getByLabel(/What is this branch called/).fill("The premium fell");
   await page.getByRole("button", { name: "Start this branch" }).click();
-  await waitForTheBranch(page, "The premium fell", 7);
+  await waitForTheBranch(page, "The premium fell", 9);
   await waitForTheAnswer(page, "Branch created. No claims moved.");
 
   await page.locator('.react-flow__node[data-id="C"]').click();
   await page.keyboard.press("e");
   await expect(page.locator(".intervene")).toContainText(
-    "Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.",
+    "Lloyd's war-risk insurance premium for Gulf transits is under 0.4%.",
   );
   await page.getByRole("button", { name: /^This happened/ }).click();
 
   // The edit is finished when the map says what it did, and not before.
-  await waitForTheAnswer(page, "Branch created. Two claims moved.");
-  await waitForTheLayout(page, 7);
+  await waitForTheAnswer(page, SOMETHING_MOVED);
+  await waitForTheLayout(page, 9);
 
   // The panel, on the strait itself.
   await page.locator('.react-flow__node[data-id="H"]').click();
 
-  await test.step("test_the_tile_says_why_the_engine_reports_no_change", async () => {
-    // The strait's own tile, on the same branch: the engine will not call what
-    // happened to it a move, and the tile says so, with the engine's own two
-    // readings in the sentence behind it.
-    const strait = page.locator(
-      '.react-flow__node[data-id="H"] .tile__badge[data-badge="movement"]',
-    );
-    await expect(strait.locator(".tile__badge-words")).toHaveText("no change");
-    // Asserted on the element rather than read off it, so that a sentence still
-    // being written when the badge's words land is waited out.
-    await expect(strait).toHaveAttribute(
-      "title",
-      /reports no change on this claim: it read \.\d+ then \.\d+/,
-    );
+  await test.step("test_the_report_reaches_back_up_into_the_strait", async () => {
+    // **The rule this branch exists for.** Nothing on the map pushes on the
+    // strait's own likelihood — it is the claim the map starts from — and yet
+    // reporting the insurance premium moves it, because news about an effect is
+    // evidence about its causes. A browser that drew the strait *untouched* here
+    // would be drawing the map as it was written over a number the engine had
+    // moved. The direction is the engine's and neither number is written here.
+    const strait = page.locator('.react-flow__node[data-id="H"]');
+    await expect(strait.locator(".tile")).toHaveAttribute("data-diff", "shifted");
+    await expect(
+      strait.locator('.tile__badge[data-badge="movement"] .tile__badge-words'),
+    ).toHaveText(/^\.\d+ [▲▼] \.\d+$/);
+  });
 
-    // And the talks, which plainly did move and still came out unchanged. **The
-    // engine's reason for that one is a fact about its two thousand versions of
-    // the map**, which this product no longer shows, so the sentence says the
-    // verdict and its two readings and then says plainly that it has no reason
-    // it can give — rather than naming one nobody on this screen could check.
+  await test.step("test_the_tile_says_why_the_engine_reports_no_change", async () => {
+    // The talks, on the same branch: the report reaches them, the engine will not
+    // call what happened to them a move, and the tile says so — in words, with the
+    // engine's own two readings in the sentence behind it, and with the engine's
+    // one reason for the verdict rather than none.
     const talks = page.locator(
       '.react-flow__node[data-id="N1"] .tile__badge[data-badge="movement"]',
     );
     await expect(talks.locator(".tile__badge-words")).toHaveText("no change");
+    // Asserted on the element rather than read off it, so that a sentence still
+    // being written when the badge's words land is waited out.
     await expect(talks).toHaveAttribute(
       "title",
       /reports no change on this claim: it read \.\d+ then \.\d+/,
     );
-    await expect(talks).not.toHaveAttribute("title", /it does not say/);
+    // The engine gives one reason now — the move is smaller than it will report at
+    // all — so the tile names it rather than saying it has none to give.
+    await expect(talks).toHaveAttribute("title", /smaller than it will report/);
+    await expect(talks).not.toHaveAttribute("title", /gave no reason/);
   });
 
   await test.step("test_nothing_on_this_screen_names_a_version_or_a_world", async () => {
@@ -1403,7 +1475,7 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
     .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
-  await waitForTheLayout(page, 7);
+  await waitForTheLayout(page, 9);
 
   // A branch, and the news: the premium fell.
   await page.locator('.react-flow__node[data-id="C"]').click();
@@ -1412,22 +1484,22 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
     .getByLabel(/What is this branch called/)
     .fill("The premium fell, then the push changed");
   await page.getByRole("button", { name: "Start this branch" }).click();
-  await waitForTheBranch(page, "The premium fell, then the push changed", 7);
+  await waitForTheBranch(page, "The premium fell, then the push changed", 9);
   await waitForTheAnswer(page, "Branch created. No claims moved.");
 
   await page.locator('.react-flow__node[data-id="C"]').click();
   await page.keyboard.press("e");
   await expect(page.locator(".intervene")).toContainText(
-    "Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.",
+    "Lloyd's war-risk insurance premium for Gulf transits is under 0.4%.",
   );
   await page.getByRole("button", { name: /^This happened/ }).click();
-  await waitForTheAnswer(page, "Branch created. Two claims moved.");
-  await waitForTheLayout(page, 7);
+  await waitForTheAnswer(page, SOMETHING_MOVED);
+  await waitForTheLayout(page, 9);
 
-  // The strait causes the premium, so it is a claim the report is evidence
-  // about. It must already be a claim the edit can reach.
-  const strait = page.locator('.react-flow__node[data-id="H"]');
-  await expect(strait.locator(".tile")).not.toHaveAttribute("data-diff", "untouched");
+  // The strait staying open causes the premium, so it is a claim the report is
+  // evidence about. It must already be a claim the edit can reach.
+  const staysOpen = page.locator('.react-flow__node[data-id="O"]');
+  await expect(staysOpen.locator(".tile")).not.toHaveAttribute("data-diff", "untouched");
 
   // Hold the engine's next answer in flight, so the moment before it lands can
   // be looked at rather than guessed at.
@@ -1439,8 +1511,11 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
     await route.continue();
   });
 
-  // Now change how hard the strait's opening pushes the premium.
-  await openThePanelOnTheArrow(page, "H->C");
+  // Now change how hard the strait staying open pushes the premium. **It is
+  // `O->C` rather than `H->C`** *(2026-09-22)*: the map gained the claim that the
+  // strait *stays open* between the two, so the one arrow became two, and this is
+  // the one whose source the report is evidence about.
+  await openThePanelOnTheArrow(page, "O->C");
   // Asked for inside the panel of operations, by name. The Inspector's head
   // carries a control with these same words — it is the way in, and it is not
   // drawn while the panel it opens is already open — and scoping the ask here
@@ -1454,7 +1529,7 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
 
   // **Before the answer.** The line is already there, saying what it is waiting
   // for, and the tile is the size it will keep.
-  const movement = strait.locator('.tile__badge[data-badge="movement"]');
+  const movement = staysOpen.locator('.tile__badge[data-badge="movement"]');
   await expect(movement).toBeVisible();
   // Word for word the sentence the engine's own absence carries while it is
   // being asked — not merely a sentence with "engine" in it, which the answer
@@ -1464,7 +1539,7 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
     "title",
     /has been asked at \/api\/worlds .* and has not answered/,
   );
-  const tile = strait.locator(".tile");
+  const tile = staysOpen.locator(".tile");
   const whileWaiting = await tile.evaluate((el) => (el as HTMLElement).offsetHeight);
 
   holding = false;
@@ -1472,7 +1547,7 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
   // **After the answer.** The line reads the engine's own two numbers, and the
   // tile is the same size it was: nothing grew when the answer landed.
   await expect(movement).toHaveAttribute("title", /\.\d+.*\.\d+/);
-  await expect(strait).not.toContainText("no engine yet");
+  await expect(staysOpen).not.toContainText("no engine yet");
   const said = (await movement.getAttribute("title")) ?? "";
   const readings = [...said.matchAll(/(?<![\d.])\.\d+/g)].map((one) => one[0]);
   expect(readings.length).toBeGreaterThanOrEqual(2);
@@ -1504,11 +1579,11 @@ test("test_a_retune_under_a_report_moves_the_arrows_source", async ({ page }) =>
  *
  * **It is per tile, which is why it shows up as one missing arrow rather than
  * an empty map.** Measured, dropping one tile's notifications and keeping every
- * other: deafen the insurance premium and the two arrows that touch it go, and
- * only those; deafen the strait and its three go. An arrow is not drawn when
- * *either* end was never measured. That is the shape the end-to-end suite met
- * in the wild — `H->C` absent from the glass, everything else in place — about
- * once in two hundred runs at six workers on a loaded machine.
+ * other: deafen the insurance premium and the arrows that touch it go, and only
+ * those; deafen the strait and its own go. An arrow is not drawn when *either*
+ * end was never measured. That is the shape the end-to-end suite met in the wild
+ * — one arrow out of the strait absent from the glass, everything else in place
+ * — about once in two hundred runs at six workers on a loaded machine.
  *
  * **Why it passes now, and why nothing is retried to make it pass.** Every
  * tile hands the drawing library its box and its four ports outright, worked
@@ -1548,7 +1623,7 @@ test("test_the_arrows_are_drawn_when_the_browser_drops_a_size_notification", asy
     .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
     .first()
     .click();
-  await waitForTheLayout(page, 7);
+  await waitForTheLayout(page, 9);
 
   // Every claim, visible — which is #37's half of this, and still holding.
   await expect
