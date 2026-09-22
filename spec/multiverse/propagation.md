@@ -11,7 +11,9 @@ A branch is a list of edits; a world is what those edits do to the numbers. This
 
 Every claim says which it is, in a field called `persistence`, and no code can work it out from the sentence (decision record 0017).
 
-The chapter settles five things: how an arrow bends a claim's **rate** rather than a likelihood read on one day; how two causes of the same claim combine; how *Suppose this is true* and *This happened* are answered; where the **range** under a computed number comes from; and what the engine costs.
+The chapter settles four things: how an arrow bends a claim's **rate** rather than a likelihood read on one day; how two causes of the same claim combine; how *Suppose this is true* and *This happened* are answered; and what the engine costs.
+
+**One likelihood per claim, computed once, and no range anywhere** *(decision record 0028, 2026-09-22)*. The engine used to work the whole map out two thousand times over, each time drawing every stated number from the range around it, and report the middle 80% of the answers as a range of its own. That is cut — from the screen and from the engine alike, in one place, because a number nothing reads is work nobody can account for. What is left is the one number, at two significant figures, with `<.01` and `>.99` standing in for the two claims nobody here is entitled to make.
 
 ### Every number on the map moves twice, and this is the first move
 
@@ -23,7 +25,7 @@ So **every computed number on the map moves once at this flip, and once more at 
 
 **Every engine-computed figure this chapter mentions is cited from one generated file and never typed here.** [`docs/worked-numbers.txt`](../../docs/worked-numbers.txt) is written by `make numbers` from the shipped engine on the Strait of Hormuz map, at that example's own seed and the shipped loop sizes, and the build fails when it goes stale. Every line in it starts with a name a passage can cite — `B · base · reading` — and the numbers a person typed into the example are kept in a part of their own, apart from the numbers the engine worked out. The day the arithmetic changes, the diff of that one file is the whole list of what moved.
 
-Everything here rests on decision records **0016** (a claim's number is the chance it happens by its deadline; *whether* is solved exactly, *when* is sampled) and **0017** (a claim is an event or a state; nothing retracts itself). Both amend record 0005, which named `trigger` and `sustain`, and record 0014, which owns what the range means — **and `lo` and `hi` keep exactly the meaning 0014 gave them.**
+Everything here rests on decision records **0016** (a claim's number is the chance it happens by its deadline; *whether* is solved exactly, *when* is sampled), **0017** (a claim is an event or a state; nothing retracts itself) and **0028** (one likelihood per claim, computed once; no range anywhere). All three amend record 0005, which named `trigger` and `sustain`, and record 0014, whose range 0028 reverses.
 
 ---
 
@@ -42,7 +44,7 @@ The shapes, and the module that defines each. Frozen, like everything else in `b
 Two states, one per claim per day, in `domain/propagation.py`:
 
 * **`sampled`** — the ordinary case. The number is worked out.
-* **`supposed`** — a *Suppose this is true* is holding. The claim is true in every version, and the tile shows the word where a likelihood would go.
+* **`supposed`** — a *Suppose this is true* is holding. The claim is simply true, and the tile shows the word where a likelihood would go.
 
 There used to be two more, `withdrawn` and `pushed`, for a supposition the engine ended on a calendar. **Nothing retracts itself any more** (record 0017): a supposition holds until another edit changes it, so there is no third or fourth state to be in.
 
@@ -53,18 +55,27 @@ There used to be two more, `withdrawn` and `pushed`, for a supposition the engin
 | Field | What it is for |
 |---|---|
 | `base_id`, `branch_id`, `seed` | the replay triple — these three rebuild this world byte for byte on any machine |
-| `versions` | how many versions of the map were drawn; the range is the spread across them |
 | `graph`, `assignments` | the map `apply` left behind, and every value an edit fixed |
 | `beliefs` | one number per claim, owner `model`, read on that claim's own resolve-by day |
 | `series`, `series_days` | how that number stands on each day drawn, and which day of the window each point sits on |
 | `states` | one of the two day-states above, per claim per day, the same length as the series |
 | `conditionals` | one number per arrow: its target, with its source **supposed** true. Empty until asked for |
-| `range_shares` | whose stated chance explains whose range. No route reads it until stack 06 |
 | `warnings` | plain sentences: a series sampled down, an arrow stated beyond ±5, an arrow that could not hold its claim back as far as its number asks (B4) |
 
 `series` is what makes the scrubbable time axis possible (UX-3). **An event's series only rises** — it is the chance the claim has happened by that day, and a thing that has happened does not un-happen. **A state's series may fall**, because it is the chance the claim is still holding.
 
-Three fields are on the wire and always empty, each with a dated comment saying so, because their readers in the browser move in a later pull request: `retractions` (nothing retracts itself), `worlds` (there is no inner loop, so it is `0`), and `ClaimDiff.moved_only_by_reweighting` in [`diff.md`](diff.md) (every version now counts the same). They go together, when those readers do. <!-- VERIFY AT FLIP: that all three are present and empty rather than deleted, and that each carries its dated comment. -->
+Several fields are on the wire and carry nothing, each with a dated comment saying so, because their readers in the browser move in a later pull request. They go together, when those readers do:
+
+| Field | What it carries now |
+|---|---|
+| `retractions` | always empty — nothing retracts itself (record 0017) |
+| `worlds` | always `0` — there is no inner loop (record 0016) |
+| `versions` | always `1` — there is one reading, computed once (record 0028) |
+| `Belief.lo`, `Belief.hi` | always equal to `p` — there is no range (record 0028) |
+| `range_shares` | always empty — it answered whose stated number explained whose range (record 0028) |
+| `ClaimDiff.moved_only_by_reweighting`, `agreement`, `DeltaRow.range_width` | see [`diff.md`](diff.md) |
+
+**A field that is always equal to another field is a field somebody will eventually believe**, which is why they leave together and soon rather than one at a time. <!-- VERIFY AT FLIP: that every row of this table is present and empty rather than deleted, and that each carries its dated comment; and which of them the flip can delete outright because no browser reader is left. -->
 
 **`conditionals` means *supposed*, not *observed*, and it is empty on a freshly built world.** The number on a wire's midpoint chip is the target's likelihood **with that arrow's source supposed true** — the interventional number. It is never "how often do these two show up together", which is the correlational quantity [`../graph/link.md`](../graph/link.md)'s anti-pattern 3 refuses; putting that on a wire claiming a mechanism would be the worst kind of quiet lie. Computing it costs an extra solve per arrow, for a number most users never open, so it is fetched **lazily**, one arrow at a time, through `POST /api/worlds/conditional`. Laziness costs nothing in honesty: the number is a pure function of the same three inputs plus the arrow, so a lazily fetched number is byte-identical to an eagerly computed one.
 
@@ -85,11 +96,11 @@ They import in one direction only — each reads the one above it and never the 
 
 ```python
 def propagate(graph, assignments, *, as_of, seed,
-              versions=2_000, worlds=0, introduced_by=NOTHING_ADDED,
+              versions=1, worlds=0, introduced_by=NOTHING_ADDED,
               slices=24, sampled_worlds=50_000) -> World
 ```
 
-`as_of` is day zero, passed in by `engine/worlds.py` from the stored example's own date; this layer reads no clock. `worlds` and `introduced_by` are the two arguments nothing reads any more, kept until their callers move. <!-- VERIFY AT FLIP: the exact signature — whether `introduced_by` survives the deletion of retraction, and whether the `engine=` flag that stood the two cores side by side is deleted here or kept with its default changed. -->
+`as_of` is day zero, passed in by `engine/worlds.py` from the stored example's own date; this layer reads no clock. `worlds`, `versions` and `introduced_by` are the arguments nothing reads any more, kept until their callers move. **The version axis runs at length one**: every array inside keeps the shape it had, and one reading is computed rather than two thousand. <!-- VERIFY AT FLIP: the exact signature — whether `introduced_by` survives the deletion of retraction, and whether the `engine=` flag that stood the two cores side by side is deleted here or kept with its default changed. -->
 
 ---
 
@@ -200,19 +211,19 @@ A **state** carries two times: the day it came on and the day it went off. Both 
 
 A `sustain` arrow may therefore leave only a state, because only a state can stop. That rule is refused by name — `sustain_without_state` — **from the shape freeze**, together with the prompt sentence that asks the model for `persistence`; until then the code that mints claims from a recorded proposal makes every one an event, and a `sustain` arrow out of an event measures identical to a `trigger`.
 
-**What a state costs.** In the exact solve, nothing: on a twenty-claim map with five states the largest table, the entries built and the elimination time are the same as on the same maps with no state at all. Its **pair of times is the one expensive piece**, and only a `sustain` child ever reads it — the pair costs versions times slices **cubed** where the on-curve alone costs versions times slices squared, about twenty times the work per state at 2 000 versions and 24 slices. So `needs_the_joint` in `domain/states.py` builds the pair only for a state some `sustain` arrow leaves. **No measured saving is claimed for that**: record 0017's own forward-pass timing already skipped the pair for the states nothing sustained. It exists so a map full of states nobody reads the stretch of does not pay slices cubed for work no reader wants.
+**What a state costs.** In the exact solve, nothing: on a twenty-claim map with five states the largest table, the entries built and the elimination time are the same as on the same maps with no state at all. Its **pair of times is the one expensive piece**, and only a `sustain` child ever reads it — the pair costs slices **cubed** where the on-curve alone costs slices squared, about twenty times the work per state at 24 slices (measured at the two thousand versions record 0028 has since cut, so the ratio is what carries over, not the milliseconds). So `needs_the_joint` in `domain/states.py` builds the pair only for a state some `sustain` arrow leaves. **No measured saving is claimed for that**: record 0017's own forward-pass timing already skipped the pair for the states nothing sustained. It exists so a map full of states nobody reads the stretch of does not pay slices cubed for work no reader wants.
 
 **And a state is no less accurate than an event**: over 82 map skeletons run once with states and once with every claim an event, both sides put 99.8% of numbers within `.005` of the enumerator, with worst gaps of `.00835` and `.00794` — the same maps, the same seeds, the additive rate, measured at 12 slices and re-measured at 24 before the tolerance goes into a test.
 
-**What nobody has measured: what a state does to the range.** Every version draws each claim's stated chance from its stated range; a state has two rates and the second is fitted from its ending arrows rather than drawn. Record 0017 names this as a real gap, and the core pull request measures it and writes the answer into `docs/measurements.md`.
+*(Record 0017 left one thing open here — what a state does to the **range**, since a state has two rates and only one of them was ever drawn from a stated range. Decision record 0028 closes it by removing the range: there is nothing left for a state to do to it, and the measurement record 0017 asked for is not owed.)*
 
 > **On the Hormuz map.** *Hormuz opens, then Iran is struck* leaves **both events standing**: H is supposed true and S is supposed true, and neither is withdrawn, retracted or dated out. What falls is the state O — it was held up by the reopening and is ended by the strike — and what falls with it is C, which O sustains. The lines are `H · strike · reading`, `S · strike · reading`, `O · base · reading`, `O · strike · reading` and `C · strike · reading`. Nothing consults a calendar, nothing un-trues a claim, and the word *retracted* appears nowhere in the answer.
 
 ### B6 — *Suppose this is true*, and *This happened*
 
-*Whether* each claim is true is solved **exactly**, by summing claims out of the map's small yes/no tables one at a time in an order chosen to keep those tables small (`domain/solving.py`). The order changes how much work the solve does and never changes the answer. The versions ride as an extra axis on every array, so a whole range is one pass rather than two thousand.
+*Whether* each claim is true is solved **exactly**, by summing claims out of the map's small yes/no tables one at a time in an order chosen to keep those tables small (`domain/solving.py`). The order changes how much work the solve does and never changes the answer. Every array carries a leading axis that once held two thousand versions of the map and now holds one reading (record 0028); the shapes are unchanged and the work is one pass.
 
-**A supposition is a hard fact until another edit changes it.** While it holds, the claim is simply true in every version — not a large finite baseline that arrows can argue with. There is no number at all: the tile shows the word *Supposed* and its date. A tool that answered "suppose this is true" with `.98` would be lying about what the user asked for.
+**A supposition is a hard fact until another edit changes it.** While it holds, the claim is simply true — not a large finite baseline that arrows can argue with. There is no number at all: the tile shows the word *Supposed* and its date. A tool that answered "suppose this is true" with `.98` would be lying about what the user asked for.
 
 **The two verbs are answered differently, and that difference is the product.**
 
@@ -233,71 +244,41 @@ The exact solve above answers *whether*. It is built from timing worked out **be
 
 **The correction, in one sentence.** Worlds are drawn forward with arrival days; at the observed claim the world is not thrown away, but set to what was seen with its weight multiplied by how likely that was; and **the same world is drawn twice with the same random numbers** — once under the full time model and once under the yes/no model whose answer is already known exactly — so only the *difference* between them is sampled and added to an answer already known exactly. *(A control variate, which is the textbook name for sampling only a difference from something exact.)*
 
-Fifty thousand worlds, seeded, and **one sample serves a whole range and both its readers** — the numbers on screen, and the arrival days stack 06 reads to walk a position through time. The sample is drawn at **one** version, not at each of the two thousand, and its correction is a single number per claim added to every version's exact answer. That is why it is a fixed cost rather than a per-version one, and what bounds the error of sharing it is measured: under the rate model this engine uses the correction is `.0020` and moves `.0020` across versions, where under the multiplicative rate the old engine used it was `.1172` and moved `.0805`. Redone per version, 2 000 versions would cost 110 seconds.
-
-**Which version the one sample is drawn at is named rather than assumed**: version 0, the first row of the spread. Nothing measured a better choice, and a rule a reader can check beats one nobody wrote down.
+Fifty thousand worlds, seeded, and **one sample serves both its readers** — the numbers on screen, and the arrival days stack 06 reads to walk a position through time. Its correction is a single number per claim, added to the exact answer.
 
 **What it hands stack 06**, as a fixed contract: the day the window starts and how many days it runs; the claims in a fixed order; for each drawn world and each claim, the day it came on and the day it went off, with markers for *never* and *still holding*; and a weight per drawn world. Three things a consumer must know: the days are **slice middles rounded to whole days**, so on a sixty-day window at 24 slices every arrival lands on one of twenty-four days about two and a half apart; the weights are **real**, not all ones, so every count is weighted and any floor counts *effective* draws rather than rows; and an event's off day is always *still holding*, where a state's may not be.
 
 **How accurate that makes *This happened*** (Kent, R25): on the four-claim maps the enumerator can check, no number was further than `.005` from it. That is what the Inspector is allowed to say, and it must not be widened to *on maps this size* — the accuracy was measured on four-claim maps and the cost on twenty-claim ones, and the two sets never meet.
 
-### B8 — Versions, and where the range comes from
+### B8 — One likelihood, computed once — and the range that used to be here
 
-Read this before any formula, because it is the idea the whole design rests on.
+**There is one reading per claim and no range around it** *(decision record 0028, 2026-09-22; Kent, decisions note row R48)*. The number is worked out once, from the numbers the map states, and that is the whole of it. It is rendered at two significant figures, with `<.01` below a hundredth and `>.99` above ninety-nine hundredths, and nothing is drawn beside it.
 
-* **How the dice fall.** The strait either opens or it does not. That is already inside the number: it is the chance the claim comes out true.
-* **How sure we are of the numbers we put in.** Every chance on the map was elicited, and every arrow's number was written down by somebody with more or less to go on. A different but equally defensible set of those numbers would give a different answer. **That** is the range.
+**What used to be here, and why it is worth knowing it is gone.** The engine worked the map out **two thousand times over**. Each of those versions took every stated number — a claim's own chance, and every arrow's — from the range around it, drawn as one coherent set of numbers the model would have stood behind rather than every low end at once. The middle 80% of the two thousand answers was reported as a **range**, and it meant *how sure we are of the number we put in*, never *how much the world can move*. Two thousand was measured rather than guessed: at two hundred a range's end wandered a tenth of the range's own width.
 
-So a wide range means *"we are not sure what number to give you; more homework would move it"* — never *"the event is more volatile"*. That is the one sentence a trader has to be able to repeat, and the chip says it: **model interval, uncalibrated · how sure we are of this number — not how much the world can move.**
+Three further things went with it, each of which had a real job:
 
-**What a stated `{p, lo, hi}` means: a split logit-normal** — a bell curve on the log-odds scale with its two halves fitted separately, so that the middle is `p`, the 10th percentile is `lo` and the 90th is `hi`. "Eight times in ten" is the phrase. The halves are fitted separately because real elicited ranges are lopsided: over the seven base-map claims the fixture's own ranges are near-symmetric on log-odds and clearly skewed on probability. This honours all three stated numbers exactly, stays inside 0 and 1 with no clamping, and needs no new field on `Belief`.
+* **How wide an arrow was drawn came from its receipt** — `documented` narrow, `asserted` widest — so *how well-backed* became *how wide* at no extra elicitation cost. **The half of that rule which survives is permanent: there is no `strength_lo` and no `strength_hi`, now or ever** (Kent, record 0014). One number about an arrow, and no second number to drift from it.
+* **`range_shares`** answered whose stated number explained whose width, which was FR-21's *where to spend modeling budget* ranking. FR-21 is not built in version one.
+* **The share of versions that moved the same way** — *same direction 95%* — was the second half of the test that decided whether a claim had moved at all. [`diff.md`](diff.md) B3 says what that test is now.
 
-**How wide an arrow's number is drawn comes from its receipt, and nobody is asked a second question.** An arrow carries a `provenance` — a receipt our own pipeline writes from what actually happened, never something a model claims for itself — and each version draws the arrow's number from a bell curve centred on what the map states, this wide, in log-odds:
+**Why it went, in his words.** Kent tried the built product and said *"The 2,000 runs thing is confusing. Can we cut that from the scope of this project completely for the sake of defending its design…?"* He was told first that the engine pass is a fraction of a millisecond beside the model calls, so **the cut buys simplicity, not speed**, and chose it with that in front of him. Record 0028 carries the whole of it.
 
-| Where the arrow came from | How wide |
-|---|---|
-| `documented` · `historical` · `market_implied` — somebody fetched something | `0.15` |
-| `argued` · `user` — a stated mechanism, or a person's own judgement | `0.40` |
-| `simulated` — a probe's output | `0.50` |
-| `asserted` — a sentence with no mechanism in it | `0.60` |
+**What did not change.** The number itself still answers the same question — the chance the claim comes out true by its own deadline — and is still worked out by the forward pass and the exact solve of B1 to B7. Nothing about how a cause reaches a claim depends on there having been more than one reading.
 
-A weakly-backed arrow can come out the other way round in some versions, and that is the honest reading: *we cannot vouch for which way this one goes* is most of what `asserted` means. **There is no `strength_lo` and no `strength_hi`, now or ever** (Kent, record 0014): the width is derived from the receipt every time it is needed, so there is one number about an arrow and it cannot drift from a second. Not to be confused with the *other* table that reads the same receipt — [`diff.md`](diff.md)'s provenance **weight**, which turns it into how well-backed a *route* is for ranking. Two questions, two tables.
-
-**The loop is now one loop.**
-
-1. Draw **2 000 versions** of the map — a chance for every claim and a number for every arrow, spread evenly by a Latin hypercube, which is a way of spreading draws evenly instead of letting them clump. A version is **one coherent set of numbers this model would have stood behind**, never "every low end at once".
-2. Solve every version **exactly**, on one array axis.
-3. The reported number is the mean across versions; `lo` and `hi` are the 10th and 90th percentiles across versions.
-
-There is no inner loop, no coin flip to keep, and **no noise correction**, because there is no noise left to subtract. That makes the statement that the range is not sampling noise exact rather than approximate: freeze every stated chance to a point and freeze every arrow's number at what the map states, and the range comes out **zero wide, exactly**.
-
-**Two thousand versions, and why not two hundred.** At 2 000, a range's end wanders `.0086` on a wide range and `.0046` on a narrow one across seeds; at 200 it wanders `.0275`, which is a tenth of the range's own width. What 2 000 buys is a *narrow* range's two ends to two significant figures — a range a quarter of the scale across needs about 6 000 by the square-root rule that measurement obeys, and this chapter does not claim otherwise. *(Measured at 12 slices under the multiplicative rate and not re-run under the additive one, so it could move.)*
-
-**Where the width comes from, free.** Sorting the same versions into bins by the value each stated chance drew, and comparing the bins' averages, gives each claim's **share of another claim's range** — how much of the width comes from not being sure of *this* claim. Six lines, nothing run twice, now read off the exact per-version answers rather than a sampled average. It is carried as `range_shares[target][source]` and no route reads it until stack 06, where it becomes FR-21's *where to spend modeling budget* ranking.
-
-**The shares do not add up to the whole range, and are not meant to.** They answer whose stated *chance* explains this width, and a version draws the arrows' numbers too; what the arrows explain is in no entry. On the Hormuz map the lines are named `B · base · band from B`, `B · base · band from H` and so on, against the range on `B · base · reading`. Pin B's own chance down and most of that width goes with it — which is the ranking FR-21 asks for, in one number per claim.
-
-**Two counter-intuitive warnings, both measured on this fixture.** A *Suppose* does not reliably narrow what is downstream: it collapses the target's own range, and the width of a claim below it can go *up*, because the curve is steeper where the answer lands. The honest thing to show is the **share**, not the width. And a terminal's range is dominated by its own stated chance: an upstream range reaches it multiplied by a factor that is at most a quarter, so *widen the hypothesis and watch the ending widen* is not a demo, it is a rounding error. <!-- VERIFY AT FLIP: both of these were measured on the old engine; re-measure under the exact core and cite the line names, or cut the passage. -->
-
-### B9 — Three seed streams, and replay
+### B9 — One seed stream, and replay
 
 Everything comes from the one `seed` argument, through random generators built from it and nothing else. **No module-level generator, no clock, no global state, ever.** The same map, branch and seed give byte-identical worlds on any machine — NFR-2 — which is what makes a three-day-old screenshot reproducible from three values.
 
-| Stream | Drives | Rule |
-|---|---|---|
-| `params` | which chance each of the 2 000 versions gives each claim | **Must not depend on the branch.** A base world and a branch world from one seed use the *same* 2 000 versions |
-| `strengths` | which number each of those versions gives each arrow | the same rule, for the same reason |
-| `worlds` | the worlds the forward sample of B7 draws | ordinary; may depend on anything |
+**One stream is left**, and it draws the worlds of B7's forward sample. It is derived per claim, from the seed and that claim's **own** identifier, so adding a claim cannot shift another claim's draws.
 
-The first two keep the jobs they had. The third has changed jobs rather than gone: it used to drive the coin flips inside each version, and there are no coin flips inside a version any more, so it drives the forward sample instead.
-
-**Every stream is derived per thing**, from the seed and the claim's or arrow's **own** identifier. So adding a claim cannot shift another claim's draws and adding an arrow cannot shift another arrow's — which is what makes the dice cancel out of a paired comparison: version *k* of the base world and version *k* of the branch world drew the same numbers for everything they share. That is *common random numbers*, and without it every comparison is the user's change plus a wash of sampling noise. [`diff.md`](diff.md) spends the whole of it: a change is read off the paired difference, never off whether two ranges overlap.
+*(Two streams have gone with the versions — decision record 0028. `params` chose each version's likelihood for each claim and `strengths` chose each version's number for each arrow, and the rule on both was that neither could see the branch, so a base world and a branch world were built from the same underlying numbers and their difference was the edit rather than a wash of sampling noise. There are no such numbers to hold fixed now: one reading is computed from what the map states, so two worlds differ by the edit and by nothing else, by construction rather than by a rule.)*
 
 ### B10 — What the user ends up looking at
 
 | What the interface reads | Where it comes from |
 |---|---|
-| The number on a tile | `beliefs[claim]`, read on that claim's own resolve-by day, at two significant figures with its range (NFR-1) |
+| The number on a tile | `beliefs[claim]`, read on that claim's own resolve-by day, at two significant figures and nothing beside it (NFR-1, amended by record 0028) |
 | The sparkline and the scrubber | `series[claim]` against `series_days` — rising for an event, able to fall for a state (UX-3) |
 | *Supposed · date* | `states[claim]`, the same length as the series |
 | The number on a wire's midpoint chip | `conditionals[link]`, fetched one arrow at a time, always the *supposed* number |
@@ -307,15 +288,15 @@ The first two keep the jobs they had. The third has changed jobs rather than gon
 
 * **R is identical to the byte** between the two worlds, because the only arrow into it is a feedback arrow, which the engine sets aside. That is the feedback rule doing its work rather than a coincidence.
 * **N1 goes up** on the branch that makes everything else worse. `H → N1` is a `trigger`: the reopening was supposed true, the arrow fired, and a `trigger` keeps pushing whatever its cause does afterwards. What already rose stays risen.
-* **N1's range is the widest on the map**, because the only arrow into it is the fixture's one `asserted` arrow — the spread saying, in the one place on this map where it is entitled to, *we cannot vouch for this arrow*.
+* **The map's one `asserted` arrow is still the weakest thing on it**, and it is the only way into N1. Nothing on screen widens to say so any more; what reads it is [`diff.md`](diff.md)'s provenance **weight**, which ranks a route by its worst-backed arrow.
 
-<!-- VERIFY AT FLIP: all three bullets are orderings rather than values, but all three are engine results on a fixture the flip rebuilds — that R stays byte-identical, that N1 still rises on the strike branch, and that N1's range is still the widest. Read them off the regenerated numbers file before this lands. -->
+<!-- VERIFY AT FLIP: the first two bullets are orderings rather than values, but both are engine results on a fixture the flip rebuilds — that R stays byte-identical and that N1 still rises on the strike branch. Read them off the regenerated numbers file before this lands. -->
 
 ### What it costs, and the target it is read against
 
-**Recalculating a branch has a target proportional to the size of the map, not a fixed number, and it is a target rather than a gate** (Kent, R24, superseding the fixed 600 ms of R19). The reference point is 600 ms for one world with its range on a **twenty-claim** map at 2 000 versions — 30 ms a claim by plain division — and what it protects is that an edit feels responsive. **No test gates on the clock.**
+**Recalculating a branch has a target proportional to the size of the map, not a fixed number, and it is a target rather than a gate** (Kent, R24, superseding the fixed 600 ms of R19). The reference point was 600 ms for one world **with its range** on a twenty-claim map at 2 000 versions — 30 ms a claim by plain division — and what it protects is that an edit feels responsive. **No test gates on the clock.** *(Every timing in this section was measured with the two thousand versions record 0028 has since cut. One reading is a small fraction of that work, so the engine is far inside the target and the target has stopped being the interesting number; the model calls are what a reader waits for.)*
 
-Where the design stood against that when record 0016 was written, on one benchmark — twenty claims, up to three causes each, 2 000 versions, 24 slices — the prototype measured 538–568 ms with three arrows holding claims back, and **644 ms with five states feeding `sustain` arrows**, which is over the target and the record says so. The engine's own measured figures are recorded beside the old engine's in `ARCHITECTURE.md` §10 and in `docs/measurements.md`; the old engine's figures are not overwritten, because they were measured. <!-- VERIFY AT FLIP: the shipped engine's own benchmark, which the core pull request records; these are the prototype's. -->
+Where the design stood against that when record 0016 was written, on one benchmark — twenty claims, up to three causes each, **2 000 versions**, 24 slices — the prototype measured 538–568 ms with three arrows holding claims back, and **644 ms with five states feeding `sustain` arrows**, which was over the target and the record says so. That was the hard case for a design that no longer exists. The engine's own measured figures are recorded beside the old engine's in `ARCHITECTURE.md` §10 and in `docs/measurements.md`; the old engine's figures are not overwritten, because they were measured. <!-- VERIFY AT FLIP: the shipped engine's own benchmark, which the core pull request records; these are the prototype's. -->
 
 **One arrangement that is deliberately not built.** One tree built once and passed over twice would replace twenty elimination passes rather than the solve itself — about a tenth of the cost of a hard map, and nothing now asks for twenty passes in one request. The seam for it is the signature of `all_marginals` and nothing else.
 
@@ -325,7 +306,7 @@ Where the design stood against that when record 0016 was written, on one benchma
 
 Each statement is true for every input a named generator can produce, and each names the test that checks it. Generators live in `backend/tests/strategies.py`: `graphs()` yields random **valid** maps, `interventions(graph)` yields edits whose subjects exist in that map, `branches(graph)` yields branches of such edits, `seeds()` draws integer seeds, and `separated_pair(graph)` picks two claims joined by no path and sharing no ancestor. Tests live in `backend/tests/unit/domain/test_propagation.py` unless noted.
 
-This chapter uses the local numbers `INV-multiverse.9` through `.17`. `.1`–`.5` belong to [`interventions.md`](interventions.md), `.6`–`.8` to [`branches-and-worlds.md`](branches-and-worlds.md), and `.18` onward to [`diff.md`](diff.md).
+This chapter uses the local numbers `INV-multiverse.9` through `.17`; `.12` is retired with the range it was about (decision record 0028) and is not reused. `.1`–`.5` belong to [`interventions.md`](interventions.md), `.6`–`.8` to [`branches-and-worlds.md`](branches-and-worlds.md), and `.18` onward to [`diff.md`](diff.md).
 
 **INV-7 — honest numbers (product invariant: `0 ≤ lo ≤ p ≤ hi ≤ 1` on every belief, always).** For all maps, branches and seeds: every belief and every series point lies between 0 and 1 and satisfies that chain. Tests: `test_probability_bounds`, `test_belief_bounds_after_any_sequence`.
 
@@ -333,17 +314,13 @@ This chapter uses the local numbers `INV-multiverse.9` through `.17`. `.1`–`.5
 
 **INV-4 — locality (product invariant: an edit changes only what is still connected to its subject in the map the edit leaves behind).** For all maps and all edits: every claim outside the edit's affected set is byte-identical between the base world and the branch world, for all six operations, each pinning at least one fully separated claim. The test computes the affected set itself from the shape of the map — over the map with feedback arrows set aside — and never calls the code it is testing. Test: `test_intervention_locality`, in `test_patches.py`, re-checked after every step of `GraphEditMachine`.
 
-**INV-multiverse.9 — the versions do not depend on the branch.** For all maps, branches and seeds: the 2 000 versions drawn for a base world and for a branch world from one seed are element-for-element identical. Without this, every comparison is the user's edit plus a wash of sampling noise. Test: `test_versions_do_not_depend_on_the_branch`. *Catches:* deciding that something moved by comparing two ranges.
+**INV-multiverse.9 — a supposition is true, full stop.** For all maps and all `Do` edits: the target comes out true in the one reading, and its state on every day is `supposed`. Not `.98`, not `.999`. Nothing ends it but another edit, so there is no condition on the statement. Test: `test_supposition_is_true_in_every_world_until_undermined`. *Catches:* an implementation that models a supposition as a large finite baseline.
 
-**INV-multiverse.10 — a supposition is true in every version.** For all maps and all `Do` edits: the target comes out true in **every** version, and its state on every day is `supposed`. Not `.98`, not `.999`. Nothing ends it but another edit, so there is no condition on the statement. Test: `test_supposition_is_true_in_every_world_until_undermined`. *Catches:* an implementation that models a supposition as a large finite baseline.
+**INV-multiverse.10 — no number carries a range** *(replaces the statement that the range was not sampling noise; decision record 0028)*. For all maps, branches and seeds: every belief a world carries satisfies `lo == p == hi`, exactly; `range_shares` is empty; and no module under `domain/` draws a stated number from the range around it. Tests: `test_a_computed_belief_has_no_range`, and `test_nothing_draws_a_version`, a source check over `domain/` for a Latin hypercube, a per-version draw, or a version axis longer than one. *Catches:* the machinery growing back a field at a time.
 
 **INV-multiverse.11 — the elimination is exact.** For all maps of four claims or fewer from `graphs()`, all edits and all seeds: the answer agrees with an enumerator that sums the joint by hand **over the core's own tables** to `1e-9`. Test: `test_the_elimination_is_exact`, in `test_solving.py`. That enumerator is blind to a wrong table, which is why `.13` exists beside it. *Catches:* a wrong elimination order, a factor patched after the fact instead of the pass redone, a renormalisation that divides by zero.
 
-**INV-multiverse.12 — the range is not sampling noise, and is zero wide exactly.** For all maps rewritten so every stated chance is a point, **and worked through with every arrow's number held at exactly what the map states**, and all seeds: every computed range comes out **zero width**, exactly and not within a tolerance. Test: `test_band_is_not_sampling_noise`. Both freezes are needed: a version draws an arrow's number as well as a claim's chance, so freezing the chances alone leaves a range that is perfectly real, and `test_freezing_the_priors_alone_leaves_the_arrows_talking` is the other half. *Catches:* reporting the engine's own wobble as uncertainty, which is the single most likely way to get this chapter wrong.
-
 **INV-multiverse.13 — the tables agree with integrating over time.** For all maps of four claims or fewer from `graphs()`, carrying **states as well as events** and including at least one impulse and one diamond: every claim's number is within `.005` of an enumerator built from the arrow parameters alone — forbidden the core's tables — on at least 99% of the generated set, with failing cases named. Seeded, sample size stated, and run at the **same 24 slices and the same middle-of-slice convention as the core**, so what it measures is the arithmetic and not the grid (B1 says what the grid itself costs). Test: `test_the_tables_agree_with_integrating_over_time`, in `test_by_deadline.py`. *Catches:* the defect the first design of this core shipped with, where the arithmetic was exact and the table it ran on was built from timing worked out before the evidence.
-
-**INV-multiverse.13b — how wide an arrow's number is drawn comes from where it came from, and from nothing else.** Two arrows sharing a `provenance` and differing in every other field draw numbers that agree to the bit; each word's draws are centred on what the map states and spread by B8's table; on a map whose every stated chance is a point, the claim an arrow points at has a wider range where that arrow is `asserted` than `argued`, and wider there than `documented`. Adding an arrow leaves every other arrow's draws untouched. Tests: `test_link_spread_comes_only_from_provenance`, `test_a_documented_arrow_gives_a_narrower_band_than_an_asserted_one`, `test_adding_an_arrow_does_not_move_another_arrows_draws`.
 
 **INV-multiverse.14 — the domino stays fallen and the apple falls.** For all maps containing a `trigger` arrow out of a claim that later stops holding: the target's series afterwards is byte-identical to the series in which the source never stopped. For all maps containing a `sustain` arrow out of a **state**: the arrow contributes exactly nothing from the moment its source stops holding. Tests: `test_a_sustain_arrow_reads_the_whole_interval_and_a_trigger_only_the_on_day`, `test_trigger_persists_after_parent_reset`.
 
@@ -369,15 +346,13 @@ Assertion 5 is a comparison **between branches on one day**, where the old golde
 
 ## ANTI-PATTERNS
 
-**1. Do not report the spread of a sampler as the range.** *Because* it measures the machine rather than the map: run more of it and the "uncertainty" shrinks, which means a number that moves when you buy computer time is being passed off as a statement about the world. **Do** take the percentiles across versions of exactly solved answers, and keep `test_band_is_not_sampling_noise`, which freezes every stated chance to a point **and** holds every arrow's number at what the map states and demands a range of zero width. *(This anti-pattern kept its rule and lost its mechanism: there is no inner loop left to subtract, and the law of total variance that used to do the subtracting is gone with it.)*
+**1. Do not put a second number beside a claim's likelihood.** *Because* one number that answers the claim's own sentence is what a reader can act on, and the second — a range, a width, a share of runs that agreed — costs attention on every tile and gives back a caveat. It was tried, on screen, and Kent cut it (record 0028). **Do** show the one likelihood at two significant figures, with `<.01` and `>.99` where they are true, and say the rest in words under the map.
 
-**2. Do not let the `params` or the `strengths` stream see the branch.** *Because* the base world and the branch world then run on different underlying numbers, and every comparison becomes the user's edit plus a wash of elicitation noise, with no way to separate them. **Do** derive both from the seed alone, and each thing's own stream from its own identifier.
+**2. Do not grow the versions back one field at a time.** *Because* each piece is individually defensible — a range here, a width share there, a spread on an arrow — and together they are the design that was cut. **Do** keep the version axis at length one, and let `test_nothing_draws_a_version` fail the day something draws one.
 
-**3. Do not model a supposition as a big finite baseline.** *Because* ±4.0 is an arbitrary constant with no source, it contradicts the user in about two per cent of versions, and it makes "suppose this is true" mean "assume ninety-eight per cent", which is not what the button says. **Do** make the claim true in every version while the supposition holds, and show a word where a number would go.
+**3. Do not model a supposition as a big finite baseline.** *Because* ±4.0 is an arbitrary constant with no source, it contradicts the user about one time in fifty, and it makes "suppose this is true" mean "assume ninety-eight per cent", which is not what the button says. **Do** make the claim true in every version while the supposition holds, and show a word where a number would go.
 
-**4. Do not fit `{p, lo, hi}` on the probability scale.** *Because* elicited ranges are lopsided there, so a symmetric fit has to clamp at 0 and 1 and silently stops honouring the three numbers the model stated. **Do** fit the two halves separately on the log-odds scale, which honours all three exactly and can never leave 0–1.
-
-**5. Do not decide that something moved by comparing two ranges.** *Because* the ranges answer a different question: two worlds can overlap across more than half the narrower of them while nearly every version moves the same way. **Do** subtract version by version and read the paired difference; [`diff.md`](diff.md) states the rule.
+**4. Do not decide that something moved by eye.** *Because* two numbers that round to the same two figures may genuinely differ, and two that look far apart may be inside the floor a reader can act on. **Do** subtract the two worlds' numbers and compare the difference against the `.005` floor; [`diff.md`](diff.md) states the rule.
 
 **6. Do not reach for a module-level random generator, a global seed, or the clock.** *Because* a world would then depend on how many other worlds had been computed before it, which quietly destroys replay and with it every reproducible screenshot. **Do** pass the seed as an argument and build every generator from it.
 
@@ -385,7 +360,7 @@ Assertion 5 is a comparison **between branches on one day**, where the old golde
 
 **8. Do not put "how often these two show up together" on a wire.** *Because* that is a correlation, and a wire claims a mechanism; the two disagree whenever a third thing caused both, and the reader has no way to tell. **Do** compute `conditionals` with the arrow's source **supposed** true.
 
-**9. Do not add `strength_lo` and `strength_hi` to make arrows uncertain.** *Because* a second elicited number per arrow is exactly the budget record 0005 refused, and two numbers about one arrow's width would eventually drift apart. **Do** derive the width from the arrow's `provenance` every time it is needed.
+**9. Do not add `strength_lo` and `strength_hi` to make arrows uncertain.** *Because* a second elicited number per arrow is exactly the budget record 0005 refused, and two numbers about one arrow would eventually drift apart. This one is **permanent** — Kent, record 0014, and nothing in record 0028 softens it. **Do** carry one number per arrow and say how well-backed it is with its `provenance`, which is a receipt rather than a second estimate.
 
 **10. Do not read when a cause arrived off a grid the map's shape chose.** *Because* that grid is a property of the **whole map** — how far out the furthest deadline happens to sit — so a claim inserted at one end of the map re-times a claim at the other end that nothing connects it to, and locality fails through the sampling rather than along the arrows. **Do** take *when* out of the forward pass, which reads each claim's own window and its own arrows and nothing else.
 
