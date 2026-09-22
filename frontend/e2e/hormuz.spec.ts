@@ -831,7 +831,12 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   // A tile is 280 pixels wide, measured rather than eyeballed — and measured
   // only once the framing animation has stopped, because a width read against a
   // zoom that is still changing is two measurements of different moments.
-  await whereTheMapCameToRest(page);
+  //
+  // **The reading is kept**, because it is the frame this map opens with beside
+  // the panel, and folding the panel away and bringing it back is checked
+  // against it further down. No number is written down: the transform is
+  // compared with itself across the two presses.
+  const framedOnOpening = await whereTheMapCameToRest(page);
   await expect
     .poll(
       () =>
@@ -885,7 +890,10 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     const wide = async () => (await theStage.boundingBox())?.width ?? 0;
     const wasWide = await wide();
     expect(wasWide, "the stage was drawn at no width at all").toBeGreaterThan(0);
-    const framedOpen = await whereTheMapCameToRest(page);
+    // Waited for rather than read: the walk above may have moved the map to
+    // bring a claim onto the glass, and the press below must land on a map that
+    // has finished moving.
+    await whereTheMapCameToRest(page);
 
     await page.getByRole("button", { name: "Hide the panel beside the map" }).click();
     await expect(page.locator(".dock-column")).toHaveCount(0);
@@ -897,14 +905,18 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     // went behind, which is the only control on screen while it is away.
     await expect(page.getByRole("button", { name: "Show the panel beside the map" })).toBeVisible();
 
-    // **The map is framed again for the stage it is now in, once, as a cut.**
-    // 310 more pixels and the same map: framed for the narrower stage it would
-    // sit off to one side of the wider one. The reading is the viewport's own
-    // transform compared with itself across the press — no number is written
-    // here — and it is taken once the map has stopped moving, because a
-    // transform read while it is still changing is a reading of a moment.
+    // **The map is framed again for the stage it is now in, once, as a cut** —
+    // and framing again is framing, not restoring. Whatever the walk above had
+    // moved the map to is let go, and the map lands on its own framing: the very
+    // one it opened with, because a map this wide is started at its beginning at
+    // either stage width and the two framings are therefore the same frame.
+    // `src/graph/__tests__/layout.test.ts` does that arithmetic with no browser.
+    // The reading is the viewport's own transform compared with itself across
+    // the press — no number is written here — and it is taken once the map has
+    // stopped moving, because a transform read while it is still changing is a
+    // reading of a moment.
     const framedWider = await whereTheMapCameToRest(page);
-    expect(framedWider, "the map was not framed again when the panel folded").not.toBe(framedOpen);
+    expect(framedWider, "the map was not framed again when the panel folded").toBe(framedOnOpening);
 
     // **And it is framed honestly, which is not the same as everything fitting.**
     // This map is five columns of tiles, and at the zoom the frame holds — the
@@ -940,13 +952,19 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     await expect(page.locator(".map-status")).toContainText("along an arrow");
     await expect(page.locator(".dock-column")).toHaveCount(0);
 
-    // The key still brings it back, and the map is framed back to where it was.
+    // The key still brings it back, and the map is framed again for the stage it
+    // is back in — which is the frame it opened with, to the pixel. **Not
+    // wherever the reader had last panned to**: the step along a wire a moment
+    // ago may have moved the map to bring a claim onto the glass, and a frame is
+    // worked out from the map and the stage rather than remembered. That is the
+    // rule this product settled on when the panel learned to fold — the map is
+    // framed again, once, as a cut — and this is that rule read off the glass.
     await page.keyboard.press("P");
     await expect(page.locator(".dock-column")).toHaveCount(1);
     await expect
       .poll(wide, { timeout: 5_000, message: "the stage never gave the panel's width back" })
       .toBe(wasWide);
-    expect(await whereTheMapCameToRest(page)).toBe(framedOpen);
+    expect(await whereTheMapCameToRest(page)).toBe(framedOnOpening);
 
     // And the walk goes on from the claim it was on before this step.
     await standOn(page, standingWhenTheWalkFoldedThePanel);
