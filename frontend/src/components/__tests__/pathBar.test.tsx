@@ -99,9 +99,7 @@ describe("what the bar says", () => {
     const withANumber = aWorld({
       ...world,
       claims: world.claims.map((claim) =>
-        claim.id === "M1"
-          ? aClaim({ ...claim, pathProduct: { reading: { p: 0.18, lo: 0.1, hi: 0.3 } } })
-          : claim,
+        claim.id === "M1" ? aClaim({ ...claim, pathProduct: { reading: { p: 0.18 } } }) : claim,
       ),
     });
     const second = render(<PathBar world={withANumber} claimId="M1" />);

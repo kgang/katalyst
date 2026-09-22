@@ -188,11 +188,18 @@ describe("asking the engine", () => {
 
     // Full precision, not rounded here: rounding is a display decision and is
     // made once, in the chip.
-    expect(h?.beliefs.model.reading).toEqual({ p: 0.081, lo: 0.04, hi: 0.13 });
-    // And how the engine was run, so the chip can say whether its range was
-    // computed rather than merely stated.
-    expect(world.versions).toBe(2000);
-    expect(world.worldsPerVersion).toBe(8);
+    //
+    // **One number, and the bottom and the top the engine still sends are
+    // dropped here** (Kent, 2026-09-22, R48). They are on the wire because the
+    // engine that computes them is another stack's to rewrite; there is nowhere
+    // on this side to put them and nothing on screen that would print them.
+    expect(h?.beliefs.model.reading).toEqual({ p: 0.081 });
+    // And that the engine worked these numbers out, rather than how it got
+    // there: the count of versions came off the world with the range it was
+    // carried for.
+    expect(world.workedOut).toBe(true);
+    expect("versions" in world).toBe(false);
+    expect("worldsPerVersion" in world).toBe(false);
     expect(world.seed).toBe(20261001);
     // Whatever the engine wanted the reader to see, said once and unedited.
     expect(world.warnings).toEqual(["Fewer worlds survived than usual."]);
@@ -207,7 +214,7 @@ describe("asking the engine", () => {
     // number: every reader looks at the world's states first and writes the
     // word where the likelihood would go.
     expect(strike?.standing?.words).toBe("Supposed · Oct 2");
-    expect(strike?.standing?.reason).toContain("settled in every version of the map");
+    expect(strike?.standing?.reason).toContain("settled wherever the engine looks");
   });
 
   it("test_a_claim_judged_on_a_day_the_series_does_not_draw_is_read_the_engines_way", async () => {
@@ -257,7 +264,7 @@ describe("asking the engine", () => {
     const world = await new ApiWorldSource().readWorld({ baseId: "example", branch: BRANCH });
     const news = world.claims.find((claim) => claim.id === "S");
     expect(news?.standing?.words).toBe("Happened · Oct 1");
-    expect(news?.standing?.reason).toContain("settled in every version of the map");
+    expect(news?.standing?.reason).toContain("settled wherever the engine looks");
   });
 
   it("test_news_that_something_did_not_happen_reads_the_mirror_word", async () => {
@@ -336,6 +343,12 @@ describe("asking the engine", () => {
     // test, and the engine says which: the move was too small, or the versions
     // of the map did not agree which way it went. The two numbers below are
     // plainly made up; the words are what is under test.
+    //
+    // **One of the two words stops here** *(Kent, 2026-09-22, R48)*.
+    // `versions_disagree` is a fact about running the map two thousand times,
+    // and there are no versions of the map on this screen, so it is dropped on
+    // the way in and a claim that failed on it carries no word at all. It is
+    // still on the wire, and it dies with the engine half.
     vi.mocked(readDiff).mockResolvedValue({
       ...DIFFERENCE,
       claims: {
@@ -368,7 +381,7 @@ describe("asking the engine", () => {
     // this is the only way the browser can know which half a claim failed —
     // which is what stops a second engine growing here and disagreeing with
     // the first about which claims held still.
-    expect(change.claims.get("H")?.moved?.unchangedBecause).toBe("versions_disagree");
+    expect(change.claims.get("H")?.moved?.unchangedBecause).toBeUndefined();
     expect(change.claims.get("S")?.moved?.unchangedBecause).toBe("under_the_floor");
   });
 

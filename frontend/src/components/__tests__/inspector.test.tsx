@@ -34,8 +34,8 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
           },
         },
         beliefs: {
-          model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
-          user: { reading: { p: 0.55, lo: 0.4, hi: 0.7 } },
+          model: { reading: { p: 0.35 } },
+          user: { reading: { p: 0.55 } },
           market: {
             absence: absence("no_market", "no venue quotes this claim"),
           },
@@ -54,7 +54,7 @@ function hormuzish(over: Partial<WorldView> = {}): WorldView {
         id: "B",
         claim: "Brent crude settles below $68 for five sessions.",
         beliefs: {
-          model: { reading: { p: 0.46, lo: 0.3, hi: 0.63 } },
+          model: { reading: { p: 0.46 } },
           user: { absence: absence("not_said", "You have not said.") },
           market: {
             absence: absence("no_market", "no venue quotes this claim"),
@@ -148,42 +148,27 @@ describe("the panel, on a claim", () => {
     expect(document.body.textContent).not.toContain("NaN");
   });
 
-  it("test_picks_the_sentence_from_versions", () => {
-    // Nothing computed this number, so the range is what whoever wrote it down
-    // said about how sure they were. Printing "uncalibrated" over it would claim
-    // an arithmetic that never ran.
-    const { unmount } = render(
-      <Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />,
-    );
-    expect(screen.getByText("stated range · not computed")).toBeInTheDocument();
-    expect(document.body.textContent).toContain("This range is stated, not computed");
-    expect(document.body.textContent).not.toContain("uncalibrated");
-    unmount();
-
-    render(
-      <Inspector world={hormuzish({ versions: 2000 })} selection={{ kind: "claim", id: "H" }} />,
-    );
-    expect(document.body.textContent).toContain("model interval, uncalibrated");
-    expect(document.body.textContent).toContain("Across 2 000 versions of this map");
-    expect(document.body.textContent).toContain("eight times in ten");
-  });
-
-  it("test_the_band_slot_is_never_drawn_without_versions", () => {
-    const { unmount } = render(
-      <Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />,
-    );
-    expect(document.querySelector(".inspector__band-slot")).toBeNull();
-    unmount();
-
-    render(
-      <Inspector world={hormuzish({ versions: 2000 })} selection={{ kind: "claim", id: "H" }} />,
-    );
-    // The slot is reserved so the layout does not jump the day the sentence
-    // arrives — and it is empty, because a sentence naming a percentage nobody
-    // computed is a number nobody computed wearing words.
-    const slot = document.querySelector(".inspector__band-slot");
-    expect(slot).not.toBeNull();
-    expect(slot?.textContent).toBe("");
+  // **Two tests stood here and are replaced by one** *(Kent, 2026-09-22, R48)*.
+  // `test_picks_the_sentence_from_versions` checked that the panel said *stated
+  // range · not computed* over a number nobody had worked out and *model
+  // interval, uncalibrated · … Across 2 000 versions of this map…* over one the
+  // engine had; `test_the_band_slot_is_never_drawn_without_versions` checked the
+  // empty slot reserved under it for *why is this band wide?*. There is no
+  // range, so neither sentence and neither slot has anything to be about.
+  it("test_the_panel_says_nothing_about_a_range_or_about_versions", () => {
+    for (const world of [hormuzish(), hormuzish({ workedOut: true })]) {
+      const { unmount } = render(
+        <Inspector world={world} selection={{ kind: "claim", id: "H" }} />,
+      );
+      const words = (document.body.textContent ?? "").toLowerCase();
+      for (const forbidden of ["uncalibrated", "interval", "version", "worlds", "middle 80"]) {
+        expect(words).not.toContain(forbidden);
+      }
+      // And nothing that reads as a pair of numbers with a dash between them.
+      expect(document.body.textContent ?? "").not.toMatch(/[.>]\d+\s*[–-]\s*[.<>]/);
+      expect(document.querySelector(".inspector__band-slot")).toBeNull();
+      unmount();
+    }
   });
 
   it("test_never_derives_a_displayed_number", () => {
@@ -204,13 +189,13 @@ describe("the panel, on a claim", () => {
     render(<Inspector world={hormuzish()} selection={{ kind: "claim", id: "H" }} />);
     const numbers = (document.body.textContent ?? "").match(/\.\d\d/g) ?? [];
     for (const number of numbers) {
-      expect([".35", ".22", ".50", ".55", ".40", ".70", ".28", ".15", ".42"]).toContain(number);
+      expect([".35", ".55", ".28"]).toContain(number);
     }
   });
 
   it("test_the_decomposition_is_laid_out_and_never_added_up", () => {
     render(
-      <Inspector world={hormuzish({ versions: 2000 })} selection={{ kind: "claim", id: "B" }} />,
+      <Inspector world={hormuzish({ workedOut: true })} selection={{ kind: "claim", id: "B" }} />,
     );
 
     // What it started at, what pushes on it, and what it comes to — every line
@@ -222,7 +207,7 @@ describe("the panel, on a claim", () => {
 
     // The result is the engine's own answer for this claim, printed as it came:
     // once on the belief row, once at the foot of the decomposition.
-    expect(screen.getAllByText(".46 (.30–.63)").length).toBe(2);
+    expect(screen.getAllByText(".46").length).toBe(2);
     expect(screen.getByText(/the engine's own answer for this claim/)).toBeInTheDocument();
   });
 
@@ -265,71 +250,51 @@ describe("the panel, on a claim", () => {
     ).toBeInTheDocument();
   });
 
-  it("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", () => {
-    // The engine's difference carries `moved_only_by_reweighting` on the claim's
-    // own row, and the browser must never work it out for itself — whether a
-    // claim moved for that reason is a fact about how the engine read the
-    // numbers. So the panel is driven here with the field set by hand, which
-    // checks the one thing this side owns: that the sentence is printed, word
-    // for word, exactly when the engine says so and never otherwise. The
-    // end-to-end test drives the real engine into the same state.
-    const moved = {
-      from: 0.356,
-      to: 0.365,
-      way: "up" as const,
-      by: 0.008968,
-      sameDirection: { reading: 0 },
-    };
-    const sentence = "this claim moved only because the observation made some versions count more.";
-
-    const quiet = render(
-      <Inspector
-        world={hormuzish({
-          versions: 2000,
-          claims: [aClaim({ id: "H", kind: "hypothesis", diff: "shifted", moved })],
-        })}
-        selection={{ kind: "claim", id: "H" }}
-      />,
-    );
-    expect(screen.queryByText(sentence)).toBeNull();
-    quiet.unmount();
-
+  // **This test was `test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector`**
+  // and now asserts the sentence's absence (Kent, 2026-09-22, R48). The engine
+  // still carries `moved_only_by_reweighting` on a claim's row; what it says is
+  // that a claim moved only because an observation made some of the two thousand
+  // versions of the map count for more than others, and there are no versions of
+  // the map on this screen for it to be about. `world/apiSource.ts` is where it
+  // stops, and it dies with the engine half.
+  it("test_no_sentence_about_reweighting_reaches_the_panel", () => {
     render(
       <Inspector
         world={hormuzish({
-          versions: 2000,
+          workedOut: true,
           claims: [
             aClaim({
               id: "H",
               kind: "hypothesis",
               diff: "shifted",
-              moved: { ...moved, onlyReweighted: true },
+              moved: { from: 0.356, to: 0.365, way: "up", by: 0.008968 },
             }),
           ],
         })}
         selection={{ kind: "claim", id: "H" }}
       />,
     );
-    expect(screen.getByText(sentence)).toBeInTheDocument();
+    const words = (document.body.textContent ?? "").toLowerCase();
+    expect(words).not.toContain("count more");
+    expect(words).not.toContain("reweight");
+    expect(words).not.toContain("version");
   });
 
-  it("test_a_moved_claim_shows_the_two_readings_and_the_share_that_agreed", () => {
-    render(
+  // **This test was `test_a_moved_claim_shows_the_two_readings_and_the_share_that_agreed`.**
+  // The share was *same direction* — how many of the two thousand versions of
+  // the map moved the same way — and it went with them (Kent, 2026-09-22, R48).
+  // What a moved claim shows is the two readings and the direction.
+  it("test_a_moved_claim_shows_the_two_readings_and_the_direction", () => {
+    const { container } = render(
       <Inspector
         world={hormuzish({
-          versions: 2000,
+          workedOut: true,
           claims: [
             aClaim({
               id: "H",
               kind: "hypothesis",
               diff: "shifted",
-              moved: {
-                from: 0.356,
-                to: 0.081,
-                way: "down",
-                by: -0.275,
-                sameDirection: { reading: 1 },
-              },
+              moved: { from: 0.356, to: 0.081, way: "down", by: -0.275 },
             }),
           ],
         })}
@@ -339,8 +304,9 @@ describe("the panel, on a claim", () => {
     expect(screen.getByText(".36 ▼ .081")).toBeInTheDocument();
     // The chevron is never the only thing saying which way it went.
     expect(screen.getByText("down")).toBeInTheDocument();
-    expect(screen.getByText("same direction")).toBeInTheDocument();
-    expect(screen.getByText("100%")).toBeInTheDocument();
+    // And nothing beside it counts anything: no column, no share, no percentage.
+    expect(screen.queryByText("same direction")).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/\d+%/);
   });
 });
 
@@ -369,13 +335,13 @@ describe("the panel, on an arrow", () => {
           ...world,
           links: world.links.map((wire) => ({
             ...wire,
-            conditional: { reading: { p: 0.584, lo: 0.416, hi: 0.734 } },
+            conditional: { reading: { p: 0.584 } },
           })),
         }}
         selection={{ kind: "wire", id: "H->B" }}
       />,
     );
-    expect(screen.getByText(".58 (.42–.73)")).toBeInTheDocument();
+    expect(screen.getByText(".58")).toBeInTheDocument();
     expect(screen.getByText(/supposed, never observed/)).toBeInTheDocument();
   });
 

@@ -6,19 +6,20 @@
  * re-sorted here; without it, in the order the map stores them, and the rail
  * says so on its own face. And **it invents no number** — every slot without one
  * renders the reason it has none, in words a reader can get at without a mouse.
+ *
+ * **A row is the ending, its number before and after, and the direction**
+ * *(Kent, 2026-09-22, R48)*. Two columns stood beside them until then — *how
+ * firm*, the width of the range around the new number, and *same direction*, the
+ * share of the two thousand versions of the map that moved the same way — and
+ * the tests that asserted them assert their absence below.
  */
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { quietRow } from "../../graph/diff/noChange";
 import type { DeltaRow, Movement } from "../../world";
-import { absence, inTheEnginesWords, noReadingAtAll } from "../../world/absence";
+import { absence, inTheEnginesWords } from "../../world/absence";
 import { DeltaRail } from "../DeltaRail";
-
-/** Where a number will go, and why it is not there yet. */
-const NOT_YET = {
-  absence: noReadingAtAll("Nothing has worked this number through the map yet."),
-};
 
 /** Three endings, in the order the stored example's map holds them. */
 const ROWS: DeltaRow[] = [
@@ -29,8 +30,6 @@ const ROWS: DeltaRow[] = [
     move: {
       absence: absence("no_engine", "Nothing has worked this ending's number through the map."),
     },
-    rangeWidth: NOT_YET,
-    agreement: NOT_YET,
   },
   {
     claimId: "M2",
@@ -39,8 +38,6 @@ const ROWS: DeltaRow[] = [
     move: {
       absence: absence("no_engine", "Nothing has worked this ending's number through the map."),
     },
-    rangeWidth: NOT_YET,
-    agreement: NOT_YET,
   },
   {
     claimId: "N1",
@@ -49,8 +46,6 @@ const ROWS: DeltaRow[] = [
     move: {
       absence: absence("no_engine", "Nothing has worked this ending's number through the map."),
     },
-    rangeWidth: NOT_YET,
-    agreement: NOT_YET,
   },
 ];
 
@@ -71,11 +66,13 @@ const SUMMARY = {
  * the engine's own word — not this file's idea of what that word ought to look
  * like.
  *
- * The two readings and the share are plainly made up and nothing below reads
- * them; what is real is the engine's word for which half of its test the claim
- * failed, which is the only thing that changes between one call and the next.
+ * The two readings are plainly made up and nothing below reads them; what is
+ * real is the engine's own word for why it would not call the difference a move,
+ * which is the only thing that changes between one call and the next.
  *
- * @param because The engine's own word, or nothing at all where it gave none.
+ * @param because The engine's own word, or nothing at all where it gave none —
+ *   which is now also what a claim its two thousand versions disagreed about
+ *   arrives as, because that word never reaches the browser (2026-09-22, R48).
  */
 function heldFor(because: Movement["unchangedBecause"]): DeltaRow {
   const moved: Movement = {
@@ -83,8 +80,7 @@ function heldFor(because: Movement["unchangedBecause"]): DeltaRow {
     to: 0.3,
     way: "up",
     by: 0.1,
-    sameDirection: { reading: 0.5 },
-    unchangedBecause: because,
+    ...(because === undefined ? {} : { unchangedBecause: because }),
   };
   const quiet = quietRow("unchanged", moved, undefined);
   return {
@@ -92,8 +88,6 @@ function heldFor(because: Movement["unchangedBecause"]): DeltaRow {
     label: "Omani-mediated talks resume publicly.",
     kind: "not_tradeable",
     move: { absence: inTheEnginesWords(quiet.words, quiet.reason) },
-    rangeWidth: NOT_YET,
-    agreement: NOT_YET,
     unranked: true,
     note: quiet.note,
   };
@@ -121,24 +115,18 @@ const RANKED: DeltaRow[] = [
     move: {
       reading: { from: 0.496, to: 0.417, largestOn: "2026-10-04", way: "down", by: -0.0791 },
     },
-    rangeWidth: { reading: 0.269 },
-    agreement: { reading: 0.9663 },
   },
   {
     claimId: "M2",
     label: "The energy fund XLE underperforms SPY by more than 3%.",
     kind: "market",
     move: { reading: { from: 0.432, to: 0.363, largestOn: "2026-10-06", way: "down", by: -0.069 } },
-    rangeWidth: { reading: 0.278 },
-    agreement: { reading: 0.9553 },
   },
   {
     claimId: "N1",
     label: "Omani-mediated talks resume publicly.",
     kind: "not_tradeable",
     move: { reading: { from: 0.281, to: 0.369, largestOn: "2026-10-11", way: "up", by: 0.0877 } },
-    rangeWidth: { reading: 0.316 },
-    agreement: { reading: 0.9995 },
   },
 ];
 
@@ -190,27 +178,28 @@ describe("the rail beside the map", () => {
     expect(screen.getByText(/In the order the engine put them in/)).toBeInTheDocument();
   });
 
-  it("test_how_firm_and_same_direction_are_columns_not_factors", () => {
-    render(<DeltaRail rows={RANKED} ranked={true} summary={SUMMARY} />);
+  // **This test was `test_how_firm_and_same_direction_are_columns_not_factors`**
+  // and now asserts the absence of both columns (Kent, 2026-09-22, R48). It
+  // used to check that the width of a range and the share of the versions of
+  // the map that agreed were printed beside each move and never folded into the
+  // ranking. There is no range and there are no versions, so there is nothing
+  // to fold and nothing to print.
+  it("test_the_change_list_has_no_how_firm_and_no_same_direction", () => {
+    const { container } = render(<DeltaRail rows={RANKED} ranked={true} summary={SUMMARY} />);
 
-    // Two headings, two columns, every row carrying both — and neither of them
-    // anywhere near the order the rows are drawn in. They answer different
-    // questions, a trader weighs them separately, and blending either into a
-    // rank would bury exactly the wide claims worth researching.
-    expect(screen.getByText("how firm")).toBeInTheDocument();
-    expect(screen.getByText("same direction")).toBeInTheDocument();
+    expect(screen.queryByText("how firm")).toBeNull();
+    expect(screen.queryByText("same direction")).toBeNull();
+    const words = (container.textContent ?? "").toLowerCase();
+    expect(words).not.toContain("how firm");
+    expect(words).not.toContain("same direction");
+    // One column label, and one value cell a row.
+    expect([...container.querySelectorAll(".delta-rail__labels > *")]).toHaveLength(1);
+    for (const values of container.querySelectorAll(".delta-rail__values")) {
+      expect([...values.children]).toHaveLength(1);
+    }
 
-    // Widest band first would be N1, M2, M1; most agreement first would be N1,
-    // M1, M2. The rail shows neither, because it shows the order it was given.
+    // And the order is still the one the rail was given.
     expect(inOrder()).toEqual(["M1", "M2", "N1"]);
-
-    // Both are printed at two significant figures, like every number on screen,
-    // and a share is printed as a whole percentage because it is counted rather
-    // than estimated.
-    expect(screen.getByText(".27")).toBeInTheDocument();
-    expect(screen.getByText("97%")).toBeInTheDocument();
-    // A share that is not quite all of them never rounds up into all of them.
-    expect(screen.getByText(">99%")).toBeInTheDocument();
   });
 
   it("test_an_unmoved_terminal_is_a_greyed_row_not_a_missing_one", () => {
@@ -220,13 +209,11 @@ describe("the rail beside the map", () => {
     //
     // This is the ending the whole rule was written for. On the stored
     // example's strike branch the talks make the biggest move on the map and
-    // the engine still will not call it a move, because the one arrow into them
-    // is the map's one bare assertion and the versions of the map end up
-    // disagreeing which way the talks went. A list that dropped it would drop
-    // the most interesting thing on the map without saying so.
+    // the engine still will not call it a move. A list that dropped it would
+    // drop the most interesting thing on the map without saying so.
     const { container } = render(
       <DeltaRail
-        rows={[RANKED[0] as DeltaRow, heldFor("versions_disagree")]}
+        rows={[RANKED[0] as DeltaRow, heldFor(undefined)]}
         ranked={true}
         summary={SUMMARY}
       />,
@@ -244,47 +231,42 @@ describe("the rail beside the map", () => {
   });
 
   it("test_the_no_change_sentence_comes_from_the_engines_own_word", () => {
-    // A claim that barely moved and a claim whose versions of the map
-    // disagreed which way are two different findings, and the reader is told
-    // which. The word is the engine's, on the claim's own row; the browser
-    // picks the words that go with it and works nothing out, because the floor
-    // and the bar that decide it are constants inside the engine and are on no
-    // wire.
+    // The word is the engine's, on the claim's own row; the browser picks the
+    // words that go with it and works nothing out, because the floor that
+    // decides it is a constant inside the engine and is on no wire.
+    //
+    // **The engine has a second word and this product no longer shows it**
+    // *(2026-09-22, R48)*: *the versions of the map disagreed which way*. It is
+    // a fact about running the map two thousand times, so it stops at the wire
+    // and a claim that failed on it arrives here with no word at all.
     const { rerender } = render(
-      <DeltaRail rows={[heldFor("versions_disagree")]} ranked={true} summary={SUMMARY} />,
+      <DeltaRail rows={[heldFor("under_the_floor")]} ranked={true} summary={SUMMARY} />,
     );
-    const disagreed = screen.getByText("no change");
-    expect(screen.getByText("the versions disagreed which way")).toBeInTheDocument();
-    expect(screen.queryByText("barely moved")).toBeNull();
-    expect(disagreed.getAttribute("aria-label") ?? "").toMatch(/did not agree which way it went/);
-
-    rerender(<DeltaRail rows={[heldFor("under_the_floor")]} ranked={true} summary={SUMMARY} />);
     expect(screen.getByText("barely moved")).toBeInTheDocument();
-    expect(screen.queryByText("the versions disagreed which way")).toBeNull();
     expect(screen.getByText("no change").getAttribute("aria-label") ?? "").toMatch(
-      /smaller than the engine will report/,
+      /smaller than it will report/,
     );
 
-    // And where the engine gave no word, neither does the rail: a half-line
-    // nobody can account for is exactly what this product refuses to draw.
+    // And where the engine gave no word this product may show, neither does the
+    // rail: a half-line nobody can account for is exactly what this product
+    // refuses to draw.
     rerender(<DeltaRail rows={[heldFor(undefined)]} ranked={true} summary={SUMMARY} />);
     expect(screen.queryByText("barely moved")).toBeNull();
-    expect(screen.queryByText("the versions disagreed which way")).toBeNull();
+    expect(screen.getByText("no change")).toBeInTheDocument();
   });
 
   it("test_a_greyed_row_is_not_greyed_by_colour_alone", () => {
     // Convert the screen to grey, or read the list out loud, and a row that is
     // merely a shade quieter than its neighbours says nothing at all. So the
     // row says it twice: the change cell reads the engine's verdict in words,
-    // and the half-line under the ending says which half of the engine's test
-    // it failed. Neither is a colour.
+    // and the half-line under the ending says why. Neither is a colour.
     const { container } = render(
-      <DeltaRail rows={[heldFor("versions_disagree")]} ranked={true} summary={SUMMARY} />,
+      <DeltaRail rows={[heldFor("under_the_floor")]} ranked={true} summary={SUMMARY} />,
     );
     const row = container.querySelector('.delta-rail__row[data-ranked="no"]') as HTMLElement;
     const words = (row.textContent ?? "").toLowerCase();
     expect(words).toContain("no change");
-    expect(words).toContain("the versions disagreed which way");
+    expect(words).toContain("barely moved");
   });
 
   it("test_a_ranked_row_names_the_day_the_two_worlds_are_furthest_apart", () => {
@@ -303,23 +285,20 @@ describe("the rail beside the map", () => {
 
   it("test_renders_a_reason_for_every_absent_number", () => {
     render(<DeltaRail rows={ROWS} ranked={false} summary={SUMMARY} />);
-    // Three cells a row, three rows, and every one of them a thing the keyboard
-    // can land on whose name carries the sentence behind it.
+    // One cell a row, three rows, and every one of them a thing the keyboard
+    // can land on whose name carries the sentence behind it. It was three cells
+    // a row until R48 took the other two columns (2026-09-22).
     const cells = screen.getAllByRole("button");
-    expect(cells).toHaveLength(9);
+    expect(cells).toHaveLength(3);
     for (const cell of cells) {
       expect(cell.getAttribute("aria-label") ?? "").toMatch(/Nothing has worked/);
     }
   });
 
-  it("test_never_sorts_by_width_or_agreement", () => {
-    render(<DeltaRail rows={ROWS} ranked={false} summary={SUMMARY} />);
-    expect(screen.getByText("how firm")).toBeInTheDocument();
-    expect(screen.getByText("same direction")).toBeInTheDocument();
-    // The word *agreement* is kept off the screen: it is reserved for a
-    // different number, computed run to run, that this build does not have.
-    expect(screen.queryByText(/agreement/i)).toBeNull();
-  });
+  // **`test_never_sorts_by_width_or_agreement` is deleted** *(2026-09-22, R48)*.
+  // There is no width and no agreement to sort by: the test above,
+  // `test_the_change_list_has_no_how_firm_and_no_same_direction`, asserts that
+  // neither is on the screen at all, which is the stronger claim.
 
   it("test_the_summary_slot_is_an_absence_with_a_reason", () => {
     render(<DeltaRail rows={ROWS} ranked={false} summary={SUMMARY} />);

@@ -741,7 +741,12 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(page.locator('.react-flow__node[data-id="H"]')).toBeVisible();
   await expect(page.locator(".map-origin")).toContainText("/api/fixtures/hormuz");
   await expect(page.locator(".map-origin")).toContainText("/api/worlds");
-  await expect(page.locator(".map-origin")).toContainText("versions of the map");
+  // The seed, because a run is reproducible from it — and **not** how many
+  // versions of the map the engine tried, nor how many worlds under each, which
+  // Kent cut from this product on 2026-09-22 (R48).
+  await expect(page.locator(".map-origin")).toContainText("at seed");
+  await expect(page.locator(".map-origin")).not.toContainText("versions of the map");
+  await expect(page.locator(".map-origin")).not.toContainText("worlds under each");
   await waitForTheLayout(page, 7);
 
   // And every arrow, by name. The map's claims are only half of what it says;
@@ -884,13 +889,11 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     /^\.\d+$/,
   );
 
-  // And the band around that number, so that "the same number as before" means
-  // the same number *and* the same band: a claim an edit cannot reach is
-  // identical, not merely close.
-  const opecBandBefore = await readWhenReady(
-    page.locator('.react-flow__node[data-id="R"] .belief-chip__under').first(),
-    /^\.\d+–\.\d+$/,
-  );
+  // **There is no band to read, and that is the assertion** *(2026-09-22, R48)*.
+  // This read the range under the number so that "the same number as before"
+  // meant the same number *and* the same band; a chip is the owner, the mark and
+  // the number now, and the line the range stood on is gone rather than empty.
+  await expect(page.locator('.react-flow__node[data-id="R"] .belief-chip__under')).toHaveCount(0);
 
   await page.keyboard.press("Meta+k");
   await expect(page.getByText(/Every command, by name/)).toBeVisible();
@@ -933,12 +936,11 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
   await expect(hypothesis.locator(".belief-chip__figure").first()).toHaveText(/^[.>]\d/);
 
   // The claim the edit provably cannot reach. Its number is the one it read
-  // before the branch — the whole chip, range and all, unchanged.
+  // before the branch — the whole chip, unchanged.
   const opec = page.locator('.react-flow__node[data-id="R"]');
   await test.step("test_the_fully_separated_claim_does_not_change", async () => {
     await expect(opec).toContainText("OPEC+ announces output restraint.");
     await expect(opec.locator(".belief-chip__reading").first()).toHaveText(opecBefore);
-    await expect(opec.locator(".belief-chip__under").first()).toHaveText(opecBandBefore);
     await expect(opec).not.toContainText("no engine yet");
     await expect(opec.locator(".tile")).toHaveAttribute("data-diff", "untouched");
   });
@@ -996,12 +998,14 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     "true",
   );
 
-  // The rail beside the map lists the endings, in the engine's own order, with
-  // the two columns that are never folded into it.
+  // The rail beside the map lists the endings, in the engine's own order — and
+  // **nothing beside them**: *how firm*, the width of the range around the new
+  // number, and *same direction*, the share of the versions of the map that
+  // moved the same way, were both cut on 2026-09-22 (R48).
   const rail = page.locator(".delta-rail");
   await expect(rail).toContainText("In the order the engine put them in");
-  await expect(rail).toContainText("how firm");
-  await expect(rail).toContainText("same direction");
+  await expect(rail).not.toContainText("how firm");
+  await expect(rail).not.toContainText("same direction");
   await expect(rail).not.toContainText("no engine yet");
 
   // **Exactly the endings the edit can reach are on the list, by name.** Which
@@ -1044,19 +1048,19 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
     "the change list has no quiet row to check",
   ).toContain("N1");
 
-  // Every row the engine ranked carries three readings and nothing else — the
+  // Every row the engine ranked carries **one** reading and nothing else — the
   // count of cells tied to the count of rows read off the same page, so a rail
-  // that drew one row and three cells cannot pass for a rail that drew three.
+  // that drew one row cannot pass for a rail that drew three. It was three
+  // readings a row until R48 took the other two columns (2026-09-22).
   const ranked = rail.locator('.delta-rail__row[data-ranked="yes"]');
   const many = onTheList.length - quiet.length;
   expect(many, "the engine ranked no ending at all").toBeGreaterThan(0);
   await expect(ranked).toHaveCount(many);
-  await expect(ranked.locator(".delta-rail__value")).toHaveCount(many * 3);
+  await expect(ranked.locator(".delta-rail__value")).toHaveCount(many);
   for (const cell of await ranked.locator(".delta-rail__values").all()) {
-    // The change, then how firm, then the share that moved the same way. Every
-    // one at two significant figures, and a share that is not quite all of them
-    // printed as `>99%` rather than rounded up into all of them.
-    await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+\.\d+[<>]?\d+%$/);
+    // The two readings with a chevron between them, each at two significant
+    // figures, and nothing after them.
+    await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+$/);
   }
 
   // And every quiet row says what happened in words, and says why in words:
@@ -1120,9 +1124,8 @@ test("the stored example, opened and edited by keyboard alone", async ({ page })
  * **Where the observation lands matters, and both cases are here.** Reporting
  * Brent as news moves both contracts hanging off it, and they appear on the
  * rail. Reporting the insurance premium as news moves the strait's own
- * likelihood — but nothing pushes on the strait, so what moved it is the
- * observation making the versions in which it was likely count for more. The
- * engine says so in one field and the panel prints one sentence.
+ * likelihood even though nothing on the map pushes on it — and what the screen
+ * says about that is the subject of the test after this one.
  */
 test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   await page.goto("/");
@@ -1172,11 +1175,30 @@ test("test_this_happened_puts_rows_on_the_rail", async ({ page }) => {
   const moved = rail.locator('.delta-rail__row[data-ranked="yes"] .delta-rail__values');
   await expect(moved).toHaveCount(2);
   for (const cell of await moved.all()) {
-    await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+\.\d+[<>]?\d+%$/);
+    await expect(cell).toHaveText(/^\.\d+ [▲▼] \.\d+$/);
   }
 });
 
-test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({ page }) => {
+/**
+ * **The sentence this test was written for is gone, and this is what took its
+ * place** *(Kent, 2026-09-22, R48)*.
+ *
+ * It was `test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector`.
+ * Reporting the insurance premium as news moves the strait's own likelihood even
+ * though nothing on the map pushes on it: what moved it was the observation
+ * making the versions of the map in which it was likely count for more, and the
+ * panel said so in one sentence. There are no versions of the map on this screen
+ * any more, so the sentence has nothing to be about and is not drawn. The engine
+ * still sends the field; `frontend/src/world/apiSource.ts` is where it stops.
+ *
+ * What is left to hold up is the stronger claim: the engine can reach this state
+ * against the real map, and **nothing anywhere on the screen names a version, a
+ * world or an interval when it does**. The tile still says *no change*, in the
+ * engine's own words, with its two readings behind it.
+ */
+test("test_nothing_on_screen_names_versions_when_an_observation_moves_a_claim", async ({
+  page,
+}) => {
   await page.goto("/");
   await page
     .getByRole("button", { name: /Strait of Hormuz[\s\S]*Open the map/ })
@@ -1185,8 +1207,8 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
   await waitForTheLayout(page, 7);
 
   // The news is the insurance premium falling. Nothing on this map pushes on
-  // the strait's own likelihood — it is the claim the map starts from — so the
-  // only way it can move is the observation making some versions count for more.
+  // the strait's own likelihood — it is the claim the map starts from — so this
+  // is the one branch that reaches the state the cut sentence described.
   await page.locator('.react-flow__node[data-id="C"]').click();
   await page.keyboard.press("b");
   await page.getByLabel(/What is this branch called/).fill("The premium fell");
@@ -1205,59 +1227,63 @@ test("test_a_claim_moved_only_by_reweighting_says_so_in_the_inspector", async ({
   await waitForTheAnswer(page, "Branch created. Two claims moved.");
   await waitForTheLayout(page, 7);
 
-  // The panel, on the strait itself, word for word.
+  // The panel, on the strait itself.
   await page.locator('.react-flow__node[data-id="H"]').click();
-  await expect(
-    page.getByText("this claim moved only because the observation made some versions count more."),
-  ).toBeVisible();
 
   await test.step("test_the_tile_says_why_the_engine_reports_no_change", async () => {
-    // The strait's own tile, on the same branch. The engine names one cause of
-    // an unmoved number and only one — the observation changing how much each
-    // version counts — and where it names it, the tile says it.
+    // The strait's own tile, on the same branch: the engine will not call what
+    // happened to it a move, and the tile says so, with the engine's own two
+    // readings in the sentence behind it.
     const strait = page.locator(
       '.react-flow__node[data-id="H"] .tile__badge[data-badge="movement"]',
     );
     await expect(strait.locator(".tile__badge-words")).toHaveText("no change");
+    // Asserted on the element rather than read off it, so that a sentence still
+    // being written when the badge's words land is waited out.
     await expect(strait).toHaveAttribute(
       "title",
-      /inside every version of the map its number held still/,
+      /reports no change on this claim: it read \.\d+ then \.\d+/,
     );
 
-    // And the talks, which plainly did move and still came out unchanged
-    // because the versions of the map did not agree on which way. **This is the
-    // case the sentence was wrong about.** The tile used to tell this reader the
-    // number had not moved enough to report while the engine's own two readings,
-    // a click away, were two points apart.
+    // And the talks, which plainly did move and still came out unchanged. **The
+    // engine's reason for that one is a fact about its two thousand versions of
+    // the map**, which this product no longer shows, so the sentence says the
+    // verdict and its two readings and then says plainly that it has no reason
+    // it can give — rather than naming one nobody on this screen could check.
     const talks = page.locator(
       '.react-flow__node[data-id="N1"] .tile__badge[data-badge="movement"]',
     );
     await expect(talks.locator(".tile__badge-words")).toHaveText("no change");
-    // Asserted on the element rather than read off it, so that a sentence still
-    // being written when the badge's words land is waited out.
     await expect(talks).toHaveAttribute(
       "title",
       /reports no change on this claim: it read \.\d+ then \.\d+/,
     );
-    await expect(talks).toHaveAttribute("title", /of the versions of the map moved the same way/);
-    // **And it names the half of its test the engine named.** The engine says
-    // which half an unchanged claim failed, on the claim's own row, so the
-    // sentence that used to close here — *which of the two it was is the
-    // engine's to say, and it does not say* — is no longer true of anything.
-    // Which of the two this claim failed is the engine's answer and is not
-    // written into this file; that it says one of them, and never both, is.
-    const half =
-      /The engine says which half it failed: (the move is smaller than the engine will report at all|the move is far enough, and the versions of the map did not agree which way it went)\./;
-    await expect(talks).toHaveAttribute("title", half);
     await expect(talks).not.toHaveAttribute("title", /it does not say/);
-    // **One half, never both and never neither.** The alternation above is
-    // satisfied by a sentence that went on to name the other half as well, so
-    // the halves are counted rather than matched. A guard written against a
-    // phrase that appears nowhere in the product would sit here for ever
-    // looking like a check and never being one, which is what the line it
-    // replaced was.
-    const said = (await talks.getAttribute("title")) ?? "";
-    expect([...said.matchAll(/The engine says which half it failed:/g)]).toHaveLength(1);
+  });
+
+  await test.step("test_nothing_on_this_screen_names_a_version_or_a_world", async () => {
+    // The whole screen, read as a reader would hear it: the map, the strip, the
+    // line under it and whichever panel is open. The one address with the word
+    // in it — where the engine is asked — is taken out first, because that is a
+    // route rather than a sentence about the multiverse.
+    for (const which of [/This claim/, /Branches and changes/, /Outline/]) {
+      await turnThePanelTo(page, which);
+      const said = (await page.locator("main").innerText()).replace(
+        /\/api\/worlds(\/[a-z]+)?/g,
+        " ",
+      );
+      for (const word of [
+        /\bversions?\b/i,
+        /\bworlds\b/i,
+        /\binterval\b/i,
+        /\buncalibrated\b/i,
+        /middle 80/i,
+      ]) {
+        expect(said, `the screen says ${word}`).not.toMatch(word);
+      }
+      // And no reading on it is a pair of numbers with a dash between them.
+      expect(said).not.toMatch(/[.>]\s*\d[\d.]*\s*[–—-]\s*[.<>]\s*\d/);
+    }
   });
 });
 

@@ -21,7 +21,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { toMovement, toShare } from "../../components/BeliefChip";
+import { toMovement } from "../../components/BeliefChip";
 import { aClaim, aWire, aWorld } from "../../test/aMap";
 import type { Badge, BranchView, ClaimView, DiffView, Edit, Movement } from "../../world";
 import { disagreements, type EngineState } from "../diff/agreement";
@@ -139,7 +139,7 @@ describe("what an edit did to the map", () => {
 
   it("test_your_own_number_moves_nothing_the_map_computes", () => {
     const { states, canMove } = readDiff(CLAIMS as unknown as string[], ARROWS, [
-      { op: "believe", target: "M1", belief: { p: 0.4, lo: 0.3, hi: 0.5 } },
+      { op: "believe", target: "M1", belief: { p: 0.4 } },
     ]);
     expect(states.get("M1")).toBe("downstream");
     // Your number is not pushed through the map, so the model's number on that
@@ -243,7 +243,7 @@ describe("the second world", () => {
           "B",
           {
             state: "shifted" as const,
-            moved: { from: 0.4, to: 1, way: "up" as const, by: 0.6, sameDirection: { reading: 1 } },
+            moved: { from: 0.4, to: 1, way: "up" as const, by: 0.6 },
           },
         ],
       ]),
@@ -255,8 +255,6 @@ describe("the second world", () => {
           move: {
             reading: { from: 0.4, to: 1, largestOn: "2026-10-02", way: "up" as const, by: 0.6 },
           },
-          rangeWidth: { reading: 0 },
-          agreement: { reading: 1 },
         },
       ],
       summary: { reading: "It moves one ending." },
@@ -302,20 +300,23 @@ describe("the second world", () => {
   /**
    * Why the engine says a claim did not move — the one sentence, in one place.
    *
-   * The engine calls a claim `shifted` only when **both** halves of its test
-   * pass: the move clears its floor, and the versions of the map agree on which
-   * way it went. `unchanged` is what a claim gets when either half fails — **and
-   * the engine now says which half**, on the claim's own row, in one plain word:
-   * *under the floor* where the move is too small to report at all, *versions
-   * disagree* where the move was far enough and the versions did not agree which
-   * way. The floor is read first, so a claim failing both says the floor.
+   * The engine calls a claim `shifted` only when its move clears a floor, and
+   * `unchanged` when it does not — **and it says so on the claim's own row**, in
+   * one plain word: *under the floor*.
    *
    * So the browser copies that word across and turns it into words. It still
-   * works nothing out: the floor and the bar are constants inside the engine and
-   * are nowhere in its answer, so re-running the test here is not possible even
-   * by accident. Where the engine gives no word, neither does the browser —
-   * guessing would mean printing a sentence that is flatly false about half the
-   * claims it appears on, which is the traceability veto in plain sight.
+   * works nothing out: the floor is a constant inside the engine and is nowhere
+   * in its answer, so re-running the test here is not possible even by accident.
+   * Where the engine gives no word, neither does the browser — guessing would
+   * mean printing a sentence that is flatly false about half the claims it
+   * appears on, which is the traceability veto in plain sight.
+   *
+   * **The engine has a second word and this product no longer shows it** *(Kent,
+   * 2026-09-22, R48)*: *the versions of the map disagreed which way it went*. It
+   * is a fact about running the map two thousand times, which is the thing Kent
+   * cut, so `world/apiSource.ts` drops it on the way in and a claim that failed
+   * on it reaches here with no word at all — the case the second test below is
+   * about.
    */
   describe("why the engine reports no change", () => {
     /** The engine's answer: every claim untouched but one, which it calls unchanged. */
@@ -339,59 +340,34 @@ describe("the second world", () => {
       return (b?.badges ?? []).find((badge) => badge.movement === true);
     }
 
-    it("test_the_no_change_reason_names_the_half_the_engine_named", () => {
-      // It moved .41 to .46 and only .62 of the versions went the same way, and
-      // the engine says which half of its test that failed. So the sentence may
-      // say the versions disagreed — and must not say it barely moved, which is
-      // flatly false of a claim five points apart.
-      const disagreed = tileLine({
-        from: 0.41,
-        to: 0.46,
-        way: "up",
-        by: 0.05,
-        sameDirection: { reading: 0.62 },
-        unchangedBecause: "versions_disagree",
-      });
-      expect(disagreed?.words).toBe("no change");
-      expect(disagreed?.reason).toMatch(/did not agree which way it went/);
-      expect(disagreed?.reason).not.toMatch(/smaller than the engine will report/);
-
-      // And this one moved a hair with the versions all but unanimous, and the
-      // engine names the other half. The two say different, true things.
+    it("test_the_no_change_reason_names_the_reason_the_engine_named", () => {
+      // It moved a hair and the engine says so. The sentence names the engine's
+      // own reason and the engine's own two numbers, and nothing else.
       const aHair = tileLine({
         from: 0.41,
         to: 0.412,
         way: "up",
         by: 0.002,
-        sameDirection: { reading: 0.99 },
         unchangedBecause: "under_the_floor",
       });
-      expect(aHair?.reason).toMatch(/smaller than the engine will report/);
-      expect(aHair?.reason).not.toMatch(/did not agree which way it went/);
-
-      // Either way it says the verdict and the engine's own two numbers.
-      expect(disagreed?.reason).toContain(".41");
-      expect(disagreed?.reason).toContain(".46");
-      expect(disagreed?.reason).toContain(toShare(0.62));
+      expect(aHair?.words).toBe("no change");
+      expect(aHair?.reason).toMatch(/smaller than it will report/);
+      expect(aHair?.reason).toContain(".41");
     });
 
-    it("test_the_no_change_reason_invents_no_half_the_engine_left_out", () => {
-      // The engine leaves the word out where there was no test to fail — no
-      // version of the map counted in both numbers, so there was no direction
-      // for them to agree about. The browser cannot work the half out for
-      // itself, because neither the floor nor the bar is anywhere in the
-      // engine's answer, so where the word is missing neither half is named.
-      const silent = tileLine({
-        from: 0.41,
-        to: 0.46,
-        way: "up",
-        by: 0.05,
-        sameDirection: { reading: 0.62 },
-      });
+    it("test_the_no_change_reason_invents_no_reason_the_engine_left_out", () => {
+      // The engine leaves the word out where there was no test to fail, and it
+      // is also left out where the word it gave is one this product may not show
+      // — *the versions of the map disagreed which way* (2026-09-22, R48).
+      // Either way the browser cannot work the reason out for itself, because
+      // the floor is nowhere in the engine's answer, so no reason is named.
+      const silent = tileLine({ from: 0.41, to: 0.46, way: "up", by: 0.05 });
       expect(silent?.words).toBe("no change");
-      expect(silent?.reason).not.toMatch(/smaller than the engine will report/);
-      expect(silent?.reason).not.toMatch(/did not agree which way it went/);
-      expect(silent?.reason).toMatch(/gave no word for which half/);
+      expect(silent?.reason).not.toMatch(/smaller than it will report/);
+      expect(silent?.reason).toMatch(/gave no reason this product can show/);
+      // And nothing about versions of the map, on a sentence that used to name
+      // them twice.
+      expect(silent?.reason.toLowerCase()).not.toContain("version");
     });
 
     it("test_the_tile_and_the_rail_give_one_reason_and_not_two", () => {
@@ -400,8 +376,7 @@ describe("the second world", () => {
         to: 0.46,
         way: "up",
         by: 0.05,
-        sameDirection: { reading: 0.62 },
-        unchangedBecause: "versions_disagree",
+        unchangedBecause: "under_the_floor",
       };
       const line = tileLine(moved);
       // The rail lists endings, so this half of the test asks about one: M1, a
@@ -419,25 +394,22 @@ describe("the second world", () => {
       // anything — comes from the same module and the same engine word, so the
       // glance and the sentence behind it cannot say two different things.
       expect(held?.note).toBe(noChangeInAWord(moved));
-      expect(held?.note).toBe("the versions disagreed which way");
+      expect(held?.note).toBe("barely moved");
     });
 
-    it("test_an_ending_the_versions_disagree_about_stays_on_the_list", () => {
+    it("test_an_ending_the_engine_will_not_call_moved_stays_on_the_list", () => {
       // The rule this whole block exists for, stated as a rule about the list
       // rather than about a sentence: an ending the engine will not call moved
-      // is **on the change list**, marked as one that held still, and saying
-      // why. On the stored example's strike branch that is the talks — the
-      // biggest move on the map, behind the map's one bare assertion — and a
-      // list that quietly dropped it would drop the most interesting thing on
-      // the map without saying so.
-      const moved: Movement = {
-        from: 0.28,
-        to: 0.38,
-        way: "up",
-        by: 0.1,
-        sameDirection: { reading: 0.88 },
-        unchangedBecause: "versions_disagree",
-      };
+      // is **on the change list**, marked as one that held still. On the stored
+      // example's strike branch that is the talks — the biggest move on the map,
+      // behind the map's one bare assertion — and a list that quietly dropped it
+      // would drop the most interesting thing on the map without saying so.
+      //
+      // The engine's reason for that one is *the versions of the map disagreed
+      // which way*, which this product no longer shows (2026-09-22, R48), so the
+      // move reaches the browser with no word at all: the row is still there,
+      // still marked, and simply carries no half-line.
+      const moved: Movement = { from: 0.28, to: 0.38, way: "up", by: 0.1 };
       const change = saysUnchanged(moved, "N1");
       const listed = railRows(
         branchWorld(base(), branch(), { at: "answered", now: base(), change }),
@@ -446,7 +418,8 @@ describe("the second world", () => {
       expect(listed.map((row) => row.claimId)).toContain("N1");
       const talks = listed.find((row) => row.claimId === "N1");
       expect(talks?.unranked).toBe(true);
-      expect(talks?.note).toBe("the versions disagreed which way");
+      expect(talks?.move.absence?.words).toBe("no change");
+      expect(talks?.note).toBeUndefined();
     });
 
     it("test_an_ending_you_forced_false_stays_on_the_list_and_is_not_no_change", () => {
@@ -571,7 +544,6 @@ describe("the second world", () => {
       to: 0.42,
       way: "down",
       by: -0.08,
-      sameDirection: { reading: 0.9663 },
     };
 
     it("test_the_line_says_which_day_it_is_read_on_and_that_the_rail_reads_another", () => {
@@ -768,7 +740,7 @@ describe("an edit that can move a reported claim", () => {
     // change what a report says about anything.
     const read = readDiff(CLAIMS, ARROWS, [
       { op: "observe", target: "R", value: true, at: "2026-10-01" },
-      { op: "believe", target: "N1", belief: { p: 0.9, lo: 0.8, hi: 0.95 } },
+      { op: "believe", target: "N1", belief: { p: 0.9 } },
     ]);
     // Your number reaches the claim you wrote it on and nothing else. The
     // report speaks about OPEC's announcement and what that leads to; the
@@ -899,9 +871,12 @@ describe("the endings the edit can reach", () => {
     expect(rows.map((row) => row.claimId)).toEqual(["M1", "M2", "N1"]);
     for (const row of rows) {
       expect(row.move.reading).toBeUndefined();
-      expect(row.rangeWidth.reading).toBeUndefined();
-      expect(row.agreement.reading).toBeUndefined();
       expect(row.move.absence?.reason.length ?? 0).toBeGreaterThan(20);
+      // And a row is the ending and its change, and nothing else: *how firm*
+      // and *same direction* were readings of a range and of the versions of
+      // the map behind one, and both went with them (2026-09-22, R48).
+      expect("rangeWidth" in row).toBe(false);
+      expect("agreement" in row).toBe(false);
     }
   });
 });
