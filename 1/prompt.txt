@@ -2191,3 +2191,63 @@ Please also clean up branches, worktrees, and docs that are no longer needed aft
 <status>completed</status>
 <summary>Background command "Land pull request #51 after the build's checks" completed (exit code 0)</summary>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>af4fca91a86e39bf2</task-id>
+<tool-use-id>toolu_019i4zS1ari4Y3DRt7w43zTx</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/b0c894cc-4ecb-4c15-9930-d321fce0a448/tasks/af4fca91a86e39bf2.output</output-file>
+<status>completed</status>
+<summary>Agent "Carry list for the batch" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Done. Six commits on `feat/04c-carry`, worktree clean, both suites green.
+
+## What the coordinator must run
+
+```
+cd /Users/kentgang/git3/katalyst-wt/feat-04c-carry/frontend &amp;&amp; \
+KATALYST_E2E_BACKEND_PORT=8051 KATALYST_E2E_FRONTEND_PORT=5197 \
+KATALYST_E2E_SLOW_BACKEND_PORT=8052 KATALYST_E2E_SLOW_FRONTEND_PORT=5198 \
+npx playwright test
+```
+I edited two end-to-end specs (`generate.spec.ts`, `hormuz.spec.ts`), both only in the shortcuts-sheet assertion — `"Tiles do not move"` → `"You cannot move a tile"` (one in `generate.spec.ts` at the `?`-mid-replay step, two plus a comment in `hormuz.spec.ts`). Nothing else in the browser walks changed. I did not run playwright.
+
+## Per item
+
+1. **0023's dated amendment — NOT DONE, and it could not be.** `docs/adr/0023-*.md` does not exist on `try/04c-4`; the index there runs 0022 → 0027. Records 0023/0024 were on the unmerged `adr/04-...` branch and **landed on `origin/main` as #51 (`8fd3ca0`) while I was working**. The exact paragraph is written, checked byte-for-byte against main's copy and checked to apply cleanly: `/Users/kentgang/git3/katalyst/plans/logs/04c/carry/apply/` (`README-item-1.md`, `0023-amendment.diff`, `0023-amendment-paragraph.md`, before/after).
+2. **Done.** B12 after B11 in `streaming-growth.md`; open question 1 re-answered (the stream does not say *that* a call went out — it says what the call is doing, on a line never recorded); `readonly activity: WhatTheModelIsDoing` added to the chapter's `Growth` block; `NOT_IN_THE_CHAPTER_YET` and its two loop lines deleted from `theChapterAndTheCode.test.ts`. **Deviation:** the type-level allowance in `eventsMatchSchema.test-d.ts` is **rewritten, not deleted**. `Activity` cannot be pinned to a generated shape — `./scripts/gen-types.sh` run from the worktree root changed **no byte** of `api/schema.ts`, because the line travels only as a server-sent event and OpenAPI describes `text/event-stream` and stops. That is the same reason the eight envelopes above it are unpinned, so the block now carries the standing reason and keeps its check as a tripwire for the day a route ever carries the shape as JSON.
+3. **Done.** `NO_DRAGGING` → *"You cannot move a tile: the layout is automatic, left to right, and a tile moves only when an arrow would otherwise point backwards, or once when a run stops."* Updated: `generate.spec.ts`, `hormuz.spec.ts` (2 assertions the brief did not name), `everyKey.test.tsx` (6), `keyboard-and-access.md` with a dated note.
+4. **Done.** `useMapKeys.ts`'s table gains the `N` row (naming `PanelSwitch.tsx` as where it is bound and why) and `P`'s row now says both map screens and the chevron.
+5. **Done.** `Outline.tsx` says *"Nothing has arrived yet. Each claim takes its place here as it does."* and drops the empty `role="tree"`; new `components/__tests__/outline.test.tsx`, 3 cases.
+6. **Done.** `.16 – .21` → `.16 – .22`, and the summary names the live-only line.
+7. **DATA — nothing edited (R9).** It is double-escaped in the recording: the raw file holds `\\u2014`, so the decoded string carries the six literal characters `\u2014`. The browser decodes JSON correctly; there is nothing to fix on our side. Three places in `backend/recordings/hormuz.jsonl`:
+   - line 3, `proposal_accepted` → `data.proposition.base_rate.reference_class`: *"…shipping resumed) for that week \u2014 this happened only during the roughly two-week window…"* ← the one visible in the panel
+   - line 10, `data.proposition.resolution.criteria`: two occurrences
+   - line 11, `data.links[0].rationale`: one
+   Fixing it means a paid re-record at the freeze, or a server-side unescape of model text, which would be repairing rather than rejecting.
+8. **Done.** *as it was built* on a generated map, *as it was written* on a stored one, in five places (bar, flip side-note, flip status line, palette command, branch-panel first row + its unedited-map sentence). One function pair in `BranchPanel.tsx`; the flag is `built = generation !== undefined` — the run that built the map, absent on a stored example. Two tests.
+9. **Done, and the four places were not where the brief expected.** `try/04c-4`'s ARCHITECTURE.md has no duplicated paragraphs and no stale `[planned]` run-strip/settle entries — those live on the ADR lane that has only now landed. What it *did* have: §5's invariant table split in two by a blank line with **INV-7 and INV-8 written twice**, once per side. Kept the true side of each, verified against the code (`test_chip_never_omits_the_range` is gone / `test_no_chip_draws_a_range` and `noRange.test.tsx` exist; `_multiplied_out` is gone / `_shift_between`, `_joint_along`, `_weakest_arrow_on` exist). Plus two places calling the visual checklist *thirteen-line* when `VR14` landed.
+
+## `git diff --stat try/04c-4`
+
+18 files, +433 −128 — `ARCHITECTURE.md` 9, `e2e/generate.spec.ts` 2, `e2e/hormuz.spec.ts` 6, `BranchPanel.tsx` 40, `MapScreen.tsx` 25, `Outline.tsx` 72, `branchPanel.test.tsx` 48, `outline.test.tsx` 65 (new), `outline.css` 10, `everyKey.test.tsx` 12, `keys.ts` 10, `useMapKeys.ts` 3, `editAGeneratedMap.test.tsx` 41, `eventsMatchSchema.test-d.ts` 70, `theChapterAndTheCode.test.ts` 33, `spec/generation/README.md` 4, `keyboard-and-access.md` 4, `streaming-growth.md` 107.
+
+## Verification (both through the queue, once each)
+
+```
+carry: npm run check         exit=0  took=7s     → 51 files, 465 tests passed (baseline 460; +5 new)
+carry: whole server suite    exit=0  took=247s   → 1153 passed, 4 xfailed, coverage 100%
+```
+Logs: `plans/logs/04c/carry/check.log`, `plans/logs/04c/carry/server.log`. No backend file was touched.
+
+## What is rough — read before merging
+
+- **`try/04c-4` is three landed pull requests behind `origin/main`** (#50 question mark, #51 records 0023/0024, #52 quieter tile). My branch is a clean delta on `try/04c-4`; I deliberately did not take that merge on.
+- **A trial merge of the ADR lane gave 4 conflicted files / 5 hunks — but the danger is the parts that auto-merge.** That branch was cut from an older `main`, so its versions of `spec/workbench/README.md` and `layout-and-zoom.md` would **silently revert** later work: `VR3`/`VR4`/`VR13`/`VR14` back to pre-R48 wording, the `first-screen.md` row deleted, and the zoom floor back from ≈0.158 to 0.5. Diff those two files against `try/04c-4` by hand after merging.
+- **B-number collision in `streaming-growth.md`.** `origin/main` has `B11 — The foot of the map says what the run is doing`; `try/04c-4` has `B11 — A finished generation is a map like any other`; I added `B12`. Suggested order: strip = B11, mine = B12 (it puts two more lines on that same strip), finished generation = B13. My B12 is referenced in exactly three places: the heading, the `Growth` block comment (`spec/workbench/streaming-growth.md:379`), and open question 1 (`:1597`).
+- **Open question 1 is answered twice after the merge.** Main's copy says *not in version one* (record 0023); mine says record 0027 overturned that on 2026-09-22. Keep mine.
+- **`INV-generation.22` is now used twice** — `streaming.md` (activity is live and nothing keeps it) and `replay.md` (a replay emits the recording line for line). I made the landing page match `streaming.md` as instructed, which is the change that makes the clash visible. It needs a decision: renumbering `streaming.md`'s would falsify record 0027's own citation (records are a journal); renumbering `replay.md` `.22`–`.27` and `evaluation.md` `.28`–`.32` is 18 citations across 6 files.
+- **Not chased, deliberately:** `graph/diff/branchWorld.ts:343` prints *"This is the map as it was written"* in the origin sentence under a branch world — same wording fault as item 8, but that file is named as the stack-05 session's one builder. `spec/workbench/layout-and-zoom.md`'s `### B8 — Tiles do not move, and the interface says so` heading is now imprecise (its body, about draggability, is true); I left it because the ADR lane edits that chapter.</result>
+<usage><subagent_tokens>315496</subagent_tokens><tool_uses>202</tool_uses><duration_ms>1493784</duration_ms></usage>
+</task-notification>
