@@ -76,12 +76,7 @@ import "./canvas.css";
  * drawing library never has to rebuild its tiles because the object changed. */
 const TILE_TYPES = {
   claim: ({ data }: { data: ClaimNode["data"] }) => (
-    <Tile
-      claim={data.claim}
-      isHypothesis={data.isHypothesis}
-      versions={data.versions}
-      height={data.height}
-    />
+    <Tile claim={data.claim} isHypothesis={data.isHypothesis} height={data.height} />
   ),
   overflow: ({ data }: { data: OverflowNode["data"] }) => <TileOverflow count={data.count} />,
   skeleton: ({ data }: { data: SkeletonNode["data"] }) => <SkeletonTile words={data.words} />,

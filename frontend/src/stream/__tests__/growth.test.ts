@@ -485,7 +485,7 @@ describe("the reader's own number", () => {
     // It is checked against the number handed in, never against one written
     // here: what is being asked is whether the screen carries the reader's own
     // figure through, not what that figure is.
-    const mine = { p: 0.72, lo: 0.6, hi: 0.85, owner: "user" as const };
+    const mine = { p: 0.72, lo: 0.72, hi: 0.72, owner: "user" as const };
     const withMine = EVERY_CLAIM.map((one) =>
       one.id === "H" ? { ...one, beliefs: { ...one.beliefs, user: mine } } : one,
     );
@@ -495,7 +495,9 @@ describe("the reader's own number", () => {
     ]);
 
     const hypothesis = finished.world.claims.find((claim) => claim.id === "H");
-    expect(hypothesis?.beliefs.user.reading).toEqual({ p: mine.p, lo: mine.lo, hi: mine.hi });
+    // The likelihood, and only the likelihood: the bottom and the top the wire
+    // still carries are dropped at the boundary (2026-09-22, R48).
+    expect(hypothesis?.beliefs.user.reading).toEqual({ p: mine.p });
     // And nobody else's slot was filled in from it: two slots that are never
     // merged stay two slots.
     for (const claim of finished.world.claims) {

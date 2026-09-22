@@ -29,8 +29,8 @@
  *    through the map — so it fills in immediately and moves nothing else.
  */
 
-import { toMovement, toShare, toTwoFigures } from "../../components/BeliefChip";
-import { absence, inTheEnginesWords, noReadingAtAll } from "../../world/absence";
+import { toMovement, toTwoFigures } from "../../components/BeliefChip";
+import { absence, inTheEnginesWords } from "../../world/absence";
 import type {
   Absence,
   Badge,
@@ -173,7 +173,6 @@ function movedBadge(
     // how three of them came to name causes the engine never gave.
     return { words: NO_CHANGE, reason: noChangeReason(moved), movement: true };
   }
-  const agreed = moved.sameDirection.reading;
   return {
     words: toMovement(moved.from, moved.to, moved.by, moved.way),
     // **The clause about the day is in the sentence behind the line, not in the
@@ -192,10 +191,7 @@ function movedBadge(
       `${toTwoFigures(moved.to)}, read on ${toDay(resolvesBy)} — the day this claim is judged. ` +
       `The change list beside the map reads each ending on the day the two maps are furthest ` +
       `apart instead, which is usually a different day, so the two are two readings rather than ` +
-      `a disagreement. ` +
-      (agreed === undefined
-        ? moved.sameDirection.absence.reason
-        : `${toShare(agreed)} of the versions of the map moved the same way.`),
+      `a disagreement.`,
     movement: true,
   };
 }
@@ -220,7 +216,7 @@ function movedBadge(
  * and two answers to that question is one too many.
  *
  * **A claim standing on the reader's own say-so has no move to report.** While a
- * supposition holds the claim is true in every version of the map, and the
+ * supposition holds the claim is true in every world the engine works through, and the
  * engine stores a flat `1` on it so that a chain multiplied out has a factor for
  * it. No surface prints that number — and ".41 up to >.99" is that number with
  * the certainty guard in front of it. So such a row reads the word instead, the
@@ -289,17 +285,6 @@ export function railRows(painted: WorldView, change: DiffView): readonly DeltaRo
         kind: claim.kind,
         move: { absence: inTheEnginesWords(quiet.words, quiet.reason) },
         note: quiet.note,
-        rangeWidth: {
-          absence: noReadingAtAll(
-            "How firm a number is only says something about a number that moved.",
-          ),
-        },
-        agreement: {
-          absence: noReadingAtAll(
-            "Whether the versions of the map agreed on a direction only says something about a " +
-              "claim that had a direction.",
-          ),
-        },
         unranked: true,
       };
     });
@@ -445,10 +430,11 @@ export function branchWorld(base: WorldView, branch: BranchView, engine?: Engine
     ...(computed === undefined
       ? {}
       : {
-          // How the engine was run, so the chip can say whether its range was
-          // computed and the line under the map can name the seed.
-          versions: computed.now.versions,
-          worldsPerVersion: computed.now.worldsPerVersion,
+          // That the engine worked these numbers out, and the seed it did it
+          // from. How it got there — how many versions of the map it tried —
+          // came off the world on 2026-09-22 with the range it was carried for
+          // (R48).
+          ...(computed.now.workedOut === true ? { workedOut: true as const } : {}),
           seed: computed.now.seed,
           warnings: computed.now.warnings,
         }),
@@ -459,7 +445,7 @@ export function branchWorld(base: WorldView, branch: BranchView, engine?: Engine
       const state = tileState(structural, computed?.change, claim.id);
       // How far the number moved — unless the claim is standing on the reader's
       // own say-so, in which case there is no number to have moved to. While a
-      // supposition holds the claim is true in every version of the map, and the
+      // supposition holds the claim is true in every world the engine works through, and the
       // engine stores a flat 1 on it so that a chain has a factor to multiply;
       // **no surface prints that number**, and a reading of ".40 up to >.99" is
       // that number wearing the certainty guard's clothes. The badge pair says

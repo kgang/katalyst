@@ -1,42 +1,39 @@
 /**
- * One likelihood, with the range that says how sure we are of it — or, when
- * there is no likelihood, the absence and the reason for it.
+ * One likelihood with a name on it — or, when there is no likelihood, the
+ * absence and the reason for it.
  *
  * This is the smallest component in the product and the one carrying the most
  * of its honesty rule, so it is worth reading in full.
  *
- * **Two significant figures and the range, always.** A likelihood is printed as
- * `.35` and never as `.348` — a third figure claims an accuracy nobody has —
- * and it is never printed without the range under it. The rounding happens
- * here, once, at the moment of display; everything upstream carries the number
- * at full precision so that nothing is rounded twice.
+ * **A chip is three things: whose number it is, the mark, and the number**
+ * *(Kent, 2026-09-22, R48)*. There used to be a fourth line under the number —
+ * a range, `.24–.56`, saying how sure we were of it — and a shelf that slid out
+ * of the tile to explain what the range meant and that it came out of running
+ * the map two thousand times. Kent cut the two thousand versions of the map from
+ * this product, and the range and its explanation went with them. One claim, one
+ * likelihood.
  *
- * **What the range means, said out loud.** It is *how sure we are of the
- * number*, not how much the world can move. How much the world can move is
- * already inside the likelihood itself. That distinction is not a footnote: a
- * reader who takes a wide range to mean a volatile event has been misled by the
- * interface, so the model chip says which it is in its own label and spells it
- * out in full when you look at it.
+ * **Two significant figures, always.** A likelihood is printed as `.35` and
+ * never as `.348` — a third figure claims an accuracy nobody has. The rounding
+ * happens here, once, at the moment of display; everything upstream carries the
+ * number at full precision so that nothing is rounded twice.
  *
  * **An absent number is an absence, never a blank.** There is no path through
  * this component that prints nothing, prints a zero, or prints a stand-in. A
- * slot with no number shows the words for its absence and carries the reason
- * for it. A claim standing on the reader's own say-so shows the word — *Supposed
- * · Oct 1* — because while it is supposed it is true in every simulated world
- * and there is no number to show.
+ * slot with no number shows the words for its absence. A claim standing on the
+ * reader's own say-so shows the word — *Supposed · Oct 1* — because while it is
+ * supposed it is true in every world the engine works through and there is no
+ * number to show. The sentence behind either is read in the panel beside the
+ * map, where a reason has room to be one.
  *
  * **Which chips a tile draws is not decided here.** A chip draws whatever it is
  * handed; `Tile.tsx` decides that the model's column is always drawn and that
  * the reader's and a venue's are drawn only where they hold a number, because
- * that is a statement about a tile rather than about a chip. So the absence
- * states below are reached by the model's column, and the other two keep their
- * words and their reasons in the panel beside the map, where a reason has room
- * to be a sentence.
+ * that is a statement about a tile rather than about a chip.
  */
 
-import { useId, useState } from "react";
 import { type LikelihoodStep, likelihoodStep } from "../graph/wires/encodings";
-import type { BeliefOwner, Known, Ranged, Standing } from "../world";
+import type { BeliefOwner, Known, Likelihood, Standing } from "../world";
 import "./beliefChip.css";
 
 /**
@@ -89,8 +86,7 @@ function written({ figures, exponent }: { figures: number; exponent: number }): 
 }
 
 /**
- * Print a **likelihood** — or an end of the range around one, which is a
- * likelihood too — the way this product prints one.
+ * Print a **likelihood** the way this product prints one.
  *
  * **A likelihood, and only a likelihood.** How far a number moved and how wide a
  * band is are measured on the same scale and are not likelihoods; they take
@@ -138,8 +134,7 @@ export function toTwoFigures(value: number): string {
 }
 
 /**
- * Print a **size** on the likelihood scale: how far a number moved, or how wide
- * a band is.
+ * Print a **size** on the likelihood scale: how far a number moved.
  *
  * **A size is not a likelihood, and it takes no guard.** `<.01` on a likelihood
  * says "nothing here, but we are not calling it impossible" — a claim about the
@@ -211,56 +206,12 @@ export function toMovement(from: number, to: number, by: number, way: "up" | "do
   return `${after} · ${WAY[way].word} by ${toSize(by)}`;
 }
 
-/**
- * Print a range the way this product prints one: `.22–.50`.
- *
- * Both ends are likelihoods, so both take the guard: a band whose bottom end
- * sits under a hundredth reads `<.01–.03`, which says the low end is small
- * without calling it impossible.
- *
- * The dash is an en dash, the one used for a span between two numbers.
- */
-export function toRange(lo: number, hi: number): string {
-  return `${toTwoFigures(lo)}–${toTwoFigures(hi)}`;
-}
-
-/**
- * Print a share of something counted — *how many of the two thousand versions
- * of the map moved the same way* — as a whole percentage.
- *
- * A share is not a likelihood. It is a count of things that happened divided by
- * how many there were, so a hundred per cent really can mean *every one of
- * them*, and printing `>.99` over it would hide a fact the machine actually
- * counted. So the only guard here is the one that stops rounding from inventing
- * unanimity: a share that is not quite all of them never prints as all of them.
- *
- * Two figures, like everything else on screen: `97%`, never `96.63%`.
- *
- * @param share A share from 0 to 1, at full precision.
- */
-export function toShare(share: number): string {
-  if (!Number.isFinite(share)) {
-    return "—";
-  }
-  const whole = Math.round(share * 100);
-  if (whole >= 100 && share < 1) {
-    return ">99%";
-  }
-  if (whole <= 0 && share > 0) {
-    return "<1%";
-  }
-  return `${whole}%`;
-}
-
-/**
- * The whole reading, in the form a sentence would use: `.35 (.22–.50)`.
- *
- * This is what the chip is called when it is read aloud, and what the tile uses
- * when it needs the reading inside a longer sentence.
- */
-export function toReading(p: number, lo: number, hi: number): string {
-  return `${toTwoFigures(p)} (${toRange(lo, hi)})`;
-}
+/* **Three printers used to live here and no longer do** *(2026-09-22, R48)*.
+ * `toRange` wrote `.22–.50`; `toReading` wrote `.35 (.22–.50)`, which was what a
+ * chip was called when it was read aloud; `toShare` wrote `97%`, the share of
+ * the two thousand versions of the map that moved the same way. All three
+ * printed a range or the versions behind one, so all three went with them. A
+ * chip is called by its owner and its number now. */
 
 /** The word each owner is called by on screen. */
 const OWNER_WORDS: Record<BeliefOwner, string> = {
@@ -270,143 +221,40 @@ const OWNER_WORDS: Record<BeliefOwner, string> = {
 };
 
 /**
- * The note a chip opens when you look at it: one label, one sentence.
+ * Work out the two lines a chip shows, and what it is called when it is read
+ * out loud.
  *
- * It is not a pop-up. It is a shelf that slides out from the bottom edge of the
- * tile, drawn on the tile's own surface, and it needs no dismissing — look
- * away, or move the keyboard on, and it closes itself.
+ * **There used to be a third line and a shelf behind it** *(until 2026-09-22,
+ * R48)*. The third line was the range, `.24–.56`; the shelf was a label and a
+ * sentence saying what the range meant — *model interval, uncalibrated*, and
+ * *across 2 000 versions of this map…*. There is no range, so there is nothing
+ * left for either of them to say. The sentence behind an absence is still read
+ * in full in the panel beside the map, where a reason has room to be a sentence.
  */
-interface Note {
-  /** The chip's label, printed as the first line of the shelf. */
-  readonly label: string;
-  /** The sentence under it. */
-  readonly sentence: string;
-}
-
-/** Group a count in thousands the way the sentence below writes it: `2 000`. */
-function inThousands(count: number): string {
-  return count.toLocaleString("en-GB").replace(/,/g, " ");
-}
-
-/**
- * What the model chip says about itself — and there are two answers, because
- * there are two different things a range can be.
- *
- * **When a world computed these numbers**, the range came out of running the
- * map many times over, each run a coherent set of numbers the model would have
- * stood behind, and the sentence says so and then admits in its last clause
- * that nobody has checked the claim against anything that resolved.
- *
- * **When nothing computed them** — which is every number in this build, because
- * the engine's route does not exist yet — the range is what whoever wrote the
- * number down said about how sure they were. Saying "across 2 000 versions of
- * this map" over a number nobody ran through a map would be the plainest kind
- * of lie this product can tell, so it says the other thing instead.
- *
- * The chip picks between them by one fact: whether the world it is drawing
- * reports how many versions were run. Nothing else changes when the engine
- * lands.
- */
-function modelNote(p: number, lo: number, hi: number, versions: number | undefined): Note {
-  if (versions === undefined) {
-    return {
-      label: "stated range · not computed",
-      sentence:
-        "This range is stated, not computed — it says how sure the elicitation was. " +
-        "Nothing has worked this number through the map yet.",
-    };
-  }
-  return {
-    label:
-      `model interval, uncalibrated · how sure we are of ${toTwoFigures(p)} — ` +
-      `not how much the world can move`,
-    sentence:
-      `Across ${inThousands(versions)} versions of this map — each one a set of numbers this ` +
-      `model would have stood behind — the answer landed between ${toTwoFigures(lo)} and ` +
-      `${toTwoFigures(hi)} eight times in ten. Nobody has checked whether that 8-in-10 holds ` +
-      `up; no claim on this map has resolved yet.`,
-  };
-}
-
-/** What the reader's own chip says about itself. */
-function userNote(p: number, lo: number, hi: number): Note {
-  return {
-    label: `your own number · ${toReading(p, lo, hi)}`,
-    sentence:
-      "This is the number you gave. It sits beside the model's and the market's and is " +
-      "never averaged with either of them.",
-  };
-}
-
-/** What a market chip says about itself. */
-function marketNote(lo: number, hi: number): Note {
-  return {
-    label: "market, as a venue is quoting it",
-    sentence:
-      `The likelihood is the middle of the best bid and the best offer; the range, ` +
-      `${toRange(lo, hi)}, is the spread between them. It is what somebody will trade this ` +
-      `claim at, not an opinion about it.`,
-  };
-}
-
-/** Work out the three lines a chip shows, and the note behind it. */
 function readChip(
-  owner: BeliefOwner,
-  slot: Known<Ranged>,
+  slot: Known<Likelihood>,
   standing: Standing | undefined,
-  versions: number | undefined,
 ): {
   reading: string;
-  under: string | null;
-  spoken: string;
-  note: Note;
+  alsoSaid: string | null;
   numeric: boolean;
   step: LikelihoodStep | null;
 } {
-  // A claim the reader has supposed true is true in every simulated world, so
-  // the chip shows the word rather than a number. Inventing one — .98, or 1.0 —
-  // would invite the reader to wonder about the other two per cent of a thing
-  // they themselves declared settled.
+  // A claim the reader has supposed true is true in every world the engine
+  // works through, so the chip shows the word rather than a number. Inventing
+  // one — .98, or 1.0 — would invite the reader to wonder about the other two
+  // per cent of a thing they themselves declared settled.
   if (standing !== undefined) {
-    return {
-      reading: standing.words,
-      under: null,
-      spoken: `${OWNER_WORDS[owner]}: ${standing.words}`,
-      note: { label: standing.words, sentence: standing.reason },
-      numeric: false,
-      step: null,
-    };
+    return { reading: standing.words, alsoSaid: null, numeric: false, step: null };
   }
 
   if (slot.reading === undefined) {
     const absence = slot.absence;
-    return {
-      reading: absence.words,
-      // The reader's own empty slot says what to do about it; every other
-      // absence keeps its sentence for the shelf, where there is room for it.
-      under: owner === "user" ? "add yours" : null,
-      spoken: `${OWNER_WORDS[owner]}: ${absence.words}. ${absence.reason}`,
-      note: { label: absence.words, sentence: absence.reason },
-      numeric: false,
-      step: null,
-    };
+    return { reading: absence.words, alsoSaid: absence.reason, numeric: false, step: null };
   }
 
-  const { p, lo, hi } = slot.reading;
-  const note =
-    owner === "model"
-      ? modelNote(p, lo, hi, versions)
-      : owner === "user"
-        ? userNote(p, lo, hi)
-        : marketNote(lo, hi);
-  return {
-    reading: toTwoFigures(p),
-    under: toRange(lo, hi),
-    spoken: `${OWNER_WORDS[owner]}: ${toReading(p, lo, hi)}`,
-    note,
-    numeric: true,
-    step: likelihoodStep(p),
-  };
+  const { p } = slot.reading;
+  return { reading: toTwoFigures(p), alsoSaid: null, numeric: true, step: likelihoodStep(p) };
 }
 
 /** What a belief chip needs to draw itself. */
@@ -414,41 +262,25 @@ export interface BeliefChipProps {
   /** Whose number this is. There are three, and they are never averaged. */
   readonly owner: BeliefOwner;
   /** The number, or the absence that stands where it would have been. */
-  readonly slot: Known<Ranged>;
+  readonly slot: Known<Likelihood>;
   /** A word shown instead of a likelihood, when the claim stands on the reader's say-so. */
   readonly standing?: Standing;
-  /**
-   * How many versions of the map were run to produce this number.
-   *
-   * Absent means nothing computed it, and the model chip then says so rather
-   * than describing a run that never happened.
-   */
-  readonly versions?: number;
 }
 
 /** One of the three belief chips on a tile. */
-export function BeliefChip({ owner, slot, standing, versions }: BeliefChipProps) {
-  const noteId = useId();
-  const [pinned, setPinned] = useState(false);
-  const { reading, under, spoken, note, numeric, step } = readChip(owner, slot, standing, versions);
+export function BeliefChip({ owner, slot, standing }: BeliefChipProps) {
+  const { reading, alsoSaid, numeric, step } = readChip(slot, standing);
 
   return (
     <span className="belief-chip" data-owner={owner} data-reading={numeric ? "number" : "words"}>
-      {/* The face of the chip is the thing you can reach, so that looking at it
-          with a pointer and arriving at it with the keyboard do the same thing.
-          Pressing it pins the note open, for a reader who wants both hands free
-          while they read it; pressing again puts it away. It is named by the
-          whole reading — the number and its range together — because that is how
-          the chip would be said out loud, and the range is never left off. */}
-      <button
-        className="belief-chip__face"
-        type="button"
-        aria-label={spoken}
-        aria-describedby={noteId}
-        aria-controls={noteId}
-        aria-expanded={pinned}
-        onClick={() => setPinned((was) => !was)}
-      >
+      {/* **Two lines and nothing to press** *(2026-09-22, R48)*. The face was a
+          button, because pressing it pinned open a shelf explaining the range
+          under the number; with the range gone there is nothing behind the chip
+          to open, and a control that does nothing is worse than no control.
+          **And it needs no accessible name written onto it**: what it is called
+          is what it reads — the owner, then the number — so the two lines below
+          say it themselves and cannot drift from what is on the glass. */}
+      <span className="belief-chip__face">
         <span className="belief-chip__owner">{OWNER_WORDS[owner]}</span>
         <span className="belief-chip__reading">
           {/* The bounded bar the likelihood rides on: one of five brightnesses,
@@ -464,11 +296,10 @@ export function BeliefChip({ owner, slot, standing, versions }: BeliefChipProps)
           )}
           <span className="belief-chip__figure">{reading}</span>
         </span>
-        <span className="belief-chip__under">{under ?? ""}</span>
-      </button>
-      <span className="belief-chip__note" id={noteId} data-pinned={pinned ? "yes" : "no"}>
-        <span className="belief-chip__note-label">{note.label}</span>
-        <span className="belief-chip__note-sentence">{note.sentence}</span>
+        {/* Why there is no number, for a reader who hears the chip rather than
+            seeing it. On the glass it is read in the panel beside the map, where
+            a reason has room to be a sentence. */}
+        {alsoSaid === null ? null : <span className="belief-chip__hidden">{alsoSaid}</span>}
       </span>
     </span>
   );

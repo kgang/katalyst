@@ -184,9 +184,9 @@ describe("how tall a tile is", () => {
     return aClaim({
       claim: text,
       beliefs: {
-        model: { reading: { p: 0.35, lo: 0.22, hi: 0.5 } },
+        model: { reading: { p: 0.35 } },
         user: { absence: absence("not_said", "You have not said.") },
-        market: { reading: { p: 0.48, lo: 0.45, hi: 0.52 } },
+        market: { reading: { p: 0.48 } },
       },
       ...extra,
     });

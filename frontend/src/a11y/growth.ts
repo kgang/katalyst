@@ -95,9 +95,9 @@ export function whatChanged(was: Growth, now: Growth): string {
   }
 
   // The likelihoods landing: one event, one world, every number. It is the
-  // engine's own world arriving that says so — a growing map has no count of
-  // versions on it, because nothing has been run through it yet.
-  if (was.world.versions === undefined && now.world.versions !== undefined) {
+  // engine's own world arriving that says so — a growing map is not marked as
+  // worked out, because nothing has been worked through it yet.
+  if (was.world.workedOut !== true && now.world.workedOut === true) {
     return (
       "Every likelihood has been worked out, through the whole finished map, at once. Every " +
       "claim on the map now carries a number."

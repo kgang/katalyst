@@ -533,27 +533,21 @@
   border-left: none;
 }
 
-/* One belief, said the way it would be read out loud: the owner, the number,
- * the range. **One wrapping line, not three columns and not two rows** — the
- * range stays beside its number wherever it fits and drops under it where it
- * does not. Nothing counts anything; the browser wraps when the words run out
- * of room.
+/* One belief, said the way it would be read out loud: the owner, then the
+ * number. **One wrapping line, not two columns and not two rows.** Nothing
+ * counts anything; the browser wraps when the words run out of room.
  *
- * **Why it has to be allowed to wrap.** Every word out here is set at
- * twenty-two pixels and may not be set smaller: half zoom is as far out as the
- * map goes, and twenty-two pixels there is the eleven the product promises. The
- * longest line the engine can print — the owner *market*, a three-figure
- * likelihood and a three-figure range, which the stored example's strike branch
- * really does print — comes to 281 pixels against the 256 a belief row has, and
- * 244 on the two tiles whose outline cuts into one side. It cannot be made to
- * fit on one line, and a range is never dropped and never cut off. So it is
- * given a line. (Measured at the furthest zoom on 2026-09-22: on that branch
- * the hypothesis lost 23 pixels of its range off the right of its row and
- * Lloyd's lost 11.)
+ * **The range used to live on this line and is gone** *(2026-09-22, R48)*. It
+ * was the reason the line had to be allowed to wrap at all: the owner *market*,
+ * a three-figure likelihood and a three-figure range came to 281 pixels against
+ * the 256 a belief row has, so the range dropped under its number. An owner and
+ * a number fit on one line on every tile now, and the wrap is left in place for
+ * the other thing that can overrun it — a reading that is words, such as *the
+ * ask did not come back*.
  *
- * **The wrapped range lines up with the number, not with the owner**, so it
- * reads as the rest of that belief rather than as a belief of its own. That is
- * the padding below, with the same distance taken back off the owner: the owner
+ * **A wrapped line lines up with the number, not with the owner**, so it reads
+ * as the rest of that belief rather than as a belief of its own. That is the
+ * padding below, with the same distance taken back off the owner: the owner
  * hangs out into it on the first line, and every line after the first starts
  * where the number starts. */
 .tile[data-detail="summary"] .belief-chip__face {
@@ -575,8 +569,9 @@
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: var(--space-1);
-  /* The two lines of one belief are held together by their line height alone;
-   * the gap that separates one belief from the next is on the row above. */
+  /* Where one belief does run to two lines, they are held together by their
+   * line height alone; the gap that separates one belief from the next is on
+   * the row above. */
   row-gap: 0;
   width: 100%;
   padding-left: calc(var(--far-owner) + var(--space-1));
@@ -606,24 +601,19 @@
  * it.** The bar carries no text, so the browser had nothing to take a baseline
  * from and used the bar's bottom edge — and a four-pixel bar centred in a
  * twenty-two-pixel line sits about five pixels above where the words sit, so
- * the owner, the number and the range were lined up on the bar and the whole
- * line was pushed five pixels down the tile for nothing. Saying that the number
- * is the thing with a baseline puts those five pixels back, a line, and leaves
- * the bar where it was drawn. */
+ * the owner and the number were lined up on the bar and the whole line was
+ * pushed five pixels down the tile for nothing. Saying that the number is the
+ * thing with a baseline puts those five pixels back, a line, and leaves the bar
+ * where it was drawn. */
 .tile[data-detail="summary"] .belief-chip__figure {
   align-self: baseline;
 }
 
-.tile[data-detail="summary"] .belief-chip__under {
-  flex: none;
-}
-
 .tile[data-detail="summary"] .belief-chip__owner,
-.tile[data-detail="summary"] .belief-chip__reading,
-.tile[data-detail="summary"] .belief-chip__under {
+.tile[data-detail="summary"] .belief-chip__reading {
   font-size: var(--text-lg);
   /* Tighter than the 1.25 the near form sets. The tile's box was reserved from
-   * the near form and never grows, so the room a wrapped range needs has to
+   * the near form and never grows, so the room a wrapped reading needs has to
    * come from somewhere inside it: this is two and a half pixels a line of it,
    * and the step above the row is the rest. */
   line-height: 1.15;
@@ -632,10 +622,9 @@
 
 /* A reading that is words rather than a number — *no engine yet*, *Supposed ·
  * Oct 2* — takes the rest of the line and wraps inside it, instead of starting
- * a line of its own. It costs nothing: a chip showing words has no range under
- * it, so the line it would have taken is free. Last of these rules, because it
- * is the narrowest: a rule that names more than the one before it and is
- * written above it may never get its turn. */
+ * a line of its own. Last of these rules, because it is the narrowest: a rule
+ * that names more than the one before it and is written above it may never get
+ * its turn. */
 .tile[data-detail="summary"] .belief-chip[data-reading="words"] .belief-chip__reading {
   flex: 1 1 0;
 }

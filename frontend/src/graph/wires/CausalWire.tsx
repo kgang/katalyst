@@ -38,7 +38,7 @@ import {
   getSmoothStepPath,
 } from "@xyflow/react";
 import { OriginMark } from "../../components/OriginMark";
-import type { Known, LinkMode, LinkShape, Provenance, Ranged } from "../../world";
+import type { Known, Likelihood, LinkMode, LinkShape, Provenance } from "../../world";
 import type { TileDetail } from "../geometry";
 import { strokeFor, widthFor } from "./encodings";
 import { MARK_STANDOFF } from "./plates";
@@ -68,7 +68,7 @@ export interface WireData extends Record<string, unknown> {
   /** Where the arrow and its number came from. The mark at the tail. */
   readonly provenance: Provenance;
   /** The likelihood with this arrow's cause supposed true. Absent in this build. */
-  readonly conditional: Known<Ranged>;
+  readonly conditional: Known<Likelihood>;
   /** How this wire gets from one end to the other, worked out from the layout. */
   readonly plan?: RoutePlan;
   /** True when the hover lens has put this wire off the path. */

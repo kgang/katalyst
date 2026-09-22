@@ -265,7 +265,7 @@ export function standingByClaim(
     const badge = supposed(edit.at, edit.value);
     standing.set(edit.target, {
       words: badge.words,
-      reason: `${badge.reason} While a claim is supposed it is true in every version of the map, so there is no likelihood to show.`,
+      reason: `${badge.reason} While a claim is supposed it is true wherever the engine looks, so there is no likelihood to show.`,
     });
   }
   return standing;
