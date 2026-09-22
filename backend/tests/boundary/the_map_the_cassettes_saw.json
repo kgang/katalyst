@@ -1,0 +1,382 @@
+{
+  "id": "hormuz",
+  "propositions": [
+    {
+      "id": "H",
+      "claim": "The Strait of Hormuz reopens to unrestricted commercial transit.",
+      "kind": "hypothesis",
+      "resolution": {
+        "criteria": "At least 14 consecutive days of unrestricted commercial transit through the Strait of Hormuz.",
+        "source": "Lloyd's List transit counts.",
+        "by": "2026-11-01"
+      },
+      "prior": {
+        "p": 0.35,
+        "lo": 0.22,
+        "hi": 0.5,
+        "owner": "model"
+      },
+      "beliefs": {
+        "model": {
+          "p": 0.35,
+          "lo": 0.22,
+          "hi": 0.5,
+          "owner": "model"
+        },
+        "user": {
+          "p": 0.55,
+          "lo": 0.4,
+          "hi": 0.7,
+          "owner": "user"
+        },
+        "market": null
+      },
+      "base_rate": {
+        "reference_class": "Closure or disruption episodes in the Strait of Hormuz since 1980 that ended within 90 days.",
+        "k": 7,
+        "n": 9,
+        "sources": []
+      },
+      "evidence": [
+        {
+          "claim": "An Omani-mediated round is reported, with both sides attending.",
+          "url": "https://www.bbc.com/news/world/middle_east",
+          "direction": 1,
+          "weight": 0.3
+        },
+        {
+          "claim": "Three tankers remain held and no release has been announced.",
+          "url": "https://www.lloydslist.com/",
+          "direction": -1,
+          "weight": 0.4
+        }
+      ],
+      "payoff": null,
+      "not_tradeable_reason": null,
+      "persistence": "event"
+    },
+    {
+      "id": "C",
+      "claim": "Lloyd's war-risk insurance premium for Gulf transits falls below 0.4%.",
+      "kind": "event",
+      "resolution": {
+        "criteria": "The quoted war-risk premium for a Gulf transit, as a percentage of hull value, prints below 0.40% on any day in the window.",
+        "source": "Lloyd's List war-risk rate reporting.",
+        "by": "2026-10-31"
+      },
+      "prior": {
+        "p": 0.3,
+        "lo": 0.18,
+        "hi": 0.45,
+        "owner": "model"
+      },
+      "beliefs": {
+        "model": {
+          "p": 0.3,
+          "lo": 0.18,
+          "hi": 0.45,
+          "owner": "model"
+        },
+        "user": null,
+        "market": null
+      },
+      "base_rate": null,
+      "evidence": [],
+      "payoff": null,
+      "not_tradeable_reason": null,
+      "persistence": "event"
+    },
+    {
+      "id": "B",
+      "claim": "Brent crude settles below $68 for five sessions.",
+      "kind": "event",
+      "resolution": {
+        "criteria": "Front-month Brent crude futures settle below $68.00 on five sessions, consecutive or not, within the window.",
+        "source": "ICE Brent front-month settlement prices.",
+        "by": "2026-10-15"
+      },
+      "prior": {
+        "p": 0.28,
+        "lo": 0.15,
+        "hi": 0.42,
+        "owner": "model"
+      },
+      "beliefs": {
+        "model": {
+          "p": 0.28,
+          "lo": 0.15,
+          "hi": 0.42,
+          "owner": "model"
+        },
+        "user": null,
+        "market": null
+      },
+      "base_rate": null,
+      "evidence": [],
+      "payoff": null,
+      "not_tradeable_reason": null,
+      "persistence": "event"
+    },
+    {
+      "id": "R",
+      "claim": "OPEC+ announces output restraint.",
+      "kind": "event",
+      "resolution": {
+        "criteria": "OPEC+ publishes a communiqué announcing a production cut, or an extension of existing cuts, of at least 500,000 barrels a day.",
+        "source": "The OPEC secretariat's published communiqué.",
+        "by": "2026-11-30"
+      },
+      "prior": {
+        "p": 0.18,
+        "lo": 0.08,
+        "hi": 0.32,
+        "owner": "model"
+      },
+      "beliefs": {
+        "model": {
+          "p": 0.18,
+          "lo": 0.08,
+          "hi": 0.32,
+          "owner": "model"
+        },
+        "user": null,
+        "market": null
+      },
+      "base_rate": null,
+      "evidence": [],
+      "payoff": null,
+      "not_tradeable_reason": null,
+      "persistence": "event"
+    },
+    {
+      "id": "M1",
+      "claim": "A Polymarket contract \"Brent below $70 on 2026-10-31\" resolves YES.",
+      "kind": "market",
+      "resolution": {
+        "criteria": "The contract's published resolution is YES.",
+        "source": "Polymarket's own resolution of the contract.",
+        "by": "2026-10-31"
+      },
+      "prior": {
+        "p": 0.4,
+        "lo": 0.28,
+        "hi": 0.55,
+        "owner": "model"
+      },
+      "beliefs": {
+        "model": {
+          "p": 0.4,
+          "lo": 0.28,
+          "hi": 0.55,
+          "owner": "model"
+        },
+        "user": null,
+        "market": {
+          "p": 0.48,
+          "lo": 0.45,
+          "hi": 0.52,
+          "owner": "market"
+        }
+      },
+      "base_rate": null,
+      "evidence": [],
+      "payoff": {
+        "kind": "contract",
+        "venue": "Polymarket",
+        "contract_id": "brent-below-70-2026-10-31",
+        "title": "Brent below $70 on 2026-10-31",
+        "side": "yes"
+      },
+      "not_tradeable_reason": null,
+      "persistence": "event"
+    },
+    {
+      "id": "M2",
+      "claim": "The energy fund XLE underperforms the S&P 500 fund SPY by more than 3% over 20 trading days.",
+      "kind": "market",
+      "resolution": {
+        "criteria": "XLE's total return minus SPY's total return, over the 20 trading days ending on the resolve-by date, is below -3.0%.",
+        "source": "Published closing prices and distributions for XLE and SPY.",
+        "by": "2026-11-15"
+      },
+      "prior": {
+        "p": 0.35,
+        "lo": 0.22,
+        "hi": 0.5,
+        "owner": "model"
+      },
+      "beliefs": {
+        "model": {
+          "p": 0.35,
+          "lo": 0.22,
+          "hi": 0.5,
+          "owner": "model"
+        },
+        "user": null,
+        "market": null
+      },
+      "base_rate": null,
+      "evidence": [],
+      "payoff": {
+        "kind": "price",
+        "instrument": "XLE vs SPY",
+        "direction": "short",
+        "move": 0.03
+      },
+      "not_tradeable_reason": null,
+      "persistence": "event"
+    },
+    {
+      "id": "N1",
+      "claim": "Omani-mediated United States-Iran talks resume publicly.",
+      "kind": "not_tradeable",
+      "resolution": {
+        "criteria": "Both governments confirm, on the record, that a mediated round has taken place in Oman.",
+        "source": "The Omani foreign ministry's statement, confirmed by both governments.",
+        "by": "2026-11-30"
+      },
+      "prior": {
+        "p": 0.22,
+        "lo": 0.12,
+        "hi": 0.36,
+        "owner": "model"
+      },
+      "beliefs": {
+        "model": {
+          "p": 0.22,
+          "lo": 0.12,
+          "hi": 0.36,
+          "owner": "model"
+        },
+        "user": null,
+        "market": null
+      },
+      "base_rate": null,
+      "evidence": [],
+      "payoff": null,
+      "not_tradeable_reason": "No venue quotes a contract on a diplomatic round, and the nearest traded proxies are sanctioned Iranian assets that cannot be bought at all, so there is nothing to price this with.",
+      "persistence": "event"
+    }
+  ],
+  "links": [
+    {
+      "id": "H->B",
+      "source": "H",
+      "target": "B",
+      "mode": "trigger",
+      "strength": 1.6,
+      "lag": 2.0,
+      "shape": "impulse",
+      "half_life": 30.0,
+      "rationale": "The war-risk premium priced into crude unwinds once transit data confirms the lane is open. It is a one-time repricing, not a standing discount.",
+      "sources": [
+        {
+          "url": "https://www.eia.gov/todayinenergy/detail.php?id=4430",
+          "title": "The Strait of Hormuz is the world's most important oil transit chokepoint",
+          "retrieved": null
+        }
+      ],
+      "provenance": "argued",
+      "reflexive": false
+    },
+    {
+      "id": "H->C",
+      "source": "H",
+      "target": "C",
+      "mode": "sustain",
+      "strength": 1.1,
+      "lag": 0.0,
+      "shape": "step",
+      "half_life": null,
+      "rationale": "Underwriters reprice Gulf hulls only while the lane actually stays open. The low rate is held up by the openness, not caused once by it.",
+      "sources": [],
+      "provenance": "argued",
+      "reflexive": false
+    },
+    {
+      "id": "H->N1",
+      "source": "H",
+      "target": "N1",
+      "mode": "trigger",
+      "strength": 0.7,
+      "lag": 10.0,
+      "shape": "ramp",
+      "half_life": null,
+      "rationale": "A lane that stays open is the confidence-building step mediators point to, so a public round becomes easier to announce. Which way this runs is arguable: quiet talks may be what reopened the lane in the first place.",
+      "sources": [],
+      "provenance": "asserted",
+      "reflexive": false
+    },
+    {
+      "id": "C->B",
+      "source": "C",
+      "target": "B",
+      "mode": "sustain",
+      "strength": 0.7,
+      "lag": 7.0,
+      "shape": "step",
+      "half_life": null,
+      "rationale": "Lower war-risk premiums cut the delivered cost of a Gulf cargo, and the saving shows up in the physical differential within about a week.",
+      "sources": [],
+      "provenance": "argued",
+      "reflexive": false
+    },
+    {
+      "id": "B->M1",
+      "source": "B",
+      "target": "M1",
+      "mode": "trigger",
+      "strength": 0.9,
+      "lag": 1.0,
+      "shape": "impulse",
+      "half_life": 30.0,
+      "rationale": "The contract is written on almost the same thing the claim measures, so a run of settlements below $68 reprices it within a day.",
+      "sources": [],
+      "provenance": "argued",
+      "reflexive": false
+    },
+    {
+      "id": "B->M2",
+      "source": "B",
+      "target": "M2",
+      "mode": "trigger",
+      "strength": 0.8,
+      "lag": 3.0,
+      "shape": "ramp",
+      "half_life": null,
+      "rationale": "Energy earnings track the crude price with a lag, and the shares grind toward the new level over days rather than repricing in one session.",
+      "sources": [],
+      "provenance": "argued",
+      "reflexive": false
+    },
+    {
+      "id": "B->R",
+      "source": "B",
+      "target": "R",
+      "mode": "trigger",
+      "strength": 0.6,
+      "lag": 14.0,
+      "shape": "ramp",
+      "half_life": null,
+      "rationale": "A sustained run of sub-$68 settlements pressures OPEC+ revenue targets and brings forward a restraint announcement.",
+      "sources": [],
+      "provenance": "argued",
+      "reflexive": true
+    },
+    {
+      "id": "R->B",
+      "source": "R",
+      "target": "B",
+      "mode": "trigger",
+      "strength": -1.2,
+      "lag": 5.0,
+      "shape": "step",
+      "half_life": null,
+      "rationale": "Announced restraint tightens expected supply and props the price back above the threshold.",
+      "sources": [],
+      "provenance": "argued",
+      "reflexive": false
+    }
+  ],
+  "hypothesis_id": "H"
+}
