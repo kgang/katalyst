@@ -1757,3 +1757,44 @@ Suite: `1153 passed, 4 xfailed in 195.17s`, `thesis` 100%. PR body updated.
 <status>completed</status>
 <summary>Background command "Wait for checks and squash-merge the position-route PR #63" completed (exit code 0)</summary>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a6857c7f5b34cbfd4</task-id>
+<tool-use-id>toolu_014B8b9cesPGGQ9aUYRf9bia</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kentgang-git3-katalyst/c26da87e-e96d-4928-aff7-305a5e5b9f83/tasks/a6857c7f5b34cbfd4.output</output-file>
+<status>completed</status>
+<summary>Agent "Freeze Z1: model-side shapes" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>**Run, in order:** from `backend/`: `uv run ruff check . &amp;&amp; uv run ruff format --check .`; `uv run mypy --strict src/katalyst/{domain,grounding,thesis}`; `uv run mypy src`; `uv run pytest tests/unit tests/oracles tests/grounding tests/api -q`; then `make numbers-check` and `make types`. All green here (364 owned + 315 engine + 125 grounding/api). Diff: `plans/analysis/2026-09-22-freeze-numbers-diff.md`.
+
+**The shapes — final on disk ~40 min in, and noted for Z2 in `plans/notes/2026-09-22-freeze-shapes-Z1.md`:**
+1. `Link.chance_with_this_cause: float | None` — R6's chance, by the target's own deadline.
+2. `Link.chance_it_stops: float | None` — R26's chance, only into a `state`.
+3. **Two fields, exactly one set**, not one field with two meanings: on a state `.70` is unreadable either way, and the fixture's ending arrow is `.95`, so size cannot tell them apart. Gives up: the model can answer neither/both, refused by name.
+4. `Link.strength` deleted; `rates.stated_chance_with`, `_log_odds`, `_push_as_written`, `LOUD_STRENGTH` deleted.
+5. `Proposition.kind`: `hypothesis · step · market · not_tradeable`.
+6. `persistence` required, unchanged.
+7. `Source.quote` + `Source.role` (`SourceRole`), both required.
+8. Payoff `kind` required (2f0845a cherry-picked by hand).
+9. `Retune.strength` → `Retune.chance`.
+10. Five codes: `sustain_without_state`, `arrow_without_one_chance`, `chance_out_of_range`, `stops_without_a_state`, `lowers_without_ending` — one test each, incl. `test_a_sustain_arrow_must_leave_a_state`.
+
+**The conversion:** odds of the target's own chance × *e*^(old push), back to a chance, rounded to two significant figures; for an ending, `1 − that / own`. Assumed the old number was read on a day the push had reached full size — the bridge's own arithmetic. Working beside every arrow; script at `plans/analysis/scripts/stack-05-freeze/convert_the_fixture.py`. 29 of 37 readings moved, largest `+.00482`.
+
+**Z2:** nothing broken — they had already landed `chance_with_this_cause`, `SourceDraft.quote/role` and `grounding.py`. **Their `LinkDraft` still has one field; it must split** (note explains).
+
+**Outside my list, minimally, reported not hidden:** `domain/{propagation,intervention,patch,diff,belief}.py`, `engine/worked_numbers.py`, `tests/{thesis,grounding}` — all mechanical follow-through; ADR 0013's amendment.
+
+**Pre-existing red, not mine:** 5 `tests/thesis` tests assert `model.lo &lt; model.hi`; the flip made every belief a point (R48/0028). `tests/boundary` (9) await re-recording.
+
+**Commits:**
+- `feat(domain): an arrow states one plain chance, and an ending arrow the chance it stops` — `domain/{link,proposition,rates,forward,validity,propagation,intervention,patch,diff,belief,__init__}.py`
+- `test(domain): every test moved to the new fields, one per new rule` — `tests/**`
+- `feat(fixtures): the Hormuz arrows converted by hand, with the arithmetic beside each` — `fixtures/hormuz.py`, `engine/worked_numbers.py`, `docs/worked-numbers.txt`
+- `spec: an arrow's one number, the two composition paragraphs' rule, the five new rules` — `spec/**`
+- `adr: dated amendments on 0006, 0017 and 0013 for the one shape freeze` — `docs/adr/**`
+- `chore: regenerate the browser's types` — `frontend/src/api/schema.ts`</result>
+<usage><subagent_tokens>519000</subagent_tokens><tool_uses>270</tool_uses><duration_ms>3591811</duration_ms></usage>
+</task-notification>
