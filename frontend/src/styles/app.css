@@ -183,7 +183,13 @@ body {
  * It takes the room its own words need and no more, so the provenance beside it
  * gets the rest of the row. */
 .map-status {
-  flex: 0 1 auto;
+  /* **It takes what it needs and never gives way.** Left to shrink beside the
+     provenance it was cut after thirty characters at 1600: the provenance's
+     natural width is a sentence of three hundred, so shrinking the two in
+     proportion hands it nearly everything. The cap is on the sentence below
+     rather than here, so that it is a count of characters the reader gets and
+     not of characters minus the width of a label. */
+  flex: 0 0 auto;
   display: flex;
   align-items: baseline;
   gap: var(--space-1);
@@ -212,6 +218,11 @@ body {
  * that takes three, and the quiet row becomes the tallest thing at the foot for
  * the most transient thing on it. The words that matter are the first ones. */
 .map-status__said {
+  /* Forty-six characters, which is the longest thing this line says whole —
+     *the panel is away · press P to bring it back*. Past that it is cut, because
+     past that the words are detail and the provenance beside it is a sentence
+     three hundred characters long that has to fit on the same row. */
+  max-width: 46ch;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
